@@ -33,8 +33,12 @@ use crate::parser::{
     // Import/Export
     ImportDeclaration, ImportClause, NamespaceImport, NamedImports, ImportSpecifier,
     ExportDeclaration, NamedExports, ExportSpecifier, ExportAssignment,
+    // Types
+    TypeReference, ArrayType, TupleType, UnionType, IntersectionType,
+    FunctionType, TypeLiteral, ParenthesizedType, TypeParameterDeclaration,
+    LiteralType,
     // Misc
-    SourceFile, HeritageClause,
+    SourceFile, HeritageClause, ParameterDeclaration,
 };
 
 // =============================================================================
@@ -2346,10 +2350,283 @@ impl ParserState {
         list
     }
 
-    /// Parse a type (simplified - just create an identifier for now).
+    // =========================================================================
+    // Type Parsing
+    // =========================================================================
+
+    /// Parse a type.
     fn parse_type(&mut self) -> NodeIndex {
-        // For now, just parse an identifier as a type reference
+        self.parse_union_or_intersection_type()
+    }
+
+    /// Parse a union or intersection type (A | B or A & B).
+    fn parse_union_or_intersection_type(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        // Check for leading | or &
+        let is_union = self.is_token(SyntaxKind::BarToken);
+        let is_intersection = self.is_token(SyntaxKind::AmpersandToken);
+
+        if is_union {
+            self.next_token();
+        } else if is_intersection {
+            self.next_token();
+        }
+
+        let first_type = self.parse_intersection_or_primary_type();
+
+        // Check for | or &
+        if self.is_token(SyntaxKind::BarToken) {
+            // Union type
+            let mut types = NodeList::new();
+            types.push(first_type);
+
+            while self.parse_optional(SyntaxKind::BarToken) {
+                types.push(self.parse_intersection_or_primary_type());
+            }
+
+            let end = self.get_token_start();
+            let union = UnionType {
+                base: NodeBase::new_ext(syntax_kind_ext::UNION_TYPE, pos, end),
+                types,
+            };
+            self.alloc_node(Node::UnionType(union))
+        } else if self.is_token(SyntaxKind::AmpersandToken) {
+            // Intersection type
+            let mut types = NodeList::new();
+            types.push(first_type);
+
+            while self.parse_optional(SyntaxKind::AmpersandToken) {
+                types.push(self.parse_primary_type());
+            }
+
+            let end = self.get_token_start();
+            let intersection = IntersectionType {
+                base: NodeBase::new_ext(syntax_kind_ext::INTERSECTION_TYPE, pos, end),
+                types,
+            };
+            self.alloc_node(Node::IntersectionType(intersection))
+        } else {
+            first_type
+        }
+    }
+
+    /// Parse intersection or primary type (handles & parsing).
+    fn parse_intersection_or_primary_type(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let first_type = self.parse_primary_type();
+
+        if self.is_token(SyntaxKind::AmpersandToken) {
+            let mut types = NodeList::new();
+            types.push(first_type);
+
+            while self.parse_optional(SyntaxKind::AmpersandToken) {
+                types.push(self.parse_primary_type());
+            }
+
+            let end = self.get_token_start();
+            let intersection = IntersectionType {
+                base: NodeBase::new_ext(syntax_kind_ext::INTERSECTION_TYPE, pos, end),
+                types,
+            };
+            self.alloc_node(Node::IntersectionType(intersection))
+        } else {
+            first_type
+        }
+    }
+
+    /// Parse a primary type (the base types before postfix operators).
+    fn parse_primary_type(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        match self.token() {
+            // Parenthesized type
+            SyntaxKind::OpenParenToken => {
+                self.next_token();
+                let type_node = self.parse_type();
+                self.parse_expected(SyntaxKind::CloseParenToken);
+
+                let end = self.get_token_start();
+                let paren = ParenthesizedType {
+                    base: NodeBase::new_ext(syntax_kind_ext::PARENTHESIZED_TYPE, pos, end),
+                    type_node,
+                };
+                let node_idx = self.alloc_node(Node::ParenthesizedType(paren));
+                self.parse_type_postfix(node_idx)
+            }
+
+            // Tuple type
+            SyntaxKind::OpenBracketToken => {
+                self.next_token();
+                let elements = self.parse_delimited_list(
+                    SyntaxKind::CloseBracketToken,
+                    |p| p.is_type_start(),
+                    |p| p.parse_type(),
+                );
+                self.parse_expected(SyntaxKind::CloseBracketToken);
+
+                let end = self.get_token_start();
+                let tuple = TupleType {
+                    base: NodeBase::new_ext(syntax_kind_ext::TUPLE_TYPE, pos, end),
+                    elements,
+                };
+                let node_idx = self.alloc_node(Node::TupleType(tuple));
+                self.parse_type_postfix(node_idx)
+            }
+
+            // Object type / type literal
+            SyntaxKind::OpenBraceToken => {
+                self.next_token();
+                let members = self.parse_type_members();
+                self.parse_expected(SyntaxKind::CloseBraceToken);
+
+                let end = self.get_token_start();
+                let type_literal = TypeLiteral {
+                    base: NodeBase::new_ext(syntax_kind_ext::TYPE_LITERAL, pos, end),
+                    members,
+                };
+                let node_idx = self.alloc_node(Node::TypeLiteral(type_literal));
+                self.parse_type_postfix(node_idx)
+            }
+
+            // String/number/boolean literals as types
+            SyntaxKind::StringLiteral => {
+                let literal = self.parse_string_literal();
+                let end = self.get_token_start();
+                let lit_type = LiteralType {
+                    base: NodeBase::new_ext(syntax_kind_ext::LITERAL_TYPE, pos, end),
+                    literal,
+                };
+                let node_idx = self.alloc_node(Node::LiteralType(lit_type));
+                self.parse_type_postfix(node_idx)
+            }
+
+            SyntaxKind::NumericLiteral => {
+                let literal = self.parse_numeric_literal();
+                let end = self.get_token_start();
+                let lit_type = LiteralType {
+                    base: NodeBase::new_ext(syntax_kind_ext::LITERAL_TYPE, pos, end),
+                    literal,
+                };
+                let node_idx = self.alloc_node(Node::LiteralType(lit_type));
+                self.parse_type_postfix(node_idx)
+            }
+
+            SyntaxKind::TrueKeyword | SyntaxKind::FalseKeyword => {
+                let literal = self.parse_identifier();
+                let end = self.get_token_start();
+                let lit_type = LiteralType {
+                    base: NodeBase::new_ext(syntax_kind_ext::LITERAL_TYPE, pos, end),
+                    literal,
+                };
+                let node_idx = self.alloc_node(Node::LiteralType(lit_type));
+                self.parse_type_postfix(node_idx)
+            }
+
+            // Type reference (identifier, possibly with type arguments)
+            _ => {
+                let type_name = self.parse_type_name();
+                let type_arguments = if self.is_token(SyntaxKind::LessThanToken) {
+                    Some(self.parse_type_arguments())
+                } else {
+                    None
+                };
+
+                let end = self.get_token_start();
+                let type_ref = TypeReference {
+                    base: NodeBase::new_ext(syntax_kind_ext::TYPE_REFERENCE, pos, end),
+                    type_name,
+                    type_arguments,
+                };
+                let node_idx = self.alloc_node(Node::TypeReference(type_ref));
+                self.parse_type_postfix(node_idx)
+            }
+        }
+    }
+
+    /// Parse type postfix operators ([], [key], etc).
+    fn parse_type_postfix(&mut self, mut type_node: NodeIndex) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        while !self.at_end() {
+            if self.is_token(SyntaxKind::OpenBracketToken) {
+                self.next_token();
+
+                if self.is_token(SyntaxKind::CloseBracketToken) {
+                    // Array type: T[]
+                    self.next_token();
+                    let end = self.get_token_start();
+                    let array_type = ArrayType {
+                        base: NodeBase::new_ext(syntax_kind_ext::ARRAY_TYPE, pos, end),
+                        element_type: type_node,
+                    };
+                    type_node = self.alloc_node(Node::ArrayType(array_type));
+                } else {
+                    // Just consume as T[], don't handle indexed access for now
+                    self.parse_type();
+                    self.parse_expected(SyntaxKind::CloseBracketToken);
+                    // Return as-is for now
+                }
+            } else {
+                break;
+            }
+        }
+
+        type_node
+    }
+
+    /// Parse a type name (identifier or qualified name).
+    fn parse_type_name(&mut self) -> NodeIndex {
+        // For now, just parse an identifier
         self.parse_identifier()
+    }
+
+    /// Parse type arguments (<T, U>).
+    fn parse_type_arguments(&mut self) -> NodeList {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::LessThanToken);
+
+        let mut args = NodeList::new();
+        loop {
+            args.push(self.parse_type());
+            if !self.parse_optional(SyntaxKind::CommaToken) {
+                break;
+            }
+        }
+
+        self.parse_expected(SyntaxKind::GreaterThanToken);
+
+        let end = self.get_token_start();
+        args.pos = pos;
+        args.end = end;
+        args
+    }
+
+    /// Check if current token starts a type.
+    fn is_type_start(&self) -> bool {
+        match self.token() {
+            SyntaxKind::Identifier
+            | SyntaxKind::StringLiteral
+            | SyntaxKind::NumericLiteral
+            | SyntaxKind::TrueKeyword
+            | SyntaxKind::FalseKeyword
+            | SyntaxKind::OpenParenToken
+            | SyntaxKind::OpenBracketToken
+            | SyntaxKind::OpenBraceToken
+            | SyntaxKind::VoidKeyword
+            | SyntaxKind::NullKeyword
+            | SyntaxKind::UndefinedKeyword
+            | SyntaxKind::NeverKeyword
+            | SyntaxKind::AnyKeyword
+            | SyntaxKind::UnknownKeyword
+            | SyntaxKind::ObjectKeyword
+            | SyntaxKind::StringKeyword
+            | SyntaxKind::NumberKeyword
+            | SyntaxKind::BigIntKeyword
+            | SyntaxKind::BooleanKeyword
+            | SyntaxKind::SymbolKeyword => true,
+            _ => false,
+        }
     }
 }
 
