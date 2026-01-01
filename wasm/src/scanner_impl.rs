@@ -43,8 +43,19 @@ pub enum TokenFlags {
 // Scanner State
 // =============================================================================
 
+/// A snapshot of scanner state for look-ahead.
+#[derive(Clone)]
+pub struct ScannerSnapshot {
+    pub pos: usize,
+    pub full_start_pos: usize,
+    pub token_start: usize,
+    pub token: SyntaxKind,
+    pub token_value: String,
+    pub token_flags: u32,
+}
+
 /// The scanner state that holds the current position and token information.
-/// 
+///
 /// All positions (pos, end, token_start, full_start_pos) are CHARACTER indices,
 /// not byte indices. This matches TypeScript/JavaScript string indexing.
 #[wasm_bindgen]
@@ -1238,6 +1249,34 @@ impl ScannerState {
                 }
             }
         }
+    }
+}
+
+// =============================================================================
+// Non-wasm methods for internal use
+// =============================================================================
+
+impl ScannerState {
+    /// Save the current scanner state for look-ahead.
+    pub fn save_state(&self) -> ScannerSnapshot {
+        ScannerSnapshot {
+            pos: self.pos,
+            full_start_pos: self.full_start_pos,
+            token_start: self.token_start,
+            token: self.token,
+            token_value: self.token_value.clone(),
+            token_flags: self.token_flags,
+        }
+    }
+
+    /// Restore a saved scanner state.
+    pub fn restore_state(&mut self, snapshot: ScannerSnapshot) {
+        self.pos = snapshot.pos;
+        self.full_start_pos = snapshot.full_start_pos;
+        self.token_start = snapshot.token_start;
+        self.token = snapshot.token;
+        self.token_value = snapshot.token_value;
+        self.token_flags = snapshot.token_flags;
     }
 }
 

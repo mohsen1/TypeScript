@@ -35,7 +35,7 @@ use crate::parser::{
     ExportDeclaration, NamedExports, ExportSpecifier, ExportAssignment,
     // Types
     TypeReference, ArrayType, TupleType, UnionType, IntersectionType,
-    FunctionType, TypeLiteral, ParenthesizedType, TypeParameterDeclaration,
+    FunctionType, ConstructorType, TypeLiteral, ParenthesizedType, TypeParameterDeclaration,
     LiteralType,
     // Misc
     SourceFile, HeritageClause, ParameterDeclaration,
@@ -2356,7 +2356,226 @@ impl ParserState {
 
     /// Parse a type.
     fn parse_type(&mut self) -> NodeIndex {
+        // Check for function type or constructor type first
+        if self.is_start_of_function_or_constructor_type() {
+            return self.parse_function_or_constructor_type();
+        }
         self.parse_union_or_intersection_type()
+    }
+
+    /// Check if we're at the start of a function type or constructor type.
+    fn is_start_of_function_or_constructor_type(&mut self) -> bool {
+        // <T>(...) => ... is a function type
+        if self.is_token(SyntaxKind::LessThanToken) {
+            return true;
+        }
+        // (...) => ... might be a function type
+        if self.is_token(SyntaxKind::OpenParenToken) && self.look_ahead_is_function_type() {
+            return true;
+        }
+        // new (...) => ... is a constructor type
+        if self.is_token(SyntaxKind::NewKeyword) {
+            return true;
+        }
+        // abstract new (...) => ... is a constructor type
+        if self.is_token(SyntaxKind::AbstractKeyword) && self.look_ahead_is_new_keyword() {
+            return true;
+        }
+        false
+    }
+
+    /// Look ahead to see if we have "new" keyword.
+    fn look_ahead_is_new_keyword(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let saved_token = self.current_token;
+
+        self.next_token();
+        let is_new = self.is_token(SyntaxKind::NewKeyword);
+
+        // Restore
+        self.scanner.restore_state(snapshot);
+        self.current_token = saved_token;
+
+        is_new
+    }
+
+    /// Look ahead to determine if this is unambiguously a function type.
+    /// TypeScript checks: () =>, (x:, (x,, (x?, (x=, (..., (x) =>
+    fn look_ahead_is_function_type(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let saved_token = self.current_token;
+
+        // Consume (
+        self.next_token();
+
+        let result = if self.is_token(SyntaxKind::CloseParenToken) || self.is_token(SyntaxKind::DotDotDotToken) {
+            // () or (...
+            true
+        } else if self.skip_parameter_start() {
+            // We skipped modifiers and an identifier/pattern
+            // Check for parameter indicators
+            if self.is_token(SyntaxKind::ColonToken) ||
+               self.is_token(SyntaxKind::CommaToken) ||
+               self.is_token(SyntaxKind::QuestionToken) ||
+               self.is_token(SyntaxKind::EqualsToken) {
+                // (x:, (x,, (x?, (x=
+                true
+            } else if self.is_token(SyntaxKind::CloseParenToken) {
+                self.next_token();
+                // (x) =>
+                self.is_token(SyntaxKind::EqualsGreaterThanToken)
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        // Restore
+        self.scanner.restore_state(snapshot);
+        self.current_token = saved_token;
+
+        result
+    }
+
+    /// Skip over parameter start (modifiers, identifier or pattern).
+    fn skip_parameter_start(&mut self) -> bool {
+        // Skip modifiers
+        while self.is_modifier() {
+            self.next_token();
+        }
+
+        // Skip identifier or this
+        if self.scanner.is_identifier() || self.is_token(SyntaxKind::ThisKeyword) {
+            self.next_token();
+            return true;
+        }
+
+        // Skip binding patterns (simplified - just check for matching brackets)
+        if self.is_token(SyntaxKind::OpenBracketToken) || self.is_token(SyntaxKind::OpenBraceToken) {
+            // For now, assume valid binding pattern starts
+            self.skip_matching_brackets();
+            return true;
+        }
+
+        false
+    }
+
+    /// Skip matching brackets for binding patterns.
+    fn skip_matching_brackets(&mut self) {
+        let open = self.token();
+        let close = if open == SyntaxKind::OpenBracketToken {
+            SyntaxKind::CloseBracketToken
+        } else {
+            SyntaxKind::CloseBraceToken
+        };
+
+        let mut depth = 1;
+        self.next_token();
+
+        while depth > 0 && !self.at_end() {
+            if self.is_token(open) {
+                depth += 1;
+            } else if self.is_token(close) {
+                depth -= 1;
+            }
+            self.next_token();
+        }
+    }
+
+    /// Check if current token is a modifier.
+    fn is_modifier(&self) -> bool {
+        matches!(
+            self.token(),
+            SyntaxKind::PublicKeyword |
+            SyntaxKind::PrivateKeyword |
+            SyntaxKind::ProtectedKeyword |
+            SyntaxKind::StaticKeyword |
+            SyntaxKind::ReadonlyKeyword |
+            SyntaxKind::AbstractKeyword |
+            SyntaxKind::AsyncKeyword |
+            SyntaxKind::OverrideKeyword |
+            SyntaxKind::ExportKeyword |
+            SyntaxKind::DefaultKeyword |
+            SyntaxKind::DeclareKeyword |
+            SyntaxKind::ConstKeyword
+        )
+    }
+
+    /// Parse a function type or constructor type.
+    fn parse_function_or_constructor_type(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        // Parse modifiers for constructor type (abstract)
+        let modifiers = if self.is_token(SyntaxKind::AbstractKeyword) {
+            let mod_pos = self.get_full_start();
+            let mut mods = NodeList::new();
+            let abstract_node = self.parse_identifier();
+            mods.push(abstract_node);
+            Some(mods)
+        } else {
+            None
+        };
+
+        // Check for 'new' keyword (constructor type)
+        let is_constructor_type = self.parse_optional(SyntaxKind::NewKeyword);
+
+        // Parse type parameters
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        // Parse parameters
+        let parameters = self.parse_function_type_parameters();
+
+        // Parse => and return type
+        self.parse_expected(SyntaxKind::EqualsGreaterThanToken);
+        let return_type = self.parse_type();
+
+        let end = self.get_token_start();
+
+        if is_constructor_type {
+            let ctor_type = ConstructorType {
+                base: NodeBase::new_ext(syntax_kind_ext::CONSTRUCTOR_TYPE, pos, end),
+                modifiers,
+                type_parameters,
+                parameters,
+                type_node: return_type,
+            };
+            self.alloc_node(Node::ConstructorType(ctor_type))
+        } else {
+            let func_type = FunctionType {
+                base: NodeBase::new_ext(syntax_kind_ext::FUNCTION_TYPE, pos, end),
+                type_parameters,
+                parameters,
+                type_node: return_type,
+            };
+            self.alloc_node(Node::FunctionType(func_type))
+        }
+    }
+
+    /// Parse function type parameters (parameter list in parentheses).
+    fn parse_function_type_parameters(&mut self) -> NodeList {
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let params = self.parse_delimited_list(
+            SyntaxKind::CloseParenToken,
+            |p| p.is_parameter_start(),
+            |p| p.parse_parameter(),
+        );
+        self.parse_expected(SyntaxKind::CloseParenToken);
+        params
+    }
+
+    /// Check if at the start of a parameter.
+    fn is_parameter_start(&self) -> bool {
+        self.scanner.is_identifier() ||
+        self.is_token(SyntaxKind::DotDotDotToken) ||
+        self.is_token(SyntaxKind::ThisKeyword) ||
+        self.is_token(SyntaxKind::OpenBracketToken) ||
+        self.is_token(SyntaxKind::OpenBraceToken) ||
+        self.is_modifier()
     }
 
     /// Parse a union or intersection type (A | B or A & B).
@@ -2729,6 +2948,74 @@ mod tests {
         let sf = parser.arena.get(sf_idx).unwrap();
         if let Node::SourceFile(source_file) = sf {
             assert_eq!(source_file.statements.len(), 1);
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_function_type() {
+        let mut parser = ParserState::new("test.ts".to_string(), "type Fn = (x: number) => string;".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            // Verify we parsed a type alias
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::TypeAliasDeclaration(type_alias) = stmt {
+                // Verify the type is a FunctionType
+                let type_node = parser.arena.get(type_alias.type_node).unwrap();
+                assert!(matches!(type_node, Node::FunctionType(_)), "Expected FunctionType");
+            } else {
+                panic!("Expected TypeAliasDeclaration");
+            }
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_constructor_type() {
+        let mut parser = ParserState::new("test.ts".to_string(), "type Ctor = new (x: number) => MyClass;".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            // Verify we parsed a type alias
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::TypeAliasDeclaration(type_alias) = stmt {
+                // Verify the type is a ConstructorType
+                let type_node = parser.arena.get(type_alias.type_node).unwrap();
+                assert!(matches!(type_node, Node::ConstructorType(_)), "Expected ConstructorType");
+            } else {
+                panic!("Expected TypeAliasDeclaration");
+            }
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_generic_function_type() {
+        let mut parser = ParserState::new("test.ts".to_string(), "type GenericFn = <T>(x: T) => T;".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::TypeAliasDeclaration(type_alias) = stmt {
+                let type_node = parser.arena.get(type_alias.type_node).unwrap();
+                if let Node::FunctionType(func_type) = type_node {
+                    assert!(func_type.type_parameters.is_some(), "Expected type parameters");
+                } else {
+                    panic!("Expected FunctionType");
+                }
+            } else {
+                panic!("Expected TypeAliasDeclaration");
+            }
         } else {
             panic!("Expected SourceFile");
         }
