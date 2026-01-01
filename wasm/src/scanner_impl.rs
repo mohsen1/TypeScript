@@ -2,6 +2,9 @@
 //!
 //! This module implements the core Scanner struct that tokenizes TypeScript source code.
 //! It's designed to produce the same token stream as TypeScript's scanner.ts.
+//!
+//! IMPORTANT: All positions are character-based (like JavaScript's string indexing),
+//! NOT byte-based. This ensures compatibility with TypeScript's scanner positions.
 
 use wasm_bindgen::prelude::*;
 use crate::scanner::SyntaxKind;
@@ -41,16 +44,28 @@ pub enum TokenFlags {
 // =============================================================================
 
 /// The scanner state that holds the current position and token information.
+/// 
+/// All positions (pos, end, token_start, full_start_pos) are CHARACTER indices,
+/// not byte indices. This matches TypeScript/JavaScript string indexing.
 #[wasm_bindgen]
 pub struct ScannerState {
-    text: String,
+    /// The source text as a Vec<char> for O(1) character access
+    chars: Vec<char>,
+    /// Current position (character index)
     pos: usize,
+    /// End position (character count)
     end: usize,
+    /// Full start position including leading trivia
     full_start_pos: usize,
+    /// Token start position (excluding trivia)
     token_start: usize,
+    /// Current token kind
     token: SyntaxKind,
+    /// Current token's string value
     token_value: String,
+    /// Token flags
     token_flags: u32,
+    /// Whether to skip trivia (whitespace, comments)
     skip_trivia: bool,
 }
 
@@ -59,9 +74,10 @@ impl ScannerState {
     /// Create a new scanner state with the given text.
     #[wasm_bindgen(constructor)]
     pub fn new(text: String, skip_trivia: bool) -> ScannerState {
-        let end = text.len();
+        let chars: Vec<char> = text.chars().collect();
+        let end = chars.len();
         ScannerState {
-            text,
+            chars,
             pos: 0,
             end,
             full_start_pos: 0,
@@ -112,7 +128,7 @@ impl ScannerState {
     /// Get the current token's text from the source.
     #[wasm_bindgen(js_name = getTokenText)]
     pub fn get_token_text(&self) -> String {
-        self.text[self.token_start..self.pos].to_string()
+        self.chars[self.token_start..self.pos].iter().collect()
     }
 
     /// Get the token flags.
@@ -149,9 +165,9 @@ impl ScannerState {
     /// Set the text to scan.
     #[wasm_bindgen(js_name = setText)]
     pub fn set_text(&mut self, text: String, start: Option<usize>, length: Option<usize>) {
+        self.chars = text.chars().collect();
         let start = start.unwrap_or(0);
-        let len = length.unwrap_or(text.len() - start);
-        self.text = text;
+        let len = length.unwrap_or(self.chars.len() - start);
         self.pos = start;
         self.end = start + len;
         self.full_start_pos = start;
@@ -175,23 +191,43 @@ impl ScannerState {
     /// Get the source text.
     #[wasm_bindgen(js_name = getText)]
     pub fn get_text(&self) -> String {
-        self.text.clone()
+        self.chars.iter().collect()
     }
 
     // =========================================================================
-    // Helper methods
+    // Helper methods (character-indexed for TypeScript compatibility)
     // =========================================================================
 
+    /// Get the character code at the given character index.
+    /// Returns None if out of bounds.
+    #[inline]
     fn char_code_at(&self, index: usize) -> Option<u32> {
-        self.text.chars().nth(index).map(|c| c as u32)
+        if index < self.chars.len() {
+            Some(self.chars[index] as u32)
+        } else {
+            None
+        }
     }
 
+    /// Get character code at index, returns 0 if out of bounds.
+    #[inline]
     fn char_code_unchecked(&self, index: usize) -> u32 {
-        self.char_code_at(index).unwrap_or(0)
+        if index < self.chars.len() {
+            self.chars[index] as u32
+        } else {
+            0
+        }
     }
 
+    #[inline]
     fn is_at_end(&self) -> bool {
         self.pos >= self.end
+    }
+    
+    /// Get a substring from start to end character indices.
+    #[inline]
+    fn substring(&self, start: usize, end: usize) -> String {
+        self.chars[start..end].iter().collect()
     }
 
     // =========================================================================
@@ -526,6 +562,8 @@ impl ScannerState {
                 }
 
                 // Less than
+                // Note: `</` (LessThanSlashToken) is only used in JSX mode.
+                // In regular mode, `<` and `/` are separate tokens.
                 CharacterCodes::LESS_THAN => {
                     if self.char_code_at(self.pos + 1) == Some(CharacterCodes::LESS_THAN) {
                         if self.char_code_at(self.pos + 2) == Some(CharacterCodes::EQUALS) {
@@ -542,24 +580,15 @@ impl ScannerState {
                         self.token = SyntaxKind::LessThanEqualsToken;
                         return self.token;
                     }
-                    if self.char_code_at(self.pos + 1) == Some(CharacterCodes::SLASH) {
-                        self.pos += 2;
-                        self.token = SyntaxKind::LessThanSlashToken;
-                        return self.token;
-                    }
+                    // LessThanSlashToken is JSX-only, not returned in regular scanning
                     self.pos += 1;
                     self.token = SyntaxKind::LessThanToken;
                     return self.token;
                 }
 
-                // Greater than
+                // Greater than - only return GreaterThanToken
+                // The parser calls reScanGreaterToken() to get >=, >>, >>>, >>=, >>>=
                 CharacterCodes::GREATER_THAN => {
-                    // Note: we don't handle >> or >>> here - those require reScanGreaterToken
-                    if self.char_code_at(self.pos + 1) == Some(CharacterCodes::EQUALS) {
-                        self.pos += 2;
-                        self.token = SyntaxKind::GreaterThanEqualsToken;
-                        return self.token;
-                    }
                     self.pos += 1;
                     self.token = SyntaxKind::GreaterThanToken;
                     return self.token;
@@ -643,7 +672,7 @@ impl ScannerState {
                         while self.pos < self.end && is_identifier_part(self.char_code_unchecked(self.pos)) {
                             self.pos += 1;
                         }
-                        self.token_value = self.text[self.token_start..self.pos].to_string();
+                        self.token_value = self.substring(self.token_start, self.pos);
                         self.token = SyntaxKind::PrivateIdentifier;
                     } else {
                         self.token = SyntaxKind::HashToken;
@@ -680,7 +709,7 @@ impl ScannerState {
         while self.pos < self.end {
             let ch = self.char_code_unchecked(self.pos);
             if ch == quote {
-                self.pos += 1;
+                self.pos += 1; // Closing quote
                 self.token_value = result;
                 self.token = SyntaxKind::StringLiteral;
                 return;
@@ -796,7 +825,7 @@ impl ScannerState {
                 while self.pos < self.end && is_hex_digit(self.char_code_unchecked(self.pos)) {
                     self.pos += 1;
                 }
-                self.token_value = self.text[start..self.pos].to_string();
+                self.token_value = self.substring(start, self.pos);
                 self.token = SyntaxKind::NumericLiteral;
                 return;
             }
@@ -811,7 +840,7 @@ impl ScannerState {
                     }
                     self.pos += 1;
                 }
-                self.token_value = self.text[start..self.pos].to_string();
+                self.token_value = self.substring(start, self.pos);
                 self.token = SyntaxKind::NumericLiteral;
                 return;
             }
@@ -822,7 +851,7 @@ impl ScannerState {
                 while self.pos < self.end && is_octal_digit(self.char_code_unchecked(self.pos)) {
                     self.pos += 1;
                 }
-                self.token_value = self.text[start..self.pos].to_string();
+                self.token_value = self.substring(start, self.pos);
                 self.token = SyntaxKind::NumericLiteral;
                 return;
             }
@@ -862,29 +891,34 @@ impl ScannerState {
         // BigInt suffix
         if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LOWER_N {
             self.pos += 1;
-            self.token_value = self.text[start..self.pos].to_string();
+            self.token_value = self.substring(start, self.pos);
             self.token = SyntaxKind::BigIntLiteral;
             return;
         }
         
-        self.token_value = self.text[start..self.pos].to_string();
+        self.token_value = self.substring(start, self.pos);
         self.token = SyntaxKind::NumericLiteral;
     }
 
     /// Scan an identifier.
     fn scan_identifier(&mut self) {
         let start = self.pos;
+        // Advance past first character
         self.pos += 1;
         
-        while self.pos < self.end && is_identifier_part(self.char_code_unchecked(self.pos)) {
+        while self.pos < self.end {
+            let ch = self.char_code_unchecked(self.pos);
+            if !is_identifier_part(ch) {
+                break;
+            }
             self.pos += 1;
         }
         
-        let text = &self.text[start..self.pos];
-        self.token_value = text.to_string();
+        let text = self.substring(start, self.pos);
+        self.token_value = text.clone();
         
         // Check if it's a keyword
-        self.token = crate::scanner::text_to_keyword(text).unwrap_or(SyntaxKind::Identifier);
+        self.token = crate::scanner::text_to_keyword(&text).unwrap_or(SyntaxKind::Identifier);
     }
 }
 

@@ -58,6 +58,36 @@ export interface WasmModule {
     punctuationToText(token: number): string | undefined;
     textToKeyword(text: string): number | undefined;
     stringToToken(text: string): number;
+
+    // Scanner class (Phase 2)
+    ScannerState: WasmScannerStateClass;
+    createScanner(text: string, skipTrivia: boolean): WasmScannerStateInstance;
+}
+
+/** @internal */
+interface WasmScannerStateClass {
+    new(text: string, skipTrivia: boolean): WasmScannerStateInstance;
+}
+
+/** @internal */
+interface WasmScannerStateInstance {
+    scan(): number;
+    getPos(): number;
+    getTokenFullStart(): number;
+    getTokenStart(): number;
+    getTokenEnd(): number;
+    getToken(): number;
+    getTokenValue(): string;
+    getTokenText(): string;
+    getTokenFlags(): number;
+    hasPrecedingLineBreak(): boolean;
+    isUnterminated(): boolean;
+    isIdentifier(): boolean;
+    isReservedWord(): boolean;
+    setText(text: string, start?: number, length?: number): void;
+    resetTokenState(pos: number): void;
+    getText(): string;
+    free(): void;
 }
 
 // =============================================================================
@@ -449,3 +479,24 @@ export function wasmStringToToken(text: string): number | undefined {
     const wasm = getWasm();
     return wasm?.stringToToken(text);
 }
+
+// =============================================================================
+// Scanner (Phase 2)
+// =============================================================================
+
+/**
+ * Create a new Rust scanner instance.
+ * Returns undefined if wasm is unavailable.
+ * @internal
+ */
+export function wasmCreateScanner(text: string, skipTrivia: boolean): WasmScannerStateInstance | undefined {
+    const wasm = getWasm();
+    if (!wasm) return undefined;
+    return wasm.createScanner(text, skipTrivia);
+}
+
+/**
+ * Type alias for the Rust scanner instance.
+ * @internal
+ */
+export type WasmScanner = WasmScannerStateInstance;

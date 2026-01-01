@@ -12,6 +12,17 @@ pub mod scanner_impl;
 pub use scanner_impl::*;
 
 // =============================================================================
+// Scanner Factory Function
+// =============================================================================
+
+/// Create a new scanner for the given source text.
+/// This is the wasm-bindgen entry point for creating scanners from JavaScript.
+#[wasm_bindgen(js_name = createScanner)]
+pub fn create_scanner(text: String, skip_trivia: bool) -> ScannerState {
+    ScannerState::new(text, skip_trivia)
+}
+
+// =============================================================================
 // Comparison enum - matches TypeScript's Comparison const enum
 // =============================================================================
 

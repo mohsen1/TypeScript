@@ -41,6 +41,20 @@ if (asyncKind !== undefined) {
     ts.sys.write(`[WASM] textToKeyword("async") = ${asyncKind} (AsyncKeyword=${ts.SyntaxKind.AsyncKeyword})${ts.sys.newLine}`);
 }
 
+// WASM scanner test (Phase 2)
+const rustScanner = ts.wasmCreateScanner("const x = 42;", true);
+if (rustScanner) {
+    const tokens: number[] = [];
+    let tok = rustScanner.scan();
+    while (tok !== ts.SyntaxKind.EndOfFileToken) {
+        tokens.push(tok);
+        tok = rustScanner.scan();
+    }
+    // Expected: ConstKeyword(87), Identifier(80), EqualsToken(64), NumericLiteral(9), SemicolonToken(27)
+    ts.sys.write(`[WASM] scanner("const x = 42;") = [${tokens.join(", ")}]${ts.sys.newLine}`);
+    rustScanner.free();
+}
+
 // enable deprecation logging
 ts.Debug.loggingHost = {
     log(_level, s) {
