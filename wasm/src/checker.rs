@@ -4,7 +4,7 @@
 //! diagnostics for type errors.
 
 use serde::Serialize;
-use crate::binder::{SymbolId, SymbolArena, SymbolTable, symbol_flags};
+use crate::binder::{SymbolId, SymbolArena, SymbolTable};
 use crate::parser::NodeIndex;
 
 // =============================================================================
@@ -593,6 +593,391 @@ impl Default for TypeArena {
 }
 
 // =============================================================================
+// Diagnostic
+// =============================================================================
+
+/// A type-checking diagnostic message.
+#[derive(Clone, Debug, Serialize)]
+pub struct Diagnostic {
+    pub file: String,
+    pub start: u32,
+    pub length: u32,
+    pub message_text: String,
+    pub category: DiagnosticCategory,
+    pub code: u32,
+}
+
+/// Diagnostic category.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum DiagnosticCategory {
+    Warning = 0,
+    Error = 1,
+    Suggestion = 2,
+    Message = 3,
+}
+
+// =============================================================================
+// Checker State
+// =============================================================================
+
+/// The type checker state.
+/// Performs type inference and type checking on AST nodes.
+pub struct CheckerState<'a> {
+    /// The node arena containing the AST.
+    pub node_arena: &'a crate::parser::NodeArena,
+
+    /// The symbol arena containing bound symbols.
+    pub symbol_arena: &'a SymbolArena,
+
+    /// The type arena for allocating types.
+    pub types: TypeArena,
+
+    /// Cached types for symbols.
+    symbol_types: std::collections::HashMap<SymbolId, TypeId>,
+
+    /// Cached types for nodes.
+    node_types: std::collections::HashMap<NodeIndex, TypeId>,
+
+    /// Diagnostics produced during type checking.
+    pub diagnostics: Vec<Diagnostic>,
+
+    /// Current file name.
+    pub file_name: String,
+}
+
+impl<'a> CheckerState<'a> {
+    /// Create a new checker state.
+    pub fn new(
+        node_arena: &'a crate::parser::NodeArena,
+        symbol_arena: &'a SymbolArena,
+        file_name: String,
+    ) -> Self {
+        CheckerState {
+            node_arena,
+            symbol_arena,
+            types: TypeArena::new(),
+            symbol_types: std::collections::HashMap::new(),
+            node_types: std::collections::HashMap::new(),
+            diagnostics: Vec::new(),
+            file_name,
+        }
+    }
+
+    /// Report a diagnostic error.
+    pub fn error(&mut self, node: NodeIndex, message: &str, code: u32) {
+        if let Some(n) = self.node_arena.get(node) {
+            let base = n.base();
+            self.diagnostics.push(Diagnostic {
+                file: self.file_name.clone(),
+                start: base.pos,
+                length: base.end - base.pos,
+                message_text: message.to_string(),
+                category: DiagnosticCategory::Error,
+                code,
+            });
+        }
+    }
+
+    // =========================================================================
+    // Type Retrieval
+    // =========================================================================
+
+    /// Get the type of a node (with caching).
+    pub fn get_type_of_node(&mut self, node: NodeIndex) -> TypeId {
+        // Check cache first
+        if let Some(&cached) = self.node_types.get(&node) {
+            return cached;
+        }
+
+        let type_id = self.get_type_of_node_worker(node);
+        self.node_types.insert(node, type_id);
+        type_id
+    }
+
+    /// Get type of node (worker, no caching).
+    fn get_type_of_node_worker(&mut self, node: NodeIndex) -> TypeId {
+        use crate::parser::Node;
+        use crate::scanner::SyntaxKind;
+
+        let Some(n) = self.node_arena.get(node) else {
+            return self.types.any_type;
+        };
+
+        match n {
+            // Literals
+            Node::StringLiteral(lit) => {
+                self.types.create_string_literal(lit.text.clone())
+            }
+            Node::NumericLiteral(lit) => {
+                let value = lit.text.parse::<f64>().unwrap_or(0.0);
+                self.types.create_number_literal(value)
+            }
+
+            // Token nodes - check the kind for keywords
+            Node::Token(base) => {
+                let kind = base.kind;
+                if kind == SyntaxKind::TrueKeyword as u16 {
+                    self.types.true_type
+                } else if kind == SyntaxKind::FalseKeyword as u16 {
+                    self.types.false_type
+                } else if kind == SyntaxKind::NullKeyword as u16 {
+                    self.types.null_type
+                } else if kind == SyntaxKind::StringKeyword as u16 {
+                    self.types.string_type
+                } else if kind == SyntaxKind::NumberKeyword as u16 {
+                    self.types.number_type
+                } else if kind == SyntaxKind::BooleanKeyword as u16 {
+                    self.types.boolean_type
+                } else if kind == SyntaxKind::VoidKeyword as u16 {
+                    self.types.void_type
+                } else if kind == SyntaxKind::AnyKeyword as u16 {
+                    self.types.any_type
+                } else if kind == SyntaxKind::NeverKeyword as u16 {
+                    self.types.never_type
+                } else if kind == SyntaxKind::UndefinedKeyword as u16 {
+                    self.types.undefined_type
+                } else if kind == SyntaxKind::UnknownKeyword as u16 {
+                    self.types.unknown_type
+                } else if kind == SyntaxKind::ObjectKeyword as u16 {
+                    self.types.object_type
+                } else if kind == SyntaxKind::BigIntKeyword as u16 {
+                    self.types.big_int_type
+                } else if kind == SyntaxKind::SymbolKeyword as u16 {
+                    self.types.es_symbol_type
+                } else {
+                    self.types.any_type
+                }
+            }
+
+            // Identifiers - look up in symbol table
+            Node::Identifier(_) => {
+                // For now, return any. Symbol resolution will be added later.
+                self.types.any_type
+            }
+
+            // Union types
+            Node::UnionType(ut) => {
+                let types: Vec<TypeId> = ut.types.nodes.iter()
+                    .map(|&t| self.get_type_of_node(t))
+                    .collect();
+                self.types.create_union(types)
+            }
+
+            // Intersection types
+            Node::IntersectionType(it) => {
+                let types: Vec<TypeId> = it.types.nodes.iter()
+                    .map(|&t| self.get_type_of_node(t))
+                    .collect();
+                self.types.create_intersection(types)
+            }
+
+            // Array types
+            Node::ArrayType(at) => {
+                let element_type = self.get_type_of_node(at.element_type);
+                // For now, return object type. Proper array handling needs Array<T> type.
+                let _ = element_type;
+                self.types.object_type
+            }
+
+            // Type references (generic types like Array<T>)
+            Node::TypeReference(tr) => {
+                // For now, return object. Proper handling needs symbol lookup.
+                let _ = tr;
+                self.types.object_type
+            }
+
+            // Parenthesized types
+            Node::ParenthesizedType(pt) => {
+                self.get_type_of_node(pt.type_node)
+            }
+
+            // Literal types
+            Node::LiteralType(lt) => {
+                self.get_type_of_node(lt.literal)
+            }
+
+            // Variable declarations - get type from initializer or annotation
+            Node::VariableDeclaration(vd) => {
+                if !vd.type_annotation.is_none() {
+                    self.get_type_of_node(vd.type_annotation)
+                } else if !vd.initializer.is_none() {
+                    self.get_type_of_node(vd.initializer)
+                } else {
+                    self.types.any_type
+                }
+            }
+
+            // Default: return any
+            _ => self.types.any_type,
+        }
+    }
+
+    /// Get the type of a symbol (with caching).
+    pub fn get_type_of_symbol(&mut self, symbol_id: SymbolId) -> TypeId {
+        // Check cache first
+        if let Some(&cached) = self.symbol_types.get(&symbol_id) {
+            return cached;
+        }
+
+        let type_id = self.get_type_of_symbol_worker(symbol_id);
+        self.symbol_types.insert(symbol_id, type_id);
+        type_id
+    }
+
+    /// Get type of symbol (worker, no caching).
+    fn get_type_of_symbol_worker(&mut self, symbol_id: SymbolId) -> TypeId {
+        let Some(symbol) = self.symbol_arena.get(symbol_id) else {
+            return self.types.any_type;
+        };
+
+        // Get type from value declaration
+        if !symbol.value_declaration.is_none() {
+            return self.get_type_of_node(symbol.value_declaration);
+        }
+
+        self.types.any_type
+    }
+
+    // =========================================================================
+    // Type Checking
+    // =========================================================================
+
+    /// Check if a type is assignable to another.
+    /// Returns true if source is assignable to target.
+    pub fn is_type_assignable_to(&self, source: TypeId, target: TypeId) -> bool {
+        // Same type is always assignable
+        if source == target {
+            return true;
+        }
+
+        let Some(source_type) = self.types.get(source) else {
+            return false;
+        };
+        let Some(target_type) = self.types.get(target) else {
+            return false;
+        };
+
+        let source_flags = source_type.flags();
+        let target_flags = target_type.flags();
+
+        // any is assignable to anything, anything is assignable to any
+        if (source_flags & type_flags::ANY) != 0 || (target_flags & type_flags::ANY) != 0 {
+            return true;
+        }
+
+        // unknown accepts anything
+        if (target_flags & type_flags::UNKNOWN) != 0 {
+            return true;
+        }
+
+        // never is assignable to everything
+        if (source_flags & type_flags::NEVER) != 0 {
+            return true;
+        }
+
+        // undefined is assignable to void
+        if (source_flags & type_flags::UNDEFINED) != 0 && (target_flags & type_flags::VOID) != 0 {
+            return true;
+        }
+
+        // null is assignable to undefined (with strictNullChecks off)
+        if (source_flags & type_flags::NULL) != 0 && (target_flags & type_flags::UNDEFINED) != 0 {
+            return true;
+        }
+
+        // String literal is assignable to string
+        if (source_flags & type_flags::STRING_LITERAL) != 0 && (target_flags & type_flags::STRING) != 0 {
+            return true;
+        }
+
+        // Number literal is assignable to number
+        if (source_flags & type_flags::NUMBER_LITERAL) != 0 && (target_flags & type_flags::NUMBER) != 0 {
+            return true;
+        }
+
+        // Boolean literal is assignable to boolean
+        if (source_flags & type_flags::BOOLEAN_LITERAL) != 0 && (target_flags & type_flags::BOOLEAN) != 0 {
+            return true;
+        }
+
+        // BigInt literal is assignable to bigint
+        if (source_flags & type_flags::BIG_INT_LITERAL) != 0 && (target_flags & type_flags::BIG_INT) != 0 {
+            return true;
+        }
+
+        // Handle union targets: source assignable to any constituent
+        if let Type::Union(union) = target_type {
+            return union.types.iter().any(|&t| self.is_type_assignable_to(source, t));
+        }
+
+        // Handle union sources: all constituents must be assignable
+        if let Type::Union(union) = source_type {
+            return union.types.iter().all(|&t| self.is_type_assignable_to(t, target));
+        }
+
+        // Handle intersection targets: must be assignable to all
+        if let Type::Intersection(intersection) = target_type {
+            return intersection.types.iter().all(|&t| self.is_type_assignable_to(source, t));
+        }
+
+        false
+    }
+
+    /// Get the diagnostics as JSON.
+    pub fn get_diagnostics_json(&self) -> String {
+        serde_json::to_string(&self.diagnostics).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Get the number of types allocated.
+    pub fn get_type_count(&self) -> usize {
+        self.types.len()
+    }
+
+    /// Type to string for debugging.
+    pub fn type_to_string(&self, type_id: TypeId) -> String {
+        let Some(typ) = self.types.get(type_id) else {
+            return "unknown".to_string();
+        };
+
+        match typ {
+            Type::Intrinsic(i) => i.intrinsic_name.clone(),
+            Type::Literal(lit) => match &lit.value {
+                LiteralValue::String(s) => format!("\"{}\"", s),
+                LiteralValue::Number(n) => n.to_string(),
+                LiteralValue::BigInt(b) => format!("{}n", b),
+                LiteralValue::Boolean(b) => b.to_string(),
+            },
+            Type::Union(u) => {
+                let parts: Vec<String> = u.types.iter()
+                    .map(|&t| self.type_to_string(t))
+                    .collect();
+                parts.join(" | ")
+            }
+            Type::Intersection(i) => {
+                let parts: Vec<String> = i.types.iter()
+                    .map(|&t| self.type_to_string(t))
+                    .collect();
+                parts.join(" & ")
+            }
+            Type::Object(_) => "object".to_string(),
+            Type::TypeReference(_) => "TypeReference".to_string(),
+            Type::TypeParameter(tp) => {
+                if let Some(sym) = self.symbol_arena.get(tp.symbol) {
+                    sym.escaped_name.clone()
+                } else {
+                    "T".to_string()
+                }
+            }
+            Type::Conditional(_) => "ConditionalType".to_string(),
+            Type::Mapped(_) => "MappedType".to_string(),
+            Type::IndexedAccess(_) => "IndexedAccessType".to_string(),
+            Type::Index(_) => "IndexType".to_string(),
+            Type::TemplateLiteral(_) => "TemplateLiteralType".to_string(),
+        }
+    }
+}
+
+// =============================================================================
 // Tests
 // =============================================================================
 
@@ -752,5 +1137,158 @@ mod tests {
         assert_eq!(object_flags::CLASS, 1);
         assert_eq!(object_flags::INTERFACE, 2);
         assert_eq!(object_flags::CLASS_OR_INTERFACE, object_flags::CLASS | object_flags::INTERFACE);
+    }
+
+    #[test]
+    fn test_checker_state_creation() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let checker = CheckerState::new(&node_arena, &symbol_arena, "test.ts".to_string());
+
+        // Should have intrinsic types pre-allocated
+        assert!(!checker.types.any_type.is_none());
+        assert!(!checker.types.string_type.is_none());
+        assert_eq!(checker.diagnostics.len(), 0);
+    }
+
+    #[test]
+    fn test_type_assignability_same() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let checker = CheckerState::new(&node_arena, &symbol_arena, "test.ts".to_string());
+
+        // Same type is assignable to itself
+        assert!(checker.is_type_assignable_to(checker.types.string_type, checker.types.string_type));
+        assert!(checker.is_type_assignable_to(checker.types.number_type, checker.types.number_type));
+        assert!(checker.is_type_assignable_to(checker.types.boolean_type, checker.types.boolean_type));
+    }
+
+    #[test]
+    fn test_type_assignability_any() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let checker = CheckerState::new(&node_arena, &symbol_arena, "test.ts".to_string());
+
+        // any is assignable to anything
+        assert!(checker.is_type_assignable_to(checker.types.any_type, checker.types.string_type));
+        assert!(checker.is_type_assignable_to(checker.types.any_type, checker.types.number_type));
+
+        // Anything is assignable to any
+        assert!(checker.is_type_assignable_to(checker.types.string_type, checker.types.any_type));
+        assert!(checker.is_type_assignable_to(checker.types.number_type, checker.types.any_type));
+    }
+
+    #[test]
+    fn test_type_assignability_never() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let checker = CheckerState::new(&node_arena, &symbol_arena, "test.ts".to_string());
+
+        // never is assignable to everything
+        assert!(checker.is_type_assignable_to(checker.types.never_type, checker.types.string_type));
+        assert!(checker.is_type_assignable_to(checker.types.never_type, checker.types.number_type));
+        assert!(checker.is_type_assignable_to(checker.types.never_type, checker.types.void_type));
+    }
+
+    #[test]
+    fn test_type_assignability_literals() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, "test.ts".to_string());
+
+        // String literal is assignable to string
+        let str_lit = checker.types.create_string_literal("hello".to_string());
+        assert!(checker.is_type_assignable_to(str_lit, checker.types.string_type));
+
+        // Number literal is assignable to number
+        let num_lit = checker.types.create_number_literal(42.0);
+        assert!(checker.is_type_assignable_to(num_lit, checker.types.number_type));
+
+        // Boolean literal is assignable to boolean
+        assert!(checker.is_type_assignable_to(checker.types.true_type, checker.types.boolean_type));
+        assert!(checker.is_type_assignable_to(checker.types.false_type, checker.types.boolean_type));
+    }
+
+    #[test]
+    fn test_type_assignability_union() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, "test.ts".to_string());
+
+        // string is assignable to string | number
+        let union = checker.types.create_union(vec![
+            checker.types.string_type,
+            checker.types.number_type,
+        ]);
+        assert!(checker.is_type_assignable_to(checker.types.string_type, union));
+        assert!(checker.is_type_assignable_to(checker.types.number_type, union));
+
+        // boolean is NOT assignable to string | number
+        assert!(!checker.is_type_assignable_to(checker.types.boolean_type, union));
+    }
+
+    #[test]
+    fn test_type_to_string() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, "test.ts".to_string());
+
+        assert_eq!(checker.type_to_string(checker.types.string_type), "string");
+        assert_eq!(checker.type_to_string(checker.types.number_type), "number");
+        assert_eq!(checker.type_to_string(checker.types.boolean_type), "boolean");
+        assert_eq!(checker.type_to_string(checker.types.any_type), "any");
+        assert_eq!(checker.type_to_string(checker.types.never_type), "never");
+
+        let str_lit = checker.types.create_string_literal("hello".to_string());
+        assert_eq!(checker.type_to_string(str_lit), "\"hello\"");
+
+        let num_lit = checker.types.create_number_literal(42.0);
+        assert_eq!(checker.type_to_string(num_lit), "42");
+    }
+
+    #[test]
+    fn test_get_type_of_literal_nodes() {
+        use crate::parser_impl::ParserState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"const x = "hello";"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let symbol_arena = SymbolArena::new();
+        let mut checker = CheckerState::new(&parser.arena, &symbol_arena, "test.ts".to_string());
+
+        // Get the source file
+        if let Some(crate::parser::Node::SourceFile(sf)) = parser.arena.get(root) {
+            // Get the first statement (variable statement)
+            if let Some(&stmt_idx) = sf.statements.nodes.first() {
+                if let Some(crate::parser::Node::VariableStatement(vs)) = parser.arena.get(stmt_idx) {
+                    // Get declaration list
+                    if let Some(crate::parser::Node::VariableDeclarationList(vdl)) = parser.arena.get(vs.declaration_list) {
+                        // Get the first declaration
+                        if let Some(&decl_idx) = vdl.declarations.nodes.first() {
+                            let decl_type = checker.get_type_of_node(decl_idx);
+                            // Should be a string literal type
+                            assert!(checker.types.get(decl_type).unwrap().has_flags(type_flags::STRING_LITERAL));
+                        }
+                    }
+                }
+            }
+        }
     }
 }

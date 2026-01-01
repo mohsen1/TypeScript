@@ -348,7 +348,7 @@ impl TextRange {
 /// Index into the node arena. Used instead of pointers/references
 /// for efficient serialization and memory management.
 #[wasm_bindgen]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default, Serialize, Hash)]
 pub struct NodeIndex(pub u32);
 
 impl NodeIndex {
