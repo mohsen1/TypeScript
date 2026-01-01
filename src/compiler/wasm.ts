@@ -88,6 +88,10 @@ interface WasmScannerStateInstance {
     resetTokenState(pos: number): void;
     getText(): string;
     free(): void;
+    // Rescan methods (Phase 2.6)
+    reScanGreaterToken(): number;
+    reScanSlashToken(): number;
+    reScanAsteriskEqualsToken(): number;
 }
 
 // =============================================================================

@@ -920,6 +920,120 @@ impl ScannerState {
         // Check if it's a keyword
         self.token = crate::scanner::text_to_keyword(&text).unwrap_or(SyntaxKind::Identifier);
     }
+
+    // =========================================================================
+    // Rescan methods - for context-sensitive parsing
+    // =========================================================================
+
+    /// Re-scan the current `>` token to see if it should be `>=`, `>>`, `>>>`, `>>=`, or `>>>=`.
+    /// This is used by the parser for type arguments and bitwise operators.
+    #[wasm_bindgen(js_name = reScanGreaterToken)]
+    pub fn re_scan_greater_token(&mut self) -> SyntaxKind {
+        if self.token == SyntaxKind::GreaterThanToken {
+            let next_char = self.char_code_unchecked(self.pos);
+            if next_char == CharacterCodes::GREATER_THAN {
+                let next_next = self.char_code_unchecked(self.pos + 1);
+                if next_next == CharacterCodes::GREATER_THAN {
+                    // >>>
+                    let next_next_next = self.char_code_unchecked(self.pos + 2);
+                    if next_next_next == CharacterCodes::EQUALS {
+                        // >>>=
+                        self.pos += 3;
+                        self.token = SyntaxKind::GreaterThanGreaterThanGreaterThanEqualsToken;
+                        return self.token;
+                    }
+                    self.pos += 2;
+                    self.token = SyntaxKind::GreaterThanGreaterThanGreaterThanToken;
+                    return self.token;
+                }
+                if next_next == CharacterCodes::EQUALS {
+                    // >>=
+                    self.pos += 2;
+                    self.token = SyntaxKind::GreaterThanGreaterThanEqualsToken;
+                    return self.token;
+                }
+                // >>
+                self.pos += 1;
+                self.token = SyntaxKind::GreaterThanGreaterThanToken;
+                return self.token;
+            }
+            if next_char == CharacterCodes::EQUALS {
+                // >=
+                self.pos += 1;
+                self.token = SyntaxKind::GreaterThanEqualsToken;
+                return self.token;
+            }
+        }
+        self.token
+    }
+
+    /// Re-scan the current `/` or `/=` token as a regex literal.
+    /// This is used by the parser when it determines the context requires a regex.
+    #[wasm_bindgen(js_name = reScanSlashToken)]
+    pub fn re_scan_slash_token(&mut self) -> SyntaxKind {
+        if self.token == SyntaxKind::SlashToken || self.token == SyntaxKind::SlashEqualsToken {
+            // Start scanning from after the initial /
+            let start_of_regex_body = self.token_start + 1;
+            self.pos = start_of_regex_body;
+            let mut in_escape = false;
+            let mut in_character_class = false;
+
+            // Scan until we find the closing /
+            while self.pos < self.end {
+                let ch = self.char_code_unchecked(self.pos);
+                
+                // Unterminated regex if we hit a newline
+                if is_line_break(ch) {
+                    self.token_flags |= TokenFlags::Unterminated as u32;
+                    break;
+                }
+
+                if in_escape {
+                    // After backslash, just consume the next character
+                    in_escape = false;
+                } else if ch == CharacterCodes::SLASH && !in_character_class {
+                    // Found the closing /
+                    break;
+                } else if ch == CharacterCodes::OPEN_BRACKET {
+                    in_character_class = true;
+                } else if ch == CharacterCodes::BACKSLASH {
+                    in_escape = true;
+                } else if ch == CharacterCodes::CLOSE_BRACKET {
+                    in_character_class = false;
+                }
+                self.pos += 1;
+            }
+
+            if (self.token_flags & TokenFlags::Unterminated as u32) == 0 {
+                // Consume the closing /
+                self.pos += 1;
+                
+                // Scan regex flags (g, i, m, s, u, v, y, d)
+                while self.pos < self.end {
+                    let ch = self.char_code_unchecked(self.pos);
+                    if !is_regex_flag(ch) && !is_identifier_part(ch) {
+                        break;
+                    }
+                    self.pos += 1;
+                }
+            }
+
+            self.token_value = self.substring(self.token_start, self.pos);
+            self.token = SyntaxKind::RegularExpressionLiteral;
+        }
+        self.token
+    }
+
+    /// Re-scan the current `*=` token as `*` followed by `=`.
+    /// Used when parsing computed property names.
+    #[wasm_bindgen(js_name = reScanAsteriskEqualsToken)]
+    pub fn re_scan_asterisk_equals_token(&mut self) -> SyntaxKind {
+        if self.token == SyntaxKind::AsteriskEqualsToken {
+            self.pos = self.token_start + 1;
+            self.token = SyntaxKind::EqualsToken;
+        }
+        self.token
+    }
 }
 
 // =============================================================================
@@ -964,6 +1078,28 @@ fn is_identifier_start(ch: u32) -> bool {
 
 fn is_identifier_part(ch: u32) -> bool {
     is_identifier_start(ch) || is_digit(ch)
+}
+
+fn is_line_break(ch: u32) -> bool {
+    ch == CharacterCodes::LINE_FEED
+        || ch == CharacterCodes::CARRIAGE_RETURN
+        || ch == CharacterCodes::LINE_SEPARATOR
+        || ch == CharacterCodes::PARAGRAPH_SEPARATOR
+}
+
+/// Check if a character is a valid regex flag (g, i, m, s, u, v, y, d)
+fn is_regex_flag(ch: u32) -> bool {
+    matches!(
+        ch,
+        CharacterCodes::LOWER_G  // g - global
+        | CharacterCodes::LOWER_I  // i - ignore case
+        | CharacterCodes::LOWER_M  // m - multiline
+        | CharacterCodes::LOWER_S  // s - dotAll
+        | CharacterCodes::LOWER_U  // u - unicode
+        | CharacterCodes::LOWER_V  // v - unicode sets
+        | CharacterCodes::LOWER_Y  // y - sticky
+        | CharacterCodes::LOWER_D  // d - has indices
+    )
 }
 
 // =============================================================================

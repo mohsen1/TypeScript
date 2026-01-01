@@ -526,12 +526,23 @@ PROGRESS LOG
 - Identified remaining work: rescan methods, JSX/JSDoc scanning
 - Commit: `afbff8186`
 
-Verified working:
-- Simple to moderately complex TS files compile
-- Classes, interfaces, generics, arrow functions, template literals all work
-- Files with regex literals fail fast (expected - reScanSlashToken needed)
+[2026-01-01] Phase 2.6 Complete - Rescan Methods
+------------------------------------------------
+- Implemented `reScanGreaterToken()` for `>`, `>>`, `>>>`, `>=`, `>>=`, `>>>=`
+- Implemented `reScanSlashToken()` for regex literal parsing
+- Implemented `reScanAsteriskEqualsToken()` for computed property names
+- Fixed critical bug: position offset handling when scanner starts mid-text
+  - Added `textOffset` tracking in RustScanner adapter
+  - All position accessors now add offset for correct absolute positions
+  - `setTextPos`/`resetTokenState` subtract offset before passing to Rust
+- Successfully compiled `src/compiler/core.ts` with `--useRustScanner`!
 
-Next Step: Phase 2.6 - Implement reScanSlashToken and reScanGreaterToken
+Verified working:
+- Regex literals (`/pattern/flags`)
+- Right-shift operators (`>>`, `>>>`)
+- Complex TypeScript source files (92k+ chars, 10k+ tokens)
+
+Next Step: Phase 2.7 - Template rescan methods for template literals
 
 ==============================================================================
 ESTIMATED TIMELINE (AGGRESSIVE)

@@ -4133,6 +4133,9 @@ export function createRustScanner(
     // Create the Rust scanner
     let text = textInitial ?? "";
     let wasmScanner: WasmScanner | undefined;
+    // Offset to add to positions returned by the Rust scanner
+    // (since it receives a substring, not the full text)
+    let textOffset = 0;
     
     // State that we track on the TS side (not yet in Rust)
     let commentDirectives: CommentDirective[] | undefined;
@@ -4142,9 +4145,10 @@ export function createRustScanner(
     initializeScanner();
     
     function initializeScanner() {
-        const actualStart = start ?? 0;
-        const actualLength = length ?? text.length;
-        const scanText = text.substring(actualStart, actualStart + actualLength);
+        textOffset = start ?? 0;
+        // When length is not provided, scan from start to end of text
+        const actualLength = length ?? (text.length - textOffset);
+        const scanText = text.substring(textOffset, textOffset + actualLength);
         
         wasmScanner = wasmCreateScanner(scanText, skipTrivia);
         if (!wasmScanner) {
@@ -4166,14 +4170,15 @@ export function createRustScanner(
     }
     
     // Scanner interface implementation
+    // Note: All position accessors add textOffset to convert from substring to original text positions
     const scanner: Scanner = {
-        getStartPos: () => getScanner().getTokenFullStart(),
+        getStartPos: () => getScanner().getTokenFullStart() + textOffset,
         getToken: () => getScanner().getToken() as SyntaxKind,
-        getTokenFullStart: () => getScanner().getTokenFullStart(),
-        getTokenStart: () => getScanner().getTokenStart(),
-        getTokenEnd: () => getScanner().getTokenEnd(),
-        getTextPos: () => getScanner().getPos(),
-        getTokenPos: () => getScanner().getTokenStart(),
+        getTokenFullStart: () => getScanner().getTokenFullStart() + textOffset,
+        getTokenStart: () => getScanner().getTokenStart() + textOffset,
+        getTokenEnd: () => getScanner().getTokenEnd() + textOffset,
+        getTextPos: () => getScanner().getPos() + textOffset,
+        getTokenPos: () => getScanner().getTokenStart() + textOffset,
         getTokenText: () => getScanner().getTokenText(),
         getTokenValue: () => getScanner().getTokenValue(),
         
@@ -4191,10 +4196,11 @@ export function createRustScanner(
         getCommentDirectives: () => commentDirectives,
         getTokenFlags: () => getScanner().getTokenFlags() as TokenFlags,
         
+        // Rescan methods - implemented in Rust
+        reScanGreaterToken: () => getScanner().reScanGreaterToken() as SyntaxKind,
+        reScanSlashToken: () => getScanner().reScanSlashToken() as SyntaxKind,
+        reScanAsteriskEqualsToken: () => getScanner().reScanAsteriskEqualsToken() as SyntaxKind,
         // Rescan methods - not yet implemented in Rust
-        reScanGreaterToken: () => notImplemented("reScanGreaterToken"),
-        reScanSlashToken: () => notImplemented("reScanSlashToken"),
-        reScanAsteriskEqualsToken: () => notImplemented("reScanAsteriskEqualsToken"),
         reScanTemplateToken: () => notImplemented("reScanTemplateToken"),
         reScanTemplateHeadOrNoSubstitutionTemplate: () => notImplemented("reScanTemplateHeadOrNoSubstitutionTemplate"),
         reScanJsxAttributeValue: () => notImplemented("reScanJsxAttributeValue"),
@@ -4221,14 +4227,15 @@ export function createRustScanner(
         clearCommentDirectives: () => { commentDirectives = undefined; },
         setText: (newText: string | undefined, newStart?: number, newLength?: number) => {
             text = newText ?? "";
-            const actualStart = newStart ?? 0;
-            const actualLength = newLength ?? text.length;
+            textOffset = newStart ?? 0;
+            // When length is not provided, scan from start to end of text
+            const actualLength = newLength ?? (text.length - textOffset);
             
             // Free the old scanner and create a new one
             if (wasmScanner) {
                 wasmScanner.free();
             }
-            const scanText = text.substring(actualStart, actualStart + actualLength);
+            const scanText = text.substring(textOffset, textOffset + actualLength);
             wasmScanner = wasmCreateScanner(scanText, skipTrivia);
             if (!wasmScanner) {
                 Debug.fail("Rust scanner unavailable after setText");
@@ -4247,8 +4254,8 @@ export function createRustScanner(
         setJSDocParsingMode: (_kind: JSDocParsingMode) => {
             // Rust scanner doesn't support JSDoc mode yet
         },
-        setTextPos: (textPos: number) => getScanner().resetTokenState(textPos),
-        resetTokenState: (pos: number) => getScanner().resetTokenState(pos),
+        setTextPos: (textPos: number) => getScanner().resetTokenState(textPos - textOffset),
+        resetTokenState: (pos: number) => getScanner().resetTokenState(pos - textOffset),
         setSkipJsDocLeadingAsterisks: (_skip: boolean) => {
             // Rust scanner doesn't support JSDoc asterisks yet
         },
@@ -4271,8 +4278,9 @@ export function createRustScanner(
         },
         
         scanRange: <T>(scanStart: number, scanLength: number, callback: () => T): T => {
-            // Save current text
+            // Save current state
             const savedText = text;
+            const savedTextOffset = textOffset;
             
             // Set the range
             scanner.setText(text, scanStart, scanLength);
@@ -4281,7 +4289,9 @@ export function createRustScanner(
             const result = callback();
             
             // Restore
-            scanner.setText(savedText);
+            text = savedText;
+            textOffset = savedTextOffset;
+            scanner.setText(savedText, savedTextOffset);
             
             return result;
         },
