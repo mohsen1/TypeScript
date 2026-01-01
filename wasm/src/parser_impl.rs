@@ -36,7 +36,7 @@ use crate::parser::{
     // Types
     TypeReference, ArrayType, TupleType, UnionType, IntersectionType,
     FunctionType, ConstructorType, TypeLiteral, ParenthesizedType, TypeParameterDeclaration,
-    LiteralType,
+    LiteralType, ConditionalType, InferType, TypeOperator, TypeQuery,
     // Misc
     SourceFile, HeritageClause, ParameterDeclaration,
 };
@@ -309,6 +309,25 @@ impl ParserState {
     /// Check if we're in an await context.
     pub fn in_await_context(&self) -> bool {
         (self.context_flags & context_flags::AWAIT) != 0
+    }
+
+    /// Check if we're in a context that disallows conditional types.
+    pub fn in_disallow_conditional_types_context(&self) -> bool {
+        (self.context_flags & context_flags::DISALLOW_CONDITIONAL_TYPES) != 0
+    }
+
+    /// Run a function allowing conditional types.
+    pub fn allow_conditional_types_and<T, F>(&mut self, func: F) -> T
+    where F: FnOnce(&mut Self) -> T
+    {
+        self.without_context(context_flags::DISALLOW_CONDITIONAL_TYPES, func)
+    }
+
+    /// Run a function disallowing conditional types.
+    pub fn disallow_conditional_types_and<T, F>(&mut self, func: F) -> T
+    where F: FnOnce(&mut Self) -> T
+    {
+        self.with_context(context_flags::DISALLOW_CONDITIONAL_TYPES, func)
     }
 
     /// Run a function with modified context flags.
@@ -2360,7 +2379,34 @@ impl ParserState {
         if self.is_start_of_function_or_constructor_type() {
             return self.parse_function_or_constructor_type();
         }
-        self.parse_union_or_intersection_type()
+
+        let pos = self.get_full_start();
+        let check_type = self.parse_union_or_intersection_type();
+
+        // Check for conditional type: T extends U ? X : Y
+        if !self.in_disallow_conditional_types_context()
+           && !self.scanner.has_preceding_line_break()
+           && self.parse_optional(SyntaxKind::ExtendsKeyword)
+        {
+            // The type following 'extends' is not permitted to be another conditional type
+            let extends_type = self.disallow_conditional_types_and(|p| p.parse_type());
+            self.parse_expected(SyntaxKind::QuestionToken);
+            let true_type = self.allow_conditional_types_and(|p| p.parse_type());
+            self.parse_expected(SyntaxKind::ColonToken);
+            let false_type = self.allow_conditional_types_and(|p| p.parse_type());
+
+            let end = self.get_token_start();
+            let conditional = ConditionalType {
+                base: NodeBase::new_ext(syntax_kind_ext::CONDITIONAL_TYPE, pos, end),
+                check_type,
+                extends_type,
+                true_type,
+                false_type,
+            };
+            return self.alloc_node(Node::ConditionalType(conditional));
+        }
+
+        check_type
     }
 
     /// Check if we're at the start of a function type or constructor type.
@@ -2633,14 +2679,14 @@ impl ParserState {
     /// Parse intersection or primary type (handles & parsing).
     fn parse_intersection_or_primary_type(&mut self) -> NodeIndex {
         let pos = self.get_full_start();
-        let first_type = self.parse_primary_type();
+        let first_type = self.parse_type_operator_or_higher();
 
         if self.is_token(SyntaxKind::AmpersandToken) {
             let mut types = NodeList::new();
             types.push(first_type);
 
             while self.parse_optional(SyntaxKind::AmpersandToken) {
-                types.push(self.parse_primary_type());
+                types.push(self.parse_type_operator_or_higher());
             }
 
             let end = self.get_token_start();
@@ -2652,6 +2698,125 @@ impl ParserState {
         } else {
             first_type
         }
+    }
+
+    /// Parse type operators: keyof, unique, readonly, infer, typeof
+    fn parse_type_operator_or_higher(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let operator = self.token();
+
+        match operator {
+            // keyof T, unique symbol, readonly T
+            SyntaxKind::KeyOfKeyword | SyntaxKind::UniqueKeyword | SyntaxKind::ReadonlyKeyword => {
+                self.next_token();
+                let type_node = self.parse_type_operator_or_higher();
+                let end = self.get_token_start();
+                let type_op = TypeOperator {
+                    base: NodeBase::new_ext(syntax_kind_ext::TYPE_OPERATOR, pos, end),
+                    operator: operator as u16,
+                    type_node,
+                };
+                self.alloc_node(Node::TypeOperator(type_op))
+            }
+
+            // infer T
+            SyntaxKind::InferKeyword => {
+                self.parse_infer_type()
+            }
+
+            // typeof x
+            SyntaxKind::TypeOfKeyword => {
+                self.parse_type_query()
+            }
+
+            // Otherwise, parse postfix types
+            _ => {
+                self.allow_conditional_types_and(|p| p.parse_postfix_type_or_higher())
+            }
+        }
+    }
+
+    /// Parse infer type: infer T
+    fn parse_infer_type(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::InferKeyword);
+
+        // Parse the type parameter
+        let type_param_pos = self.get_full_start();
+        let name = self.parse_identifier();
+
+        // Try to parse constraint: infer T extends U
+        let constraint = self.try_parse_infer_type_constraint();
+
+        let type_param_end = self.get_token_start();
+        let type_param = TypeParameterDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::TYPE_PARAMETER, type_param_pos, type_param_end),
+            modifiers: None,
+            name,
+            constraint: constraint.unwrap_or(NodeIndex::NONE),
+            default: NodeIndex::NONE,
+        };
+        let type_parameter = self.alloc_node(Node::TypeParameterDeclaration(type_param));
+
+        let end = self.get_token_start();
+        let infer = InferType {
+            base: NodeBase::new_ext(syntax_kind_ext::INFER_TYPE, pos, end),
+            type_parameter,
+        };
+        self.alloc_node(Node::InferType(infer))
+    }
+
+    /// Try to parse constraint of infer type: extends U (but not if followed by ?)
+    fn try_parse_infer_type_constraint(&mut self) -> Option<NodeIndex> {
+        if self.parse_optional(SyntaxKind::ExtendsKeyword) {
+            let constraint = self.disallow_conditional_types_and(|p| p.parse_type());
+            // If we're in disallow conditional types context or next token is not ?,
+            // return the constraint
+            if self.in_disallow_conditional_types_context() || !self.is_token(SyntaxKind::QuestionToken) {
+                return Some(constraint);
+            }
+            // Otherwise, this extends belongs to a conditional type, not the infer constraint
+            // We need to backtrack, but for now we'll just return None
+            // TODO: proper backtracking
+        }
+        None
+    }
+
+    /// Parse type query: typeof x
+    fn parse_type_query(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::TypeOfKeyword);
+
+        // Parse the expression (entity name)
+        let expr_name = self.parse_entity_name();
+
+        // Parse optional type arguments: typeof x<T>
+        let type_arguments = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_arguments())
+        } else {
+            None
+        };
+
+        let end = self.get_token_start();
+        let query = TypeQuery {
+            base: NodeBase::new_ext(syntax_kind_ext::TYPE_QUERY, pos, end),
+            expr_name,
+            type_arguments,
+        };
+        self.alloc_node(Node::TypeQuery(query))
+    }
+
+    /// Parse an entity name (Identifier or QualifiedName).
+    fn parse_entity_name(&mut self) -> NodeIndex {
+        // For now, just parse a simple identifier
+        // TODO: handle QualifiedName (A.B.C)
+        self.parse_identifier()
+    }
+
+    /// Parse postfix type or higher (handles [] array type).
+    fn parse_postfix_type_or_higher(&mut self) -> NodeIndex {
+        let type_node = self.parse_primary_type();
+        self.parse_type_postfix(type_node)
     }
 
     /// Parse a primary type (the base types before postfix operators).
@@ -2843,7 +3008,16 @@ impl ParserState {
             | SyntaxKind::NumberKeyword
             | SyntaxKind::BigIntKeyword
             | SyntaxKind::BooleanKeyword
-            | SyntaxKind::SymbolKeyword => true,
+            | SyntaxKind::SymbolKeyword
+            // Type operators
+            | SyntaxKind::TypeOfKeyword
+            | SyntaxKind::KeyOfKeyword
+            | SyntaxKind::UniqueKeyword
+            | SyntaxKind::ReadonlyKeyword
+            | SyntaxKind::InferKeyword
+            // Function/constructor type start
+            | SyntaxKind::NewKeyword
+            | SyntaxKind::LessThanToken => true,
             _ => false,
         }
     }
@@ -3013,6 +3187,107 @@ mod tests {
                 } else {
                     panic!("Expected FunctionType");
                 }
+            } else {
+                panic!("Expected TypeAliasDeclaration");
+            }
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_conditional_type() {
+        let mut parser = ParserState::new("test.ts".to_string(), "type Check<T> = T extends string ? 'yes' : 'no';".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::TypeAliasDeclaration(type_alias) = stmt {
+                let type_node = parser.arena.get(type_alias.type_node).unwrap();
+                assert!(matches!(type_node, Node::ConditionalType(_)), "Expected ConditionalType, got {:?}", type_node);
+            } else {
+                panic!("Expected TypeAliasDeclaration");
+            }
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_infer_type() {
+        let mut parser = ParserState::new("test.ts".to_string(), "type Unpacked<T> = T extends Array<infer U> ? U : T;".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::TypeAliasDeclaration(type_alias) = stmt {
+                let type_node = parser.arena.get(type_alias.type_node).unwrap();
+                // Should be a conditional type with infer inside
+                assert!(matches!(type_node, Node::ConditionalType(_)), "Expected ConditionalType");
+            } else {
+                panic!("Expected TypeAliasDeclaration");
+            }
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_typeof() {
+        let mut parser = ParserState::new("test.ts".to_string(), "type T = typeof myVariable;".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::TypeAliasDeclaration(type_alias) = stmt {
+                let type_node = parser.arena.get(type_alias.type_node).unwrap();
+                assert!(matches!(type_node, Node::TypeQuery(_)), "Expected TypeQuery, got {:?}", type_node);
+            } else {
+                panic!("Expected TypeAliasDeclaration");
+            }
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_keyof() {
+        let mut parser = ParserState::new("test.ts".to_string(), "type Keys = keyof { a: 1; b: 2 };".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::TypeAliasDeclaration(type_alias) = stmt {
+                let type_node = parser.arena.get(type_alias.type_node).unwrap();
+                assert!(matches!(type_node, Node::TypeOperator(_)), "Expected TypeOperator (keyof), got {:?}", type_node);
+            } else {
+                panic!("Expected TypeAliasDeclaration");
+            }
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_readonly_type() {
+        let mut parser = ParserState::new("test.ts".to_string(), "type ReadonlyArr = readonly number[];".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::TypeAliasDeclaration(type_alias) = stmt {
+                let type_node = parser.arena.get(type_alias.type_node).unwrap();
+                assert!(matches!(type_node, Node::TypeOperator(_)), "Expected TypeOperator (readonly), got {:?}", type_node);
             } else {
                 panic!("Expected TypeAliasDeclaration");
             }

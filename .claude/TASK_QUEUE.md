@@ -17,14 +17,14 @@ Claude should work through these in order, skipping any that are blocked.
 
 ### Parser Features (Priority: High)
 
-- [ ] **Function type parsing** `(x: number) => string`
+- [x] **Function type parsing** `(x: number) => string`
   - File: `wasm/src/parser_impl.rs`
   - Add `parse_function_type()` method
   - Handle parameter list with types
   - Handle return type after `=>`
   - Test: `type Fn = (x: number) => string`
 
-- [ ] **Constructor type parsing** `new (x: number) => Foo`
+- [x] **Constructor type parsing** `new (x: number) => Foo`
   - File: `wasm/src/parser_impl.rs`
   - Similar to function type but starts with `new`
   - Test: `type Ctor = new (x: number) => MyClass`
@@ -126,3 +126,5 @@ Claude should work through these in order, skipping any that are blocked.
 [2026-01-01] Type parsing (union, intersection, array, tuple, literal)
 [2026-01-01] wasm-bindgen exports for parser
 [2026-01-01] TypeScript wasm bridge for parser
+[2026-01-01] Function type parsing `(x: number) => string`
+[2026-01-01] Constructor type parsing `new (x: number) => Foo`
