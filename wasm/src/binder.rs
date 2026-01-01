@@ -370,6 +370,17 @@ impl BinderState {
                 // they reference existing ones
             }
 
+            // Module/namespace declarations
+            Node::ModuleDeclaration(module) => {
+                self.bind_module_declaration(arena, module, idx);
+            }
+            Node::ModuleBlock(block) => {
+                // Module block creates a new scope
+                for &stmt_idx in &block.statements.nodes {
+                    self.bind_node(arena, stmt_idx);
+                }
+            }
+
             _ => {
                 // For other node types, no symbols to create
             }
@@ -574,6 +585,28 @@ impl BinderState {
             }
         }
     }
+
+    fn bind_module_declaration(
+        &mut self,
+        arena: &NodeArena,
+        module: &crate::parser::ModuleDeclaration,
+        module_idx: NodeIndex,
+    ) {
+        // Get module name
+        if let Some(name) = self.get_identifier_name(arena, module.name) {
+            // Determine if this is a namespace (value) or module (ambient)
+            // For simplicity, treat as namespace module (can contain values)
+            let flags = symbol_flags::NAMESPACE_MODULE | symbol_flags::VALUE_MODULE;
+            self.declare_symbol(name, flags, module_idx);
+        }
+
+        // Bind module body in new scope
+        if !module.body.is_none() {
+            self.push_scope();
+            self.bind_node(arena, module.body);
+            self.pop_scope();
+        }
+    }
 }
 
 impl Default for BinderState {
@@ -762,5 +795,32 @@ mod tests {
 
         let mytype_id = binder.file_locals.get("MyType").unwrap();
         assert!(binder.symbols.get(mytype_id).unwrap().has_flags(symbol_flags::TYPE_ALIAS));
+    }
+
+    #[test]
+    fn test_bind_namespace_declaration() {
+        use crate::parser_impl::ParserState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                namespace MyNamespace {
+                    export const x = 1;
+                    export function foo() {}
+                }
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        // Should have namespace symbol 'MyNamespace'
+        assert!(binder.file_locals.has("MyNamespace"));
+
+        let ns_id = binder.file_locals.get("MyNamespace").unwrap();
+        let ns_sym = binder.symbols.get(ns_id).unwrap();
+        assert_eq!(ns_sym.escaped_name, "MyNamespace");
+        assert!(ns_sym.has_any_flags(symbol_flags::MODULE));
     }
 }

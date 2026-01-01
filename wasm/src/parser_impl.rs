@@ -30,9 +30,10 @@ use crate::parser::{
     MethodDeclaration, PropertyDeclaration, ConstructorDeclaration,
     GetAccessorDeclaration, SetAccessorDeclaration,
     InterfaceDeclaration, TypeAliasDeclaration, EnumDeclaration, EnumMember,
-    // Import/Export
+    // Import/Export/Module
     ImportDeclaration, ImportClause, NamespaceImport, NamedImports, ImportSpecifier,
     ExportDeclaration, NamedExports, ExportSpecifier, ExportAssignment,
+    ModuleDeclaration, ModuleBlock,
     // Types
     TypeReference, ArrayType, TupleType, UnionType, IntersectionType,
     FunctionType, ConstructorType, TypeLiteral, ParenthesizedType, TypeParameterDeclaration,
@@ -535,6 +536,7 @@ impl ParserState {
             SyntaxKind::EnumKeyword => self.parse_enum_declaration(),
             SyntaxKind::ImportKeyword => self.parse_import_declaration(),
             SyntaxKind::ExportKeyword => self.parse_export_declaration(),
+            SyntaxKind::ModuleKeyword | SyntaxKind::NamespaceKeyword => self.parse_module_declaration(),
             _ => self.parse_expression_or_labeled_statement(),
         }
     }
@@ -1725,6 +1727,56 @@ impl ParserState {
         }
 
         members
+    }
+
+    /// Parse a module or namespace declaration.
+    fn parse_module_declaration(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        // Skip 'module' or 'namespace' keyword
+        self.next_token();
+        let name = self.parse_identifier();
+
+        // Parse module body
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_module_block()
+        } else if self.is_token(SyntaxKind::DotToken) {
+            // Nested namespace: namespace A.B.C { }
+            self.next_token();
+            self.parse_module_declaration()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end = self.get_token_start();
+
+        let decl = ModuleDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::MODULE_DECLARATION, pos, end),
+            modifiers: None,
+            name,
+            body,
+        };
+        self.alloc_node(Node::ModuleDeclaration(decl))
+    }
+
+    /// Parse a module block ({ ... }).
+    fn parse_module_block(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+
+        let statements = self.parse_list(
+            |p| !p.is_token(SyntaxKind::CloseBraceToken) && !p.at_end(),
+            |p| p.parse_statement()
+        );
+
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+        let end = self.get_token_start();
+
+        let block = ModuleBlock {
+            base: NodeBase::new_ext(syntax_kind_ext::MODULE_BLOCK, pos, end),
+            statements,
+        };
+        self.alloc_node(Node::ModuleBlock(block))
     }
 
     // =========================================================================
