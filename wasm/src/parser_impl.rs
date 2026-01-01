@@ -3,6 +3,7 @@
 //! This module implements the core Parser struct that produces an AST from tokens.
 //! It's designed to produce the same AST as TypeScript's parser.ts.
 
+use wasm_bindgen::prelude::*;
 use crate::scanner::SyntaxKind;
 use crate::scanner_impl::ScannerState;
 use crate::parser::{
@@ -55,10 +56,12 @@ pub mod context_flags {
 // =============================================================================
 
 /// The parser state that holds scanner and AST building context.
+#[wasm_bindgen]
 pub struct ParserState {
     /// The scanner for tokenizing
     scanner: ScannerState,
-    /// Arena for allocating AST nodes
+    /// Arena for allocating AST nodes (not exposed to JS)
+    #[wasm_bindgen(skip)]
     pub arena: NodeArena,
     /// Source file name
     file_name: String,
@@ -87,8 +90,14 @@ pub struct ParseDiagnostic {
     pub code: u32,
 }
 
+// =============================================================================
+// wasm-bindgen Public API
+// =============================================================================
+
+#[wasm_bindgen]
 impl ParserState {
     /// Create a new parser state for the given source text.
+    #[wasm_bindgen(constructor)]
     pub fn new(file_name: String, source_text: String) -> ParserState {
         let scanner = ScannerState::new(source_text.clone(), true);
         ParserState {
@@ -105,6 +114,58 @@ impl ParserState {
         }
     }
 
+    /// Parse a source file and return the root node index.
+    /// The AST can be accessed via getSourceFileJson().
+    #[wasm_bindgen(js_name = parseSourceFile)]
+    pub fn parse_source_file_wasm(&mut self) -> u32 {
+        let idx = self.parse_source_file();
+        idx.0
+    }
+
+    /// Get the source file AST as JSON.
+    /// This serializes the entire AST for consumption by JavaScript.
+    #[wasm_bindgen(js_name = getSourceFileJson)]
+    pub fn get_source_file_json(&self, root_idx: u32) -> String {
+        let idx = NodeIndex(root_idx);
+        if let Some(node) = self.arena.get(idx) {
+            // TODO: Implement proper JSON serialization
+            format!("{{\"kind\": {}, \"pos\": {}, \"end\": {}}}",
+                node.base().kind,
+                node.base().pos,
+                node.base().end)
+        } else {
+            "null".to_string()
+        }
+    }
+
+    /// Get the number of nodes in the AST.
+    #[wasm_bindgen(js_name = getNodeCount)]
+    pub fn get_node_count(&self) -> u32 {
+        self.node_count
+    }
+
+    /// Get the list of identifiers found during parsing.
+    #[wasm_bindgen(js_name = getIdentifiers)]
+    pub fn get_identifiers(&self) -> Vec<String> {
+        self.identifiers.clone()
+    }
+
+    /// Get parse diagnostics as JSON.
+    #[wasm_bindgen(js_name = getDiagnosticsJson)]
+    pub fn get_diagnostics_json(&self) -> String {
+        let diagnostics: Vec<String> = self.parse_diagnostics.iter().map(|d| {
+            format!("{{\"start\":{},\"length\":{},\"message\":\"{}\",\"code\":{}}}",
+                d.start, d.length, d.message, d.code)
+        }).collect();
+        format!("[{}]", diagnostics.join(","))
+    }
+}
+
+// =============================================================================
+// Internal Implementation
+// =============================================================================
+
+impl ParserState {
     // =========================================================================
     // Token Utilities
     // =========================================================================

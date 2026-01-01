@@ -29,6 +29,17 @@ pub fn create_scanner(text: String, skip_trivia: bool) -> ScannerState {
 }
 
 // =============================================================================
+// Parser Factory Function
+// =============================================================================
+
+/// Create a new parser for the given source text.
+/// This is the wasm-bindgen entry point for creating parsers from JavaScript.
+#[wasm_bindgen(js_name = createParser)]
+pub fn create_parser(file_name: String, source_text: String) -> parser_impl::ParserState {
+    parser_impl::ParserState::new(file_name, source_text)
+}
+
+// =============================================================================
 // Comparison enum - matches TypeScript's Comparison const enum
 // =============================================================================
 
