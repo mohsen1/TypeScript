@@ -1437,6 +1437,7 @@ export interface System {
     /** @internal */ tryEnableSourceMapsForHost?(): void;
     /** @internal */ getAccessibleFileSystemEntries?(path: string): FileSystemEntries;
     /** @internal */ debugMode?: boolean;
+    /** @internal */ useRustScanner?: boolean;
     setTimeout?(callback: (...args: any[]) => void, ms: number, ...args: any[]): any;
     clearTimeout?(timeoutId: any): void;
     clearScreen?(): void;

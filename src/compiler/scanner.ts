@@ -32,8 +32,11 @@ import {
     ScriptTarget,
     SourceFileLike,
     SyntaxKind,
+    sys,
     TextRange,
     TokenFlags,
+    wasmCreateScanner,
+    WasmScanner,
 } from "./_namespaces/ts.js";
 
 export type ErrorCallback = (message: DiagnosticMessage, length: number, arg0?: any) => void;
@@ -1028,6 +1031,11 @@ export function createScanner(
     start?: number,
     length?: number,
 ): Scanner {
+    // Check if Rust scanner should be used (Phase 2.5)
+    if (sys?.useRustScanner) {
+        return createRustScanner(languageVersion, skipTrivia, languageVariant, textInitial, onError, start, length);
+    }
+    
     // Why var? It avoids TDZ checks in the runtime which can be costly.
     // See: https://github.com/microsoft/TypeScript/issues/52924
     /* eslint-disable no-var */
@@ -4099,3 +4107,201 @@ const valuesOfNonBinaryUnicodeProperties = {
 // The Script_Extensions property of a character contains one or more Script values. See https://www.unicode.org/reports/tr24/#Script_Extensions
 // Here since each Unicode property value expression only allows a single value, its values can be considered the same as those of the Script property.
 valuesOfNonBinaryUnicodeProperties.Script_Extensions = valuesOfNonBinaryUnicodeProperties.Script;
+
+// =============================================================================
+// Rust Scanner Adapter (Phase 2.5)
+// =============================================================================
+
+/**
+ * Creates a scanner backed by the Rust/WASM implementation.
+ * This is an adapter that implements the Scanner interface using the Rust scanner.
+ * 
+ * Note: Not all methods are implemented. Unimplemented methods will throw Debug.fail().
+ * Currently unsupported: JSX scanning, JSDoc scanning, rescan methods.
+ * 
+ * @internal
+ */
+export function createRustScanner(
+    languageVersion: ScriptTarget,
+    skipTrivia: boolean,
+    languageVariant: LanguageVariant = LanguageVariant.Standard,
+    textInitial?: string,
+    onError?: ErrorCallback,
+    start?: number,
+    length?: number,
+): Scanner {
+    // Create the Rust scanner
+    let text = textInitial ?? "";
+    let wasmScanner: WasmScanner | undefined;
+    
+    // State that we track on the TS side (not yet in Rust)
+    let commentDirectives: CommentDirective[] | undefined;
+    let savedOnError = onError;
+    
+    // Initialize the scanner
+    initializeScanner();
+    
+    function initializeScanner() {
+        const actualStart = start ?? 0;
+        const actualLength = length ?? text.length;
+        const scanText = text.substring(actualStart, actualStart + actualLength);
+        
+        wasmScanner = wasmCreateScanner(scanText, skipTrivia);
+        if (!wasmScanner) {
+            Debug.fail("Rust scanner unavailable - wasmCreateScanner returned undefined");
+        }
+    }
+    
+    // Helper that returns non-null scanner or throws
+    function getScanner(): WasmScanner {
+        if (!wasmScanner) {
+            return Debug.fail("Rust scanner not initialized");
+        }
+        return wasmScanner;
+    }
+    
+    // Helper to throw for unimplemented methods
+    function notImplemented(methodName: string): never {
+        return Debug.fail(`RustScanner: ${methodName} not yet implemented`);
+    }
+    
+    // Scanner interface implementation
+    const scanner: Scanner = {
+        getStartPos: () => getScanner().getTokenFullStart(),
+        getToken: () => getScanner().getToken() as SyntaxKind,
+        getTokenFullStart: () => getScanner().getTokenFullStart(),
+        getTokenStart: () => getScanner().getTokenStart(),
+        getTokenEnd: () => getScanner().getTokenEnd(),
+        getTextPos: () => getScanner().getPos(),
+        getTokenPos: () => getScanner().getTokenStart(),
+        getTokenText: () => getScanner().getTokenText(),
+        getTokenValue: () => getScanner().getTokenValue(),
+        
+        hasUnicodeEscape: () => (getScanner().getTokenFlags() & TokenFlags.UnicodeEscape) !== 0,
+        hasExtendedUnicodeEscape: () => (getScanner().getTokenFlags() & TokenFlags.ExtendedUnicodeEscape) !== 0,
+        hasPrecedingLineBreak: () => getScanner().hasPrecedingLineBreak(),
+        hasPrecedingJSDocComment: () => (getScanner().getTokenFlags() & TokenFlags.PrecedingJSDocComment) !== 0,
+        hasPrecedingJSDocLeadingAsterisks: () => (getScanner().getTokenFlags() & TokenFlags.PrecedingJSDocLeadingAsterisks) !== 0,
+        
+        isIdentifier: () => getScanner().isIdentifier(),
+        isReservedWord: () => getScanner().isReservedWord(),
+        isUnterminated: () => getScanner().isUnterminated(),
+        
+        getNumericLiteralFlags: () => getScanner().getTokenFlags() & TokenFlags.NumericLiteralFlags,
+        getCommentDirectives: () => commentDirectives,
+        getTokenFlags: () => getScanner().getTokenFlags() as TokenFlags,
+        
+        // Rescan methods - not yet implemented in Rust
+        reScanGreaterToken: () => notImplemented("reScanGreaterToken"),
+        reScanSlashToken: () => notImplemented("reScanSlashToken"),
+        reScanAsteriskEqualsToken: () => notImplemented("reScanAsteriskEqualsToken"),
+        reScanTemplateToken: () => notImplemented("reScanTemplateToken"),
+        reScanTemplateHeadOrNoSubstitutionTemplate: () => notImplemented("reScanTemplateHeadOrNoSubstitutionTemplate"),
+        reScanJsxAttributeValue: () => notImplemented("reScanJsxAttributeValue"),
+        reScanJsxToken: () => notImplemented("reScanJsxToken"),
+        reScanLessThanToken: () => notImplemented("reScanLessThanToken"),
+        reScanHashToken: () => notImplemented("reScanHashToken"),
+        reScanQuestionToken: () => notImplemented("reScanQuestionToken"),
+        reScanInvalidIdentifier: () => notImplemented("reScanInvalidIdentifier"),
+        
+        // JSX methods - not yet implemented in Rust
+        scanJsxIdentifier: () => notImplemented("scanJsxIdentifier"),
+        scanJsxAttributeValue: () => notImplemented("scanJsxAttributeValue"),
+        scanJsxToken: () => notImplemented("scanJsxToken"),
+        
+        // JSDoc methods - not yet implemented in Rust
+        scanJsDocToken: () => notImplemented("scanJsDocToken"),
+        scanJSDocCommentTextToken: () => notImplemented("scanJSDocCommentTextToken"),
+        
+        // Core scanning
+        scan: () => getScanner().scan() as SyntaxKind,
+        
+        // Text management
+        getText: () => getScanner().getText(),
+        clearCommentDirectives: () => { commentDirectives = undefined; },
+        setText: (newText: string | undefined, newStart?: number, newLength?: number) => {
+            text = newText ?? "";
+            const actualStart = newStart ?? 0;
+            const actualLength = newLength ?? text.length;
+            
+            // Free the old scanner and create a new one
+            if (wasmScanner) {
+                wasmScanner.free();
+            }
+            const scanText = text.substring(actualStart, actualStart + actualLength);
+            wasmScanner = wasmCreateScanner(scanText, skipTrivia);
+            if (!wasmScanner) {
+                Debug.fail("Rust scanner unavailable after setText");
+            }
+        },
+        setOnError: (errorCallback: ErrorCallback | undefined) => { savedOnError = errorCallback; },
+        setScriptTarget: (_scriptTarget: ScriptTarget) => {
+            // Rust scanner doesn't use script target yet - may need for ES3 features
+        },
+        setLanguageVariant: (_variant: LanguageVariant) => {
+            // Rust scanner doesn't support JSX variant yet
+        },
+        setScriptKind: (_kind: ScriptKind) => {
+            // Rust scanner doesn't use script kind yet
+        },
+        setJSDocParsingMode: (_kind: JSDocParsingMode) => {
+            // Rust scanner doesn't support JSDoc mode yet
+        },
+        setTextPos: (textPos: number) => getScanner().resetTokenState(textPos),
+        resetTokenState: (pos: number) => getScanner().resetTokenState(pos),
+        setSkipJsDocLeadingAsterisks: (_skip: boolean) => {
+            // Rust scanner doesn't support JSDoc asterisks yet
+        },
+        
+        // State save/restore - critical for parser
+        lookAhead: <T>(callback: () => T): T => {
+            const s = getScanner();
+            // Save state
+            const saveTokenStart = s.getTokenStart();
+            
+            // Execute callback
+            const result = callback();
+            
+            // Restore state
+            s.resetTokenState(saveTokenStart);
+            // Note: We can't fully restore token/tokenValue/tokenFlags in Rust scanner yet
+            // This may cause issues with complex lookAhead scenarios
+            
+            return result;
+        },
+        
+        scanRange: <T>(scanStart: number, scanLength: number, callback: () => T): T => {
+            // Save current text
+            const savedText = text;
+            
+            // Set the range
+            scanner.setText(text, scanStart, scanLength);
+            
+            // Execute callback
+            const result = callback();
+            
+            // Restore
+            scanner.setText(savedText);
+            
+            return result;
+        },
+        
+        tryScan: <T>(callback: () => T): T => {
+            const s = getScanner();
+            // Save state
+            const saveTokenStart = s.getTokenStart();
+            
+            // Execute callback
+            const result = callback();
+            
+            // Only restore if callback returned falsy
+            if (!result) {
+                s.resetTokenState(saveTokenStart);
+            }
+            
+            return result;
+        },
+    };
+    
+    return scanner;
+}

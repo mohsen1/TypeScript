@@ -55,6 +55,15 @@ if (rustScanner) {
     rustScanner.free();
 }
 
+// Check for --useRustScanner flag (Phase 2.5)
+const useRustScannerIndex = ts.sys.args.indexOf("--useRustScanner");
+if (useRustScannerIndex !== -1) {
+    ts.sys.useRustScanner = true;
+    // Remove the flag from args so it doesn't confuse the compiler
+    ts.sys.args.splice(useRustScannerIndex, 1);
+    ts.sys.write(`[WASM] Rust scanner enabled${ts.sys.newLine}`);
+}
+
 // enable deprecation logging
 ts.Debug.loggingHost = {
     log(_level, s) {
