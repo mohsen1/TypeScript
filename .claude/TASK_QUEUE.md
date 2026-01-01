@@ -110,7 +110,28 @@ All Phase 4 tasks finished:
   - Nullable guards: get_non_nullable_type, get_type_with_facts
   - Union type filtering based on type flags
 
-### Priority: Medium
+### Completed (Phase 5.7)
+
+- [x] **Generic call expression inference**
+  - Type parameter scoping for function signatures
+  - Explicit type arguments: `identity<number>(42)`
+  - Type argument inference from argument types
+  - Type instantiation for return types
+  - Parser support for call expressions with type arguments: `expr<T>(args)`
+  - Element access expression parsing: `expr[index]`
+
+### Next Up
+
+- [ ] **Control flow based type narrowing**
+  - Use flow nodes created by binder
+  - Narrow types based on if/while conditions
+
+- [ ] **instanceof type guards**
+  - `x instanceof Foo` narrows to Foo
+
+- [ ] **Class type checking**
+  - Instance types
+  - Constructor types
 
 ## Blocked
 
@@ -118,9 +139,9 @@ All Phase 4 tasks finished:
 
 ## Notes
 
-- Phase 5.1-5.6 completed 2026-01-01
-- 157 Rust tests passing
-- CheckerState with type inference, assignability, function types, generics, object types, and type narrowing
-- Parser now handles assignment expressions and unary operators (typeof, void, delete, await)
+- Phase 5.1-5.7 completed 2026-01-01
+- 159 Rust tests passing
+- CheckerState with type inference, assignability, function types, generics, object types, type narrowing, and generic call inference
+- Parser now handles assignment expressions, unary operators (typeof, void, delete, await), and call expressions with type arguments
 - Binder flow analysis infrastructure for if/while statements
 - Explored typescript-go for architectural patterns (documented in TYPE_CHECKER_MINDMAP.md)

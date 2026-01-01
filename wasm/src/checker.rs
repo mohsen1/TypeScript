@@ -789,6 +789,10 @@ pub struct CheckerState<'a> {
     /// Type parameter names for type_to_string.
     type_parameter_names: std::collections::HashMap<TypeId, String>,
 
+    /// Current type parameter scope (name -> TypeId) for resolving type references
+    /// during function signature processing.
+    type_parameter_scope: std::collections::HashMap<String, TypeId>,
+
     /// Diagnostics produced during type checking.
     pub diagnostics: Vec<Diagnostic>,
 
@@ -813,6 +817,7 @@ impl<'a> CheckerState<'a> {
             symbol_types: std::collections::HashMap::new(),
             node_types: std::collections::HashMap::new(),
             type_parameter_names: std::collections::HashMap::new(),
+            type_parameter_scope: std::collections::HashMap::new(),
             diagnostics: Vec::new(),
             file_name,
         }
@@ -969,8 +974,12 @@ impl<'a> CheckerState<'a> {
                         "bigint" => self.types.big_int_type,
                         "symbol" => self.types.es_symbol_type,
                         _ => {
-                            // For other type references, look up in symbol table
-                            if let Some(symbol_id) = self.file_locals.get(&id.escaped_text) {
+                            // First, check if it's a type parameter in the current scope
+                            if let Some(&type_param) = self.type_parameter_scope.get(&id.escaped_text) {
+                                type_param
+                            }
+                            // Otherwise, look up in symbol table
+                            else if let Some(symbol_id) = self.file_locals.get(&id.escaped_text) {
                                 self.get_type_of_symbol(symbol_id)
                             } else {
                                 self.types.object_type
@@ -1085,7 +1094,7 @@ impl<'a> CheckerState<'a> {
 
             // Call expressions (e.g., fn(arg1, arg2))
             Node::CallExpression(ce) => {
-                self.get_type_of_call_expression(ce.expression, &ce.arguments)
+                self.get_type_of_call_expression(ce.expression, &ce.type_arguments, &ce.arguments)
             }
 
             // New expressions (e.g., new Foo(arg))
@@ -1119,24 +1128,50 @@ impl<'a> CheckerState<'a> {
     }
 
     /// Get the type of a call expression.
-    fn get_type_of_call_expression(&mut self, expression: NodeIndex, arguments: &crate::parser::NodeList) -> TypeId {
+    fn get_type_of_call_expression(
+        &mut self,
+        expression: NodeIndex,
+        type_arguments: &Option<crate::parser::NodeList>,
+        arguments: &crate::parser::NodeList
+    ) -> TypeId {
         // Get the type of the function being called
         let func_type = self.get_type_of_node(expression);
 
-        // If it's a function type, return the return type
+        // If it's a function type, handle generics and return type
         if let Some(Type::Function(f)) = self.types.get(func_type) {
+            // Extract function information to avoid borrow issues
+            let type_parameters = f.type_parameters.clone();
+            let parameter_types = f.parameter_types.clone();
+            let return_type = f.return_type;
+            let min_argument_count = f.min_argument_count;
+            let has_rest_parameter = f.has_rest_parameter;
+
             // Check argument count
             let arg_count = arguments.nodes.len() as u32;
-            if arg_count < f.min_argument_count && !f.has_rest_parameter {
+            if arg_count < min_argument_count && !has_rest_parameter {
                 // TODO: Add diagnostic for too few arguments
             }
-            if arg_count > f.parameter_types.len() as u32 && !f.has_rest_parameter {
+            if arg_count > parameter_types.len() as u32 && !has_rest_parameter {
                 // TODO: Add diagnostic for too many arguments
             }
 
-            // TODO: Check argument types match parameter types
+            // If the function has type parameters, we need to infer or use explicit type arguments
+            if !type_parameters.is_empty() {
+                let inferred_type_args = if let Some(explicit_args) = type_arguments {
+                    // Use explicit type arguments: identity<string>("hello")
+                    explicit_args.nodes.iter()
+                        .map(|&arg| self.get_type_of_node(arg))
+                        .collect::<Vec<_>>()
+                } else {
+                    // Infer type arguments from the argument types
+                    self.infer_type_arguments(&type_parameters, &parameter_types, arguments)
+                };
 
-            return f.return_type;
+                // Instantiate the return type with the inferred type arguments
+                return self.instantiate_type(return_type, &inferred_type_args, &type_parameters);
+            }
+
+            return return_type;
         }
 
         // If it's an object with call signatures, use those
@@ -1151,6 +1186,96 @@ impl<'a> CheckerState<'a> {
 
         // Default to any for unknown callable types
         self.types.any_type
+    }
+
+    /// Infer type arguments for a generic function call from the provided arguments.
+    fn infer_type_arguments(
+        &mut self,
+        type_parameters: &[TypeId],
+        parameter_types: &[TypeId],
+        arguments: &crate::parser::NodeList
+    ) -> Vec<TypeId> {
+        // Create a mapping from type parameter to inferred type
+        let mut inferred: std::collections::HashMap<TypeId, TypeId> = std::collections::HashMap::new();
+
+        // For each argument, try to infer type parameters from the corresponding parameter type
+        for (i, &arg_node) in arguments.nodes.iter().enumerate() {
+            if i >= parameter_types.len() {
+                break;
+            }
+
+            let arg_type = self.get_type_of_node(arg_node);
+            let param_type = parameter_types[i];
+
+            // If the parameter type is a type parameter, infer it from the argument type
+            self.infer_from_types(param_type, arg_type, type_parameters, &mut inferred);
+        }
+
+        // Build the result vector in order of type parameters
+        type_parameters.iter()
+            .map(|&tp| *inferred.get(&tp).unwrap_or(&self.types.any_type))
+            .collect()
+    }
+
+    /// Recursively infer type arguments by matching a pattern type against an actual type.
+    fn infer_from_types(
+        &mut self,
+        pattern_type: TypeId,
+        actual_type: TypeId,
+        type_parameters: &[TypeId],
+        inferred: &mut std::collections::HashMap<TypeId, TypeId>
+    ) {
+        // If the pattern is a type parameter, infer it
+        if type_parameters.contains(&pattern_type) {
+            // If we already inferred this type parameter, we could merge types (union)
+            // For now, just use the first inference
+            inferred.entry(pattern_type).or_insert(actual_type);
+            return;
+        }
+
+        // Extract info from pattern type to avoid borrow issues
+        enum PatternInfo {
+            Function { parameter_types: Vec<TypeId>, return_type: TypeId },
+            Union { types: Vec<TypeId> },
+            Intersection { types: Vec<TypeId> },
+            Other,
+        }
+
+        let pattern_info = match self.types.get(pattern_type) {
+            Some(Type::Function(f)) => PatternInfo::Function {
+                parameter_types: f.parameter_types.clone(),
+                return_type: f.return_type,
+            },
+            Some(Type::Union(u)) => PatternInfo::Union { types: u.types.clone() },
+            Some(Type::Intersection(i)) => PatternInfo::Intersection { types: i.types.clone() },
+            _ => PatternInfo::Other,
+        };
+
+        // Extract info from actual type
+        let actual_info = match self.types.get(actual_type) {
+            Some(Type::Function(f)) => PatternInfo::Function {
+                parameter_types: f.parameter_types.clone(),
+                return_type: f.return_type,
+            },
+            Some(Type::Union(u)) => PatternInfo::Union { types: u.types.clone() },
+            Some(Type::Intersection(i)) => PatternInfo::Intersection { types: i.types.clone() },
+            _ => PatternInfo::Other,
+        };
+
+        // Match function types: (T) => U with (string) => number infers T=string, U=number
+        if let (
+            PatternInfo::Function { parameter_types: pattern_params, return_type: pattern_return },
+            PatternInfo::Function { parameter_types: actual_params, return_type: actual_return }
+        ) = (&pattern_info, &actual_info) {
+            // Infer from parameter types (contravariant, but for simplicity we use covariant here)
+            for (pattern_param, actual_param) in pattern_params.iter().zip(actual_params.iter()) {
+                self.infer_from_types(*pattern_param, *actual_param, type_parameters, inferred);
+            }
+            // Infer from return type
+            self.infer_from_types(*pattern_return, *actual_return, type_parameters, inferred);
+        }
+
+        // TODO: Handle object types, array types, etc.
     }
 
     /// Get the type of a new expression.
@@ -1615,10 +1740,20 @@ impl<'a> CheckerState<'a> {
     ) -> TypeId {
         use crate::parser::Node;
 
-        // Create type parameters
+        // Save and clear the current type parameter scope
+        let saved_scope = std::mem::take(&mut self.type_parameter_scope);
+
+        // Create type parameters and add them to the scope
         let type_param_ids: Vec<TypeId> = if let Some(type_params) = type_parameters {
             type_params.nodes.iter()
-                .filter_map(|&tp_idx| self.create_type_parameter(tp_idx))
+                .filter_map(|&tp_idx| {
+                    let type_id = self.create_type_parameter(tp_idx)?;
+                    // Add to type parameter scope for name lookup during signature processing
+                    if let Some(name) = self.type_parameter_names.get(&type_id) {
+                        self.type_parameter_scope.insert(name.clone(), type_id);
+                    }
+                    Some(type_id)
+                })
                 .collect()
         } else {
             Vec::new()
@@ -1668,6 +1803,9 @@ impl<'a> CheckerState<'a> {
             // For now, default to any
             self.types.any_type
         };
+
+        // Restore the previous type parameter scope
+        self.type_parameter_scope = saved_scope;
 
         self.types.create_function_type_with_type_params(
             declaration,
@@ -3826,5 +3964,118 @@ mod tests {
         let narrowed = checker.narrow_type_by_typeof(checker.types.string_type, "number");
 
         assert_eq!(narrowed, checker.types.never_type);
+    }
+
+    #[test]
+    fn test_generic_call_expression_inference() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test: identity<T>(x: T): T called with "hello" should infer T = string
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+            function identity<T>(x: T): T { return x; }
+            const result = identity("hello");
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Verify identity function type
+        assert!(binder.file_locals.has("identity"));
+        if let Some(identity_sym) = binder.file_locals.get("identity") {
+            let identity_type = checker.get_type_of_symbol(identity_sym);
+            let identity_str = checker.type_to_string(identity_type);
+
+            // Should have form <T>(x: T) => T
+            assert!(identity_str.contains("<T>"), "Expected type parameter T, got: {}", identity_str);
+
+            // Verify it has type parameters
+            if let Some(Type::Function(f)) = checker.types.get(identity_type) {
+                assert_eq!(f.type_parameters.len(), 1, "Expected 1 type parameter");
+                // param type and return type should be the same (T)
+                assert_eq!(f.parameter_types.len(), 1);
+                assert_eq!(f.parameter_types[0], f.return_type);
+            }
+        }
+
+        // Get the result variable type
+        assert!(binder.file_locals.has("result"));
+        if let Some(symbol) = binder.file_locals.get("result") {
+            let result_type = checker.get_type_of_symbol(symbol);
+
+            // The result should be a string literal type "hello" (or widened to string)
+            // since identity<T>(x: T): T returns T, and T is inferred from "hello"
+            if let Some(Type::Literal(lit)) = checker.types.get(result_type) {
+                assert!(matches!(lit.value, LiteralValue::String(_)),
+                    "Expected string literal type, got {:?}", lit.value);
+            } else {
+                // Could also be string_type if literal widening is applied
+                assert!(result_type == checker.types.string_type ||
+                        matches!(checker.types.get(result_type), Some(Type::Literal(_))),
+                    "Expected string or string literal type, got: {}",
+                    checker.type_to_string(result_type));
+            }
+        } else {
+            panic!("result variable not found");
+        }
+    }
+
+    #[test]
+    fn test_generic_call_with_explicit_type_args() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test: identity<string>(x) should use the explicit type argument
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+            function identity<T>(x: T): T { return x; }
+            const result = identity<number>(42);
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Verify identity function type
+        assert!(binder.file_locals.has("identity"));
+        if let Some(identity_sym) = binder.file_locals.get("identity") {
+            let identity_type = checker.get_type_of_symbol(identity_sym);
+            let identity_str = checker.type_to_string(identity_type);
+            assert!(identity_str.contains("<T>"), "Expected generic function, got: {}", identity_str);
+        }
+
+        // Get result type - should be number (from explicit type argument)
+        assert!(binder.file_locals.has("result"));
+        if let Some(symbol) = binder.file_locals.get("result") {
+            let result_type = checker.get_type_of_symbol(symbol);
+
+            // With explicit type argument <number>, result should be number
+            assert!(result_type == checker.types.number_type ||
+                    matches!(checker.types.get(result_type), Some(Type::Literal(l))
+                             if matches!(l.value, LiteralValue::Number(_))),
+                "Expected number type, got: {}", checker.type_to_string(result_type));
+        } else {
+            panic!("result variable not found");
+        }
     }
 }

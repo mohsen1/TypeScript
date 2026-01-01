@@ -2569,12 +2569,103 @@ impl ParserState {
                     };
                     expr = self.alloc_node(Node::CallExpression(call));
                 }
-                // TODO: Handle bracket access, optional chaining, etc.
+                SyntaxKind::LessThanToken => {
+                    // Potential type arguments: expr<T>(args)
+                    // Try to parse as type arguments followed by call
+                    if let Some((type_args, arguments)) = self.try_parse_call_with_type_arguments() {
+                        let pos = self.arena.get(expr).map(|n| n.base().pos).unwrap_or(0);
+                        let end = self.get_token_start();
+
+                        let call = CallExpression {
+                            base: NodeBase::new_ext(syntax_kind_ext::CALL_EXPRESSION, pos, end),
+                            expression: expr,
+                            type_arguments: Some(type_args),
+                            arguments,
+                        };
+                        expr = self.alloc_node(Node::CallExpression(call));
+                    } else {
+                        // Not a call with type arguments, stop parsing LHS
+                        break;
+                    }
+                }
+                SyntaxKind::OpenBracketToken => {
+                    // Element access: expr[index]
+                    self.next_token();
+                    let pos = self.arena.get(expr).map(|n| n.base().pos).unwrap_or(0);
+                    let index = self.parse_expression();
+                    self.parse_expected(SyntaxKind::CloseBracketToken);
+                    let end = self.get_token_start();
+
+                    let access = ElementAccessExpression {
+                        base: NodeBase::new_ext(syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION, pos, end),
+                        expression: expr,
+                        question_dot_token: false,
+                        argument_expression: index,
+                    };
+                    expr = self.alloc_node(Node::ElementAccessExpression(access));
+                }
+                // TODO: Handle optional chaining, etc.
                 _ => break,
             }
         }
 
         expr
+    }
+
+    /// Try to parse type arguments followed by a call expression: <T>(args)
+    /// Returns Some((type_args, arguments)) if successful, None otherwise.
+    fn try_parse_call_with_type_arguments(&mut self) -> Option<(NodeList, NodeList)> {
+        // Save position for potential rollback
+        let saved_state = self.scanner.save_state();
+
+        // Consume the '<'
+        if !self.is_token(SyntaxKind::LessThanToken) {
+            return None;
+        }
+        let type_args_pos = self.get_full_start();
+        self.next_token();
+
+        // Try to parse type argument list
+        let mut type_args = Vec::new();
+
+        loop {
+            // Parse a type
+            let type_node = self.parse_type();
+            type_args.push(type_node);
+
+            if self.is_token(SyntaxKind::CommaToken) {
+                self.next_token();
+            } else {
+                break;
+            }
+        }
+
+        // Expect '>' followed by '('
+        if !self.is_token(SyntaxKind::GreaterThanToken) {
+            // Failed - rollback
+            self.scanner.restore_state(saved_state);
+            return None;
+        }
+        let type_args_end = self.get_token_start();
+        self.next_token(); // consume '>'
+
+        if !self.is_token(SyntaxKind::OpenParenToken) {
+            // Not a call expression - rollback
+            self.scanner.restore_state(saved_state);
+            return None;
+        }
+
+        // Parse the argument list
+        let arguments = self.parse_argument_list();
+
+        let type_args_list = NodeList {
+            nodes: type_args,
+            pos: type_args_pos,
+            end: type_args_end,
+            has_trailing_comma: false,
+        };
+
+        Some((type_args_list, arguments))
     }
 
     /// Parse a primary expression.
