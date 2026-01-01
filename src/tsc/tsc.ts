@@ -21,6 +21,12 @@ if (normalizedPath !== undefined) {
     ts.sys.write(`[WASM] normalizeSlashes("path\\\\to\\\\file") = "${normalizedPath}"${ts.sys.newLine}`);
 }
 
+// WASM character classification verification (Phase 1.3)
+const isDigitResult = ts.wasmIsDigit("5".charCodeAt(0));
+if (isDigitResult !== undefined) {
+    ts.sys.write(`[WASM] isDigit('5') = ${isDigitResult}${ts.sys.newLine}`);
+}
+
 // enable deprecation logging
 ts.Debug.loggingHost = {
     log(_level, s) {

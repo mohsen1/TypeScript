@@ -222,6 +222,110 @@ pub fn file_extension_is(path: &str, extension: &str) -> bool {
 }
 
 // =============================================================================
+// Character Classification (Phase 1.3 - Scanner Prep)
+// =============================================================================
+
+// Character codes matching TypeScript's CharacterCodes enum
+mod char_codes {
+    pub const LINE_FEED: u32 = 0x0A;
+    pub const CARRIAGE_RETURN: u32 = 0x0D;
+    pub const LINE_SEPARATOR: u32 = 0x2028;
+    pub const PARAGRAPH_SEPARATOR: u32 = 0x2029;
+    pub const NEXT_LINE: u32 = 0x0085;
+
+    pub const SPACE: u32 = 0x0020;
+    pub const TAB: u32 = 0x09;
+    pub const VERTICAL_TAB: u32 = 0x0B;
+    pub const FORM_FEED: u32 = 0x0C;
+    pub const NON_BREAKING_SPACE: u32 = 0x00A0;
+    pub const OGHAM: u32 = 0x1680;
+    pub const EN_QUAD: u32 = 0x2000;
+    pub const ZERO_WIDTH_SPACE: u32 = 0x200B;
+    pub const NARROW_NO_BREAK_SPACE: u32 = 0x202F;
+    pub const MATHEMATICAL_SPACE: u32 = 0x205F;
+    pub const IDEOGRAPHIC_SPACE: u32 = 0x3000;
+    pub const BYTE_ORDER_MARK: u32 = 0xFEFF;
+
+    pub const _0: u32 = 0x30;
+    pub const _9: u32 = 0x39;
+    pub const _7: u32 = 0x37;
+
+    pub const UPPER_A: u32 = 0x41;
+    pub const UPPER_F: u32 = 0x46;
+    pub const UPPER_Z: u32 = 0x5A;
+    pub const LOWER_A: u32 = 0x61;
+    pub const LOWER_F: u32 = 0x66;
+    pub const LOWER_Z: u32 = 0x7A;
+
+    pub const UNDERSCORE: u32 = 0x5F;
+}
+
+/// Check if character is a line break (LF, CR, LS, PS).
+#[wasm_bindgen(js_name = isLineBreak)]
+pub fn is_line_break(ch: u32) -> bool {
+    ch == char_codes::LINE_FEED
+        || ch == char_codes::CARRIAGE_RETURN
+        || ch == char_codes::LINE_SEPARATOR
+        || ch == char_codes::PARAGRAPH_SEPARATOR
+}
+
+/// Check if character is a single-line whitespace (not including line breaks).
+#[wasm_bindgen(js_name = isWhiteSpaceSingleLine)]
+pub fn is_white_space_single_line(ch: u32) -> bool {
+    ch == char_codes::SPACE
+        || ch == char_codes::TAB
+        || ch == char_codes::VERTICAL_TAB
+        || ch == char_codes::FORM_FEED
+        || ch == char_codes::NON_BREAKING_SPACE
+        || ch == char_codes::NEXT_LINE
+        || ch == char_codes::OGHAM
+        || (ch >= char_codes::EN_QUAD && ch <= char_codes::ZERO_WIDTH_SPACE)
+        || ch == char_codes::NARROW_NO_BREAK_SPACE
+        || ch == char_codes::MATHEMATICAL_SPACE
+        || ch == char_codes::IDEOGRAPHIC_SPACE
+        || ch == char_codes::BYTE_ORDER_MARK
+}
+
+/// Check if character is any whitespace (including line breaks).
+#[wasm_bindgen(js_name = isWhiteSpaceLike)]
+pub fn is_white_space_like(ch: u32) -> bool {
+    is_white_space_single_line(ch) || is_line_break(ch)
+}
+
+/// Check if character is a decimal digit (0-9).
+#[wasm_bindgen(js_name = isDigit)]
+pub fn is_digit(ch: u32) -> bool {
+    ch >= char_codes::_0 && ch <= char_codes::_9
+}
+
+/// Check if character is an octal digit (0-7).
+#[wasm_bindgen(js_name = isOctalDigit)]
+pub fn is_octal_digit(ch: u32) -> bool {
+    ch >= char_codes::_0 && ch <= char_codes::_7
+}
+
+/// Check if character is a hexadecimal digit (0-9, A-F, a-f).
+#[wasm_bindgen(js_name = isHexDigit)]
+pub fn is_hex_digit(ch: u32) -> bool {
+    is_digit(ch)
+        || (ch >= char_codes::UPPER_A && ch <= char_codes::UPPER_F)
+        || (ch >= char_codes::LOWER_A && ch <= char_codes::LOWER_F)
+}
+
+/// Check if character is an ASCII letter (A-Z, a-z).
+#[wasm_bindgen(js_name = isASCIILetter)]
+pub fn is_ascii_letter(ch: u32) -> bool {
+    (ch >= char_codes::UPPER_A && ch <= char_codes::UPPER_Z)
+        || (ch >= char_codes::LOWER_A && ch <= char_codes::LOWER_Z)
+}
+
+/// Check if character is a word character (A-Z, a-z, 0-9, _).
+#[wasm_bindgen(js_name = isWordCharacter)]
+pub fn is_word_character(ch: u32) -> bool {
+    is_ascii_letter(ch) || is_digit(ch) || ch == char_codes::UNDERSCORE
+}
+
+// =============================================================================
 // Unit Tests
 // =============================================================================
 
@@ -381,5 +485,86 @@ mod tests {
         assert!(file_extension_is("/path/to/file.d.ts", ".d.ts"));
         assert!(!file_extension_is("file.ts", ".js"));
         assert!(!file_extension_is(".ts", ".ts")); // path must be longer than extension
+    }
+
+    // Character classification tests
+
+    #[test]
+    fn test_is_line_break() {
+        assert!(is_line_break(0x0A)); // LF
+        assert!(is_line_break(0x0D)); // CR
+        assert!(is_line_break(0x2028)); // Line separator
+        assert!(is_line_break(0x2029)); // Paragraph separator
+        assert!(!is_line_break(0x20)); // Space
+        assert!(!is_line_break(0x09)); // Tab
+    }
+
+    #[test]
+    fn test_is_white_space_single_line() {
+        assert!(is_white_space_single_line(0x20)); // Space
+        assert!(is_white_space_single_line(0x09)); // Tab
+        assert!(is_white_space_single_line(0x0B)); // Vertical tab
+        assert!(is_white_space_single_line(0x0C)); // Form feed
+        assert!(is_white_space_single_line(0xA0)); // Non-breaking space
+        assert!(!is_white_space_single_line(0x0A)); // LF is not single-line whitespace
+        assert!(!is_white_space_single_line(0x61)); // 'a'
+    }
+
+    #[test]
+    fn test_is_white_space_like() {
+        // Includes both single-line and line breaks
+        assert!(is_white_space_like(0x20)); // Space
+        assert!(is_white_space_like(0x0A)); // LF
+        assert!(is_white_space_like(0x0D)); // CR
+        assert!(!is_white_space_like(0x61)); // 'a'
+    }
+
+    #[test]
+    fn test_is_digit() {
+        assert!(is_digit('0' as u32));
+        assert!(is_digit('5' as u32));
+        assert!(is_digit('9' as u32));
+        assert!(!is_digit('a' as u32));
+        assert!(!is_digit('A' as u32));
+    }
+
+    #[test]
+    fn test_is_octal_digit() {
+        assert!(is_octal_digit('0' as u32));
+        assert!(is_octal_digit('7' as u32));
+        assert!(!is_octal_digit('8' as u32));
+        assert!(!is_octal_digit('9' as u32));
+    }
+
+    #[test]
+    fn test_is_hex_digit() {
+        assert!(is_hex_digit('0' as u32));
+        assert!(is_hex_digit('9' as u32));
+        assert!(is_hex_digit('a' as u32));
+        assert!(is_hex_digit('f' as u32));
+        assert!(is_hex_digit('A' as u32));
+        assert!(is_hex_digit('F' as u32));
+        assert!(!is_hex_digit('g' as u32));
+        assert!(!is_hex_digit('G' as u32));
+    }
+
+    #[test]
+    fn test_is_ascii_letter() {
+        assert!(is_ascii_letter('a' as u32));
+        assert!(is_ascii_letter('z' as u32));
+        assert!(is_ascii_letter('A' as u32));
+        assert!(is_ascii_letter('Z' as u32));
+        assert!(!is_ascii_letter('0' as u32));
+        assert!(!is_ascii_letter('_' as u32));
+    }
+
+    #[test]
+    fn test_is_word_character() {
+        assert!(is_word_character('a' as u32));
+        assert!(is_word_character('Z' as u32));
+        assert!(is_word_character('0' as u32));
+        assert!(is_word_character('_' as u32));
+        assert!(!is_word_character('-' as u32));
+        assert!(!is_word_character(' ' as u32));
     }
 }

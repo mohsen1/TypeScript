@@ -392,7 +392,31 @@ PROGRESS LOG
 - Bridge: `src/compiler/wasm.ts` + `src/tsc/tsc.ts` integration
 - Verification: `node built/local/tsc.js --version` outputs `[WASM] 2 + 2 = 4`
 
-Next Step: Begin Phase 1.1 (String Utilities)
+[2026-01-01] Phase 1.1 Complete - String Utilities
+--------------------------------------------------
+- Ported `compareStringsCaseSensitive` to Rust
+- Ported `compareStringsCaseInsensitive` to Rust
+- Ported `compareStringsCaseInsensitiveEslintCompatible` to Rust
+- Ported `equateStringsCaseSensitive` and `equateStringsCaseInsensitive`
+- Added Rust `Comparison` enum matching TypeScript
+- 4 Rust unit tests passing
+- Commit: `97292d8aa`
+
+[2026-01-01] Phase 1.2 Complete - Path Utilities
+------------------------------------------------
+- Ported `isAnyDirectorySeparator` to Rust
+- Ported `normalizeSlashes` to Rust
+- Ported `hasTrailingDirectorySeparator` to Rust
+- Ported `pathIsRelative` to Rust
+- Ported `removeTrailingDirectorySeparator` to Rust
+- Ported `ensureTrailingDirectorySeparator` to Rust
+- Ported `hasExtension` to Rust
+- Ported `getBaseFileName` to Rust
+- Ported `fileExtensionIs` to Rust
+- 13 Rust unit tests passing (4 string + 9 path)
+- Commit: `979dde4c9`
+
+Next Step: Continue Phase 1 (more utilities) or begin Phase 2 (Scanner)
 
 ==============================================================================
 ESTIMATED TIMELINE (AGGRESSIVE)

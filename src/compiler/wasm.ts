@@ -33,6 +33,16 @@ export interface WasmModule {
     hasExtension(fileName: string): boolean;
     getBaseFileName(path: string): string;
     fileExtensionIs(path: string, extension: string): boolean;
+
+    // Character classification (Phase 1.3 - Scanner prep)
+    isLineBreak(ch: number): boolean;
+    isWhiteSpaceSingleLine(ch: number): boolean;
+    isWhiteSpaceLike(ch: number): boolean;
+    isDigit(ch: number): boolean;
+    isOctalDigit(ch: number): boolean;
+    isHexDigit(ch: number): boolean;
+    isASCIILetter(ch: number): boolean;
+    isWordCharacter(ch: number): boolean;
 }
 
 // =============================================================================
@@ -223,4 +233,80 @@ export function wasmGetBaseFileName(pathStr: string): string | undefined {
 export function wasmFileExtensionIs(pathStr: string, extension: string): boolean | undefined {
     const wasm = getWasm();
     return wasm?.fileExtensionIs(pathStr, extension);
+}
+
+// =============================================================================
+// Character Classification (Phase 1.3 - Scanner Prep)
+// =============================================================================
+
+/**
+ * Check if character is a line break (Rust implementation).
+ * @internal
+ */
+export function wasmIsLineBreak(ch: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.isLineBreak(ch);
+}
+
+/**
+ * Check if character is single-line whitespace (Rust implementation).
+ * @internal
+ */
+export function wasmIsWhiteSpaceSingleLine(ch: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.isWhiteSpaceSingleLine(ch);
+}
+
+/**
+ * Check if character is any whitespace including line breaks (Rust implementation).
+ * @internal
+ */
+export function wasmIsWhiteSpaceLike(ch: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.isWhiteSpaceLike(ch);
+}
+
+/**
+ * Check if character is a decimal digit (Rust implementation).
+ * @internal
+ */
+export function wasmIsDigit(ch: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.isDigit(ch);
+}
+
+/**
+ * Check if character is an octal digit (Rust implementation).
+ * @internal
+ */
+export function wasmIsOctalDigit(ch: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.isOctalDigit(ch);
+}
+
+/**
+ * Check if character is a hex digit (Rust implementation).
+ * @internal
+ */
+export function wasmIsHexDigit(ch: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.isHexDigit(ch);
+}
+
+/**
+ * Check if character is an ASCII letter (Rust implementation).
+ * @internal
+ */
+export function wasmIsASCIILetter(ch: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.isASCIILetter(ch);
+}
+
+/**
+ * Check if character is a word character (Rust implementation).
+ * @internal
+ */
+export function wasmIsWordCharacter(ch: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.isWordCharacter(ch);
 }
