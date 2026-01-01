@@ -241,7 +241,7 @@ scanner and shares data structures with the type checker.
 - [x] Create `Node` enum encompassing all ~120 node variants
 - [x] Implement `base()` and `base_mut()` accessors for all node types
 - [x] Unit tests passing: 6 parser tests
-- [ ] Consider using `serde` for AST serialization
+- [x] Add `serde` for AST serialization (all 130+ node types)
 
 3.2 Parser Core (IN PROGRESS)
 -----------------------------
@@ -288,10 +288,18 @@ scanner and shares data structures with the type checker.
 - [x] Add TypeScript wasm bridge for parser (`src/compiler/wasm.ts`)
       - `WasmParserStateInstance` interface
       - `wasmCreateParser()` wrapper function
-- [x] 62 Rust tests passing
-- [ ] Add full type parsing (type annotations, generics)
-- [ ] Implement AST-to-TypeScript-AST conversion
-- [ ] Add `--useRustParser` CLI flag
+- [x] 74 Rust tests passing
+- [x] Add full type parsing (type annotations, generics, function types, conditional types)
+      - FunctionType, ConstructorType parsing
+      - ConditionalType (T extends U ? X : Y) parsing
+      - MappedType ({ [K in T]: U }) parsing
+      - IndexedAccessType (T[K]) parsing
+      - TypeOperator (keyof, typeof, readonly, unique, infer) parsing
+      - Predefined types (string, number, boolean, etc.)
+- [x] Implement AST-to-TypeScript-AST conversion (JSON serialization)
+      - `getSourceFileJson()` for recursive node serialization
+      - `getArenaJson()` for full arena export
+- [x] Add `--useRustParser` CLI flag
 
 3.3 JSX & Decorators
 --------------------
@@ -302,9 +310,10 @@ scanner and shares data structures with the type checker.
 
 3.4 Integration
 ---------------
-- [ ] Create `RustParser` wrapper calling into wasm
-- [ ] Feature flag: `--useRustParser`
+- [x] Create `RustParser` wrapper calling into wasm (wasmCreateParser in wasm.ts)
+- [x] Feature flag: `--useRustParser` (sys.ts + tsc.ts)
 - [ ] Roundtrip test: parse → emit → parse must be identical
+- [ ] Wire parser output to TypeScript's AST consumers
 
 Verification Gate: All parser baselines match.
 
@@ -721,7 +730,21 @@ Next Step: Phase 3 - Parser Integration (first target: simple statement parsing)
 - 62 Rust tests passing
 - Commits: `ba5a31abb`, `53c707caf`
 
-Next: Implement full type parsing, AST-to-TypeScript conversion, --useRustParser flag
+[2026-01-01] Phase 3.2 Complete - Type Parsing & Serialization
+---------------------------------------------------------------
+- Added mapped type parsing: { [K in T]: U }, { [K in T as N]: U }
+- Added indexed access type parsing: T[K]
+- Added predefined type keyword handling (string, number, boolean, etc.)
+- Fixed infinite loop when parsing type keywords as identifiers
+- Added serde Serialize derive to all 130+ AST node types
+- Implemented getSourceFileJson() for recursive node serialization
+- Implemented getArenaJson() for full arena export
+- Added --useRustParser CLI flag (sys.ts + tsc.ts)
+- 74 Rust tests passing
+- TypeScript build successful
+- Commits: `ef8751272`, `611914362`, `81aecb56e`
+
+Next: JSX parsing, decorator parsing, parser/TypeScript AST integration
 
 ==============================================================================
 ESTIMATED TIMELINE (AGGRESSIVE)
@@ -732,7 +755,7 @@ ESTIMATED TIMELINE (AGGRESSIVE)
 | 0     | Infrastructure      | 1 week      | Low     | ✅ DONE
 | 1     | Utilities           | 2 weeks     | Low     | ✅ DONE
 | 2     | Scanner             | 3 weeks     | Medium  | 🟢 95% (templates done)
-| 3     | Parser              | 6 weeks     | Medium  | ⬜ Pending
+| 3     | Parser              | 6 weeks     | Medium  | 🟢 80% (types done, JSX pending)
 | 4     | Binder              | 4 weeks     | Medium  | ⬜ Pending
 | 5     | Type Checker        | 16 weeks    | High    | ⬜ Pending
 | 6     | Emitter             | 6 weeks     | Medium  | ⬜ Pending
