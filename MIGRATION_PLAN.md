@@ -245,10 +245,26 @@ scanner and shares data structures with the type checker.
 
 3.2 Parser Core (IN PROGRESS)
 -----------------------------
-- [ ] Port `parseSourceFile()` entry point
-- [ ] Implement statement parsing (`parseStatement`, `parseDeclaration`)
-- [ ] Implement expression parsing (`parseExpression`, `parseBinaryExpression`)
-- [ ] Handle automatic semicolon insertion (ASI)
+- [x] Create `wasm/src/parser_impl.rs` module
+- [x] Implement `ParserState` struct with scanner integration
+- [x] Port `parseSourceFile()` entry point
+- [x] Implement statement parsing:
+      - `parseStatement`, `parseEmptyStatement`, `parseBlock`
+      - `parseVariableStatement`, `parseVariableDeclarationList`
+      - `parseIfStatement`, `parseReturnStatement`, `parseExpressionStatement`
+      - `parseFunctionDeclaration`
+- [x] Implement expression parsing:
+      - `parseExpression`, `parseBinaryExpression` with precedence
+      - `parseUnaryExpression`, `parsePostfixExpression`
+      - `parseLeftHandSideExpression`, `parsePrimaryExpression`
+      - `parseIdentifier`, `parseNumericLiteral`, `parseStringLiteral`
+      - `parseArrayLiteral`, `parseObjectLiteral`, `parsePropertyAssignment`
+      - `parseParenthesizedExpression`, `parseArgumentList`
+- [x] Handle automatic semicolon insertion (ASI)
+- [x] 4 parser implementation tests passing
+- [ ] Add type parsing (full type annotation support)
+- [ ] Add class parsing
+- [ ] Add import/export parsing
 
 3.3 JSX & Decorators
 --------------------
@@ -612,6 +628,32 @@ Verified:
 - Scanner verification: 0 mismatches
 
 Next Step: Phase 3 - Parser Integration (first target: simple statement parsing)
+
+[2026-01-01] Phase 3.1 Complete - AST Node Definitions
+------------------------------------------------------
+- Created `wasm/src/parser.rs` with ~120 AST node type definitions
+- Flag constants as const modules: NodeFlags, ModifierFlags, TransformFlags
+- Extended SyntaxKind (167-309) for node types beyond tokens
+- Core structures: NodeBase, NodeIndex, NodeList, NodeArena
+- All expression, statement, declaration, and type node types
+- Import/Export declarations with specifiers and attributes
+- JSX nodes: JsxElement, JsxAttribute, JsxExpression, etc.
+- Node enum with base()/base_mut() accessors for all ~120 variants
+- 6 parser AST tests passing
+- Commit: `e3f1f486e`
+
+[2026-01-01] Phase 3.2 Started - Parser Core Implementation
+------------------------------------------------------------
+- Created `wasm/src/parser_impl.rs` with ParserState struct
+- Integrated scanner for tokenization
+- Implemented parseSourceFile() entry point producing SourceFile AST
+- Statement parsing: variable, function, if, return, block, expression statements
+- Expression parsing with operator precedence for binary expressions
+- Primary expressions: identifiers, literals, arrays, objects
+- Left-hand-side: property access, call expressions
+- Automatic semicolon insertion (ASI) support
+- 4 parser implementation tests passing (62 total tests)
+- Basic parsing works for simple TypeScript constructs
 
 ==============================================================================
 ESTIMATED TIMELINE (AGGRESSIVE)
