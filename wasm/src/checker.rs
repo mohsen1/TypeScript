@@ -672,6 +672,34 @@ impl TypeArena {
         self.alloc(Type::Object(obj))
     }
 
+    /// Create a class type with properties and construct signatures.
+    pub fn create_class_type(
+        &mut self,
+        properties: Vec<SymbolId>,
+        construct_signatures: Vec<Signature>,
+        call_signatures: Vec<Signature>,
+    ) -> TypeId {
+        let mut obj = ObjectType::new(object_flags::CLASS, SymbolId::NONE);
+        obj.properties = properties;
+        obj.construct_signatures = construct_signatures;
+        obj.call_signatures = call_signatures;
+        self.alloc(Type::Object(obj))
+    }
+
+    /// Create an interface type with properties and signatures.
+    pub fn create_interface_type(
+        &mut self,
+        properties: Vec<SymbolId>,
+        construct_signatures: Vec<Signature>,
+        call_signatures: Vec<Signature>,
+    ) -> TypeId {
+        let mut obj = ObjectType::new(object_flags::INTERFACE, SymbolId::NONE);
+        obj.properties = properties;
+        obj.construct_signatures = construct_signatures;
+        obj.call_signatures = call_signatures;
+        self.alloc(Type::Object(obj))
+    }
+
     /// Create a union type from a list of types.
     pub fn create_union_type(&mut self, types: Vec<TypeId>) -> TypeId {
         // Filter duplicates and flatten nested unions
@@ -1065,6 +1093,16 @@ impl<'a> CheckerState<'a> {
                 self.get_type_of_node(pe.expression)
             }
 
+            // Class declarations
+            Node::ClassDeclaration(cd) => {
+                self.get_type_of_class_declaration(node, cd)
+            }
+
+            // Interface declarations
+            Node::InterfaceDeclaration(id) => {
+                self.get_type_of_interface_declaration(node, id)
+            }
+
             // Default: return any
             _ => self.types.any_type,
         }
@@ -1151,6 +1189,228 @@ impl<'a> CheckerState<'a> {
             // Multiple types - create union (would be Array<T | U | ...> in full impl)
             self.types.create_union_type(element_types)
         }
+    }
+
+    /// Get the type of a class declaration.
+    /// Creates an ObjectType with CLASS object flags, containing all class members.
+    fn get_type_of_class_declaration(
+        &mut self,
+        _node: NodeIndex,
+        class: &crate::parser::ClassDeclaration,
+    ) -> TypeId {
+        use crate::parser::Node;
+
+        let mut properties = Vec::new();
+        let mut call_signatures = Vec::new();
+        let mut construct_signatures = Vec::new();
+
+        // Process class members
+        for &member_idx in &class.members.nodes {
+            if let Some(member_node) = self.node_arena.get(member_idx) {
+                match member_node {
+                    // Property declarations
+                    Node::PropertyDeclaration(pd) => {
+                        // Get property name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(pd.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get property type
+                        let prop_type = if !pd.type_annotation.is_none() {
+                            self.get_type_of_node(pd.type_annotation)
+                        } else if !pd.initializer.is_none() {
+                            self.get_type_of_node(pd.initializer)
+                        } else {
+                            self.types.any_type
+                        };
+
+                        // Create a symbol for this property
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::PROPERTY, name.clone());
+                        self.symbol_types.insert(symbol_id, prop_type);
+                        properties.push(symbol_id);
+                    }
+
+                    // Method declarations
+                    Node::MethodDeclaration(md) => {
+                        // Get method name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(md.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get method type
+                        let method_type = self.get_type_of_function_like_with_type_params(
+                            member_idx,
+                            &md.parameters,
+                            md.type_annotation,
+                            md.type_parameters.as_ref(),
+                        );
+
+                        // Create a symbol for this method
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::METHOD, name.clone());
+                        self.symbol_types.insert(symbol_id, method_type);
+                        properties.push(symbol_id);
+                    }
+
+                    // Constructor declaration
+                    Node::ConstructorDeclaration(cd) => {
+                        // Create a construct signature
+                        let mut signature = Signature::new(member_idx);
+
+                        // Add parameters
+                        for &param_idx in &cd.parameters.nodes {
+                            if let Some(Node::ParameterDeclaration(param)) = self.node_arena.get(param_idx) {
+                                if let Some(Node::Identifier(id)) = self.node_arena.get(param.name) {
+                                    let param_symbol = self.local_symbols_mut().alloc(
+                                        symbol_flags::FUNCTION_SCOPED_VARIABLE,
+                                        id.escaped_text.clone(),
+                                    );
+                                    signature.parameters.push(param_symbol);
+                                }
+                            }
+                        }
+
+                        signature.min_argument_count = signature.parameters.len() as u32;
+                        construct_signatures.push(signature);
+                    }
+
+                    // Get accessor
+                    Node::GetAccessorDeclaration(ga) => {
+                        // Get accessor name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(ga.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get return type
+                        let get_type = if !ga.type_annotation.is_none() {
+                            self.get_type_of_node(ga.type_annotation)
+                        } else {
+                            self.types.any_type
+                        };
+
+                        // Create a symbol for this accessor
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::GET_ACCESSOR, name.clone());
+                        self.symbol_types.insert(symbol_id, get_type);
+                        properties.push(symbol_id);
+                    }
+
+                    // Set accessor
+                    Node::SetAccessorDeclaration(sa) => {
+                        // Get accessor name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(sa.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Set accessor type is the parameter type
+                        let set_type = if !sa.parameters.nodes.is_empty() {
+                            if let Some(Node::ParameterDeclaration(param)) =
+                                self.node_arena.get(sa.parameters.nodes[0])
+                            {
+                                if !param.type_annotation.is_none() {
+                                    self.get_type_of_node(param.type_annotation)
+                                } else {
+                                    self.types.any_type
+                                }
+                            } else {
+                                self.types.any_type
+                            }
+                        } else {
+                            self.types.any_type
+                        };
+
+                        // Create a symbol for this accessor
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::SET_ACCESSOR, name.clone());
+                        self.symbol_types.insert(symbol_id, set_type);
+                        properties.push(symbol_id);
+                    }
+
+                    _ => {}
+                }
+            }
+        }
+
+        // Create the class type as an ObjectType with CLASS object flags
+        let class_type = self.types.create_class_type(properties, construct_signatures, call_signatures);
+        class_type
+    }
+
+    /// Get the type of an interface declaration.
+    /// Creates an ObjectType with INTERFACE object flags.
+    fn get_type_of_interface_declaration(
+        &mut self,
+        _node: NodeIndex,
+        iface: &crate::parser::InterfaceDeclaration,
+    ) -> TypeId {
+        use crate::parser::Node;
+
+        let mut properties = Vec::new();
+        let mut call_signatures = Vec::new();
+        let mut construct_signatures = Vec::new();
+
+        // Process interface members
+        for &member_idx in &iface.members.nodes {
+            if let Some(member_node) = self.node_arena.get(member_idx) {
+                match member_node {
+                    // Property signatures
+                    Node::PropertySignature(ps) => {
+                        // Get property name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(ps.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get property type
+                        let prop_type = if !ps.type_annotation.is_none() {
+                            self.get_type_of_node(ps.type_annotation)
+                        } else {
+                            self.types.any_type
+                        };
+
+                        // Create a symbol for this property
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::PROPERTY, name.clone());
+                        self.symbol_types.insert(symbol_id, prop_type);
+                        properties.push(symbol_id);
+                    }
+
+                    // Method signatures
+                    Node::MethodSignature(ms) => {
+                        // Get method name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(ms.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get method type
+                        let method_type = self.get_type_of_function_like_with_type_params(
+                            member_idx,
+                            &ms.parameters,
+                            ms.type_annotation,
+                            ms.type_parameters.as_ref(),
+                        );
+
+                        // Create a symbol for this method
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::METHOD, name.clone());
+                        self.symbol_types.insert(symbol_id, method_type);
+                        properties.push(symbol_id);
+                    }
+
+                    // TODO: Add CallSignature and ConstructSignature when parser supports them
+                    _ => {}
+                }
+            }
+        }
+
+        // Create the interface type as an ObjectType with INTERFACE object flags
+        self.types.create_interface_type(properties, construct_signatures, call_signatures)
     }
 
     /// Get the type of a type literal ({ x: number, y: string }).
@@ -2721,5 +2981,180 @@ mod tests {
         // Type to string should work
         let type_str = checker.type_to_string(union_type);
         assert!(type_str.contains("|"));
+    }
+
+    #[test]
+    fn test_class_type() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test class type
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"class Person {
+                name: string;
+                age: number;
+                greet(): string { return "hello"; }
+            }"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("Person"));
+
+        if let Some(symbol) = binder.file_locals.get("Person") {
+            let person_type = checker.get_type_of_symbol(symbol);
+            let typ = checker.types.get(person_type).unwrap();
+
+            if let Type::Object(obj) = typ {
+                // Should have CLASS object flag
+                assert!(obj.has_object_flags(object_flags::CLASS));
+                // Should have 3 properties: name, age, greet
+                assert_eq!(obj.properties.len(), 3);
+            } else {
+                panic!("Expected Object type with CLASS flag, got {:?}", typ);
+            }
+        }
+    }
+
+    #[test]
+    fn test_class_with_constructor() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test class with constructor - simplified without this.x assignments
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"class Point {
+                x: number;
+                y: number;
+                constructor(a: number, b: number) { }
+            }"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("Point"));
+
+        if let Some(symbol) = binder.file_locals.get("Point") {
+            let point_type = checker.get_type_of_symbol(symbol);
+            let typ = checker.types.get(point_type).unwrap();
+
+            if let Type::Object(obj) = typ {
+                // Should have CLASS object flag
+                assert!(obj.has_object_flags(object_flags::CLASS));
+                // Should have 2 properties: x, y
+                assert_eq!(obj.properties.len(), 2);
+                // Should have 1 construct signature
+                assert_eq!(obj.construct_signatures.len(), 1);
+                // Construct signature should have 2 parameters
+                assert_eq!(obj.construct_signatures[0].parameters.len(), 2);
+            } else {
+                panic!("Expected Object type with CLASS flag, got {:?}", typ);
+            }
+        }
+    }
+
+    #[test]
+    fn test_interface_type() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test interface type
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"interface Animal {
+                name: string;
+                speak(): void;
+            }"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("Animal"));
+
+        if let Some(symbol) = binder.file_locals.get("Animal") {
+            let animal_type = checker.get_type_of_symbol(symbol);
+            let typ = checker.types.get(animal_type).unwrap();
+
+            if let Type::Object(obj) = typ {
+                // Should have INTERFACE object flag
+                assert!(obj.has_object_flags(object_flags::INTERFACE));
+                // Should have 2 properties: name, speak
+                assert_eq!(obj.properties.len(), 2);
+            } else {
+                panic!("Expected Object type with INTERFACE flag, got {:?}", typ);
+            }
+        }
+    }
+
+    #[test]
+    fn test_class_with_accessors() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test class with get/set accessors - simplified without this references
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"class Counter {
+                _value: number;
+                get value(): number { return 0; }
+                set value(v: number) { }
+            }"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("Counter"));
+
+        if let Some(symbol) = binder.file_locals.get("Counter") {
+            let counter_type = checker.get_type_of_symbol(symbol);
+            let typ = checker.types.get(counter_type).unwrap();
+
+            if let Type::Object(obj) = typ {
+                // Should have CLASS object flag
+                assert!(obj.has_object_flags(object_flags::CLASS));
+                // Should have 3 properties: _value, get value, set value
+                assert_eq!(obj.properties.len(), 3);
+            } else {
+                panic!("Expected Object type with CLASS flag, got {:?}", typ);
+            }
+        }
     }
 }
