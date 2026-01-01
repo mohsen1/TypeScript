@@ -37,6 +37,10 @@ use crate::parser::{
     TypeReference, ArrayType, TupleType, UnionType, IntersectionType,
     FunctionType, ConstructorType, TypeLiteral, ParenthesizedType, TypeParameterDeclaration,
     LiteralType, ConditionalType, InferType, TypeOperator, TypeQuery, MappedType, IndexedAccessType,
+    // JSX
+    JsxElement, JsxSelfClosingElement, JsxOpeningElement, JsxClosingElement,
+    JsxFragment, JsxOpeningFragment, JsxClosingFragment,
+    JsxAttributes, JsxAttribute, JsxSpreadAttribute, JsxExpression, JsxText, JsxNamespacedName,
     // Misc
     SourceFile, HeritageClause, ParameterDeclaration,
 };
@@ -2066,6 +2070,10 @@ impl ParserState {
             SyntaxKind::TrueKeyword | SyntaxKind::FalseKeyword => self.parse_boolean_literal(),
             SyntaxKind::NullKeyword => self.parse_null_literal(),
             SyntaxKind::ThisKeyword => self.parse_this_expression(),
+            SyntaxKind::LessThanToken => {
+                // JSX element or fragment: <Foo> or <>
+                self.parse_jsx_element_or_self_closing_or_fragment(true)
+            }
             _ => {
                 // Create a missing identifier
                 self.parse_error_at_current_token("Expression expected");
@@ -3224,6 +3232,364 @@ impl ParserState {
             _ => false,
         }
     }
+
+    // =========================================================================
+    // JSX Parsing
+    // =========================================================================
+
+    /// Parse a JSX element, self-closing element, or fragment.
+    /// Called when we see `<` in an expression context.
+    fn parse_jsx_element_or_self_closing_or_fragment(&mut self, in_expression_context: bool) -> NodeIndex {
+        let pos = self.get_full_start();
+        let opening = self.parse_jsx_opening_or_self_closing_or_fragment(in_expression_context);
+
+        match self.arena.get(opening) {
+            Some(Node::JsxOpeningElement(_)) => {
+                // Parse children and closing element
+                let children = self.parse_jsx_children();
+                let closing = self.parse_jsx_closing_element();
+
+                let end = self.get_token_start();
+                let element = JsxElement {
+                    base: NodeBase::new_ext(syntax_kind_ext::JSX_ELEMENT, pos, end),
+                    opening_element: opening,
+                    children,
+                    closing_element: closing,
+                };
+                self.alloc_node(Node::JsxElement(element))
+            }
+            Some(Node::JsxOpeningFragment(_)) => {
+                // Parse children and closing fragment
+                let children = self.parse_jsx_children();
+                let closing = self.parse_jsx_closing_fragment();
+
+                let end = self.get_token_start();
+                let fragment = JsxFragment {
+                    base: NodeBase::new_ext(syntax_kind_ext::JSX_FRAGMENT, pos, end),
+                    opening_fragment: opening,
+                    children,
+                    closing_fragment: closing,
+                };
+                self.alloc_node(Node::JsxFragment(fragment))
+            }
+            Some(Node::JsxSelfClosingElement(_)) => {
+                // Self-closing element, already complete
+                opening
+            }
+            _ => opening,
+        }
+    }
+
+    /// Parse JSX opening element, self-closing element, or opening fragment.
+    fn parse_jsx_opening_or_self_closing_or_fragment(&mut self, in_expression_context: bool) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::LessThanToken);
+
+        // Check for fragment: <>
+        if self.is_token(SyntaxKind::GreaterThanToken) {
+            self.next_token(); // consume >
+            let end = self.get_token_start();
+            let fragment = JsxOpeningFragment {
+                base: NodeBase::new_ext(syntax_kind_ext::JSX_OPENING_FRAGMENT, pos, end),
+            };
+            return self.alloc_node(Node::JsxOpeningFragment(fragment));
+        }
+
+        // Parse tag name
+        let tag_name = self.parse_jsx_element_name();
+
+        // Parse optional type arguments
+        let type_arguments = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_arguments())
+        } else {
+            None
+        };
+
+        // Parse attributes
+        let attributes = self.parse_jsx_attributes();
+
+        // Check for self-closing: />
+        if self.is_token(SyntaxKind::SlashToken) {
+            self.next_token(); // consume /
+            self.parse_expected(SyntaxKind::GreaterThanToken);
+            let end = self.get_token_start();
+            let element = JsxSelfClosingElement {
+                base: NodeBase::new_ext(syntax_kind_ext::JSX_SELF_CLOSING_ELEMENT, pos, end),
+                tag_name,
+                type_arguments,
+                attributes,
+            };
+            return self.alloc_node(Node::JsxSelfClosingElement(element));
+        }
+
+        // Opening element: consume > and continue parsing children
+        self.parse_expected(SyntaxKind::GreaterThanToken);
+        let end = self.get_token_start();
+        let element = JsxOpeningElement {
+            base: NodeBase::new_ext(syntax_kind_ext::JSX_OPENING_ELEMENT, pos, end),
+            tag_name,
+            type_arguments,
+            attributes,
+        };
+        self.alloc_node(Node::JsxOpeningElement(element))
+    }
+
+    /// Parse JSX element name (identifier, this, namespaced, or property access).
+    fn parse_jsx_element_name(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        // Parse the initial name (identifier or this)
+        let mut expr = if self.is_token(SyntaxKind::ThisKeyword) {
+            self.next_token();
+            let end = self.get_token_start();
+            let base = NodeBase::new(SyntaxKind::ThisKeyword, pos, end);
+            self.alloc_node(Node::Token(base))
+        } else {
+            let name = self.parse_identifier();
+
+            // Check for namespaced name (a:b)
+            if self.is_token(SyntaxKind::ColonToken) {
+                self.next_token(); // consume :
+                let local_name = self.parse_identifier();
+                let end = self.get_token_start();
+                let namespaced = JsxNamespacedName {
+                    base: NodeBase::new_ext(syntax_kind_ext::JSX_NAMESPACED_NAME, pos, end),
+                    namespace: name,
+                    name: local_name,
+                };
+                return self.alloc_node(Node::JsxNamespacedName(namespaced));
+            }
+
+            name
+        };
+
+        // Parse property access chain (Foo.Bar.Baz)
+        while self.is_token(SyntaxKind::DotToken) {
+            self.next_token(); // consume .
+            let name = self.parse_identifier();
+            let end = self.get_token_start();
+            let access = PropertyAccessExpression {
+                base: NodeBase::new_ext(syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION, pos, end),
+                expression: expr,
+                name,
+                question_dot_token: false,
+            };
+            expr = self.alloc_node(Node::PropertyAccessExpression(access));
+        }
+
+        expr
+    }
+
+    /// Parse JSX attributes list.
+    fn parse_jsx_attributes(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let mut properties = NodeList::new();
+
+        while !self.is_token(SyntaxKind::GreaterThanToken)
+            && !self.is_token(SyntaxKind::SlashToken)
+            && !self.at_end()
+        {
+            if self.is_token(SyntaxKind::OpenBraceToken) {
+                // Spread attribute: {...props}
+                properties.push(self.parse_jsx_spread_attribute());
+            } else {
+                // Regular attribute: name="value" or name={expr} or just name
+                properties.push(self.parse_jsx_attribute());
+            }
+        }
+
+        let end = self.get_token_start();
+        properties.pos = pos;
+        properties.end = end;
+        let attrs = JsxAttributes {
+            base: NodeBase::new_ext(syntax_kind_ext::JSX_ATTRIBUTES, pos, end),
+            properties,
+        };
+        self.alloc_node(Node::JsxAttributes(attrs))
+    }
+
+    /// Parse a single JSX attribute.
+    fn parse_jsx_attribute(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let name = self.parse_jsx_attribute_name();
+
+        // Check for value: = followed by string, expression, or nested JSX
+        let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
+            if self.is_token(SyntaxKind::StringLiteral) {
+                self.parse_string_literal()
+            } else if self.is_token(SyntaxKind::OpenBraceToken) {
+                self.parse_jsx_expression()
+            } else if self.is_token(SyntaxKind::LessThanToken) {
+                self.parse_jsx_element_or_self_closing_or_fragment(true)
+            } else {
+                self.parse_error_at_current_token("JSX attribute value expected");
+                NodeIndex::NONE
+            }
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end = self.get_token_start();
+        let attr = JsxAttribute {
+            base: NodeBase::new_ext(syntax_kind_ext::JSX_ATTRIBUTE, pos, end),
+            name,
+            initializer,
+        };
+        self.alloc_node(Node::JsxAttribute(attr))
+    }
+
+    /// Parse JSX attribute name (possibly namespaced).
+    fn parse_jsx_attribute_name(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let name = self.parse_identifier();
+
+        // Check for namespaced name (a:b)
+        if self.is_token(SyntaxKind::ColonToken) {
+            self.next_token(); // consume :
+            let local_name = self.parse_identifier();
+            let end = self.get_token_start();
+            let namespaced = JsxNamespacedName {
+                base: NodeBase::new_ext(syntax_kind_ext::JSX_NAMESPACED_NAME, pos, end),
+                namespace: name,
+                name: local_name,
+            };
+            return self.alloc_node(Node::JsxNamespacedName(namespaced));
+        }
+
+        name
+    }
+
+    /// Parse a JSX spread attribute: {...props}
+    fn parse_jsx_spread_attribute(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+        self.parse_expected(SyntaxKind::DotDotDotToken);
+        let expression = self.parse_expression();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end = self.get_token_start();
+        let spread = JsxSpreadAttribute {
+            base: NodeBase::new_ext(syntax_kind_ext::JSX_SPREAD_ATTRIBUTE, pos, end),
+            expression,
+        };
+        self.alloc_node(Node::JsxSpreadAttribute(spread))
+    }
+
+    /// Parse a JSX expression: {expr} or {...expr}
+    fn parse_jsx_expression(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+
+        // Check for spread: {...}
+        let dot_dot_dot_token = self.parse_optional(SyntaxKind::DotDotDotToken);
+
+        // Check for empty expression: {}
+        let expression = if self.is_token(SyntaxKind::CloseBraceToken) {
+            NodeIndex::NONE
+        } else {
+            self.parse_expression()
+        };
+
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end = self.get_token_start();
+        let expr = JsxExpression {
+            base: NodeBase::new_ext(syntax_kind_ext::JSX_EXPRESSION, pos, end),
+            dot_dot_dot_token,
+            expression,
+        };
+        self.alloc_node(Node::JsxExpression(expr))
+    }
+
+    /// Parse JSX children (elements, text, expressions).
+    fn parse_jsx_children(&mut self) -> NodeList {
+        let pos = self.get_full_start();
+        let mut children = NodeList::new();
+
+        loop {
+            // Check for closing tag or closing fragment
+            if self.is_token(SyntaxKind::LessThanToken) {
+                // Look ahead for </
+                let saved = self.scanner.save_state();
+                let saved_token = self.current_token;
+                self.next_token();
+
+                if self.is_token(SyntaxKind::SlashToken) {
+                    // Closing tag/fragment, restore and stop
+                    self.scanner.restore_state(saved);
+                    self.current_token = saved_token;
+                    break;
+                }
+
+                // Nested JSX element
+                self.scanner.restore_state(saved);
+                self.current_token = saved_token;
+                children.push(self.parse_jsx_element_or_self_closing_or_fragment(false));
+            } else if self.is_token(SyntaxKind::OpenBraceToken) {
+                // JSX expression: {expr}
+                children.push(self.parse_jsx_expression());
+            } else if self.is_token(SyntaxKind::JsxText) {
+                // Text node
+                children.push(self.parse_jsx_text());
+            } else if self.at_end() {
+                break;
+            } else {
+                // Consume as text for now (simplified handling)
+                // In a full implementation, we'd use scanJsxText() to properly tokenize
+                break;
+            }
+        }
+
+        let end = self.get_token_start();
+        children.pos = pos;
+        children.end = end;
+        children
+    }
+
+    /// Parse JSX text content.
+    fn parse_jsx_text(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let text = self.get_token_value();
+        self.next_token();
+        let end = self.get_token_start();
+
+        let jsx_text = JsxText {
+            base: NodeBase::new(SyntaxKind::JsxText, pos, end),
+            text,
+            contains_only_trivia_white_spaces: false, // TODO: compute this
+        };
+        self.alloc_node(Node::JsxText(jsx_text))
+    }
+
+    /// Parse a JSX closing element: </Foo>
+    fn parse_jsx_closing_element(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::LessThanToken);
+        self.parse_expected(SyntaxKind::SlashToken);
+        let tag_name = self.parse_jsx_element_name();
+        self.parse_expected(SyntaxKind::GreaterThanToken);
+
+        let end = self.get_token_start();
+        let closing = JsxClosingElement {
+            base: NodeBase::new_ext(syntax_kind_ext::JSX_CLOSING_ELEMENT, pos, end),
+            tag_name,
+        };
+        self.alloc_node(Node::JsxClosingElement(closing))
+    }
+
+    /// Parse a JSX closing fragment: </>
+    fn parse_jsx_closing_fragment(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::LessThanToken);
+        self.parse_expected(SyntaxKind::SlashToken);
+        self.parse_expected(SyntaxKind::GreaterThanToken);
+
+        let end = self.get_token_start();
+        let closing = JsxClosingFragment {
+            base: NodeBase::new_ext(syntax_kind_ext::JSX_CLOSING_FRAGMENT, pos, end),
+        };
+        self.alloc_node(Node::JsxClosingFragment(closing))
+    }
 }
 
 // =============================================================================
@@ -3574,5 +3940,58 @@ mod tests {
         let arena_json = parser.get_arena_json();
         assert!(arena_json.starts_with("["));
         assert!(arena_json.ends_with("]"));
+    }
+
+    #[test]
+    fn test_parse_jsx_self_closing() {
+        let mut parser = ParserState::new("test.tsx".to_string(), "const x = <Foo />;".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            // Should have a variable statement with JSX self-closing element
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_jsx_element() {
+        let mut parser = ParserState::new("test.tsx".to_string(), "const x = <div></div>;".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_jsx_with_attributes() {
+        let mut parser = ParserState::new("test.tsx".to_string(), "const x = <Button onClick={handler} disabled />;".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_jsx_fragment() {
+        let mut parser = ParserState::new("test.tsx".to_string(), "const x = <></>;".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+        } else {
+            panic!("Expected SourceFile");
+        }
     }
 }
