@@ -62,6 +62,10 @@ export interface WasmModule {
     // Scanner class (Phase 2)
     ScannerState: WasmScannerStateClass;
     createScanner(text: string, skipTrivia: boolean): WasmScannerStateInstance;
+
+    // Parser class (Phase 3)
+    ParserState: WasmParserStateClass;
+    createParser(fileName: string, sourceText: string): WasmParserStateInstance;
 }
 
 /** @internal */
@@ -507,3 +511,45 @@ export function wasmCreateScanner(text: string, skipTrivia: boolean): WasmScanne
  * @internal
  */
 export type WasmScanner = WasmScannerStateInstance;
+
+// =============================================================================
+// Parser Types (Phase 3)
+// =============================================================================
+
+/** @internal */
+interface WasmParserStateClass {
+    new(fileName: string, sourceText: string): WasmParserStateInstance;
+}
+
+/** @internal */
+interface WasmParserStateInstance {
+    /** Parse the source file and return the root node index */
+    parseSourceFile(): number;
+    /** Get the AST as a JSON string for the given root index */
+    getSourceFileJson(rootIdx: number): string;
+    /** Get the number of nodes in the AST */
+    getNodeCount(): number;
+    /** Get all identifiers found during parsing */
+    getIdentifiers(): string[];
+    /** Get parse diagnostics as JSON */
+    getDiagnosticsJson(): string;
+    /** Free the parser resources */
+    free(): void;
+}
+
+/**
+ * Create a new Rust parser instance.
+ * Returns undefined if wasm is unavailable.
+ * @internal
+ */
+export function wasmCreateParser(fileName: string, sourceText: string): WasmParserStateInstance | undefined {
+    const wasm = getWasm();
+    if (!wasm) return undefined;
+    return wasm.createParser(fileName, sourceText);
+}
+
+/**
+ * Type alias for the Rust parser instance.
+ * @internal
+ */
+export type WasmParser = WasmParserStateInstance;
