@@ -92,6 +92,9 @@ interface WasmScannerStateInstance {
     reScanGreaterToken(): number;
     reScanSlashToken(): number;
     reScanAsteriskEqualsToken(): number;
+    // Template rescan methods (Phase 2.7)
+    reScanTemplateToken(isTaggedTemplate: boolean): number;
+    reScanTemplateHeadOrNoSubstitutionTemplate(): number;
 }
 
 // =============================================================================

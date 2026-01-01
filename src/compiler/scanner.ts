@@ -4200,9 +4200,9 @@ export function createRustScanner(
         reScanGreaterToken: () => getScanner().reScanGreaterToken() as SyntaxKind,
         reScanSlashToken: () => getScanner().reScanSlashToken() as SyntaxKind,
         reScanAsteriskEqualsToken: () => getScanner().reScanAsteriskEqualsToken() as SyntaxKind,
+        reScanTemplateToken: (isTaggedTemplate: boolean) => getScanner().reScanTemplateToken(isTaggedTemplate) as SyntaxKind,
+        reScanTemplateHeadOrNoSubstitutionTemplate: () => getScanner().reScanTemplateHeadOrNoSubstitutionTemplate() as SyntaxKind,
         // Rescan methods - not yet implemented in Rust
-        reScanTemplateToken: () => notImplemented("reScanTemplateToken"),
-        reScanTemplateHeadOrNoSubstitutionTemplate: () => notImplemented("reScanTemplateHeadOrNoSubstitutionTemplate"),
         reScanJsxAttributeValue: () => notImplemented("reScanJsxAttributeValue"),
         reScanJsxToken: () => notImplemented("reScanJsxToken"),
         reScanLessThanToken: () => notImplemented("reScanLessThanToken"),
