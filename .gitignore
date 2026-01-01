@@ -67,3 +67,4 @@ package-lock.json
 
 wasm/pkg/
 wasm-demo/dist/
+wasm/target/

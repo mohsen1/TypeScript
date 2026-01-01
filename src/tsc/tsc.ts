@@ -15,6 +15,12 @@ if (cmpResult !== undefined) {
     ts.sys.write(`[WASM] compareStringsCaseSensitive("abc", "abd") = ${cmpName}${ts.sys.newLine}`);
 }
 
+// WASM path utilities verification (Phase 1.2)
+const normalizedPath = ts.wasmNormalizeSlashes("path\\to\\file");
+if (normalizedPath !== undefined) {
+    ts.sys.write(`[WASM] normalizeSlashes("path\\\\to\\\\file") = "${normalizedPath}"${ts.sys.newLine}`);
+}
+
 // enable deprecation logging
 ts.Debug.loggingHost = {
     log(_level, s) {

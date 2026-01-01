@@ -22,6 +22,17 @@ export interface WasmModule {
     compareStringsCaseInsensitiveEslintCompatible(a: string | undefined, b: string | undefined): Comparison;
     equateStringsCaseSensitive(a: string, b: string): boolean;
     equateStringsCaseInsensitive(a: string, b: string): boolean;
+
+    // Path utilities (Phase 1.2)
+    isAnyDirectorySeparator(charCode: number): boolean;
+    normalizeSlashes(path: string): string;
+    hasTrailingDirectorySeparator(path: string): boolean;
+    pathIsRelative(path: string): boolean;
+    removeTrailingDirectorySeparator(path: string): string;
+    ensureTrailingDirectorySeparator(path: string): string;
+    hasExtension(fileName: string): boolean;
+    getBaseFileName(path: string): string;
+    fileExtensionIs(path: string, extension: string): boolean;
 }
 
 // =============================================================================
@@ -127,4 +138,89 @@ export function wasmEquateStringsCaseSensitive(a: string, b: string): boolean | 
 export function wasmEquateStringsCaseInsensitive(a: string, b: string): boolean | undefined {
     const wasm = getWasm();
     return wasm?.equateStringsCaseInsensitive(a, b);
+}
+
+// =============================================================================
+// Path Utilities (Phase 1.2)
+// =============================================================================
+
+/**
+ * Determines whether a charCode corresponds to `/` or `\` (Rust implementation).
+ * @internal
+ */
+export function wasmIsAnyDirectorySeparator(charCode: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.isAnyDirectorySeparator(charCode);
+}
+
+/**
+ * Normalize path separators, converting `\` into `/` (Rust implementation).
+ * @internal
+ */
+export function wasmNormalizeSlashes(pathStr: string): string | undefined {
+    const wasm = getWasm();
+    return wasm?.normalizeSlashes(pathStr);
+}
+
+/**
+ * Determines whether a path has a trailing separator (Rust implementation).
+ * @internal
+ */
+export function wasmHasTrailingDirectorySeparator(pathStr: string): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.hasTrailingDirectorySeparator(pathStr);
+}
+
+/**
+ * Determines whether a path starts with a relative path component (Rust implementation).
+ * @internal
+ */
+export function wasmPathIsRelative(pathStr: string): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.pathIsRelative(pathStr);
+}
+
+/**
+ * Removes a trailing directory separator from a path (Rust implementation).
+ * @internal
+ */
+export function wasmRemoveTrailingDirectorySeparator(pathStr: string): string | undefined {
+    const wasm = getWasm();
+    return wasm?.removeTrailingDirectorySeparator(pathStr);
+}
+
+/**
+ * Ensures a path has a trailing directory separator (Rust implementation).
+ * @internal
+ */
+export function wasmEnsureTrailingDirectorySeparator(pathStr: string): string | undefined {
+    const wasm = getWasm();
+    return wasm?.ensureTrailingDirectorySeparator(pathStr);
+}
+
+/**
+ * Determines whether a path has an extension (Rust implementation).
+ * @internal
+ */
+export function wasmHasExtension(fileName: string): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.hasExtension(fileName);
+}
+
+/**
+ * Returns the path except for its containing directory name (Rust implementation).
+ * @internal
+ */
+export function wasmGetBaseFileName(pathStr: string): string | undefined {
+    const wasm = getWasm();
+    return wasm?.getBaseFileName(pathStr);
+}
+
+/**
+ * Check if path ends with a specific extension (Rust implementation).
+ * @internal
+ */
+export function wasmFileExtensionIs(pathStr: string, extension: string): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.fileExtensionIs(pathStr, extension);
 }

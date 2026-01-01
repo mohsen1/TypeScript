@@ -124,6 +124,104 @@ pub fn equate_strings_case_insensitive(a: &str, b: &str) -> bool {
 }
 
 // =============================================================================
+// Path Utilities (Phase 1.2)
+// =============================================================================
+
+/// Directory separator used internally (forward slash).
+pub const DIRECTORY_SEPARATOR: char = '/';
+
+/// Alternative directory separator (backslash, used on Windows).
+pub const ALT_DIRECTORY_SEPARATOR: char = '\\';
+
+/// Determines whether a charCode corresponds to `/` or `\`.
+#[wasm_bindgen(js_name = isAnyDirectorySeparator)]
+pub fn is_any_directory_separator(char_code: u32) -> bool {
+    char_code == DIRECTORY_SEPARATOR as u32 || char_code == ALT_DIRECTORY_SEPARATOR as u32
+}
+
+/// Normalize path separators, converting `\` into `/`.
+#[wasm_bindgen(js_name = normalizeSlashes)]
+pub fn normalize_slashes(path: &str) -> String {
+    if path.contains('\\') {
+        path.replace('\\', "/")
+    } else {
+        path.to_string()
+    }
+}
+
+/// Determines whether a path has a trailing separator (`/` or `\\`).
+#[wasm_bindgen(js_name = hasTrailingDirectorySeparator)]
+pub fn has_trailing_directory_separator(path: &str) -> bool {
+    if path.is_empty() {
+        return false;
+    }
+    let last_char = path.chars().last().unwrap();
+    last_char == DIRECTORY_SEPARATOR || last_char == ALT_DIRECTORY_SEPARATOR
+}
+
+/// Determines whether a path starts with a relative path component (i.e. `.` or `..`).
+#[wasm_bindgen(js_name = pathIsRelative)]
+pub fn path_is_relative(path: &str) -> bool {
+    // Matches /^\.\.?(?:$|[\\/])/
+    if path.starts_with("./") || path.starts_with(".\\") || path == "." {
+        return true;
+    }
+    if path.starts_with("../") || path.starts_with("..\\") || path == ".." {
+        return true;
+    }
+    false
+}
+
+/// Removes a trailing directory separator from a path, if it has one.
+#[wasm_bindgen(js_name = removeTrailingDirectorySeparator)]
+pub fn remove_trailing_directory_separator(path: &str) -> String {
+    if has_trailing_directory_separator(path) && path.len() > 1 {
+        path[..path.len() - 1].to_string()
+    } else {
+        path.to_string()
+    }
+}
+
+/// Ensures a path has a trailing directory separator.
+#[wasm_bindgen(js_name = ensureTrailingDirectorySeparator)]
+pub fn ensure_trailing_directory_separator(path: &str) -> String {
+    if has_trailing_directory_separator(path) {
+        path.to_string()
+    } else {
+        format!("{}/", path)
+    }
+}
+
+/// Determines whether a path has an extension.
+#[wasm_bindgen(js_name = hasExtension)]
+pub fn has_extension(file_name: &str) -> bool {
+    get_base_file_name(file_name).contains('.')
+}
+
+/// Returns the path except for its containing directory name (basename).
+#[wasm_bindgen(js_name = getBaseFileName)]
+pub fn get_base_file_name(path: &str) -> String {
+    let path = normalize_slashes(path);
+    // Remove trailing separator
+    let path = if has_trailing_directory_separator(&path) && path.len() > 1 {
+        &path[..path.len() - 1]
+    } else {
+        &path
+    };
+    // Find last separator
+    match path.rfind('/') {
+        Some(idx) => path[idx + 1..].to_string(),
+        None => path.to_string(),
+    }
+}
+
+/// Check if path ends with a specific extension.
+#[wasm_bindgen(js_name = fileExtensionIs)]
+pub fn file_extension_is(path: &str, extension: &str) -> bool {
+    path.len() > extension.len() && path.ends_with(extension)
+}
+
+// =============================================================================
 // Unit Tests
 // =============================================================================
 
@@ -207,5 +305,81 @@ mod tests {
         assert!(equate_strings_case_insensitive("abc", "ABC"));
         assert!(equate_strings_case_insensitive("ABC", "abc"));
         assert!(!equate_strings_case_insensitive("abc", "abd"));
+    }
+
+    // Path utility tests
+
+    #[test]
+    fn test_is_any_directory_separator() {
+        assert!(is_any_directory_separator('/' as u32));
+        assert!(is_any_directory_separator('\\' as u32));
+        assert!(!is_any_directory_separator('a' as u32));
+        assert!(!is_any_directory_separator(':' as u32));
+    }
+
+    #[test]
+    fn test_normalize_slashes() {
+        assert_eq!(normalize_slashes("path/to/file"), "path/to/file");
+        assert_eq!(normalize_slashes("path\\to\\file"), "path/to/file");
+        assert_eq!(normalize_slashes("path\\to/file"), "path/to/file");
+        assert_eq!(normalize_slashes("c:\\windows\\system32"), "c:/windows/system32");
+    }
+
+    #[test]
+    fn test_has_trailing_directory_separator() {
+        assert!(has_trailing_directory_separator("/path/to/dir/"));
+        assert!(has_trailing_directory_separator("path\\"));
+        assert!(!has_trailing_directory_separator("/path/to/file.ext"));
+        assert!(!has_trailing_directory_separator(""));
+    }
+
+    #[test]
+    fn test_path_is_relative() {
+        assert!(path_is_relative("./path"));
+        assert!(path_is_relative(".\\path"));
+        assert!(path_is_relative("../path"));
+        assert!(path_is_relative("..\\path"));
+        assert!(path_is_relative("."));
+        assert!(path_is_relative(".."));
+        assert!(!path_is_relative("/absolute/path"));
+        assert!(!path_is_relative("path/to/file"));
+        assert!(!path_is_relative("c:/windows"));
+    }
+
+    #[test]
+    fn test_remove_trailing_directory_separator() {
+        assert_eq!(remove_trailing_directory_separator("/path/to/dir/"), "/path/to/dir");
+        assert_eq!(remove_trailing_directory_separator("/path/to/file"), "/path/to/file");
+        assert_eq!(remove_trailing_directory_separator("/"), "/");
+    }
+
+    #[test]
+    fn test_ensure_trailing_directory_separator() {
+        assert_eq!(ensure_trailing_directory_separator("/path/to/dir"), "/path/to/dir/");
+        assert_eq!(ensure_trailing_directory_separator("/path/to/dir/"), "/path/to/dir/");
+    }
+
+    #[test]
+    fn test_get_base_file_name() {
+        assert_eq!(get_base_file_name("/path/to/file.ext"), "file.ext");
+        assert_eq!(get_base_file_name("/path/to/"), "to");
+        assert_eq!(get_base_file_name("file.ext"), "file.ext");
+        assert_eq!(get_base_file_name("/"), "");
+    }
+
+    #[test]
+    fn test_has_extension() {
+        assert!(has_extension("file.ext"));
+        assert!(has_extension("/path/to/file.ts"));
+        assert!(!has_extension("/path/to/"));
+        assert!(!has_extension("noextension"));
+    }
+
+    #[test]
+    fn test_file_extension_is() {
+        assert!(file_extension_is("file.ts", ".ts"));
+        assert!(file_extension_is("/path/to/file.d.ts", ".d.ts"));
+        assert!(!file_extension_is("file.ts", ".js"));
+        assert!(!file_extension_is(".ts", ".ts")); // path must be longer than extension
     }
 }
