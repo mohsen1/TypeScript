@@ -40,32 +40,67 @@ All Phase 4 tasks finished:
   - wasm.ts interface updated
   - 10 binder verification tests passing
 
-## Phase 5 - Type Checker (Next)
+## Phase 5 - Type Checker (IN PROGRESS)
 
-### Priority: High
+### Completed
 
-- [ ] **Type struct in Rust**
-  - TypeFlags
-  - TypeArena
+- [x] **Type struct in Rust** (Phase 5.1)
+  - TypeFlags and ObjectFlags modules
+  - TypeId for type references
+  - TypeArena with singleton caching
+  - 14 intrinsic types pre-allocated
 
-- [ ] **Basic type checking**
-  - Primitive types
-  - Object types
-  - Function types
+- [x] **Type variants** (Phase 5.1)
+  - IntrinsicType, LiteralType, ObjectType
+  - UnionType, IntersectionType
+  - TypeParameter, ConditionalType, MappedType
+  - IndexedAccessType, IndexType, TemplateLiteralType
+  - TypeReference with type arguments
 
-- [ ] **Type inference**
-  - Variable inference
+- [x] **CheckerState** (Phase 5.2)
+  - Type caching (node→type, symbol→type)
+  - Diagnostic collection
+  - get_type_of_node() for inference
+  - get_type_of_symbol() for symbol lookup
+
+- [x] **Type assignability** (Phase 5.2)
+  - is_type_assignable_to() with rules for:
+    - any/unknown/never handling
+    - Literal to base type widening
+    - Union/intersection distribution
+
+- [x] **Basic type inference** (Phase 5.2)
+  - Literals: string, number, boolean, null
+  - Type keywords: string, number, boolean, void, any, never, etc.
+  - Union/Intersection types
+  - Variable declarations (from initializer/annotation)
+
+### In Progress
+
+- [ ] **Symbol type resolution**
+  - Link symbols to declarations
+  - Resolve identifier types via symbol table
+
+- [ ] **Function type inference**
+  - Parameter types
   - Return type inference
+  - Call expression type checking
 
 ### Priority: Medium
 
 - [ ] **Generic types**
   - Type parameters
   - Type arguments
+  - Instantiation
 
-- [ ] **Union/Intersection types**
-  - Type narrowing
-  - Type guards
+- [ ] **Object type checking**
+  - Property access
+  - Method signatures
+  - Index signatures
+
+- [ ] **Type narrowing**
+  - Type guards (typeof, instanceof)
+  - Control flow analysis
 
 ## Blocked
 
@@ -73,6 +108,6 @@ All Phase 4 tasks finished:
 
 ## Notes
 
-- Phase 4 completed 2026-01-01
-- 98 Rust tests + 10 binder tests passing
-- Binder creates symbols for: variables, functions, classes, interfaces, type aliases, enums, namespaces, imports
+- Phase 5.1-5.2 completed 2026-01-01
+- 117 Rust tests passing (98 base + 19 checker)
+- CheckerState with type inference and assignability working

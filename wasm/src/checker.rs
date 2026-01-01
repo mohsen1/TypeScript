@@ -629,6 +629,9 @@ pub struct CheckerState<'a> {
     /// The symbol arena containing bound symbols.
     pub symbol_arena: &'a SymbolArena,
 
+    /// Symbol table for file-local name lookup.
+    pub file_locals: &'a SymbolTable,
+
     /// The type arena for allocating types.
     pub types: TypeArena,
 
@@ -650,17 +653,24 @@ impl<'a> CheckerState<'a> {
     pub fn new(
         node_arena: &'a crate::parser::NodeArena,
         symbol_arena: &'a SymbolArena,
+        file_locals: &'a SymbolTable,
         file_name: String,
     ) -> Self {
         CheckerState {
             node_arena,
             symbol_arena,
+            file_locals,
             types: TypeArena::new(),
             symbol_types: std::collections::HashMap::new(),
             node_types: std::collections::HashMap::new(),
             diagnostics: Vec::new(),
             file_name,
         }
+    }
+
+    /// Resolve a name to a symbol.
+    pub fn resolve_name(&self, name: &str) -> Option<SymbolId> {
+        self.file_locals.get(name)
     }
 
     /// Report a diagnostic error.
@@ -750,9 +760,14 @@ impl<'a> CheckerState<'a> {
             }
 
             // Identifiers - look up in symbol table
-            Node::Identifier(_) => {
-                // For now, return any. Symbol resolution will be added later.
-                self.types.any_type
+            Node::Identifier(id) => {
+                // Look up the identifier in the symbol table
+                if let Some(symbol_id) = self.file_locals.get(&id.escaped_text) {
+                    self.get_type_of_symbol(symbol_id)
+                } else {
+                    // Undeclared identifier - could report error
+                    self.types.any_type
+                }
             }
 
             // Union types
@@ -1145,7 +1160,8 @@ mod tests {
 
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
-        let checker = CheckerState::new(&node_arena, &symbol_arena, "test.ts".to_string());
+        let file_locals = SymbolTable::new();
+        let checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
 
         // Should have intrinsic types pre-allocated
         assert!(!checker.types.any_type.is_none());
@@ -1159,7 +1175,8 @@ mod tests {
 
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
-        let checker = CheckerState::new(&node_arena, &symbol_arena, "test.ts".to_string());
+        let file_locals = SymbolTable::new();
+        let checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
 
         // Same type is assignable to itself
         assert!(checker.is_type_assignable_to(checker.types.string_type, checker.types.string_type));
@@ -1173,7 +1190,8 @@ mod tests {
 
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
-        let checker = CheckerState::new(&node_arena, &symbol_arena, "test.ts".to_string());
+        let file_locals = SymbolTable::new();
+        let checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
 
         // any is assignable to anything
         assert!(checker.is_type_assignable_to(checker.types.any_type, checker.types.string_type));
@@ -1190,7 +1208,8 @@ mod tests {
 
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
-        let checker = CheckerState::new(&node_arena, &symbol_arena, "test.ts".to_string());
+        let file_locals = SymbolTable::new();
+        let checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
 
         // never is assignable to everything
         assert!(checker.is_type_assignable_to(checker.types.never_type, checker.types.string_type));
@@ -1204,7 +1223,8 @@ mod tests {
 
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, "test.ts".to_string());
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
 
         // String literal is assignable to string
         let str_lit = checker.types.create_string_literal("hello".to_string());
@@ -1225,7 +1245,8 @@ mod tests {
 
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, "test.ts".to_string());
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
 
         // string is assignable to string | number
         let union = checker.types.create_union(vec![
@@ -1245,7 +1266,8 @@ mod tests {
 
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, "test.ts".to_string());
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
 
         assert_eq!(checker.type_to_string(checker.types.string_type), "string");
         assert_eq!(checker.type_to_string(checker.types.number_type), "number");
@@ -1271,7 +1293,8 @@ mod tests {
         let root = parser.parse_source_file();
 
         let symbol_arena = SymbolArena::new();
-        let mut checker = CheckerState::new(&parser.arena, &symbol_arena, "test.ts".to_string());
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&parser.arena, &symbol_arena, &file_locals, "test.ts".to_string());
 
         // Get the source file
         if let Some(crate::parser::Node::SourceFile(sf)) = parser.arena.get(root) {
@@ -1289,6 +1312,40 @@ mod tests {
                     }
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_symbol_type_resolution() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Parse and bind a simple program
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"const x = "hello"; const y = x;"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        // Create checker with bound symbols
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Verify 'x' is in the symbol table
+        assert!(binder.file_locals.has("x"));
+
+        // Get type of 'x' symbol
+        if let Some(x_symbol) = binder.file_locals.get("x") {
+            let x_type = checker.get_type_of_symbol(x_symbol);
+            // x should have type "hello" (string literal)
+            assert!(checker.types.get(x_type).unwrap().has_flags(type_flags::STRING_LITERAL));
         }
     }
 }
