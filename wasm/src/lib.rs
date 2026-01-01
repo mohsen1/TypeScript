@@ -17,6 +17,9 @@ pub mod parser;
 // Parser implementation (Phase 3.2)
 pub mod parser_impl;
 
+// Binder types and implementation (Phase 4)
+pub mod binder;
+
 // =============================================================================
 // Scanner Factory Function
 // =============================================================================
