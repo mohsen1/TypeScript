@@ -7,14 +7,15 @@ Rust components progressively replace TypeScript while compiler stays functional
 
 ## Current State
 
-**Phase**: 5 - Type Checker (starting)
-**Tests**: 98 Rust tests + 19 parser TS tests + 10 binder tests
-**Features**: Full parser + binder with symbol tables
+**Phase**: 5 - Type Checker (in progress)
+**Tests**: 118 Rust tests + 19 parser TS tests + 10 binder tests
+**Features**: Full parser + binder + type infrastructure
 
 ### What's Working
 - Scanner: Complete, verified token-for-token match with TS scanner
 - Parser: All major constructs (statements, expressions, declarations, types)
 - Binder: Symbol creation, scope management, declaration merging
+- Checker: Type infrastructure, intrinsic types, type assignability, symbol resolution
 - Integration: parseWithRustParser() + bindSourceFile() working end-to-end
 - JSX & Decorators: Full support
 - Type System: All advanced types (conditional, mapped, indexed access, infer, keyof, typeof)
@@ -29,6 +30,7 @@ Rust components progressively replace TypeScript while compiler stays functional
 | `wasm/src/parser.rs` | AST nodes (~2200 lines, 130+ types) |
 | `wasm/src/parser_impl.rs` | Parser (~4000 lines) |
 | `wasm/src/binder.rs` | Binder (~1100 lines) |
+| `wasm/src/checker.rs` | Type Checker (~1300 lines, 20 tests) |
 | `src/compiler/parser.ts` | TS integration (parseWithRustParser, convertNode) |
 | `src/compiler/wasm.ts` | WASM bridge |
 
@@ -56,14 +58,18 @@ node scripts/verifyBinder.mjs
 
 ## Architecture
 
-- **Arena allocation**: `NodeArena` + `NodeIndex` for AST nodes, `SymbolArena` for symbols
+- **Arena allocation**: `NodeArena` + `NodeIndex` for AST nodes, `SymbolArena` for symbols, `TypeArena` for types
 - **Serialization**: JSON via serde for Rust↔JS
 - **Feature flags**: `--useRustScanner`, `--useRustParser`
 - **Fallback**: Graceful fallback to TS parser on unsupported features
 
-## Next Steps (Phase 5)
+## Phase 5 Progress
 
-- [ ] Type struct and TypeFlags
-- [ ] Basic type checking (primitives, objects, functions)
-- [ ] Type inference
-- [ ] Generic types
+- [x] Type struct and TypeFlags
+- [x] TypeArena with singleton intrinsic types
+- [x] CheckerState with type caching
+- [x] Type assignability (is_type_assignable_to)
+- [x] Symbol type resolution via binder
+- [ ] Function type inference
+- [ ] Generic types and instantiation
+- [ ] Object type checking
