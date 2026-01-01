@@ -2031,6 +2031,171 @@ impl<'a> CheckerState<'a> {
         false
     }
 
+    // =========================================================================
+    // Type Narrowing
+    // =========================================================================
+
+    /// Narrow a type based on a typeof guard.
+    /// Returns the narrowed type if the guard matches, or the original type.
+    ///
+    /// For example, if type is `string | number` and typeof_result is "string",
+    /// returns `string`.
+    pub fn narrow_type_by_typeof(&mut self, type_id: TypeId, typeof_result: &str) -> TypeId {
+        let expected_flags = match typeof_result {
+            "string" => type_flags::STRING | type_flags::STRING_LITERAL,
+            "number" => type_flags::NUMBER | type_flags::NUMBER_LITERAL,
+            "boolean" => type_flags::BOOLEAN | type_flags::BOOLEAN_LITERAL,
+            "bigint" => type_flags::BIG_INT | type_flags::BIG_INT_LITERAL,
+            "symbol" => type_flags::ES_SYMBOL | type_flags::UNIQUE_ES_SYMBOL,
+            "undefined" => type_flags::UNDEFINED,
+            "function" => type_flags::OBJECT, // Functions are objects with call signatures
+            "object" => type_flags::OBJECT | type_flags::NULL, // null returns "object" for typeof
+            _ => return type_id, // Unknown typeof result
+        };
+
+        let Some(typ) = self.types.get(type_id) else {
+            return type_id;
+        };
+
+        // If it's a union, filter to matching types
+        if let Type::Union(u) = typ {
+            let matching_types: Vec<TypeId> = u.types.iter()
+                .filter(|&&t| {
+                    if let Some(inner) = self.types.get(t) {
+                        (inner.flags() & expected_flags) != 0
+                    } else {
+                        false
+                    }
+                })
+                .copied()
+                .collect();
+
+            if matching_types.is_empty() {
+                return self.types.never_type;
+            } else if matching_types.len() == 1 {
+                return matching_types[0];
+            } else {
+                return self.types.create_union_type(matching_types);
+            }
+        }
+
+        // For non-union types, check if it matches
+        let type_flags = typ.flags();
+        if (type_flags & expected_flags) != 0 {
+            type_id // Type matches, return as-is
+        } else {
+            self.types.never_type // Type doesn't match, narrow to never
+        }
+    }
+
+    /// Narrow a type to exclude types matching a typeof guard.
+    /// Returns the narrowed type if the guard doesn't match.
+    ///
+    /// For example, if type is `string | number` and typeof_result is "string",
+    /// returns `number`.
+    pub fn narrow_type_by_typeof_negation(&mut self, type_id: TypeId, typeof_result: &str) -> TypeId {
+        let excluded_flags = match typeof_result {
+            "string" => type_flags::STRING | type_flags::STRING_LITERAL,
+            "number" => type_flags::NUMBER | type_flags::NUMBER_LITERAL,
+            "boolean" => type_flags::BOOLEAN | type_flags::BOOLEAN_LITERAL,
+            "bigint" => type_flags::BIG_INT | type_flags::BIG_INT_LITERAL,
+            "symbol" => type_flags::ES_SYMBOL | type_flags::UNIQUE_ES_SYMBOL,
+            "undefined" => type_flags::UNDEFINED,
+            "function" => type_flags::OBJECT,
+            "object" => type_flags::OBJECT | type_flags::NULL,
+            _ => return type_id,
+        };
+
+        let Some(typ) = self.types.get(type_id) else {
+            return type_id;
+        };
+
+        // If it's a union, filter out matching types
+        if let Type::Union(u) = typ {
+            let remaining_types: Vec<TypeId> = u.types.iter()
+                .filter(|&&t| {
+                    if let Some(inner) = self.types.get(t) {
+                        (inner.flags() & excluded_flags) == 0
+                    } else {
+                        true
+                    }
+                })
+                .copied()
+                .collect();
+
+            if remaining_types.is_empty() {
+                return self.types.never_type;
+            } else if remaining_types.len() == 1 {
+                return remaining_types[0];
+            } else {
+                return self.types.create_union_type(remaining_types);
+            }
+        }
+
+        // For non-union types, check if it should be excluded
+        let type_flags = typ.flags();
+        if (type_flags & excluded_flags) != 0 {
+            self.types.never_type // Type matches exclusion
+        } else {
+            type_id // Type doesn't match, keep as-is
+        }
+    }
+
+    /// Narrow a union type to exclude null and undefined.
+    pub fn get_type_with_facts(&mut self, type_id: TypeId, include_null: bool, include_undefined: bool) -> TypeId {
+        let Some(typ) = self.types.get(type_id) else {
+            return type_id;
+        };
+
+        // If it's a union, filter appropriately
+        if let Type::Union(u) = typ {
+            let filtered_types: Vec<TypeId> = u.types.iter()
+                .filter(|&&t| {
+                    if let Some(inner) = self.types.get(t) {
+                        let flags = inner.flags();
+                        let is_null = (flags & type_flags::NULL) != 0;
+                        let is_undefined = (flags & type_flags::UNDEFINED) != 0;
+
+                        if is_null && !include_null {
+                            return false;
+                        }
+                        if is_undefined && !include_undefined {
+                            return false;
+                        }
+                        true
+                    } else {
+                        true
+                    }
+                })
+                .copied()
+                .collect();
+
+            if filtered_types.is_empty() {
+                return self.types.never_type;
+            } else if filtered_types.len() == 1 {
+                return filtered_types[0];
+            } else {
+                return self.types.create_union_type(filtered_types);
+            }
+        }
+
+        // For non-union types, check if they should be excluded
+        let type_flags = typ.flags();
+        if (type_flags & type_flags::NULL) != 0 && !include_null {
+            return self.types.never_type;
+        }
+        if (type_flags & type_flags::UNDEFINED) != 0 && !include_undefined {
+            return self.types.never_type;
+        }
+
+        type_id
+    }
+
+    /// Get a non-nullable version of a type (exclude null and undefined).
+    pub fn get_non_nullable_type(&mut self, type_id: TypeId) -> TypeId {
+        self.get_type_with_facts(type_id, false, false)
+    }
+
     /// Get the diagnostics as JSON.
     pub fn get_diagnostics_json(&self) -> String {
         serde_json::to_string(&self.diagnostics).unwrap_or_else(|_| "[]".to_string())
@@ -3556,5 +3721,110 @@ mod tests {
                 panic!("Expected Object type for interface");
             }
         }
+    }
+
+    #[test]
+    fn test_typeof_narrowing_string() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+
+        // Create a union type: string | number
+        let union_type = checker.types.create_union(vec![
+            checker.types.string_type,
+            checker.types.number_type,
+        ]);
+
+        // Narrow by typeof === "string"
+        let narrowed = checker.narrow_type_by_typeof(union_type, "string");
+
+        // Should narrow to string
+        assert_eq!(narrowed, checker.types.string_type);
+    }
+
+    #[test]
+    fn test_typeof_narrowing_number() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+
+        // Create a union type: string | number | boolean
+        let union_type = checker.types.create_union(vec![
+            checker.types.string_type,
+            checker.types.number_type,
+            checker.types.boolean_type,
+        ]);
+
+        // Narrow by typeof === "number"
+        let narrowed = checker.narrow_type_by_typeof(union_type, "number");
+
+        // Should narrow to number
+        assert_eq!(narrowed, checker.types.number_type);
+    }
+
+    #[test]
+    fn test_typeof_narrowing_negation() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+
+        // Create a union type: string | number
+        let union_type = checker.types.create_union(vec![
+            checker.types.string_type,
+            checker.types.number_type,
+        ]);
+
+        // Narrow by typeof !== "string"
+        let narrowed = checker.narrow_type_by_typeof_negation(union_type, "string");
+
+        // Should narrow to number
+        assert_eq!(narrowed, checker.types.number_type);
+    }
+
+    #[test]
+    fn test_non_nullable_type() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+
+        // Create a union type: string | null | undefined
+        let union_type = checker.types.create_union(vec![
+            checker.types.string_type,
+            checker.types.null_type,
+            checker.types.undefined_type,
+        ]);
+
+        // Get non-nullable
+        let non_nullable = checker.get_non_nullable_type(union_type);
+
+        // Should narrow to string
+        assert_eq!(non_nullable, checker.types.string_type);
+    }
+
+    #[test]
+    fn test_typeof_narrowing_no_match() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+
+        // Narrow string by typeof === "number" should give never
+        let narrowed = checker.narrow_type_by_typeof(checker.types.string_type, "number");
+
+        assert_eq!(narrowed, checker.types.never_type);
     }
 }

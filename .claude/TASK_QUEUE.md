@@ -103,11 +103,14 @@ All Phase 4 tasks finished:
   - Interface member resolution
   - Method signatures as function types
 
-### Priority: Medium
+### Completed (Phase 5.6)
 
-- [ ] **Type narrowing**
-  - Type guards (typeof, instanceof)
-  - Control flow analysis
+- [x] **Type narrowing**
+  - typeof guards: narrow_type_by_typeof, narrow_type_by_typeof_negation
+  - Nullable guards: get_non_nullable_type, get_type_with_facts
+  - Union type filtering based on type flags
+
+### Priority: Medium
 
 ## Blocked
 
@@ -115,9 +118,9 @@ All Phase 4 tasks finished:
 
 ## Notes
 
-- Phase 5.1-5.5 completed 2026-01-01
-- 152 Rust tests passing
-- CheckerState with type inference, assignability, function types, generics, and object types
+- Phase 5.1-5.6 completed 2026-01-01
+- 157 Rust tests passing
+- CheckerState with type inference, assignability, function types, generics, object types, and type narrowing
 - Parser now handles assignment expressions and unary operators (typeof, void, delete, await)
 - Binder flow analysis infrastructure for if/while statements
 - Explored typescript-go for architectural patterns (documented in TYPE_CHECKER_MINDMAP.md)
