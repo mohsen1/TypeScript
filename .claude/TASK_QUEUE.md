@@ -120,14 +120,19 @@ All Phase 4 tasks finished:
   - Parser support for call expressions with type arguments: `expr<T>(args)`
   - Element access expression parsing: `expr[index]`
 
+### Completed (Phase 5.8)
+
+- [x] **instanceof type guards**
+  - narrow_type_by_instanceof() narrows to target class type
+  - narrow_type_by_instanceof_negation() excludes target from union
+  - could_be_instanceof() filters out primitive types
+  - is_definitely_instanceof() uses assignability
+
 ### Next Up
 
 - [ ] **Control flow based type narrowing**
   - Use flow nodes created by binder
   - Narrow types based on if/while conditions
-
-- [ ] **instanceof type guards**
-  - `x instanceof Foo` narrows to Foo
 
 - [ ] **Class type checking**
   - Instance types
@@ -139,8 +144,8 @@ All Phase 4 tasks finished:
 
 ## Notes
 
-- Phase 5.1-5.7 completed 2026-01-01
-- 159 Rust tests passing
+- Phase 5.1-5.8 completed 2026-01-01
+- 163 Rust tests passing
 - CheckerState with type inference, assignability, function types, generics, object types, type narrowing, and generic call inference
 - Parser now handles assignment expressions, unary operators (typeof, void, delete, await), and call expressions with type arguments
 - Binder flow analysis infrastructure for if/while statements
