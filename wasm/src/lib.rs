@@ -20,6 +20,9 @@ pub mod parser_impl;
 // Binder types and implementation (Phase 4)
 pub mod binder;
 
+// Checker types and implementation (Phase 5)
+pub mod checker;
+
 // =============================================================================
 // Scanner Factory Function
 // =============================================================================
