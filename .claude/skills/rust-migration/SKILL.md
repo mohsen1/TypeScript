@@ -53,6 +53,15 @@ For detailed patterns, see:
 - [AST Reference](../agent_docs/ast-nodes.md) - Node structure and types
 - [TypeScript Parser](../agent_docs/typescript-parser.md) - Original implementation reference
 
+## Documentation
+
+For type system implementation:
+- `docs/TYPE_CHECKER_MINDMAP.md` - Visual type system architecture and flow
+- `docs/TYPE_CHECKER_DESIGN.md` - High-level checker design decisions
+- `docs/TYPE_CHECKER_IMPLEMENTATION.md` - Implementation details and patterns
+- `docs/TYPESCRIPT_LANGUAGE_SPECIFICATION.md` - TypeScript language spec reference
+- `docs/TYPESCRIPT_ADVANCED_TYPES.md` - Advanced type system features (generics, conditional types, etc.)
+
 ## Key Rules
 
 1. **Never break the build** - Run tests before committing

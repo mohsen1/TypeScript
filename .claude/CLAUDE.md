@@ -10,7 +10,7 @@ Rust components progressively replace TypeScript while compiler stays functional
 ## Current State
 
 **Phase**: Integrated Parser + Checker Development
-**Tests**: 125 Rust tests + 19 parser TS tests + 10 binder tests
+**Tests**: 157 Rust tests + 19 parser TS tests + 10 binder tests
 **Architecture**: Scanner → Parser → Binder → Checker (all in Rust)
 
 ### Component Status
@@ -18,15 +18,15 @@ Rust components progressively replace TypeScript while compiler stays functional
 | Component | Status | Lines | Tests |
 |-----------|--------|-------|-------|
 | Scanner | Complete ✅ | ~800 | Token-verified |
-| Parser | ~95% ✅ | ~4200 | 38 tests |
-| Binder | Complete ✅ | ~1100 | 10 tests |
-| Checker | In Progress 🔄 | ~1700 | 27 tests |
+| Parser | ~98% ✅ | ~4700 | 45 tests |
+| Binder | Complete ✅ | ~1400 | 13 tests |
+| Checker | In Progress 🔄 | ~3800 | 35 tests |
 
 ### What's Working
 - **Scanner**: Token-for-token match with TS scanner
-- **Parser**: Statements, expressions, declarations, types, JSX, decorators, arrow functions
-- **Binder**: Symbol creation, scopes, declaration merging, flow analysis setup
-- **Checker**: Type inference, assignability, function types, symbol resolution
+- **Parser**: Statements, expressions, declarations, types, JSX, decorators, arrow functions, assignment expressions, unary operators
+- **Binder**: Symbol creation, scopes, declaration merging, flow analysis (if/while)
+- **Checker**: Type inference, assignability, function types, generics, object types, type narrowing
 
 ## Key Files
 
@@ -38,7 +38,16 @@ Rust components progressively replace TypeScript while compiler stays functional
 | `wasm/src/binder.rs` | Symbol binding |
 | `wasm/src/checker.rs` | Type checking |
 | `src/compiler/wasm.ts` | WASM bridge |
-| `docs/TYPE_CHECKER_MINDMAP.md` | Type system architecture |
+
+## Documentation
+
+| Document | Purpose |
+|----------|---------|
+| `docs/TYPE_CHECKER_MINDMAP.md` | Visual type system architecture and flow |
+| `docs/TYPE_CHECKER_DESIGN.md` | High-level checker design decisions |
+| `docs/TYPE_CHECKER_IMPLEMENTATION.md` | Implementation details and patterns |
+| `docs/TYPESCRIPT_LANGUAGE_SPECIFICATION.md` | TypeScript language spec reference |
+| `docs/TYPESCRIPT_ADVANCED_TYPES.md` | Advanced type system features |
 
 ## Commands
 
@@ -98,25 +107,42 @@ Source Code
 - `NodeArena` + `NodeIndex` - AST nodes
 - `SymbolArena` + `SymbolId` - Symbols
 - `TypeArena` + `TypeId` - Types
+- `FlowNodeArena` + `FlowNodeId` - Control flow nodes
+
+## Completed Features
+
+### Parser
+- [x] Assignment expressions (=, +=, -=, *=, etc.)
+- [x] Unary expressions (typeof, void, delete, await, ++, --, !, ~)
+- [x] Arrow functions with type parameters
+- [x] Generic function/type declarations
+
+### Checker
+- [x] Generic types (type parameters, constraints, defaults)
+- [x] Type instantiation (substituting type arguments)
+- [x] Object type checking (property access, type literals)
+- [x] Type narrowing (typeof guards, non-nullable)
+- [x] Function types with type parameters
+
+### Binder
+- [x] Flow analysis for if/while statements
+- [x] Flow node creation and antecedent tracking
 
 ## Current Tasks
 
 ### In Progress
-- [ ] Generic types (type parameters, instantiation)
-- [ ] Object type checking (property access, methods)
+- [ ] Control flow based type narrowing (use flow nodes in checker)
+- [ ] Call expression type checking with generics
 
 ### Next Up
-- [ ] Type narrowing (typeof, instanceof guards)
-- [ ] Call expression type checking
+- [ ] instanceof type guards
 - [ ] Class type checking
-
-### Parser Gaps to Fill as Needed
-- Assignment expressions (+=, etc.)
-- Prefix/postfix operators (++, --)
-- Spread in more contexts
+- [ ] Index signatures
 
 ## Reference
 
 - `docs/TYPE_CHECKER_MINDMAP.md` - Visual type system architecture
+- `docs/TYPESCRIPT_LANGUAGE_SPECIFICATION.md` - Language spec for behavior reference
+- `docs/TYPESCRIPT_ADVANCED_TYPES.md` - Advanced type features guide
 - `~/code/typescript-go` - Microsoft's Go port for patterns
 - TypeScript `src/compiler/checker.ts` - Original implementation
