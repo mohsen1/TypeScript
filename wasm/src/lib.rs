@@ -1,8 +1,15 @@
 use wasm_bindgen::prelude::*;
 
+// Character code constants
+pub mod char_codes;
+
 // Scanner types and token definitions
 pub mod scanner;
 pub use scanner::*;
+
+// Scanner implementation
+pub mod scanner_impl;
+pub use scanner_impl::*;
 
 // =============================================================================
 // Comparison enum - matches TypeScript's Comparison const enum
@@ -229,65 +236,32 @@ pub fn file_extension_is(path: &str, extension: &str) -> bool {
 // Character Classification (Phase 1.3 - Scanner Prep)
 // =============================================================================
 
-// Character codes matching TypeScript's CharacterCodes enum
-mod char_codes {
-    pub const LINE_FEED: u32 = 0x0A;
-    pub const CARRIAGE_RETURN: u32 = 0x0D;
-    pub const LINE_SEPARATOR: u32 = 0x2028;
-    pub const PARAGRAPH_SEPARATOR: u32 = 0x2029;
-    pub const NEXT_LINE: u32 = 0x0085;
-
-    pub const SPACE: u32 = 0x0020;
-    pub const TAB: u32 = 0x09;
-    pub const VERTICAL_TAB: u32 = 0x0B;
-    pub const FORM_FEED: u32 = 0x0C;
-    pub const NON_BREAKING_SPACE: u32 = 0x00A0;
-    pub const OGHAM: u32 = 0x1680;
-    pub const EN_QUAD: u32 = 0x2000;
-    pub const ZERO_WIDTH_SPACE: u32 = 0x200B;
-    pub const NARROW_NO_BREAK_SPACE: u32 = 0x202F;
-    pub const MATHEMATICAL_SPACE: u32 = 0x205F;
-    pub const IDEOGRAPHIC_SPACE: u32 = 0x3000;
-    pub const BYTE_ORDER_MARK: u32 = 0xFEFF;
-
-    pub const _0: u32 = 0x30;
-    pub const _9: u32 = 0x39;
-    pub const _7: u32 = 0x37;
-
-    pub const UPPER_A: u32 = 0x41;
-    pub const UPPER_F: u32 = 0x46;
-    pub const UPPER_Z: u32 = 0x5A;
-    pub const LOWER_A: u32 = 0x61;
-    pub const LOWER_F: u32 = 0x66;
-    pub const LOWER_Z: u32 = 0x7A;
-
-    pub const UNDERSCORE: u32 = 0x5F;
-}
+use crate::char_codes::CharacterCodes;
 
 /// Check if character is a line break (LF, CR, LS, PS).
 #[wasm_bindgen(js_name = isLineBreak)]
 pub fn is_line_break(ch: u32) -> bool {
-    ch == char_codes::LINE_FEED
-        || ch == char_codes::CARRIAGE_RETURN
-        || ch == char_codes::LINE_SEPARATOR
-        || ch == char_codes::PARAGRAPH_SEPARATOR
+    ch == CharacterCodes::LINE_FEED
+        || ch == CharacterCodes::CARRIAGE_RETURN
+        || ch == CharacterCodes::LINE_SEPARATOR
+        || ch == CharacterCodes::PARAGRAPH_SEPARATOR
 }
 
 /// Check if character is a single-line whitespace (not including line breaks).
 #[wasm_bindgen(js_name = isWhiteSpaceSingleLine)]
 pub fn is_white_space_single_line(ch: u32) -> bool {
-    ch == char_codes::SPACE
-        || ch == char_codes::TAB
-        || ch == char_codes::VERTICAL_TAB
-        || ch == char_codes::FORM_FEED
-        || ch == char_codes::NON_BREAKING_SPACE
-        || ch == char_codes::NEXT_LINE
-        || ch == char_codes::OGHAM
-        || (ch >= char_codes::EN_QUAD && ch <= char_codes::ZERO_WIDTH_SPACE)
-        || ch == char_codes::NARROW_NO_BREAK_SPACE
-        || ch == char_codes::MATHEMATICAL_SPACE
-        || ch == char_codes::IDEOGRAPHIC_SPACE
-        || ch == char_codes::BYTE_ORDER_MARK
+    ch == CharacterCodes::SPACE
+        || ch == CharacterCodes::TAB
+        || ch == CharacterCodes::VERTICAL_TAB
+        || ch == CharacterCodes::FORM_FEED
+        || ch == CharacterCodes::NON_BREAKING_SPACE
+        || ch == CharacterCodes::NEXT_LINE
+        || ch == CharacterCodes::OGHAM
+        || (ch >= CharacterCodes::EN_QUAD && ch <= CharacterCodes::ZERO_WIDTH_SPACE)
+        || ch == CharacterCodes::NARROW_NO_BREAK_SPACE
+        || ch == CharacterCodes::MATHEMATICAL_SPACE
+        || ch == CharacterCodes::IDEOGRAPHIC_SPACE
+        || ch == CharacterCodes::BYTE_ORDER_MARK
 }
 
 /// Check if character is any whitespace (including line breaks).
@@ -299,34 +273,34 @@ pub fn is_white_space_like(ch: u32) -> bool {
 /// Check if character is a decimal digit (0-9).
 #[wasm_bindgen(js_name = isDigit)]
 pub fn is_digit(ch: u32) -> bool {
-    ch >= char_codes::_0 && ch <= char_codes::_9
+    ch >= CharacterCodes::_0 && ch <= CharacterCodes::_9
 }
 
 /// Check if character is an octal digit (0-7).
 #[wasm_bindgen(js_name = isOctalDigit)]
 pub fn is_octal_digit(ch: u32) -> bool {
-    ch >= char_codes::_0 && ch <= char_codes::_7
+    ch >= CharacterCodes::_0 && ch <= CharacterCodes::_7
 }
 
 /// Check if character is a hexadecimal digit (0-9, A-F, a-f).
 #[wasm_bindgen(js_name = isHexDigit)]
 pub fn is_hex_digit(ch: u32) -> bool {
     is_digit(ch)
-        || (ch >= char_codes::UPPER_A && ch <= char_codes::UPPER_F)
-        || (ch >= char_codes::LOWER_A && ch <= char_codes::LOWER_F)
+        || (ch >= CharacterCodes::UPPER_A && ch <= CharacterCodes::UPPER_F)
+        || (ch >= CharacterCodes::LOWER_A && ch <= CharacterCodes::LOWER_F)
 }
 
 /// Check if character is an ASCII letter (A-Z, a-z).
 #[wasm_bindgen(js_name = isASCIILetter)]
 pub fn is_ascii_letter(ch: u32) -> bool {
-    (ch >= char_codes::UPPER_A && ch <= char_codes::UPPER_Z)
-        || (ch >= char_codes::LOWER_A && ch <= char_codes::LOWER_Z)
+    (ch >= CharacterCodes::UPPER_A && ch <= CharacterCodes::UPPER_Z)
+        || (ch >= CharacterCodes::LOWER_A && ch <= CharacterCodes::LOWER_Z)
 }
 
 /// Check if character is a word character (A-Z, a-z, 0-9, _).
 #[wasm_bindgen(js_name = isWordCharacter)]
 pub fn is_word_character(ch: u32) -> bool {
-    is_ascii_letter(ch) || is_digit(ch) || ch == char_codes::UNDERSCORE
+    is_ascii_letter(ch) || is_digit(ch) || ch == CharacterCodes::UNDERSCORE
 }
 
 // =============================================================================
