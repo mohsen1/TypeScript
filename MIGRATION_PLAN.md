@@ -253,6 +253,11 @@ scanner and shares data structures with the type checker.
       - `parseVariableStatement`, `parseVariableDeclarationList`
       - `parseIfStatement`, `parseReturnStatement`, `parseExpressionStatement`
       - `parseFunctionDeclaration`
+      - `parseWhileStatement`, `parseDoStatement`, `parseForStatement`
+      - `parseForInStatement`, `parseForOfStatement`
+      - `parseSwitchStatement`, `parseCaseClause`, `parseDefaultClause`
+      - `parseBreakStatement`, `parseContinueStatement`, `parseThrowStatement`
+      - `parseTryStatement`, `parseCatchClause`
 - [x] Implement expression parsing:
       - `parseExpression`, `parseBinaryExpression` with precedence
       - `parseUnaryExpression`, `parsePostfixExpression`
@@ -261,10 +266,32 @@ scanner and shares data structures with the type checker.
       - `parseArrayLiteral`, `parseObjectLiteral`, `parsePropertyAssignment`
       - `parseParenthesizedExpression`, `parseArgumentList`
 - [x] Handle automatic semicolon insertion (ASI)
-- [x] 4 parser implementation tests passing
-- [ ] Add type parsing (full type annotation support)
-- [ ] Add class parsing
-- [ ] Add import/export parsing
+- [x] Implement class parsing:
+      - `parseClassDeclaration`, `parseHeritageClause`
+      - `parseClassMembers`, `parseClassElement`
+      - `parseConstructorDeclaration`, `parseMethodDeclaration`
+      - `parsePropertyDeclaration`, `parseGetAccessor`, `parseSetAccessor`
+- [x] Implement type declaration parsing:
+      - `parseInterfaceDeclaration`, `parseTypeMembers`
+      - `parseTypeAliasDeclaration`, `parseEnumDeclaration`
+      - `PropertySignature`, `MethodSignature` types added
+- [x] Implement import/export parsing:
+      - `parseImportDeclaration`, `parseImportClause`
+      - `parseNamedImports`, `parseNamespaceImport`, `parseImportSpecifier`
+      - `parseExportDeclaration`, `parseNamedExports`, `parseExportSpecifier`
+      - `parseExportAssignment`, `parseImportAttributes`
+- [x] Add wasm-bindgen exports for parser
+      - `createParser()` factory function
+      - `ParserState.parseSourceFile()` method
+      - `ParserState.getSourceFileJson()` for AST serialization
+      - `ParserState.getNodeCount()`, `getIdentifiers()`, `getDiagnosticsJson()`
+- [x] Add TypeScript wasm bridge for parser (`src/compiler/wasm.ts`)
+      - `WasmParserStateInstance` interface
+      - `wasmCreateParser()` wrapper function
+- [x] 62 Rust tests passing
+- [ ] Add full type parsing (type annotations, generics)
+- [ ] Implement AST-to-TypeScript-AST conversion
+- [ ] Add `--useRustParser` CLI flag
 
 3.3 JSX & Decorators
 --------------------
@@ -642,8 +669,8 @@ Next Step: Phase 3 - Parser Integration (first target: simple statement parsing)
 - 6 parser AST tests passing
 - Commit: `e3f1f486e`
 
-[2026-01-01] Phase 3.2 Started - Parser Core Implementation
-------------------------------------------------------------
+[2026-01-01] Phase 3.2 In Progress - Parser Core Implementation
+----------------------------------------------------------------
 - Created `wasm/src/parser_impl.rs` with ParserState struct
 - Integrated scanner for tokenization
 - Implemented parseSourceFile() entry point producing SourceFile AST
@@ -654,6 +681,47 @@ Next Step: Phase 3 - Parser Integration (first target: simple statement parsing)
 - Automatic semicolon insertion (ASI) support
 - 4 parser implementation tests passing (62 total tests)
 - Basic parsing works for simple TypeScript constructs
+- Commit: `da38c5623`
+
+[2026-01-01] Phase 3.2 Extended - Class, Interface, Import/Export Parsing
+--------------------------------------------------------------------------
+- Expanded `wasm/src/parser_impl.rs` to ~1800 lines
+- Loop statements: while, do, for, for-in, for-of
+- Control flow: switch, try/catch/finally, break, continue, throw
+- Class declarations with full member parsing:
+  - Constructors, methods, properties
+  - Get/set accessors
+  - Heritage clauses (extends/implements)
+- Interface declarations with PropertySignature/MethodSignature
+- Type alias and enum declarations
+- Complete import/export declaration parsing:
+  - Import clauses with named imports, namespace imports
+  - Export declarations with named exports
+  - Export assignments (default and = forms)
+  - Import attributes (with/assert)
+- Added PropertySignature and MethodSignature AST node types
+- Fixed compilation errors with type mismatches
+- 62 Rust tests passing
+- Commit: `8880ccaaf`
+
+[2026-01-01] Phase 3.2 Continued - wasm-bindgen Parser Exports
+--------------------------------------------------------------
+- Added wasm-bindgen exports for parser in `wasm/src/parser_impl.rs`:
+  - `ParserState` struct with `#[wasm_bindgen]` attribute
+  - `new(fileName, sourceText)` constructor
+  - `parseSourceFile()` returns root node index
+  - `getSourceFileJson(rootIdx)` for basic AST serialization
+  - `getNodeCount()`, `getIdentifiers()`, `getDiagnosticsJson()`
+- Added `createParser()` factory function in `wasm/src/lib.rs`
+- Updated TypeScript wasm bridge (`src/compiler/wasm.ts`):
+  - Added `WasmParserStateClass` and `WasmParserStateInstance` interfaces
+  - Added `wasmCreateParser()` wrapper function
+  - Added `WasmParser` type alias
+- WASM target builds successfully
+- 62 Rust tests passing
+- Commits: `ba5a31abb`, `53c707caf`
+
+Next: Implement full type parsing, AST-to-TypeScript conversion, --useRustParser flag
 
 ==============================================================================
 ESTIMATED TIMELINE (AGGRESSIVE)
