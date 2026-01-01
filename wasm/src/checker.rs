@@ -671,6 +671,33 @@ impl TypeArena {
         obj.properties = properties;
         self.alloc(Type::Object(obj))
     }
+
+    /// Create a union type from a list of types.
+    pub fn create_union_type(&mut self, types: Vec<TypeId>) -> TypeId {
+        // Filter duplicates and flatten nested unions
+        let mut flattened = Vec::new();
+        for t in types {
+            if let Some(Type::Union(u)) = self.get(t) {
+                for &ut in &u.types {
+                    if !flattened.contains(&ut) {
+                        flattened.push(ut);
+                    }
+                }
+            } else if !flattened.contains(&t) {
+                flattened.push(t);
+            }
+        }
+
+        // Handle edge cases
+        if flattened.is_empty() {
+            return self.never_type;
+        }
+        if flattened.len() == 1 {
+            return flattened[0];
+        }
+
+        self.alloc(Type::Union(UnionType::new(flattened)))
+    }
 }
 
 impl Default for TypeArena {
@@ -1018,8 +1045,111 @@ impl<'a> CheckerState<'a> {
                 self.get_type_of_object_literal(&ole.properties)
             }
 
+            // Call expressions (e.g., fn(arg1, arg2))
+            Node::CallExpression(ce) => {
+                self.get_type_of_call_expression(ce.expression, &ce.arguments)
+            }
+
+            // New expressions (e.g., new Foo(arg))
+            Node::NewExpression(ne) => {
+                self.get_type_of_new_expression(ne.expression, &ne.arguments)
+            }
+
+            // Array literal expressions (e.g., [1, 2, 3])
+            Node::ArrayLiteralExpression(ale) => {
+                self.get_type_of_array_literal(&ale.elements)
+            }
+
+            // Parenthesized expressions (e.g., (x))
+            Node::ParenthesizedExpression(pe) => {
+                self.get_type_of_node(pe.expression)
+            }
+
             // Default: return any
             _ => self.types.any_type,
+        }
+    }
+
+    /// Get the type of a call expression.
+    fn get_type_of_call_expression(&mut self, expression: NodeIndex, arguments: &crate::parser::NodeList) -> TypeId {
+        // Get the type of the function being called
+        let func_type = self.get_type_of_node(expression);
+
+        // If it's a function type, return the return type
+        if let Some(Type::Function(f)) = self.types.get(func_type) {
+            // Check argument count
+            let arg_count = arguments.nodes.len() as u32;
+            if arg_count < f.min_argument_count && !f.has_rest_parameter {
+                // TODO: Add diagnostic for too few arguments
+            }
+            if arg_count > f.parameter_types.len() as u32 && !f.has_rest_parameter {
+                // TODO: Add diagnostic for too many arguments
+            }
+
+            // TODO: Check argument types match parameter types
+
+            return f.return_type;
+        }
+
+        // If it's an object with call signatures, use those
+        if let Some(Type::Object(obj)) = self.types.get(func_type) {
+            if !obj.call_signatures.is_empty() {
+                // For now, use the first call signature's return type
+                if let Some(return_type) = obj.call_signatures[0].resolved_return_type {
+                    return return_type;
+                }
+            }
+        }
+
+        // Default to any for unknown callable types
+        self.types.any_type
+    }
+
+    /// Get the type of a new expression.
+    fn get_type_of_new_expression(&mut self, expression: NodeIndex, _arguments: &Option<crate::parser::NodeList>) -> TypeId {
+        // Get the type of the constructor
+        let constructor_type = self.get_type_of_node(expression);
+
+        // If it's a function type, create an instance type
+        // For now, just return any - proper class instantiation is complex
+        if let Some(Type::Function(_)) = self.types.get(constructor_type) {
+            // TODO: Return the instance type
+            return self.types.any_type;
+        }
+
+        // If it's an object with construct signatures, use those
+        if let Some(Type::Object(obj)) = self.types.get(constructor_type) {
+            if !obj.construct_signatures.is_empty() {
+                if let Some(return_type) = obj.construct_signatures[0].resolved_return_type {
+                    return return_type;
+                }
+            }
+        }
+
+        self.types.any_type
+    }
+
+    /// Get the type of an array literal.
+    fn get_type_of_array_literal(&mut self, elements: &crate::parser::NodeList) -> TypeId {
+        // Collect element types
+        let mut element_types = Vec::new();
+        for &elem_idx in &elements.nodes {
+            let elem_type = self.get_type_of_node(elem_idx);
+            if !element_types.contains(&elem_type) {
+                element_types.push(elem_type);
+            }
+        }
+
+        // Create a union of element types (if multiple) or the single type
+        if element_types.is_empty() {
+            // Empty array - never[]
+            self.types.never_type
+        } else if element_types.len() == 1 {
+            // Single type - return as is (would be Array<T> in full impl)
+            element_types[0]
+        } else {
+            // Multiple types - create union (would be Array<T | U | ...> in full impl)
+            self.types.create_union_type(element_types)
         }
     }
 
@@ -2484,5 +2614,112 @@ mod tests {
         } else {
             panic!("Expected Object type");
         }
+    }
+
+    #[test]
+    fn test_call_expression_type() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test function call expression
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                function greet(name: string): string { return name; }
+                const result = greet("hello");
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // 'greet' should be a function type
+        assert!(binder.file_locals.has("greet"));
+        if let Some(symbol) = binder.file_locals.get("greet") {
+            let fn_type = checker.get_type_of_symbol(symbol);
+            let typ = checker.types.get(fn_type).unwrap();
+
+            if let Type::Function(f) = typ {
+                assert_eq!(f.return_type, checker.types.string_type);
+            } else {
+                panic!("Expected Function type");
+            }
+        }
+
+        // 'result' should also be string (return type of greet)
+        assert!(binder.file_locals.has("result"));
+    }
+
+    #[test]
+    fn test_array_literal_type() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test array literal with mixed types
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"const arr = [1, "hello"];"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("arr"));
+
+        if let Some(symbol) = binder.file_locals.get("arr") {
+            let arr_type = checker.get_type_of_symbol(symbol);
+            let typ = checker.types.get(arr_type).unwrap();
+
+            // The type should be a union of number and string literals
+            if let Type::Union(u) = typ {
+                assert_eq!(u.types.len(), 2);
+            } else {
+                panic!("Expected Union type for mixed array, got {:?}", typ);
+            }
+        }
+    }
+
+    #[test]
+    fn test_union_type_creation() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+
+        // Create a union type of string | number
+        let string_type = checker.types.string_type;
+        let number_type = checker.types.number_type;
+        let union_type = checker.types.create_union_type(vec![string_type, number_type]);
+
+        let typ = checker.types.get(union_type).unwrap();
+        if let Type::Union(u) = typ {
+            assert_eq!(u.types.len(), 2);
+            assert!(u.types.contains(&string_type));
+            assert!(u.types.contains(&number_type));
+        } else {
+            panic!("Expected Union type");
+        }
+
+        // Type to string should work
+        let type_str = checker.type_to_string(union_type);
+        assert!(type_str.contains("|"));
     }
 }
