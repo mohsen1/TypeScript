@@ -2334,6 +2334,136 @@ impl<'a> CheckerState<'a> {
         self.get_type_with_facts(type_id, false, false)
     }
 
+    /// Narrow a type based on an instanceof guard.
+    /// When `x instanceof Foo` is true, narrows x to Foo (or intersection with Foo).
+    ///
+    /// For example, if type is `unknown` and target_type is class Foo,
+    /// returns `Foo`.
+    pub fn narrow_type_by_instanceof(&mut self, type_id: TypeId, target_type: TypeId) -> TypeId {
+        // If the source type is any, unknown, or object, narrow to target
+        let Some(source) = self.types.get(type_id) else {
+            return target_type;
+        };
+
+        let source_flags = source.flags();
+
+        // any or unknown narrows directly to the target
+        if (source_flags & (type_flags::ANY | type_flags::UNKNOWN)) != 0 {
+            return target_type;
+        }
+
+        // If it's a union type, filter to types that could be instanceof the target
+        if let Type::Union(u) = source {
+            let types = u.types.clone();
+            let filtered_types: Vec<TypeId> = types.iter()
+                .filter(|&&t| self.could_be_instanceof(t, target_type))
+                .copied()
+                .collect();
+
+            if filtered_types.is_empty() {
+                // No types could match, but instanceof succeeded, so result is target
+                return target_type;
+            } else if filtered_types.len() == 1 {
+                return filtered_types[0];
+            } else {
+                return self.types.create_union_type(filtered_types);
+            }
+        }
+
+        // For object types, check if they're related to target
+        if (source_flags & type_flags::OBJECT) != 0 {
+            // If source could be the target type, return the target
+            if self.could_be_instanceof(type_id, target_type) {
+                return target_type;
+            }
+        }
+
+        // Default: return intersection of source and target
+        // (this handles cases like `x instanceof Foo` where x might have additional properties)
+        if type_id != target_type {
+            // For now, just return the target type for simplicity
+            return target_type;
+        }
+
+        target_type
+    }
+
+    /// Narrow a type by excluding types that match instanceof.
+    /// When `x instanceof Foo` is false, narrows x to exclude Foo.
+    pub fn narrow_type_by_instanceof_negation(&mut self, type_id: TypeId, target_type: TypeId) -> TypeId {
+        let Some(source) = self.types.get(type_id) else {
+            return type_id;
+        };
+
+        // If it's a union type, filter out the target type and its subtypes
+        if let Type::Union(u) = source {
+            let types = u.types.clone();
+            let remaining_types: Vec<TypeId> = types.iter()
+                .filter(|&&t| !self.is_definitely_instanceof(t, target_type))
+                .copied()
+                .collect();
+
+            if remaining_types.is_empty() {
+                return self.types.never_type;
+            } else if remaining_types.len() == 1 {
+                return remaining_types[0];
+            } else {
+                return self.types.create_union_type(remaining_types);
+            }
+        }
+
+        // For single types, if it's definitely the target, narrow to never
+        if self.is_definitely_instanceof(type_id, target_type) {
+            return self.types.never_type;
+        }
+
+        type_id
+    }
+
+    /// Check if a type could potentially be an instance of a target type.
+    fn could_be_instanceof(&self, type_id: TypeId, target_type: TypeId) -> bool {
+        // Same type always matches
+        if type_id == target_type {
+            return true;
+        }
+
+        let Some(source) = self.types.get(type_id) else {
+            return false;
+        };
+
+        let source_flags = source.flags();
+
+        // Any/unknown could be anything
+        if (source_flags & (type_flags::ANY | type_flags::UNKNOWN)) != 0 {
+            return true;
+        }
+
+        // Primitives can't be instanceof
+        if (source_flags & (type_flags::STRING | type_flags::NUMBER | type_flags::BOOLEAN |
+                           type_flags::UNDEFINED | type_flags::NULL | type_flags::VOID |
+                           type_flags::NEVER)) != 0 {
+            return false;
+        }
+
+        // Objects could potentially match
+        if (source_flags & type_flags::OBJECT) != 0 {
+            return true;
+        }
+
+        false
+    }
+
+    /// Check if a type is definitely an instance of a target type.
+    fn is_definitely_instanceof(&self, type_id: TypeId, target_type: TypeId) -> bool {
+        // Same type always matches
+        if type_id == target_type {
+            return true;
+        }
+
+        // Check if type is assignable to target
+        self.is_type_assignable_to(type_id, target_type)
+    }
+
     /// Get the diagnostics as JSON.
     pub fn get_diagnostics_json(&self) -> String {
         serde_json::to_string(&self.diagnostics).unwrap_or_else(|_| "[]".to_string())
@@ -4077,5 +4207,89 @@ mod tests {
         } else {
             panic!("result variable not found");
         }
+    }
+
+    #[test]
+    fn test_instanceof_narrowing_unknown() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+
+        // Create a simple class type
+        let class_type = checker.types.create_class_type(vec![], vec![], vec![]);
+
+        // Narrow unknown by instanceof should give the class type
+        let narrowed = checker.narrow_type_by_instanceof(checker.types.unknown_type, class_type);
+
+        assert_eq!(narrowed, class_type);
+    }
+
+    #[test]
+    fn test_instanceof_narrowing_any() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+
+        // Create a simple class type
+        let class_type = checker.types.create_class_type(vec![], vec![], vec![]);
+
+        // Narrow any by instanceof should give the class type
+        let narrowed = checker.narrow_type_by_instanceof(checker.types.any_type, class_type);
+
+        assert_eq!(narrowed, class_type);
+    }
+
+    #[test]
+    fn test_instanceof_narrowing_union() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+
+        // Create a class type
+        let class_type = checker.types.create_class_type(vec![], vec![], vec![]);
+
+        // Create a union of string | class
+        let union_type = checker.types.create_union(vec![
+            checker.types.string_type,
+            class_type,
+        ]);
+
+        // Narrow by instanceof should filter out string (primitive)
+        let narrowed = checker.narrow_type_by_instanceof(union_type, class_type);
+
+        // Should narrow to just the class type
+        assert_eq!(narrowed, class_type);
+    }
+
+    #[test]
+    fn test_instanceof_negation() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+
+        // Create two class types
+        let class_a = checker.types.create_class_type(vec![], vec![], vec![]);
+        let class_b = checker.types.create_class_type(vec![], vec![], vec![]);
+
+        // Create a union of A | B
+        let union_type = checker.types.create_union(vec![class_a, class_b]);
+
+        // Narrow by NOT instanceof A should give B
+        let narrowed = checker.narrow_type_by_instanceof_negation(union_type, class_a);
+
+        // Should narrow to class_b
+        assert_eq!(narrowed, class_b);
     }
 }
