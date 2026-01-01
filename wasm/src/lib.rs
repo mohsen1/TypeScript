@@ -11,6 +11,9 @@ pub use scanner::*;
 pub mod scanner_impl;
 pub use scanner_impl::*;
 
+// Parser AST types (Phase 3)
+pub mod parser;
+
 // =============================================================================
 // Scanner Factory Function
 // =============================================================================

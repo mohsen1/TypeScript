@@ -1,1 +1,0 @@
-/Users/mohsenazimi/code/TypeScript/wasm/target/wasm32-unknown-unknown/release/wasm.wasm: /Users/mohsenazimi/code/TypeScript/wasm/src/char_codes.rs /Users/mohsenazimi/code/TypeScript/wasm/src/lib.rs /Users/mohsenazimi/code/TypeScript/wasm/src/scanner.rs /Users/mohsenazimi/code/TypeScript/wasm/src/scanner_impl.rs
