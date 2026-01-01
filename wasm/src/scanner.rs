@@ -4,6 +4,7 @@
 //! that mirror TypeScript's scanner output.
 
 use wasm_bindgen::prelude::*;
+use serde::Serialize;
 
 // =============================================================================
 // SyntaxKind Enum - Token Types (Scanner Output)
@@ -14,7 +15,7 @@ use wasm_bindgen::prelude::*;
 /// AST node types are not included here.
 #[wasm_bindgen]
 #[repr(u16)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
 pub enum SyntaxKind {
     Unknown = 0,
     EndOfFileToken = 1,

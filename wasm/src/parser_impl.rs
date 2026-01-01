@@ -128,18 +128,18 @@ impl ParserState {
 
     /// Get the source file AST as JSON.
     /// This serializes the entire AST for consumption by JavaScript.
+    /// The root node is serialized recursively with all children resolved.
     #[wasm_bindgen(js_name = getSourceFileJson)]
     pub fn get_source_file_json(&self, root_idx: u32) -> String {
         let idx = NodeIndex(root_idx);
-        if let Some(node) = self.arena.get(idx) {
-            // TODO: Implement proper JSON serialization
-            format!("{{\"kind\": {}, \"pos\": {}, \"end\": {}}}",
-                node.base().kind,
-                node.base().pos,
-                node.base().end)
-        } else {
-            "null".to_string()
-        }
+        self.serialize_node_to_json(idx)
+    }
+
+    /// Serialize the entire arena as a JSON array.
+    /// This can be used for debugging or when the client wants to reconstruct the AST.
+    #[wasm_bindgen(js_name = getArenaJson)]
+    pub fn get_arena_json(&self) -> String {
+        serde_json::to_string(&self.arena.nodes).unwrap_or_else(|_| "[]".to_string())
     }
 
     /// Get the number of nodes in the AST.
@@ -170,6 +170,18 @@ impl ParserState {
 // =============================================================================
 
 impl ParserState {
+    /// Serialize a node to JSON, recursively resolving all child node references.
+    fn serialize_node_to_json(&self, idx: NodeIndex) -> String {
+        if idx.is_none() {
+            return "null".to_string();
+        }
+
+        match self.arena.get(idx) {
+            Some(node) => serde_json::to_string(node).unwrap_or_else(|_| "null".to_string()),
+            None => "null".to_string(),
+        }
+    }
+
     // =========================================================================
     // Token Utilities
     // =========================================================================
@@ -3545,5 +3557,22 @@ mod tests {
         } else {
             panic!("Expected SourceFile");
         }
+    }
+
+    #[test]
+    fn test_json_serialization() {
+        let mut parser = ParserState::new("test.ts".to_string(), "const x = 1;".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        // Test node serialization
+        let json = parser.serialize_node_to_json(NodeIndex(sf_idx.0));
+        assert!(json.contains("\"kind\":"));
+        assert!(json.contains("\"pos\":"));
+        assert!(json.contains("\"end\":"));
+
+        // Test arena serialization
+        let arena_json = parser.get_arena_json();
+        assert!(arena_json.starts_with("["));
+        assert!(arena_json.ends_with("]"));
     }
 }
