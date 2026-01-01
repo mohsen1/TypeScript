@@ -7,17 +7,17 @@ Rust components progressively replace TypeScript while compiler stays functional
 
 ## Current State
 
-**Phase**: 4 - Binder (in progress)
-**Tests**: 94 Rust tests + 19 TypeScript integration tests
-**Features**: Full parser + basic binder with symbol tables
+**Phase**: 5 - Type Checker (starting)
+**Tests**: 98 Rust tests + 19 parser TS tests + 10 binder tests
+**Features**: Full parser + binder with symbol tables
 
 ### What's Working
 - Scanner: Complete, verified token-for-token match with TS scanner
 - Parser: All major constructs (statements, expressions, declarations, types)
-- Integration: parseWithRustParser() in parser.ts, 45+ node type conversions
+- Binder: Symbol creation, scope management, declaration merging
+- Integration: parseWithRustParser() + bindSourceFile() working end-to-end
 - JSX & Decorators: Full support
 - Type System: All advanced types (conditional, mapped, indexed access, infer, keyof, typeof)
-- Binder: Symbol creation, scope management, declaration merging
 
 ## Key Files
 
@@ -28,7 +28,7 @@ Rust components progressively replace TypeScript while compiler stays functional
 | `wasm/src/scanner_impl.rs` | Scanner (~800 lines) |
 | `wasm/src/parser.rs` | AST nodes (~2200 lines, 130+ types) |
 | `wasm/src/parser_impl.rs` | Parser (~4000 lines) |
-| `wasm/src/binder.rs` | Binder (~1000 lines) |
+| `wasm/src/binder.rs` | Binder (~1100 lines) |
 | `src/compiler/parser.ts` | TS integration (parseWithRustParser, convertNode) |
 | `src/compiler/wasm.ts` | WASM bridge |
 
@@ -49,6 +49,9 @@ node scripts/verifyScanner.mjs src/compiler/checker.ts
 
 # Verify parser
 node scripts/verifyParser.mjs
+
+# Verify binder
+node scripts/verifyBinder.mjs
 ```
 
 ## Architecture
@@ -58,8 +61,9 @@ node scripts/verifyParser.mjs
 - **Feature flags**: `--useRustScanner`, `--useRustParser`
 - **Fallback**: Graceful fallback to TS parser on unsupported features
 
-## Next Steps
+## Next Steps (Phase 5)
 
-- [ ] Flow analysis setup (control flow graph, narrowing)
-- [ ] TypeScript integration for binder
-- [ ] Type checker foundation
+- [ ] Type struct and TypeFlags
+- [ ] Basic type checking (primitives, objects, functions)
+- [ ] Type inference
+- [ ] Generic types
