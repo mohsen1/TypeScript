@@ -360,6 +360,20 @@ pub struct TemplateLiteralType {
     pub types: Vec<TypeId>,
 }
 
+/// A function type ((x: T) => U)
+#[derive(Clone, Debug, Serialize)]
+pub struct FunctionType {
+    pub flags: u32,
+    pub object_flags: u32,
+    pub declaration: NodeIndex,
+    pub parameter_types: Vec<TypeId>,
+    pub parameter_names: Vec<String>,
+    pub return_type: TypeId,
+    pub type_parameters: Vec<TypeId>,
+    pub min_argument_count: u32,
+    pub has_rest_parameter: bool,
+}
+
 // =============================================================================
 // Type Enum
 // =============================================================================
@@ -379,6 +393,7 @@ pub enum Type {
     IndexedAccess(IndexedAccessType),
     Index(IndexType),
     TemplateLiteral(TemplateLiteralType),
+    Function(FunctionType),
 }
 
 impl Type {
@@ -397,6 +412,7 @@ impl Type {
             Type::IndexedAccess(t) => t.flags,
             Type::Index(t) => t.flags,
             Type::TemplateLiteral(t) => t.flags,
+            Type::Function(t) => t.flags,
         }
     }
 
@@ -583,6 +599,29 @@ impl TypeArena {
             return self.unknown_type;
         }
         self.alloc(Type::Intersection(IntersectionType::new(types)))
+    }
+
+    /// Create a function type.
+    pub fn create_function_type(
+        &mut self,
+        declaration: NodeIndex,
+        parameter_types: Vec<TypeId>,
+        parameter_names: Vec<String>,
+        return_type: TypeId,
+        min_argument_count: u32,
+        has_rest_parameter: bool,
+    ) -> TypeId {
+        self.alloc(Type::Function(FunctionType {
+            flags: type_flags::OBJECT,
+            object_flags: object_flags::ANONYMOUS,
+            declaration,
+            parameter_types,
+            parameter_names,
+            return_type,
+            type_parameters: Vec::new(),
+            min_argument_count,
+            has_rest_parameter,
+        }))
     }
 }
 
@@ -794,11 +833,32 @@ impl<'a> CheckerState<'a> {
                 self.types.object_type
             }
 
-            // Type references (generic types like Array<T>)
+            // Type references (generic types like Array<T>, or keywords like number)
             Node::TypeReference(tr) => {
-                // For now, return object. Proper handling needs symbol lookup.
-                let _ = tr;
-                self.types.object_type
+                // Check if the type_name is a keyword type
+                if let Some(Node::Identifier(id)) = self.node_arena.get(tr.type_name) {
+                    match id.escaped_text.as_str() {
+                        "string" => self.types.string_type,
+                        "number" => self.types.number_type,
+                        "boolean" => self.types.boolean_type,
+                        "void" => self.types.void_type,
+                        "any" => self.types.any_type,
+                        "never" => self.types.never_type,
+                        "undefined" => self.types.undefined_type,
+                        "null" => self.types.null_type,
+                        "unknown" => self.types.unknown_type,
+                        "object" => self.types.object_type,
+                        "bigint" => self.types.big_int_type,
+                        "symbol" => self.types.es_symbol_type,
+                        _ => {
+                            // For other type references, look up in symbol table
+                            // For now, return object (proper handling needs symbol lookup)
+                            self.types.object_type
+                        }
+                    }
+                } else {
+                    self.types.object_type
+                }
             }
 
             // Parenthesized types
@@ -822,9 +882,132 @@ impl<'a> CheckerState<'a> {
                 }
             }
 
+            // Function declarations
+            Node::FunctionDeclaration(fd) => {
+                self.get_type_of_function_like(
+                    node,
+                    &fd.parameters,
+                    fd.type_annotation,
+                )
+            }
+
+            // Function expressions
+            Node::FunctionExpression(fe) => {
+                self.get_type_of_function_like(
+                    node,
+                    &fe.parameters,
+                    fe.type_annotation,
+                )
+            }
+
+            // Arrow functions
+            Node::ArrowFunction(af) => {
+                self.get_type_of_function_like(
+                    node,
+                    &af.parameters,
+                    af.type_annotation,
+                )
+            }
+
+            // Method declarations
+            Node::MethodDeclaration(md) => {
+                self.get_type_of_function_like(
+                    node,
+                    &md.parameters,
+                    md.type_annotation,
+                )
+            }
+
+            // Function type nodes (e.g., type F = (x: number) => string)
+            Node::FunctionType(ft) => {
+                self.get_type_of_function_like(
+                    node,
+                    &ft.parameters,
+                    ft.type_node,
+                )
+            }
+
+            // Constructor type nodes
+            Node::ConstructorType(ct) => {
+                self.get_type_of_function_like(
+                    node,
+                    &ct.parameters,
+                    ct.type_node,
+                )
+            }
+
+            // Type alias declarations - get the declared type
+            Node::TypeAliasDeclaration(ta) => {
+                self.get_type_of_node(ta.type_node)
+            }
+
             // Default: return any
             _ => self.types.any_type,
         }
+    }
+
+    /// Get the type of a function-like declaration (function, method, arrow, etc.)
+    fn get_type_of_function_like(
+        &mut self,
+        declaration: NodeIndex,
+        parameters: &crate::parser::NodeList,
+        return_type_annotation: NodeIndex,
+    ) -> TypeId {
+        use crate::parser::Node;
+
+        // Collect parameter types and names
+        let mut param_types = Vec::new();
+        let mut param_names = Vec::new();
+        let mut min_arg_count = 0u32;
+        let mut has_rest = false;
+
+        for &param_idx in &parameters.nodes {
+            if let Some(Node::ParameterDeclaration(param)) = self.node_arena.get(param_idx) {
+                // Get parameter name
+                let name = if let Some(Node::Identifier(id)) = self.node_arena.get(param.name) {
+                    id.escaped_text.clone()
+                } else {
+                    String::new()
+                };
+                param_names.push(name);
+
+                // Get parameter type
+                let param_type = if !param.type_annotation.is_none() {
+                    self.get_type_of_node(param.type_annotation)
+                } else if !param.initializer.is_none() {
+                    // Infer from initializer
+                    self.get_type_of_node(param.initializer)
+                } else {
+                    self.types.any_type
+                };
+                param_types.push(param_type);
+
+                // Track min argument count and rest parameter
+                if param.dot_dot_dot_token {
+                    has_rest = true;
+                } else if !param.question_token && param.initializer.is_none() {
+                    min_arg_count += 1;
+                }
+            }
+        }
+
+        // Get return type
+        let return_type = if !return_type_annotation.is_none() {
+            self.get_type_of_node(return_type_annotation)
+        } else {
+            // Return type inference would happen here
+            // For now, default to any
+            self.types.any_type
+        };
+
+        self.types.create_function_type(
+            declaration,
+            param_types,
+            param_names,
+            return_type,
+            min_arg_count,
+            has_rest,
+        )
     }
 
     /// Get the type of a symbol (with caching).
@@ -841,13 +1024,27 @@ impl<'a> CheckerState<'a> {
 
     /// Get type of symbol (worker, no caching).
     fn get_type_of_symbol_worker(&mut self, symbol_id: SymbolId) -> TypeId {
+        use crate::binder::symbol_flags;
+
         let Some(symbol) = self.symbol_arena.get(symbol_id) else {
             return self.types.any_type;
         };
 
+        // For type aliases, use the first declaration
+        if symbol.has_flags(symbol_flags::TYPE_ALIAS) {
+            if let Some(&decl) = symbol.declarations.first() {
+                return self.get_type_of_node(decl);
+            }
+        }
+
         // Get type from value declaration
         if !symbol.value_declaration.is_none() {
             return self.get_type_of_node(symbol.value_declaration);
+        }
+
+        // Fallback: try first declaration
+        if let Some(&decl) = symbol.declarations.first() {
+            return self.get_type_of_node(decl);
         }
 
         self.types.any_type
@@ -988,6 +1185,21 @@ impl<'a> CheckerState<'a> {
             Type::IndexedAccess(_) => "IndexedAccessType".to_string(),
             Type::Index(_) => "IndexType".to_string(),
             Type::TemplateLiteral(_) => "TemplateLiteralType".to_string(),
+            Type::Function(f) => {
+                // Format as (param1: Type1, param2: Type2) => ReturnType
+                let params: Vec<String> = f.parameter_names.iter()
+                    .zip(f.parameter_types.iter())
+                    .map(|(name, &typ)| {
+                        if name.is_empty() {
+                            self.type_to_string(typ)
+                        } else {
+                            format!("{}: {}", name, self.type_to_string(typ))
+                        }
+                    })
+                    .collect();
+                let return_str = self.type_to_string(f.return_type);
+                format!("({}) => {}", params.join(", "), return_str)
+            }
         }
     }
 }
@@ -1347,5 +1559,180 @@ mod tests {
             // x should have type "hello" (string literal)
             assert!(checker.types.get(x_type).unwrap().has_flags(type_flags::STRING_LITERAL));
         }
+    }
+
+    #[test]
+    fn test_function_type_inference() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Parse a function declaration
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"function add(x: number, y: number): number { return x + y; }"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Verify 'add' is in the symbol table
+        assert!(binder.file_locals.has("add"));
+
+        // Get type of 'add' symbol
+        if let Some(add_symbol) = binder.file_locals.get("add") {
+            let add_type = checker.get_type_of_symbol(add_symbol);
+
+            // Should be a function type with OBJECT flag
+            let typ = checker.types.get(add_type).unwrap();
+            assert!(typ.has_flags(type_flags::OBJECT));
+
+            // Verify it's a Function variant
+            if let Type::Function(f) = typ {
+                assert_eq!(f.parameter_names.len(), 2);
+                assert_eq!(f.parameter_names[0], "x");
+                assert_eq!(f.parameter_names[1], "y");
+                assert_eq!(f.parameter_types.len(), 2);
+                assert_eq!(f.min_argument_count, 2);
+                assert!(!f.has_rest_parameter);
+
+                // Both params should be number type
+                assert_eq!(f.parameter_types[0], checker.types.number_type);
+                assert_eq!(f.parameter_types[1], checker.types.number_type);
+
+                // Return type should be number
+                assert_eq!(f.return_type, checker.types.number_type);
+            } else {
+                panic!("Expected Function type, got {:?}", typ);
+            }
+
+            // Verify type_to_string works
+            let type_str = checker.type_to_string(add_type);
+            assert_eq!(type_str, "(x: number, y: number) => number");
+        }
+    }
+
+    #[test]
+    fn test_function_type_with_optional_params() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"function greet(name: string, greeting?: string): void {}"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        if let Some(fn_symbol) = binder.file_locals.get("greet") {
+            let fn_type = checker.get_type_of_symbol(fn_symbol);
+
+            if let Type::Function(f) = checker.types.get(fn_type).unwrap() {
+                assert_eq!(f.parameter_names.len(), 2);
+                // Optional param doesn't count toward min
+                assert_eq!(f.min_argument_count, 1);
+                assert!(!f.has_rest_parameter);
+                assert_eq!(f.return_type, checker.types.void_type);
+            } else {
+                panic!("Expected Function type");
+            }
+        }
+    }
+
+    #[test]
+    fn test_function_type_node() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test function type nodes (type aliases)
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"type Callback = (x: number, y: string) => boolean;"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // 'Callback' should be in the symbol table
+        assert!(binder.file_locals.has("Callback"));
+
+        // Get the type alias symbol and its declared type
+        if let Some(callback_symbol) = binder.file_locals.get("Callback") {
+            let callback_type = checker.get_type_of_symbol(callback_symbol);
+            let typ = checker.types.get(callback_type).unwrap();
+
+            // The type should be a function type
+            if let Type::Function(f) = typ {
+                assert_eq!(f.parameter_names.len(), 2);
+                assert_eq!(f.parameter_names[0], "x");
+                assert_eq!(f.parameter_names[1], "y");
+                assert_eq!(f.parameter_types[0], checker.types.number_type);
+                assert_eq!(f.parameter_types[1], checker.types.string_type);
+                assert_eq!(f.return_type, checker.types.boolean_type);
+            } else {
+                panic!("Expected Function type, got {:?}", typ);
+            }
+        }
+    }
+
+    #[test]
+    fn test_function_type_direct() {
+        use crate::parser::NodeArena;
+
+        // Test directly creating a function type
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+
+        // Create a function type manually
+        let fn_type = checker.types.create_function_type(
+            NodeIndex::NONE,
+            vec![checker.types.number_type, checker.types.string_type],
+            vec!["a".to_string(), "b".to_string()],
+            checker.types.boolean_type,
+            2,
+            false,
+        );
+
+        // Verify the type
+        let typ = checker.types.get(fn_type).unwrap();
+        assert!(typ.has_flags(type_flags::OBJECT));
+
+        if let Type::Function(f) = typ {
+            assert_eq!(f.parameter_types.len(), 2);
+            assert_eq!(f.parameter_names, vec!["a", "b"]);
+            assert_eq!(f.return_type, checker.types.boolean_type);
+        } else {
+            panic!("Expected Function type");
+        }
+
+        // Test type_to_string
+        let type_str = checker.type_to_string(fn_type);
+        assert_eq!(type_str, "(a: number, b: string) => boolean");
     }
 }

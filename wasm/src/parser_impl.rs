@@ -2559,7 +2559,14 @@ impl ParserState {
     /// Parse a parameter (simplified).
     fn parse_parameter(&mut self) -> NodeIndex {
         let pos = self.get_full_start();
+
+        // Check for rest parameter (...args)
+        let dot_dot_dot_token = self.parse_optional(SyntaxKind::DotDotDotToken);
+
         let name = self.parse_identifier();
+
+        // Check for optional parameter (name?)
+        let question_token = self.parse_optional(SyntaxKind::QuestionToken);
 
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
             self.parse_type()
@@ -2578,9 +2585,9 @@ impl ParserState {
         let param = crate::parser::ParameterDeclaration {
             base: NodeBase::new_ext(syntax_kind_ext::PARAMETER, pos, end),
             modifiers: None,
-            dot_dot_dot_token: false,
+            dot_dot_dot_token,
             name,
-            question_token: false,
+            question_token,
             type_annotation,
             initializer,
         };

@@ -75,23 +75,26 @@ All Phase 4 tasks finished:
   - Union/Intersection types
   - Variable declarations (from initializer/annotation)
 
-### In Progress
-
-- [ ] **Symbol type resolution**
+- [x] **Symbol type resolution** (Phase 5.2)
   - Link symbols to declarations
   - Resolve identifier types via symbol table
+  - Type alias support
 
-- [ ] **Function type inference**
-  - Parameter types
+- [x] **Function type inference** (Phase 5.3)
+  - FunctionType struct for function types
+  - Parameter types and names
   - Return type inference
-  - Call expression type checking
+  - Function declarations, function types, type aliases
+  - Optional parameters and rest parameters
 
-### Priority: Medium
+### In Progress
 
 - [ ] **Generic types**
   - Type parameters
   - Type arguments
   - Instantiation
+
+### Priority: Medium
 
 - [ ] **Object type checking**
   - Property access
@@ -102,12 +105,17 @@ All Phase 4 tasks finished:
   - Type guards (typeof, instanceof)
   - Control flow analysis
 
+- [ ] **Arrow expression parsing**
+  - Arrow functions in expression position not yet parsed
+  - Needed for `const f = (x) => x * 2`
+
 ## Blocked
 
 (none)
 
 ## Notes
 
-- Phase 5.1-5.2 completed 2026-01-01
-- 117 Rust tests passing (98 base + 19 checker)
-- CheckerState with type inference and assignability working
+- Phase 5.1-5.3 completed 2026-01-01
+- 122 Rust tests passing (98 base + 24 checker)
+- CheckerState with type inference, assignability, and function types working
+- Explored typescript-go for architectural patterns (documented in TYPE_CHECKER_MINDMAP.md)

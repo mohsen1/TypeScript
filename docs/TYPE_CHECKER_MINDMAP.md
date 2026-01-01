@@ -500,3 +500,73 @@ Phase 5.5 □ Advanced
 | `keyof T` | Key union | Index type |
 | `T[K]` | Indexed access | Projection |
 | `T extends U ? X : Y` | Conditional | Type-level if |
+
+---
+
+## Insights from typescript-go (Microsoft's Go port)
+
+### Architecture Patterns
+
+1. **State Pooling** - Relater and InferenceState are pooled and reused
+   ```go
+   func (c *Checker) getRelater() *Relater {
+       r := c.freeRelater
+       if r == nil { r = &Relater{c: c} }
+       c.freeRelater = r.next
+       return r
+   }
+   ```
+
+2. **Separated Concerns** - Key files:
+   - `checker.go` (~31K lines) - Main type checking
+   - `relater.go` (~5K lines) - Type relation checking
+   - `inference.go` (~1.6K lines) - Type inference
+   - `flow.go` (~2.7K lines) - Control flow analysis
+
+3. **Multiple Relations** - Separate caches for each relation:
+   - `identityRelation` - Structural equality
+   - `subtypeRelation` - Strict subtyping
+   - `strictSubtypeRelation` - Even stricter
+   - `assignableRelation` - Assignment compatibility
+   - `comparableRelation` - Comparison operators
+
+4. **Ternary Results** - TernaryTrue/TernaryFalse/TernaryMaybe for relation checking
+
+5. **Overflow Protection** - Track recursion depth and complexity limits
+
+### Key Data Structures
+
+```go
+type Relater struct {
+    relation       *Relation
+    sourceStack    []*Type
+    targetStack    []*Type
+    expandingFlags ExpandingFlags
+    overflow       bool
+    relationCount  int
+}
+
+type InferenceState struct {
+    inferences      []*InferenceInfo
+    priority        InferencePriority
+    contravariant   bool
+    propagationType *Type
+}
+```
+
+### Fast Paths in Type Relation
+
+1. Same type identity check
+2. Object vs primitive shortcut
+3. Type parameter vs constraint match
+4. Singleton type check (null, undefined, true, false)
+
+### Rust Implementation Mapping
+
+| typescript-go | Rust (wasm) |
+|---------------|-------------|
+| `*Type` pointer | `TypeId` (arena index) |
+| `Relater` struct | Could add `RelaterState` |
+| `InferenceState` | Could add `InferenceContext` |
+| `getRelater()/putRelater()` | Arena or pool pattern |
+| `Ternary` | `enum Ternary { True, False, Maybe }` |
