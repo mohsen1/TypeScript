@@ -36,7 +36,7 @@ use crate::parser::{
     // Types
     TypeReference, ArrayType, TupleType, UnionType, IntersectionType,
     FunctionType, ConstructorType, TypeLiteral, ParenthesizedType, TypeParameterDeclaration,
-    LiteralType, ConditionalType, InferType, TypeOperator, TypeQuery,
+    LiteralType, ConditionalType, InferType, TypeOperator, TypeQuery, MappedType, IndexedAccessType,
     // Misc
     SourceFile, HeritageClause, ParameterDeclaration,
 };
@@ -2098,6 +2098,22 @@ impl ParserState {
         self.alloc_node(Node::Identifier(id))
     }
 
+    /// Parse a keyword as an identifier (for type keywords like string, number, etc.)
+    fn parse_keyword_as_identifier(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let text = self.get_token_value();
+        self.next_token();
+        let end = self.get_token_start();
+
+        let id = Identifier {
+            base: NodeBase::new(SyntaxKind::Identifier, pos, end),
+            escaped_text: text,
+            original_text: None,
+            type_arguments: None,
+        };
+        self.alloc_node(Node::Identifier(id))
+    }
+
     /// Parse a numeric literal.
     fn parse_numeric_literal(&mut self) -> NodeIndex {
         let pos = self.get_full_start();
@@ -2813,6 +2829,142 @@ impl ParserState {
         self.parse_identifier()
     }
 
+    /// Look ahead to check if we're at the start of a mapped type.
+    /// Mapped types start with: { [+/-] readonly? [ identifier in ... ]
+    fn look_ahead_is_start_of_mapped_type(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let saved_token = self.current_token;
+
+        // Consume {
+        self.next_token();
+
+        // Check for +/- before readonly
+        if self.is_token(SyntaxKind::PlusToken) || self.is_token(SyntaxKind::MinusToken) {
+            let result = {
+                self.next_token();
+                self.is_token(SyntaxKind::ReadonlyKeyword)
+            };
+            self.scanner.restore_state(snapshot);
+            self.current_token = saved_token;
+            return result;
+        }
+
+        // Skip optional readonly
+        if self.is_token(SyntaxKind::ReadonlyKeyword) {
+            self.next_token();
+        }
+
+        // Check for [ identifier in
+        let result = self.is_token(SyntaxKind::OpenBracketToken) && {
+            self.next_token();
+            self.scanner.is_identifier() && {
+                self.next_token();
+                self.is_token(SyntaxKind::InKeyword)
+            }
+        };
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = saved_token;
+        result
+    }
+
+    /// Parse a mapped type: { [K in T]: U }
+    fn parse_mapped_type(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+
+        // Parse optional readonly modifier: +readonly, -readonly, readonly
+        let readonly_token = if self.is_token(SyntaxKind::ReadonlyKeyword)
+            || self.is_token(SyntaxKind::PlusToken)
+            || self.is_token(SyntaxKind::MinusToken)
+        {
+            let token = self.token();
+            self.next_token();
+            if token != SyntaxKind::ReadonlyKeyword {
+                self.parse_expected(SyntaxKind::ReadonlyKeyword);
+            }
+            Some(token as u16)
+        } else {
+            None
+        };
+
+        // Parse [K in T]
+        self.parse_expected(SyntaxKind::OpenBracketToken);
+        let type_parameter = self.parse_mapped_type_parameter();
+
+        // Parse optional 'as NameType'
+        let name_type = if self.parse_optional(SyntaxKind::AsKeyword) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+        self.parse_expected(SyntaxKind::CloseBracketToken);
+
+        // Parse optional question modifier: +?, -?, ?
+        let question_token = if self.is_token(SyntaxKind::QuestionToken)
+            || self.is_token(SyntaxKind::PlusToken)
+            || self.is_token(SyntaxKind::MinusToken)
+        {
+            let token = self.token();
+            self.next_token();
+            if token != SyntaxKind::QuestionToken {
+                self.parse_expected(SyntaxKind::QuestionToken);
+            }
+            Some(token as u16)
+        } else {
+            None
+        };
+
+        // Parse optional type annotation
+        let type_node = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Skip optional semicolon
+        self.parse_optional(SyntaxKind::SemicolonToken);
+
+        // Parse any remaining members (for type literals with both mapped and regular members)
+        let members = if !self.is_token(SyntaxKind::CloseBraceToken) {
+            Some(self.parse_type_members())
+        } else {
+            None
+        };
+
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end = self.get_token_start();
+        let mapped = MappedType {
+            base: NodeBase::new_ext(syntax_kind_ext::MAPPED_TYPE, pos, end),
+            readonly_token,
+            type_parameter,
+            name_type,
+            question_token,
+            type_node,
+            members,
+        };
+        self.alloc_node(Node::MappedType(mapped))
+    }
+
+    /// Parse a mapped type parameter: K in T
+    fn parse_mapped_type_parameter(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let name = self.parse_identifier();
+        self.parse_expected(SyntaxKind::InKeyword);
+        let constraint = self.parse_type();
+
+        let end = self.get_token_start();
+        let type_param = TypeParameterDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::TYPE_PARAMETER, pos, end),
+            modifiers: None,
+            name,
+            constraint,
+            default: NodeIndex::NONE,
+        };
+        self.alloc_node(Node::TypeParameterDeclaration(type_param))
+    }
+
     /// Parse postfix type or higher (handles [] array type).
     fn parse_postfix_type_or_higher(&mut self) -> NodeIndex {
         let type_node = self.parse_primary_type();
@@ -2858,19 +3010,23 @@ impl ParserState {
                 self.parse_type_postfix(node_idx)
             }
 
-            // Object type / type literal
+            // Object type / type literal / mapped type
             SyntaxKind::OpenBraceToken => {
-                self.next_token();
-                let members = self.parse_type_members();
-                self.parse_expected(SyntaxKind::CloseBraceToken);
+                if self.look_ahead_is_start_of_mapped_type() {
+                    self.parse_mapped_type()
+                } else {
+                    self.next_token();
+                    let members = self.parse_type_members();
+                    self.parse_expected(SyntaxKind::CloseBraceToken);
 
-                let end = self.get_token_start();
-                let type_literal = TypeLiteral {
-                    base: NodeBase::new_ext(syntax_kind_ext::TYPE_LITERAL, pos, end),
-                    members,
-                };
-                let node_idx = self.alloc_node(Node::TypeLiteral(type_literal));
-                self.parse_type_postfix(node_idx)
+                    let end = self.get_token_start();
+                    let type_literal = TypeLiteral {
+                        base: NodeBase::new_ext(syntax_kind_ext::TYPE_LITERAL, pos, end),
+                        members,
+                    };
+                    let node_idx = self.alloc_node(Node::TypeLiteral(type_literal));
+                    self.parse_type_postfix(node_idx)
+                }
             }
 
             // String/number/boolean literals as types
@@ -2907,6 +3063,32 @@ impl ParserState {
                 self.parse_type_postfix(node_idx)
             }
 
+            // Predefined type keywords (string, number, boolean, etc.)
+            SyntaxKind::StringKeyword
+            | SyntaxKind::NumberKeyword
+            | SyntaxKind::BooleanKeyword
+            | SyntaxKind::SymbolKeyword
+            | SyntaxKind::BigIntKeyword
+            | SyntaxKind::VoidKeyword
+            | SyntaxKind::NullKeyword
+            | SyntaxKind::UndefinedKeyword
+            | SyntaxKind::NeverKeyword
+            | SyntaxKind::AnyKeyword
+            | SyntaxKind::UnknownKeyword
+            | SyntaxKind::ObjectKeyword
+            | SyntaxKind::IntrinsicKeyword => {
+                // Parse as a type reference with keyword name
+                let type_name = self.parse_keyword_as_identifier();
+                let end = self.get_token_start();
+                let type_ref = TypeReference {
+                    base: NodeBase::new_ext(syntax_kind_ext::TYPE_REFERENCE, pos, end),
+                    type_name,
+                    type_arguments: None,
+                };
+                let node_idx = self.alloc_node(Node::TypeReference(type_ref));
+                self.parse_type_postfix(node_idx)
+            }
+
             // Type reference (identifier, possibly with type arguments)
             _ => {
                 let type_name = self.parse_type_name();
@@ -2930,9 +3112,12 @@ impl ParserState {
 
     /// Parse type postfix operators ([], [key], etc).
     fn parse_type_postfix(&mut self, mut type_node: NodeIndex) -> NodeIndex {
-        let pos = self.get_full_start();
-
         while !self.at_end() {
+            let pos = {
+                let node = self.arena.get(type_node).unwrap();
+                node.base().pos
+            };
+
             if self.is_token(SyntaxKind::OpenBracketToken) {
                 self.next_token();
 
@@ -2946,10 +3131,16 @@ impl ParserState {
                     };
                     type_node = self.alloc_node(Node::ArrayType(array_type));
                 } else {
-                    // Just consume as T[], don't handle indexed access for now
-                    self.parse_type();
+                    // Indexed access type: T[K]
+                    let index_type = self.parse_type();
                     self.parse_expected(SyntaxKind::CloseBracketToken);
-                    // Return as-is for now
+                    let end = self.get_token_start();
+                    let indexed_access = IndexedAccessType {
+                        base: NodeBase::new_ext(syntax_kind_ext::INDEXED_ACCESS_TYPE, pos, end),
+                        object_type: type_node,
+                        index_type,
+                    };
+                    type_node = self.alloc_node(Node::IndexedAccessType(indexed_access));
                 }
             } else {
                 break;
@@ -3288,6 +3479,66 @@ mod tests {
             if let Node::TypeAliasDeclaration(type_alias) = stmt {
                 let type_node = parser.arena.get(type_alias.type_node).unwrap();
                 assert!(matches!(type_node, Node::TypeOperator(_)), "Expected TypeOperator (readonly), got {:?}", type_node);
+            } else {
+                panic!("Expected TypeAliasDeclaration");
+            }
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_mapped_type() {
+        let mut parser = ParserState::new("test.ts".to_string(), "type Readonly<T> = { readonly [K in keyof T]: T[K] };".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::TypeAliasDeclaration(type_alias) = stmt {
+                let type_node = parser.arena.get(type_alias.type_node).unwrap();
+                assert!(matches!(type_node, Node::MappedType(_)), "Expected MappedType, got {:?}", type_node);
+            } else {
+                panic!("Expected TypeAliasDeclaration");
+            }
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_indexed_access_type() {
+        let mut parser = ParserState::new("test.ts".to_string(), "type PropType = T['prop'];".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::TypeAliasDeclaration(type_alias) = stmt {
+                let type_node = parser.arena.get(type_alias.type_node).unwrap();
+                assert!(matches!(type_node, Node::IndexedAccessType(_)), "Expected IndexedAccessType, got {:?}", type_node);
+            } else {
+                panic!("Expected TypeAliasDeclaration");
+            }
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_mapped_type_with_as() {
+        let mut parser = ParserState::new("test.ts".to_string(), "type Renamed<T> = { [K in keyof T as string]: T[K] };".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::TypeAliasDeclaration(type_alias) = stmt {
+                let type_node = parser.arena.get(type_alias.type_node).unwrap();
+                assert!(matches!(type_node, Node::MappedType(_)), "Expected MappedType, got {:?}", type_node);
             } else {
                 panic!("Expected TypeAliasDeclaration");
             }
