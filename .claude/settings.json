@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "mcp__*",
+      "WebSearch",
+      "WebFetch(*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf *)",
+      "Bash(sudo rm -rf:*)",
+      "Bash(:(){ :|:& };:)",
+      "Bash(mkfs:*)",
+      "Bash(dd if=/dev/zero:*)"
+    ],
+    "ask": []
+  }
+}
