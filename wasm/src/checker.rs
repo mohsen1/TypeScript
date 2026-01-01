@@ -4,7 +4,7 @@
 //! diagnostics for type errors.
 
 use serde::Serialize;
-use crate::binder::{SymbolId, SymbolArena, SymbolTable};
+use crate::binder::{SymbolId, SymbolArena, SymbolTable, symbol_flags};
 use crate::parser::NodeIndex;
 
 // =============================================================================
@@ -237,6 +237,11 @@ impl ObjectType {
             construct_signatures: Vec::new(),
             index_infos: Vec::new(),
         }
+    }
+
+    /// Check if this object type has specific object flags set.
+    pub fn has_object_flags(&self, flags: u32) -> bool {
+        (self.object_flags & flags) != 0
     }
 }
 
@@ -659,6 +664,13 @@ impl TypeArena {
             is_this_type: false,
         }))
     }
+
+    /// Create an object type with properties.
+    pub fn create_object_type(&mut self, properties: Vec<SymbolId>) -> TypeId {
+        let mut obj = ObjectType::new(object_flags::ANONYMOUS, SymbolId::NONE);
+        obj.properties = properties;
+        self.alloc(Type::Object(obj))
+    }
 }
 
 impl Default for TypeArena {
@@ -710,6 +722,9 @@ pub struct CheckerState<'a> {
     /// The type arena for allocating types.
     pub types: TypeArena,
 
+    /// Local symbol arena for checker-created symbols (e.g., for object type properties).
+    local_symbols: SymbolArena,
+
     /// Cached types for symbols.
     symbol_types: std::collections::HashMap<SymbolId, TypeId>,
 
@@ -739,6 +754,7 @@ impl<'a> CheckerState<'a> {
             symbol_arena,
             file_locals,
             types: TypeArena::new(),
+            local_symbols: SymbolArena::new(),
             symbol_types: std::collections::HashMap::new(),
             node_types: std::collections::HashMap::new(),
             type_parameter_names: std::collections::HashMap::new(),
@@ -987,9 +1003,191 @@ impl<'a> CheckerState<'a> {
                 self.get_type_of_node(ta.type_node)
             }
 
+            // Type literals (e.g., { x: number, y: string })
+            Node::TypeLiteral(tl) => {
+                self.get_type_of_type_literal(&tl.members)
+            }
+
+            // Property access expressions (e.g., obj.prop)
+            Node::PropertyAccessExpression(pa) => {
+                self.get_type_of_property_access(pa.expression, pa.name)
+            }
+
+            // Object literals (e.g., { x: 1, y: "hello" })
+            Node::ObjectLiteralExpression(ole) => {
+                self.get_type_of_object_literal(&ole.properties)
+            }
+
             // Default: return any
             _ => self.types.any_type,
         }
+    }
+
+    /// Get the type of a type literal ({ x: number, y: string }).
+    fn get_type_of_type_literal(&mut self, members: &crate::parser::NodeList) -> TypeId {
+        use crate::parser::Node;
+
+        let mut properties = Vec::new();
+
+        for &member_idx in &members.nodes {
+            if let Some(node) = self.node_arena.get(member_idx) {
+                match node {
+                    Node::PropertySignature(ps) => {
+                        // Get property name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(ps.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get property type
+                        let prop_type = if !ps.type_annotation.is_none() {
+                            self.get_type_of_node(ps.type_annotation)
+                        } else {
+                            self.types.any_type
+                        };
+
+                        // Create a symbol for this property
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::PROPERTY, name.clone());
+
+                        // Cache the symbol's type
+                        self.symbol_types.insert(symbol_id, prop_type);
+                        properties.push(symbol_id);
+                    }
+                    Node::MethodSignature(ms) => {
+                        // Get method name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(ms.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get method type
+                        let method_type = self.get_type_of_function_like_with_type_params(
+                            member_idx,
+                            &ms.parameters,
+                            ms.type_annotation,
+                            ms.type_parameters.as_ref(),
+                        );
+
+                        // Create a symbol for this method
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::METHOD, name.clone());
+
+                        // Cache the symbol's type
+                        self.symbol_types.insert(symbol_id, method_type);
+                        properties.push(symbol_id);
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Create object type
+        self.types.create_object_type(properties)
+    }
+
+    /// Get the type of a property access expression (obj.prop).
+    fn get_type_of_property_access(&mut self, expression: NodeIndex, name: NodeIndex) -> TypeId {
+        use crate::parser::Node;
+
+        // Get the type of the expression
+        let expr_type = self.get_type_of_node(expression);
+
+        // Get the property name
+        let prop_name = if let Some(Node::Identifier(id)) = self.node_arena.get(name) {
+            id.escaped_text.clone()
+        } else {
+            return self.types.any_type;
+        };
+
+        // Look up the property on the expression type
+        self.get_property_type(expr_type, &prop_name)
+    }
+
+    /// Get the type of a property on an object type.
+    fn get_property_type(&self, object_type: TypeId, prop_name: &str) -> TypeId {
+        let Some(typ) = self.types.get(object_type) else {
+            return self.types.any_type;
+        };
+
+        match typ {
+            Type::Object(obj) => {
+                // Look up property in object's properties
+                for &prop_id in &obj.properties {
+                    if let Some(sym) = self.get_symbol(prop_id) {
+                        if sym.escaped_name == prop_name {
+                            return self.symbol_types.get(&prop_id).copied().unwrap_or(self.types.any_type);
+                        }
+                    }
+                }
+                self.types.any_type
+            }
+            _ => self.types.any_type,
+        }
+    }
+
+    /// Get the type of an object literal ({ x: 1, y: "hello" }).
+    fn get_type_of_object_literal(&mut self, properties: &crate::parser::NodeList) -> TypeId {
+        use crate::parser::Node;
+
+        let mut prop_symbols = Vec::new();
+
+        for &prop_idx in &properties.nodes {
+            if let Some(node) = self.node_arena.get(prop_idx) {
+                match node {
+                    Node::PropertyAssignment(pa) => {
+                        // Get property name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(pa.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get property type from initializer
+                        let prop_type = self.get_type_of_node(pa.initializer);
+
+                        // Create a symbol for this property
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::PROPERTY, name.clone());
+
+                        // Cache the symbol's type
+                        self.symbol_types.insert(symbol_id, prop_type);
+                        prop_symbols.push(symbol_id);
+                    }
+                    Node::ShorthandPropertyAssignment(spa) => {
+                        // Get property name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(spa.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get property type from the name identifier (which should resolve to a variable)
+                        let prop_type = self.get_type_of_node(spa.name);
+
+                        // Create a symbol for this property
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::PROPERTY, name.clone());
+
+                        // Cache the symbol's type
+                        self.symbol_types.insert(symbol_id, prop_type);
+                        prop_symbols.push(symbol_id);
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Create object type
+        self.types.create_object_type(prop_symbols)
+    }
+
+    /// Get a mutable reference to the local symbol arena (for creating new symbols during type checking).
+    fn local_symbols_mut(&mut self) -> &mut SymbolArena {
+        &mut self.local_symbols
+    }
+
+    /// Look up a symbol by ID in both binder and local symbols.
+    fn get_symbol(&self, id: SymbolId) -> Option<&crate::binder::Symbol> {
+        self.symbol_arena.get(id).or_else(|| self.local_symbols.get(id))
     }
 
     /// Get the type of a function-like declaration (function, method, arrow, etc.)
@@ -2192,6 +2390,99 @@ mod tests {
             assert!(t.default.is_none());
         } else {
             panic!("Expected TypeParameter");
+        }
+    }
+
+    #[test]
+    fn test_type_literal() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test type literal
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"type Point = { x: number; y: number };"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("Point"));
+
+        if let Some(symbol) = binder.file_locals.get("Point") {
+            let point_type = checker.get_type_of_symbol(symbol);
+            let typ = checker.types.get(point_type).unwrap();
+
+            if let Type::Object(obj) = typ {
+                assert_eq!(obj.properties.len(), 2);
+            } else {
+                panic!("Expected Object type, got {:?}", typ);
+            }
+        }
+    }
+
+    #[test]
+    fn test_object_type_with_method() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test type literal with method
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"type Greeter = { greet(name: string): string };"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("Greeter"));
+
+        if let Some(symbol) = binder.file_locals.get("Greeter") {
+            let greeter_type = checker.get_type_of_symbol(symbol);
+            let typ = checker.types.get(greeter_type).unwrap();
+
+            if let Type::Object(obj) = typ {
+                assert_eq!(obj.properties.len(), 1);
+            } else {
+                panic!("Expected Object type, got {:?}", typ);
+            }
+        }
+    }
+
+    #[test]
+    fn test_create_object_type() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+
+        // Create an empty object type
+        let obj_type = checker.types.create_object_type(Vec::new());
+        let typ = checker.types.get(obj_type).unwrap();
+
+        if let Type::Object(obj) = typ {
+            assert_eq!(obj.properties.len(), 0);
+            assert!(obj.has_object_flags(object_flags::ANONYMOUS));
+        } else {
+            panic!("Expected Object type");
         }
     }
 }
