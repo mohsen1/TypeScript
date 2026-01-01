@@ -402,13 +402,26 @@ impl BinderState {
     }
 
     /// Declare a symbol in the current scope.
+    /// Handles declaration merging for interfaces, namespaces, and functions.
     fn declare_symbol(&mut self, name: String, flags: u32, declaration: NodeIndex) -> SymbolId {
         // Check if symbol already exists
         if let Some(existing_id) = self.current_scope.get(&name) {
-            // Symbol already exists - could merge or report error
-            // For now, just add the declaration
+            // Get existing flags first to avoid borrow issues
+            let existing_flags = self.symbols.get(existing_id).map(|s| s.flags).unwrap_or(0);
+            let can_merge = Self::can_merge_flags(existing_flags, flags);
+
             if let Some(sym) = self.symbols.get_mut(existing_id) {
-                sym.declarations.push(declaration);
+                if can_merge {
+                    // Merge the flags and add the declaration
+                    sym.flags |= flags;
+                    sym.declarations.push(declaration);
+                    if sym.value_declaration.is_none() && (flags & symbol_flags::VALUE) != 0 {
+                        sym.value_declaration = declaration;
+                    }
+                } else {
+                    // Conflicting declaration - still add but could report error
+                    sym.declarations.push(declaration);
+                }
             }
             return existing_id;
         }
@@ -423,6 +436,49 @@ impl BinderState {
         }
         self.current_scope.set(name, id);
         id
+    }
+
+    /// Check if two symbol flag sets can be merged.
+    /// TypeScript allows merging:
+    /// - Interface + Interface
+    /// - Namespace + Namespace
+    /// - Namespace + Class/Function/Enum
+    /// - Function + Function (overloads)
+    fn can_merge_flags(existing_flags: u32, new_flags: u32) -> bool {
+        // Interface can merge with interface
+        if (existing_flags & symbol_flags::INTERFACE) != 0
+            && (new_flags & symbol_flags::INTERFACE) != 0
+        {
+            return true;
+        }
+
+        // Namespace/module can merge with namespace/module
+        if (existing_flags & symbol_flags::MODULE) != 0
+            && (new_flags & symbol_flags::MODULE) != 0
+        {
+            return true;
+        }
+
+        // Namespace can merge with class, function, or enum
+        if (existing_flags & symbol_flags::MODULE) != 0 {
+            if (new_flags & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::ENUM)) != 0 {
+                return true;
+            }
+        }
+        if (new_flags & symbol_flags::MODULE) != 0 {
+            if (existing_flags & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::ENUM)) != 0 {
+                return true;
+            }
+        }
+
+        // Function overloads
+        if (existing_flags & symbol_flags::FUNCTION) != 0
+            && (new_flags & symbol_flags::FUNCTION) != 0
+        {
+            return true;
+        }
+
+        false
     }
 
     /// Get the name from an identifier node.
@@ -822,5 +878,96 @@ mod tests {
         let ns_sym = binder.symbols.get(ns_id).unwrap();
         assert_eq!(ns_sym.escaped_name, "MyNamespace");
         assert!(ns_sym.has_any_flags(symbol_flags::MODULE));
+    }
+
+    #[test]
+    fn test_interface_merging() {
+        use crate::parser_impl::ParserState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                interface Foo {
+                    x: number;
+                }
+                interface Foo {
+                    y: string;
+                }
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        // Should have one symbol 'Foo' with two declarations
+        assert!(binder.file_locals.has("Foo"));
+
+        let foo_id = binder.file_locals.get("Foo").unwrap();
+        let foo_sym = binder.symbols.get(foo_id).unwrap();
+        assert_eq!(foo_sym.escaped_name, "Foo");
+        assert!(foo_sym.has_flags(symbol_flags::INTERFACE));
+        assert_eq!(foo_sym.declarations.len(), 2);
+    }
+
+    #[test]
+    fn test_namespace_merging() {
+        use crate::parser_impl::ParserState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                namespace NS {
+                    export const a = 1;
+                }
+                namespace NS {
+                    export const b = 2;
+                }
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        // Should have one symbol 'NS' with two declarations
+        assert!(binder.file_locals.has("NS"));
+
+        let ns_id = binder.file_locals.get("NS").unwrap();
+        let ns_sym = binder.symbols.get(ns_id).unwrap();
+        assert_eq!(ns_sym.escaped_name, "NS");
+        assert!(ns_sym.has_any_flags(symbol_flags::MODULE));
+        assert_eq!(ns_sym.declarations.len(), 2);
+    }
+
+    #[test]
+    fn test_class_namespace_merging() {
+        use crate::parser_impl::ParserState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                class Foo {
+                    x: number;
+                }
+                namespace Foo {
+                    export const bar = 1;
+                }
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        // Should have one symbol 'Foo' with both CLASS and MODULE flags
+        assert!(binder.file_locals.has("Foo"));
+
+        let foo_id = binder.file_locals.get("Foo").unwrap();
+        let foo_sym = binder.symbols.get(foo_id).unwrap();
+        assert_eq!(foo_sym.escaped_name, "Foo");
+        assert!(foo_sym.has_flags(symbol_flags::CLASS));
+        assert!(foo_sym.has_any_flags(symbol_flags::MODULE));
+        assert_eq!(foo_sym.declarations.len(), 2);
     }
 }
