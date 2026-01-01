@@ -8,33 +8,42 @@ All parser tasks finished:
 - Integration: Complete
 - 81 Rust tests + 19 TS tests passing
 
-## Phase 4 - Binder (Next)
+## Phase 4 - Binder: IN PROGRESS
 
-### Priority: High
+### Completed ✓
 
-- [ ] **Symbol struct in Rust**
-  - File: `wasm/src/binder.rs` (new)
+- [x] **Symbol struct in Rust**
+  - File: `wasm/src/binder.rs`
   - Port Symbol from TypeScript
   - Add SymbolFlags
 
-- [ ] **Symbol table**
-  - Store symbols in arena
-  - Create symbol lookup
+- [x] **Symbol table**
+  - SymbolArena for symbol allocation
+  - SymbolTable for name lookup
 
-- [ ] **Scope management**
-  - Block scope
-  - Function scope
-  - Module scope
+- [x] **Scope management**
+  - Block scope (push/pop)
+  - Function scope (parameters)
+  - Module scope (namespaces)
 
-### Priority: Medium
-
-- [ ] **Declaration merging**
+- [x] **Declaration merging**
   - Interface merging
   - Namespace merging
+  - Class + namespace merging
+
+- [x] **WASM exposure**
+  - createBinder factory
+  - JSON serialization for symbols
+
+### Priority: High (Next)
 
 - [ ] **Flow analysis setup**
   - Control flow graph
   - Narrowing framework
+
+- [ ] **TypeScript integration**
+  - bindWithRustBinder in binder.ts
+  - Test with real TS files
 
 ## Blocked
 
@@ -42,4 +51,6 @@ All parser tasks finished:
 
 ## Notes
 
-Phase 3 completed 2026-01-01. See MIGRATION_PLAN.md for details.
+- Phase 4 started 2026-01-01
+- 94 Rust tests passing
+- Binder creates symbols for: variables, functions, classes, interfaces, type aliases, enums, namespaces
