@@ -32,6 +32,10 @@ export default tseslint.config(
             "scripts/**/*.d.*",
             "internal/**",
             "coverage/**",
+            // Wasm generated files
+            "wasm/pkg/**",
+            "wasm/built/**",
+            "wasm-demo/dist/**",
         ],
     },
     eslint.configs.recommended,

@@ -98,7 +98,9 @@
         "lint": "hereby lint",
         "knip": "hereby knip",
         "format": "dprint fmt",
-        "setup-hooks": "node scripts/link-hooks.mjs"
+        "setup-hooks": "node scripts/link-hooks.mjs",
+        "wasm:build": "wasm-pack build wasm --target nodejs --out-dir pkg",
+        "wasm:demo": "npm run wasm:build && npx -y --package typescript@5.9.3 tsc wasm-demo/index.ts --module commonjs --esModuleInterop --target es2020 --moduleResolution node --outDir wasm-demo/dist --skipLibCheck && node wasm-demo/dist/index.js"
     },
     "browser": {
         "fs": false,

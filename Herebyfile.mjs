@@ -48,6 +48,20 @@ export const buildScripts = task({
     run: () => buildProject("scripts"),
 });
 
+const wasmOutput = "built/local/wasm/wasm_bg.wasm";
+export const buildWasm = task({
+    name: "build-wasm",
+    description: "Builds the wasm crate for Node targets",
+    run: async () => {
+        const sources = ["wasm/Cargo.toml", ...glob.sync("wasm/src/**/*.rs")];
+        if (!needsUpdate(sources, wasmOutput)) {
+            return;
+        }
+        await fs.promises.mkdir(path.dirname(wasmOutput), { recursive: true });
+        await exec("wasm-pack", ["build", "wasm", "--target", "nodejs", "--out-dir", "../built/local/wasm"]);
+    },
+});
+
 const libs = memoize(() => {
     /** @type {{ libs: string[]; paths: Record<string, string | undefined>; }} */
     const libraries = readJson("./src/lib/libs.json");
@@ -64,6 +78,7 @@ const libs = memoize(() => {
 export const generateLibs = task({
     name: "lib",
     description: "Builds the library targets",
+    dependencies: [buildWasm],
     run: async () => {
         await fs.promises.mkdir("./built/local", { recursive: true });
         for (const lib of libs()) {
