@@ -42,7 +42,7 @@ use crate::parser::{
     JsxFragment, JsxOpeningFragment, JsxClosingFragment,
     JsxAttributes, JsxAttribute, JsxSpreadAttribute, JsxExpression, JsxText, JsxNamespacedName,
     // Misc
-    SourceFile, HeritageClause, ParameterDeclaration,
+    SourceFile, HeritageClause, ParameterDeclaration, Decorator,
 };
 
 // =============================================================================
@@ -507,6 +507,11 @@ impl ParserState {
 impl ParserState {
     /// Parse a statement.
     pub fn parse_statement(&mut self) -> NodeIndex {
+        // Check for decorators before class or function declarations
+        if self.is_token(SyntaxKind::AtToken) {
+            return self.parse_decorated_declaration();
+        }
+
         match self.token() {
             SyntaxKind::SemicolonToken => self.parse_empty_statement(),
             SyntaxKind::OpenBraceToken => self.parse_block(),
@@ -531,6 +536,31 @@ impl ParserState {
             SyntaxKind::ImportKeyword => self.parse_import_declaration(),
             SyntaxKind::ExportKeyword => self.parse_export_declaration(),
             _ => self.parse_expression_or_labeled_statement(),
+        }
+    }
+
+    /// Parse a decorated declaration (class or function with decorators).
+    fn parse_decorated_declaration(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let decorators = self.parse_decorators();
+
+        // After decorators, we expect class or function
+        match self.token() {
+            SyntaxKind::ClassKeyword => self.parse_class_declaration_with_decorators(decorators, pos),
+            SyntaxKind::FunctionKeyword => self.parse_function_declaration_with_decorators(decorators, pos),
+            SyntaxKind::ExportKeyword => {
+                // Export with decorators: @decorator export class Foo {}
+                self.parse_export_declaration()
+            }
+            SyntaxKind::AbstractKeyword => {
+                // Abstract class with decorators
+                self.parse_class_declaration_with_decorators(decorators, pos)
+            }
+            _ => {
+                // Unexpected - just report error and continue
+                self.parse_error_at_current_token("Declaration expected after decorator");
+                self.parse_expression_statement()
+            }
         }
     }
 
@@ -1178,6 +1208,102 @@ impl ParserState {
             members,
         };
         self.alloc_node(Node::ClassDeclaration(decl))
+    }
+
+    /// Parse a class declaration with decorators.
+    fn parse_class_declaration_with_decorators(&mut self, decorators: Option<NodeList>, start_pos: u32) -> NodeIndex {
+        // Handle abstract keyword
+        if self.is_token(SyntaxKind::AbstractKeyword) {
+            self.next_token();
+        }
+
+        self.parse_expected(SyntaxKind::ClassKeyword);
+
+        // Optional name (anonymous for default exports)
+        let name = if self.is_token(SyntaxKind::Identifier) {
+            self.parse_identifier()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Type parameters
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        // Heritage clauses (extends, implements)
+        let heritage_clauses = self.parse_heritage_clauses();
+
+        // Class body
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+        let members = self.parse_class_members();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end = self.get_token_start();
+
+        let decl = ClassDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::CLASS_DECLARATION, start_pos, end),
+            modifiers: decorators, // Store decorators in modifiers for now
+            name,
+            type_parameters,
+            heritage_clauses,
+            members,
+        };
+        self.alloc_node(Node::ClassDeclaration(decl))
+    }
+
+    /// Parse a function declaration with decorators.
+    fn parse_function_declaration_with_decorators(&mut self, decorators: Option<NodeList>, start_pos: u32) -> NodeIndex {
+        self.parse_expected(SyntaxKind::FunctionKeyword);
+
+        // Asterisk for generators
+        let asterisk = self.parse_optional(SyntaxKind::AsteriskToken);
+
+        // Name
+        let name = self.parse_identifier();
+
+        // Type parameters
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        // Parameters
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Return type
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Body (optional for declarations)
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            self.parse_optional(SyntaxKind::SemicolonToken);
+            NodeIndex::NONE
+        };
+
+        let end = self.get_token_start();
+
+        let decl = FunctionDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::FUNCTION_DECLARATION, start_pos, end),
+            modifiers: decorators, // Store decorators in modifiers for now
+            asterisk_token: asterisk,
+            name,
+            type_parameters,
+            parameters,
+            type_annotation,
+            body,
+        };
+        self.alloc_node(Node::FunctionDeclaration(decl))
     }
 
     /// Parse heritage clauses (extends, implements).
@@ -3590,6 +3716,53 @@ impl ParserState {
         };
         self.alloc_node(Node::JsxClosingFragment(closing))
     }
+
+    // =========================================================================
+    // Decorator Parsing
+    // =========================================================================
+
+    /// Try to parse a decorator (@expression).
+    fn try_parse_decorator(&mut self) -> Option<NodeIndex> {
+        if !self.is_token(SyntaxKind::AtToken) {
+            return None;
+        }
+
+        let pos = self.get_full_start();
+        self.next_token(); // consume @
+
+        // Parse the decorator expression (identifier, member access, or call)
+        let expression = self.parse_left_hand_side_expression();
+
+        let end = self.get_token_start();
+        let decorator = Decorator {
+            base: NodeBase::new_ext(syntax_kind_ext::DECORATOR, pos, end),
+            expression,
+        };
+        Some(self.alloc_node(Node::Decorator(decorator)))
+    }
+
+    /// Parse any decorators present before a declaration.
+    fn parse_decorators(&mut self) -> Option<NodeList> {
+        if !self.is_token(SyntaxKind::AtToken) {
+            return None;
+        }
+
+        let pos = self.get_full_start();
+        let mut decorators = NodeList::new();
+
+        while let Some(decorator) = self.try_parse_decorator() {
+            decorators.push(decorator);
+        }
+
+        if decorators.is_empty() {
+            return None;
+        }
+
+        let end = self.get_token_start();
+        decorators.pos = pos;
+        decorators.end = end;
+        Some(decorators)
+    }
 }
 
 // =============================================================================
@@ -3990,6 +4163,60 @@ mod tests {
         let sf = parser.arena.get(sf_idx).unwrap();
         if let Node::SourceFile(source_file) = sf {
             assert_eq!(source_file.statements.len(), 1);
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_decorator_class() {
+        let mut parser = ParserState::new("test.ts".to_string(), "@Component class MyClass {}".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::ClassDeclaration(class_decl) = stmt {
+                // Should have decorators in modifiers
+                assert!(class_decl.modifiers.is_some());
+            } else {
+                panic!("Expected ClassDeclaration, got {:?}", stmt);
+            }
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_decorator_with_call() {
+        let mut parser = ParserState::new("test.ts".to_string(), "@Injectable() class Service {}".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_multiple_decorators() {
+        let mut parser = ParserState::new("test.ts".to_string(), "@A @B @C class Multi {}".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::ClassDeclaration(class_decl) = stmt {
+                // Should have 3 decorators
+                assert!(class_decl.modifiers.is_some());
+                assert_eq!(class_decl.modifiers.as_ref().unwrap().len(), 3);
+            } else {
+                panic!("Expected ClassDeclaration");
+            }
         } else {
             panic!("Expected SourceFile");
         }
