@@ -1953,6 +1953,72 @@ namespace Parser {
                 }
                 break;
             }
+            case SyntaxKind.WhileStatement: {
+                const expression = convertNode(rustNode.expression, sourceText);
+                const statement = convertNode(rustNode.statement, sourceText);
+                if (expression && statement) {
+                    const stmt = factory.createWhileStatement(expression as Expression, statement as Statement);
+                    setTextRangePosEnd(stmt, pos, end);
+                    node = stmt;
+                }
+                break;
+            }
+            case SyntaxKind.DoStatement: {
+                const statement = convertNode(rustNode.statement, sourceText);
+                const expression = convertNode(rustNode.expression, sourceText);
+                if (statement && expression) {
+                    const stmt = factory.createDoStatement(statement as Statement, expression as Expression);
+                    setTextRangePosEnd(stmt, pos, end);
+                    node = stmt;
+                }
+                break;
+            }
+            case SyntaxKind.ForStatement: {
+                const initializer = rustNode.initializer ? convertNode(rustNode.initializer, sourceText) : undefined;
+                const condition = rustNode.condition ? convertNode(rustNode.condition, sourceText) : undefined;
+                const incrementor = rustNode.incrementor ? convertNode(rustNode.incrementor, sourceText) : undefined;
+                const statement = convertNode(rustNode.statement, sourceText);
+                if (statement) {
+                    const stmt = factory.createForStatement(
+                        initializer as any,
+                        condition as Expression,
+                        incrementor as Expression,
+                        statement as Statement,
+                    );
+                    setTextRangePosEnd(stmt, pos, end);
+                    node = stmt;
+                }
+                break;
+            }
+            case SyntaxKind.BreakStatement: {
+                const label = rustNode.label ? convertNode(rustNode.label, sourceText) : undefined;
+                const stmt = factory.createBreakStatement(label as any);
+                setTextRangePosEnd(stmt, pos, end);
+                node = stmt;
+                break;
+            }
+            case SyntaxKind.ContinueStatement: {
+                const label = rustNode.label ? convertNode(rustNode.label, sourceText) : undefined;
+                const stmt = factory.createContinueStatement(label as any);
+                setTextRangePosEnd(stmt, pos, end);
+                node = stmt;
+                break;
+            }
+            case SyntaxKind.ThrowStatement: {
+                const expression = convertNode(rustNode.expression, sourceText);
+                if (expression) {
+                    const stmt = factory.createThrowStatement(expression as Expression);
+                    setTextRangePosEnd(stmt, pos, end);
+                    node = stmt;
+                }
+                break;
+            }
+            case SyntaxKind.EmptyStatement: {
+                const stmt = factory.createEmptyStatement();
+                setTextRangePosEnd(stmt, pos, end);
+                node = stmt;
+                break;
+            }
 
             // Function declarations
             case SyntaxKind.FunctionDeclaration: {
@@ -2004,6 +2070,149 @@ namespace Parser {
                 break;
             }
 
+            // Class declarations
+            case SyntaxKind.ClassDeclaration: {
+                const name = rustNode.name ? convertNode(rustNode.name, sourceText) : undefined;
+                const members = rustNode.members?.map((m: any) => convertNode(m, sourceText)).filter(Boolean) ?? [];
+                const heritageClauses = rustNode.heritage_clauses?.map((h: any) => convertNode(h, sourceText)).filter(Boolean);
+                const classDecl = factory.createClassDeclaration(
+                    undefined, // modifiers
+                    name as any,
+                    undefined, // type parameters
+                    heritageClauses,
+                    members,
+                );
+                setTextRangePosEnd(classDecl, pos, end);
+                node = classDecl;
+                break;
+            }
+            case SyntaxKind.Constructor: {
+                const parameters = rustNode.parameters?.map((p: any) => convertNode(p, sourceText)).filter(Boolean) ?? [];
+                const body = rustNode.body ? convertNode(rustNode.body, sourceText) : undefined;
+                const ctor = factory.createConstructorDeclaration(
+                    undefined, // modifiers
+                    parameters,
+                    body as Block,
+                );
+                setTextRangePosEnd(ctor, pos, end);
+                node = ctor;
+                break;
+            }
+            case SyntaxKind.MethodDeclaration: {
+                const name = convertNode(rustNode.name, sourceText);
+                const parameters = rustNode.parameters?.map((p: any) => convertNode(p, sourceText)).filter(Boolean) ?? [];
+                const body = rustNode.body ? convertNode(rustNode.body, sourceText) : undefined;
+                const type = rustNode.type_annotation ? convertNode(rustNode.type_annotation, sourceText) : undefined;
+                if (name) {
+                    const method = factory.createMethodDeclaration(
+                        undefined, // modifiers
+                        undefined, // asterisk
+                        name as any,
+                        undefined, // question
+                        undefined, // type parameters
+                        parameters,
+                        type as TypeNode,
+                        body as Block,
+                    );
+                    setTextRangePosEnd(method, pos, end);
+                    node = method;
+                }
+                break;
+            }
+            case SyntaxKind.PropertyDeclaration: {
+                const name = convertNode(rustNode.name, sourceText);
+                const type = rustNode.type_annotation ? convertNode(rustNode.type_annotation, sourceText) : undefined;
+                const initializer = rustNode.initializer ? convertNode(rustNode.initializer, sourceText) : undefined;
+                if (name) {
+                    const prop = factory.createPropertyDeclaration(
+                        undefined, // modifiers
+                        name as any,
+                        undefined, // question or exclamation
+                        type as TypeNode,
+                        initializer as Expression,
+                    );
+                    setTextRangePosEnd(prop, pos, end);
+                    node = prop;
+                }
+                break;
+            }
+
+            // Interface declarations
+            case SyntaxKind.InterfaceDeclaration: {
+                const name = convertNode(rustNode.name, sourceText);
+                const members = rustNode.members?.map((m: any) => convertNode(m, sourceText)).filter(Boolean) ?? [];
+                if (name) {
+                    const iface = factory.createInterfaceDeclaration(
+                        undefined, // modifiers
+                        name as any,
+                        undefined, // type parameters
+                        undefined, // heritage clauses
+                        members,
+                    );
+                    setTextRangePosEnd(iface, pos, end);
+                    node = iface;
+                }
+                break;
+            }
+            case SyntaxKind.PropertySignature: {
+                const name = convertNode(rustNode.name, sourceText);
+                const type = rustNode.type_annotation ? convertNode(rustNode.type_annotation, sourceText) : undefined;
+                if (name) {
+                    const sig = factory.createPropertySignature(
+                        undefined, // modifiers
+                        name as any,
+                        undefined, // question
+                        type as TypeNode,
+                    );
+                    setTextRangePosEnd(sig, pos, end);
+                    node = sig;
+                }
+                break;
+            }
+
+            // Type alias
+            case SyntaxKind.TypeAliasDeclaration: {
+                const name = convertNode(rustNode.name, sourceText);
+                const type = convertNode(rustNode.type_annotation, sourceText);
+                if (name && type) {
+                    const alias = factory.createTypeAliasDeclaration(
+                        undefined, // modifiers
+                        name as any,
+                        undefined, // type parameters
+                        type as TypeNode,
+                    );
+                    setTextRangePosEnd(alias, pos, end);
+                    node = alias;
+                }
+                break;
+            }
+
+            // Enum
+            case SyntaxKind.EnumDeclaration: {
+                const name = convertNode(rustNode.name, sourceText);
+                const members = rustNode.members?.map((m: any) => convertNode(m, sourceText)).filter(Boolean) ?? [];
+                if (name) {
+                    const enumDecl = factory.createEnumDeclaration(
+                        undefined, // modifiers
+                        name as any,
+                        members,
+                    );
+                    setTextRangePosEnd(enumDecl, pos, end);
+                    node = enumDecl;
+                }
+                break;
+            }
+            case SyntaxKind.EnumMember: {
+                const name = convertNode(rustNode.name, sourceText);
+                const initializer = rustNode.initializer ? convertNode(rustNode.initializer, sourceText) : undefined;
+                if (name) {
+                    const member = factory.createEnumMember(name as any, initializer as Expression);
+                    setTextRangePosEnd(member, pos, end);
+                    node = member;
+                }
+                break;
+            }
+
             // Import/Export
             case SyntaxKind.ImportDeclaration: {
                 const importClause = rustNode.import_clause ? convertNode(rustNode.import_clause, sourceText) : undefined;
@@ -2017,6 +2226,161 @@ namespace Parser {
                     );
                     setTextRangePosEnd(importDecl, pos, end);
                     node = importDecl;
+                }
+                break;
+            }
+            case SyntaxKind.ImportClause: {
+                const name = rustNode.name ? convertNode(rustNode.name, sourceText) : undefined;
+                const namedBindings = rustNode.named_bindings ? convertNode(rustNode.named_bindings, sourceText) : undefined;
+                const clause = factory.createImportClause(
+                    rustNode.is_type_only ?? false,
+                    name as any,
+                    namedBindings as any,
+                );
+                setTextRangePosEnd(clause, pos, end);
+                node = clause;
+                break;
+            }
+            case SyntaxKind.NamedImports: {
+                const elements = rustNode.elements?.map((e: any) => convertNode(e, sourceText)).filter(Boolean) ?? [];
+                const named = factory.createNamedImports(elements);
+                setTextRangePosEnd(named, pos, end);
+                node = named;
+                break;
+            }
+            case SyntaxKind.ImportSpecifier: {
+                const name = convertNode(rustNode.name, sourceText);
+                const propertyName = rustNode.property_name ? convertNode(rustNode.property_name, sourceText) : undefined;
+                if (name) {
+                    const spec = factory.createImportSpecifier(
+                        rustNode.is_type_only ?? false,
+                        propertyName as any,
+                        name as any,
+                    );
+                    setTextRangePosEnd(spec, pos, end);
+                    node = spec;
+                }
+                break;
+            }
+            case SyntaxKind.ExportDeclaration: {
+                const exportClause = rustNode.export_clause ? convertNode(rustNode.export_clause, sourceText) : undefined;
+                const moduleSpecifier = rustNode.module_specifier ? convertNode(rustNode.module_specifier, sourceText) : undefined;
+                const exportDecl = factory.createExportDeclaration(
+                    undefined, // modifiers
+                    rustNode.is_type_only ?? false,
+                    exportClause as any,
+                    moduleSpecifier as Expression,
+                    undefined, // attributes
+                );
+                setTextRangePosEnd(exportDecl, pos, end);
+                node = exportDecl;
+                break;
+            }
+
+            // Type literals and advanced types
+            case SyntaxKind.TypeLiteral: {
+                const members = rustNode.members?.map((m: any) => convertNode(m, sourceText)).filter(Boolean) ?? [];
+                const lit = factory.createTypeLiteralNode(members);
+                setTextRangePosEnd(lit, pos, end);
+                node = lit;
+                break;
+            }
+            case SyntaxKind.ArrayType: {
+                const elementType = convertNode(rustNode.element_type, sourceText);
+                if (elementType) {
+                    const arr = factory.createArrayTypeNode(elementType as TypeNode);
+                    setTextRangePosEnd(arr, pos, end);
+                    node = arr;
+                }
+                break;
+            }
+            case SyntaxKind.UnionType: {
+                const types = rustNode.types?.map((t: any) => convertNode(t, sourceText)).filter(Boolean) ?? [];
+                const union = factory.createUnionTypeNode(types);
+                setTextRangePosEnd(union, pos, end);
+                node = union;
+                break;
+            }
+
+            // Literals and expressions
+            case SyntaxKind.TrueKeyword: {
+                const lit = factory.createTrue();
+                setTextRangePosEnd(lit, pos, end);
+                node = lit;
+                break;
+            }
+            case SyntaxKind.FalseKeyword: {
+                const lit = factory.createFalse();
+                setTextRangePosEnd(lit, pos, end);
+                node = lit;
+                break;
+            }
+            case SyntaxKind.NullKeyword: {
+                const lit = factory.createNull();
+                setTextRangePosEnd(lit, pos, end);
+                node = lit;
+                break;
+            }
+            case SyntaxKind.ArrayLiteralExpression: {
+                const elements = rustNode.elements?.map((e: any) => convertNode(e, sourceText)).filter(Boolean) ?? [];
+                const arr = factory.createArrayLiteralExpression(elements);
+                setTextRangePosEnd(arr, pos, end);
+                node = arr;
+                break;
+            }
+            case SyntaxKind.ObjectLiteralExpression: {
+                const properties = rustNode.properties?.map((p: any) => convertNode(p, sourceText)).filter(Boolean) ?? [];
+                const obj = factory.createObjectLiteralExpression(properties);
+                setTextRangePosEnd(obj, pos, end);
+                node = obj;
+                break;
+            }
+            case SyntaxKind.PropertyAssignment: {
+                const name = convertNode(rustNode.name, sourceText);
+                const initializer = convertNode(rustNode.initializer, sourceText);
+                if (name && initializer) {
+                    const prop = factory.createPropertyAssignment(name as any, initializer as Expression);
+                    setTextRangePosEnd(prop, pos, end);
+                    node = prop;
+                }
+                break;
+            }
+            case SyntaxKind.PrefixUnaryExpression: {
+                const operator = rustNode.operator ?? SyntaxKind.PlusToken;
+                const operand = convertNode(rustNode.operand, sourceText);
+                if (operand) {
+                    const expr = factory.createPrefixUnaryExpression(operator, operand as UnaryExpression);
+                    setTextRangePosEnd(expr, pos, end);
+                    node = expr;
+                }
+                break;
+            }
+            case SyntaxKind.PostfixUnaryExpression: {
+                const operator = rustNode.operator ?? SyntaxKind.PlusPlusToken;
+                const operand = convertNode(rustNode.operand, sourceText);
+                if (operand) {
+                    const expr = factory.createPostfixUnaryExpression(operand as Expression, operator);
+                    setTextRangePosEnd(expr, pos, end);
+                    node = expr;
+                }
+                break;
+            }
+            case SyntaxKind.ParenthesizedExpression: {
+                const expression = convertNode(rustNode.expression, sourceText);
+                if (expression) {
+                    const paren = factory.createParenthesizedExpression(expression as Expression);
+                    setTextRangePosEnd(paren, pos, end);
+                    node = paren;
+                }
+                break;
+            }
+            case SyntaxKind.NewExpression: {
+                const expression = convertNode(rustNode.expression, sourceText);
+                const args = rustNode.arguments?.map((a: any) => convertNode(a, sourceText)).filter(Boolean) ?? [];
+                if (expression) {
+                    const newExpr = factory.createNewExpression(expression as Expression, undefined, args);
+                    setTextRangePosEnd(newExpr, pos, end);
+                    node = newExpr;
                 }
                 break;
             }
