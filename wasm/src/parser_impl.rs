@@ -7,13 +7,33 @@ use crate::scanner::SyntaxKind;
 use crate::scanner_impl::ScannerState;
 use crate::parser::{
     Node, NodeBase, NodeArena, NodeIndex, NodeList,
-    syntax_kind_ext, node_flags, modifier_flags,
-    Identifier, SourceFile, Block, ExpressionStatement,
-    VariableStatement, VariableDeclarationList, VariableDeclaration,
+    syntax_kind_ext, node_flags,
+    // Names and Identifiers
+    Identifier,
+    // Literals
+    NumericLiteral, StringLiteral,
+    // Expressions
     BinaryExpression, CallExpression, PropertyAccessExpression,
-    FunctionDeclaration, IfStatement, ReturnStatement,
-    NumericLiteral, StringLiteral, ArrayLiteralExpression,
-    ObjectLiteralExpression, PropertyAssignment,
+    ArrayLiteralExpression, ObjectLiteralExpression, PropertyAssignment,
+    NewExpression, ElementAccessExpression,
+    // Statements
+    Block, ExpressionStatement, VariableStatement,
+    VariableDeclarationList, VariableDeclaration,
+    IfStatement, ReturnStatement, WhileStatement, DoStatement,
+    ForStatement, ForInStatement, ForOfStatement,
+    SwitchStatement, CaseClause, DefaultClause,
+    ThrowStatement, TryStatement, CatchClause,
+    BreakStatement, ContinueStatement, LabeledStatement,
+    // Declarations
+    FunctionDeclaration, ClassDeclaration,
+    MethodDeclaration, PropertyDeclaration, ConstructorDeclaration,
+    GetAccessorDeclaration, SetAccessorDeclaration,
+    InterfaceDeclaration, TypeAliasDeclaration, EnumDeclaration, EnumMember,
+    // Import/Export
+    ImportDeclaration, ImportClause, NamespaceImport, NamedImports, ImportSpecifier,
+    ExportDeclaration, NamedExports, ExportSpecifier, ExportAssignment,
+    // Misc
+    SourceFile, HeritageClause,
 };
 
 // =============================================================================
@@ -390,15 +410,39 @@ impl ParserState {
         match self.token() {
             SyntaxKind::SemicolonToken => self.parse_empty_statement(),
             SyntaxKind::OpenBraceToken => self.parse_block(),
-            SyntaxKind::VarKeyword => self.parse_variable_statement(),
-            SyntaxKind::LetKeyword => self.parse_variable_statement(),
-            SyntaxKind::ConstKeyword => self.parse_variable_statement(),
+            SyntaxKind::VarKeyword | SyntaxKind::LetKeyword | SyntaxKind::ConstKeyword => {
+                self.parse_variable_statement()
+            }
             SyntaxKind::FunctionKeyword => self.parse_function_declaration(),
+            SyntaxKind::ClassKeyword => self.parse_class_declaration(),
             SyntaxKind::IfKeyword => self.parse_if_statement(),
+            SyntaxKind::WhileKeyword => self.parse_while_statement(),
+            SyntaxKind::DoKeyword => self.parse_do_statement(),
+            SyntaxKind::ForKeyword => self.parse_for_statement(),
+            SyntaxKind::SwitchKeyword => self.parse_switch_statement(),
             SyntaxKind::ReturnKeyword => self.parse_return_statement(),
-            // TODO: Add more statement types
-            _ => self.parse_expression_statement(),
+            SyntaxKind::ThrowKeyword => self.parse_throw_statement(),
+            SyntaxKind::TryKeyword => self.parse_try_statement(),
+            SyntaxKind::BreakKeyword => self.parse_break_statement(),
+            SyntaxKind::ContinueKeyword => self.parse_continue_statement(),
+            SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
+            SyntaxKind::TypeKeyword => self.parse_type_alias_declaration(),
+            SyntaxKind::EnumKeyword => self.parse_enum_declaration(),
+            SyntaxKind::ImportKeyword => self.parse_import_declaration(),
+            SyntaxKind::ExportKeyword => self.parse_export_declaration(),
+            _ => self.parse_expression_or_labeled_statement(),
         }
+    }
+
+    /// Parse an expression statement or labeled statement.
+    fn parse_expression_or_labeled_statement(&mut self) -> NodeIndex {
+        // Check for labeled statement: identifier followed by colon
+        if self.is_token(SyntaxKind::Identifier) {
+            // Look ahead to see if next is colon
+            // For now, just parse as expression statement
+            // TODO: Implement proper lookahead for labels
+        }
+        self.parse_expression_statement()
     }
 
     /// Parse an empty statement (;).
@@ -654,6 +698,1157 @@ impl ParserState {
         } else {
             self.parse_error_at_current_token("';' expected");
         }
+    }
+
+    // =========================================================================
+    // Loop Statements
+    // =========================================================================
+
+    /// Parse a while statement.
+    fn parse_while_statement(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::WhileKeyword);
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let expression = self.parse_expression();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+        let statement = self.parse_statement();
+        let end = self.get_token_start();
+
+        let stmt = WhileStatement {
+            base: NodeBase::new_ext(syntax_kind_ext::WHILE_STATEMENT, pos, end),
+            expression,
+            statement,
+        };
+        self.alloc_node(Node::WhileStatement(stmt))
+    }
+
+    /// Parse a do-while statement.
+    fn parse_do_statement(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::DoKeyword);
+        let statement = self.parse_statement();
+        self.parse_expected(SyntaxKind::WhileKeyword);
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let expression = self.parse_expression();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+        self.parse_semicolon();
+        let end = self.get_token_start();
+
+        let stmt = DoStatement {
+            base: NodeBase::new_ext(syntax_kind_ext::DO_STATEMENT, pos, end),
+            statement,
+            expression,
+        };
+        self.alloc_node(Node::DoStatement(stmt))
+    }
+
+    /// Parse a for statement (for, for-in, for-of).
+    fn parse_for_statement(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::ForKeyword);
+
+        let await_modifier = self.parse_optional(SyntaxKind::AwaitKeyword);
+
+        self.parse_expected(SyntaxKind::OpenParenToken);
+
+        // Parse initializer
+        let initializer = if !self.is_token(SyntaxKind::SemicolonToken) {
+            if self.is_token(SyntaxKind::VarKeyword)
+                || self.is_token(SyntaxKind::LetKeyword)
+                || self.is_token(SyntaxKind::ConstKeyword)
+            {
+                self.parse_variable_declaration_list()
+            } else {
+                self.without_context(context_flags::DISALLOW_IN, |p| p.parse_expression())
+            }
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Check for for-in or for-of
+        if self.parse_optional(SyntaxKind::InKeyword) {
+            let expression = self.parse_expression();
+            self.parse_expected(SyntaxKind::CloseParenToken);
+            let statement = self.parse_statement();
+            let end = self.get_token_start();
+
+            let stmt = ForInStatement {
+                base: NodeBase::new_ext(syntax_kind_ext::FOR_IN_STATEMENT, pos, end),
+                initializer,
+                expression,
+                statement,
+            };
+            return self.alloc_node(Node::ForInStatement(stmt));
+        }
+
+        if self.parse_optional(SyntaxKind::OfKeyword) {
+            let expression = self.parse_assignment_expression_or_higher();
+            self.parse_expected(SyntaxKind::CloseParenToken);
+            let statement = self.parse_statement();
+            let end = self.get_token_start();
+
+            let stmt = ForOfStatement {
+                base: NodeBase::new_ext(syntax_kind_ext::FOR_OF_STATEMENT, pos, end),
+                await_modifier,
+                initializer,
+                expression,
+                statement,
+            };
+            return self.alloc_node(Node::ForOfStatement(stmt));
+        }
+
+        // Regular for statement
+        self.parse_expected(SyntaxKind::SemicolonToken);
+        let condition = if !self.is_token(SyntaxKind::SemicolonToken) {
+            self.parse_expression()
+        } else {
+            NodeIndex::NONE
+        };
+        self.parse_expected(SyntaxKind::SemicolonToken);
+        let incrementor = if !self.is_token(SyntaxKind::CloseParenToken) {
+            self.parse_expression()
+        } else {
+            NodeIndex::NONE
+        };
+        self.parse_expected(SyntaxKind::CloseParenToken);
+        let statement = self.parse_statement();
+        let end = self.get_token_start();
+
+        let stmt = ForStatement {
+            base: NodeBase::new_ext(syntax_kind_ext::FOR_STATEMENT, pos, end),
+            initializer,
+            condition,
+            incrementor,
+            statement,
+        };
+        self.alloc_node(Node::ForStatement(stmt))
+    }
+
+    // =========================================================================
+    // Control Flow Statements
+    // =========================================================================
+
+    /// Parse a switch statement.
+    fn parse_switch_statement(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::SwitchKeyword);
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let expression = self.parse_expression();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+        let case_block = self.parse_case_block();
+        let end = self.get_token_start();
+
+        let stmt = SwitchStatement {
+            base: NodeBase::new_ext(syntax_kind_ext::SWITCH_STATEMENT, pos, end),
+            expression,
+            case_block,
+        };
+        self.alloc_node(Node::SwitchStatement(stmt))
+    }
+
+    /// Parse a case block.
+    fn parse_case_block(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+
+        let mut clauses = NodeList::new();
+        while !self.is_token(SyntaxKind::CloseBraceToken) && !self.at_end() {
+            if self.is_token(SyntaxKind::CaseKeyword) {
+                clauses.push(self.parse_case_clause());
+            } else if self.is_token(SyntaxKind::DefaultKeyword) {
+                clauses.push(self.parse_default_clause());
+            } else {
+                break;
+            }
+        }
+
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+        let end = self.get_token_start();
+
+        let block = crate::parser::CaseBlock {
+            base: NodeBase::new_ext(syntax_kind_ext::CASE_BLOCK, pos, end),
+            clauses,
+        };
+        self.alloc_node(Node::CaseBlock(block))
+    }
+
+    /// Parse a case clause.
+    fn parse_case_clause(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::CaseKeyword);
+        let expression = self.parse_expression();
+        self.parse_expected(SyntaxKind::ColonToken);
+
+        let statements = self.parse_list(
+            |p| !p.is_token(SyntaxKind::CaseKeyword)
+                && !p.is_token(SyntaxKind::DefaultKeyword)
+                && !p.is_token(SyntaxKind::CloseBraceToken)
+                && !p.at_end(),
+            |p| p.parse_statement(),
+        );
+
+        let end = self.get_token_start();
+        let clause = CaseClause {
+            base: NodeBase::new_ext(syntax_kind_ext::CASE_CLAUSE, pos, end),
+            expression,
+            statements,
+        };
+        self.alloc_node(Node::CaseClause(clause))
+    }
+
+    /// Parse a default clause.
+    fn parse_default_clause(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::DefaultKeyword);
+        self.parse_expected(SyntaxKind::ColonToken);
+
+        let statements = self.parse_list(
+            |p| !p.is_token(SyntaxKind::CaseKeyword)
+                && !p.is_token(SyntaxKind::DefaultKeyword)
+                && !p.is_token(SyntaxKind::CloseBraceToken)
+                && !p.at_end(),
+            |p| p.parse_statement(),
+        );
+
+        let end = self.get_token_start();
+        let clause = DefaultClause {
+            base: NodeBase::new_ext(syntax_kind_ext::DEFAULT_CLAUSE, pos, end),
+            statements,
+        };
+        self.alloc_node(Node::DefaultClause(clause))
+    }
+
+    /// Parse a break statement.
+    fn parse_break_statement(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::BreakKeyword);
+
+        let label = if !self.has_preceding_line_break() && self.is_token(SyntaxKind::Identifier) {
+            self.parse_identifier()
+        } else {
+            NodeIndex::NONE
+        };
+
+        self.parse_semicolon();
+        let end = self.get_token_start();
+
+        let stmt = BreakStatement {
+            base: NodeBase::new_ext(syntax_kind_ext::BREAK_STATEMENT, pos, end),
+            label,
+        };
+        self.alloc_node(Node::BreakStatement(stmt))
+    }
+
+    /// Parse a continue statement.
+    fn parse_continue_statement(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::ContinueKeyword);
+
+        let label = if !self.has_preceding_line_break() && self.is_token(SyntaxKind::Identifier) {
+            self.parse_identifier()
+        } else {
+            NodeIndex::NONE
+        };
+
+        self.parse_semicolon();
+        let end = self.get_token_start();
+
+        let stmt = ContinueStatement {
+            base: NodeBase::new_ext(syntax_kind_ext::CONTINUE_STATEMENT, pos, end),
+            label,
+        };
+        self.alloc_node(Node::ContinueStatement(stmt))
+    }
+
+    /// Parse a throw statement.
+    fn parse_throw_statement(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::ThrowKeyword);
+
+        // Expression required, no line break allowed
+        let expression = if self.has_preceding_line_break() {
+            self.parse_error_at_current_token("Line break not permitted here");
+            NodeIndex::NONE
+        } else {
+            self.parse_expression()
+        };
+
+        self.parse_semicolon();
+        let end = self.get_token_start();
+
+        let stmt = ThrowStatement {
+            base: NodeBase::new_ext(syntax_kind_ext::THROW_STATEMENT, pos, end),
+            expression,
+        };
+        self.alloc_node(Node::ThrowStatement(stmt))
+    }
+
+    /// Parse a try statement.
+    fn parse_try_statement(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::TryKeyword);
+        let try_block = self.parse_block();
+
+        let catch_clause = if self.is_token(SyntaxKind::CatchKeyword) {
+            self.parse_catch_clause()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let finally_block = if self.parse_optional(SyntaxKind::FinallyKeyword) {
+            self.parse_block()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end = self.get_token_start();
+
+        let stmt = TryStatement {
+            base: NodeBase::new_ext(syntax_kind_ext::TRY_STATEMENT, pos, end),
+            try_block,
+            catch_clause,
+            finally_block,
+        };
+        self.alloc_node(Node::TryStatement(stmt))
+    }
+
+    /// Parse a catch clause.
+    fn parse_catch_clause(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::CatchKeyword);
+
+        let variable_declaration = if self.parse_optional(SyntaxKind::OpenParenToken) {
+            let decl = self.parse_variable_declaration();
+            self.parse_expected(SyntaxKind::CloseParenToken);
+            decl
+        } else {
+            NodeIndex::NONE
+        };
+
+        let block = self.parse_block();
+        let end = self.get_token_start();
+
+        let clause = CatchClause {
+            base: NodeBase::new_ext(syntax_kind_ext::CATCH_CLAUSE, pos, end),
+            variable_declaration,
+            block,
+        };
+        self.alloc_node(Node::CatchClause(clause))
+    }
+
+    // =========================================================================
+    // Class Declarations
+    // =========================================================================
+
+    /// Parse a class declaration.
+    fn parse_class_declaration(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::ClassKeyword);
+
+        // Optional name (anonymous for default exports)
+        let name = if self.is_token(SyntaxKind::Identifier) {
+            self.parse_identifier()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Type parameters
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        // Heritage clauses (extends, implements)
+        let heritage_clauses = self.parse_heritage_clauses();
+
+        // Class body
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+        let members = self.parse_class_members();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end = self.get_token_start();
+
+        let decl = ClassDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::CLASS_DECLARATION, pos, end),
+            modifiers: None,
+            name,
+            type_parameters,
+            heritage_clauses,
+            members,
+        };
+        self.alloc_node(Node::ClassDeclaration(decl))
+    }
+
+    /// Parse heritage clauses (extends, implements).
+    fn parse_heritage_clauses(&mut self) -> Option<NodeList> {
+        if !self.is_token(SyntaxKind::ExtendsKeyword) && !self.is_token(SyntaxKind::ImplementsKeyword) {
+            return None;
+        }
+
+        let mut clauses = NodeList::new();
+
+        while self.is_token(SyntaxKind::ExtendsKeyword) || self.is_token(SyntaxKind::ImplementsKeyword) {
+            let pos = self.get_full_start();
+            let token = self.token();
+            self.next_token();
+
+            let mut types = NodeList::new();
+            loop {
+                let expr = self.parse_left_hand_side_expression();
+                types.push(expr);
+                if !self.parse_optional(SyntaxKind::CommaToken) {
+                    break;
+                }
+            }
+
+            let end = self.get_token_start();
+            let clause = HeritageClause {
+                base: NodeBase::new_ext(syntax_kind_ext::HERITAGE_CLAUSE, pos, end),
+                token: token as u16,
+                types,
+            };
+            clauses.push(self.alloc_node(Node::HeritageClause(clause)));
+        }
+
+        Some(clauses)
+    }
+
+    /// Parse class members.
+    fn parse_class_members(&mut self) -> NodeList {
+        let mut members = NodeList::new();
+
+        while !self.is_token(SyntaxKind::CloseBraceToken) && !self.at_end() {
+            // Skip semicolons
+            if self.parse_optional(SyntaxKind::SemicolonToken) {
+                continue;
+            }
+
+            let member = self.parse_class_element();
+            members.push(member);
+        }
+
+        members
+    }
+
+    /// Parse a single class element.
+    fn parse_class_element(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        // TODO: Parse modifiers (public, private, static, etc.)
+
+        // Check for constructor
+        if self.is_token(SyntaxKind::ConstructorKeyword) {
+            return self.parse_constructor_declaration(pos);
+        }
+
+        // Check for getter/setter
+        if self.is_token(SyntaxKind::GetKeyword) {
+            self.next_token();
+            return self.parse_get_accessor(pos);
+        }
+        if self.is_token(SyntaxKind::SetKeyword) {
+            self.next_token();
+            return self.parse_set_accessor(pos);
+        }
+
+        // Parse as method or property
+        let name = self.parse_property_name();
+
+        if self.is_token(SyntaxKind::OpenParenToken) || self.is_token(SyntaxKind::LessThanToken) {
+            // Method
+            self.parse_method_declaration(pos, name)
+        } else {
+            // Property
+            self.parse_property_declaration(pos, name)
+        }
+    }
+
+    /// Parse a constructor declaration.
+    fn parse_constructor_declaration(&mut self, pos: u32) -> NodeIndex {
+        self.parse_expected(SyntaxKind::ConstructorKeyword);
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end = self.get_token_start();
+
+        let decl = ConstructorDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::CONSTRUCTOR, pos, end),
+            modifiers: None,
+            type_parameters: None,
+            parameters,
+            body,
+        };
+        self.alloc_node(Node::ConstructorDeclaration(decl))
+    }
+
+    /// Parse a method declaration.
+    fn parse_method_declaration(&mut self, pos: u32, name: NodeIndex) -> NodeIndex {
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            self.parse_semicolon();
+            NodeIndex::NONE
+        };
+
+        let end = self.get_token_start();
+
+        let decl = MethodDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::METHOD_DECLARATION, pos, end),
+            modifiers: None,
+            asterisk_token: false,
+            name,
+            question_token: false,
+            type_parameters,
+            parameters,
+            type_annotation,
+            body,
+        };
+        self.alloc_node(Node::MethodDeclaration(decl))
+    }
+
+    /// Parse a property declaration.
+    fn parse_property_declaration(&mut self, pos: u32, name: NodeIndex) -> NodeIndex {
+        let question_token = self.parse_optional(SyntaxKind::QuestionToken);
+        let exclamation_token = self.parse_optional(SyntaxKind::ExclamationToken);
+
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
+            self.parse_assignment_expression_or_higher()
+        } else {
+            NodeIndex::NONE
+        };
+
+        self.parse_semicolon();
+        let end = self.get_token_start();
+
+        let decl = PropertyDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::PROPERTY_DECLARATION, pos, end),
+            modifiers: None,
+            name,
+            question_token,
+            exclamation_token,
+            type_annotation,
+            initializer,
+        };
+        self.alloc_node(Node::PropertyDeclaration(decl))
+    }
+
+    /// Parse a get accessor.
+    fn parse_get_accessor(&mut self, pos: u32) -> NodeIndex {
+        let name = self.parse_property_name();
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end = self.get_token_start();
+
+        let decl = GetAccessorDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::GET_ACCESSOR, pos, end),
+            modifiers: None,
+            name,
+            type_parameters: None,
+            parameters: NodeList::new(),
+            type_annotation,
+            body,
+        };
+        self.alloc_node(Node::GetAccessorDeclaration(decl))
+    }
+
+    /// Parse a set accessor.
+    fn parse_set_accessor(&mut self, pos: u32) -> NodeIndex {
+        let name = self.parse_property_name();
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end = self.get_token_start();
+
+        let decl = SetAccessorDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::SET_ACCESSOR, pos, end),
+            modifiers: None,
+            name,
+            type_parameters: None,
+            parameters,
+            body,
+        };
+        self.alloc_node(Node::SetAccessorDeclaration(decl))
+    }
+
+    // =========================================================================
+    // Type Declarations
+    // =========================================================================
+
+    /// Parse an interface declaration.
+    fn parse_interface_declaration(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::InterfaceKeyword);
+        let name = self.parse_identifier();
+
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        let heritage_clauses = self.parse_heritage_clauses();
+
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+        let members = self.parse_type_members();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end = self.get_token_start();
+
+        let decl = InterfaceDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::INTERFACE_DECLARATION, pos, end),
+            modifiers: None,
+            name,
+            type_parameters,
+            heritage_clauses,
+            members,
+        };
+        self.alloc_node(Node::InterfaceDeclaration(decl))
+    }
+
+    /// Parse type members (for interfaces and type literals).
+    fn parse_type_members(&mut self) -> NodeList {
+        let mut members = NodeList::new();
+
+        while !self.is_token(SyntaxKind::CloseBraceToken) && !self.at_end() {
+            // Skip semicolons and commas
+            if self.parse_optional(SyntaxKind::SemicolonToken) || self.parse_optional(SyntaxKind::CommaToken) {
+                continue;
+            }
+
+            // Parse property or method signature
+            let pos = self.get_full_start();
+            let name = self.parse_property_name();
+
+            let question_token = self.parse_optional(SyntaxKind::QuestionToken);
+
+            if self.is_token(SyntaxKind::OpenParenToken) || self.is_token(SyntaxKind::LessThanToken) {
+                // Method signature
+                let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+                    Some(self.parse_type_parameters())
+                } else {
+                    None
+                };
+                self.parse_expected(SyntaxKind::OpenParenToken);
+                let parameters = self.parse_parameter_list();
+                self.parse_expected(SyntaxKind::CloseParenToken);
+                let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+                    self.parse_type()
+                } else {
+                    NodeIndex::NONE
+                };
+
+                let end = self.get_token_start();
+                let sig = crate::parser::MethodSignature {
+                    base: NodeBase::new_ext(syntax_kind_ext::METHOD_SIGNATURE, pos, end),
+                    modifiers: None,
+                    name,
+                    question_token,
+                    type_parameters,
+                    parameters,
+                    type_annotation,
+                };
+                members.push(self.alloc_node(Node::MethodSignature(sig)));
+            } else {
+                // Property signature
+                let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+                    self.parse_type()
+                } else {
+                    NodeIndex::NONE
+                };
+
+                let end = self.get_token_start();
+                let sig = crate::parser::PropertySignature {
+                    base: NodeBase::new_ext(syntax_kind_ext::PROPERTY_SIGNATURE, pos, end),
+                    modifiers: None,
+                    name,
+                    question_token,
+                    type_annotation,
+                    initializer: NodeIndex::NONE,
+                };
+                members.push(self.alloc_node(Node::PropertySignature(sig)));
+            }
+        }
+
+        members
+    }
+
+    /// Parse a type alias declaration.
+    fn parse_type_alias_declaration(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::TypeKeyword);
+        let name = self.parse_identifier();
+
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        self.parse_expected(SyntaxKind::EqualsToken);
+        let type_node = self.parse_type();
+        self.parse_semicolon();
+
+        let end = self.get_token_start();
+
+        let decl = TypeAliasDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::TYPE_ALIAS_DECLARATION, pos, end),
+            modifiers: None,
+            name,
+            type_parameters,
+            type_node,
+        };
+        self.alloc_node(Node::TypeAliasDeclaration(decl))
+    }
+
+    /// Parse an enum declaration.
+    fn parse_enum_declaration(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::EnumKeyword);
+        let name = self.parse_identifier();
+
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+        let members = self.parse_enum_members();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end = self.get_token_start();
+
+        let decl = EnumDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::ENUM_DECLARATION, pos, end),
+            modifiers: None,
+            name,
+            members,
+        };
+        self.alloc_node(Node::EnumDeclaration(decl))
+    }
+
+    /// Parse enum members.
+    fn parse_enum_members(&mut self) -> NodeList {
+        let mut members = NodeList::new();
+
+        while !self.is_token(SyntaxKind::CloseBraceToken) && !self.at_end() {
+            let pos = self.get_full_start();
+            let name = self.parse_property_name();
+
+            let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
+                self.parse_assignment_expression_or_higher()
+            } else {
+                NodeIndex::NONE
+            };
+
+            let end = self.get_token_start();
+            let member = EnumMember {
+                base: NodeBase::new_ext(syntax_kind_ext::ENUM_MEMBER, pos, end),
+                name,
+                initializer,
+            };
+            members.push(self.alloc_node(Node::EnumMember(member)));
+
+            if !self.parse_optional(SyntaxKind::CommaToken) {
+                break;
+            }
+        }
+
+        members
+    }
+
+    // =========================================================================
+    // Import/Export Declarations
+    // =========================================================================
+
+    /// Parse an import declaration.
+    fn parse_import_declaration(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::ImportKeyword);
+
+        // Check for import type
+        let is_type_only = self.parse_optional(SyntaxKind::TypeKeyword);
+
+        let import_clause = if self.is_token(SyntaxKind::StringLiteral) {
+            // import "module" - no import clause
+            NodeIndex::NONE
+        } else {
+            self.parse_import_clause()
+        };
+
+        // Module specifier
+        let module_specifier = if import_clause != NodeIndex::NONE {
+            self.parse_expected(SyntaxKind::FromKeyword);
+            self.parse_string_literal()
+        } else {
+            self.parse_string_literal()
+        };
+
+        // Import attributes (assert clause)
+        let attributes = if self.is_token(SyntaxKind::WithKeyword) || self.is_token(SyntaxKind::AssertKeyword) {
+            self.next_token();
+            self.parse_import_attributes()
+        } else {
+            NodeIndex::NONE
+        };
+
+        self.parse_semicolon();
+        let end = self.get_token_start();
+
+        let mut base = NodeBase::new_ext(syntax_kind_ext::IMPORT_DECLARATION, pos, end);
+        if is_type_only {
+            base.flags |= node_flags::TYPE_ONLY;
+        }
+
+        let decl = ImportDeclaration {
+            base,
+            modifiers: None,
+            import_clause,
+            module_specifier,
+            attributes,
+        };
+        self.alloc_node(Node::ImportDeclaration(decl))
+    }
+
+    /// Parse an import clause.
+    fn parse_import_clause(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        let mut name = NodeIndex::NONE;
+        let mut named_bindings = NodeIndex::NONE;
+
+        // Default import
+        if self.is_token(SyntaxKind::Identifier) {
+            name = self.parse_identifier();
+
+            if self.parse_optional(SyntaxKind::CommaToken) {
+                named_bindings = self.parse_named_imports_or_namespace_import();
+            }
+        } else {
+            named_bindings = self.parse_named_imports_or_namespace_import();
+        }
+
+        let end = self.get_token_start();
+
+        let clause = ImportClause {
+            base: NodeBase::new_ext(syntax_kind_ext::IMPORT_CLAUSE, pos, end),
+            is_type_only: false,
+            name,
+            named_bindings,
+        };
+        self.alloc_node(Node::ImportClause(clause))
+    }
+
+    /// Parse named imports or namespace import.
+    fn parse_named_imports_or_namespace_import(&mut self) -> NodeIndex {
+        if self.is_token(SyntaxKind::AsteriskToken) {
+            // Namespace import: * as name
+            let pos = self.get_full_start();
+            self.next_token();
+            self.parse_expected(SyntaxKind::AsKeyword);
+            let name = self.parse_identifier();
+            let end = self.get_token_start();
+
+            let ns = NamespaceImport {
+                base: NodeBase::new_ext(syntax_kind_ext::NAMESPACE_IMPORT, pos, end),
+                name,
+            };
+            self.alloc_node(Node::NamespaceImport(ns))
+        } else {
+            // Named imports: { a, b as c }
+            let pos = self.get_full_start();
+            self.parse_expected(SyntaxKind::OpenBraceToken);
+
+            let elements = self.parse_delimited_list(
+                SyntaxKind::CloseBraceToken,
+                |p| p.is_token(SyntaxKind::Identifier) || p.is_token(SyntaxKind::TypeKeyword),
+                |p| p.parse_import_specifier(),
+            );
+
+            self.parse_expected(SyntaxKind::CloseBraceToken);
+            let end = self.get_token_start();
+
+            let named = NamedImports {
+                base: NodeBase::new_ext(syntax_kind_ext::NAMED_IMPORTS, pos, end),
+                elements,
+            };
+            self.alloc_node(Node::NamedImports(named))
+        }
+    }
+
+    /// Parse an import specifier.
+    fn parse_import_specifier(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let is_type_only = self.parse_optional(SyntaxKind::TypeKeyword);
+
+        let property_name: NodeIndex;
+        let name: NodeIndex;
+
+        let first = self.parse_identifier();
+
+        if self.parse_optional(SyntaxKind::AsKeyword) {
+            property_name = first;
+            name = self.parse_identifier();
+        } else {
+            property_name = NodeIndex::NONE;
+            name = first;
+        }
+
+        let end = self.get_token_start();
+
+        let spec = ImportSpecifier {
+            base: NodeBase::new_ext(syntax_kind_ext::IMPORT_SPECIFIER, pos, end),
+            is_type_only,
+            property_name,
+            name,
+        };
+        self.alloc_node(Node::ImportSpecifier(spec))
+    }
+
+    /// Parse import attributes.
+    fn parse_import_attributes(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+
+        let elements = self.parse_delimited_list(
+            SyntaxKind::CloseBraceToken,
+            |p| p.is_token(SyntaxKind::Identifier) || p.is_token(SyntaxKind::StringLiteral),
+            |p| p.parse_import_attribute(),
+        );
+
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+        let end = self.get_token_start();
+
+        let attrs = crate::parser::ImportAttributes {
+            base: NodeBase::new_ext(syntax_kind_ext::IMPORT_ATTRIBUTES, pos, end),
+            token: SyntaxKind::WithKeyword as u16,
+            elements,
+            multi_line: false,
+        };
+        self.alloc_node(Node::ImportAttributes(attrs))
+    }
+
+    /// Parse a single import attribute.
+    fn parse_import_attribute(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let name = self.parse_property_name();
+        self.parse_expected(SyntaxKind::ColonToken);
+        let value = self.parse_assignment_expression_or_higher();
+        let end = self.get_token_start();
+
+        let attr = crate::parser::ImportAttribute {
+            base: NodeBase::new_ext(syntax_kind_ext::IMPORT_ATTRIBUTE, pos, end),
+            name,
+            value,
+        };
+        self.alloc_node(Node::ImportAttribute(attr))
+    }
+
+    /// Parse an export declaration.
+    fn parse_export_declaration(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::ExportKeyword);
+
+        // export default
+        if self.parse_optional(SyntaxKind::DefaultKeyword) {
+            return self.parse_export_assignment(pos, true);
+        }
+
+        // export =
+        if self.parse_optional(SyntaxKind::EqualsToken) {
+            return self.parse_export_assignment(pos, false);
+        }
+
+        // export type
+        let is_type_only = self.parse_optional(SyntaxKind::TypeKeyword);
+
+        // export { ... }
+        if self.is_token(SyntaxKind::OpenBraceToken) {
+            let export_clause = self.parse_named_exports();
+
+            let module_specifier = if self.parse_optional(SyntaxKind::FromKeyword) {
+                self.parse_string_literal()
+            } else {
+                NodeIndex::NONE
+            };
+
+            self.parse_semicolon();
+            let end = self.get_token_start();
+
+            let mut base = NodeBase::new_ext(syntax_kind_ext::EXPORT_DECLARATION, pos, end);
+            if is_type_only {
+                base.flags |= node_flags::TYPE_ONLY;
+            }
+
+            let decl = ExportDeclaration {
+                base,
+                modifiers: None,
+                is_type_only,
+                export_clause,
+                module_specifier,
+                attributes: NodeIndex::NONE,
+            };
+            return self.alloc_node(Node::ExportDeclaration(decl));
+        }
+
+        // export * from "module"
+        if self.is_token(SyntaxKind::AsteriskToken) {
+            self.next_token();
+
+            // export * as ns from "module"
+            let export_clause = if self.parse_optional(SyntaxKind::AsKeyword) {
+                let ns_pos = self.get_full_start();
+                let name = self.parse_identifier();
+                let ns_end = self.get_token_start();
+                let ns = crate::parser::NamespaceExport {
+                    base: NodeBase::new_ext(syntax_kind_ext::NAMESPACE_EXPORT, ns_pos, ns_end),
+                    name,
+                };
+                self.alloc_node(Node::NamespaceExport(ns))
+            } else {
+                NodeIndex::NONE
+            };
+
+            self.parse_expected(SyntaxKind::FromKeyword);
+            let module_specifier = self.parse_string_literal();
+            self.parse_semicolon();
+
+            let end = self.get_token_start();
+
+            let decl = ExportDeclaration {
+                base: NodeBase::new_ext(syntax_kind_ext::EXPORT_DECLARATION, pos, end),
+                modifiers: None,
+                is_type_only,
+                export_clause,
+                module_specifier,
+                attributes: NodeIndex::NONE,
+            };
+            return self.alloc_node(Node::ExportDeclaration(decl));
+        }
+
+        // export function/class/etc.
+        let declaration = self.parse_statement();
+        let end = self.get_token_start();
+
+        // Wrap in export declaration
+        let decl = ExportDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::EXPORT_DECLARATION, pos, end),
+            modifiers: None,
+            is_type_only: false,
+            export_clause: declaration,
+            module_specifier: NodeIndex::NONE,
+            attributes: NodeIndex::NONE,
+        };
+        self.alloc_node(Node::ExportDeclaration(decl))
+    }
+
+    /// Parse named exports.
+    fn parse_named_exports(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+
+        let elements = self.parse_delimited_list(
+            SyntaxKind::CloseBraceToken,
+            |p| p.is_token(SyntaxKind::Identifier) || p.is_token(SyntaxKind::TypeKeyword),
+            |p| p.parse_export_specifier(),
+        );
+
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+        let end = self.get_token_start();
+
+        let named = NamedExports {
+            base: NodeBase::new_ext(syntax_kind_ext::NAMED_EXPORTS, pos, end),
+            elements,
+        };
+        self.alloc_node(Node::NamedExports(named))
+    }
+
+    /// Parse an export specifier.
+    fn parse_export_specifier(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let is_type_only = self.parse_optional(SyntaxKind::TypeKeyword);
+
+        let property_name: NodeIndex;
+        let name: NodeIndex;
+
+        let first = self.parse_identifier();
+
+        if self.parse_optional(SyntaxKind::AsKeyword) {
+            property_name = first;
+            name = self.parse_identifier();
+        } else {
+            property_name = NodeIndex::NONE;
+            name = first;
+        }
+
+        let end = self.get_token_start();
+
+        let spec = ExportSpecifier {
+            base: NodeBase::new_ext(syntax_kind_ext::EXPORT_SPECIFIER, pos, end),
+            is_type_only,
+            property_name,
+            name,
+        };
+        self.alloc_node(Node::ExportSpecifier(spec))
+    }
+
+    /// Parse an export assignment (export default or export =).
+    fn parse_export_assignment(&mut self, pos: u32, is_export_equals: bool) -> NodeIndex {
+        let expression = self.parse_assignment_expression_or_higher();
+        self.parse_semicolon();
+        let end = self.get_token_start();
+
+        let decl = ExportAssignment {
+            base: NodeBase::new_ext(syntax_kind_ext::EXPORT_ASSIGNMENT, pos, end),
+            modifiers: None,
+            is_export_equals,
+            expression,
+        };
+        self.alloc_node(Node::ExportAssignment(decl))
     }
 }
 

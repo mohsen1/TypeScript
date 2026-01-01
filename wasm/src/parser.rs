@@ -54,6 +54,9 @@ pub mod node_flags {
     pub const JSON_FILE: u32          = 134217728; // 1 << 27
     pub const TYPE_CACHED: u32        = 268435456; // 1 << 28
     pub const DEPRECATED: u32         = 536870912; // 1 << 29
+
+    // Type-only imports/exports
+    pub const TYPE_ONLY: u32          = 1073741824; // 1 << 30
 }
 
 // =============================================================================
@@ -1296,6 +1299,29 @@ pub struct InterfaceDeclaration {
     pub members: NodeList,
 }
 
+/// A property signature (in interface or type literal).
+#[derive(Clone, Debug)]
+pub struct PropertySignature {
+    pub base: NodeBase,
+    pub modifiers: Option<NodeList>,
+    pub name: NodeIndex,
+    pub question_token: bool,
+    pub type_annotation: NodeIndex,  // Optional
+    pub initializer: NodeIndex,      // Optional
+}
+
+/// A method signature (in interface or type literal).
+#[derive(Clone, Debug)]
+pub struct MethodSignature {
+    pub base: NodeBase,
+    pub modifiers: Option<NodeList>,
+    pub name: NodeIndex,
+    pub question_token: bool,
+    pub type_parameters: Option<NodeList>,
+    pub parameters: NodeList,
+    pub type_annotation: NodeIndex,  // Optional
+}
+
 /// A type alias declaration.
 #[derive(Clone, Debug)]
 pub struct TypeAliasDeclaration {
@@ -1692,6 +1718,8 @@ pub enum Node {
     FunctionDeclaration(FunctionDeclaration),
     ClassDeclaration(ClassDeclaration),
     InterfaceDeclaration(InterfaceDeclaration),
+    PropertySignature(PropertySignature),
+    MethodSignature(MethodSignature),
     TypeAliasDeclaration(TypeAliasDeclaration),
     EnumDeclaration(EnumDeclaration),
     EnumMember(EnumMember),
@@ -1843,6 +1871,8 @@ impl Node {
             Node::FunctionDeclaration(n) => &n.base,
             Node::ClassDeclaration(n) => &n.base,
             Node::InterfaceDeclaration(n) => &n.base,
+            Node::PropertySignature(n) => &n.base,
+            Node::MethodSignature(n) => &n.base,
             Node::TypeAliasDeclaration(n) => &n.base,
             Node::EnumDeclaration(n) => &n.base,
             Node::EnumMember(n) => &n.base,
@@ -1975,6 +2005,8 @@ impl Node {
             Node::FunctionDeclaration(n) => &mut n.base,
             Node::ClassDeclaration(n) => &mut n.base,
             Node::InterfaceDeclaration(n) => &mut n.base,
+            Node::PropertySignature(n) => &mut n.base,
+            Node::MethodSignature(n) => &mut n.base,
             Node::TypeAliasDeclaration(n) => &mut n.base,
             Node::EnumDeclaration(n) => &mut n.base,
             Node::EnumMember(n) => &mut n.base,
