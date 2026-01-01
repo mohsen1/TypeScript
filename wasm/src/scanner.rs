@@ -451,6 +451,113 @@ pub fn punctuation_to_text(token: SyntaxKind) -> Option<String> {
 }
 
 // =============================================================================
+// Text to Keyword Lookup
+// =============================================================================
+
+/// Convert a string to its keyword SyntaxKind, if it's a keyword.
+/// Returns None if the text is not a keyword.
+#[wasm_bindgen(js_name = textToKeyword)]
+pub fn text_to_keyword(text: &str) -> Option<SyntaxKind> {
+    match text {
+        // Reserved words
+        "break" => Some(SyntaxKind::BreakKeyword),
+        "case" => Some(SyntaxKind::CaseKeyword),
+        "catch" => Some(SyntaxKind::CatchKeyword),
+        "class" => Some(SyntaxKind::ClassKeyword),
+        "const" => Some(SyntaxKind::ConstKeyword),
+        "continue" => Some(SyntaxKind::ContinueKeyword),
+        "debugger" => Some(SyntaxKind::DebuggerKeyword),
+        "default" => Some(SyntaxKind::DefaultKeyword),
+        "delete" => Some(SyntaxKind::DeleteKeyword),
+        "do" => Some(SyntaxKind::DoKeyword),
+        "else" => Some(SyntaxKind::ElseKeyword),
+        "enum" => Some(SyntaxKind::EnumKeyword),
+        "export" => Some(SyntaxKind::ExportKeyword),
+        "extends" => Some(SyntaxKind::ExtendsKeyword),
+        "false" => Some(SyntaxKind::FalseKeyword),
+        "finally" => Some(SyntaxKind::FinallyKeyword),
+        "for" => Some(SyntaxKind::ForKeyword),
+        "function" => Some(SyntaxKind::FunctionKeyword),
+        "if" => Some(SyntaxKind::IfKeyword),
+        "import" => Some(SyntaxKind::ImportKeyword),
+        "in" => Some(SyntaxKind::InKeyword),
+        "instanceof" => Some(SyntaxKind::InstanceOfKeyword),
+        "new" => Some(SyntaxKind::NewKeyword),
+        "null" => Some(SyntaxKind::NullKeyword),
+        "return" => Some(SyntaxKind::ReturnKeyword),
+        "super" => Some(SyntaxKind::SuperKeyword),
+        "switch" => Some(SyntaxKind::SwitchKeyword),
+        "this" => Some(SyntaxKind::ThisKeyword),
+        "throw" => Some(SyntaxKind::ThrowKeyword),
+        "true" => Some(SyntaxKind::TrueKeyword),
+        "try" => Some(SyntaxKind::TryKeyword),
+        "typeof" => Some(SyntaxKind::TypeOfKeyword),
+        "var" => Some(SyntaxKind::VarKeyword),
+        "void" => Some(SyntaxKind::VoidKeyword),
+        "while" => Some(SyntaxKind::WhileKeyword),
+        "with" => Some(SyntaxKind::WithKeyword),
+        // Strict mode reserved words
+        "implements" => Some(SyntaxKind::ImplementsKeyword),
+        "interface" => Some(SyntaxKind::InterfaceKeyword),
+        "let" => Some(SyntaxKind::LetKeyword),
+        "package" => Some(SyntaxKind::PackageKeyword),
+        "private" => Some(SyntaxKind::PrivateKeyword),
+        "protected" => Some(SyntaxKind::ProtectedKeyword),
+        "public" => Some(SyntaxKind::PublicKeyword),
+        "static" => Some(SyntaxKind::StaticKeyword),
+        "yield" => Some(SyntaxKind::YieldKeyword),
+        // Contextual keywords
+        "abstract" => Some(SyntaxKind::AbstractKeyword),
+        "accessor" => Some(SyntaxKind::AccessorKeyword),
+        "as" => Some(SyntaxKind::AsKeyword),
+        "asserts" => Some(SyntaxKind::AssertsKeyword),
+        "assert" => Some(SyntaxKind::AssertKeyword),
+        "any" => Some(SyntaxKind::AnyKeyword),
+        "async" => Some(SyntaxKind::AsyncKeyword),
+        "await" => Some(SyntaxKind::AwaitKeyword),
+        "boolean" => Some(SyntaxKind::BooleanKeyword),
+        "constructor" => Some(SyntaxKind::ConstructorKeyword),
+        "declare" => Some(SyntaxKind::DeclareKeyword),
+        "get" => Some(SyntaxKind::GetKeyword),
+        "infer" => Some(SyntaxKind::InferKeyword),
+        "intrinsic" => Some(SyntaxKind::IntrinsicKeyword),
+        "is" => Some(SyntaxKind::IsKeyword),
+        "keyof" => Some(SyntaxKind::KeyOfKeyword),
+        "module" => Some(SyntaxKind::ModuleKeyword),
+        "namespace" => Some(SyntaxKind::NamespaceKeyword),
+        "never" => Some(SyntaxKind::NeverKeyword),
+        "out" => Some(SyntaxKind::OutKeyword),
+        "readonly" => Some(SyntaxKind::ReadonlyKeyword),
+        "require" => Some(SyntaxKind::RequireKeyword),
+        "number" => Some(SyntaxKind::NumberKeyword),
+        "object" => Some(SyntaxKind::ObjectKeyword),
+        "satisfies" => Some(SyntaxKind::SatisfiesKeyword),
+        "set" => Some(SyntaxKind::SetKeyword),
+        "string" => Some(SyntaxKind::StringKeyword),
+        "symbol" => Some(SyntaxKind::SymbolKeyword),
+        "type" => Some(SyntaxKind::TypeKeyword),
+        "undefined" => Some(SyntaxKind::UndefinedKeyword),
+        "unique" => Some(SyntaxKind::UniqueKeyword),
+        "unknown" => Some(SyntaxKind::UnknownKeyword),
+        "using" => Some(SyntaxKind::UsingKeyword),
+        "from" => Some(SyntaxKind::FromKeyword),
+        "global" => Some(SyntaxKind::GlobalKeyword),
+        "bigint" => Some(SyntaxKind::BigIntKeyword),
+        "override" => Some(SyntaxKind::OverrideKeyword),
+        "of" => Some(SyntaxKind::OfKeyword),
+        "defer" => Some(SyntaxKind::DeferKeyword),
+        _ => None,
+    }
+}
+
+/// Get the token kind for a given text, including identifiers and keywords.
+/// Returns Identifier if the text is not a keyword.
+#[wasm_bindgen(js_name = stringToToken)]
+pub fn string_to_token(text: &str) -> SyntaxKind {
+    text_to_keyword(text).unwrap_or(SyntaxKind::Identifier)
+}
+
+// =============================================================================
 // Unit Tests
 // =============================================================================
 
@@ -511,5 +618,32 @@ mod tests {
         assert_eq!(SyntaxKind::EndOfFileToken as u16, 1);
         assert_eq!(SyntaxKind::Identifier as u16, 80);
         assert_eq!(SyntaxKind::BreakKeyword as u16, 83);
+    }
+
+    #[test]
+    fn test_text_to_keyword() {
+        // Reserved words
+        assert_eq!(text_to_keyword("const"), Some(SyntaxKind::ConstKeyword));
+        assert_eq!(text_to_keyword("function"), Some(SyntaxKind::FunctionKeyword));
+        assert_eq!(text_to_keyword("return"), Some(SyntaxKind::ReturnKeyword));
+        // Strict mode reserved
+        assert_eq!(text_to_keyword("let"), Some(SyntaxKind::LetKeyword));
+        assert_eq!(text_to_keyword("yield"), Some(SyntaxKind::YieldKeyword));
+        // Contextual keywords
+        assert_eq!(text_to_keyword("async"), Some(SyntaxKind::AsyncKeyword));
+        assert_eq!(text_to_keyword("await"), Some(SyntaxKind::AwaitKeyword));
+        assert_eq!(text_to_keyword("type"), Some(SyntaxKind::TypeKeyword));
+        // Not a keyword
+        assert_eq!(text_to_keyword("foo"), None);
+        assert_eq!(text_to_keyword("bar"), None);
+        assert_eq!(text_to_keyword("CONST"), None); // Case sensitive
+    }
+
+    #[test]
+    fn test_string_to_token() {
+        assert_eq!(string_to_token("const"), SyntaxKind::ConstKeyword);
+        assert_eq!(string_to_token("async"), SyntaxKind::AsyncKeyword);
+        assert_eq!(string_to_token("foo"), SyntaxKind::Identifier);
+        assert_eq!(string_to_token("myVar"), SyntaxKind::Identifier);
     }
 }

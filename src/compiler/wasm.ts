@@ -56,6 +56,8 @@ export interface WasmModule {
     tokenIsTrivia(token: number): boolean;
     keywordToText(token: number): string | undefined;
     punctuationToText(token: number): string | undefined;
+    textToKeyword(text: string): number | undefined;
+    stringToToken(text: string): number;
 }
 
 // =============================================================================
@@ -425,4 +427,25 @@ export function wasmKeywordToText(token: number): string | undefined {
 export function wasmPunctuationToText(token: number): string | undefined {
     const wasm = getWasm();
     return wasm?.punctuationToText(token);
+}
+
+/**
+ * Convert a string to its keyword SyntaxKind, if it's a keyword (Rust implementation).
+ * Returns undefined if the text is not a keyword or wasm is unavailable.
+ * @internal
+ */
+export function wasmTextToKeyword(text: string): number | undefined {
+    const wasm = getWasm();
+    return wasm?.textToKeyword(text);
+}
+
+/**
+ * Get the token kind for a given text, including identifiers and keywords (Rust implementation).
+ * Returns Identifier if the text is not a keyword.
+ * Returns undefined if wasm is unavailable.
+ * @internal
+ */
+export function wasmStringToToken(text: string): number | undefined {
+    const wasm = getWasm();
+    return wasm?.stringToToken(text);
 }

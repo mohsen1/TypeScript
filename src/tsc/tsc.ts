@@ -36,6 +36,10 @@ const keywordText = ts.wasmKeywordToText(ts.SyntaxKind.AsyncKeyword);
 if (keywordText !== undefined) {
     ts.sys.write(`[WASM] keywordToText(AsyncKeyword) = "${keywordText}"${ts.sys.newLine}`);
 }
+const asyncKind = ts.wasmTextToKeyword("async");
+if (asyncKind !== undefined) {
+    ts.sys.write(`[WASM] textToKeyword("async") = ${asyncKind} (AsyncKeyword=${ts.SyntaxKind.AsyncKeyword})${ts.sys.newLine}`);
+}
 
 // enable deprecation logging
 ts.Debug.loggingHost = {
