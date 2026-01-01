@@ -946,6 +946,13 @@ impl<'a> CheckerState<'a> {
 
             // Type references (generic types like Array<T>, or keywords like number)
             Node::TypeReference(tr) => {
+                // Check for type arguments
+                if let Some(ref type_args) = tr.type_arguments {
+                    if !type_args.nodes.is_empty() {
+                        return self.get_type_of_type_reference_with_args(tr.type_name, type_args);
+                    }
+                }
+
                 // Check if the type_name is a keyword type
                 if let Some(Node::Identifier(id)) = self.node_arena.get(tr.type_name) {
                     match id.escaped_text.as_str() {
@@ -963,8 +970,11 @@ impl<'a> CheckerState<'a> {
                         "symbol" => self.types.es_symbol_type,
                         _ => {
                             // For other type references, look up in symbol table
-                            // For now, return object (proper handling needs symbol lookup)
-                            self.types.object_type
+                            if let Some(symbol_id) = self.file_locals.get(&id.escaped_text) {
+                                self.get_type_of_symbol(symbol_id)
+                            } else {
+                                self.types.object_type
+                            }
                         }
                     }
                 } else {
@@ -1687,7 +1697,7 @@ impl<'a> CheckerState<'a> {
         };
 
         // Create a symbol for the type parameter
-        let symbol_id = SymbolId::NONE; // TODO: Create actual symbol
+        let symbol_id = self.local_symbols.alloc(symbol_flags::TYPE_PARAMETER, name.clone());
 
         // Get constraint type if present
         let constraint = if !tp.constraint.is_none() {
@@ -1720,6 +1730,180 @@ impl<'a> CheckerState<'a> {
         self.type_parameter_names.insert(type_id, name);
 
         Some(type_id)
+    }
+
+    /// Instantiate a generic type with type arguments.
+    /// Replaces type parameters with the provided type arguments.
+    pub fn instantiate_type(&mut self, type_id: TypeId, type_arguments: &[TypeId], type_parameters: &[TypeId]) -> TypeId {
+        // If no type arguments, return the original type
+        if type_arguments.is_empty() || type_parameters.is_empty() {
+            return type_id;
+        }
+
+        // Create a mapping from type parameters to type arguments
+        let mapper: std::collections::HashMap<TypeId, TypeId> = type_parameters.iter()
+            .zip(type_arguments.iter())
+            .map(|(&param, &arg)| (param, arg))
+            .collect();
+
+        self.instantiate_type_with_mapper(type_id, &mapper)
+    }
+
+    /// Instantiate a type using a type parameter mapper.
+    fn instantiate_type_with_mapper(&mut self, type_id: TypeId, mapper: &std::collections::HashMap<TypeId, TypeId>) -> TypeId {
+        // Check if this type parameter is in the mapper
+        if let Some(&mapped_type) = mapper.get(&type_id) {
+            return mapped_type;
+        }
+
+        // Extract data from the type to avoid borrowing issues
+        enum TypeInfo {
+            TypeParameter,
+            Function {
+                declaration: NodeIndex,
+                parameter_types: Vec<TypeId>,
+                parameter_names: Vec<String>,
+                return_type: TypeId,
+                min_argument_count: u32,
+                has_rest_parameter: bool,
+            },
+            Union {
+                types: Vec<TypeId>,
+            },
+            Intersection {
+                types: Vec<TypeId>,
+            },
+            Other,
+        }
+
+        let type_info = match self.types.get(type_id) {
+            Some(Type::TypeParameter(_)) => TypeInfo::TypeParameter,
+            Some(Type::Function(f)) => TypeInfo::Function {
+                declaration: f.declaration,
+                parameter_types: f.parameter_types.clone(),
+                parameter_names: f.parameter_names.clone(),
+                return_type: f.return_type,
+                min_argument_count: f.min_argument_count,
+                has_rest_parameter: f.has_rest_parameter,
+            },
+            Some(Type::Union(u)) => TypeInfo::Union {
+                types: u.types.clone(),
+            },
+            Some(Type::Intersection(i)) => TypeInfo::Intersection {
+                types: i.types.clone(),
+            },
+            Some(_) => TypeInfo::Other,
+            None => return type_id,
+        };
+
+        match type_info {
+            // Type parameter - already checked above
+            TypeInfo::TypeParameter => type_id,
+
+            // Function type - instantiate return type and parameter types
+            TypeInfo::Function {
+                declaration,
+                parameter_types,
+                parameter_names,
+                return_type,
+                min_argument_count,
+                has_rest_parameter,
+            } => {
+                let new_param_types: Vec<TypeId> = parameter_types.iter()
+                    .map(|&pt| self.instantiate_type_with_mapper(pt, mapper))
+                    .collect();
+                let new_return_type = self.instantiate_type_with_mapper(return_type, mapper);
+
+                // Check if anything changed
+                if new_param_types == parameter_types && new_return_type == return_type {
+                    return type_id;
+                }
+
+                self.types.create_function_type(
+                    declaration,
+                    new_param_types,
+                    parameter_names,
+                    new_return_type,
+                    min_argument_count,
+                    has_rest_parameter,
+                )
+            }
+
+            // Union type - instantiate each constituent
+            TypeInfo::Union { types } => {
+                let new_types: Vec<TypeId> = types.iter()
+                    .map(|&t| self.instantiate_type_with_mapper(t, mapper))
+                    .collect();
+
+                if new_types == types {
+                    return type_id;
+                }
+
+                self.types.create_union_type(new_types)
+            }
+
+            // Intersection type - instantiate each constituent
+            TypeInfo::Intersection { types } => {
+                let new_types: Vec<TypeId> = types.iter()
+                    .map(|&t| self.instantiate_type_with_mapper(t, mapper))
+                    .collect();
+
+                if new_types == types {
+                    return type_id;
+                }
+
+                self.types.create_intersection(new_types)
+            }
+
+            // Other types - return as-is for now
+            TypeInfo::Other => type_id,
+        }
+    }
+
+    /// Get the type of a type reference with type arguments (e.g., Array<T>, Map<K, V>).
+    fn get_type_of_type_reference_with_args(&mut self, type_name: NodeIndex, type_arguments: &crate::parser::NodeList) -> TypeId {
+        use crate::parser::Node;
+
+        // Get the base type name
+        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(type_name) {
+            id.escaped_text.as_str()
+        } else {
+            return self.types.object_type;
+        };
+
+        // Resolve type arguments
+        let type_args: Vec<TypeId> = type_arguments.nodes.iter()
+            .map(|&arg| self.get_type_of_node(arg))
+            .collect();
+
+        // Look up the type in the symbol table
+        if let Some(symbol_id) = self.file_locals.get(name) {
+            let base_type = self.get_type_of_symbol(symbol_id);
+
+            // Check if it's a generic type that needs instantiation
+            if let Some(Type::Function(f)) = self.types.get(base_type) {
+                if !f.type_parameters.is_empty() {
+                    return self.instantiate_type(base_type, &type_args, &f.type_parameters.clone());
+                }
+            }
+
+            return base_type;
+        }
+
+        // Built-in generic types
+        match name {
+            "Array" | "ReadonlyArray" => {
+                // For now, return object type. Full Array<T> support needs special handling.
+                self.types.object_type
+            }
+            "Promise" => {
+                self.types.object_type
+            }
+            "Map" | "Set" | "WeakMap" | "WeakSet" => {
+                self.types.object_type
+            }
+            _ => self.types.object_type,
+        }
     }
 
     /// Get the type of a symbol (with caching).
@@ -3155,6 +3339,115 @@ mod tests {
             } else {
                 panic!("Expected Object type with CLASS flag, got {:?}", typ);
             }
+        }
+    }
+
+    #[test]
+    fn test_generic_function_type_parameter() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "function identity<T>(x: T): T { return x; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the identity function
+        assert!(binder.file_locals.has("identity"));
+        if let Some(symbol) = binder.file_locals.get("identity") {
+            let func_type = checker.get_type_of_symbol(symbol);
+            let type_str = checker.type_to_string(func_type);
+
+            // Should have type parameter T
+            assert!(type_str.contains("<T>"), "Expected type parameter T, got: {}", type_str);
+            assert!(type_str.contains("T") && type_str.contains("=>"), "Expected function with T, got: {}", type_str);
+        } else {
+            panic!("identity function not found");
+        }
+    }
+
+    #[test]
+    fn test_type_instantiation() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+
+        // Create a type parameter T
+        let t_symbol = checker.local_symbols.alloc(symbol_flags::TYPE_PARAMETER, "T".to_string());
+        let t_type = checker.types.alloc(Type::TypeParameter(TypeParameter {
+            flags: type_flags::TYPE_PARAMETER,
+            symbol: t_symbol,
+            constraint: TypeId::NONE,
+            default: TypeId::NONE,
+            target: TypeId::NONE,
+            is_this_type: false,
+        }));
+        checker.type_parameter_names.insert(t_type, "T".to_string());
+
+        // Create a function type with T as parameter and return type: (x: T) => T
+        let func_type = checker.types.create_function_type_with_type_params(
+            NodeIndex::NONE,
+            vec![t_type],              // parameter types
+            vec!["x".to_string()],     // parameter names
+            t_type,                    // return type
+            vec![t_type],              // type parameters
+            1,                         // min argument count
+            false,                     // has rest parameter
+        );
+
+        // Instantiate with T = string
+        let instantiated = checker.instantiate_type(func_type, &[checker.types.string_type], &[t_type]);
+
+        // The result should have string as parameter and return type
+        if let Some(Type::Function(f)) = checker.types.get(instantiated) {
+            assert_eq!(f.parameter_types.len(), 1);
+            assert_eq!(f.parameter_types[0], checker.types.string_type);
+            assert_eq!(f.return_type, checker.types.string_type);
+        } else {
+            panic!("Expected instantiated function type");
+        }
+    }
+
+    #[test]
+    fn test_type_parameter_with_default() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "type Create<T = string> = () => T;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the Create type alias
+        assert!(binder.file_locals.has("Create"));
+        if let Some(symbol) = binder.file_locals.get("Create") {
+            // Just verify it parses and binds successfully
+            let _ = checker.get_type_of_symbol(symbol);
         }
     }
 }

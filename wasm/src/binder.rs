@@ -372,15 +372,29 @@ pub struct BinderState {
     /// File-level symbol table
     #[wasm_bindgen(skip)]
     pub file_locals: SymbolTable,
+    /// Flow node arena for control flow analysis
+    #[wasm_bindgen(skip)]
+    pub flow_nodes: FlowNodeArena,
+    /// Current flow node
+    current_flow: FlowNodeId,
+    /// Unreachable flow node (for never-returning code)
+    unreachable_flow: FlowNodeId,
 }
 
 impl BinderState {
     pub fn new() -> Self {
+        let mut flow_nodes = FlowNodeArena::new();
+        // Create the unreachable flow node
+        let unreachable_flow = flow_nodes.alloc(flow_flags::UNREACHABLE);
+
         BinderState {
             symbols: SymbolArena::new(),
             current_scope: SymbolTable::new(),
             scope_stack: Vec::new(),
             file_locals: SymbolTable::new(),
+            flow_nodes,
+            current_flow: FlowNodeId::NONE,
+            unreachable_flow,
         }
     }
 
@@ -388,6 +402,10 @@ impl BinderState {
     pub fn bind_source_file(&mut self, arena: &NodeArena, root: NodeIndex) {
         // Start with file scope
         self.current_scope = SymbolTable::new();
+
+        // Create START flow node for the file
+        let start_flow = self.flow_nodes.alloc(flow_flags::START);
+        self.current_flow = start_flow;
 
         if let Some(node) = arena.get(root) {
             if let Node::SourceFile(sf) = node {
@@ -400,6 +418,39 @@ impl BinderState {
 
         // Store file locals
         self.file_locals = std::mem::take(&mut self.current_scope);
+    }
+
+    /// Create a new flow node and set it as current.
+    fn create_flow_node(&mut self, flags: u32, antecedent: FlowNodeId, node: NodeIndex) -> FlowNodeId {
+        let flow_id = self.flow_nodes.alloc(flags);
+        if let Some(flow) = self.flow_nodes.get_mut(flow_id) {
+            if !antecedent.is_none() {
+                flow.antecedent.push(antecedent);
+            }
+            flow.node = node;
+        }
+        flow_id
+    }
+
+    /// Create a branch label flow node (for merging control flow).
+    fn create_branch_label(&mut self) -> FlowNodeId {
+        self.flow_nodes.alloc(flow_flags::BRANCH_LABEL)
+    }
+
+    /// Add an antecedent to a branch label.
+    fn add_antecedent(&mut self, label: FlowNodeId, antecedent: FlowNodeId) {
+        if !antecedent.is_none() && antecedent != self.unreachable_flow {
+            if let Some(flow) = self.flow_nodes.get_mut(label) {
+                if !flow.antecedent.contains(&antecedent) {
+                    flow.antecedent.push(antecedent);
+                }
+            }
+        }
+    }
+
+    /// Check if current flow is reachable.
+    fn is_reachable(&self) -> bool {
+        !self.current_flow.is_none() && self.current_flow != self.unreachable_flow
     }
 
     /// Bind a single node, creating symbols as needed.
@@ -461,15 +512,12 @@ impl BinderState {
                 self.pop_scope();
             }
 
-            // Other statements - recurse into children
+            // Other statements - recurse into children with flow analysis
             Node::IfStatement(if_stmt) => {
-                self.bind_node(arena, if_stmt.then_statement);
-                if !if_stmt.else_statement.is_none() {
-                    self.bind_node(arena, if_stmt.else_statement);
-                }
+                self.bind_if_statement(arena, if_stmt, idx);
             }
             Node::WhileStatement(while_stmt) => {
-                self.bind_node(arena, while_stmt.statement);
+                self.bind_while_statement(arena, while_stmt, idx);
             }
             Node::ForStatement(for_stmt) => {
                 self.push_scope();
@@ -690,6 +738,104 @@ impl BinderState {
                 _ => {}
             }
         }
+    }
+
+    /// Bind an if statement with flow analysis.
+    fn bind_if_statement(
+        &mut self,
+        arena: &NodeArena,
+        if_stmt: &crate::parser::IfStatement,
+        _node_idx: NodeIndex,
+    ) {
+        // Save the current flow before the condition
+        let pre_condition_flow = self.current_flow;
+
+        // Create flow node for the true branch (condition is true)
+        let true_flow = self.create_flow_node(
+            flow_flags::TRUE_CONDITION,
+            pre_condition_flow,
+            if_stmt.expression,
+        );
+
+        // Bind the then statement with true flow
+        self.current_flow = true_flow;
+        self.bind_node(arena, if_stmt.then_statement);
+        let post_then_flow = self.current_flow;
+
+        // Create a branch label for merging after the if statement
+        let merge_label = self.create_branch_label();
+
+        if !if_stmt.else_statement.is_none() {
+            // Create flow node for the false branch (condition is false)
+            let false_flow = self.create_flow_node(
+                flow_flags::FALSE_CONDITION,
+                pre_condition_flow,
+                if_stmt.expression,
+            );
+
+            // Bind the else statement with false flow
+            self.current_flow = false_flow;
+            self.bind_node(arena, if_stmt.else_statement);
+            let post_else_flow = self.current_flow;
+
+            // Add both branches to the merge label
+            self.add_antecedent(merge_label, post_then_flow);
+            self.add_antecedent(merge_label, post_else_flow);
+        } else {
+            // No else branch: false path goes directly to merge
+            let false_flow = self.create_flow_node(
+                flow_flags::FALSE_CONDITION,
+                pre_condition_flow,
+                if_stmt.expression,
+            );
+
+            self.add_antecedent(merge_label, post_then_flow);
+            self.add_antecedent(merge_label, false_flow);
+        }
+
+        // Set current flow to the merge label
+        self.current_flow = merge_label;
+    }
+
+    /// Bind a while statement with flow analysis.
+    fn bind_while_statement(
+        &mut self,
+        arena: &NodeArena,
+        while_stmt: &crate::parser::WhileStatement,
+        _node_idx: NodeIndex,
+    ) {
+        // Create a loop label for the loop entry
+        let loop_label = self.flow_nodes.alloc(flow_flags::LOOP_LABEL);
+        if let Some(flow) = self.flow_nodes.get_mut(loop_label) {
+            if !self.current_flow.is_none() {
+                flow.antecedent.push(self.current_flow);
+            }
+        }
+
+        self.current_flow = loop_label;
+
+        // Create flow node for the true condition (entering loop body)
+        let true_flow = self.create_flow_node(
+            flow_flags::TRUE_CONDITION,
+            loop_label,
+            while_stmt.expression,
+        );
+
+        // Bind the loop body
+        self.current_flow = true_flow;
+        self.bind_node(arena, while_stmt.statement);
+
+        // Loop back to the loop label
+        self.add_antecedent(loop_label, self.current_flow);
+
+        // Create flow node for the false condition (exiting loop)
+        let false_flow = self.create_flow_node(
+            flow_flags::FALSE_CONDITION,
+            loop_label,
+            while_stmt.expression,
+        );
+
+        self.current_flow = false_flow;
     }
 
     fn bind_interface_declaration(
@@ -1179,5 +1325,130 @@ mod tests {
         assert!(foo_sym.has_flags(symbol_flags::CLASS));
         assert!(foo_sym.has_any_flags(symbol_flags::MODULE));
         assert_eq!(foo_sym.declarations.len(), 2);
+    }
+
+    #[test]
+    fn test_flow_nodes_basic() {
+        use crate::parser_impl::ParserState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "const x = 1;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        // Should have at least 2 flow nodes: unreachable + start
+        assert!(binder.flow_nodes.len() >= 2);
+
+        // Flow node 0 should be UNREACHABLE
+        let unreachable = binder.flow_nodes.get(FlowNodeId(0)).unwrap();
+        assert!(unreachable.has_flags(flow_flags::UNREACHABLE));
+
+        // Flow node 1 should be START
+        let start = binder.flow_nodes.get(FlowNodeId(1)).unwrap();
+        assert!(start.has_flags(flow_flags::START));
+    }
+
+    #[test]
+    fn test_flow_nodes_if_statement() {
+        use crate::parser_impl::ParserState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                let x: number | string;
+                if (typeof x === "number") {
+                    const y = x;
+                } else {
+                    const z = x;
+                }
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        // Should have multiple flow nodes for the if statement:
+        // - UNREACHABLE (0)
+        // - START (1)
+        // - TRUE_CONDITION (2) - for the if true branch
+        // - BRANCH_LABEL (3) - merge point
+        // - FALSE_CONDITION (4) - for the else branch
+        assert!(binder.flow_nodes.len() >= 5);
+
+        // Check that we have TRUE_CONDITION and FALSE_CONDITION nodes
+        let mut has_true = false;
+        let mut has_false = false;
+        let mut has_branch_label = false;
+
+        for i in 0..binder.flow_nodes.len() {
+            if let Some(flow) = binder.flow_nodes.get(FlowNodeId(i as u32)) {
+                if flow.has_flags(flow_flags::TRUE_CONDITION) {
+                    has_true = true;
+                }
+                if flow.has_flags(flow_flags::FALSE_CONDITION) {
+                    has_false = true;
+                }
+                if flow.has_flags(flow_flags::BRANCH_LABEL) {
+                    has_branch_label = true;
+                }
+            }
+        }
+
+        assert!(has_true, "Should have TRUE_CONDITION flow node");
+        assert!(has_false, "Should have FALSE_CONDITION flow node");
+        assert!(has_branch_label, "Should have BRANCH_LABEL flow node");
+    }
+
+    #[test]
+    fn test_flow_nodes_while_statement() {
+        use crate::parser_impl::ParserState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                let i = 0;
+                while (i < 10) {
+                    i = i + 1;
+                }
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        // Should have flow nodes for the while loop:
+        // - UNREACHABLE
+        // - START
+        // - LOOP_LABEL
+        // - TRUE_CONDITION
+        // - FALSE_CONDITION
+
+        let mut has_loop_label = false;
+        let mut has_true = false;
+        let mut has_false = false;
+
+        for i in 0..binder.flow_nodes.len() {
+            if let Some(flow) = binder.flow_nodes.get(FlowNodeId(i as u32)) {
+                if flow.has_flags(flow_flags::LOOP_LABEL) {
+                    has_loop_label = true;
+                }
+                if flow.has_flags(flow_flags::TRUE_CONDITION) {
+                    has_true = true;
+                }
+                if flow.has_flags(flow_flags::FALSE_CONDITION) {
+                    has_false = true;
+                }
+            }
+        }
+
+        assert!(has_loop_label, "Should have LOOP_LABEL flow node");
+        assert!(has_true, "Should have TRUE_CONDITION flow node");
+        assert!(has_false, "Should have FALSE_CONDITION flow node");
     }
 }

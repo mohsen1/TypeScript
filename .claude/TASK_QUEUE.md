@@ -87,12 +87,12 @@ All Phase 4 tasks finished:
   - Function declarations, function types, type aliases
   - Optional parameters and rest parameters
 
-### In Progress
+### Completed (Phase 5.4)
 
-- [ ] **Generic types**
-  - Type parameters
-  - Type arguments
-  - Instantiation
+- [x] **Generic types**
+  - Type parameters with proper symbols
+  - Type arguments via TypeReference handling
+  - Type instantiation with mapper
 
 ### Priority: Medium
 
@@ -111,8 +111,9 @@ All Phase 4 tasks finished:
 
 ## Notes
 
-- Phase 5.1-5.3 completed 2026-01-01
-- 125 Rust tests passing (98 base + 27 checker)
-- CheckerState with type inference, assignability, and function types working
-- Arrow function expression parsing fully implemented
+- Phase 5.1-5.4 completed 2026-01-01
+- 149 Rust tests passing
+- CheckerState with type inference, assignability, function types, and generics working
+- Parser now handles assignment expressions and unary operators (typeof, void, delete, await)
+- Binder flow analysis infrastructure for if/while statements
 - Explored typescript-go for architectural patterns (documented in TYPE_CHECKER_MINDMAP.md)

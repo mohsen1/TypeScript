@@ -2180,8 +2180,54 @@ impl ParserState {
             return self.parse_arrow_function_expression();
         }
 
-        // Parse binary/conditional expression
-        self.parse_binary_expression(0)
+        // Parse left-hand side (binary/conditional expression)
+        let left = self.parse_binary_expression(0);
+
+        // Check for assignment operator
+        if self.is_assignment_operator() {
+            let operator = self.token();
+            self.next_token();
+
+            // Parse right-hand side (assignment is right-associative)
+            let right = self.parse_assignment_expression_or_higher();
+
+            let pos = self.arena.get(left).map(|n| n.base().pos).unwrap_or(0);
+            let end = self.arena.get(right).map(|n| n.base().end).unwrap_or(0);
+
+            let expr = BinaryExpression {
+                base: NodeBase::new_ext(syntax_kind_ext::BINARY_EXPRESSION, pos, end),
+                left,
+                operator_token: operator,
+                right,
+            };
+
+            return self.alloc_node(Node::BinaryExpression(expr));
+        }
+
+        left
+    }
+
+    /// Check if current token is an assignment operator.
+    fn is_assignment_operator(&self) -> bool {
+        match self.token() {
+            SyntaxKind::EqualsToken
+            | SyntaxKind::PlusEqualsToken
+            | SyntaxKind::MinusEqualsToken
+            | SyntaxKind::AsteriskEqualsToken
+            | SyntaxKind::SlashEqualsToken
+            | SyntaxKind::PercentEqualsToken
+            | SyntaxKind::LessThanLessThanEqualsToken
+            | SyntaxKind::GreaterThanGreaterThanEqualsToken
+            | SyntaxKind::GreaterThanGreaterThanGreaterThanEqualsToken
+            | SyntaxKind::AmpersandEqualsToken
+            | SyntaxKind::BarEqualsToken
+            | SyntaxKind::CaretEqualsToken
+            | SyntaxKind::AsteriskAsteriskEqualsToken
+            | SyntaxKind::BarBarEqualsToken
+            | SyntaxKind::AmpersandAmpersandEqualsToken
+            | SyntaxKind::QuestionQuestionEqualsToken => true,
+            _ => false,
+        }
     }
 
     /// Check if we're at the start of an arrow function.
@@ -2401,8 +2447,82 @@ impl ParserState {
 
     /// Parse a unary expression.
     fn parse_unary_expression(&mut self) -> NodeIndex {
-        // TODO: Handle prefix operators
-        self.parse_postfix_expression()
+        // Handle prefix unary operators
+        match self.token() {
+            SyntaxKind::PlusToken
+            | SyntaxKind::MinusToken
+            | SyntaxKind::TildeToken
+            | SyntaxKind::ExclamationToken => {
+                self.parse_prefix_unary_expression()
+            }
+            SyntaxKind::TypeOfKeyword
+            | SyntaxKind::VoidKeyword
+            | SyntaxKind::DeleteKeyword => {
+                self.parse_typeof_void_delete_expression()
+            }
+            SyntaxKind::PlusPlusToken | SyntaxKind::MinusMinusToken => {
+                self.parse_prefix_unary_expression()
+            }
+            SyntaxKind::AwaitKeyword => {
+                self.parse_await_expression()
+            }
+            _ => self.parse_postfix_expression(),
+        }
+    }
+
+    /// Parse a prefix unary expression (+, -, ~, !, ++, --).
+    fn parse_prefix_unary_expression(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let operator = self.token();
+        self.next_token();
+        let operand = self.parse_unary_expression();
+        let end = self.arena.get(operand).map(|n| n.base().end).unwrap_or(self.get_token_start());
+
+        let expr = crate::parser::PrefixUnaryExpression {
+            base: NodeBase::new_ext(syntax_kind_ext::PREFIX_UNARY_EXPRESSION, pos, end),
+            operator,
+            operand,
+        };
+        self.alloc_node(Node::PrefixUnaryExpression(expr))
+    }
+
+    /// Parse typeof, void, or delete expression.
+    fn parse_typeof_void_delete_expression(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let operator = self.token();
+        self.next_token();
+        let operand = self.parse_unary_expression();
+        let end = self.arena.get(operand).map(|n| n.base().end).unwrap_or(self.get_token_start());
+
+        // Use the appropriate syntax kind based on the keyword
+        let kind = match operator {
+            SyntaxKind::TypeOfKeyword => syntax_kind_ext::TYPE_OF_EXPRESSION,
+            SyntaxKind::VoidKeyword => syntax_kind_ext::VOID_EXPRESSION,
+            SyntaxKind::DeleteKeyword => syntax_kind_ext::DELETE_EXPRESSION,
+            _ => syntax_kind_ext::PREFIX_UNARY_EXPRESSION,
+        };
+
+        let expr = crate::parser::PrefixUnaryExpression {
+            base: NodeBase::new_ext(kind, pos, end),
+            operator,
+            operand,
+        };
+        self.alloc_node(Node::PrefixUnaryExpression(expr))
+    }
+
+    /// Parse await expression.
+    fn parse_await_expression(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.next_token(); // consume 'await'
+        let operand = self.parse_unary_expression();
+        let end = self.arena.get(operand).map(|n| n.base().end).unwrap_or(self.get_token_start());
+
+        let expr = crate::parser::PrefixUnaryExpression {
+            base: NodeBase::new_ext(syntax_kind_ext::AWAIT_EXPRESSION, pos, end),
+            operator: SyntaxKind::AwaitKeyword,
+            operand,
+        };
+        self.alloc_node(Node::PrefixUnaryExpression(expr))
     }
 
     /// Parse a postfix expression.
@@ -4529,6 +4649,73 @@ mod tests {
                 assert_eq!(class_decl.modifiers.as_ref().unwrap().len(), 3);
             } else {
                 panic!("Expected ClassDeclaration");
+            }
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_assignment_expression() {
+        let mut parser = ParserState::new("test.ts".to_string(), "i = i + 1;".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::ExpressionStatement(expr_stmt) = stmt {
+                // The expression should be a binary expression with = operator
+                let expr = parser.arena.get(expr_stmt.expression).unwrap();
+                assert!(matches!(expr, Node::BinaryExpression(_)), "Expected BinaryExpression for assignment");
+            } else {
+                panic!("Expected ExpressionStatement");
+            }
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_assignment_in_block() {
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                while (x < 10) {
+                    x = x + 1;
+                }
+            "#.to_string(),
+        );
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            assert!(matches!(stmt, Node::WhileStatement(_)), "Expected WhileStatement");
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_compound_assignment() {
+        let mut parser = ParserState::new("test.ts".to_string(), "x += 5;".to_string());
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::ExpressionStatement(expr_stmt) = stmt {
+                let expr = parser.arena.get(expr_stmt.expression).unwrap();
+                if let Node::BinaryExpression(bin) = expr {
+                    assert_eq!(bin.operator_token, SyntaxKind::PlusEqualsToken);
+                } else {
+                    panic!("Expected BinaryExpression");
+                }
+            } else {
+                panic!("Expected ExpressionStatement");
             }
         } else {
             panic!("Expected SourceFile");
