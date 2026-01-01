@@ -22,12 +22,14 @@ src/compiler/
 ├── scanner.ts      # Lexer - converts text to tokens
 ├── parser.ts       # Parser - converts tokens to AST
 ├── binder.ts       # Symbol table creation
-├── checker.ts      # Type checking (50% of compiler)
+├── checker.ts      # Type checking (50% of compiler) ← LARGEST FILE
 ├── emitter.ts      # Code generation
 ├── types.ts        # Type definitions
 ├── utilities*.ts   # Helper functions
 └── factory.ts      # AST node factory
 ```
+
+**Key Insight**: Parser and Checker work together - understanding how a syntax is parsed AND how it's type-checked is essential for the Rust migration.
 
 ## Key Files Reference
 
@@ -41,6 +43,12 @@ For detailed information, see:
 ```bash
 # Search in parser.ts
 grep -n "parseIdentifier\|parseExpression" src/compiler/parser.ts
+```
+
+### Find how a type is checked
+```bash
+# Search in checker.ts
+grep -n "getTypeOfNode\|checkExpression" src/compiler/checker.ts
 ```
 
 ### Find a SyntaxKind usage

@@ -623,6 +623,42 @@ impl TypeArena {
             has_rest_parameter,
         }))
     }
+
+    /// Create a function type with type parameters.
+    pub fn create_function_type_with_type_params(
+        &mut self,
+        declaration: NodeIndex,
+        parameter_types: Vec<TypeId>,
+        parameter_names: Vec<String>,
+        return_type: TypeId,
+        type_parameters: Vec<TypeId>,
+        min_argument_count: u32,
+        has_rest_parameter: bool,
+    ) -> TypeId {
+        self.alloc(Type::Function(FunctionType {
+            flags: type_flags::OBJECT,
+            object_flags: object_flags::ANONYMOUS,
+            declaration,
+            parameter_types,
+            parameter_names,
+            return_type,
+            type_parameters,
+            min_argument_count,
+            has_rest_parameter,
+        }))
+    }
+
+    /// Create a type parameter.
+    pub fn create_type_parameter(&mut self, symbol: SymbolId, constraint: TypeId, default: TypeId) -> TypeId {
+        self.alloc(Type::TypeParameter(TypeParameter {
+            flags: type_flags::TYPE_PARAMETER,
+            symbol,
+            constraint,
+            default,
+            target: TypeId::NONE,
+            is_this_type: false,
+        }))
+    }
 }
 
 impl Default for TypeArena {
@@ -680,6 +716,9 @@ pub struct CheckerState<'a> {
     /// Cached types for nodes.
     node_types: std::collections::HashMap<NodeIndex, TypeId>,
 
+    /// Type parameter names for type_to_string.
+    type_parameter_names: std::collections::HashMap<TypeId, String>,
+
     /// Diagnostics produced during type checking.
     pub diagnostics: Vec<Diagnostic>,
 
@@ -702,6 +741,7 @@ impl<'a> CheckerState<'a> {
             types: TypeArena::new(),
             symbol_types: std::collections::HashMap::new(),
             node_types: std::collections::HashMap::new(),
+            type_parameter_names: std::collections::HashMap::new(),
             diagnostics: Vec::new(),
             file_name,
         }
@@ -884,55 +924,61 @@ impl<'a> CheckerState<'a> {
 
             // Function declarations
             Node::FunctionDeclaration(fd) => {
-                self.get_type_of_function_like(
+                self.get_type_of_function_like_with_type_params(
                     node,
                     &fd.parameters,
                     fd.type_annotation,
+                    fd.type_parameters.as_ref(),
                 )
             }
 
             // Function expressions
             Node::FunctionExpression(fe) => {
-                self.get_type_of_function_like(
+                self.get_type_of_function_like_with_type_params(
                     node,
                     &fe.parameters,
                     fe.type_annotation,
+                    fe.type_parameters.as_ref(),
                 )
             }
 
             // Arrow functions
             Node::ArrowFunction(af) => {
-                self.get_type_of_function_like(
+                self.get_type_of_function_like_with_type_params(
                     node,
                     &af.parameters,
                     af.type_annotation,
+                    af.type_parameters.as_ref(),
                 )
             }
 
             // Method declarations
             Node::MethodDeclaration(md) => {
-                self.get_type_of_function_like(
+                self.get_type_of_function_like_with_type_params(
                     node,
                     &md.parameters,
                     md.type_annotation,
+                    md.type_parameters.as_ref(),
                 )
             }
 
             // Function type nodes (e.g., type F = (x: number) => string)
             Node::FunctionType(ft) => {
-                self.get_type_of_function_like(
+                self.get_type_of_function_like_with_type_params(
                     node,
                     &ft.parameters,
                     ft.type_node,
+                    ft.type_parameters.as_ref(),
                 )
             }
 
             // Constructor type nodes
             Node::ConstructorType(ct) => {
-                self.get_type_of_function_like(
+                self.get_type_of_function_like_with_type_params(
                     node,
                     &ct.parameters,
                     ct.type_node,
+                    ct.type_parameters.as_ref(),
                 )
             }
 
@@ -953,7 +999,32 @@ impl<'a> CheckerState<'a> {
         parameters: &crate::parser::NodeList,
         return_type_annotation: NodeIndex,
     ) -> TypeId {
+        self.get_type_of_function_like_with_type_params(
+            declaration,
+            parameters,
+            return_type_annotation,
+            None,
+        )
+    }
+
+    /// Get the type of a function-like declaration with type parameters.
+    fn get_type_of_function_like_with_type_params(
+        &mut self,
+        declaration: NodeIndex,
+        parameters: &crate::parser::NodeList,
+        return_type_annotation: NodeIndex,
+        type_parameters: Option<&crate::parser::NodeList>,
+    ) -> TypeId {
         use crate::parser::Node;
+
+        // Create type parameters
+        let type_param_ids: Vec<TypeId> = if let Some(type_params) = type_parameters {
+            type_params.nodes.iter()
+                .filter_map(|&tp_idx| self.create_type_parameter(tp_idx))
+                .collect()
+        } else {
+            Vec::new()
+        };
 
         // Collect parameter types and names
         let mut param_types = Vec::new();
@@ -1000,14 +1071,67 @@ impl<'a> CheckerState<'a> {
             self.types.any_type
         };
 
-        self.types.create_function_type(
+        self.types.create_function_type_with_type_params(
             declaration,
             param_types,
             param_names,
             return_type,
+            type_param_ids,
             min_arg_count,
             has_rest,
         )
+    }
+
+    /// Create a TypeParameter from a TypeParameterDeclaration node.
+    fn create_type_parameter(&mut self, node: NodeIndex) -> Option<TypeId> {
+        use crate::parser::Node;
+
+        let tp = match self.node_arena.get(node)? {
+            Node::TypeParameterDeclaration(tp) => tp,
+            _ => return None,
+        };
+
+        // Get the name of the type parameter
+        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(tp.name) {
+            id.escaped_text.clone()
+        } else {
+            return None;
+        };
+
+        // Create a symbol for the type parameter
+        let symbol_id = SymbolId::NONE; // TODO: Create actual symbol
+
+        // Get constraint type if present
+        let constraint = if !tp.constraint.is_none() {
+            self.get_type_of_node(tp.constraint)
+        } else {
+            TypeId::NONE
+        };
+
+        // Get default type if present
+        let default = if !tp.default.is_none() {
+            self.get_type_of_node(tp.default)
+        } else {
+            TypeId::NONE
+        };
+
+        // Create and allocate the type parameter
+        let type_param = TypeParameter {
+            flags: type_flags::TYPE_PARAMETER,
+            symbol: symbol_id,
+            constraint,
+            default,
+            target: TypeId::NONE,
+            is_this_type: false,
+        };
+
+        // Store the name for type_to_string
+        let type_id = self.types.alloc(Type::TypeParameter(type_param));
+
+        // Cache the type parameter name for later lookup
+        self.type_parameter_names.insert(type_id, name);
+
+        Some(type_id)
     }
 
     /// Get the type of a symbol (with caching).
@@ -1173,9 +1297,16 @@ impl<'a> CheckerState<'a> {
             }
             Type::Object(_) => "object".to_string(),
             Type::TypeReference(_) => "TypeReference".to_string(),
-            Type::TypeParameter(tp) => {
-                if let Some(sym) = self.symbol_arena.get(tp.symbol) {
-                    sym.escaped_name.clone()
+            Type::TypeParameter(_) => {
+                // Try to get name from cached names first
+                if let Some(name) = self.type_parameter_names.get(&type_id) {
+                    name.clone()
+                } else if let Type::TypeParameter(tp) = typ {
+                    if let Some(sym) = self.symbol_arena.get(tp.symbol) {
+                        sym.escaped_name.clone()
+                    } else {
+                        "T".to_string()
+                    }
                 } else {
                     "T".to_string()
                 }
@@ -1186,7 +1317,17 @@ impl<'a> CheckerState<'a> {
             Type::Index(_) => "IndexType".to_string(),
             Type::TemplateLiteral(_) => "TemplateLiteralType".to_string(),
             Type::Function(f) => {
-                // Format as (param1: Type1, param2: Type2) => ReturnType
+                // Format type parameters if present
+                let type_params_str = if !f.type_parameters.is_empty() {
+                    let tp_strs: Vec<String> = f.type_parameters.iter()
+                        .map(|&tp| self.type_to_string(tp))
+                        .collect();
+                    format!("<{}>", tp_strs.join(", "))
+                } else {
+                    String::new()
+                };
+
+                // Format parameters
                 let params: Vec<String> = f.parameter_names.iter()
                     .zip(f.parameter_types.iter())
                     .map(|(name, &typ)| {
@@ -1198,7 +1339,7 @@ impl<'a> CheckerState<'a> {
                     })
                     .collect();
                 let return_str = self.type_to_string(f.return_type);
-                format!("({}) => {}", params.join(", "), return_str)
+                format!("{}({}) => {}", type_params_str, params.join(", "), return_str)
             }
         }
     }
@@ -1851,6 +1992,206 @@ mod tests {
             } else {
                 panic!("Expected Function type, got {:?}", typ);
             }
+        }
+    }
+
+    #[test]
+    fn test_generic_function_type() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test generic function declaration
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"function identity<T>(x: T): T { return x; }"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // 'identity' should have a generic function type
+        assert!(binder.file_locals.has("identity"));
+
+        if let Some(symbol) = binder.file_locals.get("identity") {
+            let fn_type = checker.get_type_of_symbol(symbol);
+            let typ = checker.types.get(fn_type).unwrap();
+
+            if let Type::Function(f) = typ {
+                // Should have one type parameter
+                assert_eq!(f.type_parameters.len(), 1);
+                assert_eq!(f.parameter_names.len(), 1);
+                assert_eq!(f.parameter_names[0], "x");
+
+                // Type string should include <T>
+                let type_str = checker.type_to_string(fn_type);
+                assert!(type_str.starts_with("<T>"), "Expected type string to start with <T>, got: {}", type_str);
+            } else {
+                panic!("Expected Function type, got {:?}", typ);
+            }
+        }
+    }
+
+    #[test]
+    fn test_generic_function_multiple_type_params() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test generic function with multiple type parameters
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"function pair<T, U>(first: T, second: U): [T, U] { return [first, second]; }"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("pair"));
+
+        if let Some(symbol) = binder.file_locals.get("pair") {
+            let fn_type = checker.get_type_of_symbol(symbol);
+            let typ = checker.types.get(fn_type).unwrap();
+
+            if let Type::Function(f) = typ {
+                // Should have two type parameters
+                assert_eq!(f.type_parameters.len(), 2);
+                assert_eq!(f.parameter_names.len(), 2);
+                assert_eq!(f.parameter_names[0], "first");
+                assert_eq!(f.parameter_names[1], "second");
+
+                // Type string should include <T, U>
+                let type_str = checker.type_to_string(fn_type);
+                assert!(type_str.starts_with("<T, U>"), "Expected type string to start with <T, U>, got: {}", type_str);
+            } else {
+                panic!("Expected Function type, got {:?}", typ);
+            }
+        }
+    }
+
+    #[test]
+    fn test_generic_function_with_constraint() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test generic function with constraint
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"function getLength<T extends { length: number }>(x: T): number { return x.length; }"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("getLength"));
+
+        if let Some(symbol) = binder.file_locals.get("getLength") {
+            let fn_type = checker.get_type_of_symbol(symbol);
+            let typ = checker.types.get(fn_type).unwrap();
+
+            if let Type::Function(f) = typ {
+                // Should have one type parameter
+                assert_eq!(f.type_parameters.len(), 1);
+
+                // The type parameter should have a constraint
+                let tp_id = f.type_parameters[0];
+                let tp = checker.types.get(tp_id).unwrap();
+                if let Type::TypeParameter(tp) = tp {
+                    // Constraint should not be NONE
+                    assert!(!tp.constraint.is_none());
+                } else {
+                    panic!("Expected TypeParameter");
+                }
+            } else {
+                panic!("Expected Function type, got {:?}", typ);
+            }
+        }
+    }
+
+    #[test]
+    fn test_generic_arrow_function() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test generic arrow function
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"const identity = <T>(x: T): T => x;"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("identity"));
+
+        if let Some(symbol) = binder.file_locals.get("identity") {
+            let fn_type = checker.get_type_of_symbol(symbol);
+            let typ = checker.types.get(fn_type).unwrap();
+
+            if let Type::Function(f) = typ {
+                // Should have one type parameter
+                assert_eq!(f.type_parameters.len(), 1);
+                assert_eq!(f.parameter_names.len(), 1);
+            } else {
+                panic!("Expected Function type, got {:?}", typ);
+            }
+        }
+    }
+
+    #[test]
+    fn test_type_parameter_creation() {
+        use crate::parser::NodeArena;
+
+        let node_arena = NodeArena::new();
+        let symbol_arena = SymbolArena::new();
+        let file_locals = SymbolTable::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+
+        // Manually create a type parameter
+        let tp_id = checker.types.create_type_parameter(
+            SymbolId::NONE,
+            TypeId::NONE,
+            TypeId::NONE,
+        );
+
+        let tp = checker.types.get(tp_id).unwrap();
+        assert!(tp.has_flags(type_flags::TYPE_PARAMETER));
+
+        if let Type::TypeParameter(t) = tp {
+            assert!(t.constraint.is_none());
+            assert!(t.default.is_none());
+        } else {
+            panic!("Expected TypeParameter");
         }
     }
 }

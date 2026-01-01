@@ -2189,10 +2189,39 @@ impl ParserState {
         match self.token() {
             // (params) => ...
             SyntaxKind::OpenParenToken => self.look_ahead_is_arrow_function(),
+            // <T>(params) => ... (generic arrow function)
+            SyntaxKind::LessThanToken => self.look_ahead_is_generic_arrow_function(),
             // identifier => ...
             _ if self.scanner.is_identifier() => self.look_ahead_is_simple_arrow_function(),
             _ => false,
         }
+    }
+
+    /// Look ahead to see if < starts a generic arrow function.
+    fn look_ahead_is_generic_arrow_function(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let saved_token = self.current_token;
+
+        // Skip <
+        self.next_token();
+
+        // Skip type parameters (match balanced <>)
+        let mut depth = 1;
+        while depth > 0 && !self.at_end() {
+            match self.token() {
+                SyntaxKind::LessThanToken => depth += 1,
+                SyntaxKind::GreaterThanToken => depth -= 1,
+                _ => {}
+            }
+            self.next_token();
+        }
+
+        // After type params, we should see (
+        let result = self.is_token(SyntaxKind::OpenParenToken);
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = saved_token;
+        result
     }
 
     /// Look ahead to see if ( starts an arrow function.
@@ -2264,16 +2293,18 @@ impl ParserState {
         let pos = self.get_full_start();
 
         // Parse async modifier if present
-        let is_async = self.parse_optional(SyntaxKind::AsyncKeyword);
+        let _is_async = self.parse_optional(SyntaxKind::AsyncKeyword);
+
+        // Parse type parameters if present (for generic arrow functions like <T>(x: T) => x)
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
 
         // Parse parameters
-        let (parameters, type_parameters) = if self.is_token(SyntaxKind::OpenParenToken) {
+        let parameters = if self.is_token(SyntaxKind::OpenParenToken) {
             // Parenthesized parameter list
-            let type_params = if self.is_token(SyntaxKind::LessThanToken) {
-                Some(self.parse_type_parameters())
-            } else {
-                None
-            };
             self.parse_expected(SyntaxKind::OpenParenToken);
             let params = self.parse_delimited_list(
                 SyntaxKind::CloseParenToken,
@@ -2281,7 +2312,7 @@ impl ParserState {
                 |p| p.parse_parameter(),
             );
             self.parse_expected(SyntaxKind::CloseParenToken);
-            (params, type_params)
+            params
         } else {
             // Single identifier parameter: x => ...
             let param_pos = self.get_full_start();
@@ -2301,7 +2332,7 @@ impl ParserState {
 
             let mut params = NodeList::new();
             params.push(param_idx);
-            (params, None)
+            params
         };
 
         // Parse return type annotation if present
@@ -2757,27 +2788,60 @@ impl ParserState {
         self.alloc_node(Node::ParameterDeclaration(param))
     }
 
-    /// Parse type parameters (simplified - just skip for now).
+    /// Parse type parameters.
     fn parse_type_parameters(&mut self) -> NodeList {
         let pos = self.get_full_start();
         self.parse_expected(SyntaxKind::LessThanToken);
 
-        // Skip type parameters for now
-        let mut depth = 1;
-        while depth > 0 && !self.at_end() {
-            match self.token() {
-                SyntaxKind::LessThanToken => depth += 1,
-                SyntaxKind::GreaterThanToken => depth -= 1,
-                _ => {}
-            }
-            self.next_token();
-        }
+        let type_params = self.parse_delimited_list(
+            SyntaxKind::GreaterThanToken,
+            |p| p.scanner.is_identifier(),
+            |p| p.parse_type_parameter(),
+        );
+
+        self.parse_expected(SyntaxKind::GreaterThanToken);
 
         let end = self.get_token_start();
-        let mut list = NodeList::new();
+        let mut list = type_params;
         list.pos = pos;
         list.end = end;
         list
+    }
+
+    /// Parse a single type parameter.
+    fn parse_type_parameter(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        // Parse variance modifiers (in/out)
+        let modifiers = None; // TODO: parse variance modifiers
+
+        // Parse name
+        let name = self.parse_identifier();
+
+        // Parse constraint (extends clause)
+        let constraint = if self.parse_optional(SyntaxKind::ExtendsKeyword) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse default type
+        let default = if self.parse_optional(SyntaxKind::EqualsToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end = self.get_token_start();
+
+        let type_param = TypeParameterDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::TYPE_PARAMETER, pos, end),
+            modifiers,
+            name,
+            constraint,
+            default,
+        };
+        self.alloc_node(Node::TypeParameterDeclaration(type_param))
     }
 
     // =========================================================================
