@@ -1,0 +1,515 @@
+//! Scanner types and utilities for TypeScript lexical analysis.
+//!
+//! This module contains the SyntaxKind enum and related token types
+//! that mirror TypeScript's scanner output.
+
+use wasm_bindgen::prelude::*;
+
+// =============================================================================
+// SyntaxKind Enum - Token Types (Scanner Output)
+// =============================================================================
+
+/// Syntax kind enum matching TypeScript's SyntaxKind.
+/// This enum contains only the token types produced by the scanner (0-186).
+/// AST node types are not included here.
+#[wasm_bindgen]
+#[repr(u16)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum SyntaxKind {
+    Unknown = 0,
+    EndOfFileToken = 1,
+    SingleLineCommentTrivia = 2,
+    MultiLineCommentTrivia = 3,
+    NewLineTrivia = 4,
+    WhitespaceTrivia = 5,
+    ShebangTrivia = 6,
+    ConflictMarkerTrivia = 7,
+    NonTextFileMarkerTrivia = 8,
+    // Literals
+    NumericLiteral = 9,
+    BigIntLiteral = 10,
+    StringLiteral = 11,
+    JsxText = 12,
+    JsxTextAllWhiteSpaces = 13,
+    RegularExpressionLiteral = 14,
+    NoSubstitutionTemplateLiteral = 15,
+    // Pseudo-literals
+    TemplateHead = 16,
+    TemplateMiddle = 17,
+    TemplateTail = 18,
+    // Punctuation
+    OpenBraceToken = 19,
+    CloseBraceToken = 20,
+    OpenParenToken = 21,
+    CloseParenToken = 22,
+    OpenBracketToken = 23,
+    CloseBracketToken = 24,
+    DotToken = 25,
+    DotDotDotToken = 26,
+    SemicolonToken = 27,
+    CommaToken = 28,
+    QuestionDotToken = 29,
+    LessThanToken = 30,
+    LessThanSlashToken = 31,
+    GreaterThanToken = 32,
+    LessThanEqualsToken = 33,
+    GreaterThanEqualsToken = 34,
+    EqualsEqualsToken = 35,
+    ExclamationEqualsToken = 36,
+    EqualsEqualsEqualsToken = 37,
+    ExclamationEqualsEqualsToken = 38,
+    EqualsGreaterThanToken = 39,
+    PlusToken = 40,
+    MinusToken = 41,
+    AsteriskToken = 42,
+    AsteriskAsteriskToken = 43,
+    SlashToken = 44,
+    PercentToken = 45,
+    PlusPlusToken = 46,
+    MinusMinusToken = 47,
+    LessThanLessThanToken = 48,
+    GreaterThanGreaterThanToken = 49,
+    GreaterThanGreaterThanGreaterThanToken = 50,
+    AmpersandToken = 51,
+    BarToken = 52,
+    CaretToken = 53,
+    ExclamationToken = 54,
+    TildeToken = 55,
+    AmpersandAmpersandToken = 56,
+    BarBarToken = 57,
+    QuestionToken = 58,
+    ColonToken = 59,
+    AtToken = 60,
+    QuestionQuestionToken = 61,
+    BacktickToken = 62,
+    HashToken = 63,
+    // Assignments
+    EqualsToken = 64,
+    PlusEqualsToken = 65,
+    MinusEqualsToken = 66,
+    AsteriskEqualsToken = 67,
+    AsteriskAsteriskEqualsToken = 68,
+    SlashEqualsToken = 69,
+    PercentEqualsToken = 70,
+    LessThanLessThanEqualsToken = 71,
+    GreaterThanGreaterThanEqualsToken = 72,
+    GreaterThanGreaterThanGreaterThanEqualsToken = 73,
+    AmpersandEqualsToken = 74,
+    BarEqualsToken = 75,
+    BarBarEqualsToken = 76,
+    AmpersandAmpersandEqualsToken = 77,
+    QuestionQuestionEqualsToken = 78,
+    CaretEqualsToken = 79,
+    // Identifiers
+    Identifier = 80,
+    PrivateIdentifier = 81,
+    JSDocCommentTextToken = 82,
+    // Reserved words (keywords)
+    BreakKeyword = 83,
+    CaseKeyword = 84,
+    CatchKeyword = 85,
+    ClassKeyword = 86,
+    ConstKeyword = 87,
+    ContinueKeyword = 88,
+    DebuggerKeyword = 89,
+    DefaultKeyword = 90,
+    DeleteKeyword = 91,
+    DoKeyword = 92,
+    ElseKeyword = 93,
+    EnumKeyword = 94,
+    ExportKeyword = 95,
+    ExtendsKeyword = 96,
+    FalseKeyword = 97,
+    FinallyKeyword = 98,
+    ForKeyword = 99,
+    FunctionKeyword = 100,
+    IfKeyword = 101,
+    ImportKeyword = 102,
+    InKeyword = 103,
+    InstanceOfKeyword = 104,
+    NewKeyword = 105,
+    NullKeyword = 106,
+    ReturnKeyword = 107,
+    SuperKeyword = 108,
+    SwitchKeyword = 109,
+    ThisKeyword = 110,
+    ThrowKeyword = 111,
+    TrueKeyword = 112,
+    TryKeyword = 113,
+    TypeOfKeyword = 114,
+    VarKeyword = 115,
+    VoidKeyword = 116,
+    WhileKeyword = 117,
+    WithKeyword = 118,
+    // Strict mode reserved words
+    ImplementsKeyword = 119,
+    InterfaceKeyword = 120,
+    LetKeyword = 121,
+    PackageKeyword = 122,
+    PrivateKeyword = 123,
+    ProtectedKeyword = 124,
+    PublicKeyword = 125,
+    StaticKeyword = 126,
+    YieldKeyword = 127,
+    // Contextual keywords
+    AbstractKeyword = 128,
+    AccessorKeyword = 129,
+    AsKeyword = 130,
+    AssertsKeyword = 131,
+    AssertKeyword = 132,
+    AnyKeyword = 133,
+    AsyncKeyword = 134,
+    AwaitKeyword = 135,
+    BooleanKeyword = 136,
+    ConstructorKeyword = 137,
+    DeclareKeyword = 138,
+    GetKeyword = 139,
+    InferKeyword = 140,
+    IntrinsicKeyword = 141,
+    IsKeyword = 142,
+    KeyOfKeyword = 143,
+    ModuleKeyword = 144,
+    NamespaceKeyword = 145,
+    NeverKeyword = 146,
+    OutKeyword = 147,
+    ReadonlyKeyword = 148,
+    RequireKeyword = 149,
+    NumberKeyword = 150,
+    ObjectKeyword = 151,
+    SatisfiesKeyword = 152,
+    SetKeyword = 153,
+    StringKeyword = 154,
+    SymbolKeyword = 155,
+    TypeKeyword = 156,
+    UndefinedKeyword = 157,
+    UniqueKeyword = 158,
+    UnknownKeyword = 159,
+    UsingKeyword = 160,
+    FromKeyword = 161,
+    GlobalKeyword = 162,
+    BigIntKeyword = 163,
+    OverrideKeyword = 164,
+    OfKeyword = 165,
+    DeferKeyword = 166, // LastKeyword and LastToken
+}
+
+// =============================================================================
+// SyntaxKind Constants
+// =============================================================================
+
+impl SyntaxKind {
+    pub const FIRST_TOKEN: SyntaxKind = SyntaxKind::Unknown;
+    pub const LAST_TOKEN: SyntaxKind = SyntaxKind::DeferKeyword;
+    pub const FIRST_KEYWORD: SyntaxKind = SyntaxKind::BreakKeyword;
+    pub const LAST_KEYWORD: SyntaxKind = SyntaxKind::DeferKeyword;
+    pub const FIRST_PUNCTUATION: SyntaxKind = SyntaxKind::OpenBraceToken;
+    pub const LAST_PUNCTUATION: SyntaxKind = SyntaxKind::CaretEqualsToken;
+    pub const FIRST_LITERAL_TOKEN: SyntaxKind = SyntaxKind::NumericLiteral;
+    pub const LAST_LITERAL_TOKEN: SyntaxKind = SyntaxKind::NoSubstitutionTemplateLiteral;
+    pub const FIRST_TEMPLATE_TOKEN: SyntaxKind = SyntaxKind::NoSubstitutionTemplateLiteral;
+    pub const LAST_TEMPLATE_TOKEN: SyntaxKind = SyntaxKind::TemplateTail;
+    pub const FIRST_RESERVED_WORD: SyntaxKind = SyntaxKind::BreakKeyword;
+    pub const LAST_RESERVED_WORD: SyntaxKind = SyntaxKind::WithKeyword;
+    pub const FIRST_FUTURE_RESERVED_WORD: SyntaxKind = SyntaxKind::ImplementsKeyword;
+    pub const LAST_FUTURE_RESERVED_WORD: SyntaxKind = SyntaxKind::YieldKeyword;
+}
+
+// =============================================================================
+// Token Classification Functions
+// =============================================================================
+
+/// Check if a token is a keyword.
+#[wasm_bindgen(js_name = tokenIsKeyword)]
+pub fn token_is_keyword(token: SyntaxKind) -> bool {
+    let t = token as u16;
+    t >= SyntaxKind::BreakKeyword as u16 && t <= SyntaxKind::DeferKeyword as u16
+}
+
+/// Check if a token is an identifier or keyword.
+#[wasm_bindgen(js_name = tokenIsIdentifierOrKeyword)]
+pub fn token_is_identifier_or_keyword(token: SyntaxKind) -> bool {
+    token as u16 >= SyntaxKind::Identifier as u16
+}
+
+/// Check if a token is a reserved word (strict reserved words).
+#[wasm_bindgen(js_name = tokenIsReservedWord)]
+pub fn token_is_reserved_word(token: SyntaxKind) -> bool {
+    let t = token as u16;
+    t >= SyntaxKind::BreakKeyword as u16 && t <= SyntaxKind::WithKeyword as u16
+}
+
+/// Check if a token is a strict mode reserved word.
+#[wasm_bindgen(js_name = tokenIsStrictModeReservedWord)]
+pub fn token_is_strict_mode_reserved_word(token: SyntaxKind) -> bool {
+    let t = token as u16;
+    t >= SyntaxKind::ImplementsKeyword as u16 && t <= SyntaxKind::YieldKeyword as u16
+}
+
+/// Check if a token is a literal (number, string, etc.).
+#[wasm_bindgen(js_name = tokenIsLiteral)]
+pub fn token_is_literal(token: SyntaxKind) -> bool {
+    let t = token as u16;
+    t >= SyntaxKind::NumericLiteral as u16 && t <= SyntaxKind::NoSubstitutionTemplateLiteral as u16
+}
+
+/// Check if a token is a template literal token.
+#[wasm_bindgen(js_name = tokenIsTemplateLiteral)]
+pub fn token_is_template_literal(token: SyntaxKind) -> bool {
+    let t = token as u16;
+    t >= SyntaxKind::NoSubstitutionTemplateLiteral as u16
+        && t <= SyntaxKind::TemplateTail as u16
+}
+
+/// Check if a token is punctuation.
+#[wasm_bindgen(js_name = tokenIsPunctuation)]
+pub fn token_is_punctuation(token: SyntaxKind) -> bool {
+    let t = token as u16;
+    t >= SyntaxKind::OpenBraceToken as u16 && t <= SyntaxKind::CaretEqualsToken as u16
+}
+
+/// Check if a token is an assignment operator.
+#[wasm_bindgen(js_name = tokenIsAssignmentOperator)]
+pub fn token_is_assignment_operator(token: SyntaxKind) -> bool {
+    let t = token as u16;
+    t >= SyntaxKind::EqualsToken as u16 && t <= SyntaxKind::CaretEqualsToken as u16
+}
+
+/// Check if a token is trivia (whitespace, comments).
+#[wasm_bindgen(js_name = tokenIsTrivia)]
+pub fn token_is_trivia(token: SyntaxKind) -> bool {
+    let t = token as u16;
+    t >= SyntaxKind::SingleLineCommentTrivia as u16
+        && t <= SyntaxKind::NonTextFileMarkerTrivia as u16
+}
+
+// =============================================================================
+// Keyword Text Mapping
+// =============================================================================
+
+/// Get the text representation of a keyword token.
+#[wasm_bindgen(js_name = keywordToText)]
+pub fn keyword_to_text(token: SyntaxKind) -> Option<String> {
+    match token {
+        SyntaxKind::BreakKeyword => Some("break".into()),
+        SyntaxKind::CaseKeyword => Some("case".into()),
+        SyntaxKind::CatchKeyword => Some("catch".into()),
+        SyntaxKind::ClassKeyword => Some("class".into()),
+        SyntaxKind::ConstKeyword => Some("const".into()),
+        SyntaxKind::ContinueKeyword => Some("continue".into()),
+        SyntaxKind::DebuggerKeyword => Some("debugger".into()),
+        SyntaxKind::DefaultKeyword => Some("default".into()),
+        SyntaxKind::DeleteKeyword => Some("delete".into()),
+        SyntaxKind::DoKeyword => Some("do".into()),
+        SyntaxKind::ElseKeyword => Some("else".into()),
+        SyntaxKind::EnumKeyword => Some("enum".into()),
+        SyntaxKind::ExportKeyword => Some("export".into()),
+        SyntaxKind::ExtendsKeyword => Some("extends".into()),
+        SyntaxKind::FalseKeyword => Some("false".into()),
+        SyntaxKind::FinallyKeyword => Some("finally".into()),
+        SyntaxKind::ForKeyword => Some("for".into()),
+        SyntaxKind::FunctionKeyword => Some("function".into()),
+        SyntaxKind::IfKeyword => Some("if".into()),
+        SyntaxKind::ImportKeyword => Some("import".into()),
+        SyntaxKind::InKeyword => Some("in".into()),
+        SyntaxKind::InstanceOfKeyword => Some("instanceof".into()),
+        SyntaxKind::NewKeyword => Some("new".into()),
+        SyntaxKind::NullKeyword => Some("null".into()),
+        SyntaxKind::ReturnKeyword => Some("return".into()),
+        SyntaxKind::SuperKeyword => Some("super".into()),
+        SyntaxKind::SwitchKeyword => Some("switch".into()),
+        SyntaxKind::ThisKeyword => Some("this".into()),
+        SyntaxKind::ThrowKeyword => Some("throw".into()),
+        SyntaxKind::TrueKeyword => Some("true".into()),
+        SyntaxKind::TryKeyword => Some("try".into()),
+        SyntaxKind::TypeOfKeyword => Some("typeof".into()),
+        SyntaxKind::VarKeyword => Some("var".into()),
+        SyntaxKind::VoidKeyword => Some("void".into()),
+        SyntaxKind::WhileKeyword => Some("while".into()),
+        SyntaxKind::WithKeyword => Some("with".into()),
+        // Strict mode reserved words
+        SyntaxKind::ImplementsKeyword => Some("implements".into()),
+        SyntaxKind::InterfaceKeyword => Some("interface".into()),
+        SyntaxKind::LetKeyword => Some("let".into()),
+        SyntaxKind::PackageKeyword => Some("package".into()),
+        SyntaxKind::PrivateKeyword => Some("private".into()),
+        SyntaxKind::ProtectedKeyword => Some("protected".into()),
+        SyntaxKind::PublicKeyword => Some("public".into()),
+        SyntaxKind::StaticKeyword => Some("static".into()),
+        SyntaxKind::YieldKeyword => Some("yield".into()),
+        // Contextual keywords
+        SyntaxKind::AbstractKeyword => Some("abstract".into()),
+        SyntaxKind::AccessorKeyword => Some("accessor".into()),
+        SyntaxKind::AsKeyword => Some("as".into()),
+        SyntaxKind::AssertsKeyword => Some("asserts".into()),
+        SyntaxKind::AssertKeyword => Some("assert".into()),
+        SyntaxKind::AnyKeyword => Some("any".into()),
+        SyntaxKind::AsyncKeyword => Some("async".into()),
+        SyntaxKind::AwaitKeyword => Some("await".into()),
+        SyntaxKind::BooleanKeyword => Some("boolean".into()),
+        SyntaxKind::ConstructorKeyword => Some("constructor".into()),
+        SyntaxKind::DeclareKeyword => Some("declare".into()),
+        SyntaxKind::GetKeyword => Some("get".into()),
+        SyntaxKind::InferKeyword => Some("infer".into()),
+        SyntaxKind::IntrinsicKeyword => Some("intrinsic".into()),
+        SyntaxKind::IsKeyword => Some("is".into()),
+        SyntaxKind::KeyOfKeyword => Some("keyof".into()),
+        SyntaxKind::ModuleKeyword => Some("module".into()),
+        SyntaxKind::NamespaceKeyword => Some("namespace".into()),
+        SyntaxKind::NeverKeyword => Some("never".into()),
+        SyntaxKind::OutKeyword => Some("out".into()),
+        SyntaxKind::ReadonlyKeyword => Some("readonly".into()),
+        SyntaxKind::RequireKeyword => Some("require".into()),
+        SyntaxKind::NumberKeyword => Some("number".into()),
+        SyntaxKind::ObjectKeyword => Some("object".into()),
+        SyntaxKind::SatisfiesKeyword => Some("satisfies".into()),
+        SyntaxKind::SetKeyword => Some("set".into()),
+        SyntaxKind::StringKeyword => Some("string".into()),
+        SyntaxKind::SymbolKeyword => Some("symbol".into()),
+        SyntaxKind::TypeKeyword => Some("type".into()),
+        SyntaxKind::UndefinedKeyword => Some("undefined".into()),
+        SyntaxKind::UniqueKeyword => Some("unique".into()),
+        SyntaxKind::UnknownKeyword => Some("unknown".into()),
+        SyntaxKind::UsingKeyword => Some("using".into()),
+        SyntaxKind::FromKeyword => Some("from".into()),
+        SyntaxKind::GlobalKeyword => Some("global".into()),
+        SyntaxKind::BigIntKeyword => Some("bigint".into()),
+        SyntaxKind::OverrideKeyword => Some("override".into()),
+        SyntaxKind::OfKeyword => Some("of".into()),
+        SyntaxKind::DeferKeyword => Some("defer".into()),
+        _ => None,
+    }
+}
+
+/// Get the text representation of a punctuation token.
+#[wasm_bindgen(js_name = punctuationToText)]
+pub fn punctuation_to_text(token: SyntaxKind) -> Option<String> {
+    match token {
+        SyntaxKind::OpenBraceToken => Some("{".into()),
+        SyntaxKind::CloseBraceToken => Some("}".into()),
+        SyntaxKind::OpenParenToken => Some("(".into()),
+        SyntaxKind::CloseParenToken => Some(")".into()),
+        SyntaxKind::OpenBracketToken => Some("[".into()),
+        SyntaxKind::CloseBracketToken => Some("]".into()),
+        SyntaxKind::DotToken => Some(".".into()),
+        SyntaxKind::DotDotDotToken => Some("...".into()),
+        SyntaxKind::SemicolonToken => Some(";".into()),
+        SyntaxKind::CommaToken => Some(",".into()),
+        SyntaxKind::QuestionDotToken => Some("?.".into()),
+        SyntaxKind::LessThanToken => Some("<".into()),
+        SyntaxKind::LessThanSlashToken => Some("</".into()),
+        SyntaxKind::GreaterThanToken => Some(">".into()),
+        SyntaxKind::LessThanEqualsToken => Some("<=".into()),
+        SyntaxKind::GreaterThanEqualsToken => Some(">=".into()),
+        SyntaxKind::EqualsEqualsToken => Some("==".into()),
+        SyntaxKind::ExclamationEqualsToken => Some("!=".into()),
+        SyntaxKind::EqualsEqualsEqualsToken => Some("===".into()),
+        SyntaxKind::ExclamationEqualsEqualsToken => Some("!==".into()),
+        SyntaxKind::EqualsGreaterThanToken => Some("=>".into()),
+        SyntaxKind::PlusToken => Some("+".into()),
+        SyntaxKind::MinusToken => Some("-".into()),
+        SyntaxKind::AsteriskToken => Some("*".into()),
+        SyntaxKind::AsteriskAsteriskToken => Some("**".into()),
+        SyntaxKind::SlashToken => Some("/".into()),
+        SyntaxKind::PercentToken => Some("%".into()),
+        SyntaxKind::PlusPlusToken => Some("++".into()),
+        SyntaxKind::MinusMinusToken => Some("--".into()),
+        SyntaxKind::LessThanLessThanToken => Some("<<".into()),
+        SyntaxKind::GreaterThanGreaterThanToken => Some(">>".into()),
+        SyntaxKind::GreaterThanGreaterThanGreaterThanToken => Some(">>>".into()),
+        SyntaxKind::AmpersandToken => Some("&".into()),
+        SyntaxKind::BarToken => Some("|".into()),
+        SyntaxKind::CaretToken => Some("^".into()),
+        SyntaxKind::ExclamationToken => Some("!".into()),
+        SyntaxKind::TildeToken => Some("~".into()),
+        SyntaxKind::AmpersandAmpersandToken => Some("&&".into()),
+        SyntaxKind::BarBarToken => Some("||".into()),
+        SyntaxKind::QuestionToken => Some("?".into()),
+        SyntaxKind::ColonToken => Some(":".into()),
+        SyntaxKind::AtToken => Some("@".into()),
+        SyntaxKind::QuestionQuestionToken => Some("??".into()),
+        SyntaxKind::BacktickToken => Some("`".into()),
+        SyntaxKind::HashToken => Some("#".into()),
+        // Assignment operators
+        SyntaxKind::EqualsToken => Some("=".into()),
+        SyntaxKind::PlusEqualsToken => Some("+=".into()),
+        SyntaxKind::MinusEqualsToken => Some("-=".into()),
+        SyntaxKind::AsteriskEqualsToken => Some("*=".into()),
+        SyntaxKind::AsteriskAsteriskEqualsToken => Some("**=".into()),
+        SyntaxKind::SlashEqualsToken => Some("/=".into()),
+        SyntaxKind::PercentEqualsToken => Some("%=".into()),
+        SyntaxKind::LessThanLessThanEqualsToken => Some("<<=".into()),
+        SyntaxKind::GreaterThanGreaterThanEqualsToken => Some(">>=".into()),
+        SyntaxKind::GreaterThanGreaterThanGreaterThanEqualsToken => Some(">>>=".into()),
+        SyntaxKind::AmpersandEqualsToken => Some("&=".into()),
+        SyntaxKind::BarEqualsToken => Some("|=".into()),
+        SyntaxKind::BarBarEqualsToken => Some("||=".into()),
+        SyntaxKind::AmpersandAmpersandEqualsToken => Some("&&=".into()),
+        SyntaxKind::QuestionQuestionEqualsToken => Some("??=".into()),
+        SyntaxKind::CaretEqualsToken => Some("^=".into()),
+        _ => None,
+    }
+}
+
+// =============================================================================
+// Unit Tests
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_token_is_keyword() {
+        assert!(token_is_keyword(SyntaxKind::BreakKeyword));
+        assert!(token_is_keyword(SyntaxKind::ConstKeyword));
+        assert!(token_is_keyword(SyntaxKind::DeferKeyword));
+        assert!(!token_is_keyword(SyntaxKind::Identifier));
+        assert!(!token_is_keyword(SyntaxKind::OpenBraceToken));
+    }
+
+    #[test]
+    fn test_token_is_identifier_or_keyword() {
+        assert!(token_is_identifier_or_keyword(SyntaxKind::Identifier));
+        assert!(token_is_identifier_or_keyword(SyntaxKind::BreakKeyword));
+        assert!(!token_is_identifier_or_keyword(SyntaxKind::OpenBraceToken));
+    }
+
+    #[test]
+    fn test_token_is_punctuation() {
+        assert!(token_is_punctuation(SyntaxKind::OpenBraceToken));
+        assert!(token_is_punctuation(SyntaxKind::EqualsToken));
+        assert!(!token_is_punctuation(SyntaxKind::Identifier));
+    }
+
+    #[test]
+    fn test_token_is_assignment_operator() {
+        assert!(token_is_assignment_operator(SyntaxKind::EqualsToken));
+        assert!(token_is_assignment_operator(SyntaxKind::PlusEqualsToken));
+        assert!(!token_is_assignment_operator(SyntaxKind::PlusToken));
+    }
+
+    #[test]
+    fn test_keyword_to_text() {
+        assert_eq!(keyword_to_text(SyntaxKind::BreakKeyword), Some("break".into()));
+        assert_eq!(keyword_to_text(SyntaxKind::ConstKeyword), Some("const".into()));
+        assert_eq!(keyword_to_text(SyntaxKind::AsyncKeyword), Some("async".into()));
+        assert_eq!(keyword_to_text(SyntaxKind::Identifier), None);
+    }
+
+    #[test]
+    fn test_punctuation_to_text() {
+        assert_eq!(punctuation_to_text(SyntaxKind::OpenBraceToken), Some("{".into()));
+        assert_eq!(punctuation_to_text(SyntaxKind::EqualsEqualsEqualsToken), Some("===".into()));
+        assert_eq!(punctuation_to_text(SyntaxKind::EqualsGreaterThanToken), Some("=>".into()));
+        assert_eq!(punctuation_to_text(SyntaxKind::Identifier), None);
+    }
+
+    #[test]
+    fn test_syntax_kind_values() {
+        // Verify some key values match TypeScript
+        assert_eq!(SyntaxKind::Unknown as u16, 0);
+        assert_eq!(SyntaxKind::EndOfFileToken as u16, 1);
+        assert_eq!(SyntaxKind::Identifier as u16, 80);
+        assert_eq!(SyntaxKind::BreakKeyword as u16, 83);
+    }
+}

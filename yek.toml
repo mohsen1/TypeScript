@@ -1,0 +1,35 @@
+# yek configuration for TypeScript compiler core analysis
+# Estimated output: ~500-700k tokens
+
+[input]
+paths = [
+  "src/compiler/types.ts",           # Type definitions (10k lines)
+  "src/compiler/scanner.ts",         # Lexer (4k lines)
+  "src/compiler/parser.ts",          # Parser (11k lines)
+  "src/compiler/binder.ts",          # Binding phase (4k lines)
+  "src/compiler/checker.ts",         # Type checker (54k lines - biggest!)
+  "src/compiler/emitter.ts",         # Code emitter (6k lines)
+  "src/compiler/utilities.ts",       # Internal utilities (12k lines)
+  "src/compiler/utilitiesPublic.ts", # Public utilities (3k lines)
+  "src/compiler/core.ts",            # Core helpers (3k lines)
+  "src/compiler/corePublic.ts",      # Public core (small)
+  "src/compiler/program.ts",         # Program API (5k lines)
+  "src/compiler/factory/nodeFactory.ts", # AST node creation (7.5k lines)
+  "src/compiler/transformer.ts",     # Transform orchestration
+  "wasm/",                           # Your Rust/Wasm code
+  "MIGRATION_PLAN.md",
+]
+
+# Alternative: use ignore patterns instead of explicit paths
+# [ignore]
+# patterns = [
+#   "src/loc/**",
+#   "src/testRunner/**",
+#   "src/harness/**",
+#   "src/lib/**",
+#   "src/services/**",
+#   "src/server/**",
+#   "**/node_modules/**",
+#   "**/*.lcl",
+#   "**/tests/**",
+# ]

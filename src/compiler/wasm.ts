@@ -43,6 +43,19 @@ export interface WasmModule {
     isHexDigit(ch: number): boolean;
     isASCIILetter(ch: number): boolean;
     isWordCharacter(ch: number): boolean;
+
+    // Scanner types (Phase 2)
+    tokenIsKeyword(token: number): boolean;
+    tokenIsIdentifierOrKeyword(token: number): boolean;
+    tokenIsReservedWord(token: number): boolean;
+    tokenIsStrictModeReservedWord(token: number): boolean;
+    tokenIsLiteral(token: number): boolean;
+    tokenIsTemplateLiteral(token: number): boolean;
+    tokenIsPunctuation(token: number): boolean;
+    tokenIsAssignmentOperator(token: number): boolean;
+    tokenIsTrivia(token: number): boolean;
+    keywordToText(token: number): string | undefined;
+    punctuationToText(token: number): string | undefined;
 }
 
 // =============================================================================
@@ -309,4 +322,107 @@ export function wasmIsASCIILetter(ch: number): boolean | undefined {
 export function wasmIsWordCharacter(ch: number): boolean | undefined {
     const wasm = getWasm();
     return wasm?.isWordCharacter(ch);
+}
+
+// =============================================================================
+// Scanner Types (Phase 2)
+// =============================================================================
+
+/**
+ * Check if a token is a keyword (Rust implementation).
+ * @internal
+ */
+export function wasmTokenIsKeyword(token: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.tokenIsKeyword(token);
+}
+
+/**
+ * Check if a token is an identifier or keyword (Rust implementation).
+ * @internal
+ */
+export function wasmTokenIsIdentifierOrKeyword(token: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.tokenIsIdentifierOrKeyword(token);
+}
+
+/**
+ * Check if a token is a reserved word (Rust implementation).
+ * @internal
+ */
+export function wasmTokenIsReservedWord(token: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.tokenIsReservedWord(token);
+}
+
+/**
+ * Check if a token is a strict mode reserved word (Rust implementation).
+ * @internal
+ */
+export function wasmTokenIsStrictModeReservedWord(token: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.tokenIsStrictModeReservedWord(token);
+}
+
+/**
+ * Check if a token is a literal (Rust implementation).
+ * @internal
+ */
+export function wasmTokenIsLiteral(token: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.tokenIsLiteral(token);
+}
+
+/**
+ * Check if a token is a template literal (Rust implementation).
+ * @internal
+ */
+export function wasmTokenIsTemplateLiteral(token: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.tokenIsTemplateLiteral(token);
+}
+
+/**
+ * Check if a token is punctuation (Rust implementation).
+ * @internal
+ */
+export function wasmTokenIsPunctuation(token: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.tokenIsPunctuation(token);
+}
+
+/**
+ * Check if a token is an assignment operator (Rust implementation).
+ * @internal
+ */
+export function wasmTokenIsAssignmentOperator(token: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.tokenIsAssignmentOperator(token);
+}
+
+/**
+ * Check if a token is trivia (Rust implementation).
+ * @internal
+ */
+export function wasmTokenIsTrivia(token: number): boolean | undefined {
+    const wasm = getWasm();
+    return wasm?.tokenIsTrivia(token);
+}
+
+/**
+ * Get the text representation of a keyword token (Rust implementation).
+ * @internal
+ */
+export function wasmKeywordToText(token: number): string | undefined {
+    const wasm = getWasm();
+    return wasm?.keywordToText(token);
+}
+
+/**
+ * Get the text representation of a punctuation token (Rust implementation).
+ * @internal
+ */
+export function wasmPunctuationToText(token: number): string | undefined {
+    const wasm = getWasm();
+    return wasm?.punctuationToText(token);
 }

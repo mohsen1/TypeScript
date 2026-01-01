@@ -1,5 +1,9 @@
 use wasm_bindgen::prelude::*;
 
+// Scanner types and token definitions
+pub mod scanner;
+pub use scanner::*;
+
 // =============================================================================
 // Comparison enum - matches TypeScript's Comparison const enum
 // =============================================================================

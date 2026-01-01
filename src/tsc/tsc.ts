@@ -27,6 +27,16 @@ if (isDigitResult !== undefined) {
     ts.sys.write(`[WASM] isDigit('5') = ${isDigitResult}${ts.sys.newLine}`);
 }
 
+// WASM scanner types verification (Phase 2)
+const isKeywordResult = ts.wasmTokenIsKeyword(ts.SyntaxKind.ConstKeyword);
+if (isKeywordResult !== undefined) {
+    ts.sys.write(`[WASM] tokenIsKeyword(ConstKeyword) = ${isKeywordResult}${ts.sys.newLine}`);
+}
+const keywordText = ts.wasmKeywordToText(ts.SyntaxKind.AsyncKeyword);
+if (keywordText !== undefined) {
+    ts.sys.write(`[WASM] keywordToText(AsyncKeyword) = "${keywordText}"${ts.sys.newLine}`);
+}
+
 // enable deprecation logging
 ts.Debug.loggingHost = {
     log(_level, s) {
