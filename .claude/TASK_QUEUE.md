@@ -94,12 +94,16 @@ All Phase 4 tasks finished:
   - Type arguments via TypeReference handling
   - Type instantiation with mapper
 
-### Priority: Medium
+### In Progress (Phase 5.5)
 
-- [ ] **Object type checking**
-  - Property access
-  - Method signatures
-  - Index signatures
+- [x] **Object type checking**
+  - Property access via get_property_type
+  - Object literals infer properties
+  - Type literals with members
+  - Interface member resolution
+  - Method signatures as function types
+
+### Priority: Medium
 
 - [ ] **Type narrowing**
   - Type guards (typeof, instanceof)
@@ -111,9 +115,9 @@ All Phase 4 tasks finished:
 
 ## Notes
 
-- Phase 5.1-5.4 completed 2026-01-01
-- 149 Rust tests passing
-- CheckerState with type inference, assignability, function types, and generics working
+- Phase 5.1-5.5 completed 2026-01-01
+- 152 Rust tests passing
+- CheckerState with type inference, assignability, function types, generics, and object types
 - Parser now handles assignment expressions and unary operators (typeof, void, delete, await)
 - Binder flow analysis infrastructure for if/while statements
 - Explored typescript-go for architectural patterns (documented in TYPE_CHECKER_MINDMAP.md)

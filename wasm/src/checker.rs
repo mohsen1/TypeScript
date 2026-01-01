@@ -3450,4 +3450,111 @@ mod tests {
             let _ = checker.get_type_of_symbol(symbol);
         }
     }
+
+    #[test]
+    fn test_object_literal_type() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"const obj = { x: 1, y: "hello" };"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("obj"));
+        if let Some(symbol) = binder.file_locals.get("obj") {
+            let obj_type = checker.get_type_of_symbol(symbol);
+
+            // Should be an object type
+            if let Some(Type::Object(obj)) = checker.types.get(obj_type) {
+                assert_eq!(obj.properties.len(), 2, "Expected 2 properties");
+            } else {
+                panic!("Expected Object type for object literal");
+            }
+        }
+    }
+
+    #[test]
+    fn test_type_literal_members() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "type Point = { x: number; y: number };".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("Point"));
+        if let Some(symbol) = binder.file_locals.get("Point") {
+            let point_type = checker.get_type_of_symbol(symbol);
+
+            // Should be an object type
+            if let Some(Type::Object(obj)) = checker.types.get(point_type) {
+                assert_eq!(obj.properties.len(), 2, "Expected 2 properties for Point");
+            } else {
+                panic!("Expected Object type for type literal");
+            }
+        }
+    }
+
+    #[test]
+    fn test_interface_members() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"interface Person {
+                name: string;
+                age: number;
+                greet(): void;
+            }"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("Person"));
+        if let Some(symbol) = binder.file_locals.get("Person") {
+            let person_type = checker.get_type_of_symbol(symbol);
+
+            // Should be an interface object type
+            if let Some(Type::Object(obj)) = checker.types.get(person_type) {
+                assert!(obj.has_object_flags(object_flags::INTERFACE), "Expected INTERFACE object flag");
+                assert_eq!(obj.properties.len(), 3, "Expected 3 properties (name, age, greet)");
+            } else {
+                panic!("Expected Object type for interface");
+            }
+        }
+    }
 }
