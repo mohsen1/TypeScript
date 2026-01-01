@@ -241,17 +241,22 @@ impl SymbolArena {
 // Binder State
 // =============================================================================
 
+use wasm_bindgen::prelude::*;
 use crate::parser::{Node, NodeArena};
 
 /// Binder state for walking the AST and creating symbols.
+#[wasm_bindgen]
 pub struct BinderState {
     /// Arena for allocating symbols
+    #[wasm_bindgen(skip)]
     pub symbols: SymbolArena,
     /// Current container's symbol table (locals)
+    #[wasm_bindgen(skip)]
     pub current_scope: SymbolTable,
     /// Stack of scopes for nested blocks
     scope_stack: Vec<SymbolTable>,
     /// File-level symbol table
+    #[wasm_bindgen(skip)]
     pub file_locals: SymbolTable,
 }
 
@@ -668,6 +673,54 @@ impl BinderState {
 impl Default for BinderState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+// =============================================================================
+// WASM Methods
+// =============================================================================
+
+#[wasm_bindgen]
+impl BinderState {
+    /// Create a new binder state.
+    #[wasm_bindgen(constructor)]
+    pub fn create() -> Self {
+        Self::new()
+    }
+
+    /// Get the number of symbols created.
+    #[wasm_bindgen(js_name = getSymbolCount)]
+    pub fn get_symbol_count(&self) -> u32 {
+        self.symbols.len() as u32
+    }
+
+    /// Get file locals as JSON string.
+    #[wasm_bindgen(js_name = getFileLocalsJson)]
+    pub fn get_file_locals_json(&self) -> String {
+        serde_json::to_string(&self.file_locals).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// Get all symbols as JSON string.
+    #[wasm_bindgen(js_name = getSymbolsJson)]
+    pub fn get_symbols_json(&self) -> String {
+        serde_json::to_string(&self.symbols).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Get a symbol by name from file locals.
+    #[wasm_bindgen(js_name = getSymbolByName)]
+    pub fn get_symbol_by_name(&self, name: &str) -> Option<String> {
+        if let Some(id) = self.file_locals.get(name) {
+            if let Some(sym) = self.symbols.get(id) {
+                return serde_json::to_string(sym).ok();
+            }
+        }
+        None
+    }
+
+    /// Check if a name exists in file locals.
+    #[wasm_bindgen(js_name = hasSymbol)]
+    pub fn has_symbol(&self, name: &str) -> bool {
+        self.file_locals.has(name)
     }
 }
 

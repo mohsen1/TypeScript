@@ -43,6 +43,17 @@ pub fn create_parser(file_name: String, source_text: String) -> parser_impl::Par
 }
 
 // =============================================================================
+// Binder Factory Function
+// =============================================================================
+
+/// Create a new binder for binding AST nodes to symbols.
+/// This is the wasm-bindgen entry point for creating binders from JavaScript.
+#[wasm_bindgen(js_name = createBinder)]
+pub fn create_binder() -> binder::BinderState {
+    binder::BinderState::new()
+}
+
+// =============================================================================
 // Comparison enum - matches TypeScript's Comparison const enum
 // =============================================================================
 
