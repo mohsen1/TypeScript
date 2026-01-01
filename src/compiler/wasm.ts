@@ -535,6 +535,10 @@ interface WasmParserStateInstance {
     getIdentifiers(): string[];
     /** Get parse diagnostics as JSON */
     getDiagnosticsJson(): string;
+    /** Bind the source file and return file-level symbols as JSON */
+    bindSourceFile(rootIdx: number): string;
+    /** Get full binding result including all symbols as JSON */
+    getBindingResult(rootIdx: number): string;
     /** Free the parser resources */
     free(): void;
 }
@@ -555,3 +559,45 @@ export function wasmCreateParser(fileName: string, sourceText: string): WasmPars
  * @internal
  */
 export type WasmParser = WasmParserStateInstance;
+
+// =============================================================================
+// Binder Types (Phase 4)
+// =============================================================================
+
+/** @internal */
+interface WasmBinderStateClass {
+    new(): WasmBinderStateInstance;
+}
+
+/** @internal */
+interface WasmBinderStateInstance {
+    /** Get the number of symbols created */
+    getSymbolCount(): number;
+    /** Get file locals as JSON string */
+    getFileLocalsJson(): string;
+    /** Get all symbols as JSON string */
+    getSymbolsJson(): string;
+    /** Get a symbol by name from file locals (returns JSON or undefined) */
+    getSymbolByName(name: string): string | undefined;
+    /** Check if a name exists in file locals */
+    hasSymbol(name: string): boolean;
+    /** Free the binder resources */
+    free(): void;
+}
+
+/**
+ * Create a new Rust binder instance.
+ * Returns undefined if wasm is unavailable.
+ * @internal
+ */
+export function wasmCreateBinder(): WasmBinderStateInstance | undefined {
+    const wasm = getWasm();
+    if (!wasm) return undefined;
+    return (wasm as any).createBinder?.();
+}
+
+/**
+ * Type alias for the Rust binder instance.
+ * @internal
+ */
+export type WasmBinder = WasmBinderStateInstance;

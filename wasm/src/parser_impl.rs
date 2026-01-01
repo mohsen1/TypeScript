@@ -168,6 +168,34 @@ impl ParserState {
         }).collect();
         format!("[{}]", diagnostics.join(","))
     }
+
+    /// Bind the source file and return symbols as JSON.
+    /// This runs the binder on the parsed AST and returns the file-level symbols.
+    #[wasm_bindgen(js_name = bindSourceFile)]
+    pub fn bind_source_file(&mut self, root_idx: u32) -> String {
+        use crate::binder::BinderState;
+        let idx = NodeIndex(root_idx);
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&self.arena, idx);
+        serde_json::to_string(&binder.file_locals).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// Get full binding result including all symbols as JSON.
+    #[wasm_bindgen(js_name = getBindingResult)]
+    pub fn get_binding_result(&mut self, root_idx: u32) -> String {
+        use crate::binder::BinderState;
+        let idx = NodeIndex(root_idx);
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&self.arena, idx);
+
+        // Return both file_locals and symbols
+        let result = serde_json::json!({
+            "fileLocals": binder.file_locals,
+            "symbols": binder.symbols,
+            "symbolCount": binder.symbols.len()
+        });
+        serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
+    }
 }
 
 // =============================================================================
