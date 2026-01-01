@@ -238,6 +238,351 @@ impl SymbolArena {
 }
 
 // =============================================================================
+// Binder State
+// =============================================================================
+
+use crate::parser::{Node, NodeArena};
+
+/// Binder state for walking the AST and creating symbols.
+pub struct BinderState {
+    /// Arena for allocating symbols
+    pub symbols: SymbolArena,
+    /// Current container's symbol table (locals)
+    pub current_scope: SymbolTable,
+    /// Stack of scopes for nested blocks
+    scope_stack: Vec<SymbolTable>,
+    /// File-level symbol table
+    pub file_locals: SymbolTable,
+}
+
+impl BinderState {
+    pub fn new() -> Self {
+        BinderState {
+            symbols: SymbolArena::new(),
+            current_scope: SymbolTable::new(),
+            scope_stack: Vec::new(),
+            file_locals: SymbolTable::new(),
+        }
+    }
+
+    /// Bind a source file, creating symbols for all declarations.
+    pub fn bind_source_file(&mut self, arena: &NodeArena, root: NodeIndex) {
+        // Start with file scope
+        self.current_scope = SymbolTable::new();
+
+        if let Some(node) = arena.get(root) {
+            if let Node::SourceFile(sf) = node {
+                // Bind each statement
+                for &stmt_idx in &sf.statements.nodes {
+                    self.bind_node(arena, stmt_idx);
+                }
+            }
+        }
+
+        // Store file locals
+        self.file_locals = std::mem::take(&mut self.current_scope);
+    }
+
+    /// Bind a single node, creating symbols as needed.
+    fn bind_node(&mut self, arena: &NodeArena, idx: NodeIndex) {
+        if idx.is_none() {
+            return;
+        }
+
+        let node = match arena.get(idx) {
+            Some(n) => n,
+            None => return,
+        };
+
+        match node {
+            // Variable declarations
+            Node::VariableStatement(stmt) => {
+                self.bind_node(arena, stmt.declaration_list);
+            }
+            Node::VariableDeclarationList(list) => {
+                for &decl_idx in &list.declarations.nodes {
+                    self.bind_node(arena, decl_idx);
+                }
+            }
+            Node::VariableDeclaration(decl) => {
+                self.bind_variable_declaration(arena, decl, idx);
+            }
+
+            // Function declarations
+            Node::FunctionDeclaration(func) => {
+                self.bind_function_declaration(arena, func, idx);
+            }
+
+            // Class declarations
+            Node::ClassDeclaration(class) => {
+                self.bind_class_declaration(arena, class, idx);
+            }
+
+            // Interface declarations
+            Node::InterfaceDeclaration(iface) => {
+                self.bind_interface_declaration(arena, iface, idx);
+            }
+
+            // Type alias declarations
+            Node::TypeAliasDeclaration(alias) => {
+                self.bind_type_alias_declaration(arena, alias, idx);
+            }
+
+            // Enum declarations
+            Node::EnumDeclaration(enum_decl) => {
+                self.bind_enum_declaration(arena, enum_decl, idx);
+            }
+
+            // Block - creates a new scope
+            Node::Block(block) => {
+                self.push_scope();
+                for &stmt_idx in &block.statements.nodes {
+                    self.bind_node(arena, stmt_idx);
+                }
+                self.pop_scope();
+            }
+
+            // Other statements - recurse into children
+            Node::IfStatement(if_stmt) => {
+                self.bind_node(arena, if_stmt.then_statement);
+                if !if_stmt.else_statement.is_none() {
+                    self.bind_node(arena, if_stmt.else_statement);
+                }
+            }
+            Node::WhileStatement(while_stmt) => {
+                self.bind_node(arena, while_stmt.statement);
+            }
+            Node::ForStatement(for_stmt) => {
+                self.push_scope();
+                self.bind_node(arena, for_stmt.initializer);
+                self.bind_node(arena, for_stmt.statement);
+                self.pop_scope();
+            }
+
+            // Import declarations
+            Node::ImportDeclaration(import) => {
+                self.bind_import_declaration(arena, import, idx);
+            }
+
+            // Export declarations
+            Node::ExportDeclaration(_export) => {
+                // Export declarations don't create new symbols,
+                // they reference existing ones
+            }
+
+            _ => {
+                // For other node types, no symbols to create
+            }
+        }
+    }
+
+    /// Push a new scope onto the scope stack.
+    fn push_scope(&mut self) {
+        let old_scope = std::mem::take(&mut self.current_scope);
+        self.scope_stack.push(old_scope);
+        self.current_scope = SymbolTable::new();
+    }
+
+    /// Pop a scope from the stack.
+    fn pop_scope(&mut self) {
+        if let Some(parent_scope) = self.scope_stack.pop() {
+            self.current_scope = parent_scope;
+        }
+    }
+
+    /// Declare a symbol in the current scope.
+    fn declare_symbol(&mut self, name: String, flags: u32, declaration: NodeIndex) -> SymbolId {
+        // Check if symbol already exists
+        if let Some(existing_id) = self.current_scope.get(&name) {
+            // Symbol already exists - could merge or report error
+            // For now, just add the declaration
+            if let Some(sym) = self.symbols.get_mut(existing_id) {
+                sym.declarations.push(declaration);
+            }
+            return existing_id;
+        }
+
+        // Create new symbol
+        let id = self.symbols.alloc(flags, name.clone());
+        if let Some(sym) = self.symbols.get_mut(id) {
+            sym.declarations.push(declaration);
+            if sym.value_declaration.is_none() && (flags & symbol_flags::VALUE) != 0 {
+                sym.value_declaration = declaration;
+            }
+        }
+        self.current_scope.set(name, id);
+        id
+    }
+
+    /// Get the name from an identifier node.
+    fn get_identifier_name(&self, arena: &NodeArena, idx: NodeIndex) -> Option<String> {
+        if let Some(Node::Identifier(id)) = arena.get(idx) {
+            Some(id.escaped_text.clone())
+        } else {
+            None
+        }
+    }
+
+    // =========================================================================
+    // Declaration Binding
+    // =========================================================================
+
+    fn bind_variable_declaration(
+        &mut self,
+        arena: &NodeArena,
+        decl: &crate::parser::VariableDeclaration,
+        decl_idx: NodeIndex,
+    ) {
+        if let Some(name) = self.get_identifier_name(arena, decl.name) {
+            // Determine flags based on parent (let/const vs var)
+            // For simplicity, treat all as block-scoped for now
+            let flags = symbol_flags::BLOCK_SCOPED_VARIABLE;
+            self.declare_symbol(name, flags, decl_idx);
+        }
+    }
+
+    fn bind_function_declaration(
+        &mut self,
+        arena: &NodeArena,
+        func: &crate::parser::FunctionDeclaration,
+        func_idx: NodeIndex,
+    ) {
+        if let Some(name) = self.get_identifier_name(arena, func.name) {
+            self.declare_symbol(name, symbol_flags::FUNCTION, func_idx);
+        }
+
+        // Bind function body in new scope
+        if !func.body.is_none() {
+            self.push_scope();
+            // Bind parameters
+            for &param_idx in &func.parameters.nodes {
+                if let Some(Node::ParameterDeclaration(param)) = arena.get(param_idx) {
+                    if let Some(name) = self.get_identifier_name(arena, param.name) {
+                        self.declare_symbol(name, symbol_flags::FUNCTION_SCOPED_VARIABLE, param_idx);
+                    }
+                }
+            }
+            self.bind_node(arena, func.body);
+            self.pop_scope();
+        }
+    }
+
+    fn bind_class_declaration(
+        &mut self,
+        arena: &NodeArena,
+        class: &crate::parser::ClassDeclaration,
+        class_idx: NodeIndex,
+    ) {
+        if let Some(name) = self.get_identifier_name(arena, class.name) {
+            self.declare_symbol(name, symbol_flags::CLASS, class_idx);
+        }
+
+        // Bind class members in a new scope
+        self.push_scope();
+        for &member_idx in &class.members.nodes {
+            self.bind_class_member(arena, member_idx);
+        }
+        self.pop_scope();
+    }
+
+    fn bind_class_member(&mut self, arena: &NodeArena, idx: NodeIndex) {
+        if let Some(node) = arena.get(idx) {
+            match node {
+                Node::MethodDeclaration(method) => {
+                    if let Some(name) = self.get_identifier_name(arena, method.name) {
+                        self.declare_symbol(name, symbol_flags::METHOD, idx);
+                    }
+                }
+                Node::PropertyDeclaration(prop) => {
+                    if let Some(name) = self.get_identifier_name(arena, prop.name) {
+                        self.declare_symbol(name, symbol_flags::PROPERTY, idx);
+                    }
+                }
+                Node::ConstructorDeclaration(_) => {
+                    self.declare_symbol("constructor".to_string(), symbol_flags::CONSTRUCTOR, idx);
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn bind_interface_declaration(
+        &mut self,
+        arena: &NodeArena,
+        iface: &crate::parser::InterfaceDeclaration,
+        iface_idx: NodeIndex,
+    ) {
+        if let Some(name) = self.get_identifier_name(arena, iface.name) {
+            self.declare_symbol(name, symbol_flags::INTERFACE, iface_idx);
+        }
+    }
+
+    fn bind_type_alias_declaration(
+        &mut self,
+        arena: &NodeArena,
+        alias: &crate::parser::TypeAliasDeclaration,
+        alias_idx: NodeIndex,
+    ) {
+        if let Some(name) = self.get_identifier_name(arena, alias.name) {
+            self.declare_symbol(name, symbol_flags::TYPE_ALIAS, alias_idx);
+        }
+    }
+
+    fn bind_enum_declaration(
+        &mut self,
+        arena: &NodeArena,
+        enum_decl: &crate::parser::EnumDeclaration,
+        enum_idx: NodeIndex,
+    ) {
+        if let Some(name) = self.get_identifier_name(arena, enum_decl.name) {
+            self.declare_symbol(name, symbol_flags::REGULAR_ENUM, enum_idx);
+        }
+
+        // Bind enum members
+        for &member_idx in &enum_decl.members.nodes {
+            if let Some(Node::EnumMember(member)) = arena.get(member_idx) {
+                if let Some(name) = self.get_identifier_name(arena, member.name) {
+                    self.declare_symbol(name, symbol_flags::ENUM_MEMBER, member_idx);
+                }
+            }
+        }
+    }
+
+    fn bind_import_declaration(
+        &mut self,
+        arena: &NodeArena,
+        import: &crate::parser::ImportDeclaration,
+        _import_idx: NodeIndex,
+    ) {
+        if let Some(Node::ImportClause(clause)) = arena.get(import.import_clause) {
+            // Default import
+            if !clause.name.is_none() {
+                if let Some(name) = self.get_identifier_name(arena, clause.name) {
+                    self.declare_symbol(name, symbol_flags::ALIAS, clause.name);
+                }
+            }
+
+            // Named imports
+            if let Some(Node::NamedImports(named)) = arena.get(clause.named_bindings) {
+                for &spec_idx in &named.elements.nodes {
+                    if let Some(Node::ImportSpecifier(spec)) = arena.get(spec_idx) {
+                        if let Some(name) = self.get_identifier_name(arena, spec.name) {
+                            self.declare_symbol(name, symbol_flags::ALIAS, spec_idx);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+impl Default for BinderState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// =============================================================================
 // Tests
 // =============================================================================
 
@@ -307,5 +652,115 @@ mod tests {
         let sym2 = arena.get(id2).unwrap();
         assert_eq!(sym2.escaped_name, "f");
         assert!(sym2.has_flags(symbol_flags::FUNCTION));
+    }
+
+    #[test]
+    fn test_bind_variable_declaration() {
+        use crate::parser_impl::ParserState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "const x = 42;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        // Should have one symbol 'x'
+        assert_eq!(binder.file_locals.len(), 1);
+        assert!(binder.file_locals.has("x"));
+
+        let x_id = binder.file_locals.get("x").unwrap();
+        let x_sym = binder.symbols.get(x_id).unwrap();
+        assert_eq!(x_sym.escaped_name, "x");
+        assert!(x_sym.has_flags(symbol_flags::BLOCK_SCOPED_VARIABLE));
+    }
+
+    #[test]
+    fn test_bind_function_declaration() {
+        use crate::parser_impl::ParserState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "function add(a: number, b: number): number { return a + b; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        // Should have one symbol 'add'
+        assert!(binder.file_locals.has("add"));
+
+        let add_id = binder.file_locals.get("add").unwrap();
+        let add_sym = binder.symbols.get(add_id).unwrap();
+        assert_eq!(add_sym.escaped_name, "add");
+        assert!(add_sym.has_flags(symbol_flags::FUNCTION));
+    }
+
+    #[test]
+    fn test_bind_class_declaration() {
+        use crate::parser_impl::ParserState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "class Foo { x: number; bar() {} }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        // Should have one symbol 'Foo'
+        assert!(binder.file_locals.has("Foo"));
+
+        let foo_id = binder.file_locals.get("Foo").unwrap();
+        let foo_sym = binder.symbols.get(foo_id).unwrap();
+        assert_eq!(foo_sym.escaped_name, "Foo");
+        assert!(foo_sym.has_flags(symbol_flags::CLASS));
+    }
+
+    #[test]
+    fn test_bind_multiple_declarations() {
+        use crate::parser_impl::ParserState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                const x = 1;
+                function foo() {}
+                class Bar {}
+                interface IBaz {}
+                type MyType = string;
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        // Should have 5 symbols
+        assert!(binder.file_locals.has("x"));
+        assert!(binder.file_locals.has("foo"));
+        assert!(binder.file_locals.has("Bar"));
+        assert!(binder.file_locals.has("IBaz"));
+        assert!(binder.file_locals.has("MyType"));
+
+        // Verify symbol flags
+        let x_id = binder.file_locals.get("x").unwrap();
+        assert!(binder.symbols.get(x_id).unwrap().has_flags(symbol_flags::BLOCK_SCOPED_VARIABLE));
+
+        let foo_id = binder.file_locals.get("foo").unwrap();
+        assert!(binder.symbols.get(foo_id).unwrap().has_flags(symbol_flags::FUNCTION));
+
+        let bar_id = binder.file_locals.get("Bar").unwrap();
+        assert!(binder.symbols.get(bar_id).unwrap().has_flags(symbol_flags::CLASS));
+
+        let ibaz_id = binder.file_locals.get("IBaz").unwrap();
+        assert!(binder.symbols.get(ibaz_id).unwrap().has_flags(symbol_flags::INTERFACE));
+
+        let mytype_id = binder.file_locals.get("MyType").unwrap();
+        assert!(binder.symbols.get(mytype_id).unwrap().has_flags(symbol_flags::TYPE_ALIAS));
     }
 }
