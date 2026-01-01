@@ -238,6 +238,120 @@ impl SymbolArena {
 }
 
 // =============================================================================
+// Control Flow Graph
+// =============================================================================
+
+/// Flags for flow nodes describing their type and properties.
+/// Matches TypeScript's FlowFlags in src/compiler/types.ts
+pub mod flow_flags {
+    pub const UNREACHABLE: u32 = 1 << 0;      // Unreachable code
+    pub const START: u32 = 1 << 1;             // Start of flow graph
+    pub const BRANCH_LABEL: u32 = 1 << 2;      // Branch label
+    pub const LOOP_LABEL: u32 = 1 << 3;        // Loop label
+    pub const ASSIGNMENT: u32 = 1 << 4;        // Assignment
+    pub const TRUE_CONDITION: u32 = 1 << 5;    // True condition
+    pub const FALSE_CONDITION: u32 = 1 << 6;   // False condition
+    pub const SWITCH_CLAUSE: u32 = 1 << 7;     // Switch clause
+    pub const ARRAY_MUTATION: u32 = 1 << 8;    // Array mutation
+    pub const CALL: u32 = 1 << 9;              // Call expression
+    pub const REDUCE_LABEL: u32 = 1 << 10;     // Reduce label
+    pub const REFERENCED: u32 = 1 << 11;       // Referenced
+
+    // Composite flags
+    pub const LABEL: u32 = BRANCH_LABEL | LOOP_LABEL;
+    pub const CONDITION: u32 = TRUE_CONDITION | FALSE_CONDITION;
+}
+
+/// Unique identifier for a flow node.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+pub struct FlowNodeId(pub u32);
+
+impl FlowNodeId {
+    pub const NONE: FlowNodeId = FlowNodeId(u32::MAX);
+
+    pub fn is_none(&self) -> bool {
+        self.0 == u32::MAX
+    }
+}
+
+/// A node in the control flow graph.
+#[derive(Clone, Debug, Serialize)]
+pub struct FlowNode {
+    /// Flow node flags
+    pub flags: u32,
+    /// Flow node ID
+    pub id: FlowNodeId,
+    /// Antecedent flow node(s) - predecessors in the control flow
+    pub antecedent: Vec<FlowNodeId>,
+    /// Associated AST node (for assignments, conditions, etc.)
+    pub node: NodeIndex,
+}
+
+impl FlowNode {
+    pub fn new(id: FlowNodeId, flags: u32) -> Self {
+        FlowNode {
+            flags,
+            id,
+            antecedent: Vec::new(),
+            node: NodeIndex::NONE,
+        }
+    }
+
+    pub fn has_flags(&self, flags: u32) -> bool {
+        (self.flags & flags) == flags
+    }
+
+    pub fn has_any_flags(&self, flags: u32) -> bool {
+        (self.flags & flags) != 0
+    }
+}
+
+/// Arena for flow nodes.
+#[derive(Debug, Default, Serialize)]
+pub struct FlowNodeArena {
+    nodes: Vec<FlowNode>,
+}
+
+impl FlowNodeArena {
+    pub fn new() -> Self {
+        FlowNodeArena { nodes: Vec::new() }
+    }
+
+    /// Allocate a new flow node.
+    pub fn alloc(&mut self, flags: u32) -> FlowNodeId {
+        let id = FlowNodeId(self.nodes.len() as u32);
+        self.nodes.push(FlowNode::new(id, flags));
+        id
+    }
+
+    /// Get a flow node by ID.
+    pub fn get(&self, id: FlowNodeId) -> Option<&FlowNode> {
+        if id.is_none() {
+            None
+        } else {
+            self.nodes.get(id.0 as usize)
+        }
+    }
+
+    /// Get a mutable flow node by ID.
+    pub fn get_mut(&mut self, id: FlowNodeId) -> Option<&mut FlowNode> {
+        if id.is_none() {
+            None
+        } else {
+            self.nodes.get_mut(id.0 as usize)
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
+}
+
+// =============================================================================
 // Binder State
 // =============================================================================
 
@@ -746,6 +860,49 @@ mod tests {
         assert_eq!(id.0, 42);
         assert!(!id.is_none());
         assert!(SymbolId::NONE.is_none());
+    }
+
+    #[test]
+    fn test_flow_flags() {
+        assert_eq!(flow_flags::UNREACHABLE, 1);
+        assert_eq!(flow_flags::START, 2);
+        assert_eq!(flow_flags::LABEL, flow_flags::BRANCH_LABEL | flow_flags::LOOP_LABEL);
+        assert_eq!(flow_flags::CONDITION, flow_flags::TRUE_CONDITION | flow_flags::FALSE_CONDITION);
+    }
+
+    #[test]
+    fn test_flow_node_id() {
+        let id = FlowNodeId(42);
+        assert_eq!(id.0, 42);
+        assert!(!id.is_none());
+        assert!(FlowNodeId::NONE.is_none());
+    }
+
+    #[test]
+    fn test_flow_node() {
+        let node = FlowNode::new(FlowNodeId(0), flow_flags::START);
+        assert!(node.has_flags(flow_flags::START));
+        assert!(!node.has_flags(flow_flags::UNREACHABLE));
+        assert!(node.antecedent.is_empty());
+    }
+
+    #[test]
+    fn test_flow_node_arena() {
+        let mut arena = FlowNodeArena::new();
+        assert!(arena.is_empty());
+
+        let start = arena.alloc(flow_flags::START);
+        let branch = arena.alloc(flow_flags::BRANCH_LABEL);
+
+        assert_eq!(arena.len(), 2);
+        assert_eq!(start.0, 0);
+        assert_eq!(branch.0, 1);
+
+        let start_node = arena.get(start).unwrap();
+        assert!(start_node.has_flags(flow_flags::START));
+
+        let branch_node = arena.get(branch).unwrap();
+        assert!(branch_node.has_flags(flow_flags::BRANCH_LABEL));
     }
 
     #[test]
