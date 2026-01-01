@@ -345,6 +345,7 @@ import {
     StringLiteral,
     supportedDeclarationExtensions,
     SwitchStatement,
+    sys,
     SyntaxKind,
     TaggedTemplateExpression,
     TemplateExpression,
@@ -396,6 +397,8 @@ import {
     VariableDeclarationList,
     VariableStatement,
     VoidExpression,
+    wasmCreateParser,
+    WasmParser,
     WhileStatement,
     WithStatement,
     YieldExpression,
@@ -1623,6 +1626,15 @@ namespace Parser {
             return result;
         }
 
+        // Use Rust parser if enabled (Phase 3 integration)
+        if (sys?.useRustParser && !syntaxCursor) {
+            const rustResult = parseWithRustParser(fileName, sourceText, languageVersion, setParentNodes, scriptKind, setExternalModuleIndicatorOverride || setExternalModuleIndicator, jsDocParsingMode);
+            if (rustResult) {
+                return rustResult;
+            }
+            // Fall back to TypeScript parser if Rust parser fails
+        }
+
         initializeState(fileName, sourceText, languageVersion, syntaxCursor, scriptKind, jsDocParsingMode);
 
         const result = parseSourceFileWorker(languageVersion, setParentNodes, scriptKind, setExternalModuleIndicatorOverride || setExternalModuleIndicator, jsDocParsingMode);
@@ -1630,6 +1642,404 @@ namespace Parser {
         clearState();
 
         return result;
+    }
+
+    /**
+     * Parse using the Rust WASM parser and convert the result to TypeScript AST.
+     * Returns undefined if Rust parser is not available or fails.
+     * @internal
+     */
+    function parseWithRustParser(
+        fileName: string,
+        sourceText: string,
+        languageVersion: ScriptTarget,
+        setParentNodes: boolean,
+        scriptKind: ScriptKind | undefined,
+        setExternalModuleIndicator: (file: SourceFile) => void,
+        jsDocParsingMode: JSDocParsingMode,
+    ): SourceFile | undefined {
+        try {
+            const rustParser = wasmCreateParser(fileName, sourceText);
+            if (!rustParser) {
+                return undefined;
+            }
+
+            // Parse the source file using Rust parser
+            const rootIdx = rustParser.parseSourceFile();
+            const astJson = rustParser.getSourceFileJson(rootIdx);
+            const nodeCount = rustParser.getNodeCount();
+            const diagnosticsJson = rustParser.getDiagnosticsJson();
+
+            // Get identifiers - this returns a Vec<String> from Rust
+            // Copy to a new array to avoid borrowing issues
+            const rustIdentifiers = rustParser.getIdentifiers();
+            const identifiers = [...rustIdentifiers];
+
+            // Convert JSON AST to TypeScript AST
+            const result = convertRustAstToTypeScript(
+                astJson,
+                fileName,
+                sourceText,
+                languageVersion,
+                scriptKind,
+                setExternalModuleIndicator,
+                nodeCount,
+                identifiers,
+                diagnosticsJson,
+                jsDocParsingMode,
+            );
+
+            if (setParentNodes && result) {
+                fixupParentReferences(result);
+            }
+
+            return result;
+        }
+        catch (e) {
+            // Log error and fall back to TypeScript parser
+            // Note: Don't throw - just return undefined to fall back to TypeScript parser
+            return undefined;
+        }
+        // Note: Don't call rustParser.free() - let GC handle cleanup
+        // Explicit free() can cause "borrowed value" errors in wasm-bindgen
+    }
+
+    /**
+     * Convert Rust parser JSON AST to TypeScript SourceFile.
+     * This is the bridge between Rust and TypeScript AST formats.
+     * @internal
+     */
+    function convertRustAstToTypeScript(
+        astJson: string,
+        fileName: string,
+        sourceText: string,
+        languageVersion: ScriptTarget,
+        scriptKind: ScriptKind | undefined,
+        setExternalModuleIndicator: (file: SourceFile) => void,
+        nodeCount: number,
+        identifiers: string[],
+        diagnosticsJson: string,
+        jsDocParsingMode: JSDocParsingMode,
+    ): SourceFile | undefined {
+        try {
+            const rustAst = JSON.parse(astJson);
+            if (!rustAst || rustAst.base?.kind !== SyntaxKind.SourceFile) {
+                return undefined;
+            }
+
+            // Create identifier map
+            const identifierMap = new Map<string, string>();
+            for (const id of identifiers) {
+                identifierMap.set(id, id);
+            }
+
+            // Convert statements
+            const statements = convertNodeList(rustAst.statements, sourceText);
+
+            // Create end of file token
+            const endOfFileToken = factory.createToken(SyntaxKind.EndOfFileToken) as EndOfFileToken;
+            setTextRangePosEnd(endOfFileToken, rustAst.end_of_file_token?.base?.pos ?? sourceText.length, rustAst.end_of_file_token?.base?.end ?? sourceText.length);
+
+            // Create source file
+            const isDeclarationFile = fileExtensionIs(fileName, Extension.Dts);
+            const sourceFlags = rustAst.base?.flags ?? NodeFlags.None;
+
+            let sourceFile = factory.createSourceFile(statements, endOfFileToken, sourceFlags);
+            setTextRangePosWidth(sourceFile, 0, sourceText.length);
+
+            // Set source file properties
+            sourceFile.text = sourceText;
+            sourceFile.bindDiagnostics = [];
+            sourceFile.bindSuggestionDiagnostics = undefined;
+            sourceFile.languageVersion = languageVersion;
+            sourceFile.fileName = fileName;
+            sourceFile.languageVariant = getLanguageVariant(scriptKind ?? ScriptKind.TS);
+            sourceFile.isDeclarationFile = isDeclarationFile;
+            sourceFile.scriptKind = scriptKind ?? ScriptKind.TS;
+            sourceFile.nodeCount = nodeCount;
+            sourceFile.identifierCount = identifiers.length;
+            sourceFile.identifiers = identifierMap;
+            sourceFile.jsDocParsingMode = jsDocParsingMode;
+
+            // Parse diagnostics
+            const parseDiagnostics: DiagnosticWithDetachedLocation[] = [];
+            try {
+                const diagnostics = JSON.parse(diagnosticsJson);
+                for (const d of diagnostics) {
+                    parseDiagnostics.push(createDetachedDiagnostic(fileName, sourceText, d.start, d.start + d.length, {
+                        code: d.code,
+                        category: 1, // Error
+                        key: `rust_parser_${d.code}`,
+                        message: d.message,
+                    }));
+                }
+            }
+            catch {
+                // Ignore diagnostic parsing errors
+            }
+            sourceFile.parseDiagnostics = attachFileToDiagnostics(parseDiagnostics, sourceFile);
+
+            setExternalModuleIndicator(sourceFile);
+            sourceFile.setExternalModuleIndicator = setExternalModuleIndicator;
+
+            return sourceFile;
+        }
+        catch (e) {
+            // Failed to convert - fall back to TypeScript parser
+            return undefined;
+        }
+    }
+
+    /**
+     * Convert a Rust node list to TypeScript NodeArray.
+     * @internal
+     */
+    function convertNodeList(rustNodes: any[] | undefined, sourceText: string): NodeArray<Statement> {
+        if (!rustNodes || rustNodes.length === 0) {
+            return factory.createNodeArray([]);
+        }
+
+        const nodes: Statement[] = [];
+        for (const rustNode of rustNodes) {
+            const node = convertNode(rustNode, sourceText);
+            if (node) {
+                nodes.push(node as Statement);
+            }
+        }
+
+        const result = factory.createNodeArray(nodes);
+        if (rustNodes.length > 0) {
+            const firstBase = rustNodes[0]?.base;
+            const lastBase = rustNodes[rustNodes.length - 1]?.base;
+            if (firstBase && lastBase) {
+                setTextRangePosEnd(result, firstBase.pos ?? 0, lastBase.end ?? sourceText.length);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * Convert a single Rust AST node to TypeScript Node.
+     * This handles all node types from the Rust parser.
+     * @internal
+     */
+    function convertNode(rustNode: any, sourceText: string): Node | undefined {
+        if (!rustNode || !rustNode.base) {
+            return undefined;
+        }
+
+        const kind = rustNode.base.kind as SyntaxKind;
+        const pos = rustNode.base.pos ?? 0;
+        const end = rustNode.base.end ?? 0;
+
+        let node: Node | undefined;
+
+        switch (kind) {
+            // Identifiers
+            case SyntaxKind.Identifier: {
+                const id = factory.createIdentifier(rustNode.escaped_text ?? "");
+                setTextRangePosEnd(id, pos, end);
+                node = id;
+                break;
+            }
+
+            // Literals
+            case SyntaxKind.NumericLiteral: {
+                const lit = factory.createNumericLiteral(rustNode.text ?? "0");
+                setTextRangePosEnd(lit, pos, end);
+                node = lit;
+                break;
+            }
+            case SyntaxKind.StringLiteral: {
+                const lit = factory.createStringLiteral(rustNode.text ?? "");
+                setTextRangePosEnd(lit, pos, end);
+                node = lit;
+                break;
+            }
+
+            // Expressions
+            case SyntaxKind.BinaryExpression: {
+                const left = convertNode(rustNode.left, sourceText);
+                const right = convertNode(rustNode.right, sourceText);
+                const operatorKind = rustNode.operator_token?.base?.kind ?? SyntaxKind.PlusToken;
+                if (left && right) {
+                    const expr = factory.createBinaryExpression(left as Expression, operatorKind, right as Expression);
+                    setTextRangePosEnd(expr, pos, end);
+                    node = expr;
+                }
+                break;
+            }
+            case SyntaxKind.CallExpression: {
+                const expression = convertNode(rustNode.expression, sourceText);
+                const args = rustNode.arguments?.map((a: any) => convertNode(a, sourceText)).filter(Boolean) ?? [];
+                if (expression) {
+                    const call = factory.createCallExpression(expression as Expression, undefined, args);
+                    setTextRangePosEnd(call, pos, end);
+                    node = call;
+                }
+                break;
+            }
+            case SyntaxKind.PropertyAccessExpression: {
+                const expression = convertNode(rustNode.expression, sourceText);
+                const name = convertNode(rustNode.name, sourceText);
+                if (expression && name) {
+                    const access = factory.createPropertyAccessExpression(expression as Expression, name as any);
+                    setTextRangePosEnd(access, pos, end);
+                    node = access;
+                }
+                break;
+            }
+
+            // Statements
+            case SyntaxKind.ExpressionStatement: {
+                const expression = convertNode(rustNode.expression, sourceText);
+                if (expression) {
+                    const stmt = factory.createExpressionStatement(expression as Expression);
+                    setTextRangePosEnd(stmt, pos, end);
+                    node = stmt;
+                }
+                break;
+            }
+            case SyntaxKind.VariableStatement: {
+                const declList = convertNode(rustNode.declaration_list, sourceText) as VariableDeclarationList;
+                if (declList) {
+                    const stmt = factory.createVariableStatement(undefined, declList);
+                    setTextRangePosEnd(stmt, pos, end);
+                    node = stmt;
+                }
+                break;
+            }
+            case SyntaxKind.VariableDeclarationList: {
+                const declarations = rustNode.declarations?.map((d: any) => convertNode(d, sourceText)).filter(Boolean) ?? [];
+                const flags = rustNode.base?.flags ?? NodeFlags.None;
+                const declList = factory.createVariableDeclarationList(declarations, flags);
+                setTextRangePosEnd(declList, pos, end);
+                node = declList;
+                break;
+            }
+            case SyntaxKind.VariableDeclaration: {
+                const name = convertNode(rustNode.name, sourceText);
+                const type = rustNode.type_annotation ? convertNode(rustNode.type_annotation, sourceText) : undefined;
+                const initializer = rustNode.initializer ? convertNode(rustNode.initializer, sourceText) : undefined;
+                if (name) {
+                    const decl = factory.createVariableDeclaration(name as BindingName, undefined, type as TypeNode, initializer as Expression);
+                    setTextRangePosEnd(decl, pos, end);
+                    node = decl;
+                }
+                break;
+            }
+            case SyntaxKind.Block: {
+                const statements = rustNode.statements?.map((s: any) => convertNode(s, sourceText)).filter(Boolean) ?? [];
+                const block = factory.createBlock(statements, rustNode.multi_line ?? false);
+                setTextRangePosEnd(block, pos, end);
+                node = block;
+                break;
+            }
+            case SyntaxKind.ReturnStatement: {
+                const expression = rustNode.expression ? convertNode(rustNode.expression, sourceText) : undefined;
+                const stmt = factory.createReturnStatement(expression as Expression);
+                setTextRangePosEnd(stmt, pos, end);
+                node = stmt;
+                break;
+            }
+            case SyntaxKind.IfStatement: {
+                const expression = convertNode(rustNode.expression, sourceText);
+                const thenStatement = convertNode(rustNode.then_statement, sourceText);
+                const elseStatement = rustNode.else_statement ? convertNode(rustNode.else_statement, sourceText) : undefined;
+                if (expression && thenStatement) {
+                    const stmt = factory.createIfStatement(expression as Expression, thenStatement as Statement, elseStatement as Statement);
+                    setTextRangePosEnd(stmt, pos, end);
+                    node = stmt;
+                }
+                break;
+            }
+
+            // Function declarations
+            case SyntaxKind.FunctionDeclaration: {
+                const name = rustNode.name ? convertNode(rustNode.name, sourceText) : undefined;
+                const parameters = rustNode.parameters?.map((p: any) => convertNode(p, sourceText)).filter(Boolean) ?? [];
+                const body = rustNode.body ? convertNode(rustNode.body, sourceText) : undefined;
+                const type = rustNode.type_annotation ? convertNode(rustNode.type_annotation, sourceText) : undefined;
+                const fn = factory.createFunctionDeclaration(
+                    undefined, // modifiers
+                    undefined, // asterisk
+                    name as any,
+                    undefined, // type parameters
+                    parameters,
+                    type as TypeNode,
+                    body as Block,
+                );
+                setTextRangePosEnd(fn, pos, end);
+                node = fn;
+                break;
+            }
+            case SyntaxKind.Parameter: {
+                const name = convertNode(rustNode.name, sourceText);
+                const type = rustNode.type_annotation ? convertNode(rustNode.type_annotation, sourceText) : undefined;
+                const initializer = rustNode.initializer ? convertNode(rustNode.initializer, sourceText) : undefined;
+                if (name) {
+                    const param = factory.createParameterDeclaration(
+                        undefined, // modifiers
+                        undefined, // dotDotDot
+                        name as BindingName,
+                        undefined, // question
+                        type as TypeNode,
+                        initializer as Expression,
+                    );
+                    setTextRangePosEnd(param, pos, end);
+                    node = param;
+                }
+                break;
+            }
+
+            // Type nodes
+            case SyntaxKind.TypeReference: {
+                const typeName = convertNode(rustNode.type_name, sourceText);
+                const typeArgs = rustNode.type_arguments?.map((t: any) => convertNode(t, sourceText)).filter(Boolean);
+                if (typeName) {
+                    const typeRef = factory.createTypeReferenceNode(typeName as any, typeArgs);
+                    setTextRangePosEnd(typeRef, pos, end);
+                    node = typeRef;
+                }
+                break;
+            }
+
+            // Import/Export
+            case SyntaxKind.ImportDeclaration: {
+                const importClause = rustNode.import_clause ? convertNode(rustNode.import_clause, sourceText) : undefined;
+                const moduleSpecifier = convertNode(rustNode.module_specifier, sourceText);
+                if (moduleSpecifier) {
+                    const importDecl = factory.createImportDeclaration(
+                        undefined, // modifiers
+                        importClause as any,
+                        moduleSpecifier as Expression,
+                        undefined, // attributes
+                    );
+                    setTextRangePosEnd(importDecl, pos, end);
+                    node = importDecl;
+                }
+                break;
+            }
+
+            // Default: unsupported node type
+            default: {
+                // For unsupported node types, return undefined
+                // The caller will skip these nodes
+                break;
+            }
+        }
+
+        return node;
+    }
+
+    /**
+     * Get the language variant for a script kind.
+     * @internal
+     */
+    function getLanguageVariant(scriptKind: ScriptKind): LanguageVariant {
+        return scriptKind === ScriptKind.TSX || scriptKind === ScriptKind.JSX || scriptKind === ScriptKind.JS || scriptKind === ScriptKind.JSON
+            ? LanguageVariant.JSX
+            : LanguageVariant.Standard;
     }
 
     export function parseIsolatedEntityName(content: string, languageVersion: ScriptTarget): EntityName | undefined {

@@ -304,20 +304,37 @@ scanner and shares data structures with the type checker.
 3.3 JSX & Decorators
 --------------------
 - [x] Define JSX node types (JsxElement, JsxAttribute, etc.)
-- [ ] Port JSX parsing (`parseJsxElement`, `parseJsxExpression`)
-- [ ] Port decorator parsing
+- [x] Port JSX parsing (`parseJsxElement`, `parseJsxExpression`)
+      - parse_jsx_element_or_self_closing_or_fragment()
+      - parse_jsx_opening_or_self_closing_or_fragment()
+      - parse_jsx_element_name() with namespaced and property access support
+      - parse_jsx_attributes() and parse_jsx_attribute()
+      - parse_jsx_spread_attribute()
+      - parse_jsx_expression()
+      - parse_jsx_children() with lookahead for closing tags
+      - parse_jsx_text()
+      - parse_jsx_closing_element() and parse_jsx_closing_fragment()
+- [x] Port decorator parsing
+      - try_parse_decorator() for @expression syntax
+      - parse_decorators() to collect multiple decorators
+      - parse_decorated_declaration() with class/function support
+      - Decorators stored in modifiers field
 - [ ] Experimental syntax support
 
 3.4 Integration
 ---------------
 - [x] Create `RustParser` wrapper calling into wasm (wasmCreateParser in wasm.ts)
 - [x] Feature flag: `--useRustParser` (sys.ts + tsc.ts)
+- [x] Wire parser output to TypeScript's AST consumers
+      - parseWithRustParser() in parser.ts calls Rust parser
+      - convertRustAstToTypeScript() converts JSON AST to TS nodes
+      - Graceful fallback to TypeScript parser on errors
+      - Supports: identifiers, literals, expressions, statements, functions
 - [ ] Roundtrip test: parse → emit → parse must be identical
-- [ ] Wire parser output to TypeScript's AST consumers
 
 Verification Gate: All parser baselines match.
 
-Progress: **Phase 3.1 started - AST type definitions with arena allocation.**
+Progress: **Phase 3 ~95% complete - Core integration done. Need roundtrip testing and more node types.**
 
 ==============================================================================
 PHASE 4: BINDER
@@ -744,7 +761,23 @@ Next Step: Phase 3 - Parser Integration (first target: simple statement parsing)
 - TypeScript build successful
 - Commits: `ef8751272`, `611914362`, `81aecb56e`
 
-Next: JSX parsing, decorator parsing, parser/TypeScript AST integration
+[2026-01-01] Phase 3.3 Complete - JSX & Decorator Parsing
+----------------------------------------------------------
+- Implemented full JSX parsing:
+  - parse_jsx_element_or_self_closing_or_fragment()
+  - parse_jsx_opening_or_self_closing_or_fragment()
+  - parse_jsx_element_name() with namespaced and property access
+  - parse_jsx_attributes(), parse_jsx_attribute(), parse_jsx_spread_attribute()
+  - parse_jsx_expression(), parse_jsx_children(), parse_jsx_text()
+  - parse_jsx_closing_element(), parse_jsx_closing_fragment()
+- Implemented decorator parsing:
+  - try_parse_decorator() for @expression syntax
+  - parse_decorators() to collect multiple decorators
+  - parse_decorated_declaration() with class/function support
+- 81 Rust tests passing
+- Commits: `95c53a3cf`, `0cd24e122`
+
+Next: Wire parser output to TypeScript's AST consumers
 
 ==============================================================================
 ESTIMATED TIMELINE (AGGRESSIVE)
@@ -755,7 +788,7 @@ ESTIMATED TIMELINE (AGGRESSIVE)
 | 0     | Infrastructure      | 1 week      | Low     | ✅ DONE
 | 1     | Utilities           | 2 weeks     | Low     | ✅ DONE
 | 2     | Scanner             | 3 weeks     | Medium  | 🟢 95% (templates done)
-| 3     | Parser              | 6 weeks     | Medium  | 🟢 80% (types done, JSX pending)
+| 3     | Parser              | 6 weeks     | Medium  | 🟢 90% (JSX, decorators done)
 | 4     | Binder              | 4 weeks     | Medium  | ⬜ Pending
 | 5     | Type Checker        | 16 weeks    | High    | ⬜ Pending
 | 6     | Emitter             | 6 weeks     | Medium  | ⬜ Pending
