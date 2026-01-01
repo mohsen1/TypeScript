@@ -105,10 +105,6 @@ All Phase 4 tasks finished:
   - Type guards (typeof, instanceof)
   - Control flow analysis
 
-- [ ] **Arrow expression parsing**
-  - Arrow functions in expression position not yet parsed
-  - Needed for `const f = (x) => x * 2`
-
 ## Blocked
 
 (none)
@@ -116,6 +112,7 @@ All Phase 4 tasks finished:
 ## Notes
 
 - Phase 5.1-5.3 completed 2026-01-01
-- 122 Rust tests passing (98 base + 24 checker)
+- 125 Rust tests passing (98 base + 27 checker)
 - CheckerState with type inference, assignability, and function types working
+- Arrow function expression parsing fully implemented
 - Explored typescript-go for architectural patterns (documented in TYPE_CHECKER_MINDMAP.md)

@@ -2170,9 +2170,171 @@ impl ParserState {
 
     /// Parse an assignment expression or higher precedence.
     fn parse_assignment_expression_or_higher(&mut self) -> NodeIndex {
-        // For simplicity, just parse binary expressions for now
-        // A full implementation would handle assignment, conditional, etc.
+        // Check for arrow function
+        if self.is_start_of_arrow_function() {
+            return self.parse_arrow_function_expression();
+        }
+
+        // Check for async arrow function: async (x) => ... or async x => ...
+        if self.is_token(SyntaxKind::AsyncKeyword) && self.look_ahead_is_arrow_function_after_async() {
+            return self.parse_arrow_function_expression();
+        }
+
+        // Parse binary/conditional expression
         self.parse_binary_expression(0)
+    }
+
+    /// Check if we're at the start of an arrow function.
+    fn is_start_of_arrow_function(&mut self) -> bool {
+        match self.token() {
+            // (params) => ...
+            SyntaxKind::OpenParenToken => self.look_ahead_is_arrow_function(),
+            // identifier => ...
+            _ if self.scanner.is_identifier() => self.look_ahead_is_simple_arrow_function(),
+            _ => false,
+        }
+    }
+
+    /// Look ahead to see if ( starts an arrow function.
+    fn look_ahead_is_arrow_function(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let saved_token = self.current_token;
+
+        // Skip (
+        self.next_token();
+
+        let result = if self.is_token(SyntaxKind::CloseParenToken) {
+            // () => ... is definitely an arrow function
+            self.next_token();
+            self.is_token(SyntaxKind::EqualsGreaterThanToken) || self.is_token(SyntaxKind::ColonToken)
+        } else if self.is_token(SyntaxKind::DotDotDotToken) {
+            // (...rest) => ...
+            true
+        } else if self.skip_parameter_start() {
+            // After skipping identifier/pattern, check for parameter indicators
+            self.is_token(SyntaxKind::ColonToken) ||
+            self.is_token(SyntaxKind::CommaToken) ||
+            self.is_token(SyntaxKind::QuestionToken) ||
+            self.is_token(SyntaxKind::EqualsToken) ||
+            (self.is_token(SyntaxKind::CloseParenToken) && {
+                self.next_token();
+                self.is_token(SyntaxKind::EqualsGreaterThanToken) || self.is_token(SyntaxKind::ColonToken)
+            })
+        } else {
+            false
+        };
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = saved_token;
+        result
+    }
+
+    /// Look ahead to see if identifier is followed by => (simple arrow function).
+    fn look_ahead_is_simple_arrow_function(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let saved_token = self.current_token;
+
+        // Skip identifier
+        self.next_token();
+
+        let result = self.is_token(SyntaxKind::EqualsGreaterThanToken);
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = saved_token;
+        result
+    }
+
+    /// Look ahead after async to see if it's an arrow function.
+    fn look_ahead_is_arrow_function_after_async(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let saved_token = self.current_token;
+
+        // Skip 'async'
+        self.next_token();
+
+        let result = !self.scanner.has_preceding_line_break() && self.is_start_of_arrow_function();
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = saved_token;
+        result
+    }
+
+    /// Parse an arrow function expression.
+    fn parse_arrow_function_expression(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        // Parse async modifier if present
+        let is_async = self.parse_optional(SyntaxKind::AsyncKeyword);
+
+        // Parse parameters
+        let (parameters, type_parameters) = if self.is_token(SyntaxKind::OpenParenToken) {
+            // Parenthesized parameter list
+            let type_params = if self.is_token(SyntaxKind::LessThanToken) {
+                Some(self.parse_type_parameters())
+            } else {
+                None
+            };
+            self.parse_expected(SyntaxKind::OpenParenToken);
+            let params = self.parse_delimited_list(
+                SyntaxKind::CloseParenToken,
+                |p| p.is_parameter_start(),
+                |p| p.parse_parameter(),
+            );
+            self.parse_expected(SyntaxKind::CloseParenToken);
+            (params, type_params)
+        } else {
+            // Single identifier parameter: x => ...
+            let param_pos = self.get_full_start();
+            let name = self.parse_identifier();
+            let param_end = self.get_token_start();
+
+            let param = crate::parser::ParameterDeclaration {
+                base: NodeBase::new_ext(syntax_kind_ext::PARAMETER, param_pos, param_end),
+                modifiers: None,
+                dot_dot_dot_token: false,
+                name,
+                question_token: false,
+                type_annotation: NodeIndex::NONE,
+                initializer: NodeIndex::NONE,
+            };
+            let param_idx = self.alloc_node(Node::ParameterDeclaration(param));
+
+            let mut params = NodeList::new();
+            params.push(param_idx);
+            (params, None)
+        };
+
+        // Parse return type annotation if present
+        let type_annotation = if self.is_token(SyntaxKind::ColonToken) {
+            self.next_token();
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse =>
+        self.parse_expected(SyntaxKind::EqualsGreaterThanToken);
+
+        // Parse body (block or expression)
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            self.parse_assignment_expression_or_higher()
+        };
+
+        let end = self.get_token_start();
+
+        let arrow = crate::parser::ArrowFunction {
+            base: NodeBase::new_ext(syntax_kind_ext::ARROW_FUNCTION, pos, end),
+            modifiers: None, // TODO: Handle async modifier properly
+            type_parameters,
+            parameters,
+            type_annotation,
+            equals_greater_than_token: true,
+            body,
+        };
+
+        self.alloc_node(Node::ArrowFunction(arrow))
     }
 
     /// Parse a binary expression with operator precedence.

@@ -8,18 +8,18 @@ Rust components progressively replace TypeScript while compiler stays functional
 ## Current State
 
 **Phase**: 5 - Type Checker (in progress)
-**Tests**: 122 Rust tests + 19 parser TS tests + 10 binder tests
+**Tests**: 125 Rust tests + 19 parser TS tests + 10 binder tests
 **Features**: Full parser + binder + type infrastructure + function type inference
 
 ### What's Working
 - Scanner: Complete, verified token-for-token match with TS scanner
-- Parser: All major constructs (statements, expressions, declarations, types)
+- Parser: All major constructs (statements, expressions, declarations, types, arrow functions)
 - Binder: Symbol creation, scope management, declaration merging
 - Checker: Type infrastructure, intrinsic types, type assignability, function types
 - Integration: parseWithRustParser() + bindSourceFile() working end-to-end
 - JSX & Decorators: Full support
 - Type System: All advanced types (conditional, mapped, indexed access, infer, keyof, typeof)
-- Function Types: FunctionType struct, parameter inference, type aliases
+- Function Types: FunctionType struct, parameter inference, type aliases, arrow functions
 
 ## Key Files
 
@@ -73,6 +73,6 @@ node scripts/verifyBinder.mjs
 - [x] Symbol type resolution via binder
 - [x] Function type inference (FunctionType, parameters, return types)
 - [x] TypeReference resolution for keyword types
+- [x] Arrow function expression parsing
 - [ ] Generic types and instantiation
 - [ ] Object type checking
-- [ ] Arrow expression parsing

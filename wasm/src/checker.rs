@@ -1735,4 +1735,122 @@ mod tests {
         let type_str = checker.type_to_string(fn_type);
         assert_eq!(type_str, "(a: number, b: string) => boolean");
     }
+
+    #[test]
+    fn test_arrow_function_type() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test arrow function with parenthesized parameters
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"const double = (x: number): number => x * 2;"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // 'double' should have a function type
+        assert!(binder.file_locals.has("double"));
+
+        if let Some(double_symbol) = binder.file_locals.get("double") {
+            let double_type = checker.get_type_of_symbol(double_symbol);
+            let typ = checker.types.get(double_type).unwrap();
+
+            if let Type::Function(f) = typ {
+                assert_eq!(f.parameter_names.len(), 1);
+                assert_eq!(f.parameter_names[0], "x");
+                assert_eq!(f.parameter_types[0], checker.types.number_type);
+                assert_eq!(f.return_type, checker.types.number_type);
+            } else {
+                panic!("Expected Function type, got {:?}", typ);
+            }
+        }
+    }
+
+    #[test]
+    fn test_simple_arrow_function() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test simple arrow function (x => x * 2)
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"const identity = x => x;"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("identity"));
+
+        if let Some(symbol) = binder.file_locals.get("identity") {
+            let id_type = checker.get_type_of_symbol(symbol);
+            let typ = checker.types.get(id_type).unwrap();
+
+            if let Type::Function(f) = typ {
+                assert_eq!(f.parameter_names.len(), 1);
+                assert_eq!(f.parameter_names[0], "x");
+                // No type annotation, should be 'any'
+                assert_eq!(f.parameter_types[0], checker.types.any_type);
+                assert_eq!(f.return_type, checker.types.any_type);
+            } else {
+                panic!("Expected Function type, got {:?}", typ);
+            }
+        }
+    }
+
+    #[test]
+    fn test_arrow_function_no_params() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test arrow function with no parameters
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"const getNumber = (): number => 42;"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("getNumber"));
+
+        if let Some(symbol) = binder.file_locals.get("getNumber") {
+            let fn_type = checker.get_type_of_symbol(symbol);
+            let typ = checker.types.get(fn_type).unwrap();
+
+            if let Type::Function(f) = typ {
+                assert_eq!(f.parameter_names.len(), 0);
+                assert_eq!(f.return_type, checker.types.number_type);
+                assert_eq!(f.min_argument_count, 0);
+            } else {
+                panic!("Expected Function type, got {:?}", typ);
+            }
+        }
+    }
 }
