@@ -527,6 +527,8 @@ interface WasmParserStateInstance {
     parseSourceFile(): number;
     /** Get the AST as a JSON string for the given root index */
     getSourceFileJson(rootIdx: number): string;
+    /** Get the entire arena as a JSON array */
+    getArenaJson(): string;
     /** Get the number of nodes in the AST */
     getNodeCount(): number;
     /** Get all identifiers found during parsing */

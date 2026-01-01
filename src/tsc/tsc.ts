@@ -64,6 +64,15 @@ if (useRustScannerIndex !== -1) {
     ts.sys.write(`[WASM] Rust scanner enabled${ts.sys.newLine}`);
 }
 
+// Check for --useRustParser flag (Phase 3)
+const useRustParserIndex = ts.sys.args.indexOf("--useRustParser");
+if (useRustParserIndex !== -1) {
+    ts.sys.useRustParser = true;
+    // Remove the flag from args so it doesn't confuse the compiler
+    ts.sys.args.splice(useRustParserIndex, 1);
+    ts.sys.write(`[WASM] Rust parser enabled${ts.sys.newLine}`);
+}
+
 // enable deprecation logging
 ts.Debug.loggingHost = {
     log(_level, s) {
