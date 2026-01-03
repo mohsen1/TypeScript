@@ -3977,3 +3977,128 @@ const instance = new Foo();
             assert_ne!(instance_type, checker.types.any_type, "instance should not be 'any'");
         }
     }
+
+    #[test]
+    fn test_excess_property_check_basic() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+        use crate::parser::Node;
+
+        // Test excess property checking
+        // Object literal { x: 1, y: 2 } should NOT be assignable to { x: number }
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                type Target = { x: number };
+                const obj = { x: 1, y: 2 };  // object literal without type annotation
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the type of the object literal (via the variable)
+        let obj_symbol = binder.file_locals.get("obj").expect("obj should be in file locals");
+        let obj_type = checker.get_type_of_symbol(obj_symbol);
+
+        let target_symbol = binder.file_locals.get("Target").expect("Target should be in file locals");
+        let target_type = checker.get_type_of_symbol(target_symbol);
+
+        // Object literal should have FRESH_LITERAL flag
+        if let Some(Type::Object(obj)) = checker.types.get(obj_type) {
+            assert!(obj.has_object_flags(object_flags::FRESH_LITERAL),
+                "Object literal should have FRESH_LITERAL flag");
+        } else {
+            panic!("Expected Object type for object literal, got something else");
+        }
+
+        // Excess property check: obj type should NOT be assignable to Target
+        // because obj has an excess property 'y'
+        let is_assignable = checker.is_type_assignable_to(obj_type, target_type);
+        assert!(!is_assignable, "Object with excess property should NOT be assignable to target");
+    }
+
+    #[test]
+    fn test_type_literal_with_index_signature() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test that type literals parse index signatures correctly
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                type Dict = { x: number; [key: string]: number };
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        let dict_symbol = binder.file_locals.get("Dict").expect("Dict should be in file locals");
+        let dict_type = checker.get_type_of_symbol(dict_symbol);
+
+        // Check that the Dict type has index infos
+        if let Some(Type::Object(dict_obj)) = checker.types.get(dict_type) {
+            assert_eq!(dict_obj.index_infos.len(), 1, "Dict should have 1 index signature");
+            assert!(dict_obj.members.has("x"), "Dict should have property x");
+
+            // Check that the index signature has correct types
+            let index_info = &dict_obj.index_infos[0];
+            assert_eq!(index_info.key_type, checker.types.string_type, "Index key should be string");
+            assert_eq!(index_info.value_type, checker.types.number_type, "Index value should be number");
+        } else {
+            panic!("Dict should be an Object type");
+        }
+    }
+
+    #[test]
+    fn test_excess_property_check_no_excess() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test that exact match is allowed
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                type Point = { x: number; y: number };
+                const p = { x: 1, y: 2 };  // object literal with exact properties
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        let p_symbol = binder.file_locals.get("p").expect("p should be in file locals");
+        let p_type = checker.get_type_of_symbol(p_symbol);
+
+        let point_symbol = binder.file_locals.get("Point").expect("Point should be in file locals");
+        let point_type = checker.get_type_of_symbol(point_symbol);
+
+        // Exact match should be assignable
+        let is_assignable = checker.is_type_assignable_to(p_type, point_type);
+        assert!(is_assignable, "Object with exact properties should be assignable");
+    }

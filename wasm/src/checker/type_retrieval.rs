@@ -1789,6 +1789,7 @@ impl<'a> CheckerState<'a> {
 
         let mut properties = Vec::new();
         let mut members_table = SymbolTable::new();
+        let mut index_infos = Vec::new();
 
         for &member_idx in &members.nodes {
             if let Some(node) = self.node_arena.get(member_idx) {
@@ -1840,13 +1841,60 @@ impl<'a> CheckerState<'a> {
                         properties.push(symbol_id);
                         members_table.set(name, symbol_id);
                     }
+                    // Index signatures: [key: string]: Type
+                    Node::IndexSignatureDeclaration(isd) => {
+                        // Get the key type from the first parameter
+                        let key_type = if !isd.parameters.nodes.is_empty() {
+                            let param_idx = isd.parameters.nodes[0];
+                            if let Some(Node::ParameterDeclaration(pd)) = self.node_arena.get(param_idx) {
+                                if !pd.type_annotation.is_none() {
+                                    self.get_type_of_node(pd.type_annotation)
+                                } else {
+                                    self.types.string_type // default to string
+                                }
+                            } else {
+                                self.types.string_type
+                            }
+                        } else {
+                            self.types.string_type
+                        };
+
+                        // Get the value type from the type annotation
+                        let value_type = if !isd.type_annotation.is_none() {
+                            self.get_type_of_node(isd.type_annotation)
+                        } else {
+                            self.types.any_type
+                        };
+
+                        // Check for readonly modifier
+                        let is_readonly = isd.modifiers.as_ref().map_or(false, |mods| {
+                            mods.nodes.iter().any(|&mod_idx| {
+                                if let Some(Node::Token(base)) = self.node_arena.get(mod_idx) {
+                                    base.kind == crate::scanner::SyntaxKind::ReadonlyKeyword as u16
+                                } else {
+                                    false
+                                }
+                            })
+                        });
+
+                        index_infos.push(IndexInfo {
+                            key_type,
+                            value_type,
+                            is_readonly,
+                            declaration: Some(member_idx),
+                        });
+                    }
                     _ => {}
                 }
             }
         }
 
-        // Create object type with members table for keyof
-        self.types.create_object_type_with_members(properties, members_table)
+        // Create object type with members table and index infos
+        let mut obj = ObjectType::new(object_flags::ANONYMOUS, SymbolId::NONE);
+        obj.properties = properties;
+        obj.members = members_table;
+        obj.index_infos = index_infos;
+        self.types.alloc(Type::Object(obj))
     }
 
     /// Get the type of a property access expression (obj.prop).

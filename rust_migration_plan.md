@@ -9,7 +9,7 @@
 | 2     | Scanner        | ✅ 95%  | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
-| 5     | Type Checker   | 🟡 60%  | 215 Rust |
+| 5     | Type Checker   | 🟡 67%  | 239 Rust |
 | 6     | Emitter        | ⬜ 0%   | - |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
@@ -50,18 +50,11 @@ All of the following are complete:
 - **5.27** Union type simplification
 - **5.28** Distributive conditional types
 - **5.29** Index access on arrays/tuples
+- **5.30** Property access on unions (get common property type across all members)
+- **5.31** Excess property checks (basic detection of extra properties in fresh object literals)
+- **5.32** Index signature support in type literals
 
 ### 🚧 In Progress / Next Up
-
-- [ ] **Property access on unions** (BLOCKED)
-    - Get common property type across all union members
-    - Handle optional properties
-    - ⚠️ `test_property_access_on_union` hangs (infinite loop in interface resolution)
-    - **Action:** Debug infinite loop in interface type resolution
-
-- [ ] **Excess property checks**
-    - Detect extra properties in object literals
-    - Error on `{ x: 1, y: 2 }` assigned to `{ x: number }`
 
 - [ ] **Contextual typing**
     - Infer parameter types from context
@@ -137,9 +130,7 @@ All of the following are complete:
 
 ## Blocked
 
-| Task | Blocker | Notes |
-|------|---------|-------|
-| Property access on unions | Infinite loop | `test_property_access_on_union` hangs |
+_None currently_
 
 ---
 
