@@ -27,6 +27,9 @@ pub mod binder;
 // Checker types and implementation (Phase 5)
 pub mod checker;
 
+// Emitter types and implementation (Phase 6)
+pub mod emitter;
+
 // =============================================================================
 // Scanner Factory Function
 // =============================================================================

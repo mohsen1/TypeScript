@@ -6,11 +6,11 @@
 |-------|----------------|--------|-------|
 | 0     | Infrastructure | ✅ DONE | - |
 | 1     | Utilities      | ✅ DONE | 21 Rust |
-| 2     | Scanner        | ✅ 95%  | 22 Rust |
+| 2     | Scanner        | ✅ DONE | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
 | 5     | Type Checker   | 🟡 75%  | 258 Rust |
-| 6     | Emitter        | ⬜ 0%   | - |
+| 6     | Emitter        | 🟡 30%  | 15 Rust |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
 
@@ -87,11 +87,12 @@ All of the following are complete:
 
 ---
 
-## Phase 6: Emitter (NOT STARTED)
+## Phase 6: Emitter (IN PROGRESS)
 
 ### 6.1 Printer
-- [ ] Port AST → text printing logic
-- [ ] Handle formatting and whitespace
+- [x] Port AST → text printing logic (basic expressions, statements, declarations)
+- [x] Handle formatting and whitespace (indentation, newlines)
+- [x] Roundtrip tests (parse → emit → parse) verified
 - [ ] Source map generation
 
 ### 6.2 Transformers
@@ -148,8 +149,12 @@ _None currently_
 
 ## Deferred
 
-- JSX scanning (`scanJsxIdentifier`, `scanJsxAttributeValue`)
-- JSDoc scanning (`scanJsDocToken`)
-- Remaining rescan methods
 - Experimental syntax support
 - Collections (`Map`, `Set`, `MultiMap` equivalents)
+
+## Performance Optimizations (DONE)
+
+- [x] Zero-copy UTF-8 scanner (String instead of Vec<char>)
+- [x] String interner with Atom handles
+- [ ] SIMD-accelerated whitespace skipping
+- [ ] Integrate Interner with Parser (Identifier.escaped_text)

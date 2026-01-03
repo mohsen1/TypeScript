@@ -38,6 +38,7 @@ impl Atom {
 ///
 /// # Example
 /// ```
+/// use wasm::interner::Interner;
 /// let mut interner = Interner::new();
 /// let a1 = interner.intern("hello");
 /// let a2 = interner.intern("hello");
