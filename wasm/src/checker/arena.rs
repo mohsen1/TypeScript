@@ -531,6 +531,7 @@ impl TypeArena {
             type_parameters: Vec::new(),
             min_argument_count,
             has_rest_parameter,
+            this_type: None,
         })))
     }
 
@@ -555,6 +556,33 @@ impl TypeArena {
             type_parameters,
             min_argument_count,
             has_rest_parameter,
+            this_type: None,
+        })))
+    }
+
+    /// Create a function type with type parameters and explicit `this` type.
+    pub fn create_function_type_with_this(
+        &mut self,
+        declaration: NodeIndex,
+        parameter_types: Vec<TypeId>,
+        parameter_names: Vec<String>,
+        return_type: TypeId,
+        type_parameters: Vec<TypeId>,
+        min_argument_count: u32,
+        has_rest_parameter: bool,
+        this_type: Option<TypeId>,
+    ) -> TypeId {
+        self.alloc(Type::Function(Box::new(FunctionType {
+            flags: type_flags::OBJECT,
+            object_flags: object_flags::ANONYMOUS,
+            declaration,
+            parameter_types,
+            parameter_names,
+            return_type,
+            type_parameters,
+            min_argument_count,
+            has_rest_parameter,
+            this_type,
         })))
     }
 

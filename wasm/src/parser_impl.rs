@@ -3133,6 +3133,21 @@ impl ParserState {
         self.alloc_node(Node::Identifier(id))
     }
 
+    /// Parse `this` keyword as an identifier for `this` parameter: function foo(this: T)
+    fn parse_this_as_identifier(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::ThisKeyword);
+        let end = self.get_token_start();
+
+        let id = Identifier {
+            base: NodeBase::new(SyntaxKind::Identifier, pos, end),
+            escaped_text: "this".to_string(),
+            original_text: None,
+            type_arguments: None,
+        };
+        self.alloc_node(Node::Identifier(id))
+    }
+
     /// Parse a numeric literal.
     fn parse_numeric_literal(&mut self) -> NodeIndex {
         let pos = self.get_full_start();
@@ -3395,7 +3410,11 @@ impl ParserState {
     fn parse_parameter_list(&mut self) -> NodeList {
         self.parse_delimited_list(
             SyntaxKind::CloseParenToken,
-            |p| p.is_token(SyntaxKind::Identifier) || p.is_token(SyntaxKind::DotDotDotToken),
+            |p| {
+                p.is_token(SyntaxKind::Identifier)
+                    || p.is_token(SyntaxKind::DotDotDotToken)
+                    || p.is_token(SyntaxKind::ThisKeyword)
+            },
             |p| p.parse_parameter(),
         )
     }
@@ -3407,7 +3426,12 @@ impl ParserState {
         // Check for rest parameter (...args)
         let dot_dot_dot_token = self.parse_optional(SyntaxKind::DotDotDotToken);
 
-        let name = self.parse_identifier();
+        // Handle `this` parameter: function foo(this: SomeType, ...)
+        let name = if self.is_token(SyntaxKind::ThisKeyword) {
+            self.parse_this_as_identifier()
+        } else {
+            self.parse_identifier()
+        };
 
         // Check for optional parameter (name?)
         let question_token = self.parse_optional(SyntaxKind::QuestionToken);

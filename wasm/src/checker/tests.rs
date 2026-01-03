@@ -7014,3 +7014,158 @@ interface TreeNode {
             panic!("Should have symbol 'Ctor'");
         }
     }
+
+    // =========================================================================
+    // 5.106: `this` parameter types
+    // =========================================================================
+
+    #[test]
+    fn test_this_parameter_parsing() {
+        // Test that `this` parameter is parsed correctly
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+            function greet(this: { name: string }, greeting: string): string {
+                return greeting + " " + this.name;
+            }
+        "#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the function 'greet'
+        if let Some(symbol_id) = binder.file_locals.get("greet") {
+            let func_type = checker.get_type_of_symbol(symbol_id);
+
+            // Check that it's a function type
+            if let Some(super::types::Type::Function(f)) = checker.types.get(func_type) {
+                // The function should have 1 regular parameter (greeting), not 2
+                // because `this` is special and not a regular parameter
+                assert_eq!(f.parameter_names.len(), 1,
+                    "Should have 1 regular parameter, not including 'this'. Got: {:?}", f.parameter_names);
+                assert_eq!(f.parameter_names[0], "greeting",
+                    "First regular parameter should be 'greeting'");
+
+                // Should have a this_type
+                assert!(f.this_type.is_some(), "Function should have this_type set");
+
+                // The this_type should be an object type
+                if let Some(this_type_id) = f.this_type {
+                    if let Some(super::types::Type::Object(_)) = checker.types.get(this_type_id) {
+                        // Good - it's an object type
+                    } else {
+                        panic!("this_type should be an object type");
+                    }
+                }
+            } else {
+                panic!("Expected Function type for greet");
+            }
+        } else {
+            panic!("Should have symbol 'greet'");
+        }
+    }
+
+    #[test]
+    fn test_this_parameter_with_type_parameter() {
+        // Test that `this` parameter works with generic functions
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+            function process<T>(this: T, data: T): T {
+                return data;
+            }
+        "#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the function 'process'
+        if let Some(symbol_id) = binder.file_locals.get("process") {
+            let func_type = checker.get_type_of_symbol(symbol_id);
+
+            // Check that it's a function type
+            if let Some(super::types::Type::Function(f)) = checker.types.get(func_type) {
+                // Should have 1 type parameter
+                assert_eq!(f.type_parameters.len(), 1, "Should have 1 type parameter");
+
+                // Should have 1 regular parameter (data)
+                assert_eq!(f.parameter_names.len(), 1,
+                    "Should have 1 regular parameter. Got: {:?}", f.parameter_names);
+                assert_eq!(f.parameter_names[0], "data");
+
+                // Should have a this_type
+                assert!(f.this_type.is_some(), "Function should have this_type set");
+            } else {
+                panic!("Expected Function type for process");
+            }
+        } else {
+            panic!("Should have symbol 'process'");
+        }
+    }
+
+    #[test]
+    fn test_no_this_parameter() {
+        // Test that regular functions without `this` parameter work correctly
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+            function add(a: number, b: number): number {
+                return a + b;
+            }
+        "#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the function 'add'
+        if let Some(symbol_id) = binder.file_locals.get("add") {
+            let func_type = checker.get_type_of_symbol(symbol_id);
+
+            if let Some(super::types::Type::Function(f)) = checker.types.get(func_type) {
+                // Should have 2 regular parameters
+                assert_eq!(f.parameter_names.len(), 2, "Should have 2 parameters");
+                assert_eq!(f.parameter_names[0], "a");
+                assert_eq!(f.parameter_names[1], "b");
+
+                // Should NOT have a this_type
+                assert!(f.this_type.is_none(), "Regular function should not have this_type");
+            } else {
+                panic!("Expected Function type for add");
+            }
+        } else {
+            panic!("Should have symbol 'add'");
+        }
+    }

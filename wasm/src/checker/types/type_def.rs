@@ -279,6 +279,8 @@ pub struct FunctionType {
     pub type_parameters: Vec<TypeId>,
     pub min_argument_count: u32,
     pub has_rest_parameter: bool,
+    /// The type of `this` parameter if explicitly specified: `function foo(this: SomeType)`
+    pub this_type: Option<TypeId>,
 }
 
 /// An array type (T[] or Array<T>).

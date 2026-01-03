@@ -2784,6 +2784,7 @@ impl<'a> CheckerState<'a> {
         let mut param_names = Vec::new();
         let mut min_arg_count = 0u32;
         let mut has_rest = false;
+        let mut this_type: Option<TypeId> = None;
 
         // Get contextual parameter types if available
         let contextual_param_types: Option<Vec<TypeId>> = self.contextual_type
@@ -2803,15 +2804,28 @@ impl<'a> CheckerState<'a> {
                 } else {
                     String::new()
                 };
+
+                // Handle `this` parameter: function foo(this: SomeType, ...)
+                // The `this` parameter must be the first parameter and is not a regular parameter
+                if name == "this" && param_index == 0 {
+                    if !param.type_annotation.is_none() {
+                        this_type = Some(self.get_type_of_node(param.type_annotation));
+                    }
+                    // Skip adding to regular parameters - `this` is special
+                    continue;
+                }
+
                 param_names.push(name);
 
                 // Get parameter type
+                // Adjust param_index for contextual types if we skipped a `this` parameter
+                let effective_param_index = if this_type.is_some() { param_index - 1 } else { param_index };
                 let param_type = if !param.type_annotation.is_none() {
                     // Explicit type annotation takes precedence
                     self.get_type_of_node(param.type_annotation)
                 } else if let Some(ref ctx_params) = contextual_param_types {
                     // Use contextual type if available
-                    ctx_params.get(param_index).copied().unwrap_or(self.types.any_type)
+                    ctx_params.get(effective_param_index).copied().unwrap_or(self.types.any_type)
                 } else if !param.initializer.is_none() {
                     // Infer from initializer
                     self.get_type_of_node(param.initializer)
@@ -2849,7 +2863,7 @@ impl<'a> CheckerState<'a> {
             }
         }
 
-        self.types.create_function_type_with_type_params(
+        self.types.create_function_type_with_this(
             declaration,
             param_types,
             param_names,
@@ -2857,6 +2871,7 @@ impl<'a> CheckerState<'a> {
             type_param_ids,
             min_arg_count,
             has_rest,
+            this_type,
         )
     }
 
