@@ -315,6 +315,26 @@ impl TypeArena {
         self.alloc(Type::Tuple(Box::new(TupleTypeInfo {
             flags: type_flags::OBJECT,
             element_types,
+            element_names: None,
+            has_optional_elements,
+            has_rest_element,
+            is_readonly,
+        })))
+    }
+
+    /// Create a named tuple type ([x: T, y: U]).
+    pub fn create_named_tuple_type(
+        &mut self,
+        element_types: Vec<TypeId>,
+        element_names: Vec<Option<String>>,
+        has_optional_elements: bool,
+        has_rest_element: bool,
+        is_readonly: bool,
+    ) -> TypeId {
+        self.alloc(Type::Tuple(Box::new(TupleTypeInfo {
+            flags: type_flags::OBJECT,
+            element_types,
+            element_names: Some(element_names),
             has_optional_elements,
             has_rest_element,
             is_readonly,

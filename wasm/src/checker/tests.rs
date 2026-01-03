@@ -6455,3 +6455,112 @@ interface TreeNode {
         let cache_size = checker.widened_type_cache.borrow().len();
         assert!(cache_size >= 3, "Cache should have at least 3 entries");
     }
+
+    // ============== 5.67: Named tuple elements ==============
+    #[test]
+    fn test_named_tuple_type_to_string() {
+        let mut arena = super::TypeArena::new();
+
+        // Create a named tuple [x: number, y: number]
+        let named_tuple = arena.create_named_tuple_type(
+            vec![arena.number_type, arena.number_type],
+            vec![Some("x".to_string()), Some("y".to_string())],
+            false, // has_optional
+            false, // has_rest
+            false, // is_readonly
+        );
+
+        // Create a checker to test type_to_string
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = "let x: number;";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // The arena has its own types, so we need to create the tuple in the checker's arena
+        // For this test, we verify the arena creation works
+        let named_tuple_checker = checker.types.create_named_tuple_type(
+            vec![checker.types.number_type, checker.types.number_type],
+            vec![Some("x".to_string()), Some("y".to_string())],
+            false, false, false,
+        );
+
+        let type_str = checker.type_to_string(named_tuple_checker);
+        assert_eq!(type_str, "[x: number, y: number]",
+            "Named tuple should show element names, got: {}", type_str);
+    }
+
+    #[test]
+    fn test_mixed_named_unnamed_tuple() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = "let x: number;";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Create a tuple with some named and some unnamed elements
+        // This is unusual but should be handled gracefully
+        let mixed_tuple = checker.types.create_named_tuple_type(
+            vec![checker.types.number_type, checker.types.string_type, checker.types.boolean_type],
+            vec![Some("first".to_string()), None, Some("third".to_string())],
+            false, false, false,
+        );
+
+        let type_str = checker.type_to_string(mixed_tuple);
+        assert_eq!(type_str, "[first: number, string, third: boolean]",
+            "Mixed tuple should show names where available, got: {}", type_str);
+    }
+
+    #[test]
+    fn test_readonly_named_tuple() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = "let x: number;";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Create a readonly named tuple
+        let readonly_named = checker.types.create_named_tuple_type(
+            vec![checker.types.number_type, checker.types.string_type],
+            vec![Some("x".to_string()), Some("y".to_string())],
+            false, false,
+            true, // is_readonly
+        );
+
+        let type_str = checker.type_to_string(readonly_named);
+        assert_eq!(type_str, "readonly [x: number, y: string]",
+            "Readonly named tuple should have readonly prefix, got: {}", type_str);
+    }

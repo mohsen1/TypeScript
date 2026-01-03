@@ -275,11 +275,15 @@ pub struct ArrayTypeInfo {
     pub is_readonly: bool,
 }
 
-/// A tuple type ([T, U, V]).
+/// A tuple type ([T, U, V] or [name: T, name2: U]).
 #[derive(Clone, Debug, Serialize)]
 pub struct TupleTypeInfo {
     pub flags: u32,
     pub element_types: Vec<TypeId>,
+    /// Element names for named tuples (e.g., [x: number, y: number]).
+    /// None means all elements are unnamed.
+    /// Some(vec) contains Option<String> for each position - None means unnamed, Some(name) means named.
+    pub element_names: Option<Vec<Option<String>>>,
     /// Whether the tuple has optional elements
     pub has_optional_elements: bool,
     /// Whether the tuple has a rest element

@@ -691,7 +691,17 @@ impl<'a> CheckerState<'a> {
             }
             Type::Tuple(tup) => {
                 let elements: Vec<String> = tup.element_types.iter()
-                    .map(|&t| self.type_to_string(t))
+                    .enumerate()
+                    .map(|(i, &t)| {
+                        let type_str = self.type_to_string(t);
+                        // Check if this element has a name
+                        if let Some(ref names) = tup.element_names {
+                            if let Some(Some(name)) = names.get(i) {
+                                return format!("{}: {}", name, type_str);
+                            }
+                        }
+                        type_str
+                    })
                     .collect();
                 if tup.is_readonly {
                     format!("readonly [{}]", elements.join(", "))

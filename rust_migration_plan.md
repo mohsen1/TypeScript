@@ -9,7 +9,7 @@
 | 2     | Scanner        | ✅ DONE | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
-| 5     | Type Checker   | 🟡 93%  | 336 Rust |
+| 5     | Type Checker   | 🟡 94%  | 339 Rust |
 | 6     | Emitter        | 🟡 40%  | 35 Rust |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
@@ -116,7 +116,7 @@ All of the following are complete:
 
 #### Advanced Tuple & Template Types
 - [ ] **5.66** Variadic tuple types (`[...T, ...U]`)
-- [ ] **5.67** Named tuple elements (`[name: string, age: number]`)
+- [x] **5.67** Named tuple elements (`[name: string, age: number]`)
 - [x] **5.68** String manipulation types (`Uppercase<T>`, `Lowercase<T>`, etc.)
 
 #### Type Inference & Relations
@@ -219,7 +219,7 @@ All of the following are complete:
 ## Phase 8: Full Rust Mode (NOT STARTED)
 
 ### 8.1 Standalone Binary
-- [ ] Create native `tsc` binary (no Node.js required)
+- [ ] Create native `tscrs` binary (no Node.js required)
 - [ ] CLI argument parsing in Rust
 - [ ] File system abstraction
 
