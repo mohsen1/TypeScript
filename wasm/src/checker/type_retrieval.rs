@@ -301,6 +301,12 @@ impl<'a> CheckerState<'a> {
                 self.get_type_of_node(pt.type_node)
             }
 
+            // TypeQuery - typeof operator in type position (typeof expr)
+            Node::TypeQuery(tq) => {
+                // Get the type of the expression
+                self.get_type_of_node(tq.expr_name)
+            }
+
             // Literal types
             Node::LiteralType(lt) => {
                 self.get_type_of_node(lt.literal)

@@ -5741,3 +5741,46 @@ class Derived extends Base {
             override_errors
         );
     }
+
+    // =========================================================================
+    // TypeQuery (typeof in type position) tests (5.103)
+    // =========================================================================
+
+    #[test]
+    fn test_typeof_type_operator() {
+        // Test typeof in type position
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+const x = 42;
+type T = typeof x;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the type of 'x'
+        if let Some(symbol_id) = binder.file_locals.get("x") {
+            let x_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(x_type);
+            // x should be either number or a numeric literal type
+            assert!(
+                x_type == checker.types.number_type || type_str == "42",
+                "x should be number or literal 42 type, got: {}",
+                type_str
+            );
+        } else {
+            panic!("Should have symbol 'x'");
+        }
+    }

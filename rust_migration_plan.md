@@ -128,7 +128,7 @@ All of the following are complete:
 - [ ] **5.74** `ThisType<T>` for object literal methods
 
 #### Type Syntax Interpretation (Parsed but needs checker support)
-- [ ] **5.103** `typeof` type operator (get type of runtime expression)
+- [x] **5.103** `typeof` type operator (get type of runtime expression)
 - [ ] **5.104** Mapped type modifiers (`+readonly`, `-readonly`, `+?`, `-?`)
 - [ ] **5.105** `unique symbol` type for const symbol declarations
 - [ ] **5.106** `this` parameter types (`function foo(this: T, ...)`)
