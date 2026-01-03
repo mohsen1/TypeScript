@@ -39,7 +39,7 @@ touch "$REVIEW_MARKER"
 cat << EOF
 {
   "decision": "block",
-  "reason": "🦀 Detected $FILE_COUNT changed Rust file(s). Please run a code review before completing:\n\nRun: ./scripts/ask-gemini.mjs --review ${ALL_RUST_FILES//$'\n'/ }\n\nAfter reviewing, summarize the key findings for the user."
+  "reason": "🦀 Detected $FILE_COUNT changed Rust file(s). Please run a code review before completing:\n\nRun: ./scripts/ask-gemini.mjs --review ${ALL_RUST_FILES//$'\n'/ }\n\nAfter reviewing, address review comments, commit and push to origin. After that build up a list of 10 tasks from migration_plan.md and complete them."
 }
 EOF
 
