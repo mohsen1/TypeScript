@@ -1,39 +1,6 @@
-# Ralph Development Plan
+# Task List
 
-This file tracks the prioritized tasks for the TypeScript to Rust/WASM migration.
-
----
-
-## 🐳 DOCKER COMMANDS (USE THESE!)
-
-All development should happen inside Docker for reproducibility:
-
-```bash
-# Build the Docker image (first time or after Dockerfile changes)
-docker build -t typescript-wasm .
-
-# Run tests in Docker (REQUIRED before any commit)
-docker run --rm -v $(pwd):/workspace typescript-wasm npx hereby runtests-parallel
-
-# Build the compiler in Docker
-docker run --rm -v $(pwd):/workspace typescript-wasm npx hereby local
-
-# Run Rust tests only
-docker run --rm -v $(pwd):/workspace typescript-wasm bash -c "cd wasm && cargo test"
-
-# Interactive shell in Docker
-docker run --rm -it -v $(pwd):/workspace typescript-wasm bash
-
-# Lint in Docker
-docker run --rm -v $(pwd):/workspace typescript-wasm npx hereby lint
-
-# Format in Docker
-docker run --rm -v $(pwd):/workspace typescript-wasm npx hereby format
-```
-
----
-
-## Current Status Summary
+## Status
 
 | Phase | Component      | Status | Tests |
 |-------|----------------|--------|-------|
@@ -168,25 +135,7 @@ All of the following are complete:
 
 ---
 
-## Deferred / Low Priority
-
-### Scanner Remaining Features
-- [ ] JSX scanning mode (`scanJsxIdentifier`, `scanJsxAttributeValue`)
-- [ ] JSDoc scanning (`scanJsDocToken`)
-- [ ] `reScanLessThanToken`, `reScanHashToken`, `reScanQuestionToken`
-- [ ] Shebang handling
-
-### Parser Remaining Features
-- [ ] Experimental syntax support
-- [ ] Roundtrip test: parse → emit → parse identical
-
-### Collections (Phase 1.4)
-- [ ] Rust equivalents for `Map`, `Set`, `MultiMap`
-- [ ] Port `createMap`, `forEach`, `some`, `every`, `find`
-
----
-
-## Blocked Tasks
+## Blocked
 
 | Task | Blocker | Notes |
 |------|---------|-------|
@@ -194,9 +143,10 @@ All of the following are complete:
 
 ---
 
-## Notes
+## Deferred
 
-- **215 Rust tests passing** (1 ignored) as of 2026-01-03
-- Parser handles: assignment expressions, unary operators, call expressions with type arguments
-- Binder has flow analysis infrastructure for if/while statements
-- Reference: `docs/TYPE_CHECKER_MINDMAP.md` for typescript-go architectural patterns
+- JSX scanning (`scanJsxIdentifier`, `scanJsxAttributeValue`)
+- JSDoc scanning (`scanJsDocToken`)
+- Remaining rescan methods
+- Experimental syntax support
+- Collections (`Map`, `Set`, `MultiMap` equivalents)

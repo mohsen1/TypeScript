@@ -1,161 +1,109 @@
-# TypeScript to Rust/WASM Migration Project
+# TypeScript → Rust/WASM Migration
 
-## Project Overview
-
-Incrementally migrating TypeScript compiler to Rust/WASM using "Strangler Fig" pattern.
-Rust components progressively replace TypeScript while compiler stays functional.
-
-**Key Insight**: Parser and Checker development happen together - new syntax requires both parsing AND type checking support.
+## Mission
+Incrementally migrate TypeScript compiler to Rust/WASM using "Strangler Fig" pattern.
+Run autonomously overnight to complete Phase 5 (Type Checker) and beyond.
 
 ## Current State
+- **Phase 5: Type Checker** - 60% complete, 222 Rust tests passing
+- **Blocked:** `test_property_access_on_union` hangs (infinite loop in interface resolution)
+- **Task List:** See `@fix_plan.md` for prioritized work
 
-**Phase**: Integrated Parser + Checker Development
-**Tests**: 157 Rust tests + 19 parser TS tests + 10 binder tests
-**Architecture**: Scanner → Parser → Binder → Checker (all in Rust)
+## Autonomous Workflow
 
-### Component Status
+```
+LOOP:
+  1. Read @fix_plan.md → pick next unchecked task
+  2. Implement in wasm/src/*.rs
+  3. Run: cd wasm && cargo test <test_name>
+  4. If pass → mark complete in @fix_plan.md, commit, continue
+  5. If fail 3x → add to Blocked section, skip, continue
+  6. After 5 tasks → run full test suite
+```
 
-| Component | Status | Lines | Tests |
-|-----------|--------|-------|-------|
-| Scanner | Complete ✅ | ~800 | Token-verified |
-| Parser | ~98% ✅ | ~4700 | 45 tests |
-| Binder | Complete ✅ | ~1400 | 13 tests |
-| Checker | In Progress 🔄 | ~3800 | 35 tests |
+## Commands
 
-### What's Working
-- **Scanner**: Token-for-token match with TS scanner
-- **Parser**: Statements, expressions, declarations, types, JSX, decorators, arrow functions, assignment expressions, unary operators
-- **Binder**: Symbol creation, scopes, declaration merging, flow analysis (if/while)
-- **Checker**: Type inference, assignability, function types, generics, object types, type narrowing
+### ⚠️ ALWAYS USE DOCKER FOR RUST (prevents RAM explosion)
+
+```bash
+# Rust tests (do this constantly)
+cd wasm && docker build -t rust-wasm-tests . && docker run --rm --memory="1g" --cpus="2.0" rust-wasm-tests
+
+# Specific test
+cd wasm && docker build -t rust-wasm-tests . && docker run --rm --memory="1g" --cpus="2.0" rust-wasm-tests cargo test test_name
+
+# Full TypeScript test suite (before committing)
+docker run --rm -v $(pwd):/workspace typescript-wasm npx hereby runtests-parallel
+
+# Build compiler
+docker run --rm -v $(pwd):/workspace typescript-wasm npx hereby local
+
+# Lint & format (required before commit)
+docker run --rm -v $(pwd):/workspace typescript-wasm npx hereby lint
+docker run --rm -v $(pwd):/workspace typescript-wasm npx hereby format
+
+# Verify components
+node scripts/verifyScanner.mjs
+node scripts/verifyParser.mjs
+```
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `wasm/src/scanner_impl.rs` | Token scanning |
+| `wasm/src/checker.rs` | Type checking (~8000 lines, main focus) |
 | `wasm/src/parser.rs` | AST node definitions |
 | `wasm/src/parser_impl.rs` | Parsing logic |
 | `wasm/src/binder.rs` | Symbol binding |
-| `wasm/src/checker.rs` | Type checking |
-| `src/compiler/wasm.ts` | WASM bridge |
-
-## Documentation
-
-| Document | Purpose |
-|----------|---------|
-| `docs/TYPE_CHECKER_MINDMAP.md` | Visual type system architecture and flow |
-| `docs/TYPE_CHECKER_DESIGN.md` | High-level checker design decisions |
-| `docs/TYPE_CHECKER_IMPLEMENTATION.md` | Implementation details and patterns |
-| `docs/TYPESCRIPT_LANGUAGE_SPECIFICATION.md` | TypeScript language spec reference |
-| `docs/TYPESCRIPT_ADVANCED_TYPES.md` | Advanced type system features |
-
-## Commands
-
-### ⚠️ CRITICAL: ALWAYS USE DOCKER FOR RUST TESTS/BENCHMARKS ⚠️
-
-**NEVER run `cargo test` or `cargo bench` directly on the host machine!**
-This WILL consume excessive RAM and crash the system.
-
-**ALWAYS use Docker with memory limits:**
-
-```bash
-# Run all Rust tests (do this frequently!)
-cd wasm && docker build -t rust-wasm-tests . && docker run --rm --memory="1g" --cpus="2.0" rust-wasm-tests
-
-# Run specific test (MUST use Docker)
-cd wasm && docker build -t rust-wasm-tests . && docker run --rm --memory="1g" --cpus="2.0" rust-wasm-tests cargo test test_name_here
-
-# Run Rust benchmarks (MUST use Docker)
-cd wasm && docker build -t rust-wasm-tests . && docker run --rm --memory="2g" --cpus="4.0" rust-wasm-tests cargo bench
-
-# Build everything including WASM
-source ~/.cargo/env && npx hereby local
-
-# Test with Rust parser
-node built/local/tsc.js file.ts --useRustParser --noEmit
-
-# Verify components
-node scripts/verifyScanner.mjs src/compiler/checker.ts
-node scripts/verifyParser.mjs
-node scripts/verifyBinder.mjs
-```
-
-## Development Workflow
-
-### When Adding New Syntax
-1. **Parser**: Add AST node to `parser.rs`, parsing to `parser_impl.rs`
-2. **Binder**: Handle node in `bind_node()` if it declares symbols
-3. **Checker**: Add to `get_type_of_node_worker()` for type inference
-4. **Tests**: Add parser test + checker test
-
-### When Adding Type Features
-1. **Checker**: Add type variant to `Type` enum, update `TypeArena`
-2. **Parser**: Ensure corresponding type syntax is parsed
-3. **Checker**: Implement type relation rules in `is_type_assignable_to()`
+| `wasm/src/scanner_impl.rs` | Token scanning |
+| `src/compiler/wasm.ts` | WASM bridge to TypeScript |
+| `@fix_plan.md` | Task list (single source of truth) |
 
 ## Architecture
 
 ```
-Source Code
-    ↓
-┌─────────────────────┐
-│  Scanner (Rust)     │  Tokenizes source text
-└─────────────────────┘
-    ↓ tokens
-┌─────────────────────┐
-│  Parser (Rust)      │  Builds AST with NodeArena
-└─────────────────────┘
-    ↓ AST
-┌─────────────────────┐
-│  Binder (Rust)      │  Creates symbols in SymbolArena
-└─────────────────────┘
-    ↓ symbols
-┌─────────────────────┐
-│  Checker (Rust)     │  Type inference with TypeArena
-└─────────────────────┘
-    ↓ types + diagnostics
+Source → Scanner → Parser → Binder → Checker → Emitter
+         (Rust)    (Rust)   (Rust)   (Rust)    (TODO)
 ```
 
 ### Arena Pattern
+All major structures use arena allocation with IDs:
 - `NodeArena` + `NodeIndex` - AST nodes
-- `SymbolArena` + `SymbolId` - Symbols
+- `SymbolArena` + `SymbolId` - Symbols  
 - `TypeArena` + `TypeId` - Types
-- `FlowNodeArena` + `FlowNodeId` - Control flow nodes
+- `FlowNodeArena` + `FlowNodeId` - Control flow
 
-## Completed Features
+## Adding Features
 
-### Parser
-- [x] Assignment expressions (=, +=, -=, *=, etc.)
-- [x] Unary expressions (typeof, void, delete, await, ++, --, !, ~)
-- [x] Arrow functions with type parameters
-- [x] Generic function/type declarations
+### New Type Feature
+1. Add type variant to `Type` enum in `checker.rs`
+2. Update `TypeArena::create_*` method
+3. Handle in `is_type_assignable_to()` relation
+4. Add test: `#[test] fn test_feature_name()`
 
-### Checker
-- [x] Generic types (type parameters, constraints, defaults)
-- [x] Type instantiation (substituting type arguments)
-- [x] Object type checking (property access, type literals)
-- [x] Type narrowing (typeof guards, non-nullable)
-- [x] Function types with type parameters
+### New Syntax
+1. Add AST node to `parser.rs`
+2. Add parsing in `parser_impl.rs`
+3. Handle in `binder.rs` if declares symbols
+4. Handle in `checker.rs` `get_type_of_node_worker()`
 
-### Binder
-- [x] Flow analysis for if/while statements
-- [x] Flow node creation and antecedent tracking
+## Commit Format
+```
+[wasm] <component>: <description>
 
-## Current Tasks
+Examples:
+[wasm] checker: add discriminated union narrowing
+[wasm] parser: handle optional chaining in call expressions
+```
 
-### In Progress
-- [ ] Control flow based type narrowing (use flow nodes in checker)
-- [ ] Call expression type checking with generics
+## Known Blockers
 
-### Next Up
-- [ ] instanceof type guards
-- [ ] Class type checking
-- [ ] Index signatures
+| Issue | Location | Workaround |
+|-------|----------|------------|
+| Property access on unions hangs | interface resolution | Skip test, debug later |
 
-## Reference
-
-- `docs/TYPE_CHECKER_MINDMAP.md` - Visual type system architecture
-- `docs/TYPESCRIPT_LANGUAGE_SPECIFICATION.md` - Language spec for behavior reference
-- `docs/TYPESCRIPT_ADVANCED_TYPES.md` - Advanced type features guide
-- `~/code/typescript-go` - Microsoft's Go port for patterns
-- TypeScript `src/compiler/checker.ts` - Original implementation
+## Reference Docs
+- `docs/TYPE_CHECKER_MINDMAP.md` - Type system architecture
+- `docs/TYPE_CHECKER_IMPLEMENTATION.md` - Implementation patterns
+- `~/code/typescript-go` - Microsoft's Go port (reference for patterns)
+- `specs/migration_plan.md` - Full migration plan (read-only reference)

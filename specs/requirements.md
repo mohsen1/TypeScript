@@ -44,8 +44,36 @@ TypeScript modules while the compiler remains fully functional at every step.
 | Flag | Description |
 |------|-------------|
 | `--useRustScanner` | Use Rust scanner instead of TypeScript |
-| `--useRustParser` | Use Rust parser instead of TypeScript |
-| `--useRustChecker` | Use Rust type checker (future) |
+| `--useRustParser` | Use Rust parser instead of TypeScript (implies scanner) |
+| `--useRustChecker` | Use Rust type checker (future, implies parser) |
+
+### Running Tests with Rust Flags
+
+```bash
+# Run all tests with Rust scanner
+npx hereby runtests-parallel -- --useRustScanner
+
+# Run all tests with Rust parser
+npx hereby runtests-parallel -- --useRustParser
+
+# Run all tests with Rust checker (when ready)
+npx hereby runtests-parallel -- --useRustChecker
+
+# Run specific test suites
+npx hereby runtests --runner=fourslash -- --useRustScanner
+npx hereby runtests --runner=compiler -- --useRustParser
+
+# Run specific test file
+npx hereby runtests --tests=tests/cases/compiler/someTest.ts -- --useRustChecker
+```
+
+### Implementing a New Feature Flag
+
+1. **CommandLineOptionDeclarations** (`src/compiler/commandLineParser.ts`)
+2. **CompilerOptions interface** (`src/compiler/types.ts`)
+3. **Diagnostic message** (`src/compiler/diagnosticMessages.json`)
+4. **WASM bridge** (`src/compiler/wasm.ts`)
+5. **Integration point** in the relevant compiler phase
 
 ## Architectural Decisions
 

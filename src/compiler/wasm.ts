@@ -99,6 +99,16 @@ interface WasmScannerStateInstance {
     // Template rescan methods (Phase 2.7)
     reScanTemplateToken(isTaggedTemplate: boolean): number;
     reScanTemplateHeadOrNoSubstitutionTemplate(): number;
+    // JSX scanning methods
+    scanJsxIdentifier(): number;
+    scanJsxAttributeValue(): number;
+    reScanJsxAttributeValue(): number;
+    reScanJsxToken(allowMultilineJsxText?: boolean): number;
+    scanJsxToken(allowMultilineJsxText?: boolean): number;
+    reScanLessThanToken(): number;
+    reScanHashToken(): number;
+    reScanQuestionToken(): number;
+    reScanInvalidIdentifier(): number;
 }
 
 // =============================================================================

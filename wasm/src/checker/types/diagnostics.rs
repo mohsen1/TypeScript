@@ -5,15 +5,36 @@
 /// TypeScript diagnostic error codes.
 /// Matches codes from TypeScript's diagnosticMessages.json
 pub mod diagnostic_codes {
+    // =========================================================================
     // Scanner/Parser errors (1xxx)
+    // =========================================================================
     pub const UNTERMINATED_STRING_LITERAL: u32 = 1002;
     pub const IDENTIFIER_EXPECTED: u32 = 1003;
     pub const TOKEN_EXPECTED: u32 = 1005;  // '{0}' expected.
+    pub const TRAILING_COMMA_NOT_ALLOWED: u32 = 1009;
     pub const UNEXPECTED_TOKEN: u32 = 1012;
+    pub const REST_PARAMETER_MUST_BE_LAST: u32 = 1014;
+    pub const PARAMETER_CANNOT_HAVE_INITIALIZER: u32 = 1015;
+    pub const SETTER_CANNOT_HAVE_RETURN_TYPE: u32 = 1095;
+    pub const GETTER_MUST_NOT_HAVE_PARAMETERS: u32 = 1054;
+    pub const SETTER_MUST_HAVE_EXACTLY_ONE_PARAMETER: u32 = 1049;
+    pub const TYPE_PARAMETER_LIST_CANNOT_BE_EMPTY: u32 = 1098;
     pub const EXPRESSION_EXPECTED: u32 = 1109;
     pub const TYPE_EXPECTED: u32 = 1110;
+    pub const DECLARATION_EXPECTED: u32 = 1146;
+    pub const VARIABLE_DECLARATION_EXPECTED: u32 = 1134;
+    pub const PROPERTY_OR_SIGNATURE_EXPECTED: u32 = 1131;
+    pub const ENUM_MEMBER_EXPECTED: u32 = 1132;
+    pub const STATEMENT_EXPECTED: u32 = 1129;
+    pub const CATCH_OR_FINALLY_EXPECTED: u32 = 1472;
+    pub const DECORATORS_NOT_VALID_HERE: u32 = 1206;
+    pub const MODIFIERS_NOT_ALLOWED_HERE: u32 = 1184;
 
+    // =========================================================================
     // Type checking errors (2xxx)
+    // =========================================================================
+
+    // Basic type errors
     pub const DUPLICATE_IDENTIFIER: u32 = 2300;
     pub const CANNOT_FIND_NAME: u32 = 2304;
     pub const MODULE_HAS_NO_EXPORTED_MEMBER: u32 = 2305;
@@ -23,33 +44,115 @@ pub mod diagnostic_codes {
     pub const PROPERTY_MISSING_IN_TYPE: u32 = 2324;
     pub const TYPES_OF_PROPERTY_INCOMPATIBLE: u32 = 2326;
     pub const PROPERTY_DOES_NOT_EXIST_ON_TYPE: u32 = 2339;
-    pub const ARGUMENT_NOT_ASSIGNABLE_TO_PARAMETER: u32 = 2345;
-    pub const CANNOT_INVOKE_NON_FUNCTION: u32 = 2349;
-    pub const CANNOT_INVOKE_POSSIBLY_UNDEFINED: u32 = 2349;
-    pub const EXPECTED_ARGUMENTS: u32 = 2554;  // Expected {0} arguments, but got {1}
-    pub const EXPECTED_AT_LEAST_ARGUMENTS: u32 = 2555;
-    pub const OBJECT_IS_POSSIBLY_UNDEFINED: u32 = 2532;
-    pub const OBJECT_IS_POSSIBLY_NULL: u32 = 2531;
-    pub const OBJECT_IS_OF_TYPE_UNKNOWN: u32 = 2571;
-    pub const NOT_ALL_CODE_PATHS_RETURN_VALUE: u32 = 2366;
-    pub const FUNCTION_LACKS_RETURN_TYPE: u32 = 2355;
     pub const TYPE_HAS_NO_PROPERTY: u32 = 2339;
 
-    // Switch exhaustiveness
-    pub const SWITCH_NOT_EXHAUSTIVE: u32 = 2761;  // Not all code paths return a value
+    // Function/call errors
+    pub const ARGUMENT_NOT_ASSIGNABLE_TO_PARAMETER: u32 = 2345;
+    pub const CANNOT_INVOKE_NON_FUNCTION: u32 = 2349;
+    pub const CANNOT_INVOKE_POSSIBLY_UNDEFINED: u32 = 2722;
+    pub const EXPECTED_ARGUMENTS: u32 = 2554;  // Expected {0} arguments, but got {1}
+    pub const EXPECTED_AT_LEAST_ARGUMENTS: u32 = 2555;
+    pub const NO_OVERLOAD_MATCHES_CALL: u32 = 2769;
+    pub const EACH_OVERLOAD_SIGNATURE_MUST_HAVE_IMPLEMENTATION: u32 = 2391;
+    pub const NOT_ALL_CODE_PATHS_RETURN_VALUE: u32 = 2366;
+    pub const FUNCTION_LACKS_RETURN_TYPE: u32 = 2355;
+    pub const FUNCTION_RETURN_TYPE_MISMATCH: u32 = 2322;
 
-    // Object literal errors
-    pub const OBJECT_LITERAL_MAY_ONLY_SPECIFY_KNOWN_PROPERTIES: u32 = 2353;
-    pub const EXCESS_PROPERTY_CHECK: u32 = 2353;
-
-    // Index signature errors
-    pub const INDEX_SIGNATURE_MISSING: u32 = 2329;
-    pub const NO_INDEX_SIGNATURE: u32 = 7053;
-
-    // Function errors
-    pub const VOID_NOT_AWAITED: u32 = 2801;
+    // Null/undefined errors
+    pub const OBJECT_IS_POSSIBLY_UNDEFINED: u32 = 2532;
+    pub const OBJECT_IS_POSSIBLY_NULL: u32 = 2531;
+    pub const OBJECT_IS_POSSIBLY_NULL_OR_UNDEFINED: u32 = 2533;
+    pub const OBJECT_IS_OF_TYPE_UNKNOWN: u32 = 2571;
+    pub const CANNOT_READ_PROPERTY_OF_UNDEFINED: u32 = 2532;
 
     // Class errors
     pub const SUPER_ONLY_IN_DERIVED_CLASS: u32 = 2335;
     pub const THIS_CANNOT_BE_REFERENCED: u32 = 2332;
+    pub const PROPERTY_HAS_NO_INITIALIZER: u32 = 2564;
+    pub const ABSTRACT_PROPERTY_IN_NON_ABSTRACT_CLASS: u32 = 2515;
+    pub const CANNOT_ASSIGN_TO_READONLY_PROPERTY: u32 = 2540;
+    pub const CLASS_INCORRECTLY_IMPLEMENTS_INTERFACE: u32 = 2420;
+    pub const CLASS_INCORRECTLY_EXTENDS_BASE_CLASS: u32 = 2415;
+    pub const MEMBER_IS_NOT_ACCESSIBLE: u32 = 2341;
+    pub const PROPERTY_IS_PRIVATE: u32 = 2341;
+    pub const PROPERTY_IS_PROTECTED: u32 = 2445;
+    pub const CANNOT_EXTEND_SEALED_CLASS: u32 = 2509;
+    pub const CONSTRUCTOR_CANNOT_HAVE_RETURN_TYPE: u32 = 2380;
+    pub const STATIC_MEMBERS_CANNOT_REFERENCE_TYPE_PARAMETERS: u32 = 2302;
+
+    // Interface/type errors
+    pub const INTERFACE_CAN_ONLY_EXTEND_INTERFACE: u32 = 2422;
+    pub const TYPE_ALIAS_CIRCULARLY_REFERENCES_ITSELF: u32 = 2456;
+    pub const INTERFACE_DECLARES_CONFLICTING_MEMBER: u32 = 2320;
+
+    // Object literal errors
+    pub const OBJECT_LITERAL_MAY_ONLY_SPECIFY_KNOWN_PROPERTIES: u32 = 2353;
+    pub const EXCESS_PROPERTY_CHECK: u32 = 2353;
+    pub const PROPERTY_ASSIGNMENT_EXPECTED: u32 = 1136;
+    pub const DUPLICATE_PROPERTY: u32 = 2300;
+
+    // Index signature errors
+    pub const INDEX_SIGNATURE_MISSING: u32 = 2329;
+    pub const NO_INDEX_SIGNATURE: u32 = 7053;
+    pub const INDEX_SIGNATURE_PARAMETER_MUST_BE_STRING_OR_NUMBER: u32 = 1023;
+
+    // Switch/control flow
+    pub const SWITCH_NOT_EXHAUSTIVE: u32 = 2761;
+    pub const FALLTHROUGH_CASE: u32 = 7029;
+    pub const UNREACHABLE_CODE_DETECTED: u32 = 7027;
+
+    // Module/import errors
+    pub const CANNOT_FIND_MODULE: u32 = 2307;
+    pub const MODULE_NOT_FOUND: u32 = 2307;
+    pub const HAS_NO_DEFAULT_EXPORT: u32 = 2613;
+    pub const EXPORT_ASSIGNMENT_CANNOT_BE_USED: u32 = 2714;
+
+    // Promise/async errors
+    pub const AWAIT_OUTSIDE_ASYNC: u32 = 1308;
+    pub const TYPE_IS_NOT_A_PROMISE: u32 = 2345;
+    pub const VOID_NOT_AWAITED: u32 = 2801;
+    pub const ASYNC_FUNCTION_WITHOUT_AWAIT: u32 = 80006;
+
+    // Type parameter/generic errors
+    pub const TYPE_PARAMETER_CONSTRAINT_NOT_SATISFIED: u32 = 2344;
+    pub const TYPE_PARAMETER_CANNOT_HAVE_VARIANCE_MODIFIER: u32 = 2637;
+    pub const CONSTRAINT_OF_TYPE_PARAMETER: u32 = 2313;
+
+    // Enum errors
+    pub const ENUM_MEMBER_MUST_HAVE_INITIALIZER: u32 = 2432;
+    pub const CONST_ENUM_MEMBER_MUST_BE_INITIALIZED: u32 = 2474;
+    pub const COMPUTED_PROPERTY_NAME_IN_ENUM: u32 = 1164;
+
+    // Spread/rest errors
+    pub const SPREAD_ARGUMENT_MUST_BE_ARRAY: u32 = 2488;
+    pub const REST_ELEMENT_MUST_BE_LAST: u32 = 2462;
+
+    // JSX errors
+    pub const JSX_ELEMENT_HAS_NO_CORRESPONDING_CLOSING_TAG: u32 = 17002;
+    pub const EXPECTED_CORRESPONDING_JSX_CLOSING_TAG: u32 = 17002;
+    pub const JSX_ATTRIBUTES_MUST_ONLY_BE_ASSIGNED_A_NON_EMPTY_EXPRESSION: u32 = 17000;
+
+    // Decorator errors
+    pub const DECORATOR_CAN_ONLY_DECORATE_CLASS_OR_CLASS_MEMBER: u32 = 1249;
+    pub const DECORATOR_FUNCTION_RETURN_TYPE_NOT_COMPATIBLE: u32 = 1270;
+
+    // Assertion errors
+    pub const ASSERTION_FUNCTIONS_CAN_ONLY_BE_PRESENT_IN_VOID_RETURNING_FUNCTIONS: u32 = 1228;
+    pub const TYPE_PREDICATE_MUST_BE_BOOLEAN: u32 = 1228;
+
+    // Mapped type errors
+    pub const MAPPED_TYPE_MODIFIER_CAN_ONLY_BE_USED: u32 = 1071;
+
+    // Conditional type errors
+    pub const INFER_CAN_ONLY_BE_USED_IN_EXTENDS_CLAUSE: u32 = 1338;
+
+    // =========================================================================
+    // Warning codes (4xxx - 6xxx)
+    // =========================================================================
+    pub const UNUSED_VARIABLE: u32 = 6133;
+    pub const UNUSED_PARAMETER: u32 = 6133;
+    pub const UNUSED_IMPORT: u32 = 6133;
+    pub const IMPLICIT_ANY: u32 = 7005;
+    pub const IMPLICIT_ANY_RETURN: u32 = 7010;
+    pub const COULD_NOT_RESOLVE_TYPE: u32 = 7016;
 }

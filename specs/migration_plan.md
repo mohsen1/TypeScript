@@ -503,11 +503,78 @@ At every step, the following must pass:
 Feature Flags
 -------------
 Each Rust component has a runtime toggle:
-- `--useRustScanner`
-- `--useRustParser`
-- `--useRustChecker`
+- `--useRustScanner` - Routes scanner/lexer to Rust implementation
+- `--useRustParser` - Routes parser to Rust (implies scanner)
+- `--useRustChecker` - Routes type checker to Rust (implies parser)
 
 This allows A/B testing and safe rollback.
+
+### Running Tests with Rust Flags
+
+```bash
+# Run all tests with Rust scanner
+npx hereby runtests-parallel -- --useRustScanner
+
+# Run all tests with Rust parser
+npx hereby runtests-parallel -- --useRustParser
+
+# Run all tests with Rust checker (when ready)
+npx hereby runtests-parallel -- --useRustChecker
+
+# Run specific test suites with Rust
+npx hereby runtests --runner=fourslash -- --useRustScanner
+npx hereby runtests --runner=compiler -- --useRustParser
+
+# Run specific test file
+npx hereby runtests --tests=tests/cases/compiler/someTest.ts -- --useRustChecker
+```
+
+### Implementing a New Feature Flag
+
+To add a new `--useRust*` flag:
+
+1. **Add to CommandLineOptionDeclarations** (`src/compiler/commandLineParser.ts`):
+   ```typescript
+   {
+       name: "useRustChecker",
+       type: "boolean",
+       category: Diagnostics.Command_line_Options,
+       description: Diagnostics.Use_the_Rust_type_checker_via_WASM,
+       defaultValueDescription: false,
+   },
+   ```
+
+2. **Add to CompilerOptions interface** (`src/compiler/types.ts`):
+   ```typescript
+   useRustChecker?: boolean;
+   ```
+
+3. **Add diagnostic message** (`src/compiler/diagnosticMessages.json`):
+   ```json
+   "Use the Rust type checker via WASM.": {
+       "category": "Message",
+       "code": 6XXX
+   }
+   ```
+
+4. **Extend WASM bridge** (`src/compiler/wasm.ts`):
+   - Add new function exports from Rust WASM module
+   - Handle data marshalling between JS and Rust
+
+5. **Add integration point** (in the relevant compiler phase):
+   ```typescript
+   if (compilerOptions.useRustChecker) {
+       return wasmChecker.check(program);
+   }
+   // Fall through to existing TS implementation
+   ```
+
+### Hybrid Approach for Complex Components
+
+For the type checker, consider incremental sub-flags:
+- Start by routing specific checks to Rust
+- Gradually expand coverage
+- Fall back to TS checker on Rust failures during development
 
 Benchmark Suite
 ---------------

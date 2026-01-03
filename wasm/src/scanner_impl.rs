@@ -1430,6 +1430,13 @@ impl ScannerState {
         self.token = SyntaxKind::StringLiteral;
     }
 
+    /// Re-scan a JSX attribute value from the current token position.
+    #[wasm_bindgen(js_name = reScanJsxAttributeValue)]
+    pub fn re_scan_jsx_attribute_value(&mut self) -> SyntaxKind {
+        self.pos = self.token_start;
+        self.scan_jsx_attribute_value()
+    }
+
     /// Re-scan a `<` token in JSX context.
     /// Returns LessThanSlashToken if followed by `/`, otherwise LessThanToken.
     #[wasm_bindgen(js_name = reScanLessThanToken)]

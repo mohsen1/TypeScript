@@ -4,6 +4,7 @@
 //! and type guard/relation definitions.
 
 use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use serde::Serialize;
 use crate::binder::{SymbolId, SymbolArena, SymbolTable};
 use crate::parser::NodeIndex;
@@ -112,14 +113,14 @@ pub struct CheckerState<'a> {
     /// Local symbol arena for checker-created symbols.
     pub(crate) local_symbols: SymbolArena,
 
-    /// Cached types for symbols.
-    pub(crate) symbol_types: HashMap<SymbolId, TypeId>,
+    /// Cached types for symbols (FxHashMap for fast integer key hashing).
+    pub(crate) symbol_types: FxHashMap<SymbolId, TypeId>,
 
-    /// Cached types for nodes.
-    pub(crate) node_types: HashMap<NodeIndex, TypeId>,
+    /// Cached types for nodes (FxHashMap for fast integer key hashing).
+    pub(crate) node_types: FxHashMap<NodeIndex, TypeId>,
 
     /// Type parameter names for type_to_string.
-    pub(crate) type_parameter_names: HashMap<TypeId, String>,
+    pub(crate) type_parameter_names: FxHashMap<TypeId, String>,
 
     /// Current type parameter scope (name -> TypeId).
     pub(crate) type_parameter_scope: HashMap<String, TypeId>,
@@ -138,6 +139,11 @@ pub struct CheckerState<'a> {
 
     /// Contextual type for expression being checked.
     pub(crate) contextual_type: Option<TypeId>,
+
+    /// Cache for type relation results (source, target, relation) -> result.
+    /// Key: (source TypeId, target TypeId, relation as u8)
+    /// Value: true if related, false otherwise
+    pub(crate) relation_cache: FxHashMap<(TypeId, TypeId, u8), bool>,
 }
 
 impl<'a> CheckerState<'a> {
@@ -154,15 +160,16 @@ impl<'a> CheckerState<'a> {
             file_locals,
             types: TypeArena::new(),
             local_symbols: SymbolArena::new_with_base(SymbolArena::CHECKER_SYMBOL_BASE),
-            symbol_types: HashMap::new(),
-            node_types: HashMap::new(),
-            type_parameter_names: HashMap::new(),
+            symbol_types: FxHashMap::default(),
+            node_types: FxHashMap::default(),
+            type_parameter_names: FxHashMap::default(),
             type_parameter_scope: HashMap::new(),
             diagnostics: Vec::new(),
             symbol_resolution_stack: Vec::new(),
             node_resolution_stack: Vec::new(),
             file_name,
             contextual_type: None,
+            relation_cache: FxHashMap::default(),
         }
     }
 
