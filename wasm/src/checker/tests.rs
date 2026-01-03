@@ -3907,6 +3907,63 @@ let x = d["key"];
     }
 
     #[test]
+    fn test_checker_variance_extraction() {
+        // Test that the checker can extract variance from type parameters
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+        use crate::parser::Node;
+
+        let code = r#"
+interface Producer<out T> {
+    produce(): T;
+}
+interface Consumer<in T> {
+    consume(value: T): void;
+}
+interface Invariant<in out T> {
+    both(value: T): T;
+}
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Find the interface declarations and check variance
+        if let Some(Node::SourceFile(sf)) = parser.arena.get(root) {
+            // Producer<out T> - should be covariant (out only)
+            if let Some(Node::InterfaceDeclaration(iface)) = parser.arena.get(sf.statements.nodes[0]) {
+                let type_params = iface.type_parameters.as_ref().expect("Should have type parameters");
+                let (is_in, is_out) = checker.get_type_parameter_variance(type_params.nodes[0]);
+                assert!(!is_in && is_out, "Producer<out T> should be covariant: in={}, out={}", is_in, is_out);
+            }
+
+            // Consumer<in T> - should be contravariant (in only)
+            if let Some(Node::InterfaceDeclaration(iface)) = parser.arena.get(sf.statements.nodes[1]) {
+                let type_params = iface.type_parameters.as_ref().expect("Should have type parameters");
+                let (is_in, is_out) = checker.get_type_parameter_variance(type_params.nodes[0]);
+                assert!(is_in && !is_out, "Consumer<in T> should be contravariant: in={}, out={}", is_in, is_out);
+            }
+
+            // Invariant<in out T> - should be invariant (both in and out)
+            if let Some(Node::InterfaceDeclaration(iface)) = parser.arena.get(sf.statements.nodes[2]) {
+                let type_params = iface.type_parameters.as_ref().expect("Should have type parameters");
+                let (is_in, is_out) = checker.get_type_parameter_variance(type_params.nodes[0]);
+                assert!(is_in && is_out, "Invariant<in out T> should be invariant: in={}, out={}", is_in, is_out);
+            }
+        }
+    }
+
+    #[test]
     fn test_new_expression_basic() {
         use crate::parser_impl::ParserState;
         use crate::binder::BinderState;

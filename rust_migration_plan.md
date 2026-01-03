@@ -104,11 +104,11 @@ All of the following are complete:
 - [x] **5.56** Private/protected visibility enforcement
 - [x] **5.57** Abstract member implementation verification
 - [x] **5.58** `override` keyword validation
-- [ ] **5.59** Static blocks and auto-accessors (`accessor` keyword)
+- [ ] **5.59** Static blocks and auto-accessors (`accessor` keyword) - BLOCKED: needs parser support
 
 #### Modern Type Features (TS 4.x-5.x)
-- [ ] **5.60** Variance annotations (`in`/`out` modifiers)
-- [ ] **5.61** `satisfies` operator type checking
+- [x] **5.60** Variance annotations (`in`/`out` modifiers) - basic extraction, full enforcement TODO
+- [x] **5.61** `satisfies` operator type checking
 - [ ] **5.62** `const` type parameters (literal inference in generics)
 - [ ] **5.63** `NoInfer<T>` utility type
 - [ ] **5.64** `using` declarations (disposable resources)

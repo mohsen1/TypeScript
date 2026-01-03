@@ -426,6 +426,39 @@ impl<'a> CheckerState<'a> {
         }
     }
 
+    // =========================================================================
+    // Variance helpers
+    // =========================================================================
+
+    /// Get variance modifier from a type parameter.
+    /// Returns (is_in, is_out) tuple indicating contravariant and covariant positions.
+    pub fn get_type_parameter_variance(&self, type_param_idx: NodeIndex) -> (bool, bool) {
+        use crate::parser::Node;
+        use crate::scanner::SyntaxKind;
+
+        if let Some(Node::TypeParameterDeclaration(tp)) = self.node_arena.get(type_param_idx) {
+            if let Some(ref mods) = tp.modifiers {
+                let mut is_in = false;
+                let mut is_out = false;
+                for &mod_idx in &mods.nodes {
+                    if let Some(Node::Token(base)) = self.node_arena.get(mod_idx) {
+                        if base.kind == SyntaxKind::InKeyword as u16 {
+                            is_in = true;
+                        } else if base.kind == SyntaxKind::OutKeyword as u16 {
+                            is_out = true;
+                        }
+                    }
+                }
+                return (is_in, is_out);
+            }
+        }
+        (false, false)
+    }
+
+    // =========================================================================
+    // Base class helpers
+    // =========================================================================
+
     /// Get the base class symbol from a class declaration's heritage clauses.
     /// Returns None if there's no extends clause.
     pub fn get_base_class_symbol(&self, heritage_clauses: &Option<crate::parser::NodeList>) -> Option<crate::binder::SymbolId> {
