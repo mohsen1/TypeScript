@@ -760,18 +760,89 @@ impl<'a> CheckerState<'a> {
             return return_type;
         }
 
-        // If it's an object with call signatures, use those
+        // If it's an object with call signatures, use those (handles overloads)
         if let Some(Type::Object(obj)) = self.types.get(func_type) {
             if !obj.call_signatures.is_empty() {
-                // For now, use the first call signature's return type
-                if let Some(return_type) = obj.call_signatures[0].resolved_return_type {
-                    return return_type;
-                }
+                let call_sigs = obj.call_signatures.clone();
+                return self.resolve_call_with_overloads(expression, &call_sigs, arguments);
             }
         }
 
         // Default to any for unknown callable types
         self.types.any_type
+    }
+
+    /// Resolve a call to a function with multiple overload signatures.
+    /// Returns the return type of the first matching overload.
+    fn resolve_call_with_overloads(
+        &mut self,
+        call_node: NodeIndex,
+        signatures: &[Signature],
+        arguments: &crate::parser::NodeList,
+    ) -> TypeId {
+        let arg_count = arguments.nodes.len();
+
+        // Collect argument types upfront
+        let arg_types: Vec<TypeId> = arguments.nodes.iter()
+            .map(|&arg| self.get_type_of_node(arg))
+            .collect();
+
+        // Try each overload in order
+        for sig in signatures {
+            // Check argument count
+            let param_count = sig.parameters.len();
+            let min_args = sig.min_argument_count as usize;
+            let has_rest = (sig.flags & signature_flags::HAS_REST_PARAMETER) != 0;
+
+            // Too few arguments?
+            if arg_count < min_args {
+                continue;
+            }
+
+            // Too many arguments (and no rest)?
+            if arg_count > param_count && !has_rest {
+                continue;
+            }
+
+            // Check each argument against its parameter type
+            let mut matches = true;
+            for (i, &arg_type) in arg_types.iter().enumerate() {
+                if i >= param_count {
+                    if !has_rest {
+                        matches = false;
+                        break;
+                    }
+                    // Rest parameter - would need to check against rest element type
+                    continue;
+                }
+
+                let param_symbol = sig.parameters[i];
+                let param_type = self.symbol_types.get(&param_symbol)
+                    .copied()
+                    .unwrap_or(self.types.any_type);
+
+                if !self.is_type_assignable_to(arg_type, param_type) {
+                    matches = false;
+                    break;
+                }
+            }
+
+            if matches {
+                return sig.resolved_return_type.unwrap_or(self.types.any_type);
+            }
+        }
+
+        // No matching overload found
+        self.error(
+            call_node,
+            "No overload matches this call.",
+            diagnostic_codes::NO_OVERLOAD_MATCHES_CALL
+        );
+
+        // Return the first overload's return type as fallback
+        signatures.first()
+            .and_then(|s| s.resolved_return_type)
+            .unwrap_or(self.types.any_type)
     }
 
     /// Infer type arguments for a generic function call from the provided arguments.

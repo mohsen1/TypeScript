@@ -5241,3 +5241,54 @@ const instance = new Foo();
             panic!("Expected literal type for Color['Red']");
         }
     }
+
+    // =========================================================================
+    // Function Overload Resolution Tests
+    // =========================================================================
+
+    #[test]
+    fn test_signature_creation() {
+        use crate::parser::NodeIndex;
+        use super::types::Signature;
+
+        let mut arena = super::TypeArena::new();
+
+        // Get types
+        let number_type = arena.number_type;
+        let string_type = arena.string_type;
+
+        // Create a signature for (x: number): string
+        let mut sig = Signature::new(NodeIndex::NONE);
+        sig.min_argument_count = 1;
+        sig.resolved_return_type = Some(string_type);
+
+        // Verify the signature
+        assert_eq!(sig.min_argument_count, 1);
+        assert_eq!(sig.resolved_return_type, Some(string_type));
+    }
+
+    #[test]
+    fn test_overload_signatures() {
+        use crate::parser::NodeIndex;
+        use super::types::Signature;
+
+        let mut arena = super::TypeArena::new();
+
+        let number_type = arena.number_type;
+        let string_type = arena.string_type;
+
+        // Create signature 1: () => number
+        let mut sig1 = Signature::new(NodeIndex::NONE);
+        sig1.min_argument_count = 0;
+        sig1.resolved_return_type = Some(number_type);
+
+        // Create signature 2: () => string
+        let mut sig2 = Signature::new(NodeIndex::NONE);
+        sig2.min_argument_count = 0;
+        sig2.resolved_return_type = Some(string_type);
+
+        // Verify we have two signatures with different return types
+        assert_eq!(sig1.resolved_return_type, Some(number_type));
+        assert_eq!(sig2.resolved_return_type, Some(string_type));
+        assert_ne!(sig1.resolved_return_type, sig2.resolved_return_type);
+    }

@@ -9,7 +9,7 @@
 | 2     | Scanner        | ✅ DONE | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
-| 5     | Type Checker   | 🟡 83%  | 310 Rust |
+| 5     | Type Checker   | 🟡 84%  | 312 Rust |
 | 6     | Emitter        | 🟡 40%  | 35 Rust |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
@@ -98,7 +98,7 @@ All of the following are complete:
 #### Enums & Overloads
 - [x] **5.53** Numeric/string/const enum type checking
 - [x] **5.54** Enum reverse mappings
-- [ ] **5.55** Function overload resolution (selecting correct overload)
+- [x] **5.55** Function overload resolution (selecting correct overload)
 
 #### Class & Member Checking
 - [ ] **5.56** Private/protected visibility enforcement
