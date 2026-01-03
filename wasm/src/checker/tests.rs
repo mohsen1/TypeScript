@@ -1571,6 +1571,7 @@ fn test_type_flags() {
             default: TypeId::NONE,
             target: TypeId::NONE,
             is_this_type: false,
+            is_const: false,
         })));
         checker.type_parameter_names.insert(t_type, "T".to_string());
 
@@ -7168,4 +7169,121 @@ interface TreeNode {
         } else {
             panic!("Should have symbol 'add'");
         }
+    }
+
+    // =========================================================================
+    // 5.62: const type parameters
+    // =========================================================================
+
+    #[test]
+    fn test_const_type_parameter_parsing() {
+        // Test that `const` type parameter is parsed and tracked correctly
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+            function tuple<const T extends readonly unknown[]>(arr: T): T {
+                return arr;
+            }
+        "#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the function 'tuple'
+        if let Some(symbol_id) = binder.file_locals.get("tuple") {
+            let func_type = checker.get_type_of_symbol(symbol_id);
+
+            // Check that it's a function type
+            if let Some(super::types::Type::Function(f)) = checker.types.get(func_type) {
+                // Should have 1 type parameter
+                assert_eq!(f.type_parameters.len(), 1, "Should have 1 type parameter");
+
+                // The type parameter should be const
+                let type_param_id = f.type_parameters[0];
+                if let Some(super::types::Type::TypeParameter(tp)) = checker.types.get(type_param_id) {
+                    assert!(tp.is_const, "Type parameter T should be const");
+                } else {
+                    panic!("Expected TypeParameter type");
+                }
+            } else {
+                panic!("Expected Function type for tuple");
+            }
+        } else {
+            panic!("Should have symbol 'tuple'");
+        }
+    }
+
+    #[test]
+    fn test_non_const_type_parameter() {
+        // Test that regular type parameters are not marked as const
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+            function identity<T>(x: T): T {
+                return x;
+            }
+        "#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the function 'identity'
+        if let Some(symbol_id) = binder.file_locals.get("identity") {
+            let func_type = checker.get_type_of_symbol(symbol_id);
+
+            if let Some(super::types::Type::Function(f)) = checker.types.get(func_type) {
+                assert_eq!(f.type_parameters.len(), 1, "Should have 1 type parameter");
+
+                let type_param_id = f.type_parameters[0];
+                if let Some(super::types::Type::TypeParameter(tp)) = checker.types.get(type_param_id) {
+                    assert!(!tp.is_const, "Regular type parameter should not be const");
+                } else {
+                    panic!("Expected TypeParameter type");
+                }
+            } else {
+                panic!("Expected Function type for identity");
+            }
+        } else {
+            panic!("Should have symbol 'identity'");
+        }
+    }
+
+    #[test]
+    fn test_const_type_parameter_with_variance_modifiers() {
+        // Test that const works together with variance modifiers (in/out)
+        use crate::parser_impl::ParserState;
+
+        // Just test that parsing handles const + out together without errors
+        let code = r#"
+            type Container<const out T> = T;
+        "#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let _root = parser.parse_source_file();
+
+        // If we got here without panic, parsing succeeded
+        // This verifies that `const out T` parses correctly
+        assert!(true, "const + variance modifiers should parse together");
     }

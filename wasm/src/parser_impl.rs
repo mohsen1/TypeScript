@@ -3484,22 +3484,35 @@ impl ParserState {
     }
 
     /// Check if current token can start a type parameter.
-    /// Type parameters can start with 'in', 'out', or an identifier.
+    /// Type parameters can start with 'const', 'in', 'out', or an identifier.
     fn is_type_parameter_start(&self) -> bool {
         self.scanner.is_identifier()
             || self.is_token(SyntaxKind::InKeyword)
             || self.is_token(SyntaxKind::OutKeyword)
+            || self.is_token(SyntaxKind::ConstKeyword)
     }
 
-    /// Parse variance modifiers (in/out) for type parameters.
+    /// Parse modifiers (const/in/out) for type parameters.
     fn parse_type_parameter_modifiers(&mut self) -> Option<NodeList> {
-        // Check for 'in' or 'out' modifiers
-        if !self.is_token(SyntaxKind::InKeyword) && !self.is_token(SyntaxKind::OutKeyword) {
+        // Check for 'const', 'in' or 'out' modifiers
+        if !self.is_token(SyntaxKind::ConstKeyword)
+            && !self.is_token(SyntaxKind::InKeyword)
+            && !self.is_token(SyntaxKind::OutKeyword)
+        {
             return None;
         }
 
         let pos = self.get_full_start();
         let mut modifiers = Vec::new();
+
+        // Parse 'const' modifier (must come first if present)
+        if self.is_token(SyntaxKind::ConstKeyword) {
+            let mod_pos = self.get_full_start();
+            self.next_token();
+            let mod_end = self.get_token_start();
+            let modifier = self.alloc_node(Node::Token(NodeBase::new(SyntaxKind::ConstKeyword, mod_pos, mod_end)));
+            modifiers.push(modifier);
+        }
 
         // Parse 'in' modifier
         if self.is_token(SyntaxKind::InKeyword) {

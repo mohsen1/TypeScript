@@ -189,6 +189,9 @@ pub struct TypeParameter {
     pub default: TypeId,       // default type
     pub target: TypeId,        // For substitution
     pub is_this_type: bool,
+    /// Whether this is a `const` type parameter (TS 5.0+): function foo<const T>()
+    /// Const type parameters cause literal inference (e.g., ['a', 'b'] instead of string[])
+    pub is_const: bool,
 }
 
 impl TypeParameter {
@@ -200,6 +203,7 @@ impl TypeParameter {
             default: TypeId::NONE,
             target: TypeId::NONE,
             is_this_type: false,
+            is_const: false,
         }
     }
 }

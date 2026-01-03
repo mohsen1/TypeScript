@@ -2878,6 +2878,7 @@ impl<'a> CheckerState<'a> {
     /// Create a TypeParameter from a TypeParameterDeclaration node.
     fn create_type_parameter(&mut self, node: NodeIndex) -> Option<TypeId> {
         use crate::parser::Node;
+        use crate::scanner::SyntaxKind;
 
         let tp = match self.node_arena.get(node)? {
             Node::TypeParameterDeclaration(tp) => tp,
@@ -2889,6 +2890,19 @@ impl<'a> CheckerState<'a> {
             id.escaped_text.clone()
         } else {
             return None;
+        };
+
+        // Check for 'const' modifier in type parameter
+        let is_const = if let Some(ref modifiers) = tp.modifiers {
+            modifiers.nodes.iter().any(|&mod_idx| {
+                if let Some(Node::Token(token_base)) = self.node_arena.get(mod_idx) {
+                    token_base.kind == SyntaxKind::ConstKeyword as u16
+                } else {
+                    false
+                }
+            })
+        } else {
+            false
         };
 
         // Create a symbol for the type parameter
@@ -2916,6 +2930,7 @@ impl<'a> CheckerState<'a> {
             default,
             target: TypeId::NONE,
             is_this_type: false,
+            is_const,
         };
 
         // Store the name for type_to_string

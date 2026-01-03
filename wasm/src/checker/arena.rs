@@ -595,6 +595,20 @@ impl TypeArena {
             default,
             target: TypeId::NONE,
             is_this_type: false,
+            is_const: false,
+        })))
+    }
+
+    /// Create a const type parameter (TS 5.0+: `function foo<const T>()`).
+    pub fn create_const_type_parameter(&mut self, symbol: SymbolId, constraint: TypeId, default: TypeId) -> TypeId {
+        self.alloc(Type::TypeParameter(Box::new(TypeParameter {
+            flags: type_flags::TYPE_PARAMETER,
+            symbol,
+            constraint,
+            default,
+            target: TypeId::NONE,
+            is_this_type: false,
+            is_const: true,
         })))
     }
 
