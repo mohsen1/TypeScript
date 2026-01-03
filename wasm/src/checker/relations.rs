@@ -188,6 +188,20 @@ impl<'a> CheckerState<'a> {
             return true;
         }
 
+        // Unique symbol type compatibility
+        // unique symbols are only assignable to themselves or to general symbol type
+        if let Type::UniqueSymbol(src_sym) = source_type {
+            if let Type::UniqueSymbol(tgt_sym) = target_type {
+                // Unique symbols are only compatible if they're the same symbol
+                return src_sym.symbol == tgt_sym.symbol;
+            }
+            // Unique symbol is assignable to general symbol type
+            if (target_flags & type_flags::ES_SYMBOL) != 0 {
+                return true;
+            }
+            return false;
+        }
+
         false
     }
 

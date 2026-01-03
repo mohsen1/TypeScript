@@ -7473,3 +7473,109 @@ type ObjectWithThis = Methods & ThisType<{ name: string }>;
             panic!("Expected ThisType");
         }
     }
+
+    // ============== 5.105: unique symbol type ==============
+    #[test]
+    fn test_unique_symbol_arena_creation() {
+        use crate::binder::SymbolId;
+
+        // Test direct arena creation of unique symbol type
+        let mut arena = super::TypeArena::new();
+
+        // Create two unique symbol types with different symbols
+        let sym1 = arena.create_unique_symbol_type(SymbolId(1), "sym1".to_string());
+        let sym2 = arena.create_unique_symbol_type(SymbolId(2), "sym2".to_string());
+
+        // Verify the types are created correctly
+        if let Some(super::types::Type::UniqueSymbol(s)) = arena.get(sym1) {
+            assert_eq!(s.symbol, SymbolId(1), "sym1 should have SymbolId(1)");
+            assert_eq!(s.name, "sym1", "sym1 should have name 'sym1'");
+            assert_eq!(s.flags, super::types::type_flags::UNIQUE_ES_SYMBOL);
+        } else {
+            panic!("Expected UniqueSymbol type for sym1");
+        }
+
+        if let Some(super::types::Type::UniqueSymbol(s)) = arena.get(sym2) {
+            assert_eq!(s.symbol, SymbolId(2), "sym2 should have SymbolId(2)");
+            assert_eq!(s.name, "sym2", "sym2 should have name 'sym2'");
+        } else {
+            panic!("Expected UniqueSymbol type for sym2");
+        }
+    }
+
+    #[test]
+    fn test_unique_symbol_equality() {
+        use crate::binder::SymbolId;
+        use crate::checker::state::{CheckerState, TypeRelation};
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Create a minimal checker to test type relations
+        let code = "";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Create unique symbols
+        let sym1a = checker.types.create_unique_symbol_type(SymbolId(1), "sym1".to_string());
+        let sym1b = checker.types.create_unique_symbol_type(SymbolId(1), "sym1".to_string()); // same symbol
+        let sym2 = checker.types.create_unique_symbol_type(SymbolId(2), "sym2".to_string());
+
+        // Same symbol should be assignable
+        assert!(
+            checker.is_type_related_to(sym1a, sym1b, TypeRelation::Assignable),
+            "unique symbol with same symbol should be assignable"
+        );
+
+        // Different symbols should NOT be assignable
+        assert!(
+            !checker.is_type_related_to(sym1a, sym2, TypeRelation::Assignable),
+            "unique symbols with different symbols should NOT be assignable"
+        );
+
+        // Unique symbol should be assignable to general symbol type
+        let symbol_type = checker.types.es_symbol_type;
+        assert!(
+            checker.is_type_related_to(sym1a, symbol_type, TypeRelation::Assignable),
+            "unique symbol should be assignable to symbol type"
+        );
+    }
+
+    #[test]
+    fn test_unique_symbol_type_string() {
+        use crate::binder::SymbolId;
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = "";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Create a unique symbol type
+        let unique_sym = checker.types.create_unique_symbol_type(SymbolId(42), "mySymbol".to_string());
+
+        // Check type to string
+        let type_str = checker.type_to_string(unique_sym);
+        assert!(
+            type_str.contains("mySymbol"),
+            "unique symbol type string should contain the name, got: {}",
+            type_str
+        );
+    }

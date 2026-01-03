@@ -723,6 +723,9 @@ impl<'a> CheckerState<'a> {
                 let constraint_str = self.type_to_string(t.constraint);
                 format!("ThisType<{}>", constraint_str)
             }
+            Type::UniqueSymbol(s) => {
+                format!("typeof {}", s.name)
+            }
         }
     }
 

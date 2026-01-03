@@ -130,7 +130,7 @@ All of the following are complete:
 #### Type Syntax Interpretation (Parsed but needs checker support)
 - [x] **5.103** `typeof` type operator (get type of runtime expression)
 - [x] **5.104** Mapped type modifiers (`+readonly`, `-readonly`, `+?`, `-?`)
-- [ ] **5.105** `unique symbol` type for const symbol declarations
+- [x] **5.105** `unique symbol` type for const symbol declarations
 - [x] **5.106** `this` parameter types (`function foo(this: T, ...)`)
 - [ ] **5.107** Abstract construct signatures (`abstract new () => T`)
 - [x] **5.108** Call/construct signatures in type literals (`{ (): void }`, `{ new(): T }`)

@@ -348,6 +348,18 @@ pub struct ThisTypeMarker {
     pub constraint: TypeId,
 }
 
+/// A unique symbol type.
+/// `const sym: unique symbol = Symbol();` creates a unique type for that specific symbol.
+/// Each unique symbol declaration creates a distinct, incompatible type.
+#[derive(Clone, Debug, Serialize)]
+pub struct UniqueSymbolType {
+    pub flags: u32,
+    /// The symbol (variable) that this unique symbol is tied to
+    pub symbol: SymbolId,
+    /// Name for display purposes
+    pub name: String,
+}
+
 // =============================================================================
 // Type Enum
 // =============================================================================
@@ -374,6 +386,8 @@ pub enum Type {
     Enum(Box<EnumTypeInfo>),
     /// ThisType<T> marker - specifies 'this' type in object literal methods
     ThisType(Box<ThisTypeMarker>),
+    /// Unique symbol type - each declaration creates a distinct type
+    UniqueSymbol(Box<UniqueSymbolType>),
 }
 
 impl Type {
@@ -397,6 +411,7 @@ impl Type {
             Type::Tuple(t) => t.flags,
             Type::Enum(t) => t.flags,
             Type::ThisType(t) => t.flags,
+            Type::UniqueSymbol(t) => t.flags,
         }
     }
 

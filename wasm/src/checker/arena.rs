@@ -12,7 +12,7 @@ use super::types::{
     ObjectType, UnionType, IntersectionType, TypeParameter,
     ConditionalType, MappedType, MappedTypeModifier, IndexType, IndexedAccessType,
     TemplateLiteralType, FunctionType, ArrayTypeInfo, TupleTypeInfo,
-    EnumTypeInfo, ThisTypeMarker, Signature, IndexInfo,
+    EnumTypeInfo, ThisTypeMarker, UniqueSymbolType, Signature, IndexInfo,
 };
 
 /// Arena allocator for types with singleton caching.
@@ -404,6 +404,16 @@ impl TypeArena {
         self.alloc(Type::ThisType(Box::new(ThisTypeMarker {
             flags: type_flags::OBJECT,
             constraint,
+        })))
+    }
+
+    /// Create a unique symbol type.
+    /// Each unique symbol declaration (const x: unique symbol = Symbol()) creates a distinct type.
+    pub fn create_unique_symbol_type(&mut self, symbol: SymbolId, name: String) -> TypeId {
+        self.alloc(Type::UniqueSymbol(Box::new(UniqueSymbolType {
+            flags: type_flags::UNIQUE_ES_SYMBOL,
+            symbol,
+            name,
         })))
     }
 
