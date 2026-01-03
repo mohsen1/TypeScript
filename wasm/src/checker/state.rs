@@ -198,6 +198,10 @@ pub struct CheckerState<'a> {
 
     /// Current depth of recursive type instantiation (for depth limits).
     pub(crate) instantiation_depth: RefCell<u32>,
+
+    /// Cache for awaited type results: TypeId → awaited TypeId.
+    /// Avoids recomputing Promise unwrapping for the same type.
+    pub(crate) awaited_type_cache: RefCell<FxHashMap<TypeId, TypeId>>,
 }
 
 /// Maximum depth for recursive type instantiation (conditional types, etc.).
@@ -232,6 +236,7 @@ impl<'a> CheckerState<'a> {
             relation_cache: RefCell::new(FxHashMap::default()),
             enclosing_class: None,
             instantiation_depth: RefCell::new(0),
+            awaited_type_cache: RefCell::new(FxHashMap::default()),
         }
     }
 

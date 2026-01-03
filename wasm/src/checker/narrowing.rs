@@ -177,8 +177,17 @@ impl<'a> CheckerState<'a> {
     /// Get the awaited type of a Promise-like type.
     /// Recursively unwraps Promise<T> to get T.
     /// For non-Promise types, returns the type unchanged.
+    /// Results are cached for performance.
     pub fn get_awaited_type(&mut self, type_id: TypeId) -> TypeId {
-        self.get_awaited_type_with_depth(type_id, 0)
+        // Check cache first
+        if let Some(&cached) = self.awaited_type_cache.borrow().get(&type_id) {
+            return cached;
+        }
+
+        // Compute and cache
+        let result = self.get_awaited_type_with_depth(type_id, 0);
+        self.awaited_type_cache.borrow_mut().insert(type_id, result);
+        result
     }
 
     /// Get awaited type with recursion depth limit.

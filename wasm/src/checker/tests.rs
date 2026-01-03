@@ -6356,3 +6356,47 @@ interface TreeNode {
         let cache_size = checker.relation_cache.borrow().len();
         assert!(cache_size >= 2, "Cache should have at least 2 entries");
     }
+
+    #[test]
+    fn test_awaited_type_cache() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = "let x: Promise<string>;";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Verify awaited cache is initially empty
+        assert!(checker.awaited_type_cache.borrow().is_empty());
+
+        // Get awaited type for a simple type (should be cached)
+        let string_type = checker.types.string_type;
+        let awaited1 = checker.get_awaited_type(string_type);
+        assert_eq!(awaited1, string_type, "Awaited<string> should be string");
+
+        // Cache should now have an entry
+        assert!(!checker.awaited_type_cache.borrow().is_empty());
+
+        // Second call should use cache
+        let awaited2 = checker.get_awaited_type(string_type);
+        assert_eq!(awaited2, string_type);
+
+        // Get awaited type for number
+        let number_type = checker.types.number_type;
+        let awaited_num = checker.get_awaited_type(number_type);
+        assert_eq!(awaited_num, number_type, "Awaited<number> should be number");
+
+        // Cache should have multiple entries
+        let cache_size = checker.awaited_type_cache.borrow().len();
+        assert!(cache_size >= 2, "Cache should have at least 2 entries");
+    }
