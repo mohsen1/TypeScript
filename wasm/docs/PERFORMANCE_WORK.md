@@ -152,3 +152,19 @@ fn skip_whitespace(&mut self) {
 1.  **Refactor `Scanner` first**: It's self-contained. Moving to `&[u8]` will break things but fix the foundation.
 2.  **Add `Interner`**: Thread it through `ParserState`.
 3.  **Benchmark**: Run `cargo bench` after these two changes. You should see a 2-5x throughput improvement.
+
+---
+
+## Completed Optimizations (2026-01-03)
+
+### ✅ FxHashMap for SymbolTable
+Changed `SymbolTable` from `std::collections::HashMap` to `rustc_hash::FxHashMap` for 2-3x faster hashing on string keys. The compiler is a short-lived process where SipHash's DoS resistance is unnecessary.
+
+**File**: `wasm/src/binder.rs`
+
+### ✅ Box Large Type Enum Variants
+All large variants in the `Type` enum are now boxed to keep the enum size small (~8-16 bytes per variant instead of 150+ bytes). This improves cache locality during type traversal.
+
+**Boxed variants**: Object, TypeReference, Union, Intersection, TypeParameter, Conditional, Mapped, IndexedAccess, Index, TemplateLiteral, Function, Array, Tuple, Enum
+
+**File**: `wasm/src/checker/types/type_def.rs`

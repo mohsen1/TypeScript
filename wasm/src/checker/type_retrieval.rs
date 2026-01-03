@@ -1607,7 +1607,7 @@ impl<'a> CheckerState<'a> {
 
         // 3. Create a placeholder ObjectType and cache it immediately to break recursion cycles
         let placeholder = ObjectType::new(object_flags::CLASS, class_symbol_id);
-        let placeholder_type_id = self.types.alloc(Type::Object(placeholder));
+        let placeholder_type_id = self.types.alloc(Type::Object(Box::new(placeholder)));
         self.node_types.insert(node, placeholder_type_id);
         if !class_symbol_id.is_none() {
             self.symbol_types.insert(class_symbol_id, placeholder_type_id);
@@ -1796,7 +1796,7 @@ impl<'a> CheckerState<'a> {
 
         // 2. Create a placeholder ObjectType
         let obj = ObjectType::new(object_flags::INTERFACE, interface_symbol_id);
-        let type_id = self.types.alloc(Type::Object(obj));
+        let type_id = self.types.alloc(Type::Object(Box::new(obj)));
 
         // 3. Cache it immediately to break recursion cycles
         self.node_types.insert(node, type_id);
@@ -2034,7 +2034,7 @@ impl<'a> CheckerState<'a> {
         obj.properties = properties;
         obj.members = members_table;
         obj.index_infos = index_infos;
-        self.types.alloc(Type::Object(obj))
+        self.types.alloc(Type::Object(Box::new(obj)))
     }
 
     /// Get the type of a property access expression (obj.prop).
@@ -2077,6 +2077,13 @@ impl<'a> CheckerState<'a> {
                 &format!("Property '{}' does not exist on type '{}'.", prop_name, type_str),
                 diagnostic_codes::PROPERTY_DOES_NOT_EXIST_ON_TYPE
             );
+        }
+
+        // Check visibility (private/protected) if property was found
+        if found {
+            if let Some(prop_symbol) = self.get_property_symbol(expr_type, &prop_name) {
+                self.check_property_visibility(prop_symbol, &prop_name, name);
+            }
         }
 
         prop_type
@@ -2162,6 +2169,84 @@ impl<'a> CheckerState<'a> {
         // Use the with_check version but ignore the found flag
         let (prop_type, _) = self.get_property_type_with_check(object_type, prop_name);
         prop_type
+    }
+
+    /// Get the symbol for a property on an object type (for visibility checks).
+    fn get_property_symbol(&self, object_type: TypeId, prop_name: &str) -> Option<SymbolId> {
+        let Some(typ) = self.types.get(object_type) else {
+            return None;
+        };
+
+        match typ {
+            Type::Object(obj) => {
+                // Look up property in object's members
+                if let Some(symbol_id) = obj.members.get(prop_name) {
+                    return Some(symbol_id);
+                }
+                // Fallback to properties list
+                for &prop_id in &obj.properties {
+                    if let Some(sym) = self.get_symbol(prop_id) {
+                        if sym.escaped_name == prop_name {
+                            return Some(prop_id);
+                        }
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    /// Check visibility of a property access and report error if not allowed.
+    /// Returns true if access is allowed, false otherwise.
+    fn check_property_visibility(
+        &mut self,
+        prop_symbol: SymbolId,
+        prop_name: &str,
+        error_node: NodeIndex,
+    ) -> bool {
+        use crate::binder::symbol_flags;
+
+        let Some(sym) = self.get_symbol(prop_symbol) else {
+            return true; // If we can't find the symbol, allow access
+        };
+
+        let is_private = (sym.flags & symbol_flags::PRIVATE) != 0;
+        let is_protected = (sym.flags & symbol_flags::PROTECTED) != 0;
+
+        if !is_private && !is_protected {
+            return true; // Public access is always allowed
+        }
+
+        // Private: only accessible within the same class
+        if is_private {
+            if self.enclosing_class.is_none() {
+                self.error(
+                    error_node,
+                    &format!("Property '{}' is private and only accessible within the class.", prop_name),
+                    diagnostic_codes::PROPERTY_IS_PRIVATE
+                );
+                return false;
+            }
+            // For now, we allow access if we're inside any class
+            // A more complete check would verify it's the same class that declares the property
+        }
+
+        // Protected: accessible within the class and derived classes
+        if is_protected {
+            if self.enclosing_class.is_none() {
+                self.error(
+                    error_node,
+                    &format!("Property '{}' is protected and only accessible within the class and its subclasses.", prop_name),
+                    diagnostic_codes::PROPERTY_IS_PROTECTED
+                );
+                return false;
+            }
+            // For now, we allow access if we're inside any class
+            // A more complete check would verify class hierarchy
+        }
+
+        true
     }
 
     /// Get the type of an element access expression (e.g., obj["key"], arr[0]).
@@ -2670,7 +2755,7 @@ impl<'a> CheckerState<'a> {
         };
 
         // Store the name for type_to_string
-        let type_id = self.types.alloc(Type::TypeParameter(type_param));
+        let type_id = self.types.alloc(Type::TypeParameter(Box::new(type_param)));
 
         // Cache the type parameter name for later lookup
         self.type_parameter_names.insert(type_id, name);
@@ -3330,6 +3415,50 @@ impl<'a> CheckerState<'a> {
 
             _ => self.types.any_type
         }
+    }
+
+    // =========================================================================
+    // Visibility Helpers
+    // =========================================================================
+
+    /// Check if a modifier list contains a private keyword.
+    pub fn has_private_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::parser::Node;
+        modifiers.as_ref().map_or(false, |mods| {
+            mods.nodes.iter().any(|&mod_idx| {
+                if let Some(Node::Token(base)) = self.node_arena.get(mod_idx) {
+                    base.kind == SyntaxKind::PrivateKeyword as u16
+                } else {
+                    false
+                }
+            })
+        })
+    }
+
+    /// Check if a modifier list contains a protected keyword.
+    pub fn has_protected_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::parser::Node;
+        modifiers.as_ref().map_or(false, |mods| {
+            mods.nodes.iter().any(|&mod_idx| {
+                if let Some(Node::Token(base)) = self.node_arena.get(mod_idx) {
+                    base.kind == SyntaxKind::ProtectedKeyword as u16
+                } else {
+                    false
+                }
+            })
+        })
+    }
+
+    /// Get visibility flags for a symbol based on modifiers.
+    pub fn get_visibility_flags(&self, modifiers: &Option<crate::parser::NodeList>) -> u32 {
+        let mut flags = 0u32;
+        if self.has_private_modifier(modifiers) {
+            flags |= symbol_flags::PRIVATE;
+        }
+        if self.has_protected_modifier(modifiers) {
+            flags |= symbol_flags::PROTECTED;
+        }
+        flags
     }
 
 }

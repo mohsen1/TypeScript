@@ -224,7 +224,7 @@ impl TypeArena {
             return flattened[0];
         }
 
-        self.alloc(Type::Union(UnionType::new(flattened)))
+        self.alloc(Type::Union(Box::new(UnionType::new(flattened))))
     }
 
     /// Create an intersection type with simplification.
@@ -292,16 +292,16 @@ impl TypeArena {
             return flattened[0];
         }
 
-        self.alloc(Type::Intersection(IntersectionType::new(flattened)))
+        self.alloc(Type::Intersection(Box::new(IntersectionType::new(flattened))))
     }
 
     /// Create an array type (T[] or Array<T>).
     pub fn create_array_type(&mut self, element_type: TypeId, is_readonly: bool) -> TypeId {
-        self.alloc(Type::Array(ArrayTypeInfo {
+        self.alloc(Type::Array(Box::new(ArrayTypeInfo {
             flags: type_flags::OBJECT,
             element_type,
             is_readonly,
-        }))
+        })))
     }
 
     /// Create a tuple type ([T, U, V]).
@@ -312,22 +312,22 @@ impl TypeArena {
         has_rest_element: bool,
         is_readonly: bool,
     ) -> TypeId {
-        self.alloc(Type::Tuple(TupleTypeInfo {
+        self.alloc(Type::Tuple(Box::new(TupleTypeInfo {
             flags: type_flags::OBJECT,
             element_types,
             has_optional_elements,
             has_rest_element,
             is_readonly,
-        }))
+        })))
     }
 
     /// Create an enum type.
     pub fn create_enum_type(&mut self, name: String, members: Vec<(String, TypeId)>) -> TypeId {
-        self.alloc(Type::Enum(EnumTypeInfo {
+        self.alloc(Type::Enum(Box::new(EnumTypeInfo {
             flags: type_flags::ENUM,
             name,
             members,
-        }))
+        })))
     }
 
     /// Create a conditional type (T extends U ? X : Y).
@@ -343,7 +343,7 @@ impl TypeArena {
         // A conditional type is distributive when check_type is a naked type parameter
         let is_distributive = self.is_naked_type_parameter(check_type);
 
-        self.alloc(Type::Conditional(ConditionalType {
+        self.alloc(Type::Conditional(Box::new(ConditionalType {
             flags: type_flags::CONDITIONAL,
             check_type,
             extends_type,
@@ -351,7 +351,7 @@ impl TypeArena {
             false_type,
             is_distributive,
             infer_type_parameters: Vec::new(),
-        }))
+        })))
     }
 
     /// Check if a type is a "naked" type parameter (just T, not keyof T or T[]).
@@ -422,11 +422,11 @@ impl TypeArena {
         }
 
         // Not all concrete, return unevaluated template literal type
-        self.alloc(Type::TemplateLiteral(TemplateLiteralType {
+        self.alloc(Type::TemplateLiteral(Box::new(TemplateLiteralType {
             flags: type_flags::TEMPLATE_LITERAL,
             texts,
             types,
-        }))
+        })))
     }
 
     /// Create a mapped type ({ [K in keyof T]: T[K] }).
@@ -438,7 +438,7 @@ impl TypeArena {
         name_type: TypeId,
         template_type: TypeId,
     ) -> TypeId {
-        self.alloc(Type::Mapped(MappedType {
+        self.alloc(Type::Mapped(Box::new(MappedType {
             flags: type_flags::OBJECT,
             object_flags: object_flags::MAPPED,
             declaration,
@@ -446,25 +446,25 @@ impl TypeArena {
             constraint_type,
             name_type,
             template_type,
-        }))
+        })))
     }
 
     /// Create an index type (keyof T).
     pub fn create_index_type(&mut self, source_type: TypeId) -> TypeId {
-        self.alloc(Type::Index(IndexType {
+        self.alloc(Type::Index(Box::new(IndexType {
             flags: type_flags::INDEX,
             source_type,
-        }))
+        })))
     }
 
     /// Create an indexed access type (T[K]).
     pub fn create_indexed_access_type(&mut self, object_type: TypeId, index_type: TypeId) -> TypeId {
-        self.alloc(Type::IndexedAccess(IndexedAccessType {
+        self.alloc(Type::IndexedAccess(Box::new(IndexedAccessType {
             flags: type_flags::INDEXED_ACCESS,
             object_type,
             index_type,
             constraint: TypeId::NONE,
-        }))
+        })))
     }
 
     /// Create a function type.
@@ -477,7 +477,7 @@ impl TypeArena {
         min_argument_count: u32,
         has_rest_parameter: bool,
     ) -> TypeId {
-        self.alloc(Type::Function(FunctionType {
+        self.alloc(Type::Function(Box::new(FunctionType {
             flags: type_flags::OBJECT,
             object_flags: object_flags::ANONYMOUS,
             declaration,
@@ -487,7 +487,7 @@ impl TypeArena {
             type_parameters: Vec::new(),
             min_argument_count,
             has_rest_parameter,
-        }))
+        })))
     }
 
     /// Create a function type with type parameters.
@@ -501,7 +501,7 @@ impl TypeArena {
         min_argument_count: u32,
         has_rest_parameter: bool,
     ) -> TypeId {
-        self.alloc(Type::Function(FunctionType {
+        self.alloc(Type::Function(Box::new(FunctionType {
             flags: type_flags::OBJECT,
             object_flags: object_flags::ANONYMOUS,
             declaration,
@@ -511,26 +511,26 @@ impl TypeArena {
             type_parameters,
             min_argument_count,
             has_rest_parameter,
-        }))
+        })))
     }
 
     /// Create a type parameter.
     pub fn create_type_parameter(&mut self, symbol: SymbolId, constraint: TypeId, default: TypeId) -> TypeId {
-        self.alloc(Type::TypeParameter(TypeParameter {
+        self.alloc(Type::TypeParameter(Box::new(TypeParameter {
             flags: type_flags::TYPE_PARAMETER,
             symbol,
             constraint,
             default,
             target: TypeId::NONE,
             is_this_type: false,
-        }))
+        })))
     }
 
     /// Create an object type with properties.
     pub fn create_object_type(&mut self, properties: Vec<SymbolId>) -> TypeId {
         let mut obj = ObjectType::new(object_flags::ANONYMOUS, SymbolId::NONE);
         obj.properties = properties;
-        self.alloc(Type::Object(obj))
+        self.alloc(Type::Object(Box::new(obj)))
     }
 
     /// Create an anonymous object type with properties and members table.
@@ -538,7 +538,7 @@ impl TypeArena {
         let mut obj = ObjectType::new(object_flags::ANONYMOUS, SymbolId::NONE);
         obj.properties = properties;
         obj.members = members;
-        self.alloc(Type::Object(obj))
+        self.alloc(Type::Object(Box::new(obj)))
     }
 
     /// Create a fresh object literal type with properties and members table.
@@ -550,7 +550,7 @@ impl TypeArena {
         );
         obj.properties = properties;
         obj.members = members;
-        self.alloc(Type::Object(obj))
+        self.alloc(Type::Object(Box::new(obj)))
     }
 
     /// Create a class type with properties and construct signatures.
@@ -564,7 +564,7 @@ impl TypeArena {
         obj.properties = properties;
         obj.construct_signatures = construct_signatures;
         obj.call_signatures = call_signatures;
-        self.alloc(Type::Object(obj))
+        self.alloc(Type::Object(Box::new(obj)))
     }
 
     /// Create an interface type with properties, signatures, and index infos.
@@ -580,7 +580,7 @@ impl TypeArena {
         obj.construct_signatures = construct_signatures;
         obj.call_signatures = call_signatures;
         obj.index_infos = index_infos;
-        self.alloc(Type::Object(obj))
+        self.alloc(Type::Object(Box::new(obj)))
     }
 
     /// Create a union type from a list of types.
@@ -607,7 +607,7 @@ impl TypeArena {
             return flattened[0];
         }
 
-        self.alloc(Type::Union(UnionType::new(flattened)))
+        self.alloc(Type::Union(Box::new(UnionType::new(flattened))))
     }
 }
 

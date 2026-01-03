@@ -192,6 +192,9 @@ pub struct CheckerState<'a> {
     /// Value: true if related, false otherwise
     /// Uses RefCell for interior mutability (allows caching from &self methods)
     pub(crate) relation_cache: RefCell<FxHashMap<(TypeId, TypeId, u8), bool>>,
+
+    /// The enclosing class for visibility checks (private/protected).
+    pub(crate) enclosing_class: Option<NodeIndex>,
 }
 
 impl<'a> CheckerState<'a> {
@@ -220,6 +223,7 @@ impl<'a> CheckerState<'a> {
             file_name,
             contextual_type: None,
             relation_cache: RefCell::new(FxHashMap::default()),
+            enclosing_class: None,
         }
     }
 
@@ -527,10 +531,15 @@ impl<'a> CheckerState<'a> {
                 }
             }
             Node::ClassDeclaration(cd) => {
+                // Save and set enclosing class for visibility checks
+                let prev_enclosing_class = self.enclosing_class;
+                self.enclosing_class = Some(stmt_idx);
                 // Check class members
                 for &member_idx in &cd.members.nodes {
                     self.check_class_member(member_idx);
                 }
+                // Restore enclosing class (handles nested classes)
+                self.enclosing_class = prev_enclosing_class;
             }
             Node::WhileStatement(ws) => {
                 self.get_type_of_node(ws.expression);

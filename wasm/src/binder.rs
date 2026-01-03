@@ -4,8 +4,10 @@
 //! scope and name resolution.
 
 use serde::Serialize;
+use rustc_hash::FxHashMap;
 use crate::parser::NodeIndex;
 use crate::parser::node_flags;
+use crate::scanner::SyntaxKind;
 
 // =============================================================================
 // Symbol Flags
@@ -43,6 +45,8 @@ pub mod symbol_flags {
     pub const TRANSIENT: u32 = 1 << 25;                 // Transient symbol
     pub const ASSIGNMENT: u32 = 1 << 26;                // Assignment treated as declaration
     pub const MODULE_EXPORTS: u32 = 1 << 27;            // CommonJS module.exports
+    pub const PRIVATE: u32 = 1 << 28;                   // Private member
+    pub const PROTECTED: u32 = 1 << 29;                 // Protected member
 
     // Composite flags
     pub const ENUM: u32 = REGULAR_ENUM | CONST_ENUM;
@@ -143,14 +147,14 @@ impl Symbol {
 /// Used for scope management and name resolution.
 #[derive(Clone, Debug, Default, Serialize)]
 pub struct SymbolTable {
-    /// Symbols indexed by their escaped name
-    symbols: std::collections::HashMap<String, SymbolId>,
+    /// Symbols indexed by their escaped name (using FxHashMap for faster hashing)
+    symbols: FxHashMap<String, SymbolId>,
 }
 
 impl SymbolTable {
     pub fn new() -> Self {
         SymbolTable {
-            symbols: std::collections::HashMap::new(),
+            symbols: FxHashMap::default(),
         }
     }
 
@@ -931,6 +935,23 @@ impl BinderState {
         }
     }
 
+    /// Get visibility flags (PRIVATE, PROTECTED) from modifier list.
+    fn get_visibility_flags(&self, arena: &NodeArena, modifiers: &Option<crate::parser::NodeList>) -> u32 {
+        let mut flags = 0u32;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(Node::Token(base)) = arena.get(mod_idx) {
+                    if base.kind == SyntaxKind::PrivateKeyword as u16 {
+                        flags |= symbol_flags::PRIVATE;
+                    } else if base.kind == SyntaxKind::ProtectedKeyword as u16 {
+                        flags |= symbol_flags::PROTECTED;
+                    }
+                }
+            }
+        }
+        flags
+    }
+
     // =========================================================================
     // Declaration Binding
     // =========================================================================
@@ -1043,12 +1064,14 @@ impl BinderState {
             match node {
                 Node::MethodDeclaration(method) => {
                     if let Some(name) = self.get_identifier_name(arena, method.name) {
-                        self.declare_symbol(name, symbol_flags::METHOD, idx);
+                        let visibility = self.get_visibility_flags(arena, &method.modifiers);
+                        self.declare_symbol(name, symbol_flags::METHOD | visibility, idx);
                     }
                 }
                 Node::PropertyDeclaration(prop) => {
                     if let Some(name) = self.get_identifier_name(arena, prop.name) {
-                        self.declare_symbol(name, symbol_flags::PROPERTY, idx);
+                        let visibility = self.get_visibility_flags(arena, &prop.modifiers);
+                        self.declare_symbol(name, symbol_flags::PROPERTY | visibility, idx);
                     }
                 }
                 Node::ConstructorDeclaration(_) => {

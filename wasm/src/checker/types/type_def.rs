@@ -303,24 +303,25 @@ pub struct EnumTypeInfo {
 // =============================================================================
 
 /// All possible type variants.
+/// Large variants are boxed to keep the enum size small (improves cache locality).
 #[derive(Clone, Debug, Serialize)]
 pub enum Type {
     Intrinsic(IntrinsicType),
     Literal(LiteralType),
-    Object(ObjectType),
-    TypeReference(TypeReference),
-    Union(UnionType),
-    Intersection(IntersectionType),
-    TypeParameter(TypeParameter),
-    Conditional(ConditionalType),
-    Mapped(MappedType),
-    IndexedAccess(IndexedAccessType),
-    Index(IndexType),
-    TemplateLiteral(TemplateLiteralType),
-    Function(FunctionType),
-    Array(ArrayTypeInfo),
-    Tuple(TupleTypeInfo),
-    Enum(EnumTypeInfo),
+    Object(Box<ObjectType>),
+    TypeReference(Box<TypeReference>),
+    Union(Box<UnionType>),
+    Intersection(Box<IntersectionType>),
+    TypeParameter(Box<TypeParameter>),
+    Conditional(Box<ConditionalType>),
+    Mapped(Box<MappedType>),
+    IndexedAccess(Box<IndexedAccessType>),
+    Index(Box<IndexType>),
+    TemplateLiteral(Box<TemplateLiteralType>),
+    Function(Box<FunctionType>),
+    Array(Box<ArrayTypeInfo>),
+    Tuple(Box<TupleTypeInfo>),
+    Enum(Box<EnumTypeInfo>),
 }
 
 impl Type {
