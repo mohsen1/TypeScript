@@ -195,7 +195,14 @@ pub struct CheckerState<'a> {
 
     /// The enclosing class for visibility checks (private/protected).
     pub(crate) enclosing_class: Option<NodeIndex>,
+
+    /// Current depth of recursive type instantiation (for depth limits).
+    pub(crate) instantiation_depth: RefCell<u32>,
 }
+
+/// Maximum depth for recursive type instantiation (conditional types, etc.).
+/// TypeScript uses a depth limit of 50 by default.
+pub const MAX_INSTANTIATION_DEPTH: u32 = 50;
 
 impl<'a> CheckerState<'a> {
     /// Create a new checker state.
@@ -224,6 +231,7 @@ impl<'a> CheckerState<'a> {
             contextual_type: None,
             relation_cache: RefCell::new(FxHashMap::default()),
             enclosing_class: None,
+            instantiation_depth: RefCell::new(0),
         }
     }
 

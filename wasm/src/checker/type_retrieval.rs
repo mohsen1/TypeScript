@@ -2803,6 +2803,31 @@ impl<'a> CheckerState<'a> {
 
     /// Instantiate a type using a type parameter mapper.
     fn instantiate_type_with_mapper(&mut self, type_id: TypeId, mapper: &std::collections::HashMap<TypeId, TypeId>) -> TypeId {
+        use super::state::MAX_INSTANTIATION_DEPTH;
+
+        // Check instantiation depth to prevent infinite recursion
+        {
+            let depth = *self.instantiation_depth.borrow();
+            if depth >= MAX_INSTANTIATION_DEPTH {
+                // Type instantiation depth limit reached - return error type
+                return self.types.any_type;
+            }
+            *self.instantiation_depth.borrow_mut() = depth + 1;
+        }
+
+        let result = self.instantiate_type_with_mapper_inner(type_id, mapper);
+
+        // Decrement depth counter
+        {
+            let mut depth = self.instantiation_depth.borrow_mut();
+            *depth = depth.saturating_sub(1);
+        }
+
+        result
+    }
+
+    /// Inner implementation of type instantiation (without depth tracking).
+    fn instantiate_type_with_mapper_inner(&mut self, type_id: TypeId, mapper: &std::collections::HashMap<TypeId, TypeId>) -> TypeId {
         // Check if this type parameter is in the mapper
         if let Some(&mapped_type) = mapper.get(&type_id) {
             return mapped_type;

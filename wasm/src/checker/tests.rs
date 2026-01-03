@@ -6124,3 +6124,75 @@ type NoInferStr = NoInfer<string>;
             panic!("Should have symbol 'NoInferStr'");
         }
     }
+
+    // ============== 5.69: Instantiation depth limits ==============
+    #[test]
+    fn test_instantiation_depth_limit_exists() {
+        use crate::checker::state::MAX_INSTANTIATION_DEPTH;
+
+        // Verify the depth limit constant is set to a reasonable value
+        assert_eq!(MAX_INSTANTIATION_DEPTH, 50, "TypeScript uses 50 as default depth limit");
+    }
+
+    #[test]
+    fn test_instantiation_depth_counter_starts_at_zero() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = "let x: number = 1;";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Verify depth starts at 0
+        let depth = *checker.instantiation_depth.borrow();
+        assert_eq!(depth, 0, "Instantiation depth should start at 0");
+    }
+
+    #[test]
+    fn test_nested_generic_type_instantiation() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test that nested generic types are properly instantiated
+        // This exercises the depth tracking mechanism without hitting the limit
+        let code = r#"
+type Wrapped<T> = { value: T };
+type DoubleWrapped<T> = Wrapped<Wrapped<T>>;
+type Test = DoubleWrapped<number>;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Type should be resolvable within depth limits
+        if let Some(symbol_id) = binder.file_locals.get("Test") {
+            let test_type = checker.get_type_of_symbol(symbol_id);
+            // Should not be any (which would indicate depth limit hit)
+            assert_ne!(test_type, checker.types.any_type,
+                "Nested generic should resolve without hitting depth limit");
+        }
+
+        // Verify depth returns to 0 after type resolution
+        let depth = *checker.instantiation_depth.borrow();
+        assert_eq!(depth, 0, "Depth should return to 0 after type resolution");
+    }
