@@ -229,13 +229,17 @@ pub fn path_is_relative(path: &str) -> bool {
 }
 
 /// Removes a trailing directory separator from a path, if it has one.
+/// Uses char-based operations for UTF-8 safety.
 #[wasm_bindgen(js_name = removeTrailingDirectorySeparator)]
 pub fn remove_trailing_directory_separator(path: &str) -> String {
-    if has_trailing_directory_separator(path) && path.len() > 1 {
-        path[..path.len() - 1].to_string()
-    } else {
-        path.to_string()
+    if !has_trailing_directory_separator(path) || path.len() <= 1 {
+        return path.to_string();
     }
+    // Use strip_suffix for UTF-8 safe character removal
+    path.strip_suffix(DIRECTORY_SEPARATOR)
+        .or_else(|| path.strip_suffix(ALT_DIRECTORY_SEPARATOR))
+        .unwrap_or(path)
+        .to_string()
 }
 
 /// Ensures a path has a trailing directory separator.
@@ -255,16 +259,19 @@ pub fn has_extension(file_name: &str) -> bool {
 }
 
 /// Returns the path except for its containing directory name (basename).
+/// Uses char-based operations for UTF-8 safety.
 #[wasm_bindgen(js_name = getBaseFileName)]
 pub fn get_base_file_name(path: &str) -> String {
     let path = normalize_slashes(path);
-    // Remove trailing separator
+    // Remove trailing separator using UTF-8 safe operations
     let path = if has_trailing_directory_separator(&path) && path.len() > 1 {
-        &path[..path.len() - 1]
+        path.strip_suffix(DIRECTORY_SEPARATOR)
+            .or_else(|| path.strip_suffix(ALT_DIRECTORY_SEPARATOR))
+            .unwrap_or(&path)
     } else {
         &path
     };
-    // Find last separator
+    // Find last separator - safe because '/' is ASCII and rfind returns valid char boundary
     match path.rfind('/') {
         Some(idx) => path[idx + 1..].to_string(),
         None => path.to_string(),
@@ -589,5 +596,19 @@ mod tests {
         assert!(is_word_character('_' as u32));
         assert!(!is_word_character('-' as u32));
         assert!(!is_word_character(' ' as u32));
+    }
+
+    #[test]
+    fn test_type_sizes() {
+        use std::mem::size_of;
+        // Track Node enum size to monitor memory usage over time.
+        // Large variants (ClassDeclaration: 200B, SourceFile/FunctionDeclaration: 168B)
+        // drive enum size to ~208 bytes. This is acceptable because:
+        // 1. Nodes are arena-allocated (NodeArena), not individually heap-allocated
+        // 2. Boxing large variants would require updating many pattern matches
+        // 3. The arena pattern already provides memory efficiency
+        // Future optimization: Box variants > 64B if stack size becomes an issue
+        let node_size = size_of::<crate::parser::Node>();
+        assert!(node_size <= 256, "Node enum unexpectedly large: {} bytes", node_size);
     }
 }

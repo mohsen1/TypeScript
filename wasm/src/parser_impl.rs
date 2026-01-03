@@ -16,7 +16,7 @@ use crate::parser::{
     // Expressions
     BinaryExpression, CallExpression, PropertyAccessExpression,
     ArrayLiteralExpression, ObjectLiteralExpression, PropertyAssignment,
-    NewExpression, ElementAccessExpression,
+    NewExpression, ElementAccessExpression, SpreadElement,
     // Statements
     Block, ExpressionStatement, VariableStatement,
     VariableDeclarationList, VariableDeclaration,
@@ -38,6 +38,7 @@ use crate::parser::{
     TypeReference, ArrayType, TupleType, UnionType, IntersectionType,
     FunctionType, ConstructorType, TypeLiteral, ParenthesizedType, TypeParameterDeclaration,
     LiteralType, ConditionalType, InferType, TypeOperator, TypeQuery, MappedType, IndexedAccessType,
+    OptionalType, RestType, TemplateLiteralType, TemplateSpan,
     // JSX
     JsxElement, JsxSelfClosingElement, JsxOpeningElement, JsxClosingElement,
     JsxFragment, JsxOpeningFragment, JsxClosingFragment,
@@ -1621,6 +1622,12 @@ impl ParserState {
                 continue;
             }
 
+            // Check for index signature: [key: string]: type
+            if self.is_token(SyntaxKind::OpenBracketToken) {
+                members.push(self.parse_index_signature_declaration());
+                continue;
+            }
+
             // Parse property or method signature
             let pos = self.get_full_start();
             let name = self.parse_property_name();
@@ -1676,6 +1683,52 @@ impl ParserState {
         }
 
         members
+    }
+
+    /// Parse an index signature declaration: [key: string]: type
+    fn parse_index_signature_declaration(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        // Parse [
+        self.parse_expected(SyntaxKind::OpenBracketToken);
+
+        // Parse parameter(s): key: string
+        let mut parameters = NodeList::new();
+        let param_pos = self.get_full_start();
+        let param_name = self.parse_identifier();
+
+        // Parse : type for the parameter
+        self.parse_expected(SyntaxKind::ColonToken);
+        let param_type = self.parse_type();
+
+        let param_end = self.get_token_start();
+        let param = crate::parser::ParameterDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::PARAMETER, param_pos, param_end),
+            modifiers: None,
+            dot_dot_dot_token: false,
+            name: param_name,
+            question_token: false,
+            type_annotation: param_type,
+            initializer: NodeIndex::NONE,
+        };
+        parameters.push(self.alloc_node(Node::ParameterDeclaration(param)));
+
+        // Parse ]
+        self.parse_expected(SyntaxKind::CloseBracketToken);
+
+        // Parse : type for the value type
+        self.parse_expected(SyntaxKind::ColonToken);
+        let value_type = self.parse_type();
+
+        let end = self.get_token_start();
+
+        let decl = crate::parser::IndexSignatureDeclaration {
+            base: NodeBase::new_ext(syntax_kind_ext::INDEX_SIGNATURE, pos, end),
+            modifiers: None,
+            parameters,
+            type_annotation: value_type,
+        };
+        self.alloc_node(Node::IndexSignatureDeclaration(decl))
     }
 
     /// Parse a type alias declaration.
@@ -2785,8 +2838,8 @@ impl ParserState {
 
         let elements = self.parse_delimited_list(
             SyntaxKind::CloseBracketToken,
-            |p| p.is_expression_start(),
-            |p| p.parse_assignment_expression_or_higher(),
+            |p| p.is_array_element_start(),
+            |p| p.parse_array_element(),
         );
 
         self.parse_expected(SyntaxKind::CloseBracketToken);
@@ -2799,6 +2852,29 @@ impl ParserState {
         };
 
         self.alloc_node(Node::ArrayLiteralExpression(lit))
+    }
+
+    /// Check if current token starts an array element (including spread).
+    fn is_array_element_start(&self) -> bool {
+        self.is_token(SyntaxKind::DotDotDotToken) || self.is_expression_start()
+    }
+
+    /// Parse an array element, which can be a spread element or a regular expression.
+    fn parse_array_element(&mut self) -> NodeIndex {
+        // Check for spread element: ...expr
+        if self.is_token(SyntaxKind::DotDotDotToken) {
+            let pos = self.get_full_start();
+            self.next_token();
+            let expression = self.parse_assignment_expression_or_higher();
+            let end = self.get_token_start();
+            let spread = SpreadElement {
+                base: NodeBase::new_ext(syntax_kind_ext::SPREAD_ELEMENT, pos, end),
+                expression,
+            };
+            return self.alloc_node(Node::SpreadElement(spread));
+        }
+
+        self.parse_assignment_expression_or_higher()
     }
 
     /// Parse an object literal.
@@ -3666,8 +3742,8 @@ impl ParserState {
                 self.next_token();
                 let elements = self.parse_delimited_list(
                     SyntaxKind::CloseBracketToken,
-                    |p| p.is_type_start(),
-                    |p| p.parse_type(),
+                    |p| p.is_tuple_element_start(),
+                    |p| p.parse_tuple_element(),
                 );
                 self.parse_expected(SyntaxKind::CloseBracketToken);
 
@@ -3730,6 +3806,32 @@ impl ParserState {
                     literal,
                 };
                 let node_idx = self.alloc_node(Node::LiteralType(lit_type));
+                self.parse_type_postfix(node_idx)
+            }
+
+            // Template literal types: `hello` or `hello ${T}`
+            SyntaxKind::NoSubstitutionTemplateLiteral => {
+                let head = self.parse_template_literal_head();
+                let end = self.get_token_start();
+                let template_type = TemplateLiteralType {
+                    base: NodeBase::new_ext(syntax_kind_ext::TEMPLATE_LITERAL_TYPE, pos, end),
+                    head,
+                    template_spans: NodeList { pos, end, nodes: Vec::new(), has_trailing_comma: false },
+                };
+                let node_idx = self.alloc_node(Node::TemplateLiteralType(template_type));
+                self.parse_type_postfix(node_idx)
+            }
+
+            SyntaxKind::TemplateHead => {
+                let head = self.parse_template_literal_head();
+                let template_spans = self.parse_template_literal_type_spans();
+                let end = self.get_token_start();
+                let template_type = TemplateLiteralType {
+                    base: NodeBase::new_ext(syntax_kind_ext::TEMPLATE_LITERAL_TYPE, pos, end),
+                    head,
+                    template_spans,
+                };
+                let node_idx = self.alloc_node(Node::TemplateLiteralType(template_type));
                 self.parse_type_postfix(node_idx)
             }
 
@@ -3847,6 +3949,87 @@ impl ParserState {
         args
     }
 
+    /// Parse the head of a template literal (NoSubstitutionTemplateLiteral or TemplateHead).
+    fn parse_template_literal_head(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let text = self.scanner.get_token_value();
+        self.next_token();
+        let end = self.get_token_start();
+        let literal = StringLiteral {
+            base: NodeBase::new(SyntaxKind::NoSubstitutionTemplateLiteral, pos, end),
+            text,
+            is_unterminated: false,
+            has_extended_unicode_escape: false,
+        };
+        self.alloc_node(Node::NoSubstitutionTemplateLiteral(literal))
+    }
+
+    /// Parse the template spans of a template literal type.
+    /// Each span consists of a type and a literal (TemplateMiddle or TemplateTail).
+    fn parse_template_literal_type_spans(&mut self) -> NodeList {
+        let list_pos = self.get_full_start();
+        let mut spans = NodeList::new();
+
+        loop {
+            let span_pos = self.get_full_start();
+
+            // Parse the type in the template span
+            let type_node = self.parse_type();
+
+            // After the type, we should see TemplateMiddle or TemplateTail
+            // The scanner should have rescanned into template mode
+            // NOTE: re_scan_template_token updates the scanner's token, but we need to
+            // also update the parser's current_token field!
+            self.current_token = self.scanner.re_scan_template_token(false);
+
+            let literal_pos = self.get_full_start();
+            let tok = self.token();
+
+            // Handle EOF or unexpected tokens
+            if tok == SyntaxKind::EndOfFileToken {
+                break;
+            }
+
+            let is_tail = tok == SyntaxKind::TemplateTail;
+            let text = self.scanner.get_token_value();
+            self.next_token();
+            let literal_end = self.get_token_start();
+
+            let literal = StringLiteral {
+                base: NodeBase::new(
+                    if is_tail { SyntaxKind::TemplateTail } else { SyntaxKind::TemplateMiddle },
+                    literal_pos,
+                    literal_end,
+                ),
+                text,
+                is_unterminated: false,
+                has_extended_unicode_escape: false,
+            };
+            let literal_idx = if is_tail {
+                self.alloc_node(Node::TemplateTail(literal))
+            } else {
+                self.alloc_node(Node::TemplateMiddle(literal))
+            };
+
+            let span_end = self.get_token_start();
+            let span = TemplateSpan {
+                base: NodeBase::new_ext(syntax_kind_ext::TEMPLATE_SPAN, span_pos, span_end),
+                expression: type_node,
+                literal: literal_idx,
+            };
+            spans.push(self.alloc_node(Node::TemplateSpan(span)));
+
+            if is_tail {
+                break;
+            }
+        }
+
+        let list_end = self.get_token_start();
+        spans.pos = list_pos;
+        spans.end = list_end;
+        spans
+    }
+
     /// Check if current token starts a type.
     fn is_type_start(&self) -> bool {
         match self.token() {
@@ -3878,9 +4061,55 @@ impl ParserState {
             | SyntaxKind::InferKeyword
             // Function/constructor type start
             | SyntaxKind::NewKeyword
-            | SyntaxKind::LessThanToken => true,
+            | SyntaxKind::LessThanToken
+            // Template literal types
+            | SyntaxKind::NoSubstitutionTemplateLiteral
+            | SyntaxKind::TemplateHead => true,
             _ => false,
         }
+    }
+
+    /// Check if current token starts a tuple element (includes ... for rest).
+    fn is_tuple_element_start(&self) -> bool {
+        // Rest element: ...T
+        if self.is_token(SyntaxKind::DotDotDotToken) {
+            return true;
+        }
+        self.is_type_start()
+    }
+
+    /// Parse a tuple element, which can be:
+    /// - A regular type: T
+    /// - An optional type: T?
+    /// - A rest type: ...T
+    fn parse_tuple_element(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        // Check for rest element: ...T
+        if self.parse_optional(SyntaxKind::DotDotDotToken) {
+            let type_node = self.parse_type();
+            let end = self.get_token_start();
+            let rest = RestType {
+                base: NodeBase::new_ext(syntax_kind_ext::REST_TYPE, pos, end),
+                type_node,
+            };
+            return self.alloc_node(Node::RestType(rest));
+        }
+
+        // Parse the base type
+        let type_node = self.parse_type();
+
+        // Check for optional element: T?
+        if self.parse_optional(SyntaxKind::QuestionToken) {
+            let end = self.get_token_start();
+            let optional = OptionalType {
+                base: NodeBase::new_ext(syntax_kind_ext::OPTIONAL_TYPE, pos, end),
+                type_node,
+            };
+            return self.alloc_node(Node::OptionalType(optional));
+        }
+
+        type_node
     }
 
     // =========================================================================
@@ -4807,6 +5036,33 @@ mod tests {
                 }
             } else {
                 panic!("Expected ExpressionStatement");
+            }
+        } else {
+            panic!("Expected SourceFile");
+        }
+    }
+
+    #[test]
+    fn test_parse_index_signature() {
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "interface Dict { [key: string]: number; }".to_string(),
+        );
+        let sf_idx = parser.parse_source_file();
+
+        let sf = parser.arena.get(sf_idx).unwrap();
+        if let Node::SourceFile(source_file) = sf {
+            assert_eq!(source_file.statements.len(), 1);
+            let stmt = parser.arena.get(source_file.statements.nodes[0]).unwrap();
+            if let Node::InterfaceDeclaration(iface) = stmt {
+                assert_eq!(iface.members.len(), 1);
+                let member = parser.arena.get(iface.members.nodes[0]).unwrap();
+                assert!(
+                    matches!(member, Node::IndexSignatureDeclaration(_)),
+                    "Expected IndexSignatureDeclaration"
+                );
+            } else {
+                panic!("Expected InterfaceDeclaration");
             }
         } else {
             panic!("Expected SourceFile");

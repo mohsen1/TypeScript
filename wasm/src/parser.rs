@@ -1323,6 +1323,15 @@ pub struct MethodSignature {
     pub type_annotation: NodeIndex,  // Optional
 }
 
+/// An index signature declaration (e.g., [key: string]: number)
+#[derive(Clone, Debug, Serialize)]
+pub struct IndexSignatureDeclaration {
+    pub base: NodeBase,
+    pub modifiers: Option<NodeList>,
+    pub parameters: NodeList,         // The index parameter(s)
+    pub type_annotation: NodeIndex,   // The value type
+}
+
 /// A type alias declaration.
 #[derive(Clone, Debug, Serialize)]
 pub struct TypeAliasDeclaration {
@@ -1721,6 +1730,7 @@ pub enum Node {
     InterfaceDeclaration(InterfaceDeclaration),
     PropertySignature(PropertySignature),
     MethodSignature(MethodSignature),
+    IndexSignatureDeclaration(IndexSignatureDeclaration),
     TypeAliasDeclaration(TypeAliasDeclaration),
     EnumDeclaration(EnumDeclaration),
     EnumMember(EnumMember),
@@ -1874,6 +1884,7 @@ impl Node {
             Node::InterfaceDeclaration(n) => &n.base,
             Node::PropertySignature(n) => &n.base,
             Node::MethodSignature(n) => &n.base,
+            Node::IndexSignatureDeclaration(n) => &n.base,
             Node::TypeAliasDeclaration(n) => &n.base,
             Node::EnumDeclaration(n) => &n.base,
             Node::EnumMember(n) => &n.base,
@@ -2008,6 +2019,7 @@ impl Node {
             Node::InterfaceDeclaration(n) => &mut n.base,
             Node::PropertySignature(n) => &mut n.base,
             Node::MethodSignature(n) => &mut n.base,
+            Node::IndexSignatureDeclaration(n) => &mut n.base,
             Node::TypeAliasDeclaration(n) => &mut n.base,
             Node::EnumDeclaration(n) => &mut n.base,
             Node::EnumMember(n) => &mut n.base,

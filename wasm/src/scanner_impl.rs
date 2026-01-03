@@ -238,7 +238,13 @@ impl ScannerState {
     /// Get a substring from start to end character indices.
     #[inline]
     fn substring(&self, start: usize, end: usize) -> String {
-        self.chars[start..end].iter().collect()
+        // Clamp indices to valid range to avoid panics
+        let clamped_start = start.min(self.chars.len());
+        let clamped_end = end.min(self.chars.len());
+        if clamped_start >= clamped_end {
+            return String::new();
+        }
+        self.chars[clamped_start..clamped_end].iter().collect()
     }
 
     // =========================================================================
@@ -1056,6 +1062,11 @@ impl ScannerState {
     #[wasm_bindgen(js_name = reScanTemplateToken)]
     pub fn re_scan_template_token(&mut self, _is_tagged_template: bool) -> SyntaxKind {
         // Reset position to token start and scan the template continuation
+        // Make sure token_start is within bounds
+        if self.token_start >= self.end {
+            self.token = SyntaxKind::EndOfFileToken;
+            return self.token;
+        }
         self.pos = self.token_start;
         self.token = self.scan_template_and_set_token_value(false);
         self.token
