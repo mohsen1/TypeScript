@@ -9,8 +9,8 @@
 | 2     | Scanner        | ✅ DONE | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
-| 5     | Type Checker   | 🟡 95%  | 340 Rust |
-| 6     | Emitter        | 🟡 40%  | 35 Rust |
+| 5     | Type Checker   | 🟡 95%  | 350 Rust |
+| 6     | Emitter        | 🟡 40%  | 38 Rust |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
 
@@ -122,7 +122,7 @@ All of the following are complete:
 #### Type Inference & Relations
 - [x] **5.69** Recursive conditional type depth limits
 - [x] **5.70** Circular reference detection
-- [ ] **5.71** Covariance/contravariance checking in functions
+- [x] **5.71** Covariance/contravariance checking in functions (basic: bivariance + variance modifiers)
 - [x] **5.72** Type widening control (`as const`)
 - [x] **5.73** `Awaited<T>` recursive unwrapping
 - [ ] **5.74** `ThisType<T>` for object literal methods
@@ -133,11 +133,11 @@ All of the following are complete:
 - [ ] **5.105** `unique symbol` type for const symbol declarations
 - [ ] **5.106** `this` parameter types (`function foo(this: T, ...)`)
 - [ ] **5.107** Abstract construct signatures (`abstract new () => T`)
-- [ ] **5.108** Call/construct signatures in type literals (`{ (): void }`, `{ new(): T }`)
+- [x] **5.108** Call/construct signatures in type literals (`{ (): void }`, `{ new(): T }`)
 - [ ] **5.109** Getter/setter signatures in type literals
 - [ ] **5.110** Type imports (`typeof import("module")`)
 - [ ] **5.111** Instantiation expressions (`fn<string>` without calling)
-- [ ] **5.112** `infer` with `extends` constraints (`infer T extends U`)
+- [x] **5.112** `infer` with `extends` constraints (`infer T extends U`)
 - [ ] **5.113** Recursive type alias detection and handling
 
 #### Declaration & Module Features
@@ -174,7 +174,7 @@ All of the following are complete:
 #### Performance & Architecture (from Go lessons)
 - [x] **5.82** Type relation caching (`(source, target) → result` map)
 - [ ] **5.83** Flow state recycling (object pooling)
-- [ ] **5.84** Apparent type cache
+- [x] **5.84** Apparent type cache
 - [x] **5.85** Awaited type cache
 - [x] **5.86** Literal union base type cache (widened type cache)
 
