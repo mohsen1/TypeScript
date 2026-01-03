@@ -22,6 +22,15 @@ enum ContextualArrayInfo {
     Tuple(Vec<TypeId>),
 }
 
+/// String mapping kind for intrinsic string manipulation types.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StringMappingKind {
+    Uppercase,
+    Lowercase,
+    Capitalize,
+    Uncapitalize,
+}
+
 impl<'a> CheckerState<'a> {
     /// Get the type of a node (with caching).
     pub fn get_type_of_node(&mut self, node: NodeIndex) -> TypeId {
@@ -3235,6 +3244,23 @@ impl<'a> CheckerState<'a> {
             "Map" | "Set" | "WeakMap" | "WeakSet" => {
                 self.types.object_type
             }
+            // String manipulation types (intrinsic)
+            "Uppercase" => {
+                let arg_type = type_args.first().copied().unwrap_or(self.types.string_type);
+                self.apply_string_mapping(arg_type, StringMappingKind::Uppercase)
+            }
+            "Lowercase" => {
+                let arg_type = type_args.first().copied().unwrap_or(self.types.string_type);
+                self.apply_string_mapping(arg_type, StringMappingKind::Lowercase)
+            }
+            "Capitalize" => {
+                let arg_type = type_args.first().copied().unwrap_or(self.types.string_type);
+                self.apply_string_mapping(arg_type, StringMappingKind::Capitalize)
+            }
+            "Uncapitalize" => {
+                let arg_type = type_args.first().copied().unwrap_or(self.types.string_type);
+                self.apply_string_mapping(arg_type, StringMappingKind::Uncapitalize)
+            }
             _ => self.types.object_type,
         }
     }
@@ -3465,6 +3491,56 @@ impl<'a> CheckerState<'a> {
             flags |= symbol_flags::PROTECTED;
         }
         flags
+    }
+
+    /// Apply a string mapping transformation to a type.
+    /// For string literal types, this transforms the value (e.g., "hello" -> "HELLO" for Uppercase).
+    /// For non-string-literal types, returns the base string type.
+    fn apply_string_mapping(&mut self, type_id: TypeId, kind: StringMappingKind) -> TypeId {
+        match self.types.get(type_id) {
+            Some(Type::Literal(lit)) => {
+                if let LiteralValue::String(s) = &lit.value {
+                    let transformed = match kind {
+                        StringMappingKind::Uppercase => s.to_uppercase(),
+                        StringMappingKind::Lowercase => s.to_lowercase(),
+                        StringMappingKind::Capitalize => {
+                            let mut chars = s.chars();
+                            match chars.next() {
+                                None => String::new(),
+                                Some(first) => first.to_uppercase().chain(chars).collect(),
+                            }
+                        }
+                        StringMappingKind::Uncapitalize => {
+                            let mut chars = s.chars();
+                            match chars.next() {
+                                None => String::new(),
+                                Some(first) => first.to_lowercase().chain(chars).collect(),
+                            }
+                        }
+                    };
+                    self.types.create_string_literal(transformed)
+                } else {
+                    // Not a string literal, return string type
+                    self.types.string_type
+                }
+            }
+            Some(Type::Union(u)) => {
+                // Apply to each member of the union
+                let types = u.types.clone();
+                let mapped_types: Vec<TypeId> = types.iter()
+                    .map(|&t| self.apply_string_mapping(t, kind))
+                    .collect();
+                self.types.create_union_type(mapped_types)
+            }
+            Some(Type::Intrinsic(i)) if i.flags & type_flags::STRING != 0 => {
+                // string -> string (can't transform unknown string)
+                self.types.string_type
+            }
+            _ => {
+                // For other types, just return string
+                self.types.string_type
+            }
+        }
     }
 
 }

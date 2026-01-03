@@ -9,7 +9,7 @@
 | 2     | Scanner        | ✅ DONE | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
-| 5     | Type Checker   | 🟡 86%  | 317 Rust |
+| 5     | Type Checker   | 🟡 87%  | 321 Rust |
 | 6     | Emitter        | 🟡 40%  | 35 Rust |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
@@ -117,7 +117,7 @@ All of the following are complete:
 #### Advanced Tuple & Template Types
 - [ ] **5.66** Variadic tuple types (`[...T, ...U]`)
 - [ ] **5.67** Named tuple elements (`[name: string, age: number]`)
-- [ ] **5.68** String manipulation types (`Uppercase<T>`, `Lowercase<T>`, etc.)
+- [x] **5.68** String manipulation types (`Uppercase<T>`, `Lowercase<T>`, etc.)
 
 #### Type Inference & Relations
 - [ ] **5.69** Recursive conditional type depth limits

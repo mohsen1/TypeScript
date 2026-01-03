@@ -5784,3 +5784,135 @@ type T = typeof x;
             panic!("Should have symbol 'x'");
         }
     }
+
+    // =========================================================================
+    // String manipulation types tests (5.68)
+    // =========================================================================
+
+    #[test]
+    fn test_uppercase_string_type() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+type Upper = Uppercase<"hello">;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the type of 'Upper'
+        if let Some(symbol_id) = binder.file_locals.get("Upper") {
+            let upper_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(upper_type);
+            assert_eq!(type_str, "\"HELLO\"", "Uppercase<\"hello\"> should be \"HELLO\"");
+        } else {
+            panic!("Should have symbol 'Upper'");
+        }
+    }
+
+    #[test]
+    fn test_lowercase_string_type() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+type Lower = Lowercase<"HELLO">;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the type of 'Lower'
+        if let Some(symbol_id) = binder.file_locals.get("Lower") {
+            let lower_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(lower_type);
+            assert_eq!(type_str, "\"hello\"", "Lowercase<\"HELLO\"> should be \"hello\"");
+        } else {
+            panic!("Should have symbol 'Lower'");
+        }
+    }
+
+    #[test]
+    fn test_capitalize_string_type() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+type Cap = Capitalize<"hello">;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the type of 'Cap'
+        if let Some(symbol_id) = binder.file_locals.get("Cap") {
+            let cap_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(cap_type);
+            assert_eq!(type_str, "\"Hello\"", "Capitalize<\"hello\"> should be \"Hello\"");
+        } else {
+            panic!("Should have symbol 'Cap'");
+        }
+    }
+
+    #[test]
+    fn test_uncapitalize_string_type() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+type Uncap = Uncapitalize<"Hello">;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the type of 'Uncap'
+        if let Some(symbol_id) = binder.file_locals.get("Uncap") {
+            let uncap_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(uncap_type);
+            assert_eq!(type_str, "\"hello\"", "Uncapitalize<\"Hello\"> should be \"hello\"");
+        } else {
+            panic!("Should have symbol 'Uncap'");
+        }
+    }
