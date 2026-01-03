@@ -4102,3 +4102,130 @@ const instance = new Foo();
         let is_assignable = checker.is_type_assignable_to(p_type, point_type);
         assert!(is_assignable, "Object with exact properties should be assignable");
     }
+
+    #[test]
+    fn test_discriminated_union_narrowing() {
+        // Test discriminated union narrowing using arena directly
+        // type Circle = { kind: "circle"; radius: number };
+        // type Square = { kind: "square"; side: number };
+        // type Shape = Circle | Square;
+
+        let mut arena = super::TypeArena::new();
+        let mut local_symbols = crate::binder::SymbolArena::new_with_base(crate::binder::SymbolArena::CHECKER_SYMBOL_BASE);
+        let mut symbol_types = rustc_hash::FxHashMap::default();
+
+        // Create Circle type: { kind: "circle"; radius: number }
+        let circle_kind = arena.create_string_literal("circle".to_string());
+        let circle_kind_sym = local_symbols.alloc(crate::binder::symbol_flags::PROPERTY, "kind".to_string());
+        let circle_radius_sym = local_symbols.alloc(crate::binder::symbol_flags::PROPERTY, "radius".to_string());
+        symbol_types.insert(circle_kind_sym, circle_kind);
+        symbol_types.insert(circle_radius_sym, arena.number_type);
+
+        let mut circle_members = SymbolTable::new();
+        circle_members.set("kind".to_string(), circle_kind_sym);
+        circle_members.set("radius".to_string(), circle_radius_sym);
+        let circle_type = arena.create_object_type_with_members(vec![circle_kind_sym, circle_radius_sym], circle_members);
+
+        // Create Square type: { kind: "square"; side: number }
+        let square_kind = arena.create_string_literal("square".to_string());
+        let square_kind_sym = local_symbols.alloc(crate::binder::symbol_flags::PROPERTY, "kind".to_string());
+        let square_side_sym = local_symbols.alloc(crate::binder::symbol_flags::PROPERTY, "side".to_string());
+        symbol_types.insert(square_kind_sym, square_kind);
+        symbol_types.insert(square_side_sym, arena.number_type);
+
+        let mut square_members = SymbolTable::new();
+        square_members.set("kind".to_string(), square_kind_sym);
+        square_members.set("side".to_string(), square_side_sym);
+        let square_type = arena.create_object_type_with_members(vec![square_kind_sym, square_side_sym], square_members);
+
+        // Create Shape = Circle | Square
+        let shape_type = arena.create_union_type(vec![circle_type, square_type]);
+
+        // Create a minimal checker to test narrowing
+        let node_arena = crate::parser::NodeArena::new();
+        let binder_symbols = crate::binder::SymbolArena::new();
+        let file_locals = SymbolTable::new();
+
+        let mut checker = CheckerState::new(
+            &node_arena,
+            &binder_symbols,
+            &file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Copy types and symbols to checker
+        checker.types = arena;
+        checker.symbol_types = symbol_types;
+
+        // Test 1: Narrow by kind === "circle" should give Circle
+        let narrowed = checker.narrow_type_by_discriminant(shape_type, "kind", "circle");
+        assert_eq!(narrowed, circle_type, "Narrowing by kind='circle' should give Circle type");
+
+        // Test 2: Narrow by kind === "square" should give Square
+        let narrowed = checker.narrow_type_by_discriminant(shape_type, "kind", "square");
+        assert_eq!(narrowed, square_type, "Narrowing by kind='square' should give Square type");
+
+        // Test 3: Narrow by kind === "unknown" should give never
+        let narrowed = checker.narrow_type_by_discriminant(shape_type, "kind", "unknown");
+        assert_eq!(narrowed, checker.types.never_type, "Narrowing by unknown value should give never");
+
+        // Test 4: Narrow by kind !== "circle" should give Square
+        let narrowed = checker.narrow_type_by_discriminant_negation(shape_type, "kind", "circle");
+        assert_eq!(narrowed, square_type, "Narrowing by kind!='circle' should give Square");
+
+        // Test 5: Narrow by kind !== "square" should give Circle
+        let narrowed = checker.narrow_type_by_discriminant_negation(shape_type, "kind", "square");
+        assert_eq!(narrowed, circle_type, "Narrowing by kind!='square' should give Circle");
+    }
+
+    #[test]
+    fn test_switch_exhaustiveness_on_discriminated_union() {
+        // Test switch exhaustiveness checking
+
+        let mut arena = super::TypeArena::new();
+
+        // Create literal types for switch cases
+        let a_literal = arena.create_string_literal("a".to_string());
+        let b_literal = arena.create_string_literal("b".to_string());
+        let c_literal = arena.create_string_literal("c".to_string());
+
+        // Create discriminant type: "a" | "b" | "c"
+        let discriminant_type = arena.create_union_type(vec![a_literal, b_literal, c_literal]);
+
+        // Create minimal checker
+        let node_arena = crate::parser::NodeArena::new();
+        let binder_symbols = crate::binder::SymbolArena::new();
+        let file_locals = SymbolTable::new();
+
+        let mut checker = CheckerState::new(
+            &node_arena,
+            &binder_symbols,
+            &file_locals,
+            "test.ts".to_string(),
+        );
+        checker.types = arena;
+
+        // Test 1: All cases covered - should return never
+        let remaining = checker.check_switch_exhaustiveness(
+            discriminant_type,
+            &[a_literal, b_literal, c_literal],
+            false
+        );
+        assert_eq!(remaining, checker.types.never_type, "Exhaustive switch should return never");
+
+        // Test 2: Missing one case - should return remaining type
+        let remaining = checker.check_switch_exhaustiveness(
+            discriminant_type,
+            &[a_literal, b_literal],  // missing "c"
+            false
+        );
+        assert_eq!(remaining, c_literal, "Non-exhaustive switch should return remaining type");
+
+        // Test 3: Has default - always exhaustive
+        let remaining = checker.check_switch_exhaustiveness(
+            discriminant_type,
+            &[a_literal],  // only "a" but has default
+            true
+        );
+        assert_eq!(remaining, checker.types.never_type, "Switch with default should be exhaustive");
+    }

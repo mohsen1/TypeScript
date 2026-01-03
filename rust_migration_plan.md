@@ -9,7 +9,7 @@
 | 2     | Scanner        | ✅ 95%  | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
-| 5     | Type Checker   | 🟡 67%  | 239 Rust |
+| 5     | Type Checker   | 🟡 70%  | 241 Rust |
 | 6     | Emitter        | ⬜ 0%   | - |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
@@ -53,6 +53,8 @@ All of the following are complete:
 - **5.30** Property access on unions (get common property type across all members)
 - **5.31** Excess property checks (basic detection of extra properties in fresh object literals)
 - **5.32** Index signature support in type literals
+- **5.33** Discriminated union narrowing (x.kind === "circle" filters union types)
+- **5.34** Switch statement exhaustiveness checking
 
 ### 🚧 In Progress / Next Up
 
@@ -60,13 +62,9 @@ All of the following are complete:
     - Infer parameter types from context
     - `arr.map(x => x + 1)` infers `x: number`
 
-- [ ] **Discriminated unions**
-    - Narrow union by discriminant property
-    - `if (obj.kind === "a") { ... }`
-
-- [ ] **Exhaustiveness checking**
-    - Ensure all union cases handled in switch
-    - Never type for unhandled cases
+- [ ] **Exhaustiveness checking diagnostics**
+    - Report errors for non-exhaustive switches
+    - Integrate with diagnostic system
 
 - [ ] **Diagnostics**
     - Port error message generation
