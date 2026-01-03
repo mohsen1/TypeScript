@@ -8,6 +8,7 @@ use super::base::{NodeBase, NodeIndex, NodeList};
 pub struct FunctionDeclaration {
     pub base: NodeBase,
     pub modifiers: Option<NodeList>,
+    pub is_async: bool,        // Async function
     pub asterisk_token: bool,  // Generator function
     pub name: NodeIndex,       // Identifier (optional for default exports)
     pub type_parameters: Option<NodeList>,

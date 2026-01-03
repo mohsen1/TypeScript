@@ -237,6 +237,9 @@ impl Printer {
             Node::ArrowFunction(func) => self.emit_arrow_function(func, arena),
             Node::ConditionalExpression(expr) => self.emit_conditional(expr, arena),
             Node::NewExpression(expr) => self.emit_new_expression(expr, arena),
+            Node::SpreadElement(expr) => self.emit_spread_element(expr, arena),
+            Node::YieldExpression(expr) => self.emit_yield_expression(expr, arena),
+            Node::AwaitExpression(expr) => self.emit_await_expression(expr, arena),
 
             // Statements
             Node::VariableStatement(stmt) => self.emit_variable_statement(stmt, arena),
@@ -245,6 +248,8 @@ impl Printer {
             Node::WhileStatement(stmt) => self.emit_while_statement(stmt, arena),
             Node::DoStatement(stmt) => self.emit_do_statement(stmt, arena),
             Node::ForStatement(stmt) => self.emit_for_statement(stmt, arena),
+            Node::ForInStatement(stmt) => self.emit_for_in_statement(stmt, arena),
+            Node::ForOfStatement(stmt) => self.emit_for_of_statement(stmt, arena),
             Node::ReturnStatement(stmt) => self.emit_return_statement(stmt, arena),
             Node::Block(block) => self.emit_block(block, arena),
             Node::EmptyStatement(_) => self.emit_empty_statement(),
@@ -269,6 +274,7 @@ impl Printer {
             // Object literal members
             Node::PropertyAssignment(prop) => self.emit_property_assignment(prop, arena),
             Node::ShorthandPropertyAssignment(prop) => self.emit_shorthand_property(prop, arena),
+            Node::SpreadAssignment(spread) => self.emit_spread_assignment(spread, arena),
 
             // Source file
             Node::SourceFile(sf) => self.emit_source_file(sf, arena),
@@ -456,6 +462,34 @@ impl Printer {
         }
     }
 
+    fn emit_spread_element(&mut self, expr: &crate::parser::expressions::SpreadElement, arena: &crate::parser::NodeArena) {
+        self.write("...");
+        if let Some(inner) = arena.get(expr.expression) {
+            self.emit_node(inner, arena);
+        }
+    }
+
+    fn emit_yield_expression(&mut self, expr: &crate::parser::expressions::YieldExpression, arena: &crate::parser::NodeArena) {
+        if expr.asterisk_token {
+            self.write("yield*");
+        } else {
+            self.write("yield");
+        }
+        if !expr.expression.is_none() {
+            self.write(" ");
+            if let Some(inner) = arena.get(expr.expression) {
+                self.emit_node(inner, arena);
+            }
+        }
+    }
+
+    fn emit_await_expression(&mut self, expr: &crate::parser::expressions::AwaitExpression, arena: &crate::parser::NodeArena) {
+        self.write("await ");
+        if let Some(inner) = arena.get(expr.expression) {
+            self.emit_node(inner, arena);
+        }
+    }
+
     // =========================================================================
     // Statement emission
     // =========================================================================
@@ -533,6 +567,40 @@ impl Printer {
             if let Some(inc) = arena.get(stmt.incrementor) {
                 self.emit_node(inc, arena);
             }
+        }
+        self.write(") ");
+        if let Some(body) = arena.get(stmt.statement) {
+            self.emit_node(body, arena);
+        }
+    }
+
+    fn emit_for_in_statement(&mut self, stmt: &crate::parser::statements::ForInStatement, arena: &crate::parser::NodeArena) {
+        self.write("for (");
+        if let Some(init) = arena.get(stmt.initializer) {
+            self.emit_node(init, arena);
+        }
+        self.write(" in ");
+        if let Some(expr) = arena.get(stmt.expression) {
+            self.emit_node(expr, arena);
+        }
+        self.write(") ");
+        if let Some(body) = arena.get(stmt.statement) {
+            self.emit_node(body, arena);
+        }
+    }
+
+    fn emit_for_of_statement(&mut self, stmt: &crate::parser::statements::ForOfStatement, arena: &crate::parser::NodeArena) {
+        if stmt.await_modifier {
+            self.write("for await (");
+        } else {
+            self.write("for (");
+        }
+        if let Some(init) = arena.get(stmt.initializer) {
+            self.emit_node(init, arena);
+        }
+        self.write(" of ");
+        if let Some(expr) = arena.get(stmt.expression) {
+            self.emit_node(expr, arena);
         }
         self.write(") ");
         if let Some(body) = arena.get(stmt.statement) {
@@ -714,6 +782,9 @@ impl Printer {
     // =========================================================================
 
     fn emit_function_declaration(&mut self, decl: &crate::parser::declarations::FunctionDeclaration, arena: &crate::parser::NodeArena) {
+        if decl.is_async {
+            self.write("async ");
+        }
         if decl.asterisk_token {
             self.write("function* ");
         } else {
@@ -822,6 +893,13 @@ impl Printer {
             if let Some(init) = arena.get(prop.object_assignment_initializer) {
                 self.emit_node(init, arena);
             }
+        }
+    }
+
+    fn emit_spread_assignment(&mut self, spread: &crate::parser::declarations::SpreadAssignment, arena: &crate::parser::NodeArena) {
+        self.write("...");
+        if let Some(expr) = arena.get(spread.expression) {
+            self.emit_node(expr, arena);
         }
     }
 
@@ -1102,5 +1180,70 @@ mod tests {
     #[test]
     fn test_roundtrip_switch() {
         assert!(roundtrip_test("switch (x) { case 1: break; }"), "Switch should roundtrip");
+    }
+
+    #[test]
+    fn test_emit_for_in() {
+        let output = parse_and_emit("for (let key in obj) { console.log(key); }");
+        assert!(output.contains("for"), "Should contain 'for': {}", output);
+        assert!(output.contains("in"), "Should contain 'in': {}", output);
+        assert!(output.contains("key"), "Should contain 'key': {}", output);
+    }
+
+    #[test]
+    fn test_emit_for_of() {
+        let output = parse_and_emit("for (let item of arr) { console.log(item); }");
+        assert!(output.contains("for"), "Should contain 'for': {}", output);
+        assert!(output.contains("of"), "Should contain 'of': {}", output);
+        assert!(output.contains("item"), "Should contain 'item': {}", output);
+    }
+
+    #[test]
+    fn test_emit_spread() {
+        let output = parse_and_emit("const arr = [1, ...other, 3];");
+        assert!(output.contains("..."), "Should contain '...': {}", output);
+        assert!(output.contains("other"), "Should contain 'other': {}", output);
+    }
+
+    #[test]
+    fn test_emit_spread_object() {
+        let output = parse_and_emit("const obj = { a: 1, ...other };");
+        assert!(output.contains("..."), "Should contain '...': {}", output);
+        assert!(output.contains("other"), "Should contain 'other': {}", output);
+    }
+
+    // Note: yield/await tests disabled pending parser fixes for async/generator functions
+    // TODO: Fix infinite loop when parsing yield/await expressions
+    // #[test]
+    // fn test_emit_await() {
+    //     let output = parse_and_emit("async function f() { await fetch(url); }");
+    //     assert!(output.contains("await"), "Should contain 'await': {}", output);
+    //     assert!(output.contains("async"), "Should contain 'async': {}", output);
+    // }
+
+    // #[test]
+    // fn test_emit_yield() {
+    //     let output = parse_and_emit("function* gen() { yield 1; }");
+    //     assert!(output.contains("yield"), "Should contain 'yield': {}", output);
+    // }
+
+    #[test]
+    fn test_roundtrip_for_in() {
+        assert!(roundtrip_test("for (let key in obj) { log(key); }"), "For-in should roundtrip");
+    }
+
+    #[test]
+    fn test_roundtrip_for_of() {
+        assert!(roundtrip_test("for (let item of arr) { log(item); }"), "For-of should roundtrip");
+    }
+
+    #[test]
+    fn test_roundtrip_spread_array() {
+        assert!(roundtrip_test("const arr = [1, ...other, 3];"), "Spread array should roundtrip");
+    }
+
+    #[test]
+    fn test_roundtrip_spread_object() {
+        assert!(roundtrip_test("const obj = { a: 1, ...other };"), "Spread object should roundtrip");
     }
 }

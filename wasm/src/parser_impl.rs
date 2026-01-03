@@ -17,6 +17,7 @@ use crate::parser::{
     BinaryExpression, CallExpression, PropertyAccessExpression,
     ArrayLiteralExpression, ObjectLiteralExpression, PropertyAssignment,
     NewExpression, ElementAccessExpression, SpreadElement,
+    AwaitExpression, YieldExpression,
     // Statements
     Block, ExpressionStatement, VariableStatement,
     VariableDeclarationList, VariableDeclaration,
@@ -30,6 +31,7 @@ use crate::parser::{
     MethodDeclaration, PropertyDeclaration, ConstructorDeclaration,
     GetAccessorDeclaration, SetAccessorDeclaration,
     InterfaceDeclaration, TypeAliasDeclaration, EnumDeclaration, EnumMember,
+    SpreadAssignment,
     // Import/Export/Module
     ImportDeclaration, ImportClause, NamespaceImport, NamedImports, ImportSpecifier,
     ExportDeclaration, NamedExports, ExportSpecifier, ExportAssignment,
@@ -566,6 +568,12 @@ impl ParserState {
             SyntaxKind::ImportKeyword => self.parse_import_declaration(),
             SyntaxKind::ExportKeyword => self.parse_export_declaration(),
             SyntaxKind::ModuleKeyword | SyntaxKind::NamespaceKeyword => self.parse_module_declaration(),
+            // Handle async keyword - async function or async arrow
+            SyntaxKind::AsyncKeyword => {
+                // parse_function_declaration handles both async function and will fall back
+                // to expression statement if it's an async arrow
+                self.parse_function_declaration()
+            }
             // Handle declare keyword - it's a modifier for various declarations
             SyntaxKind::DeclareKeyword => {
                 self.next_token(); // consume 'declare'
@@ -760,6 +768,9 @@ impl ParserState {
     fn parse_function_declaration(&mut self) -> NodeIndex {
         let pos = self.get_full_start();
 
+        // Check for async modifier
+        let is_async = self.parse_optional(SyntaxKind::AsyncKeyword);
+
         self.parse_expected(SyntaxKind::FunctionKeyword);
 
         let asterisk = self.parse_optional(SyntaxKind::AsteriskToken);
@@ -796,6 +807,7 @@ impl ParserState {
         let decl = FunctionDeclaration {
             base: NodeBase::new_ext(syntax_kind_ext::FUNCTION_DECLARATION, pos, end),
             modifiers: None,
+            is_async,
             asterisk_token: asterisk,
             name,
             type_parameters,
@@ -1353,6 +1365,7 @@ impl ParserState {
         let decl = FunctionDeclaration {
             base: NodeBase::new_ext(syntax_kind_ext::FUNCTION_DECLARATION, start_pos, end),
             modifiers: decorators, // Store decorators in modifiers for now
+            is_async: false,       // Decorated functions don't have async in this path
             asterisk_token: asterisk,
             name,
             type_parameters,
@@ -2578,6 +2591,9 @@ impl ParserState {
             SyntaxKind::AwaitKeyword => {
                 self.parse_await_expression()
             }
+            SyntaxKind::YieldKeyword => {
+                self.parse_yield_expression()
+            }
             _ => self.parse_postfix_expression(),
         }
     }
@@ -2629,12 +2645,53 @@ impl ParserState {
         let operand = self.parse_unary_expression();
         let end = self.arena.get(operand).map(|n| n.base().end).unwrap_or(self.get_token_start());
 
-        let expr = crate::parser::PrefixUnaryExpression {
+        let expr = crate::parser::expressions::AwaitExpression {
             base: NodeBase::new_ext(syntax_kind_ext::AWAIT_EXPRESSION, pos, end),
-            operator: SyntaxKind::AwaitKeyword,
-            operand,
+            expression: operand,
         };
-        self.alloc_node(Node::PrefixUnaryExpression(expr))
+        self.alloc_node(Node::AwaitExpression(expr))
+    }
+
+    /// Parse yield expression.
+    fn parse_yield_expression(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.next_token(); // consume 'yield'
+
+        // Check for yield* (delegating yield)
+        let asterisk_token = self.parse_optional(SyntaxKind::AsteriskToken);
+
+        // Parse the yielded expression (if any)
+        let expression = if !self.is_expression_terminator() {
+            self.parse_assignment_expression_or_higher()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end = if !expression.is_none() {
+            self.arena.get(expression).map(|n| n.base().end).unwrap_or(self.get_token_start())
+        } else {
+            self.get_token_start()
+        };
+
+        let expr = crate::parser::expressions::YieldExpression {
+            base: NodeBase::new_ext(syntax_kind_ext::YIELD_EXPRESSION, pos, end),
+            asterisk_token,
+            expression,
+        };
+        self.alloc_node(Node::YieldExpression(expr))
+    }
+
+    /// Check if current token terminates an expression.
+    fn is_expression_terminator(&self) -> bool {
+        matches!(
+            self.token(),
+            SyntaxKind::SemicolonToken
+                | SyntaxKind::CloseBraceToken
+                | SyntaxKind::CloseParenToken
+                | SyntaxKind::CloseBracketToken
+                | SyntaxKind::EndOfFileToken
+                | SyntaxKind::CommaToken
+        )
     }
 
     /// Parse a postfix expression.
@@ -3008,19 +3065,33 @@ impl ParserState {
         self.alloc_node(Node::ObjectLiteralExpression(lit))
     }
 
-    /// Check if current token can be a property name.
+    /// Check if current token can be a property name (or spread).
     fn is_property_name(&self) -> bool {
         matches!(self.token(),
             SyntaxKind::Identifier
             | SyntaxKind::StringLiteral
             | SyntaxKind::NumericLiteral
             | SyntaxKind::OpenBracketToken
+            | SyntaxKind::DotDotDotToken
         )
     }
 
-    /// Parse a property assignment.
+    /// Parse a property assignment or spread assignment.
     fn parse_property_assignment(&mut self) -> NodeIndex {
         let pos = self.get_full_start();
+
+        // Check for spread assignment: ...expr
+        if self.is_token(SyntaxKind::DotDotDotToken) {
+            self.next_token(); // consume '...'
+            let expression = self.parse_assignment_expression_or_higher();
+            let end = self.get_token_start();
+            let spread = SpreadAssignment {
+                base: NodeBase::new_ext(syntax_kind_ext::SPREAD_ASSIGNMENT, pos, end),
+                expression,
+            };
+            return self.alloc_node(Node::SpreadAssignment(spread));
+        }
+
         let name = self.parse_property_name();
 
         // For now just handle simple case: name: value
