@@ -251,6 +251,13 @@ impl Printer {
             Node::BreakStatement(stmt) => self.emit_break_statement(stmt, arena),
             Node::ContinueStatement(stmt) => self.emit_continue_statement(stmt, arena),
             Node::ThrowStatement(stmt) => self.emit_throw_statement(stmt, arena),
+            Node::TryStatement(stmt) => self.emit_try_statement(stmt, arena),
+            Node::SwitchStatement(stmt) => self.emit_switch_statement(stmt, arena),
+            Node::CaseBlock(block) => self.emit_case_block(block, arena),
+            Node::CaseClause(clause) => self.emit_case_clause(clause, arena),
+            Node::DefaultClause(clause) => self.emit_default_clause(clause, arena),
+            Node::CatchClause(clause) => self.emit_catch_clause(clause, arena),
+            Node::LabeledStatement(stmt) => self.emit_labeled_statement(stmt, arena),
 
             // Declarations
             Node::FunctionDeclaration(decl) => self.emit_function_declaration(decl, arena),
@@ -592,6 +599,114 @@ impl Printer {
             self.emit_node(expr, arena);
         }
         self.write_semicolon();
+    }
+
+    fn emit_try_statement(&mut self, stmt: &crate::parser::statements::TryStatement, arena: &crate::parser::NodeArena) {
+        self.write("try ");
+        if let Some(try_block) = arena.get(stmt.try_block) {
+            self.emit_node(try_block, arena);
+        }
+        if !stmt.catch_clause.is_none() {
+            if let Some(catch_clause) = arena.get(stmt.catch_clause) {
+                self.write(" ");
+                self.emit_node(catch_clause, arena);
+            }
+        }
+        if !stmt.finally_block.is_none() {
+            self.write(" finally ");
+            if let Some(finally_block) = arena.get(stmt.finally_block) {
+                self.emit_node(finally_block, arena);
+            }
+        }
+    }
+
+    fn emit_catch_clause(&mut self, clause: &crate::parser::statements::CatchClause, arena: &crate::parser::NodeArena) {
+        self.write("catch");
+        if !clause.variable_declaration.is_none() {
+            self.write(" (");
+            if let Some(var_decl) = arena.get(clause.variable_declaration) {
+                self.emit_node(var_decl, arena);
+            }
+            self.write(")");
+        }
+        self.write(" ");
+        if let Some(block) = arena.get(clause.block) {
+            self.emit_node(block, arena);
+        }
+    }
+
+    fn emit_switch_statement(&mut self, stmt: &crate::parser::statements::SwitchStatement, arena: &crate::parser::NodeArena) {
+        self.write("switch (");
+        if let Some(expr) = arena.get(stmt.expression) {
+            self.emit_node(expr, arena);
+        }
+        self.write(") ");
+        if let Some(case_block) = arena.get(stmt.case_block) {
+            self.emit_node(case_block, arena);
+        }
+    }
+
+    fn emit_case_block(&mut self, block: &crate::parser::statements::CaseBlock, arena: &crate::parser::NodeArena) {
+        self.write("{");
+        if !block.clauses.nodes.is_empty() {
+            self.write_line();
+            self.increase_indent();
+            for clause_idx in &block.clauses.nodes {
+                if let Some(clause) = arena.get(*clause_idx) {
+                    self.emit_node(clause, arena);
+                }
+            }
+            self.decrease_indent();
+        }
+        self.write("}");
+    }
+
+    fn emit_case_clause(&mut self, clause: &crate::parser::statements::CaseClause, arena: &crate::parser::NodeArena) {
+        self.write("case ");
+        if let Some(expr) = arena.get(clause.expression) {
+            self.emit_node(expr, arena);
+        }
+        self.write(":");
+        if !clause.statements.nodes.is_empty() {
+            self.write_line();
+            self.increase_indent();
+            for stmt_idx in &clause.statements.nodes {
+                if let Some(stmt) = arena.get(*stmt_idx) {
+                    self.emit_node(stmt, arena);
+                    self.write_line();
+                }
+            }
+            self.decrease_indent();
+        } else {
+            self.write_line();
+        }
+    }
+
+    fn emit_default_clause(&mut self, clause: &crate::parser::statements::DefaultClause, arena: &crate::parser::NodeArena) {
+        self.write("default:");
+        if !clause.statements.nodes.is_empty() {
+            self.write_line();
+            self.increase_indent();
+            for stmt_idx in &clause.statements.nodes {
+                if let Some(stmt) = arena.get(*stmt_idx) {
+                    self.emit_node(stmt, arena);
+                    self.write_line();
+                }
+            }
+            self.decrease_indent();
+        } else {
+            self.write_line();
+        }
+    }
+
+    fn emit_labeled_statement(&mut self, stmt: &crate::parser::statements::LabeledStatement, arena: &crate::parser::NodeArena) {
+        if let Some(label) = arena.get(stmt.label) {
+            self.emit_node(label, arena);
+        }
+        self.write(": ");
+        if let Some(statement) = arena.get(stmt.statement) {
+            self.emit_node(statement, arena);
+        }
     }
 
     // =========================================================================
@@ -953,5 +1068,39 @@ mod tests {
     #[test]
     fn test_roundtrip_call_expression() {
         assert!(roundtrip_test("foo(a, b, c);"), "Call expression should roundtrip");
+    }
+
+    #[test]
+    fn test_emit_try_catch() {
+        let output = parse_and_emit("try { x(); } catch (e) { console.log(e); }");
+        assert!(output.contains("try"), "Should contain 'try': {}", output);
+        assert!(output.contains("catch"), "Should contain 'catch': {}", output);
+    }
+
+    #[test]
+    fn test_emit_try_finally() {
+        let output = parse_and_emit("try { x(); } finally { cleanup(); }");
+        assert!(output.contains("try"), "Should contain 'try': {}", output);
+        assert!(output.contains("finally"), "Should contain 'finally': {}", output);
+    }
+
+    #[test]
+    fn test_emit_switch() {
+        let output = parse_and_emit("switch (x) { case 1: break; default: y(); }");
+        assert!(output.contains("switch"), "Should contain 'switch': {}", output);
+        assert!(output.contains("case"), "Should contain 'case': {}", output);
+        assert!(output.contains("default"), "Should contain 'default': {}", output);
+    }
+
+    // Note: Labeled statement test skipped - parser doesn't generate LabeledStatement nodes yet
+
+    #[test]
+    fn test_roundtrip_try_catch() {
+        assert!(roundtrip_test("try { x(); } catch (e) { log(e); }"), "Try-catch should roundtrip");
+    }
+
+    #[test]
+    fn test_roundtrip_switch() {
+        assert!(roundtrip_test("switch (x) { case 1: break; }"), "Switch should roundtrip");
     }
 }
