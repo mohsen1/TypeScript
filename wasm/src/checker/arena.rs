@@ -10,7 +10,7 @@ use super::types::{
     type_flags, object_flags,
     Type, TypeId, LiteralValue, LiteralType, IntrinsicType,
     ObjectType, UnionType, IntersectionType, TypeParameter,
-    ConditionalType, MappedType, IndexType, IndexedAccessType,
+    ConditionalType, MappedType, MappedTypeModifier, IndexType, IndexedAccessType,
     TemplateLiteralType, FunctionType, ArrayTypeInfo, TupleTypeInfo,
     EnumTypeInfo, Signature, IndexInfo,
 };
@@ -458,6 +458,28 @@ impl TypeArena {
         name_type: TypeId,
         template_type: TypeId,
     ) -> TypeId {
+        self.create_mapped_type_with_modifiers(
+            declaration,
+            type_parameter,
+            constraint_type,
+            name_type,
+            template_type,
+            MappedTypeModifier::None,
+            MappedTypeModifier::None,
+        )
+    }
+
+    /// Create a mapped type with explicit readonly and optional modifiers.
+    pub fn create_mapped_type_with_modifiers(
+        &mut self,
+        declaration: NodeIndex,
+        type_parameter: TypeId,
+        constraint_type: TypeId,
+        name_type: TypeId,
+        template_type: TypeId,
+        readonly_modifier: MappedTypeModifier,
+        optional_modifier: MappedTypeModifier,
+    ) -> TypeId {
         self.alloc(Type::Mapped(Box::new(MappedType {
             flags: type_flags::OBJECT,
             object_flags: object_flags::MAPPED,
@@ -466,6 +488,8 @@ impl TypeArena {
             constraint_type,
             name_type,
             template_type,
+            readonly_modifier,
+            optional_modifier,
         })))
     }
 

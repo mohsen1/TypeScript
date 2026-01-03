@@ -9,7 +9,7 @@
 | 2     | Scanner        | ✅ DONE | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
-| 5     | Type Checker   | 🟡 94%  | 339 Rust |
+| 5     | Type Checker   | 🟡 95%  | 340 Rust |
 | 6     | Emitter        | 🟡 40%  | 35 Rust |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
@@ -129,7 +129,7 @@ All of the following are complete:
 
 #### Type Syntax Interpretation (Parsed but needs checker support)
 - [x] **5.103** `typeof` type operator (get type of runtime expression)
-- [ ] **5.104** Mapped type modifiers (`+readonly`, `-readonly`, `+?`, `-?`)
+- [x] **5.104** Mapped type modifiers (`+readonly`, `-readonly`, `+?`, `-?`)
 - [ ] **5.105** `unique symbol` type for const symbol declarations
 - [ ] **5.106** `this` parameter types (`function foo(this: T, ...)`)
 - [ ] **5.107** Abstract construct signatures (`abstract new () => T`)

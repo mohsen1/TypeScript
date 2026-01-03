@@ -216,6 +216,17 @@ pub struct ConditionalType {
     pub infer_type_parameters: Vec<TypeId>,
 }
 
+/// Modifier for mapped type readonly/optional modifiers.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum MappedTypeModifier {
+    /// No modifier specified, preserve from source type
+    None,
+    /// + modifier (add the modifier)
+    Plus,
+    /// - modifier (remove the modifier)
+    Minus,
+}
+
 /// A mapped type ({ [K in keyof T]: ... })
 #[derive(Clone, Debug, Serialize)]
 pub struct MappedType {
@@ -226,6 +237,10 @@ pub struct MappedType {
     pub constraint_type: TypeId,
     pub name_type: TypeId,      // as clause
     pub template_type: TypeId,
+    /// Readonly modifier: None (preserve), Plus (+readonly), Minus (-readonly)
+    pub readonly_modifier: MappedTypeModifier,
+    /// Optional modifier: None (preserve), Plus (+?), Minus (-?)
+    pub optional_modifier: MappedTypeModifier,
 }
 
 /// An indexed access type (T[K])

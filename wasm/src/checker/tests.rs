@@ -6564,3 +6564,75 @@ interface TreeNode {
         assert_eq!(type_str, "readonly [x: number, y: string]",
             "Readonly named tuple should have readonly prefix, got: {}", type_str);
     }
+
+    // ============== 5.104: Mapped type modifiers ==============
+    #[test]
+    fn test_mapped_type_modifiers() {
+        use super::types::MappedTypeModifier;
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+        use crate::binder::SymbolId;
+
+        let code = "let x: number;";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Create a type parameter with placeholder values
+        let type_param = checker.types.create_type_parameter(
+            SymbolId::NONE,
+            TypeId::NONE, // no constraint
+            TypeId::NONE, // no default
+        );
+        let constraint = checker.types.string_type;
+
+        // Create mapped type with +readonly and +? modifiers
+        let mapped = checker.types.create_mapped_type_with_modifiers(
+            crate::parser::NodeIndex::NONE,
+            type_param,
+            constraint,
+            TypeId::NONE, // no name type
+            checker.types.number_type, // template type
+            MappedTypeModifier::Plus,  // +readonly
+            MappedTypeModifier::Plus,  // +?
+        );
+
+        // Verify the mapped type was created
+        if let Some(super::types::Type::Mapped(m)) = checker.types.get(mapped) {
+            assert_eq!(m.readonly_modifier, MappedTypeModifier::Plus,
+                "Readonly modifier should be Plus");
+            assert_eq!(m.optional_modifier, MappedTypeModifier::Plus,
+                "Optional modifier should be Plus");
+        } else {
+            panic!("Expected Mapped type");
+        }
+
+        // Test with minus modifiers
+        let mapped_minus = checker.types.create_mapped_type_with_modifiers(
+            crate::parser::NodeIndex::NONE,
+            type_param,
+            constraint,
+            TypeId::NONE,
+            checker.types.number_type,
+            MappedTypeModifier::Minus, // -readonly
+            MappedTypeModifier::Minus, // -?
+        );
+
+        if let Some(super::types::Type::Mapped(m)) = checker.types.get(mapped_minus) {
+            assert_eq!(m.readonly_modifier, MappedTypeModifier::Minus,
+                "Readonly modifier should be Minus");
+            assert_eq!(m.optional_modifier, MappedTypeModifier::Minus,
+                "Optional modifier should be Minus");
+        } else {
+            panic!("Expected Mapped type");
+        }
+    }
