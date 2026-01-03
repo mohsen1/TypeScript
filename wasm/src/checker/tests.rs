@@ -6080,3 +6080,47 @@ type Result = NonNullable<string | null | undefined>;
             panic!("Should have symbol 'Result'");
         }
     }
+
+    // ============== 5.63: NoInfer<T> type ==============
+    #[test]
+    fn test_noinfer_type() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test NoInfer<T> utility type - should return T unchanged
+        let code = r#"
+type NoInferNum = NoInfer<number>;
+type NoInferStr = NoInfer<string>;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // NoInfer<number> should return number
+        if let Some(symbol_id) = binder.file_locals.get("NoInferNum") {
+            let noinfer_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(noinfer_type);
+            assert_eq!(type_str, "number", "NoInfer<number> should be number, got: {}", type_str);
+        } else {
+            panic!("Should have symbol 'NoInferNum'");
+        }
+
+        // NoInfer<string> should return string
+        if let Some(symbol_id) = binder.file_locals.get("NoInferStr") {
+            let noinfer_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(noinfer_type);
+            assert_eq!(type_str, "string", "NoInfer<string> should be string, got: {}", type_str);
+        } else {
+            panic!("Should have symbol 'NoInferStr'");
+        }
+    }

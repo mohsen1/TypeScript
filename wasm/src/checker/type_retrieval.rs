@@ -3285,6 +3285,10 @@ impl<'a> CheckerState<'a> {
                 let arg_type = type_args.first().copied().unwrap_or(self.types.any_type);
                 self.get_non_nullable_type(arg_type)
             }
+            // NoInfer<T> - prevents type inference, returns T unchanged
+            "NoInfer" => {
+                type_args.first().copied().unwrap_or(self.types.any_type)
+            }
             // ReturnType<T>, Parameters<T>, InstanceType<T>, ConstructorParameters<T>
             "ReturnType" | "Parameters" | "InstanceType" | "ConstructorParameters" => {
                 self.types.any_type

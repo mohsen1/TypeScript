@@ -9,7 +9,7 @@
 | 2     | Scanner        | ✅ DONE | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
-| 5     | Type Checker   | 🟡 89%  | 326 Rust |
+| 5     | Type Checker   | 🟡 89%  | 327 Rust |
 | 6     | Emitter        | 🟡 40%  | 35 Rust |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
@@ -110,7 +110,7 @@ All of the following are complete:
 - [x] **5.60** Variance annotations (`in`/`out` modifiers) - basic extraction, full enforcement TODO
 - [x] **5.61** `satisfies` operator type checking
 - [ ] **5.62** `const` type parameters (literal inference in generics)
-- [ ] **5.63** `NoInfer<T>` utility type
+- [x] **5.63** `NoInfer<T>` utility type
 - [ ] **5.64** `using` declarations (disposable resources)
 - [ ] **5.65** Decorator metadata type support
 
