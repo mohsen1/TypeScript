@@ -4936,3 +4936,231 @@ const instance = new Foo();
         assert_eq!(diagnostic.related_information.len(), 1);
         assert_eq!(diagnostic.related_information[0].file, "other.ts");
     }
+
+    // =========================================================================
+    // Enum Type Checking Tests
+    // =========================================================================
+
+    #[test]
+    fn test_enum_member_access() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                enum Color { Red, Green, Blue }
+                const red = Color.Red;
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the Color enum
+        let color_symbol = binder.file_locals.get("Color").expect("Color should exist");
+        let color_type = checker.get_type_of_symbol(color_symbol);
+
+        // Should be an enum type
+        if let Some(Type::Enum(enum_info)) = checker.types.get(color_type) {
+            assert_eq!(enum_info.name, "Color");
+            assert_eq!(enum_info.members.len(), 3);
+        } else {
+            panic!("Expected enum type");
+        }
+    }
+
+    #[test]
+    fn test_enum_assignability() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "enum Color { Red, Green, Blue }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Pre-create the literal types
+        let red = checker.types.create_number_literal(0.0);
+        let green = checker.types.create_number_literal(1.0);
+        let blue = checker.types.create_number_literal(2.0);
+
+        // Create a numeric enum in the type arena
+        let color_enum = checker.types.create_enum_type(
+            "Color".to_string(),
+            vec![
+                ("Red".to_string(), red),
+                ("Green".to_string(), green),
+                ("Blue".to_string(), blue),
+            ],
+        );
+
+        let number_type = checker.types.number_type;
+
+        // Numeric enum is assignable to number
+        assert!(checker.is_type_assignable_to(color_enum, number_type));
+
+        // Number is assignable to numeric enum
+        assert!(checker.is_type_assignable_to(number_type, color_enum));
+
+        // Number literal is assignable to numeric enum
+        let num_lit = checker.types.create_number_literal(0.0);
+        assert!(checker.is_type_assignable_to(num_lit, color_enum));
+    }
+
+    #[test]
+    fn test_enum_string_values() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // String enum
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                enum Direction {
+                    Up = "UP",
+                    Down = "DOWN",
+                    Left = "LEFT",
+                    Right = "RIGHT"
+                }
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        let dir_symbol = binder.file_locals.get("Direction").expect("Direction should exist");
+        let dir_type = checker.get_type_of_symbol(dir_symbol);
+
+        // Should be an enum type with string literal values
+        if let Some(Type::Enum(enum_info)) = checker.types.get(dir_type) {
+            assert_eq!(enum_info.name, "Direction");
+            assert_eq!(enum_info.members.len(), 4);
+
+            // Check that Up has a string literal type
+            let up_type = enum_info.members.iter()
+                .find(|(name, _)| name == "Up")
+                .map(|(_, t)| *t)
+                .expect("Up should exist");
+
+            if let Some(Type::Literal(lit)) = checker.types.get(up_type) {
+                if let LiteralValue::String(s) = &lit.value {
+                    assert_eq!(s, "UP");
+                } else {
+                    panic!("Expected string literal");
+                }
+            } else {
+                panic!("Expected literal type");
+            }
+        } else {
+            panic!("Expected enum type");
+        }
+    }
+
+    #[test]
+    fn test_same_enum_assignability() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "enum Color { Red }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Pre-create literal types
+        let red1 = checker.types.create_number_literal(0.0);
+        let red2 = checker.types.create_number_literal(0.0);
+
+        // Create two enums with the same name (simulating same declaration)
+        let color1 = checker.types.create_enum_type(
+            "Color".to_string(),
+            vec![("Red".to_string(), red1)],
+        );
+
+        let color2 = checker.types.create_enum_type(
+            "Color".to_string(),
+            vec![("Red".to_string(), red2)],
+        );
+
+        // Same-name enums are compatible
+        assert!(checker.is_type_assignable_to(color1, color2));
+        assert!(checker.is_type_assignable_to(color2, color1));
+    }
+
+    #[test]
+    fn test_different_enum_not_assignable() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "enum Color { Red }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Pre-create literal types
+        let red = checker.types.create_number_literal(0.0);
+        let up = checker.types.create_number_literal(0.0);
+
+        let color = checker.types.create_enum_type(
+            "Color".to_string(),
+            vec![("Red".to_string(), red)],
+        );
+
+        let direction = checker.types.create_enum_type(
+            "Direction".to_string(),
+            vec![("Up".to_string(), up)],
+        );
+
+        // Different enums are NOT compatible, even with same values
+        assert!(!checker.is_type_assignable_to(color, direction));
+        assert!(!checker.is_type_assignable_to(direction, color));
+    }

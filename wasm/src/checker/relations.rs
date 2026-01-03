@@ -170,6 +170,12 @@ impl<'a> CheckerState<'a> {
             return true;
         }
 
+        // Enum type compatibility
+        if self.is_enum_type_related(source, source_type, target, target_type, relation) {
+            self.relation_cache.borrow_mut().insert(cache_key, true);
+            return true;
+        }
+
         // Cache negative result
         self.relation_cache.borrow_mut().insert(cache_key, false);
         false
@@ -214,8 +220,19 @@ impl<'a> CheckerState<'a> {
             return true;
         }
 
-        // Enum to number (non-const enums)
+        // Enum to number (numeric enums - allows passing enum value where number expected)
         if (source_flags & type_flags::ENUM) != 0 && (target_flags & type_flags::NUMBER) != 0 {
+            return true;
+        }
+
+        // Number to numeric enum (allows assigning any number to enum variable)
+        // Note: This is TypeScript's behavior, but may cause type safety issues
+        if (source_flags & type_flags::NUMBER) != 0 && (target_flags & type_flags::ENUM) != 0 {
+            return true;
+        }
+
+        // Number literal to numeric enum
+        if (source_flags & type_flags::NUMBER_LITERAL) != 0 && (target_flags & type_flags::ENUM) != 0 {
             return true;
         }
 
@@ -492,6 +509,35 @@ impl<'a> CheckerState<'a> {
         }
 
         true
+    }
+
+    /// Check if enum types are related.
+    /// Enums are only compatible with:
+    /// - The same enum (by name)
+    /// - Numbers (for numeric enums)
+    /// - Specific string literals (for string enums)
+    fn is_enum_type_related(
+        &self,
+        _source: TypeId,
+        source_type: &Type,
+        _target: TypeId,
+        target_type: &Type,
+        _relation: TypeRelation,
+    ) -> bool {
+        // Both must be enum types for this function
+        let (source_enum, target_enum) = match (source_type, target_type) {
+            (Type::Enum(s), Type::Enum(t)) => (s, t),
+            _ => return false,
+        };
+
+        // Same enum types are compatible (by name)
+        if source_enum.name == target_enum.name {
+            return true;
+        }
+
+        // Different enums are NOT compatible with each other
+        // (unlike plain numbers)
+        false
     }
 
     /// Check if function types are related.

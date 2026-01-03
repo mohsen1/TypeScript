@@ -9,7 +9,7 @@
 | 2     | Scanner        | ✅ DONE | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
-| 5     | Type Checker   | 🟡 78%  | 301 Rust |
+| 5     | Type Checker   | 🟡 82%  | 309 Rust |
 | 6     | Emitter        | 🟡 40%  | 35 Rust |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
@@ -82,15 +82,21 @@ All of the following are complete:
     - Contextual typing for object literal properties and methods
     - Contextual typing for array literal elements
 
-- [ ] **Complete diagnostics integration**
-    - Port error message generation
-    - Match exact TypeScript error codes
-    - Related information spans
+- [x] **Complete diagnostics integration**
+    - Port error message generation with TypeScript-style templates
+    - Match exact TypeScript error codes (diagnostic_codes module)
+    - Related information spans (DiagnosticRelatedInformation)
+    - format_message() for {0}, {1} placeholder replacement
+
+- [x] **Fix blockers from code review**
+    - Scope shadowing bug in type parameter handling
+    - Class type recursion - placeholder updated in-place
+    - TypeReference resolution returns instance type for classes
 
 ### 📋 Remaining Type Checker Features
 
 #### Enums & Overloads
-- [ ] **5.53** Numeric/string/const enum type checking
+- [x] **5.53** Numeric/string/const enum type checking
 - [ ] **5.54** Enum reverse mappings
 - [ ] **5.55** Function overload resolution (selecting correct overload)
 
