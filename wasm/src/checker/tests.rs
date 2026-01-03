@@ -5164,3 +5164,80 @@ const instance = new Foo();
         assert!(!checker.is_type_assignable_to(color, direction));
         assert!(!checker.is_type_assignable_to(direction, color));
     }
+
+    #[test]
+    fn test_enum_reverse_mapping() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "enum Color { Red, Green, Blue }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Create the enum type with numeric values
+        let red = checker.types.create_number_literal(0.0);
+        let green = checker.types.create_number_literal(1.0);
+        let blue = checker.types.create_number_literal(2.0);
+
+        let color_enum = checker.types.create_enum_type(
+            "Color".to_string(),
+            vec![
+                ("Red".to_string(), red),
+                ("Green".to_string(), green),
+                ("Blue".to_string(), blue),
+            ],
+        );
+
+        // Create index types
+        let index_0 = checker.types.create_number_literal(0.0);
+        let index_1 = checker.types.create_number_literal(1.0);
+        let index_red = checker.types.create_string_literal("Red".to_string());
+
+        // Reverse mapping: Color[0] should return "Red"
+        let result_0 = checker.get_indexed_access_type(color_enum, index_0);
+        if let Some(Type::Literal(lit)) = checker.types.get(result_0) {
+            if let LiteralValue::String(s) = &lit.value {
+                assert_eq!(s, "Red");
+            } else {
+                panic!("Expected string literal for Color[0]");
+            }
+        } else {
+            panic!("Expected literal type for Color[0]");
+        }
+
+        // Reverse mapping: Color[1] should return "Green"
+        let result_1 = checker.get_indexed_access_type(color_enum, index_1);
+        if let Some(Type::Literal(lit)) = checker.types.get(result_1) {
+            if let LiteralValue::String(s) = &lit.value {
+                assert_eq!(s, "Green");
+            } else {
+                panic!("Expected string literal for Color[1]");
+            }
+        } else {
+            panic!("Expected literal type for Color[1]");
+        }
+
+        // Forward mapping: Color["Red"] should return 0
+        let result_red = checker.get_indexed_access_type(color_enum, index_red);
+        if let Some(Type::Literal(lit)) = checker.types.get(result_red) {
+            if let LiteralValue::Number(n) = &lit.value {
+                assert_eq!(*n as i32, 0);
+            } else {
+                panic!("Expected number literal for Color['Red']");
+            }
+        } else {
+            panic!("Expected literal type for Color['Red']");
+        }
+    }

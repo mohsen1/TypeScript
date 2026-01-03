@@ -2106,7 +2106,7 @@ impl<'a> CheckerState<'a> {
     }
 
     /// Get the type resulting from indexing an object type with an index type.
-    fn get_indexed_access_type(&mut self, object_type: TypeId, index_type: TypeId) -> TypeId {
+    pub fn get_indexed_access_type(&mut self, object_type: TypeId, index_type: TypeId) -> TypeId {
         let Some(typ) = self.types.get(object_type).cloned() else {
             return self.types.any_type;
         };
@@ -2197,6 +2197,56 @@ impl<'a> CheckerState<'a> {
                     return result_types[0];
                 }
                 self.types.create_union(result_types)
+            }
+            Type::Enum(enum_info) => {
+                // Enum reverse mappings: Color[0] returns "Red", Color["Red"] returns 0
+                // Check for string literal index - forward mapping
+                if let Some(Type::Literal(lit)) = self.types.get(index_type) {
+                    match &lit.value {
+                        LiteralValue::String(member_name) => {
+                            // Forward mapping: Color["Red"] -> 0
+                            for (name, value_type) in &enum_info.members {
+                                if name == member_name {
+                                    return *value_type;
+                                }
+                            }
+                        }
+                        LiteralValue::Number(n) => {
+                            // Reverse mapping: Color[0] -> "Red" (only for numeric enums)
+                            for (name, value_type) in &enum_info.members {
+                                if let Some(Type::Literal(val_lit)) = self.types.get(*value_type) {
+                                    if let LiteralValue::Number(val) = &val_lit.value {
+                                        if (*val as i64) == (*n as i64) {
+                                            // Return the member name as a string literal type
+                                            return self.types.create_string_literal(name.clone());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                // For non-literal number type, return string (union of all member names)
+                let is_number_type = if let Some(Type::Intrinsic(intrinsic)) = self.types.get(index_type) {
+                    intrinsic.intrinsic_name == "number"
+                } else {
+                    false
+                };
+                if is_number_type {
+                    // Return union of all member name string literals
+                    let name_types: Vec<TypeId> = enum_info.members.iter()
+                        .map(|(name, _)| self.types.create_string_literal(name.clone()))
+                        .collect();
+                    if name_types.is_empty() {
+                        return self.types.string_type;
+                    }
+                    if name_types.len() == 1 {
+                        return name_types[0];
+                    }
+                    return self.types.create_union(name_types);
+                }
+                self.types.any_type
             }
             _ => self.types.any_type,
         }
