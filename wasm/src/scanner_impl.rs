@@ -56,19 +56,20 @@ pub struct ScannerSnapshot {
 
 /// The scanner state that holds the current position and token information.
 ///
-/// All positions (pos, end, token_start, full_start_pos) are CHARACTER indices,
-/// not byte indices. This matches TypeScript/JavaScript string indexing.
+/// ZERO-COPY OPTIMIZATION: Source is stored as UTF-8 String directly.
+/// For ASCII-only files (99% of TypeScript), byte position == character position.
+/// Positions are byte-based internally for performance, converted when needed.
 #[wasm_bindgen]
 pub struct ScannerState {
-    /// The source text as a Vec<char> for O(1) character access
-    chars: Vec<char>,
-    /// Current position (character index)
+    /// The source text as UTF-8 String (zero-copy from input)
+    source: String,
+    /// Current byte position
     pos: usize,
-    /// End position (character count)
+    /// End byte position
     end: usize,
-    /// Full start position including leading trivia
+    /// Full start position including leading trivia (byte offset)
     full_start_pos: usize,
-    /// Token start position (excluding trivia)
+    /// Token start position (excluding trivia, byte offset)
     token_start: usize,
     /// Current token kind
     token: SyntaxKind,
@@ -83,12 +84,12 @@ pub struct ScannerState {
 #[wasm_bindgen]
 impl ScannerState {
     /// Create a new scanner state with the given text.
+    /// ZERO-COPY: No Vec<char> allocation, works directly with UTF-8 bytes.
     #[wasm_bindgen(constructor)]
     pub fn new(text: String, skip_trivia: bool) -> ScannerState {
-        let chars: Vec<char> = text.chars().collect();
-        let end = chars.len();
+        let end = text.len(); // byte length
         ScannerState {
-            chars,
+            source: text,
             pos: 0,
             end,
             full_start_pos: 0,
@@ -139,7 +140,7 @@ impl ScannerState {
     /// Get the current token's text from the source.
     #[wasm_bindgen(js_name = getTokenText)]
     pub fn get_token_text(&self) -> String {
-        self.chars[self.token_start..self.pos].iter().collect()
+        self.source[self.token_start..self.pos].to_string()
     }
 
     /// Get the token flags.
@@ -174,11 +175,12 @@ impl ScannerState {
     }
 
     /// Set the text to scan.
+    /// ZERO-COPY: Works directly with UTF-8 bytes.
     #[wasm_bindgen(js_name = setText)]
     pub fn set_text(&mut self, text: String, start: Option<usize>, length: Option<usize>) {
-        self.chars = text.chars().collect();
         let start = start.unwrap_or(0);
-        let len = length.unwrap_or(self.chars.len() - start);
+        let len = length.unwrap_or(text.len() - start);
+        self.source = text;
         self.pos = start;
         self.end = start + len;
         self.full_start_pos = start;
@@ -202,31 +204,52 @@ impl ScannerState {
     /// Get the source text.
     #[wasm_bindgen(js_name = getText)]
     pub fn get_text(&self) -> String {
-        self.chars.iter().collect()
+        self.source.clone()
     }
 
     // =========================================================================
-    // Helper methods (character-indexed for TypeScript compatibility)
+    // Helper methods (byte-indexed for zero-copy performance)
     // =========================================================================
 
-    /// Get the character code at the given character index.
-    /// Returns None if out of bounds.
+    /// Get the byte at the given index. Returns None if out of bounds.
     #[inline]
-    fn char_code_at(&self, index: usize) -> Option<u32> {
-        if index < self.chars.len() {
-            Some(self.chars[index] as u32)
+    fn byte_at(&self, index: usize) -> Option<u8> {
+        self.source.as_bytes().get(index).copied()
+    }
+
+    /// Get byte at index as u32 char code. Returns 0 if out of bounds.
+    /// FAST PATH: For ASCII bytes (0-127), this is the character code.
+    #[inline(always)]
+    fn char_code_unchecked(&self, index: usize) -> u32 {
+        let bytes = self.source.as_bytes();
+        if index < bytes.len() {
+            let b = bytes[index];
+            if b < 128 {
+                // ASCII: byte value == char code
+                b as u32
+            } else {
+                // Non-ASCII: decode UTF-8 char
+                self.source[index..].chars().next().map(|c| c as u32).unwrap_or(0)
+            }
         } else {
-            None
+            0
         }
     }
 
-    /// Get character code at index, returns 0 if out of bounds.
+    /// Get the character code at the given byte index.
+    /// Returns None if out of bounds.
     #[inline]
-    fn char_code_unchecked(&self, index: usize) -> u32 {
-        if index < self.chars.len() {
-            self.chars[index] as u32
+    fn char_code_at(&self, index: usize) -> Option<u32> {
+        let bytes = self.source.as_bytes();
+        if index < bytes.len() {
+            let b = bytes[index];
+            if b < 128 {
+                Some(b as u32)
+            } else {
+                self.source[index..].chars().next().map(|c| c as u32)
+            }
         } else {
-            0
+            None
         }
     }
 
@@ -234,17 +257,36 @@ impl ScannerState {
     fn is_at_end(&self) -> bool {
         self.pos >= self.end
     }
-    
-    /// Get a substring from start to end character indices.
+
+    /// Get byte length of character at position (1 for ASCII, 1-4 for UTF-8)
+    #[inline(always)]
+    fn char_len_at(&self, index: usize) -> usize {
+        let bytes = self.source.as_bytes();
+        if index >= bytes.len() {
+            return 0;
+        }
+        let b = bytes[index];
+        if b < 128 {
+            1 // ASCII
+        } else if b < 0xE0 {
+            2 // 2-byte UTF-8
+        } else if b < 0xF0 {
+            3 // 3-byte UTF-8
+        } else {
+            4 // 4-byte UTF-8
+        }
+    }
+
+    /// Get a substring from start to end byte indices.
     #[inline]
     fn substring(&self, start: usize, end: usize) -> String {
-        // Clamp indices to valid range to avoid panics
-        let clamped_start = start.min(self.chars.len());
-        let clamped_end = end.min(self.chars.len());
+        let len = self.source.len();
+        let clamped_start = start.min(len);
+        let clamped_end = end.min(len);
         if clamped_start >= clamped_end {
             return String::new();
         }
-        self.chars[clamped_start..clamped_end].iter().collect()
+        self.source[clamped_start..clamped_end].to_string()
     }
 
     // =========================================================================
