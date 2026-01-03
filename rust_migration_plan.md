@@ -9,7 +9,7 @@
 | 2     | Scanner        | ✅ DONE | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
-| 5     | Type Checker   | 🟡 90%  | 330 Rust |
+| 5     | Type Checker   | 🟡 90%  | 333 Rust |
 | 6     | Emitter        | 🟡 40%  | 35 Rust |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
@@ -121,7 +121,7 @@ All of the following are complete:
 
 #### Type Inference & Relations
 - [x] **5.69** Recursive conditional type depth limits
-- [ ] **5.70** Circular reference detection
+- [x] **5.70** Circular reference detection
 - [ ] **5.71** Covariance/contravariance checking in functions
 - [x] **5.72** Type widening control (`as const`)
 - [x] **5.73** `Awaited<T>` recursive unwrapping

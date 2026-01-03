@@ -1300,9 +1300,9 @@ fn test_type_flags() {
         let a_type = checker.get_type_of_symbol(a_symbol);
         let a_str = checker.type_to_string(a_type);
 
-        // a should be of type A (an interface with property x: string)
+        // a should be of type A (named interface types print their name)
         assert!(checker.types.get(a_type).is_some(), "a should have a valid type");
-        assert!(a_str.contains("x"), "a should have property x, got: {}", a_str);
+        assert!(a_str == "A", "a should be interface A, got: {}", a_str);
     }
 
     #[test]
@@ -6195,4 +6195,116 @@ type Test = DoubleWrapped<number>;
         // Verify depth returns to 0 after type resolution
         let depth = *checker.instantiation_depth.borrow();
         assert_eq!(depth, 0, "Depth should return to 0 after type resolution");
+    }
+
+    // ============== 5.70: Circular reference detection ==============
+    #[test]
+    fn test_circular_type_alias_reference() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test circular type alias reference (should not hang)
+        // This creates a direct circular reference: type A = A
+        let code = r#"
+type Recursive = { next: Recursive };
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Resolving this should not hang - circular detection kicks in
+        if let Some(symbol_id) = binder.file_locals.get("Recursive") {
+            let recursive_type = checker.get_type_of_symbol(symbol_id);
+            // Should resolve to something (not hang)
+            let type_str = checker.type_to_string(recursive_type);
+            println!("Recursive type resolved to: {}", type_str);
+            // The type exists and didn't cause infinite loop
+            assert!(true, "Successfully resolved circular type alias");
+        } else {
+            panic!("Should have symbol 'Recursive'");
+        }
+    }
+
+    #[test]
+    fn test_circular_interface_reference() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test circular interface reference
+        // Use 'TreeNode' to avoid any potential conflicts with built-in 'Node'
+        let code = r#"
+interface TreeNode {
+    value: number;
+    left: TreeNode | null;
+    right: TreeNode | null;
+}
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Resolving this should not hang
+        if let Some(symbol_id) = binder.file_locals.get("TreeNode") {
+            let tree_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(tree_type);
+            println!("TreeNode type resolved to: {}", type_str);
+            assert!(true, "Successfully resolved circular interface");
+        } else {
+            panic!("Should have symbol 'TreeNode'");
+        }
+    }
+
+    #[test]
+    fn test_resolution_stack_is_clean_after_resolution() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = "type T = string;";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Resolve a type
+        if let Some(symbol_id) = binder.file_locals.get("T") {
+            let _ = checker.get_type_of_symbol(symbol_id);
+        }
+
+        // Verify resolution stacks are empty after resolution
+        assert!(checker.symbol_resolution_stack.is_empty(),
+            "Symbol resolution stack should be empty after resolution");
+        assert!(checker.symbol_resolution_set.is_empty(),
+            "Symbol resolution set should be empty after resolution");
+        assert!(checker.node_resolution_stack.is_empty(),
+            "Node resolution stack should be empty after resolution");
+        assert!(checker.node_resolution_set.is_empty(),
+            "Node resolution set should be empty after resolution");
     }

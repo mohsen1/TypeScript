@@ -565,16 +565,42 @@ impl<'a> CheckerState<'a> {
                 parts.join(" & ")
             }
             Type::Object(obj) => {
+                // For named types (interfaces, classes), print the name instead of expanding
+                // to avoid infinite recursion for recursive types
+                if !obj.symbol.is_none() {
+                    if let Some(sym) = self.symbol_arena.get(obj.symbol) {
+                        return sym.escaped_name.clone();
+                    }
+                }
+                // Anonymous object type - print structure
                 if obj.members.is_empty() && obj.properties.is_empty() {
                     "object".to_string()
                 } else {
                     let mut parts = Vec::new();
-                    for (name, &symbol_id) in obj.members.iter() {
+                    // Limit depth to prevent stack overflow on circular types
+                    for (name, &symbol_id) in obj.members.iter().take(10) {
                         if let Some(&prop_type) = self.symbol_types.get(&symbol_id) {
-                            parts.push(format!("{}: {}", name, self.type_to_string(prop_type)));
+                            // Don't recursively expand object types
+                            let prop_str = if let Some(Type::Object(inner_obj)) = self.types.get(prop_type) {
+                                if !inner_obj.symbol.is_none() {
+                                    if let Some(sym) = self.symbol_arena.get(inner_obj.symbol) {
+                                        sym.escaped_name.clone()
+                                    } else {
+                                        "object".to_string()
+                                    }
+                                } else {
+                                    "object".to_string()
+                                }
+                            } else {
+                                self.type_to_string(prop_type)
+                            };
+                            parts.push(format!("{}: {}", name, prop_str));
                         } else {
                             parts.push(format!("{}: any", name));
                         }
+                    }
+                    if obj.members.len() > 10 {
+                        parts.push("...".to_string());
                     }
                     format!("{{ {} }}", parts.join("; "))
                 }
