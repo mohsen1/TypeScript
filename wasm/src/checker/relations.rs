@@ -21,7 +21,7 @@ impl<'a> CheckerState<'a> {
     /// # Returns
     /// `true` if source is related to target, `false` otherwise
     pub fn is_type_related_to(&self, source: TypeId, target: TypeId, relation: TypeRelation) -> bool {
-        // Identity check - same type reference is always related
+        // Identity check - same type reference is always related (no need to cache)
         if source == target {
             return true;
         }
@@ -32,6 +32,15 @@ impl<'a> CheckerState<'a> {
             return cached;
         }
 
+        // Compute relation and cache result
+        let result = self.is_type_related_to_worker(source, target, relation);
+        self.relation_cache.borrow_mut().insert(cache_key, result);
+        result
+    }
+
+    /// Worker function that performs the actual relation checking.
+    /// Result is cached by the caller.
+    fn is_type_related_to_worker(&self, source: TypeId, target: TypeId, relation: TypeRelation) -> bool {
         // Get the actual types
         let source_type = match self.types.get(source) {
             Some(t) => t,
@@ -160,24 +169,19 @@ impl<'a> CheckerState<'a> {
 
         // Function type compatibility
         if self.is_function_type_related(source, source_type, target, target_type, relation) {
-            self.relation_cache.borrow_mut().insert(cache_key, true);
             return true;
         }
 
         // Tuple type compatibility
         if self.is_tuple_type_related(source, source_type, target, target_type, relation) {
-            self.relation_cache.borrow_mut().insert(cache_key, true);
             return true;
         }
 
         // Enum type compatibility
         if self.is_enum_type_related(source, source_type, target, target_type, relation) {
-            self.relation_cache.borrow_mut().insert(cache_key, true);
             return true;
         }
 
-        // Cache negative result
-        self.relation_cache.borrow_mut().insert(cache_key, false);
         false
     }
 

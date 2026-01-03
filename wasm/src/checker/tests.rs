@@ -6308,3 +6308,51 @@ interface TreeNode {
         assert!(checker.node_resolution_set.is_empty(),
             "Node resolution set should be empty after resolution");
     }
+
+    #[test]
+    fn test_relation_cache() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = "let x: string = 'hello';";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Verify cache is initially empty
+        assert!(checker.relation_cache.borrow().is_empty());
+
+        // First call should populate cache
+        let result1 = checker.is_type_assignable_to(checker.types.string_type, checker.types.string_type);
+        assert!(result1);
+        // Same type returns true without caching (identity optimization)
+
+        // Different types that are related - should cache
+        let string_lit = checker.types.create_string_literal("hello".to_string());
+        let result2 = checker.is_type_assignable_to(string_lit, checker.types.string_type);
+        assert!(result2);
+
+        // Cache should now have an entry
+        assert!(!checker.relation_cache.borrow().is_empty());
+
+        // Second call should use cache
+        let result3 = checker.is_type_assignable_to(string_lit, checker.types.string_type);
+        assert!(result3);
+
+        // Negative relation should also be cached
+        let result4 = checker.is_type_assignable_to(checker.types.number_type, checker.types.string_type);
+        assert!(!result4);
+
+        // Verify cache size increased
+        let cache_size = checker.relation_cache.borrow().len();
+        assert!(cache_size >= 2, "Cache should have at least 2 entries");
+    }

@@ -9,7 +9,7 @@
 | 2     | Scanner        | ✅ DONE | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
-| 5     | Type Checker   | 🟡 90%  | 333 Rust |
+| 5     | Type Checker   | 🟡 91%  | 334 Rust |
 | 6     | Emitter        | 🟡 40%  | 35 Rust |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
@@ -172,7 +172,7 @@ All of the following are complete:
 - [ ] **5.102** `Float16Array` typed array
 
 #### Performance & Architecture (from Go lessons)
-- [ ] **5.82** Type relation caching (`(source, target) → result` map)
+- [x] **5.82** Type relation caching (`(source, target) → result` map)
 - [ ] **5.83** Flow state recycling (object pooling)
 - [ ] **5.84** Apparent type cache
 - [ ] **5.85** Awaited type cache
