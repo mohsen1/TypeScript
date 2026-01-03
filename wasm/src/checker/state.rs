@@ -334,4 +334,218 @@ impl<'a> CheckerState<'a> {
             }
         }
     }
+
+    /// Check a source file and populate diagnostics.
+    /// This is the entry point for type checking a parsed and bound file.
+    pub fn check_source_file(&mut self, root_idx: crate::parser::NodeIndex) {
+        use crate::parser::Node;
+
+        let Some(node) = self.node_arena.get(root_idx) else {
+            return;
+        };
+
+        if let Node::SourceFile(sf) = node {
+            // Type check each top-level statement
+            for &stmt_idx in &sf.statements.nodes {
+                self.check_statement(stmt_idx);
+            }
+        }
+    }
+
+    /// Check a statement and produce type errors.
+    fn check_statement(&mut self, stmt_idx: crate::parser::NodeIndex) {
+        use crate::parser::Node;
+
+        let Some(node) = self.node_arena.get(stmt_idx) else {
+            return;
+        };
+
+        match node {
+            Node::VariableStatement(vs) => {
+                self.check_variable_statement(stmt_idx, vs);
+            }
+            Node::ExpressionStatement(es) => {
+                // Type-check the expression (may produce diagnostics)
+                self.get_type_of_node(es.expression);
+            }
+            Node::IfStatement(ifs) => {
+                // Check condition
+                self.get_type_of_node(ifs.expression);
+                // Check then branch
+                self.check_statement(ifs.then_statement);
+                // Check else branch if present
+                if !ifs.else_statement.is_none() {
+                    self.check_statement(ifs.else_statement);
+                }
+            }
+            Node::ReturnStatement(rs) => {
+                if !rs.expression.is_none() {
+                    self.get_type_of_node(rs.expression);
+                }
+            }
+            Node::Block(block) => {
+                for &inner_stmt in &block.statements.nodes {
+                    self.check_statement(inner_stmt);
+                }
+            }
+            Node::FunctionDeclaration(fd) => {
+                // Check function body if present
+                if !fd.body.is_none() {
+                    self.check_statement(fd.body);
+                }
+            }
+            Node::ClassDeclaration(cd) => {
+                // Check class members
+                for &member_idx in &cd.members.nodes {
+                    self.check_class_member(member_idx);
+                }
+            }
+            Node::WhileStatement(ws) => {
+                self.get_type_of_node(ws.expression);
+                self.check_statement(ws.statement);
+            }
+            Node::DoStatement(ds) => {
+                self.check_statement(ds.statement);
+                self.get_type_of_node(ds.expression);
+            }
+            Node::ForStatement(fs) => {
+                if !fs.initializer.is_none() {
+                    self.get_type_of_node(fs.initializer);
+                }
+                if !fs.condition.is_none() {
+                    self.get_type_of_node(fs.condition);
+                }
+                if !fs.incrementor.is_none() {
+                    self.get_type_of_node(fs.incrementor);
+                }
+                self.check_statement(fs.statement);
+            }
+            Node::ForInStatement(fis) => {
+                self.get_type_of_node(fis.initializer);
+                self.get_type_of_node(fis.expression);
+                self.check_statement(fis.statement);
+            }
+            Node::ForOfStatement(fos) => {
+                self.get_type_of_node(fos.initializer);
+                self.get_type_of_node(fos.expression);
+                self.check_statement(fos.statement);
+            }
+            Node::SwitchStatement(ss) => {
+                self.get_type_of_node(ss.expression);
+                // Get the CaseBlock node to access its clauses
+                if let Some(Node::CaseBlock(cb)) = self.node_arena.get(ss.case_block) {
+                    for &clause_idx in &cb.clauses.nodes {
+                        if let Some(Node::CaseClause(cc)) = self.node_arena.get(clause_idx) {
+                            self.get_type_of_node(cc.expression);
+                            for &stmt in &cc.statements.nodes {
+                                self.check_statement(stmt);
+                            }
+                        } else if let Some(Node::DefaultClause(dc)) = self.node_arena.get(clause_idx) {
+                            for &stmt in &dc.statements.nodes {
+                                self.check_statement(stmt);
+                            }
+                        }
+                    }
+                }
+            }
+            Node::TryStatement(ts) => {
+                self.check_statement(ts.try_block);
+                if !ts.catch_clause.is_none() {
+                    if let Some(Node::CatchClause(cc)) = self.node_arena.get(ts.catch_clause) {
+                        self.check_statement(cc.block);
+                    }
+                }
+                if !ts.finally_block.is_none() {
+                    self.check_statement(ts.finally_block);
+                }
+            }
+            Node::ThrowStatement(ts) => {
+                self.get_type_of_node(ts.expression);
+            }
+            // Type declarations - just register them, no expression checking needed
+            Node::InterfaceDeclaration(_) |
+            Node::TypeAliasDeclaration(_) |
+            Node::EnumDeclaration(_) |
+            Node::ImportDeclaration(_) |
+            Node::ExportDeclaration(_) |
+            Node::ExportAssignment(_) |
+            Node::ModuleDeclaration(_) => {
+                // Type declarations don't need expression checking
+            }
+            _ => {
+                // For other nodes, try to get their type (might produce diagnostics)
+                self.get_type_of_node(stmt_idx);
+            }
+        }
+    }
+
+    /// Check a variable statement.
+    fn check_variable_statement(&mut self, _stmt_idx: crate::parser::NodeIndex, vs: &crate::parser::VariableStatement) {
+        // Get the VariableDeclarationList node
+        let Some(crate::parser::Node::VariableDeclarationList(vdl)) = self.node_arena.get(vs.declaration_list) else {
+            return;
+        };
+
+        // Check each variable declaration
+        for &decl_idx in &vdl.declarations.nodes {
+            if let Some(crate::parser::Node::VariableDeclaration(vd)) = self.node_arena.get(decl_idx) {
+                // If there's an initializer, check type compatibility
+                if !vd.initializer.is_none() {
+                    let init_type = self.get_type_of_node(vd.initializer);
+
+                    // If there's a type annotation, check assignability
+                    if !vd.type_annotation.is_none() {
+                        let declared_type = self.get_type_of_node(vd.type_annotation);
+                        if !self.is_type_assignable_to(init_type, declared_type) {
+                            let init_str = self.type_to_string(init_type);
+                            let decl_str = self.type_to_string(declared_type);
+                            self.error(
+                                vd.initializer,
+                                &format!("Type '{}' is not assignable to type '{}'.", init_str, decl_str),
+                                2322,
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Check a class member.
+    fn check_class_member(&mut self, member_idx: crate::parser::NodeIndex) {
+        use crate::parser::Node;
+
+        let Some(node) = self.node_arena.get(member_idx) else {
+            return;
+        };
+
+        match node {
+            Node::MethodDeclaration(md) => {
+                if !md.body.is_none() {
+                    self.check_statement(md.body);
+                }
+            }
+            Node::PropertyDeclaration(pd) => {
+                if !pd.initializer.is_none() {
+                    self.get_type_of_node(pd.initializer);
+                }
+            }
+            Node::ConstructorDeclaration(cd) => {
+                if !cd.body.is_none() {
+                    self.check_statement(cd.body);
+                }
+            }
+            Node::GetAccessorDeclaration(gd) => {
+                if !gd.body.is_none() {
+                    self.check_statement(gd.body);
+                }
+            }
+            Node::SetAccessorDeclaration(sd) => {
+                if !sd.body.is_none() {
+                    self.check_statement(sd.body);
+                }
+            }
+            _ => {}
+        }
+    }
 }

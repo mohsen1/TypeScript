@@ -549,6 +549,10 @@ interface WasmParserStateInstance {
     bindSourceFile(rootIdx: number): string;
     /** Get full binding result including all symbols as JSON */
     getBindingResult(rootIdx: number): string;
+    /** Type check the source file and return diagnostics as JSON */
+    checkSourceFile(): string;
+    /** Get the type of a specific node as a string */
+    getTypeOfNode(nodeIdx: number): string;
     /** Free the parser resources */
     free(): void;
 }
@@ -611,3 +615,70 @@ export function wasmCreateBinder(): WasmBinderStateInstance | undefined {
  * @internal
  */
 export type WasmBinder = WasmBinderStateInstance;
+
+// =============================================================================
+// Checker Types (Phase 5)
+// =============================================================================
+
+/** @internal */
+export interface WasmCheckerDiagnostic {
+    file: string;
+    start: number;
+    length: number;
+    message_text: string;
+    category: number;
+    code: number;
+}
+
+/** @internal */
+export interface WasmCheckResult {
+    diagnostics: WasmCheckerDiagnostic[];
+    typeCount: number;
+    error?: string;
+}
+
+/**
+ * Run the Rust type checker on a source file.
+ * This is a convenience function that parses, binds, and type-checks in one call.
+ * @param fileName The file name for the source
+ * @param sourceText The TypeScript/JavaScript source code
+ * @returns The check result with diagnostics, or undefined if WASM is unavailable
+ * @internal
+ */
+export function wasmCheckSourceFile(fileName: string, sourceText: string): WasmCheckResult | undefined {
+    const parser = wasmCreateParser(fileName, sourceText);
+    if (!parser) return undefined;
+
+    try {
+        // Parse the source file
+        parser.parseSourceFile();
+
+        // Run type checker (binds automatically if needed)
+        const resultJson = parser.checkSourceFile();
+        return JSON.parse(resultJson) as WasmCheckResult;
+    }
+    finally {
+        parser.free();
+    }
+}
+
+/**
+ * Get the type of a node as a string using the Rust checker.
+ * @param fileName The file name for the source
+ * @param sourceText The TypeScript/JavaScript source code
+ * @param nodeIdx The node index to get the type for
+ * @returns The type as a string, or undefined if WASM is unavailable
+ * @internal
+ */
+export function wasmGetTypeOfNode(fileName: string, sourceText: string, nodeIdx: number): string | undefined {
+    const parser = wasmCreateParser(fileName, sourceText);
+    if (!parser) return undefined;
+
+    try {
+        parser.parseSourceFile();
+        return parser.getTypeOfNode(nodeIdx);
+    }
+    finally {
+        parser.free();
+    }
+}

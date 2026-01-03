@@ -91,6 +91,11 @@ pub struct ParserState {
     node_count: u32,
     /// Identifiers found during parsing
     identifiers: Vec<String>,
+    /// Stored binder state (populated on first bind/check call)
+    #[wasm_bindgen(skip)]
+    pub binder: Option<crate::binder::BinderState>,
+    /// Root node index (set after parsing)
+    root_idx: Option<NodeIndex>,
 }
 
 /// A parse diagnostic/error.
@@ -123,6 +128,8 @@ impl ParserState {
             source_text,
             node_count: 0,
             identifiers: Vec::new(),
+            binder: None,
+            root_idx: None,
         }
     }
 
@@ -131,6 +138,7 @@ impl ParserState {
     #[wasm_bindgen(js_name = parseSourceFile)]
     pub fn parse_source_file_wasm(&mut self) -> u32 {
         let idx = self.parse_source_file();
+        self.root_idx = Some(idx);
         idx.0
     }
 
@@ -198,6 +206,87 @@ impl ParserState {
             "symbolCount": binder.symbols.len()
         });
         serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// Ensure the binder has been run and return a reference to it.
+    /// If not yet bound, runs the binder on the stored root index.
+    fn ensure_bound(&mut self) {
+        if self.binder.is_some() {
+            return;
+        }
+
+        let root_idx = self.root_idx.unwrap_or(NodeIndex(0));
+        let mut binder = crate::binder::BinderState::new();
+        binder.bind_source_file(&self.arena, root_idx);
+        self.binder = Some(binder);
+    }
+
+    /// Type check the source file and return diagnostics as JSON.
+    /// This runs the type checker on the parsed and bound AST.
+    /// Returns JSON object with:
+    ///   - diagnostics: array of type errors
+    ///   - typeCount: number of types allocated
+    #[wasm_bindgen(js_name = checkSourceFile)]
+    pub fn check_source_file(&mut self) -> String {
+        use crate::checker::CheckerState;
+
+        // Ensure parsing happened
+        let root_idx = match self.root_idx {
+            Some(idx) => idx,
+            None => {
+                return serde_json::json!({
+                    "error": "Source file not parsed. Call parseSourceFile() first.",
+                    "diagnostics": [],
+                    "typeCount": 0
+                }).to_string();
+            }
+        };
+
+        // Ensure binding happened
+        self.ensure_bound();
+
+        // Get binder reference - we know it's Some now
+        let binder = self.binder.as_ref().unwrap();
+
+        // Create checker state
+        let mut checker = CheckerState::new(
+            &self.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            self.file_name.clone(),
+        );
+
+        // Type check all statements in the source file
+        checker.check_source_file(root_idx);
+
+        // Return diagnostics
+        let result = serde_json::json!({
+            "diagnostics": checker.diagnostics,
+            "typeCount": checker.get_type_count()
+        });
+        serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
+    }
+
+    /// Get the type of a node as a string.
+    /// Returns the type in TypeScript notation (e.g., "string", "number | boolean").
+    #[wasm_bindgen(js_name = getTypeOfNode)]
+    pub fn get_type_of_node(&mut self, node_idx: u32) -> String {
+        use crate::checker::CheckerState;
+
+        // Ensure binding happened
+        self.ensure_bound();
+
+        let binder = self.binder.as_ref().unwrap();
+
+        let mut checker = CheckerState::new(
+            &self.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            self.file_name.clone(),
+        );
+
+        let type_id = checker.get_type_of_node(NodeIndex(node_idx));
+        checker.type_to_string(type_id)
     }
 }
 

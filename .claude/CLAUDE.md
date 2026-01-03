@@ -5,7 +5,8 @@ Incrementally migrate TypeScript compiler to Rust/WASM using "Strangler Fig" pat
 Run autonomously overnight to complete Phase 5 (Type Checker) and beyond.
 
 ## Current State
-- **Phase 5: Type Checker** - 60% complete, 222 Rust tests passing
+- **Phase 5: Type Checker** - 60% complete, 297 Rust tests passing
+- **WASM Integration:** Checker now exposed to TypeScript via WASM
 - **Blocked:** `test_property_access_on_union` hangs (infinite loop in interface resolution)
 - **Task List:** See `@fix_plan.md` for prioritized work
 
@@ -19,6 +20,7 @@ LOOP:
   4. If pass → mark complete in @fix_plan.md, commit, continue
   5. If fail 3x → add to Blocked section, skip, continue
   6. After 5 tasks → run full test suite: ./wasm/test.sh
+  7. Periodically run: node scripts/verifyChecker.mjs (test against TS)
 ```
 
 ## Commands
@@ -58,21 +60,35 @@ docker run --rm -v $(pwd):/workspace typescript-wasm npx hereby local
 docker run --rm -v $(pwd):/workspace typescript-wasm npx hereby lint
 docker run --rm -v $(pwd):/workspace typescript-wasm npx hereby format
 
-# Verify components
-node scripts/verifyScanner.mjs
-node scripts/verifyParser.mjs
+# Verify components against TypeScript implementation
+node scripts/verifyScanner.mjs           # Compare scanner token output
+node scripts/verifyParser.mjs            # Compare AST structure
+node scripts/verifyChecker.mjs           # Compare type checker diagnostics
+node scripts/verifyChecker.mjs file.ts   # Check specific file
+node scripts/verifyChecker.mjs --test-suite  # Run against TS test suite
+
+# Build WASM module (requires Docker)
+docker run --rm -v /path/to/TypeScript/wasm:/app -v /path/to/TypeScript/built:/built \
+  -w /app rust:latest bash -c \
+  'curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh && \
+   wasm-pack build --target nodejs --out-dir /built/local/wasm'
+
+# Code review with Gemini
+node scripts/ask-gemini.mjs --review wasm/src/checker/state.rs
 ```
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `wasm/src/checker.rs` | Type checking (~8000 lines, main focus) |
+| `wasm/src/checker/` | Type checking module (~8000 lines, main focus) |
+| `wasm/src/checker/state.rs` | CheckerState with check_source_file() |
 | `wasm/src/parser.rs` | AST node definitions |
-| `wasm/src/parser_impl.rs` | Parsing logic |
+| `wasm/src/parser_impl.rs` | Parsing + checkSourceFile WASM binding |
 | `wasm/src/binder.rs` | Symbol binding |
 | `wasm/src/scanner_impl.rs` | Token scanning |
 | `src/compiler/wasm.ts` | WASM bridge to TypeScript |
+| `scripts/verifyChecker.mjs` | Test Rust checker against TS checker |
 | `@fix_plan.md` | Task list (single source of truth) |
 
 ## Architecture
@@ -89,19 +105,43 @@ All major structures use arena allocation with IDs:
 - `TypeArena` + `TypeId` - Types
 - `FlowNodeArena` + `FlowNodeId` - Control flow
 
+## Testing Strategy
+
+### Rust Unit Tests (Primary)
+```bash
+./wasm/test.sh              # All 297 tests
+./wasm/test.sh checker      # Checker tests only
+```
+
+### TypeScript Integration Tests (Validation)
+```bash
+# Compare Rust checker output against TypeScript checker
+node scripts/verifyChecker.mjs           # Built-in test cases (11/13 passing)
+node scripts/verifyChecker.mjs --test-suite  # Run against tests/cases/compiler/
+```
+
+### Current verifyChecker.mjs Results
+- ✅ Type mismatch errors detected correctly
+- ✅ Literal type checking works
+- ✅ Union type checking works
+- ⚠️ Array literal type inference needs work
+- ⚠️ Function parameter scope resolution needs work
+
 ## Adding Features
 
 ### New Type Feature
-1. Add type variant to `Type` enum in `checker.rs`
-2. Update `TypeArena::create_*` method
-3. Handle in `is_type_assignable_to()` relation
-4. Add test: `#[test] fn test_feature_name()`
+1. Add type variant to `Type` enum in `checker/types/type_def.rs`
+2. Update `TypeArena::create_*` method in `checker/arena.rs`
+3. Handle in `is_type_assignable_to()` in `checker/relations.rs`
+4. Add test: `#[test] fn test_feature_name()` in `checker/tests.rs`
+5. Verify: `node scripts/verifyChecker.mjs` passes
 
 ### New Syntax
 1. Add AST node to `parser.rs`
 2. Add parsing in `parser_impl.rs`
 3. Handle in `binder.rs` if declares symbols
-4. Handle in `checker.rs` `get_type_of_node_worker()`
+4. Handle in `checker/type_retrieval.rs` `get_type_of_node_worker()`
+5. Add statement handling in `checker/state.rs` `check_statement()`
 
 ## Commit Format
 ```
