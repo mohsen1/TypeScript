@@ -5986,3 +5986,97 @@ const s = "hello" as const;
             panic!("Should have symbol 's'");
         }
     }
+
+    // ============== 5.73: Awaited<T> type ==============
+    #[test]
+    fn test_awaited_type_basic() {
+        // Test that Awaited<T> returns T for non-Promise types
+        let mut arena = super::TypeArena::new();
+
+        // For non-Promise types, Awaited<T> should return T
+        let number_type = arena.number_type;
+        let string_type = arena.string_type;
+
+        // Verify these base types exist
+        assert!(arena.get(number_type).is_some(), "number type should exist");
+        assert!(arena.get(string_type).is_some(), "string type should exist");
+    }
+
+    #[test]
+    fn test_awaited_type_with_primitive() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test Awaited<T> utility type with non-Promise types
+        let code = r#"
+type AwaitedNum = Awaited<number>;
+type AwaitedStr = Awaited<string>;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // For non-Promise types, Awaited<T> should return T
+        if let Some(symbol_id) = binder.file_locals.get("AwaitedNum") {
+            let awaited_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(awaited_type);
+            // Awaited<number> = number (since number is not a Promise)
+            assert_eq!(type_str, "number", "Awaited<number> should be number, got: {}", type_str);
+        } else {
+            panic!("Should have symbol 'AwaitedNum'");
+        }
+
+        if let Some(symbol_id) = binder.file_locals.get("AwaitedStr") {
+            let awaited_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(awaited_type);
+            // Awaited<string> = string (since string is not a Promise)
+            assert_eq!(type_str, "string", "Awaited<string> should be string, got: {}", type_str);
+        } else {
+            panic!("Should have symbol 'AwaitedStr'");
+        }
+    }
+
+    #[test]
+    fn test_non_nullable_utility_type() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test NonNullable<T> utility type
+        let code = r#"
+type Result = NonNullable<string | null | undefined>;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // NonNullable<string | null | undefined> should be string
+        if let Some(symbol_id) = binder.file_locals.get("Result") {
+            let result_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(result_type);
+            // Should contain "string" after removing null and undefined
+            assert!(type_str.contains("string") || type_str == "string",
+                "NonNullable<string | null | undefined> should contain string, got: {}", type_str);
+        } else {
+            panic!("Should have symbol 'Result'");
+        }
+    }

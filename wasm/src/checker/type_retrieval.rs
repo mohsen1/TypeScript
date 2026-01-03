@@ -459,13 +459,6 @@ impl<'a> CheckerState<'a> {
                 self.get_type_of_interface_declaration(node, id)
             }
 
-            // Type assertion (x as Type)
-            Node::AsExpression(ae) => {
-                // Get the type that's being asserted to
-                let target_type = self.get_type_of_node(ae.type_node);
-                target_type
-            }
-
             // Satisfies expression (x satisfies Type)
             // Returns the narrower type of the expression, but checks assignability
             Node::SatisfiesExpression(se) => {
@@ -3273,6 +3266,28 @@ impl<'a> CheckerState<'a> {
             "Uncapitalize" => {
                 let arg_type = type_args.first().copied().unwrap_or(self.types.string_type);
                 self.apply_string_mapping(arg_type, StringMappingKind::Uncapitalize)
+            }
+            // Awaited<T> - recursively unwraps Promise types
+            "Awaited" => {
+                let arg_type = type_args.first().copied().unwrap_or(self.types.any_type);
+                self.get_awaited_type(arg_type)
+            }
+            // Partial<T>, Required<T>, Readonly<T> - return object type for now
+            "Partial" | "Required" | "Readonly" | "Record" => {
+                self.types.object_type
+            }
+            // Pick, Omit, Exclude, Extract - return object type for now
+            "Pick" | "Omit" | "Exclude" | "Extract" => {
+                self.types.object_type
+            }
+            // NonNullable<T> - remove null and undefined
+            "NonNullable" => {
+                let arg_type = type_args.first().copied().unwrap_or(self.types.any_type);
+                self.get_non_nullable_type(arg_type)
+            }
+            // ReturnType<T>, Parameters<T>, InstanceType<T>, ConstructorParameters<T>
+            "ReturnType" | "Parameters" | "InstanceType" | "ConstructorParameters" => {
+                self.types.any_type
             }
             _ => self.types.object_type,
         }

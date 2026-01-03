@@ -174,6 +174,61 @@ impl<'a> CheckerState<'a> {
         self.get_type_with_facts(type_id, false, false)
     }
 
+    /// Get the awaited type of a Promise-like type.
+    /// Recursively unwraps Promise<T> to get T.
+    /// For non-Promise types, returns the type unchanged.
+    pub fn get_awaited_type(&mut self, type_id: TypeId) -> TypeId {
+        self.get_awaited_type_with_depth(type_id, 0)
+    }
+
+    /// Get awaited type with recursion depth limit.
+    fn get_awaited_type_with_depth(&mut self, type_id: TypeId, depth: u32) -> TypeId {
+        // Prevent infinite recursion
+        if depth > 10 {
+            return type_id;
+        }
+
+        let Some(ty) = self.types.get(type_id) else {
+            return type_id;
+        };
+
+        // Handle union types: apply Awaited to each member
+        if let Type::Union(u) = ty {
+            let types = u.types.clone();
+            let awaited_types: Vec<TypeId> = types
+                .iter()
+                .map(|&t| self.get_awaited_type_with_depth(t, depth + 1))
+                .collect();
+            return self.types.create_union_type(awaited_types);
+        }
+
+        // Check for TypeReference (Promise<T>)
+        if let Type::TypeReference(tr) = ty {
+            let symbol_id = tr.symbol;
+            let type_args = tr.type_arguments.clone();
+
+            // Check if this is a Promise type by looking at the symbol name
+            if let Some(symbol) = self.symbol_arena.get(symbol_id) {
+                if symbol.escaped_name == "Promise" && !type_args.is_empty() {
+                    // Recursively unwrap the type argument
+                    return self.get_awaited_type_with_depth(type_args[0], depth + 1);
+                }
+            }
+        }
+
+        // Check for object types with a "then" method (PromiseLike)
+        if let Type::Object(obj) = ty {
+            if obj.members.has("then") {
+                // For simple PromiseLike detection, just return the type
+                // Full implementation would need to infer from the "then" callback return type
+                return type_id;
+            }
+        }
+
+        // Non-Promise type: return as-is
+        type_id
+    }
+
     /// Make a type readonly by setting the readonly flag on arrays and tuples.
     /// For other types, returns the type unchanged.
     pub fn make_type_readonly(&mut self, type_id: TypeId) -> TypeId {
