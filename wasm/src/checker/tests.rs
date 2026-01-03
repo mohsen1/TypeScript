@@ -5916,3 +5916,73 @@ type Uncap = Uncapitalize<"Hello">;
             panic!("Should have symbol 'Uncap'");
         }
     }
+
+    // =========================================================================
+    // As const tests (5.72)
+    // =========================================================================
+
+    #[test]
+    fn test_as_const_number_literal() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+const x = 42 as const;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the type of 'x'
+        if let Some(symbol_id) = binder.file_locals.get("x") {
+            let x_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(x_type);
+            // With as const, type should be the literal 42, not number
+            assert_eq!(type_str, "42", "x should be literal type 42, got: {}", type_str);
+        } else {
+            panic!("Should have symbol 'x'");
+        }
+    }
+
+    #[test]
+    fn test_as_const_string_literal() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+const s = "hello" as const;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the type of 's'
+        if let Some(symbol_id) = binder.file_locals.get("s") {
+            let s_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(s_type);
+            // With as const, type should be the literal "hello", not string
+            assert_eq!(type_str, "\"hello\"", "s should be literal type \"hello\", got: {}", type_str);
+        } else {
+            panic!("Should have symbol 's'");
+        }
+    }

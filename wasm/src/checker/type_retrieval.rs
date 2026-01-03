@@ -493,6 +493,19 @@ impl<'a> CheckerState<'a> {
                 target_type
             }
 
+            // As expression (x as Type or x as const)
+            Node::AsExpression(ae) => {
+                // Check for "as const" - this preserves literal types
+                if self.is_const_type_reference(ae.type_node) {
+                    // For "as const", return the literal type of the expression
+                    // without widening
+                    self.get_type_of_node(ae.expression)
+                } else {
+                    // Regular type assertion - use the target type
+                    self.get_type_of_node(ae.type_node)
+                }
+            }
+
             // Non-null assertion (x!)
             Node::NonNullExpression(nne) => {
                 let base_type = self.get_type_of_node(nne.expression);
@@ -3491,6 +3504,19 @@ impl<'a> CheckerState<'a> {
             flags |= symbol_flags::PROTECTED;
         }
         flags
+    }
+
+    /// Check if a type node is the special "const" type reference.
+    /// Used to detect "as const" assertions.
+    fn is_const_type_reference(&self, type_node: NodeIndex) -> bool {
+        use crate::parser::Node;
+
+        if let Some(Node::TypeReference(tr)) = self.node_arena.get(type_node) {
+            if let Some(Node::Identifier(id)) = self.node_arena.get(tr.type_name) {
+                return id.escaped_text == "const";
+            }
+        }
+        false
     }
 
     /// Apply a string mapping transformation to a type.
