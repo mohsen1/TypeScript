@@ -6400,3 +6400,58 @@ interface TreeNode {
         let cache_size = checker.awaited_type_cache.borrow().len();
         assert!(cache_size >= 2, "Cache should have at least 2 entries");
     }
+
+    #[test]
+    fn test_widened_type_cache() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = "let x: string;";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Verify widened cache is initially empty
+        assert!(checker.widened_type_cache.borrow().is_empty());
+
+        // Create a string literal type
+        let str_lit = checker.types.create_string_literal("hello".to_string());
+        let widened = checker.get_widened_type(str_lit);
+
+        // String literal should widen to string
+        assert_eq!(widened, checker.types.string_type,
+            "String literal should widen to string");
+
+        // Cache should have an entry
+        assert!(!checker.widened_type_cache.borrow().is_empty());
+
+        // Second call should use cache
+        let widened2 = checker.get_widened_type(str_lit);
+        assert_eq!(widened2, checker.types.string_type);
+
+        // Number literal should widen to number
+        let num_lit = checker.types.create_number_literal(42.0);
+        let widened_num = checker.get_widened_type(num_lit);
+        assert_eq!(widened_num, checker.types.number_type,
+            "Number literal should widen to number");
+
+        // Union of string literals should widen to string
+        let str_lit2 = checker.types.create_string_literal("world".to_string());
+        let union_type = checker.types.create_union_type(vec![str_lit, str_lit2]);
+        let widened_union = checker.get_widened_type(union_type);
+        assert_eq!(widened_union, checker.types.string_type,
+            "Union of string literals should widen to string");
+
+        // Cache should have multiple entries
+        let cache_size = checker.widened_type_cache.borrow().len();
+        assert!(cache_size >= 3, "Cache should have at least 3 entries");
+    }

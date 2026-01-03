@@ -202,6 +202,11 @@ pub struct CheckerState<'a> {
     /// Cache for awaited type results: TypeId → awaited TypeId.
     /// Avoids recomputing Promise unwrapping for the same type.
     pub(crate) awaited_type_cache: RefCell<FxHashMap<TypeId, TypeId>>,
+
+    /// Cache for widened type results: TypeId → widened TypeId.
+    /// For literal types, this is their base type (e.g., "hello" → string).
+    /// For union of literals with same base, this is the base type.
+    pub(crate) widened_type_cache: RefCell<FxHashMap<TypeId, TypeId>>,
 }
 
 /// Maximum depth for recursive type instantiation (conditional types, etc.).
@@ -237,6 +242,7 @@ impl<'a> CheckerState<'a> {
             enclosing_class: None,
             instantiation_depth: RefCell::new(0),
             awaited_type_cache: RefCell::new(FxHashMap::default()),
+            widened_type_cache: RefCell::new(FxHashMap::default()),
         }
     }
 

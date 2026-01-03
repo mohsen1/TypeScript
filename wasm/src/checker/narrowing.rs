@@ -238,6 +238,74 @@ impl<'a> CheckerState<'a> {
         type_id
     }
 
+    /// Get the widened type of a literal type.
+    /// For literal types, returns the base type (e.g., "hello" → string, 42 → number).
+    /// For unions of literals with the same base, returns the common base type.
+    /// For non-literal types, returns the type unchanged.
+    /// Results are cached for performance.
+    pub fn get_widened_type(&mut self, type_id: TypeId) -> TypeId {
+        // Check cache first
+        if let Some(&cached) = self.widened_type_cache.borrow().get(&type_id) {
+            return cached;
+        }
+
+        let result = self.get_widened_type_worker(type_id);
+        self.widened_type_cache.borrow_mut().insert(type_id, result);
+        result
+    }
+
+    /// Worker function for get_widened_type.
+    fn get_widened_type_worker(&self, type_id: TypeId) -> TypeId {
+        let Some(ty) = self.types.get(type_id) else {
+            return type_id;
+        };
+
+        match ty {
+            // String literal → string
+            Type::Literal(lit) if (lit.flags & type_flags::STRING_LITERAL) != 0 => {
+                self.types.string_type
+            }
+            // Number literal → number
+            Type::Literal(lit) if (lit.flags & type_flags::NUMBER_LITERAL) != 0 => {
+                self.types.number_type
+            }
+            // Boolean literal → boolean
+            Type::Literal(lit) if (lit.flags & type_flags::BOOLEAN_LITERAL) != 0 => {
+                self.types.boolean_type
+            }
+            // BigInt literal → bigint
+            Type::Literal(lit) if (lit.flags & type_flags::BIG_INT_LITERAL) != 0 => {
+                self.types.big_int_type
+            }
+
+            // Union types: check if all members have the same widened base type
+            Type::Union(u) => {
+                let types = u.types.clone();
+                if types.is_empty() {
+                    return type_id;
+                }
+
+                // Get the widened type of the first member
+                let first_widened = self.get_widened_type_worker(types[0]);
+
+                // Check if all members have the same widened type
+                let all_same_base = types.iter().skip(1).all(|&t| {
+                    self.get_widened_type_worker(t) == first_widened
+                });
+
+                if all_same_base {
+                    first_widened
+                } else {
+                    // Different base types, return original union
+                    type_id
+                }
+            }
+
+            // Non-literal types return unchanged
+            _ => type_id,
+        }
+    }
+
     /// Make a type readonly by setting the readonly flag on arrays and tuples.
     /// For other types, returns the type unchanged.
     pub fn make_type_readonly(&mut self, type_id: TypeId) -> TypeId {

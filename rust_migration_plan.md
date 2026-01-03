@@ -9,7 +9,7 @@
 | 2     | Scanner        | ✅ DONE | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
-| 5     | Type Checker   | 🟡 92%  | 335 Rust |
+| 5     | Type Checker   | 🟡 93%  | 336 Rust |
 | 6     | Emitter        | 🟡 40%  | 35 Rust |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
@@ -176,7 +176,7 @@ All of the following are complete:
 - [ ] **5.83** Flow state recycling (object pooling)
 - [ ] **5.84** Apparent type cache
 - [x] **5.85** Awaited type cache
-- [ ] **5.86** Literal union base type cache
+- [x] **5.86** Literal union base type cache (widened type cache)
 
 ---
 
