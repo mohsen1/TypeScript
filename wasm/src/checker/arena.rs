@@ -159,6 +159,18 @@ impl TypeArena {
         id
     }
 
+    /// Create a bigint literal type.
+    pub fn create_bigint_literal(&mut self, value: String) -> TypeId {
+        let id = TypeId(self.types.len() as u32);
+        self.types.push(Type::Literal(LiteralType {
+            flags: type_flags::BIG_INT_LITERAL,
+            value: LiteralValue::BigInt(value),
+            fresh_type: id,
+            regular_type: id,
+        }));
+        id
+    }
+
     /// Create a union type with simplification.
     /// - Flattens nested unions
     /// - Removes `never` (X | never = X)

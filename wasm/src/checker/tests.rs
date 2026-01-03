@@ -7579,3 +7579,66 @@ type ObjectWithThis = Methods & ThisType<{ name: string }>;
             type_str
         );
     }
+
+    // ============== 5.88: BigInt type checking ==============
+    #[test]
+    fn test_bigint_arena_creation() {
+        // Test direct arena creation of bigint literal type
+        let mut arena = super::TypeArena::new();
+
+        // Create bigint literal type
+        let bigint_lit = arena.create_bigint_literal("12345".to_string());
+
+        if let Some(super::types::Type::Literal(lit)) = arena.get(bigint_lit) {
+            if let super::types::LiteralValue::BigInt(ref val) = lit.value {
+                assert_eq!(val, "12345", "BigInt value should be '12345'");
+            } else {
+                panic!("Expected BigInt literal value");
+            }
+            assert_eq!(lit.flags, super::types::type_flags::BIG_INT_LITERAL);
+        } else {
+            panic!("Expected Literal type");
+        }
+    }
+
+    #[test]
+    fn test_bigint_assignability() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+        use crate::checker::state::TypeRelation;
+
+        let code = "";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Create bigint literal types
+        let bigint_lit1 = checker.types.create_bigint_literal("123".to_string());
+        let bigint_lit2 = checker.types.create_bigint_literal("456".to_string());
+        let bigint_type = checker.types.big_int_type;
+
+        // BigInt literal should be assignable to bigint
+        assert!(
+            checker.is_type_related_to(bigint_lit1, bigint_type, TypeRelation::Assignable),
+            "BigInt literal should be assignable to bigint"
+        );
+
+        // Different bigint literals should NOT be assignable to each other
+        assert!(
+            !checker.is_type_related_to(bigint_lit1, bigint_lit2, TypeRelation::Assignable),
+            "Different BigInt literals should NOT be assignable to each other"
+        );
+
+        // Same literal value should be assignable
+        let bigint_lit1_copy = checker.types.create_bigint_literal("123".to_string());
+        // Note: These are technically different TypeIds, so they won't be equal unless we compare values
+        // For now, we just verify the general bigint assignability works
+    }

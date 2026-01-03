@@ -73,6 +73,11 @@ impl<'a> CheckerState<'a> {
                 let value = lit.text.parse::<f64>().unwrap_or(0.0);
                 self.types.create_number_literal(value)
             }
+            Node::BigIntLiteral(lit) => {
+                // Remove the trailing 'n' from bigint literal (e.g., "123n" -> "123")
+                let value = lit.text.trim_end_matches('n').to_string();
+                self.types.create_bigint_literal(value)
+            }
 
             // Token nodes - check the kind for keywords
             Node::Token(base) => {

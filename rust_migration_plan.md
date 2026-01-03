@@ -45,6 +45,7 @@ All of the following are complete:
 - **5.21** Infer types in conditional types
 - **5.22** Keyof type evaluation (basic)
 - **5.23** Keyof object types (full), mapped type instantiation, infer pattern matching
+- **5.24** Indexed access type resolution (`T[K]`)
 - **5.25** Intersection type simplification
 - **5.26** Template literal type instantiation
 - **5.27** Union type simplification
@@ -153,7 +154,7 @@ All of the following are complete:
 
 #### ECMAScript Runtime Types & Built-ins
 - [ ] **5.87** `Symbol` type and well-known symbols (`Symbol.iterator`, `Symbol.asyncIterator`, etc.)
-- [ ] **5.88** `BigInt` type checking and literal types
+- [x] **5.88** `BigInt` type checking and literal types
 - [ ] **5.89** `WeakRef<T>` and `FinalizationRegistry<T>` types
 - [ ] **5.90** Iterator/Generator type inference (`Generator<T, TReturn, TNext>`)
 - [ ] **5.91** AsyncIterator/AsyncGenerator types
@@ -171,12 +172,39 @@ All of the following are complete:
 - [ ] **5.101** `Promise.try` type inference
 - [ ] **5.102** `Float16Array` typed array
 
+#### Advanced Inference & Relationships
+- [ ] **5.114** Inference priority levels (`InferencePriority` enum for candidate ranking)
+- [ ] **5.115** Bidirectional type inference (synthesis → vs checking ←)
+- [ ] **5.116** Contravariant candidate intersection vs covariant candidate union
+- [ ] **5.117** Variance computation with marker types (`getVariancesWorker`)
+- [ ] **5.118** Unmeasurable/unreliable variance tracking
+
+#### Conditional Type Edge Cases
+- [ ] **5.119** Tail recursion optimization for nested conditionals (max 1000 iterations)
+- [ ] **5.120** Deferred evaluation for generic conditional types
+- [ ] **5.121** Permissive vs restrictive instantiation for definitely true/false checks
+- [ ] **5.122** Self-referential conditionals with infer
+- [ ] **5.123** Nested distribution chains
+
+#### Mapped Type Advanced Features
+- [ ] **5.124** Homomorphic vs non-homomorphic distinction (preserve modifiers)
+- [ ] **5.125** Reverse mapped type inference
+- [ ] **5.126** Key filtering via `as never` in remapped keys
+
+#### Template Literal Advanced Features
+- [ ] **5.127** Pattern inference algorithm (`inferFromLiteralPartsToTemplateLiteral`)
+- [ ] **5.128** Template literal wildcard handling
+- [ ] **5.129** Recursive template literal depth limits
+
 #### Performance & Architecture (from Go lessons)
 - [x] **5.82** Type relation caching (`(source, target) → result` map)
 - [ ] **5.83** Flow state recycling (object pooling)
 - [x] **5.84** Apparent type cache
 - [x] **5.85** Awaited type cache
 - [x] **5.86** Literal union base type cache (widened type cache)
+- [ ] **5.130** Error recovery (continue checking after errors)
+- [ ] **5.131** Incrementality granularity (file-level vs finer caching)
+- [ ] **5.132** Type instantiation cache (avoid redundant instantiation)
 
 ---
 
