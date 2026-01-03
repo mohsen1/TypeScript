@@ -830,6 +830,7 @@ impl<'a> CheckerState<'a> {
     }
 
     /// Get the narrowed type of a symbol reference given its flow node.
+    /// Uses a worklist algorithm to handle control flow merges correctly.
     pub fn get_narrowed_type_at_flow(
         &mut self,
         symbol_id: SymbolId,
@@ -837,43 +838,85 @@ impl<'a> CheckerState<'a> {
         flow_node_id: crate::binder::FlowNodeId,
         flow_arena: &FlowNodeArena,
     ) -> TypeId {
-        let mut current_type = base_type;
-        let mut current_flow = flow_node_id;
+        use std::collections::HashSet;
 
-        // Walk back through the flow graph
-        while !current_flow.is_none() {
+        // Worklist of (flow_node, current_type) pairs
+        let mut worklist: Vec<(crate::binder::FlowNodeId, TypeId)> = vec![(flow_node_id, base_type)];
+        let mut visited: HashSet<crate::binder::FlowNodeId> = HashSet::new();
+        let mut result_types: Vec<TypeId> = Vec::new();
+
+        while let Some((current_flow, current_type)) = worklist.pop() {
+            if current_flow.is_none() || visited.contains(&current_flow) {
+                // Reached end of path or already visited - this type contributes to result
+                if current_type != base_type || result_types.is_empty() {
+                    result_types.push(current_type);
+                }
+                continue;
+            }
+            visited.insert(current_flow);
+
             let Some(flow) = flow_arena.get(current_flow) else {
-                break;
+                result_types.push(current_type);
+                continue;
             };
 
-            // Check if this is a condition node
-            if flow.has_any_flags(flow_flags::TRUE_CONDITION | flow_flags::FALSE_CONDITION) {
-                // Get the condition expression
+            // Apply narrowing if this is a condition node
+            let narrowed_type = if flow.has_any_flags(flow_flags::TRUE_CONDITION | flow_flags::FALSE_CONDITION) {
                 if !flow.node.is_none() {
                     if let Some(guard) = self.get_type_guard_from_expression(flow.node) {
-                        // Check if the guard applies to our symbol
                         if self.guard_applies_to_symbol(&guard, symbol_id) {
-                            // Determine if we should apply the guard or its negation
                             let effective_guard = if flow.has_flags(flow_flags::TRUE_CONDITION) {
                                 guard
                             } else {
                                 self.negate_type_guard(guard)
                             };
-                            current_type = self.apply_type_guard(current_type, &effective_guard);
+                            self.apply_type_guard(current_type, &effective_guard)
+                        } else {
+                            current_type
                         }
+                    } else {
+                        current_type
                     }
+                } else {
+                    current_type
                 }
-            }
-
-            // Move to the antecedent
-            if let Some(&antecedent) = flow.antecedent.first() {
-                current_flow = antecedent;
             } else {
-                break;
+                current_type
+            };
+
+            // Add ALL antecedents to worklist (not just first!)
+            if flow.antecedent.is_empty() {
+                result_types.push(narrowed_type);
+            } else {
+                for &antecedent in &flow.antecedent {
+                    worklist.push((antecedent, narrowed_type));
+                }
             }
         }
 
-        current_type
+        // If no results, return base type
+        if result_types.is_empty() {
+            return base_type;
+        }
+
+        // If only one result type, return it
+        if result_types.len() == 1 {
+            return result_types[0];
+        }
+
+        // Multiple paths converged - create union of all narrowed types
+        // Remove duplicates first
+        let unique_types: Vec<TypeId> = result_types
+            .into_iter()
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        if unique_types.len() == 1 {
+            unique_types[0]
+        } else {
+            self.types.create_union_type(unique_types)
+        }
     }
 
     /// Check if a type guard applies to a specific symbol.

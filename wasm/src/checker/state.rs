@@ -3,7 +3,8 @@
 //! This module contains the CheckerState struct, diagnostic types,
 //! and type guard/relation definitions.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::cell::RefCell;
 use rustc_hash::FxHashMap;
 use serde::Serialize;
 use crate::binder::{SymbolId, SymbolArena, SymbolTable};
@@ -130,9 +131,13 @@ pub struct CheckerState<'a> {
 
     /// Stack of symbols being resolved (to detect circular references).
     pub(crate) symbol_resolution_stack: Vec<SymbolId>,
+    /// O(1) lookup set for symbol resolution stack.
+    pub(crate) symbol_resolution_set: HashSet<SymbolId>,
 
     /// Stack of nodes being resolved (to detect circular references).
     pub(crate) node_resolution_stack: Vec<NodeIndex>,
+    /// O(1) lookup set for node resolution stack.
+    pub(crate) node_resolution_set: HashSet<NodeIndex>,
 
     /// Current file name.
     pub file_name: String,
@@ -143,7 +148,8 @@ pub struct CheckerState<'a> {
     /// Cache for type relation results (source, target, relation) -> result.
     /// Key: (source TypeId, target TypeId, relation as u8)
     /// Value: true if related, false otherwise
-    pub(crate) relation_cache: FxHashMap<(TypeId, TypeId, u8), bool>,
+    /// Uses RefCell for interior mutability (allows caching from &self methods)
+    pub(crate) relation_cache: RefCell<FxHashMap<(TypeId, TypeId, u8), bool>>,
 }
 
 impl<'a> CheckerState<'a> {
@@ -166,10 +172,12 @@ impl<'a> CheckerState<'a> {
             type_parameter_scope: HashMap::new(),
             diagnostics: Vec::new(),
             symbol_resolution_stack: Vec::new(),
+            symbol_resolution_set: HashSet::new(),
             node_resolution_stack: Vec::new(),
+            node_resolution_set: HashSet::new(),
             file_name,
             contextual_type: None,
-            relation_cache: FxHashMap::default(),
+            relation_cache: RefCell::new(FxHashMap::default()),
         }
     }
 

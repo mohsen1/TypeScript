@@ -240,6 +240,11 @@ impl Printer {
             Node::SpreadElement(expr) => self.emit_spread_element(expr, arena),
             Node::YieldExpression(expr) => self.emit_yield_expression(expr, arena),
             Node::AwaitExpression(expr) => self.emit_await_expression(expr, arena),
+            Node::AsExpression(expr) => self.emit_as_expression(expr, arena),
+            Node::TypeAssertion(expr) => self.emit_type_assertion(expr, arena),
+            Node::NonNullExpression(expr) => self.emit_non_null_expression(expr, arena),
+            Node::TemplateExpression(expr) => self.emit_template_expression(expr, arena),
+            Node::TaggedTemplateExpression(expr) => self.emit_tagged_template(expr, arena),
 
             // Statements
             Node::VariableStatement(stmt) => self.emit_variable_statement(stmt, arena),
@@ -263,6 +268,8 @@ impl Printer {
             Node::DefaultClause(clause) => self.emit_default_clause(clause, arena),
             Node::CatchClause(clause) => self.emit_catch_clause(clause, arena),
             Node::LabeledStatement(stmt) => self.emit_labeled_statement(stmt, arena),
+            Node::DebuggerStatement(_) => self.write("debugger;"),
+            Node::WithStatement(stmt) => self.emit_with_statement(stmt, arena),
 
             // Declarations
             Node::FunctionDeclaration(decl) => self.emit_function_declaration(decl, arena),
@@ -270,6 +277,20 @@ impl Printer {
             Node::VariableDeclaration(decl) => self.emit_variable_declaration(decl, arena),
             Node::VariableDeclarationList(list) => self.emit_variable_declaration_list(list, arena),
             Node::ParameterDeclaration(param) => self.emit_parameter_declaration(param, arena),
+            Node::InterfaceDeclaration(decl) => self.emit_interface_declaration(decl, arena),
+            Node::TypeAliasDeclaration(decl) => self.emit_type_alias_declaration(decl, arena),
+            Node::EnumDeclaration(decl) => self.emit_enum_declaration(decl, arena),
+            Node::ModuleDeclaration(decl) => self.emit_module_declaration(decl, arena),
+            Node::ImportDeclaration(decl) => self.emit_import_declaration(decl, arena),
+            Node::ExportDeclaration(decl) => self.emit_export_declaration(decl, arena),
+            Node::ExportAssignment(decl) => self.emit_export_assignment(decl, arena),
+
+            // Class members
+            Node::MethodDeclaration(decl) => self.emit_method_declaration(decl, arena),
+            Node::PropertyDeclaration(decl) => self.emit_property_declaration(decl, arena),
+            Node::ConstructorDeclaration(decl) => self.emit_constructor_declaration(decl, arena),
+            Node::GetAccessorDeclaration(decl) => self.emit_get_accessor(decl, arena),
+            Node::SetAccessorDeclaration(decl) => self.emit_set_accessor(decl, arena),
 
             // Object literal members
             Node::PropertyAssignment(prop) => self.emit_property_assignment(prop, arena),
@@ -904,6 +925,259 @@ impl Printer {
     }
 
     // =========================================================================
+    // TypeScript-specific expressions
+    // =========================================================================
+
+    fn emit_as_expression(&mut self, expr: &crate::parser::expressions::AsExpression, arena: &crate::parser::NodeArena) {
+        if let Some(e) = arena.get(expr.expression) {
+            self.emit_node(e, arena);
+        }
+        self.write(" as ");
+        if let Some(t) = arena.get(expr.type_node) {
+            self.emit_node(t, arena);
+        }
+    }
+
+    fn emit_type_assertion(&mut self, expr: &crate::parser::expressions::TypeAssertion, arena: &crate::parser::NodeArena) {
+        self.write("<");
+        if let Some(t) = arena.get(expr.type_node) {
+            self.emit_node(t, arena);
+        }
+        self.write(">");
+        if let Some(e) = arena.get(expr.expression) {
+            self.emit_node(e, arena);
+        }
+    }
+
+    fn emit_non_null_expression(&mut self, expr: &crate::parser::expressions::NonNullExpression, arena: &crate::parser::NodeArena) {
+        if let Some(e) = arena.get(expr.expression) {
+            self.emit_node(e, arena);
+        }
+        self.write("!");
+    }
+
+    fn emit_template_expression(&mut self, expr: &crate::parser::expressions::TemplateExpression, arena: &crate::parser::NodeArena) {
+        // Template head (e.g., `text${)
+        if let Some(head) = arena.get(expr.head) {
+            self.emit_node(head, arena);
+        }
+        // Template spans
+        for span_idx in &expr.template_spans.nodes {
+            if let Some(span) = arena.get(*span_idx) {
+                self.emit_node(span, arena);
+            }
+        }
+    }
+
+    fn emit_tagged_template(&mut self, expr: &crate::parser::expressions::TaggedTemplateExpression, arena: &crate::parser::NodeArena) {
+        if let Some(tag) = arena.get(expr.tag) {
+            self.emit_node(tag, arena);
+        }
+        if let Some(template) = arena.get(expr.template) {
+            self.emit_node(template, arena);
+        }
+    }
+
+    // =========================================================================
+    // Additional statements
+    // =========================================================================
+
+    fn emit_with_statement(&mut self, stmt: &crate::parser::statements::WithStatement, arena: &crate::parser::NodeArena) {
+        self.write("with (");
+        if let Some(expr) = arena.get(stmt.expression) {
+            self.emit_node(expr, arena);
+        }
+        self.write(") ");
+        if let Some(s) = arena.get(stmt.statement) {
+            self.emit_node(s, arena);
+        }
+    }
+
+    // =========================================================================
+    // TypeScript declarations
+    // =========================================================================
+
+    fn emit_interface_declaration(&mut self, decl: &crate::parser::declarations::InterfaceDeclaration, arena: &crate::parser::NodeArena) {
+        self.write("interface ");
+        if let Some(name) = arena.get(decl.name) {
+            self.emit_node(name, arena);
+        }
+        // TODO: type parameters, extends clause
+        self.write(" {");
+        self.write_line();
+        self.increase_indent();
+        for member_idx in &decl.members.nodes {
+            if let Some(member) = arena.get(*member_idx) {
+                self.emit_node(member, arena);
+                self.write(";");
+                self.write_line();
+            }
+        }
+        self.decrease_indent();
+        self.write("}");
+    }
+
+    fn emit_type_alias_declaration(&mut self, decl: &crate::parser::declarations::TypeAliasDeclaration, arena: &crate::parser::NodeArena) {
+        self.write("type ");
+        if let Some(name) = arena.get(decl.name) {
+            self.emit_node(name, arena);
+        }
+        // TODO: type parameters
+        self.write(" = ");
+        if let Some(ty) = arena.get(decl.type_node) {
+            self.emit_node(ty, arena);
+        }
+        self.write(";");
+    }
+
+    fn emit_enum_declaration(&mut self, decl: &crate::parser::declarations::EnumDeclaration, arena: &crate::parser::NodeArena) {
+        self.write("enum ");
+        if let Some(name) = arena.get(decl.name) {
+            self.emit_node(name, arena);
+        }
+        self.write(" {");
+        self.write_line();
+        self.increase_indent();
+        for (i, member_idx) in decl.members.nodes.iter().enumerate() {
+            if let Some(member) = arena.get(*member_idx) {
+                self.emit_node(member, arena);
+                if i < decl.members.nodes.len() - 1 {
+                    self.write(",");
+                }
+                self.write_line();
+            }
+        }
+        self.decrease_indent();
+        self.write("}");
+    }
+
+    fn emit_module_declaration(&mut self, decl: &crate::parser::declarations::ModuleDeclaration, arena: &crate::parser::NodeArena) {
+        // TODO: handle 'declare' modifier
+        self.write("namespace ");
+        if let Some(name) = arena.get(decl.name) {
+            self.emit_node(name, arena);
+        }
+        self.write(" ");
+        if let Some(body) = arena.get(decl.body) {
+            self.emit_node(body, arena);
+        }
+    }
+
+    // =========================================================================
+    // Import/Export declarations
+    // =========================================================================
+
+    fn emit_import_declaration(&mut self, decl: &crate::parser::declarations::ImportDeclaration, arena: &crate::parser::NodeArena) {
+        self.write("import ");
+        if let Some(clause) = arena.get(decl.import_clause) {
+            self.emit_node(clause, arena);
+            self.write(" from ");
+        }
+        if let Some(specifier) = arena.get(decl.module_specifier) {
+            self.emit_node(specifier, arena);
+        }
+        self.write(";");
+    }
+
+    fn emit_export_declaration(&mut self, decl: &crate::parser::declarations::ExportDeclaration, arena: &crate::parser::NodeArena) {
+        self.write("export ");
+        if let Some(clause) = arena.get(decl.export_clause) {
+            self.emit_node(clause, arena);
+        } else {
+            self.write("*");
+        }
+        if !decl.module_specifier.is_none() {
+            self.write(" from ");
+            if let Some(specifier) = arena.get(decl.module_specifier) {
+                self.emit_node(specifier, arena);
+            }
+        }
+        self.write(";");
+    }
+
+    fn emit_export_assignment(&mut self, decl: &crate::parser::declarations::ExportAssignment, arena: &crate::parser::NodeArena) {
+        if decl.is_export_equals {
+            self.write("export = ");
+        } else {
+            self.write("export default ");
+        }
+        if let Some(expr) = arena.get(decl.expression) {
+            self.emit_node(expr, arena);
+        }
+        self.write(";");
+    }
+
+    // =========================================================================
+    // Class members
+    // =========================================================================
+
+    fn emit_method_declaration(&mut self, decl: &crate::parser::declarations::MethodDeclaration, arena: &crate::parser::NodeArena) {
+        // TODO: modifiers (async, static, etc.)
+        if let Some(name) = arena.get(decl.name) {
+            self.emit_node(name, arena);
+        }
+        self.write("(");
+        self.emit_node_list(&decl.parameters, arena, ", ");
+        self.write(") ");
+        if let Some(body) = arena.get(decl.body) {
+            self.emit_node(body, arena);
+        }
+    }
+
+    fn emit_property_declaration(&mut self, decl: &crate::parser::declarations::PropertyDeclaration, arena: &crate::parser::NodeArena) {
+        // TODO: modifiers
+        if let Some(name) = arena.get(decl.name) {
+            self.emit_node(name, arena);
+        }
+        if !decl.type_annotation.is_none() {
+            self.write(": ");
+            if let Some(ty) = arena.get(decl.type_annotation) {
+                self.emit_node(ty, arena);
+            }
+        }
+        if !decl.initializer.is_none() {
+            self.write(" = ");
+            if let Some(init) = arena.get(decl.initializer) {
+                self.emit_node(init, arena);
+            }
+        }
+        self.write(";");
+    }
+
+    fn emit_constructor_declaration(&mut self, decl: &crate::parser::declarations::ConstructorDeclaration, arena: &crate::parser::NodeArena) {
+        self.write("constructor(");
+        self.emit_node_list(&decl.parameters, arena, ", ");
+        self.write(") ");
+        if let Some(body) = arena.get(decl.body) {
+            self.emit_node(body, arena);
+        }
+    }
+
+    fn emit_get_accessor(&mut self, decl: &crate::parser::declarations::GetAccessorDeclaration, arena: &crate::parser::NodeArena) {
+        self.write("get ");
+        if let Some(name) = arena.get(decl.name) {
+            self.emit_node(name, arena);
+        }
+        self.write("() ");
+        if let Some(body) = arena.get(decl.body) {
+            self.emit_node(body, arena);
+        }
+    }
+
+    fn emit_set_accessor(&mut self, decl: &crate::parser::declarations::SetAccessorDeclaration, arena: &crate::parser::NodeArena) {
+        self.write("set ");
+        if let Some(name) = arena.get(decl.name) {
+            self.emit_node(name, arena);
+        }
+        self.write("(");
+        self.emit_node_list(&decl.parameters, arena, ", ");
+        self.write(") ");
+        if let Some(body) = arena.get(decl.body) {
+            self.emit_node(body, arena);
+        }
+    }
+
+    // =========================================================================
     // Source file emission
     // =========================================================================
 
@@ -921,9 +1195,13 @@ impl Printer {
     // =========================================================================
 
     fn emit_token(&mut self, base: &NodeBase) {
-        // Safe because SyntaxKind is #[repr(u16)] and all values are valid tokens
-        let kind: SyntaxKind = unsafe { std::mem::transmute(base.kind) };
-        self.emit_token_kind(kind);
+        // Only valid for token kinds (0-166). AST node kinds are > 166.
+        if let Some(kind) = SyntaxKind::try_from_u16(base.kind) {
+            self.emit_token_kind(kind);
+        } else {
+            // Fallback: emit as unknown token (should not happen if called correctly)
+            debug_assert!(false, "emit_token called with non-token kind: {}", base.kind);
+        }
     }
 
     fn emit_token_kind(&mut self, kind: SyntaxKind) {
@@ -1245,5 +1523,102 @@ mod tests {
     #[test]
     fn test_roundtrip_spread_object() {
         assert!(roundtrip_test("const obj = { a: 1, ...other };"), "Spread object should roundtrip");
+    }
+
+    // =========================================================================
+    // TypeScript-specific tests
+    // =========================================================================
+
+    // TODO: Parser doesn't create AsExpression nodes yet
+    // #[test]
+    // fn test_emit_as_expression() {
+    //     let output = parse_and_emit("const x = value as string;");
+    //     assert!(output.contains("as"), "Should contain 'as': {}", output);
+    //     assert!(output.contains("string"), "Should contain 'string': {}", output);
+    // }
+
+    // TODO: Parser doesn't create TypeAssertion nodes yet
+    // #[test]
+    // fn test_emit_type_assertion() {
+    //     let output = parse_and_emit("const x = <string>value;");
+    //     assert!(output.contains("<string>"), "Should contain '<string>': {}", output);
+    // }
+
+    #[test]
+    fn test_emit_non_null_assertion() {
+        let output = parse_and_emit("const x = value!;");
+        assert!(output.contains("!"), "Should contain '!': {}", output);
+    }
+
+    // TODO: Parser doesn't create InterfaceDeclaration nodes from statements
+    // #[test]
+    // fn test_emit_interface() {
+    //     let output = parse_and_emit("interface Foo { x: number; }");
+    //     assert!(output.contains("interface"), "Should contain 'interface': {}", output);
+    //     assert!(output.contains("Foo"), "Should contain 'Foo': {}", output);
+    //     assert!(output.contains("x"), "Should contain 'x': {}", output);
+    // }
+
+    #[test]
+    fn test_emit_type_alias() {
+        let output = parse_and_emit("type Foo = string | number;");
+        assert!(output.contains("type"), "Should contain 'type': {}", output);
+        assert!(output.contains("Foo"), "Should contain 'Foo': {}", output);
+    }
+
+    // TODO: Parser doesn't create EnumDeclaration nodes from statements
+    // #[test]
+    // fn test_emit_enum() {
+    //     let output = parse_and_emit("enum Color { Red, Green, Blue }");
+    //     assert!(output.contains("enum"), "Should contain 'enum': {}", output);
+    //     assert!(output.contains("Color"), "Should contain 'Color': {}", output);
+    //     assert!(output.contains("Red"), "Should contain 'Red': {}", output);
+    // }
+
+    #[test]
+    fn test_emit_import() {
+        let output = parse_and_emit("import { foo } from 'bar';");
+        assert!(output.contains("import"), "Should contain 'import': {}", output);
+        assert!(output.contains("from"), "Should contain 'from': {}", output);
+    }
+
+    #[test]
+    fn test_emit_export() {
+        let output = parse_and_emit("export { foo, bar };");
+        assert!(output.contains("export"), "Should contain 'export': {}", output);
+    }
+
+    // TODO: Parser doesn't handle export default correctly yet
+    // #[test]
+    // fn test_emit_export_default() {
+    //     let output = parse_and_emit("export default function() {}");
+    //     assert!(output.contains("export"), "Should contain 'export': {}", output);
+    //     assert!(output.contains("default"), "Should contain 'default': {}", output);
+    // }
+
+    // TODO: Parser doesn't create TemplateExpression nodes yet
+    // #[test]
+    // fn test_emit_template_literal() {
+    //     let output = parse_and_emit("const s = `hello ${name}!`;");
+    //     assert!(output.contains("`"), "Should contain backtick: {}", output);
+    //     assert!(output.contains("${"), "Should contain '${': {}", output);
+    // }
+
+    #[test]
+    fn test_emit_typeof() {
+        let output = parse_and_emit("const t = typeof x;");
+        assert!(output.contains("typeof"), "Should contain 'typeof': {}", output);
+    }
+
+    #[test]
+    fn test_emit_void() {
+        let output = parse_and_emit("void 0;");
+        assert!(output.contains("void"), "Should contain 'void': {}", output);
+    }
+
+    #[test]
+    fn test_emit_delete() {
+        let output = parse_and_emit("delete obj.prop;");
+        assert!(output.contains("delete"), "Should contain 'delete': {}", output);
     }
 }

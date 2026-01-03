@@ -22,17 +22,19 @@ impl<'a> CheckerState<'a> {
             return cached;
         }
 
-        // Track recursion to catch infinite loops
-        if self.node_resolution_stack.contains(&node) {
+        // Track recursion to catch infinite loops (O(1) lookup using HashSet)
+        if self.node_resolution_set.contains(&node) {
             // Circular reference - return any_type to break the loop
             return self.types.any_type;
         }
         self.node_resolution_stack.push(node);
+        self.node_resolution_set.insert(node);
 
         let type_id = self.get_type_of_node_worker(node);
         self.node_types.insert(node, type_id);
 
         self.node_resolution_stack.pop();
+        self.node_resolution_set.remove(&node);
         type_id
     }
 
@@ -2867,17 +2869,19 @@ impl<'a> CheckerState<'a> {
             return cached;
         }
 
-        // Track recursion to catch infinite loops
-        if self.symbol_resolution_stack.contains(&symbol_id) {
+        // Track recursion to catch infinite loops (O(1) lookup using HashSet)
+        if self.symbol_resolution_set.contains(&symbol_id) {
             // Circular reference - return any_type to break the loop
             return self.types.any_type;
         }
         self.symbol_resolution_stack.push(symbol_id);
+        self.symbol_resolution_set.insert(symbol_id);
 
         let type_id = self.get_type_of_symbol_worker(symbol_id);
         self.symbol_types.insert(symbol_id, type_id);
 
         self.symbol_resolution_stack.pop();
+        self.symbol_resolution_set.remove(&symbol_id);
         type_id
     }
 

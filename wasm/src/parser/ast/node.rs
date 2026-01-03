@@ -456,11 +456,18 @@ impl Node {
         self.base().kind
     }
 
-    /// Get the SyntaxKind for this node (only valid for token kinds)
+    /// Try to get the SyntaxKind for this node.
+    /// Returns Some(kind) for token kinds (0-166), None for AST node kinds.
+    pub fn try_as_syntax_kind(&self) -> Option<SyntaxKind> {
+        SyntaxKind::try_from_u16(self.base().kind)
+    }
+
+    /// Get the SyntaxKind for this node (panics if not a token kind).
+    /// Use try_as_syntax_kind() for safe access.
+    #[inline]
     pub fn kind_as_syntax_kind(&self) -> SyntaxKind {
-        // Safety: This conversion is only valid for token kinds (0-166)
-        // For extended kinds, use kind() and compare with syntax_kind_ext constants
-        unsafe { std::mem::transmute(self.base().kind) }
+        SyntaxKind::try_from_u16(self.base().kind)
+            .expect("kind_as_syntax_kind called on non-token node")
     }
 
     /// Get the start position

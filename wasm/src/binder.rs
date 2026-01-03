@@ -5,6 +5,7 @@
 
 use serde::Serialize;
 use crate::parser::NodeIndex;
+use crate::parser::node_flags;
 
 // =============================================================================
 // Symbol Flags
@@ -526,8 +527,8 @@ impl BinderState {
                     Node::VariableStatement(stmt) => {
                         if let Some(Node::VariableDeclarationList(list)) = arena.get(stmt.declaration_list) {
                             // Check if this is a var declaration (not let/const)
-                            // We check the flags on the list
-                            let is_var = (list.base.flags & 0x03) == 0; // Neither Let (1) nor Const (2)
+                            // Use proper flags instead of magic numbers
+                            let is_var = (list.base.flags & (node_flags::LET | node_flags::CONST)) == 0;
                             if is_var {
                                 for &decl_idx in &list.declarations.nodes {
                                     if let Some(Node::VariableDeclaration(decl)) = arena.get(decl_idx) {
@@ -942,7 +943,7 @@ impl BinderState {
         if let Some(Node::VariableDeclaration(decl)) = arena.get(decl_idx) {
             // Check the base node flags - if neither Let nor Const, it's var
             let flags = decl.base.flags;
-            (flags & 0x03) == 0  // Neither Let (1) nor Const (2)
+            (flags & (node_flags::LET | node_flags::CONST)) == 0
         } else {
             false
         }

@@ -26,6 +26,12 @@ impl<'a> CheckerState<'a> {
             return true;
         }
 
+        // Check cache first
+        let cache_key = (source, target, relation as u8);
+        if let Some(&cached) = self.relation_cache.borrow().get(&cache_key) {
+            return cached;
+        }
+
         // Get the actual types
         let source_type = match self.types.get(source) {
             Some(t) => t,
@@ -154,14 +160,18 @@ impl<'a> CheckerState<'a> {
 
         // Function type compatibility
         if self.is_function_type_related(source, source_type, target, target_type, relation) {
+            self.relation_cache.borrow_mut().insert(cache_key, true);
             return true;
         }
 
         // Tuple type compatibility
         if self.is_tuple_type_related(source, source_type, target, target_type, relation) {
+            self.relation_cache.borrow_mut().insert(cache_key, true);
             return true;
         }
 
+        // Cache negative result
+        self.relation_cache.borrow_mut().insert(cache_key, false);
         false
     }
 

@@ -213,6 +213,19 @@ impl SyntaxKind {
     pub const LAST_RESERVED_WORD: SyntaxKind = SyntaxKind::WithKeyword;
     pub const FIRST_FUTURE_RESERVED_WORD: SyntaxKind = SyntaxKind::ImplementsKeyword;
     pub const LAST_FUTURE_RESERVED_WORD: SyntaxKind = SyntaxKind::YieldKeyword;
+
+    /// Safely convert a u16 to SyntaxKind if it's a valid token kind.
+    /// Returns None for extended syntax kinds (AST nodes > 166).
+    pub fn try_from_u16(value: u16) -> Option<SyntaxKind> {
+        // Valid token range is 0-166 (Unknown to DeferKeyword)
+        if value <= 166 {
+            // SAFETY: We've verified the value is in the valid enum range.
+            // SyntaxKind is #[repr(u16)] with contiguous values 0-166.
+            Some(unsafe { std::mem::transmute(value) })
+        } else {
+            None
+        }
+    }
 }
 
 // =============================================================================

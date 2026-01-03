@@ -92,7 +92,7 @@ pub struct NodeBase {
     pub pos: u32,               // Start position (character index)
     pub end: u32,               // End position (character index)
     pub parent: NodeIndex,      // Parent node index
-    pub id: u32,                // Unique node ID (assigned by binder)
+    pub id: u32,                // Unique node ID (assigned by parser)
 }
 
 impl Default for NodeBase {
