@@ -31,7 +31,7 @@ use crate::parser::{
     MethodDeclaration, PropertyDeclaration, ConstructorDeclaration,
     GetAccessorDeclaration, SetAccessorDeclaration,
     InterfaceDeclaration, TypeAliasDeclaration, EnumDeclaration, EnumMember,
-    SpreadAssignment,
+    CallSignature, ConstructSignature, SpreadAssignment,
     // Import/Export/Module
     ImportDeclaration, ImportClause, NamespaceImport, NamedImports, ImportSpecifier,
     ExportDeclaration, NamedExports, ExportSpecifier, ExportAssignment,
@@ -1756,6 +1756,19 @@ impl ParserState {
                 continue;
             }
 
+            // Check for construct signature: new (): Type or new<T>(): Type
+            if self.is_token(SyntaxKind::NewKeyword) {
+                members.push(self.parse_construct_signature());
+                continue;
+            }
+
+            // Check for call signature: (): Type or <T>(): Type
+            // Call signature starts with ( or < and has no name
+            if self.is_token(SyntaxKind::OpenParenToken) || self.is_token(SyntaxKind::LessThanToken) {
+                members.push(self.parse_call_signature());
+                continue;
+            }
+
             // Parse property or method signature
             let pos = self.get_full_start();
             let name = self.parse_property_name();
@@ -1857,6 +1870,75 @@ impl ParserState {
             type_annotation: value_type,
         };
         self.alloc_node(Node::IndexSignatureDeclaration(decl))
+    }
+
+    /// Parse a call signature: (): void or <T>(): T
+    fn parse_call_signature(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        // Parse optional type parameters
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        // Parse parameters
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Parse optional return type
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end = self.get_token_start();
+        let sig = crate::parser::CallSignature {
+            base: NodeBase::new_ext(syntax_kind_ext::CALL_SIGNATURE, pos, end),
+            type_parameters,
+            parameters,
+            type_annotation,
+        };
+        self.alloc_node(Node::CallSignature(sig))
+    }
+
+    /// Parse a construct signature: new (): Foo or new<T>(): T
+    fn parse_construct_signature(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        // Consume 'new' keyword
+        self.parse_expected(SyntaxKind::NewKeyword);
+
+        // Parse optional type parameters
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        // Parse parameters
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Parse optional return type
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end = self.get_token_start();
+        let sig = crate::parser::ConstructSignature {
+            base: NodeBase::new_ext(syntax_kind_ext::CONSTRUCT_SIGNATURE, pos, end),
+            type_parameters,
+            parameters,
+            type_annotation,
+        };
+        self.alloc_node(Node::ConstructSignature(sig))
     }
 
     /// Parse a type alias declaration.

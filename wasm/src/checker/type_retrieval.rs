@@ -1975,6 +1975,8 @@ impl<'a> CheckerState<'a> {
         let mut properties = Vec::new();
         let mut members_table = SymbolTable::new();
         let mut index_infos = Vec::new();
+        let mut call_signatures = Vec::new();
+        let mut construct_signatures = Vec::new();
 
         for &member_idx in &members.nodes {
             if let Some(node) = self.node_arena.get(member_idx) {
@@ -2026,6 +2028,26 @@ impl<'a> CheckerState<'a> {
                         properties.push(symbol_id);
                         members_table.set(name, symbol_id);
                     }
+                    // Call signatures: (): Type or <T>(): T
+                    Node::CallSignature(cs) => {
+                        let sig = self.build_signature_from_call_or_construct(
+                            member_idx,
+                            &cs.parameters,
+                            cs.type_annotation,
+                            cs.type_parameters.as_ref(),
+                        );
+                        call_signatures.push(sig);
+                    }
+                    // Construct signatures: new (): Type or new<T>(): T
+                    Node::ConstructSignature(cs) => {
+                        let sig = self.build_signature_from_call_or_construct(
+                            member_idx,
+                            &cs.parameters,
+                            cs.type_annotation,
+                            cs.type_parameters.as_ref(),
+                        );
+                        construct_signatures.push(sig);
+                    }
                     // Index signatures: [key: string]: Type
                     Node::IndexSignatureDeclaration(isd) => {
                         // Get the key type from the first parameter
@@ -2074,12 +2096,94 @@ impl<'a> CheckerState<'a> {
             }
         }
 
-        // Create object type with members table and index infos
+        // Create object type with members table, index infos, and signatures
         let mut obj = ObjectType::new(object_flags::ANONYMOUS, SymbolId::NONE);
         obj.properties = properties;
         obj.members = members_table;
         obj.index_infos = index_infos;
+        obj.call_signatures = call_signatures;
+        obj.construct_signatures = construct_signatures;
         self.types.alloc(Type::Object(Box::new(obj)))
+    }
+
+    /// Build a Signature from call or construct signature parameters.
+    fn build_signature_from_call_or_construct(
+        &mut self,
+        declaration: NodeIndex,
+        parameters: &crate::parser::NodeList,
+        return_type_node: NodeIndex,
+        type_parameters: Option<&crate::parser::NodeList>,
+    ) -> Signature {
+        use crate::parser::Node;
+
+        let mut sig = Signature::new(declaration);
+
+        // Process type parameters
+        if let Some(type_params) = type_parameters {
+            for &tp_idx in &type_params.nodes {
+                if let Some(Node::TypeParameterDeclaration(tpd)) = self.node_arena.get(tp_idx) {
+                    let name = if let Some(Node::Identifier(id)) = self.node_arena.get(tpd.name) {
+                        id.escaped_text.clone()
+                    } else {
+                        "T".to_string()
+                    };
+
+                    let constraint = if !tpd.constraint.is_none() {
+                        self.get_type_of_node(tpd.constraint)
+                    } else {
+                        TypeId::NONE
+                    };
+
+                    let default = if !tpd.default.is_none() {
+                        self.get_type_of_node(tpd.default)
+                    } else {
+                        TypeId::NONE
+                    };
+
+                    let type_param = self.types.create_type_parameter(SymbolId::NONE, constraint, default);
+                    self.type_parameter_names.insert(type_param, name.clone());
+                    self.type_parameter_scope.insert(name, type_param);
+                    sig.type_parameters.push(type_param);
+                }
+            }
+        }
+
+        // Process parameters
+        let mut min_args: u32 = 0;
+        for &param_idx in &parameters.nodes {
+            if let Some(Node::ParameterDeclaration(pd)) = self.node_arena.get(param_idx) {
+                let name = if let Some(Node::Identifier(id)) = self.node_arena.get(pd.name) {
+                    id.escaped_text.clone()
+                } else {
+                    "arg".to_string()
+                };
+
+                let param_type = if !pd.type_annotation.is_none() {
+                    self.get_type_of_node(pd.type_annotation)
+                } else {
+                    self.types.any_type
+                };
+
+                let symbol_id = self.local_symbols_mut().alloc(symbol_flags::FUNCTION_SCOPED_VARIABLE, name);
+                self.symbol_types.insert(symbol_id, param_type);
+                sig.parameters.push(symbol_id);
+
+                // Count required parameters
+                if !pd.question_token && pd.initializer.is_none() && !pd.dot_dot_dot_token {
+                    min_args += 1;
+                }
+            }
+        }
+        sig.min_argument_count = min_args;
+
+        // Get return type
+        if !return_type_node.is_none() {
+            sig.resolved_return_type = Some(self.get_type_of_node(return_type_node));
+        } else {
+            sig.resolved_return_type = Some(self.types.any_type);
+        }
+
+        sig
     }
 
     /// Get the type of a property access expression (obj.prop).

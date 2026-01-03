@@ -71,6 +71,24 @@ pub struct IndexSignatureDeclaration {
     pub type_annotation: NodeIndex,   // The value type
 }
 
+/// A call signature in a type literal or interface (e.g., `{ (): void }`)
+#[derive(Clone, Debug, Serialize)]
+pub struct CallSignature {
+    pub base: NodeBase,
+    pub type_parameters: Option<NodeList>,
+    pub parameters: NodeList,
+    pub type_annotation: NodeIndex,  // Optional return type
+}
+
+/// A construct signature in a type literal or interface (e.g., `{ new(): Foo }`)
+#[derive(Clone, Debug, Serialize)]
+pub struct ConstructSignature {
+    pub base: NodeBase,
+    pub type_parameters: Option<NodeList>,
+    pub parameters: NodeList,
+    pub type_annotation: NodeIndex,  // Optional return type
+}
+
 /// A type alias declaration.
 #[derive(Clone, Debug, Serialize)]
 pub struct TypeAliasDeclaration {

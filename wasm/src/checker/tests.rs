@@ -6872,3 +6872,145 @@ interface TreeNode {
         let cached = checker.apparent_type_cache.borrow().get(&str_lit).copied();
         assert!(cached.is_some(), "Result should be cached");
     }
+
+    // ============== 5.108: Call/construct signatures in type literals ==============
+    #[test]
+    fn test_call_signature_parsing() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test parsing a type literal with call signature
+        let code = r#"
+            type Callable = { (): void };
+            type CallableWithParams = { (x: number, y: string): boolean };
+        "#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        checker.check_source_file(root);
+        // Just verify parsing and binding complete without errors
+    }
+
+    #[test]
+    fn test_construct_signature_parsing() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test parsing a type literal with construct signature
+        let code = r#"
+            type Constructable = { new(): object };
+            type ConstructableWithParams = { new(name: string): object };
+        "#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        checker.check_source_file(root);
+        // Just verify parsing and binding complete without errors
+    }
+
+    #[test]
+    fn test_call_signature_has_signature() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test that call signature creates a type with call_signatures
+        let code = r#"
+            type Fn = { (): number };
+        "#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the type alias 'Fn'
+        if let Some(symbol_id) = binder.file_locals.get("Fn") {
+            let fn_type = checker.get_type_of_symbol(symbol_id);
+
+            // Check that it's an object type with call signatures
+            if let Some(super::types::Type::Object(obj)) = checker.types.get(fn_type) {
+                assert!(!obj.call_signatures.is_empty(),
+                    "Type literal with (): number should have call signatures");
+
+                // Check that the return type is number
+                let sig = &obj.call_signatures[0];
+                if let Some(ret_type) = sig.resolved_return_type {
+                    assert_eq!(ret_type, checker.types.number_type,
+                        "Return type should be number");
+                }
+            } else {
+                panic!("Expected Object type for Fn");
+            }
+        } else {
+            panic!("Should have symbol 'Fn'");
+        }
+    }
+
+    #[test]
+    fn test_construct_signature_has_signature() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test that construct signature creates a type with construct_signatures
+        let code = r#"
+            type Ctor = { new(): object };
+        "#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the type alias 'Ctor'
+        if let Some(symbol_id) = binder.file_locals.get("Ctor") {
+            let ctor_type = checker.get_type_of_symbol(symbol_id);
+
+            // Check that it's an object type with construct signatures
+            if let Some(super::types::Type::Object(obj)) = checker.types.get(ctor_type) {
+                assert!(!obj.construct_signatures.is_empty(),
+                    "Type literal with new(): object should have construct signatures");
+            } else {
+                panic!("Expected Object type for Ctor");
+            }
+        } else {
+            panic!("Should have symbol 'Ctor'");
+        }
+    }
