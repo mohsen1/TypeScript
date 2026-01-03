@@ -5666,6 +5666,41 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // TODO: Fix infinite loop - likely in interface/variable type resolution chain
+    fn test_simple_interface_variable() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Simpler test - just interface with variable
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                interface A { x: string; }
+                declare let a: A;
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the type of a
+        let a_symbol = binder.file_locals.get("a").expect("a should be in file locals");
+        let a_type = checker.get_type_of_symbol(a_symbol);
+        let a_str = checker.type_to_string(a_type);
+
+        // a should be of type A (an interface)
+        assert!(checker.types.get(a_type).is_some(), "a should have a valid type");
+    }
+
+    #[test]
     #[ignore] // TODO: Fix infinite loop in interface type resolution
     fn test_property_access_on_union() {
         use crate::parser_impl::ParserState;
