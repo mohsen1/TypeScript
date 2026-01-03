@@ -1,5 +1,9 @@
 use wasm_bindgen::prelude::*;
 
+// String interning for identifier deduplication (Performance optimization)
+pub mod interner;
+pub use interner::{Atom, Interner};
+
 // Character code constants
 pub mod char_codes;
 
