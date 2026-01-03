@@ -19,5 +19,13 @@
       "Bash(dd if=/dev/zero:*)"
     ],
     "ask": []
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "type": "command",
+        "command": "bash .claude/hooks/stop_review.sh"
+      }
+    ]
   }
 }

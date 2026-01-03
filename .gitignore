@@ -36,6 +36,7 @@ scripts/**/*.js.map
 scripts/debug.bat
 scripts/eslint/built/
 scripts/run.bat
+!scripts/ask-gemini.mjs
 src/compiler/diagnosticInformationMap.generated.ts
 src/compiler/diagnosticMessages.generated.json
 src/harness/*.js
@@ -69,3 +70,4 @@ yarn-error.log
 yarn.lock
 yek.toml
 ~*.docx
+.env.local
