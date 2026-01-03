@@ -1,0 +1,2647 @@
+//! Type retrieval for the type checker.
+//!
+//! This module contains the core get_type_of_node implementation and
+//! type inference logic for all AST node types.
+
+use crate::parser::{Node, NodeIndex};
+use crate::scanner::SyntaxKind;
+use crate::binder::{SymbolId, SymbolArena, SymbolTable, Symbol, symbol_flags};
+use super::types::{
+    type_flags, object_flags, signature_flags, diagnostic_codes,
+    Type, TypeId, LiteralValue, LiteralType, ObjectType, UnionType, TypeParameter,
+    FunctionType, Signature, IndexInfo,
+};
+use super::arena::TypeArena;
+use super::state::{CheckerState, Diagnostic, DiagnosticCategory};
+
+impl<'a> CheckerState<'a> {
+    /// Get the type of a node (with caching).
+    pub fn get_type_of_node(&mut self, node: NodeIndex) -> TypeId {
+        // Check cache first
+        if let Some(&cached) = self.node_types.get(&node) {
+            return cached;
+        }
+
+        // Track recursion to catch infinite loops
+        if self.node_resolution_stack.contains(&node) {
+            // Circular reference - return any_type to break the loop
+            return self.types.any_type;
+        }
+        self.node_resolution_stack.push(node);
+
+        let type_id = self.get_type_of_node_worker(node);
+        self.node_types.insert(node, type_id);
+
+        self.node_resolution_stack.pop();
+        type_id
+    }
+
+    /// Get type of node (worker, no caching).
+    fn get_type_of_node_worker(&mut self, node: NodeIndex) -> TypeId {
+        use crate::parser::Node;
+        use crate::scanner::SyntaxKind;
+
+        let Some(n) = self.node_arena.get(node) else {
+            return self.types.any_type;
+        };
+
+        match n {
+            // Literals
+            Node::StringLiteral(lit) => {
+                self.types.create_string_literal(lit.text.clone())
+            }
+            Node::NumericLiteral(lit) => {
+                let value = lit.text.parse::<f64>().unwrap_or(0.0);
+                self.types.create_number_literal(value)
+            }
+
+            // Token nodes - check the kind for keywords
+            Node::Token(base) => {
+                let kind = base.kind;
+                if kind == SyntaxKind::TrueKeyword as u16 {
+                    self.types.true_type
+                } else if kind == SyntaxKind::FalseKeyword as u16 {
+                    self.types.false_type
+                } else if kind == SyntaxKind::NullKeyword as u16 {
+                    self.types.null_type
+                } else if kind == SyntaxKind::StringKeyword as u16 {
+                    self.types.string_type
+                } else if kind == SyntaxKind::NumberKeyword as u16 {
+                    self.types.number_type
+                } else if kind == SyntaxKind::BooleanKeyword as u16 {
+                    self.types.boolean_type
+                } else if kind == SyntaxKind::VoidKeyword as u16 {
+                    self.types.void_type
+                } else if kind == SyntaxKind::AnyKeyword as u16 {
+                    self.types.any_type
+                } else if kind == SyntaxKind::NeverKeyword as u16 {
+                    self.types.never_type
+                } else if kind == SyntaxKind::UndefinedKeyword as u16 {
+                    self.types.undefined_type
+                } else if kind == SyntaxKind::UnknownKeyword as u16 {
+                    self.types.unknown_type
+                } else if kind == SyntaxKind::ObjectKeyword as u16 {
+                    self.types.object_type
+                } else if kind == SyntaxKind::BigIntKeyword as u16 {
+                    self.types.big_int_type
+                } else if kind == SyntaxKind::SymbolKeyword as u16 {
+                    self.types.es_symbol_type
+                } else {
+                    self.types.any_type
+                }
+            }
+
+            // Identifiers - look up in symbol table
+            Node::Identifier(id) => {
+                let name = id.escaped_text.clone();
+                // Look up the identifier in the symbol table
+                if let Some(symbol_id) = self.file_locals.get(&name) {
+                    self.get_type_of_symbol(symbol_id)
+                } else {
+                    // Undeclared identifier - report error
+                    self.error(
+                        node,
+                        &format!("Cannot find name '{}'.", name),
+                        diagnostic_codes::CANNOT_FIND_NAME
+                    );
+                    self.types.any_type
+                }
+            }
+
+            // Union types
+            Node::UnionType(ut) => {
+                let types: Vec<TypeId> = ut.types.nodes.iter()
+                    .map(|&t| self.get_type_of_node(t))
+                    .collect();
+                self.types.create_union(types)
+            }
+
+            // Intersection types
+            Node::IntersectionType(it) => {
+                let types: Vec<TypeId> = it.types.nodes.iter()
+                    .map(|&t| self.get_type_of_node(t))
+                    .collect();
+                self.types.create_intersection(types)
+            }
+
+            // Array types (T[])
+            Node::ArrayType(at) => {
+                let element_type = self.get_type_of_node(at.element_type);
+                self.types.create_array_type(element_type, false)
+            }
+
+            // Tuple types ([T, U, V])
+            Node::TupleType(tt) => {
+                let mut element_types: Vec<TypeId> = Vec::new();
+                let mut has_optional_elements = false;
+                let mut has_rest_element = false;
+
+                for &elem_idx in &tt.elements.nodes {
+                    if let Some(elem_node) = self.node_arena.get(elem_idx) {
+                        match elem_node {
+                            Node::OptionalType(opt) => {
+                                has_optional_elements = true;
+                                element_types.push(self.get_type_of_node(opt.type_node));
+                            }
+                            Node::RestType(rest) => {
+                                has_rest_element = true;
+                                // For rest element, get the element type of the array
+                                let rest_type = self.get_type_of_node(rest.type_node);
+                                if let Some(Type::Array(arr)) = self.types.get(rest_type) {
+                                    element_types.push(arr.element_type);
+                                } else {
+                                    // If not an array, just use the type as-is
+                                    element_types.push(rest_type);
+                                }
+                            }
+                            _ => {
+                                element_types.push(self.get_type_of_node(elem_idx));
+                            }
+                        }
+                    }
+                }
+                self.types.create_tuple_type(element_types, has_optional_elements, has_rest_element, false)
+            }
+
+            // Optional type (T?) - used in tuple elements
+            Node::OptionalType(opt) => {
+                // For optional types, return the inner type (the optionality is tracked at tuple level)
+                self.get_type_of_node(opt.type_node)
+            }
+
+            // Rest type (...T) - used in tuple elements
+            Node::RestType(rest) => {
+                // For rest types, return the element type of the array
+                let rest_type = self.get_type_of_node(rest.type_node);
+                if let Some(Type::Array(arr)) = self.types.get(rest_type) {
+                    arr.element_type
+                } else {
+                    rest_type
+                }
+            }
+
+            // Conditional type (T extends U ? X : Y)
+            Node::ConditionalType(ct) => {
+                self.get_type_of_conditional_type(ct)
+            }
+
+            // Template literal type (`hello ${T}`)
+            Node::TemplateLiteralType(tlt) => {
+                self.get_type_of_template_literal_type(tlt)
+            }
+
+            // Mapped type ({ [K in keyof T]: T[K] })
+            Node::MappedType(mt) => {
+                self.get_type_of_mapped_type(node, mt)
+            }
+
+            // Indexed access type (T[K])
+            Node::IndexedAccessType(ia) => {
+                let object_type = self.get_type_of_node(ia.object_type);
+                let index_type = self.get_type_of_node(ia.index_type);
+                // Create an IndexedAccess type that will be resolved later during instantiation
+                self.types.create_indexed_access_type(object_type, index_type)
+            }
+
+            // Infer type (infer T in conditional types)
+            Node::InferType(it) => {
+                self.get_type_of_infer_type(node, it)
+            }
+
+            // Type operators (readonly T, keyof T, etc.)
+            Node::TypeOperator(to) => {
+                if to.operator == SyntaxKind::ReadonlyKeyword as u16 {
+                    // readonly T - make the inner type readonly
+                    let inner_type = self.get_type_of_node(to.type_node);
+                    self.make_type_readonly(inner_type)
+                } else if to.operator == SyntaxKind::KeyOfKeyword as u16 {
+                    // keyof T - extract keys from the object type
+                    let inner_type = self.get_type_of_node(to.type_node);
+                    self.get_keyof_type(inner_type)
+                } else {
+                    // For other operators (unique), just get the inner type
+                    self.get_type_of_node(to.type_node)
+                }
+            }
+
+            // Type references (generic types like Array<T>, or keywords like number)
+            Node::TypeReference(tr) => {
+                // Check for type arguments
+                if let Some(ref type_args) = tr.type_arguments {
+                    if !type_args.nodes.is_empty() {
+                        return self.get_type_of_type_reference_with_args(tr.type_name, type_args);
+                    }
+                }
+
+                // Check if the type_name is a keyword type
+                if let Some(Node::Identifier(id)) = self.node_arena.get(tr.type_name) {
+                    match id.escaped_text.as_str() {
+                        "string" => self.types.string_type,
+                        "number" => self.types.number_type,
+                        "boolean" => self.types.boolean_type,
+                        "void" => self.types.void_type,
+                        "any" => self.types.any_type,
+                        "never" => self.types.never_type,
+                        "undefined" => self.types.undefined_type,
+                        "null" => self.types.null_type,
+                        "unknown" => self.types.unknown_type,
+                        "object" => self.types.object_type,
+                        "bigint" => self.types.big_int_type,
+                        "symbol" => self.types.es_symbol_type,
+                        _ => {
+                            // First, check if it's a type parameter in the current scope
+                            if let Some(&type_param) = self.type_parameter_scope.get(&id.escaped_text) {
+                                type_param
+                            }
+                            // Otherwise, look up in symbol table
+                            else if let Some(symbol_id) = self.file_locals.get(&id.escaped_text) {
+                                self.get_type_of_symbol(symbol_id)
+                            } else {
+                                self.types.object_type
+                            }
+                        }
+                    }
+                } else {
+                    self.types.object_type
+                }
+            }
+
+            // Parenthesized types
+            Node::ParenthesizedType(pt) => {
+                self.get_type_of_node(pt.type_node)
+            }
+
+            // Literal types
+            Node::LiteralType(lt) => {
+                self.get_type_of_node(lt.literal)
+            }
+
+            // Variable declarations - get type from initializer or annotation
+            Node::VariableDeclaration(vd) => {
+                if !vd.type_annotation.is_none() {
+                    self.get_type_of_node(vd.type_annotation)
+                } else if !vd.initializer.is_none() {
+                    self.get_type_of_node(vd.initializer)
+                } else {
+                    self.types.any_type
+                }
+            }
+
+            // Function declarations
+            Node::FunctionDeclaration(fd) => {
+                self.get_type_of_function_like_with_type_params(
+                    node,
+                    &fd.parameters,
+                    fd.type_annotation,
+                    fd.type_parameters.as_ref(),
+                )
+            }
+
+            // Function expressions
+            Node::FunctionExpression(fe) => {
+                self.get_type_of_function_like_with_type_params(
+                    node,
+                    &fe.parameters,
+                    fe.type_annotation,
+                    fe.type_parameters.as_ref(),
+                )
+            }
+
+            // Arrow functions
+            Node::ArrowFunction(af) => {
+                self.get_type_of_function_like_with_type_params(
+                    node,
+                    &af.parameters,
+                    af.type_annotation,
+                    af.type_parameters.as_ref(),
+                )
+            }
+
+            // Method declarations
+            Node::MethodDeclaration(md) => {
+                self.get_type_of_function_like_with_type_params(
+                    node,
+                    &md.parameters,
+                    md.type_annotation,
+                    md.type_parameters.as_ref(),
+                )
+            }
+
+            // Function type nodes (e.g., type F = (x: number) => string)
+            Node::FunctionType(ft) => {
+                self.get_type_of_function_like_with_type_params(
+                    node,
+                    &ft.parameters,
+                    ft.type_node,
+                    ft.type_parameters.as_ref(),
+                )
+            }
+
+            // Constructor type nodes
+            Node::ConstructorType(ct) => {
+                self.get_type_of_function_like_with_type_params(
+                    node,
+                    &ct.parameters,
+                    ct.type_node,
+                    ct.type_parameters.as_ref(),
+                )
+            }
+
+            // Type alias declarations - get the declared type
+            Node::TypeAliasDeclaration(ta) => {
+                self.get_type_of_type_alias_declaration(ta)
+            }
+
+            // Type literals (e.g., { x: number, y: string })
+            Node::TypeLiteral(tl) => {
+                self.get_type_of_type_literal(&tl.members)
+            }
+
+            // Property access expressions (e.g., obj.prop)
+            Node::PropertyAccessExpression(pa) => {
+                self.get_type_of_property_access(pa.expression, pa.name)
+            }
+
+            // Element access expressions (e.g., obj[key], arr[0])
+            Node::ElementAccessExpression(ea) => {
+                self.get_type_of_element_access(ea.expression, ea.argument_expression)
+            }
+
+            // Object literals (e.g., { x: 1, y: "hello" })
+            Node::ObjectLiteralExpression(ole) => {
+                self.get_type_of_object_literal(&ole.properties)
+            }
+
+            // Call expressions (e.g., fn(arg1, arg2))
+            Node::CallExpression(ce) => {
+                self.get_type_of_call_expression(ce.expression, &ce.type_arguments, &ce.arguments)
+            }
+
+            // New expressions (e.g., new Foo(arg))
+            Node::NewExpression(ne) => {
+                self.get_type_of_new_expression(ne.expression, &ne.arguments)
+            }
+
+            // Array literal expressions (e.g., [1, 2, 3])
+            Node::ArrayLiteralExpression(ale) => {
+                self.get_type_of_array_literal(&ale.elements)
+            }
+
+            // Parenthesized expressions (e.g., (x))
+            Node::ParenthesizedExpression(pe) => {
+                self.get_type_of_node(pe.expression)
+            }
+
+            // Class declarations
+            Node::ClassDeclaration(cd) => {
+                self.get_type_of_class_declaration(node, cd)
+            }
+
+            // Interface declarations
+            Node::InterfaceDeclaration(id) => {
+                self.get_type_of_interface_declaration(node, id)
+            }
+
+            // Type assertion (x as Type)
+            Node::AsExpression(ae) => {
+                // Get the type that's being asserted to
+                let target_type = self.get_type_of_node(ae.type_node);
+                target_type
+            }
+
+            // Satisfies expression (x satisfies Type)
+            // Returns the narrower type of the expression, but checks assignability
+            Node::SatisfiesExpression(se) => {
+                let expression_type = self.get_type_of_node(se.expression);
+                let constraint_type = self.get_type_of_node(se.type_node);
+
+                // Check that expression type is assignable to the constraint
+                if !self.is_type_assignable_to(expression_type, constraint_type) {
+                    let expr_str = self.type_to_string(expression_type);
+                    let constraint_str = self.type_to_string(constraint_type);
+                    self.error(
+                        node,
+                        &format!("Type '{}' does not satisfy the expected type '{}'.", expr_str, constraint_str),
+                        diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE
+                    );
+                }
+
+                // Return the original expression type (preserves narrower type)
+                expression_type
+            }
+
+            // Type assertion (<Type>x)
+            Node::TypeAssertion(ta) => {
+                let target_type = self.get_type_of_node(ta.type_node);
+                target_type
+            }
+
+            // Non-null assertion (x!)
+            Node::NonNullExpression(nne) => {
+                let base_type = self.get_type_of_node(nne.expression);
+                // Remove null and undefined from the type
+                self.get_non_nullable_type(base_type)
+            }
+
+            // Enum declarations
+            Node::EnumDeclaration(ed) => {
+                self.get_type_of_enum_declaration(node, ed)
+            }
+
+            // Default: return any
+            _ => self.types.any_type,
+        }
+    }
+
+    /// Get the type of an enum declaration.
+    fn get_type_of_enum_declaration(
+        &mut self,
+        _node: NodeIndex,
+        enum_decl: &crate::parser::EnumDeclaration
+    ) -> TypeId {
+        use crate::parser::Node;
+
+        // Get the enum name
+        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(enum_decl.name) {
+            id.escaped_text.clone()
+        } else {
+            "unknown".to_string()
+        };
+
+        // Collect enum members with their values
+        let mut members: Vec<(String, TypeId)> = Vec::new();
+        let mut next_value: i64 = 0;
+
+        for &member_idx in &enum_decl.members.nodes {
+            if let Some(Node::EnumMember(member)) = self.node_arena.get(member_idx) {
+                // Get member name
+                let member_name = if let Some(Node::Identifier(id)) = self.node_arena.get(member.name) {
+                    id.escaped_text.clone()
+                } else {
+                    continue;
+                };
+
+                // Get or compute member value
+                let value_type = if !member.initializer.is_none() {
+                    // Has explicit initializer
+                    let init_type = self.get_type_of_node(member.initializer);
+
+                    // If it's a numeric literal, update next_value
+                    if let Some(Type::Literal(lit)) = self.types.get(init_type) {
+                        if let LiteralValue::Number(n) = &lit.value {
+                            next_value = *n as i64 + 1;
+                        }
+                    }
+
+                    init_type
+                } else {
+                    // Auto-increment numeric value
+                    let lit_type = self.types.create_number_literal(next_value as f64);
+                    next_value += 1;
+                    lit_type
+                };
+
+                members.push((member_name, value_type));
+            }
+        }
+
+        // Create the enum type
+        self.types.create_enum_type(name, members)
+    }
+
+    /// Get the type of a call expression.
+    fn get_type_of_call_expression(
+        &mut self,
+        expression: NodeIndex,
+        type_arguments: &Option<crate::parser::NodeList>,
+        arguments: &crate::parser::NodeList
+    ) -> TypeId {
+        // Get the type of the function being called
+        let func_type = self.get_type_of_node(expression);
+
+        // If it's a function type, handle generics and return type
+        if let Some(Type::Function(f)) = self.types.get(func_type) {
+            // Extract function information to avoid borrow issues
+            let type_parameters = f.type_parameters.clone();
+            let parameter_types = f.parameter_types.clone();
+            let return_type = f.return_type;
+            let min_argument_count = f.min_argument_count;
+            let has_rest_parameter = f.has_rest_parameter;
+
+            // Check argument count
+            let arg_count = arguments.nodes.len() as u32;
+            if arg_count < min_argument_count && !has_rest_parameter {
+                self.error(
+                    expression,
+                    &format!("Expected {} arguments, but got {}.", min_argument_count, arg_count),
+                    diagnostic_codes::EXPECTED_ARGUMENTS
+                );
+            }
+            if arg_count > parameter_types.len() as u32 && !has_rest_parameter {
+                self.error(
+                    expression,
+                    &format!("Expected {} arguments, but got {}.", parameter_types.len(), arg_count),
+                    diagnostic_codes::EXPECTED_ARGUMENTS
+                );
+            }
+
+            // If the function has type parameters, we need to infer or use explicit type arguments
+            if !type_parameters.is_empty() {
+                let inferred_type_args = if let Some(explicit_args) = type_arguments {
+                    // Use explicit type arguments: identity<string>("hello")
+                    explicit_args.nodes.iter()
+                        .map(|&arg| self.get_type_of_node(arg))
+                        .collect::<Vec<_>>()
+                } else {
+                    // Infer type arguments from the argument types
+                    self.infer_type_arguments(&type_parameters, &parameter_types, arguments)
+                };
+
+                // Instantiate the return type with the inferred type arguments
+                return self.instantiate_type(return_type, &inferred_type_args, &type_parameters);
+            }
+
+            // For non-generic functions, still evaluate arguments with contextual types
+            // This enables contextual typing for callbacks like arr.map(x => x + 1)
+            for (i, &arg_node) in arguments.nodes.iter().enumerate() {
+                if i >= parameter_types.len() {
+                    break;
+                }
+                let param_type = parameter_types[i];
+                let prev_contextual_type = self.contextual_type;
+                self.contextual_type = Some(param_type);
+                let _arg_type = self.get_type_of_node(arg_node);
+                self.contextual_type = prev_contextual_type;
+            }
+
+            return return_type;
+        }
+
+        // If it's an object with call signatures, use those
+        if let Some(Type::Object(obj)) = self.types.get(func_type) {
+            if !obj.call_signatures.is_empty() {
+                // For now, use the first call signature's return type
+                if let Some(return_type) = obj.call_signatures[0].resolved_return_type {
+                    return return_type;
+                }
+            }
+        }
+
+        // Default to any for unknown callable types
+        self.types.any_type
+    }
+
+    /// Infer type arguments for a generic function call from the provided arguments.
+    fn infer_type_arguments(
+        &mut self,
+        type_parameters: &[TypeId],
+        parameter_types: &[TypeId],
+        arguments: &crate::parser::NodeList
+    ) -> Vec<TypeId> {
+        // Create a mapping from type parameter to inferred type
+        let mut inferred: std::collections::HashMap<TypeId, TypeId> = std::collections::HashMap::new();
+
+        // For each argument, try to infer type parameters from the corresponding parameter type
+        for (i, &arg_node) in arguments.nodes.iter().enumerate() {
+            if i >= parameter_types.len() {
+                break;
+            }
+
+            let param_type = parameter_types[i];
+
+            // Set contextual type for this argument before evaluating it.
+            // This enables contextual typing for callback parameters.
+            let prev_contextual_type = self.contextual_type;
+            self.contextual_type = Some(param_type);
+
+            let arg_type = self.get_type_of_node(arg_node);
+
+            // Restore previous contextual type
+            self.contextual_type = prev_contextual_type;
+
+            // If the parameter type is a type parameter, infer it from the argument type
+            self.infer_from_types(param_type, arg_type, type_parameters, &mut inferred);
+        }
+
+        // Build the result vector in order of type parameters
+        type_parameters.iter()
+            .map(|&tp| *inferred.get(&tp).unwrap_or(&self.types.any_type))
+            .collect()
+    }
+
+    /// Recursively infer type arguments by matching a pattern type against an actual type.
+    fn infer_from_types(
+        &mut self,
+        pattern_type: TypeId,
+        actual_type: TypeId,
+        type_parameters: &[TypeId],
+        inferred: &mut std::collections::HashMap<TypeId, TypeId>
+    ) {
+        // If the pattern is a type parameter, infer it
+        if type_parameters.contains(&pattern_type) {
+            // If we already inferred this type parameter, we could merge types (union)
+            // For now, just use the first inference
+            inferred.entry(pattern_type).or_insert(actual_type);
+            return;
+        }
+
+        // Extract info from pattern type to avoid borrow issues
+        enum PatternInfo {
+            Function { parameter_types: Vec<TypeId>, return_type: TypeId },
+            Union { types: Vec<TypeId> },
+            Intersection { types: Vec<TypeId> },
+            Other,
+        }
+
+        let pattern_info = match self.types.get(pattern_type) {
+            Some(Type::Function(f)) => PatternInfo::Function {
+                parameter_types: f.parameter_types.clone(),
+                return_type: f.return_type,
+            },
+            Some(Type::Union(u)) => PatternInfo::Union { types: u.types.clone() },
+            Some(Type::Intersection(i)) => PatternInfo::Intersection { types: i.types.clone() },
+            _ => PatternInfo::Other,
+        };
+
+        // Extract info from actual type
+        let actual_info = match self.types.get(actual_type) {
+            Some(Type::Function(f)) => PatternInfo::Function {
+                parameter_types: f.parameter_types.clone(),
+                return_type: f.return_type,
+            },
+            Some(Type::Union(u)) => PatternInfo::Union { types: u.types.clone() },
+            Some(Type::Intersection(i)) => PatternInfo::Intersection { types: i.types.clone() },
+            _ => PatternInfo::Other,
+        };
+
+        // Match function types: (T) => U with (string) => number infers T=string, U=number
+        if let (
+            PatternInfo::Function { parameter_types: pattern_params, return_type: pattern_return },
+            PatternInfo::Function { parameter_types: actual_params, return_type: actual_return }
+        ) = (&pattern_info, &actual_info) {
+            // Infer from parameter types (contravariant, but for simplicity we use covariant here)
+            for (pattern_param, actual_param) in pattern_params.iter().zip(actual_params.iter()) {
+                self.infer_from_types(*pattern_param, *actual_param, type_parameters, inferred);
+            }
+            // Infer from return type
+            self.infer_from_types(*pattern_return, *actual_return, type_parameters, inferred);
+        }
+
+        // TODO: Handle object types, array types, etc.
+    }
+
+    /// Get the type of a new expression.
+    fn get_type_of_new_expression(&mut self, expression: NodeIndex, _arguments: &Option<crate::parser::NodeList>) -> TypeId {
+        // Get the type of the constructor
+        let constructor_type = self.get_type_of_node(expression);
+
+        // If it's a function type, create an instance type
+        // For now, just return any - proper class instantiation is complex
+        if let Some(Type::Function(_)) = self.types.get(constructor_type) {
+            // TODO: Return the instance type
+            return self.types.any_type;
+        }
+
+        // If it's an object with construct signatures, use those
+        if let Some(Type::Object(obj)) = self.types.get(constructor_type) {
+            if !obj.construct_signatures.is_empty() {
+                if let Some(return_type) = obj.construct_signatures[0].resolved_return_type {
+                    return return_type;
+                }
+            }
+        }
+
+        self.types.any_type
+    }
+
+    /// Get the type of an array literal.
+    fn get_type_of_array_literal(&mut self, elements: &crate::parser::NodeList) -> TypeId {
+        use crate::parser::Node;
+
+        // Collect element types
+        let mut element_types = Vec::new();
+        for &elem_idx in &elements.nodes {
+            if let Some(elem_node) = self.node_arena.get(elem_idx) {
+                let elem_type = match elem_node {
+                    Node::SpreadElement(spread) => {
+                        // For spread element, get the element type of the spread's array
+                        let spread_type = self.get_type_of_node(spread.expression);
+                        self.get_element_type_of_spread(spread_type)
+                    }
+                    _ => self.get_type_of_node(elem_idx),
+                };
+                if !element_types.contains(&elem_type) {
+                    element_types.push(elem_type);
+                }
+            }
+        }
+
+        // Create a union of element types (if multiple) or the single type
+        if element_types.is_empty() {
+            // Empty array - never[]
+            self.types.never_type
+        } else if element_types.len() == 1 {
+            // Single type - return as is (would be Array<T> in full impl)
+            element_types[0]
+        } else {
+            // Multiple types - create union (would be Array<T | U | ...> in full impl)
+            self.types.create_union_type(element_types)
+        }
+    }
+
+    /// Get the element type when spreading an array/tuple into another array.
+    fn get_element_type_of_spread(&self, spread_type: TypeId) -> TypeId {
+        if let Some(ty) = self.types.get(spread_type) {
+            match ty {
+                Type::Array(arr) => arr.element_type,
+                Type::Tuple(tup) => {
+                    // For tuples, create a union of all element types
+                    if tup.element_types.is_empty() {
+                        self.types.never_type
+                    } else if tup.element_types.len() == 1 {
+                        tup.element_types[0]
+                    } else {
+                        // Note: We can't create a union here since we only have &self
+                        // For now, return the first element type
+                        // A proper implementation would need &mut self
+                        tup.element_types[0]
+                    }
+                }
+                _ => {
+                    // For other types (like any), just return the type
+                    spread_type
+                }
+            }
+        } else {
+            self.types.any_type
+        }
+    }
+
+    /// Get the type of a conditional type (T extends U ? X : Y).
+    /// Evaluates the condition and returns either the true or false branch type.
+    fn get_type_of_conditional_type(&mut self, ct: &crate::parser::ConditionalType) -> TypeId {
+        let check_type = self.get_type_of_node(ct.check_type);
+        let extends_type = self.get_type_of_node(ct.extends_type);
+        let true_type_node_id = ct.true_type;
+        let false_type_node_id = ct.false_type;
+
+        // Check if the check type contains unresolved type parameters
+        // In that case, we need to defer evaluation (return a conditional type)
+        if self.type_contains_type_parameter(check_type) {
+            // Evaluate both branch types first
+            let true_type = self.get_type_of_node(true_type_node_id);
+            let false_type = self.get_type_of_node(false_type_node_id);
+            // Create a deferred conditional type
+            return self.types.create_conditional_type(
+                check_type,
+                extends_type,
+                true_type,
+                false_type,
+            );
+        }
+
+        // For union types in check position, distribute the conditional
+        // (A | B) extends U ? X : Y becomes (A extends U ? X : Y) | (B extends U ? X : Y)
+        if let Some(Type::Union(union)) = self.types.get(check_type) {
+            let member_types = union.types.clone();
+            let mut result_types = Vec::new();
+            for member in member_types {
+                let result = if self.is_type_assignable_to(member, extends_type) {
+                    self.get_type_of_node(true_type_node_id)
+                } else {
+                    self.get_type_of_node(false_type_node_id)
+                };
+                if !result_types.contains(&result) {
+                    result_types.push(result);
+                }
+            }
+            if result_types.len() == 1 {
+                return result_types[0];
+            }
+            return self.types.create_union_type(result_types);
+        }
+
+        // Check if extends_type contains infer types
+        if self.type_contains_infer(extends_type) {
+            // Try to match the pattern and extract inferred types
+            let mut inferences: std::collections::HashMap<TypeId, TypeId> = std::collections::HashMap::new();
+            if self.infer_from_type(check_type, extends_type, &mut inferences) {
+                // Pattern matched - evaluate true branch with inferences substituted
+                let true_type = self.get_type_of_node(true_type_node_id);
+                return self.instantiate_type_with_mapper(true_type, &inferences);
+            } else {
+                // Pattern didn't match - use false branch
+                return self.get_type_of_node(false_type_node_id);
+            }
+        }
+
+        // Simple case: check if check_type is assignable to extends_type
+        if self.is_type_assignable_to(check_type, extends_type) {
+            self.get_type_of_node(true_type_node_id)
+        } else {
+            self.get_type_of_node(false_type_node_id)
+        }
+    }
+
+    /// Check if a type contains infer type parameters.
+    fn type_contains_infer(&self, type_id: TypeId) -> bool {
+        let Some(ty) = self.types.get(type_id) else {
+            return false;
+        };
+
+        match ty {
+            // Check if this is an infer type (type parameter with special marker)
+            Type::TypeParameter(tp) => {
+                // Infer types are type parameters created without a symbol
+                tp.symbol.is_none()
+            }
+            Type::TypeReference(tr) => {
+                tr.type_arguments.iter().any(|&t| self.type_contains_infer(t))
+            }
+            Type::Union(u) => u.types.iter().any(|&t| self.type_contains_infer(t)),
+            Type::Intersection(i) => i.types.iter().any(|&t| self.type_contains_infer(t)),
+            Type::Array(arr) => self.type_contains_infer(arr.element_type),
+            Type::Tuple(tup) => tup.element_types.iter().any(|&t| self.type_contains_infer(t)),
+            Type::Function(f) => {
+                f.parameter_types.iter().any(|&t| self.type_contains_infer(t))
+                    || self.type_contains_infer(f.return_type)
+            }
+            _ => false,
+        }
+    }
+
+    /// Match a source type against a pattern type, extracting inferred types.
+    /// Returns true if the pattern matches, false otherwise.
+    /// Inferred bindings are stored in the inferences map (pattern TypeId -> matched TypeId).
+    fn infer_from_type(
+        &self,
+        source: TypeId,
+        pattern: TypeId,
+        inferences: &mut std::collections::HashMap<TypeId, TypeId>,
+    ) -> bool {
+        let Some(pattern_type) = self.types.get(pattern) else {
+            return false;
+        };
+
+        // If pattern is an infer type parameter, bind it to source
+        if let Type::TypeParameter(tp) = pattern_type {
+            if tp.symbol.is_none() {
+                // This is an infer type - bind it
+                inferences.insert(pattern, source);
+                return true;
+            }
+        }
+
+        // Try to match based on pattern type
+        match pattern_type {
+            Type::TypeReference(pattern_ref) => {
+                // For type references like Promise<infer U>, match the structure
+                if let Some(Type::TypeReference(source_ref)) = self.types.get(source) {
+                    // Match type arguments
+                    let pattern_args = pattern_ref.type_arguments.clone();
+                    let source_args = source_ref.type_arguments.clone();
+
+                    if pattern_args.len() != source_args.len() {
+                        return false;
+                    }
+
+                    for (pattern_arg, source_arg) in pattern_args.iter().zip(source_args.iter()) {
+                        if !self.infer_from_type(*source_arg, *pattern_arg, inferences) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+                false
+            }
+            Type::Array(pattern_arr) => {
+                if let Some(Type::Array(source_arr)) = self.types.get(source) {
+                    let pattern_elem = pattern_arr.element_type;
+                    let source_elem = source_arr.element_type;
+                    self.infer_from_type(source_elem, pattern_elem, inferences)
+                } else {
+                    false
+                }
+            }
+            Type::Tuple(pattern_tup) => {
+                if let Some(Type::Tuple(source_tup)) = self.types.get(source) {
+                    let pattern_elems = pattern_tup.element_types.clone();
+                    let source_elems = source_tup.element_types.clone();
+                    if pattern_elems.len() != source_elems.len() {
+                        return false;
+                    }
+                    for (p, s) in pattern_elems.iter().zip(source_elems.iter()) {
+                        if !self.infer_from_type(*s, *p, inferences) {
+                            return false;
+                        }
+                    }
+                    true
+                } else {
+                    false
+                }
+            }
+            Type::Function(pattern_fn) => {
+                if let Some(Type::Function(source_fn)) = self.types.get(source) {
+                    // Match return type
+                    let pattern_ret = pattern_fn.return_type;
+                    let source_ret = source_fn.return_type;
+                    self.infer_from_type(source_ret, pattern_ret, inferences)
+                } else {
+                    false
+                }
+            }
+            _ => {
+                // For other types, just check assignability
+                self.is_type_assignable_to(source, pattern)
+            }
+        }
+    }
+
+    /// Check if a type contains unresolved type parameters.
+    fn type_contains_type_parameter(&self, type_id: TypeId) -> bool {
+        if let Some(ty) = self.types.get(type_id) {
+            match ty {
+                Type::TypeParameter(_) => true,
+                Type::Union(u) => u.types.iter().any(|&t| self.type_contains_type_parameter(t)),
+                Type::Intersection(i) => i.types.iter().any(|&t| self.type_contains_type_parameter(t)),
+                Type::Array(arr) => self.type_contains_type_parameter(arr.element_type),
+                Type::Tuple(tup) => tup.element_types.iter().any(|&t| self.type_contains_type_parameter(t)),
+                Type::TypeReference(r) => {
+                    r.type_arguments.iter().any(|&t| self.type_contains_type_parameter(t))
+                }
+                Type::Conditional(c) => {
+                    self.type_contains_type_parameter(c.check_type)
+                        || self.type_contains_type_parameter(c.extends_type)
+                        || self.type_contains_type_parameter(c.true_type)
+                        || self.type_contains_type_parameter(c.false_type)
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
+
+    /// Get the type of a template literal type (`hello ${T}`).
+    fn get_type_of_template_literal_type(&mut self, tlt: &crate::parser::TemplateLiteralType) -> TypeId {
+        use crate::parser::Node;
+
+        let mut texts: Vec<String> = Vec::new();
+        let mut types: Vec<TypeId> = Vec::new();
+
+        // Get the head text
+        if let Some(Node::NoSubstitutionTemplateLiteral(lit) | Node::TemplateHead(lit)) =
+            self.node_arena.get(tlt.head)
+        {
+            texts.push(lit.text.clone());
+        }
+
+        // Get the spans (type, literal pairs)
+        for &span_idx in &tlt.template_spans.nodes {
+            if let Some(Node::TemplateSpan(span)) = self.node_arena.get(span_idx) {
+                // Get the type
+                let span_type = self.get_type_of_node(span.expression);
+                types.push(span_type);
+
+                // Get the literal text
+                if let Some(Node::TemplateMiddle(lit) | Node::TemplateTail(lit)) =
+                    self.node_arena.get(span.literal)
+                {
+                    texts.push(lit.text.clone());
+                }
+            }
+        }
+
+        // If all types are string literals, we can simplify to a single string literal
+        if types.iter().all(|&t| {
+            self.types.get(t).map_or(false, |ty| {
+                matches!(ty, Type::Literal(LiteralType { value: LiteralValue::String(_), .. }))
+            })
+        }) {
+            // Concatenate all parts
+            let mut result = String::new();
+            for (i, text) in texts.iter().enumerate() {
+                result.push_str(text);
+                if i < types.len() {
+                    if let Some(Type::Literal(LiteralType { value: LiteralValue::String(s), .. })) =
+                        self.types.get(types[i])
+                    {
+                        result.push_str(s);
+                    }
+                }
+            }
+            return self.types.create_string_literal(result);
+        }
+
+        // Otherwise, create a template literal type
+        self.types.create_template_literal_type(texts, types)
+    }
+
+    /// Get the type of a mapped type ({ [K in keyof T]: T[K] }).
+    fn get_type_of_mapped_type(&mut self, node: NodeIndex, mt: &crate::parser::MappedType) -> TypeId {
+        use crate::parser::Node;
+
+        // Track if we added a type parameter to remove it later
+        let mut added_param_name: Option<String> = None;
+
+        // Get the type parameter (K in "K in keyof T") and add it to scope
+        let type_param_type = if !mt.type_parameter.is_none() {
+            let type_id = self.get_type_of_node(mt.type_parameter);
+            // Get the name of the type parameter and add to current scope
+            if let Some(Node::TypeParameterDeclaration(tp)) = self.node_arena.get(mt.type_parameter) {
+                if let Some(Node::Identifier(id)) = self.node_arena.get(tp.name) {
+                    self.type_parameter_scope.insert(id.escaped_text.clone(), type_id);
+                    self.type_parameter_names.insert(type_id, id.escaped_text.clone());
+                    added_param_name = Some(id.escaped_text.clone());
+                }
+            }
+            type_id
+        } else {
+            self.types.any_type
+        };
+
+        // Get the constraint type (keyof T in "K in keyof T")
+        // The type_parameter node should have a constraint
+        let constraint_type = if let Some(Node::TypeParameterDeclaration(tp)) = self.node_arena.get(mt.type_parameter) {
+            if !tp.constraint.is_none() {
+                self.get_type_of_node(tp.constraint)
+            } else {
+                self.types.any_type
+            }
+        } else {
+            self.types.any_type
+        };
+
+        // Get the name type (the "as" clause, if present)
+        let name_type = if !mt.name_type.is_none() {
+            self.get_type_of_node(mt.name_type)
+        } else {
+            self.types.any_type
+        };
+
+        // Get the template type (the value type, e.g., T[K])
+        // K is now in type_parameter_scope, so references to K will resolve correctly
+        let template_type = if !mt.type_node.is_none() {
+            self.get_type_of_node(mt.type_node)
+        } else {
+            self.types.any_type
+        };
+
+        // Remove the type parameter we added
+        if let Some(name) = added_param_name {
+            self.type_parameter_scope.remove(&name);
+        }
+
+        // Create a deferred mapped type (evaluation happens during instantiation)
+        self.types.create_mapped_type(
+            node,
+            type_param_type,
+            constraint_type,
+            name_type,
+            template_type,
+        )
+    }
+
+    /// Get the type of an infer type (infer T in conditional types).
+    /// Creates a special type parameter that can be bound during pattern matching.
+    fn get_type_of_infer_type(
+        &mut self,
+        _node: NodeIndex,
+        it: &crate::parser::InferType,
+    ) -> TypeId {
+        use crate::parser::Node;
+        use crate::binder::SymbolId;
+
+        // Get the type parameter name from the type parameter declaration
+        let name = if let Some(Node::TypeParameterDeclaration(tp)) = self.node_arena.get(it.type_parameter) {
+            if let Some(Node::Identifier(id)) = self.node_arena.get(tp.name) {
+                id.escaped_text.clone()
+            } else {
+                "T".to_string()
+            }
+        } else {
+            "T".to_string()
+        };
+
+        // Create a type parameter for this infer type
+        // The symbol is NONE since infer types don't have symbols in the symbol table
+        let type_param = self.types.create_type_parameter(SymbolId::NONE, TypeId::NONE, TypeId::NONE);
+
+        // Cache the name for type_to_string
+        self.type_parameter_names.insert(type_param, name.clone());
+
+        // Add to type_parameter_scope so that later references to the name can find it
+        // This is important for conditional types where the true branch references the infer type
+        self.type_parameter_scope.insert(name, type_param);
+
+        type_param
+    }
+
+    /// Get the type of a type alias declaration.
+    /// Sets up type parameter scope before evaluating the alias body.
+    fn get_type_of_type_alias_declaration(
+        &mut self,
+        ta: &crate::parser::TypeAliasDeclaration,
+    ) -> TypeId {
+        use crate::parser::Node;
+
+        // Save current type parameter scope
+        let saved_scope = std::mem::take(&mut self.type_parameter_scope);
+
+        // Set up type parameters if present
+        if let Some(ref type_params) = ta.type_parameters {
+            for &tp_idx in &type_params.nodes {
+                if let Some(type_id) = self.create_type_parameter(tp_idx) {
+                    // Add to type parameter scope for name lookup
+                    if let Some(name) = self.type_parameter_names.get(&type_id) {
+                        self.type_parameter_scope.insert(name.clone(), type_id);
+                    }
+                }
+            }
+        }
+
+        // Evaluate the type alias body with type parameters in scope
+        let result_type = self.get_type_of_node(ta.type_node);
+
+        // Restore previous type parameter scope
+        self.type_parameter_scope = saved_scope;
+
+        result_type
+    }
+
+    /// Get the keyof type for a given type.
+    /// Returns a union of string literal types for the property names.
+    fn get_keyof_type(&mut self, type_id: TypeId) -> TypeId {
+        // Handle special cases
+        if type_id == TypeId::NONE {
+            return self.types.never_type;
+        }
+
+        let Some(typ) = self.types.get(type_id) else {
+            return self.types.never_type;
+        };
+
+        match typ {
+            // For object types, extract property names as string literals
+            Type::Object(obj) => {
+                let property_ids = obj.properties.clone();
+                let mut key_types = Vec::new();
+
+                for prop_id in property_ids {
+                    // Use get_symbol to look up in both binder and local symbol arenas
+                    if let Some(sym) = self.get_symbol(prop_id) {
+                        // Create a string literal type for the property name
+                        let key_type = self.types.create_string_literal(sym.escaped_name.clone());
+                        key_types.push(key_type);
+                    }
+                }
+
+                // Also check members SymbolTable
+                let members = self.types.get(type_id)
+                    .and_then(|t| if let Type::Object(o) = t { Some(o.members.clone()) } else { None });
+
+                if let Some(members) = members {
+                    for (name, _) in members.iter() {
+                        let key_type = self.types.create_string_literal(name.clone());
+                        if !key_types.contains(&key_type) {
+                            key_types.push(key_type);
+                        }
+                    }
+                }
+
+                if key_types.is_empty() {
+                    // Empty object has no keys
+                    self.types.never_type
+                } else if key_types.len() == 1 {
+                    key_types[0]
+                } else {
+                    self.types.create_union_type(key_types)
+                }
+            }
+            // For type parameters, create an index type
+            Type::TypeParameter(_) => {
+                // keyof T where T is a type parameter - create Index type
+                self.types.create_index_type(type_id)
+            }
+            // For union types, distribute keyof
+            Type::Union(u) => {
+                // keyof (A | B) = keyof A & keyof B (intersection of keys)
+                // For now, just return string as placeholder
+                let types = u.types.clone();
+                if types.is_empty() {
+                    return self.types.never_type;
+                }
+                // Get keyof for each member and intersect
+                let mut key_types: Vec<TypeId> = types.iter()
+                    .map(|&t| self.get_keyof_type(t))
+                    .collect();
+                if key_types.len() == 1 {
+                    key_types[0]
+                } else {
+                    // For simplicity, just return string
+                    self.types.string_type
+                }
+            }
+            // For intrinsic types, return appropriate key types
+            Type::Intrinsic(i) => {
+                match i.intrinsic_name.as_str() {
+                    "any" => {
+                        // keyof any = string | number | symbol
+                        let types = vec![
+                            self.types.string_type,
+                            self.types.number_type,
+                            self.types.es_symbol_type,
+                        ];
+                        self.types.create_union_type(types)
+                    }
+                    "unknown" => self.types.never_type,
+                    "string" => {
+                        // String has methods like length, charAt, etc.
+                        // For simplicity, return number | keyof String prototype
+                        self.types.number_type
+                    }
+                    "number" => self.types.never_type,
+                    _ => self.types.never_type,
+                }
+            }
+            // Default: return string | number | symbol
+            _ => {
+                let types = vec![
+                    self.types.string_type,
+                    self.types.number_type,
+                    self.types.es_symbol_type,
+                ];
+                self.types.create_union_type(types)
+            }
+        }
+    }
+
+    /// Get the type of a class declaration.
+    /// Creates an ObjectType with CLASS object flags, containing all class members.
+    /// The returned type is the "constructor type" which has a construct signature
+    /// that returns the instance type.
+    fn get_type_of_class_declaration(
+        &mut self,
+        node: NodeIndex,
+        class: &crate::parser::ClassDeclaration,
+    ) -> TypeId {
+        use crate::parser::Node;
+
+        let mut properties = Vec::new();
+        let mut constructor_params: Vec<(NodeIndex, SymbolId)> = Vec::new();
+        let mut has_constructor = false;
+
+        // First pass: collect properties and methods (for instance type)
+        for &member_idx in &class.members.nodes {
+            if let Some(member_node) = self.node_arena.get(member_idx) {
+                match member_node {
+                    // Property declarations
+                    Node::PropertyDeclaration(pd) => {
+                        // Get property name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(pd.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get property type
+                        let prop_type = if !pd.type_annotation.is_none() {
+                            self.get_type_of_node(pd.type_annotation)
+                        } else if !pd.initializer.is_none() {
+                            self.get_type_of_node(pd.initializer)
+                        } else {
+                            self.types.any_type
+                        };
+
+                        // Create a symbol for this property
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::PROPERTY, name.clone());
+                        self.symbol_types.insert(symbol_id, prop_type);
+                        properties.push(symbol_id);
+                    }
+
+                    // Method declarations
+                    Node::MethodDeclaration(md) => {
+                        // Get method name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(md.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get method type
+                        let method_type = self.get_type_of_function_like_with_type_params(
+                            member_idx,
+                            &md.parameters,
+                            md.type_annotation,
+                            md.type_parameters.as_ref(),
+                        );
+
+                        // Create a symbol for this method
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::METHOD, name.clone());
+                        self.symbol_types.insert(symbol_id, method_type);
+                        properties.push(symbol_id);
+                    }
+
+                    // Constructor declaration - collect params
+                    Node::ConstructorDeclaration(cd) => {
+                        has_constructor = true;
+                        for &param_idx in &cd.parameters.nodes {
+                            if let Some(Node::ParameterDeclaration(param)) = self.node_arena.get(param_idx) {
+                                if let Some(Node::Identifier(id)) = self.node_arena.get(param.name) {
+                                    let param_symbol = self.local_symbols_mut().alloc(
+                                        symbol_flags::FUNCTION_SCOPED_VARIABLE,
+                                        id.escaped_text.clone(),
+                                    );
+                                    constructor_params.push((param_idx, param_symbol));
+                                }
+                            }
+                        }
+                    }
+
+                    // Get accessor
+                    Node::GetAccessorDeclaration(ga) => {
+                        // Get accessor name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(ga.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get return type
+                        let get_type = if !ga.type_annotation.is_none() {
+                            self.get_type_of_node(ga.type_annotation)
+                        } else {
+                            self.types.any_type
+                        };
+
+                        // Create a symbol for this accessor
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::GET_ACCESSOR, name.clone());
+                        self.symbol_types.insert(symbol_id, get_type);
+                        properties.push(symbol_id);
+                    }
+
+                    // Set accessor
+                    Node::SetAccessorDeclaration(sa) => {
+                        // Get accessor name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(sa.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Set accessor type is the parameter type
+                        let set_type = if !sa.parameters.nodes.is_empty() {
+                            if let Some(Node::ParameterDeclaration(param)) =
+                                self.node_arena.get(sa.parameters.nodes[0])
+                            {
+                                if !param.type_annotation.is_none() {
+                                    self.get_type_of_node(param.type_annotation)
+                                } else {
+                                    self.types.any_type
+                                }
+                            } else {
+                                self.types.any_type
+                            }
+                        } else {
+                            self.types.any_type
+                        };
+
+                        // Create a symbol for this accessor
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::SET_ACCESSOR, name.clone());
+                        self.symbol_types.insert(symbol_id, set_type);
+                        properties.push(symbol_id);
+                    }
+
+                    _ => {}
+                }
+            }
+        }
+
+        // Create the instance type (properties only, no construct signatures)
+        // This is the type of instances created with `new`
+        let instance_type = self.types.create_class_type(properties.clone(), vec![], vec![]);
+
+        // Create the construct signature - this is what allows `new Foo()`
+        let mut construct_signature = Signature::new(node);
+        for (_, param_symbol) in constructor_params {
+            construct_signature.parameters.push(param_symbol);
+        }
+        construct_signature.min_argument_count = construct_signature.parameters.len() as u32;
+        construct_signature.resolved_return_type = Some(instance_type);
+
+        // If no explicit constructor, create an implicit one
+        let construct_signatures = if has_constructor || !construct_signature.parameters.is_empty() {
+            vec![construct_signature]
+        } else {
+            // Implicit constructor with no parameters
+            let mut implicit_sig = Signature::new(node);
+            implicit_sig.resolved_return_type = Some(instance_type);
+            vec![implicit_sig]
+        };
+
+        // Create the constructor type - this is the type of the class itself
+        // It has construct signatures that return the instance type
+        let constructor_type = self.types.create_class_type(properties, construct_signatures, vec![]);
+        constructor_type
+    }
+
+    /// Get the type of an interface declaration.
+    /// Creates an ObjectType with INTERFACE object flags.
+    fn get_type_of_interface_declaration(
+        &mut self,
+        node: NodeIndex,
+        iface: &crate::parser::InterfaceDeclaration,
+    ) -> TypeId {
+        use crate::parser::Node;
+
+        // Early caching to handle recursive types
+        // 1. Resolve the symbol for this interface
+        let interface_symbol_id = if let Some(Node::Identifier(id)) = self.node_arena.get(iface.name) {
+            self.file_locals.get(&id.escaped_text).unwrap_or(SymbolId::NONE)
+        } else {
+            SymbolId::NONE
+        };
+
+        // 2. Create a placeholder ObjectType
+        let obj = ObjectType::new(object_flags::INTERFACE, interface_symbol_id);
+        let type_id = self.types.alloc(Type::Object(obj));
+
+        // 3. Cache it immediately to break recursion cycles
+        self.node_types.insert(node, type_id);
+        if !interface_symbol_id.is_none() {
+            self.symbol_types.insert(interface_symbol_id, type_id);
+        }
+
+        let mut properties = Vec::new();
+        let mut members_table = SymbolTable::new();
+        let mut call_signatures = Vec::new();
+        let mut construct_signatures = Vec::new();
+        let mut index_infos = Vec::new();
+
+        // Process interface members
+        for &member_idx in &iface.members.nodes {
+            if let Some(member_node) = self.node_arena.get(member_idx) {
+                match member_node {
+                    // Property signatures
+                    Node::PropertySignature(ps) => {
+                        // Get property name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(ps.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get property type
+                        let prop_type = if !ps.type_annotation.is_none() {
+                            self.get_type_of_node(ps.type_annotation)
+                        } else {
+                            self.types.any_type
+                        };
+
+                        // Create a symbol for this property
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::PROPERTY, name.clone());
+                        self.symbol_types.insert(symbol_id, prop_type);
+                        members_table.set(name, symbol_id);
+                        properties.push(symbol_id);
+                    }
+
+                    // Method signatures
+                    Node::MethodSignature(ms) => {
+                        // Get method name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(ms.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get method type
+                        let method_type = self.get_type_of_function_like_with_type_params(
+                            member_idx,
+                            &ms.parameters,
+                            ms.type_annotation,
+                            ms.type_parameters.as_ref(),
+                        );
+
+                        // Create a symbol for this method
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::METHOD, name.clone());
+                        self.symbol_types.insert(symbol_id, method_type);
+                        members_table.set(name, symbol_id);
+                        properties.push(symbol_id);
+                    }
+
+                    // Index signatures: [key: string]: Type
+                    Node::IndexSignatureDeclaration(isd) => {
+                        // Get the key type from the first parameter
+                        let key_type = if !isd.parameters.nodes.is_empty() {
+                            let param_idx = isd.parameters.nodes[0];
+                            if let Some(Node::ParameterDeclaration(pd)) = self.node_arena.get(param_idx) {
+                                if !pd.type_annotation.is_none() {
+                                    self.get_type_of_node(pd.type_annotation)
+                                } else {
+                                    self.types.string_type // default to string
+                                }
+                            } else {
+                                self.types.string_type
+                            }
+                        } else {
+                            self.types.string_type
+                        };
+
+                        // Get the value type from the type annotation
+                        let value_type = if !isd.type_annotation.is_none() {
+                            self.get_type_of_node(isd.type_annotation)
+                        } else {
+                            self.types.any_type
+                        };
+
+                        // Check for readonly modifier
+                        let is_readonly = isd.modifiers.as_ref().map_or(false, |mods| {
+                            mods.nodes.iter().any(|&mod_idx| {
+                                if let Some(Node::Token(base)) = self.node_arena.get(mod_idx) {
+                                    base.kind == crate::scanner::SyntaxKind::ReadonlyKeyword as u16
+                                } else {
+                                    false
+                                }
+                            })
+                        });
+
+                        index_infos.push(IndexInfo {
+                            key_type,
+                            value_type,
+                            is_readonly,
+                            declaration: Some(member_idx),
+                        });
+                    }
+
+                    // TODO: Add CallSignature and ConstructSignature when parser supports them
+                    _ => {}
+                }
+            }
+        }
+
+        // Update the placeholder type with the resolved members
+        if let Some(Type::Object(obj)) = self.types.get_mut(type_id) {
+            obj.properties = properties;
+            obj.members = members_table;
+            obj.construct_signatures = construct_signatures;
+            obj.call_signatures = call_signatures;
+            obj.index_infos = index_infos;
+        }
+
+        type_id
+    }
+
+    /// Get the type of a type literal ({ x: number, y: string }).
+    fn get_type_of_type_literal(&mut self, members: &crate::parser::NodeList) -> TypeId {
+        use crate::parser::Node;
+
+        let mut properties = Vec::new();
+        let mut members_table = SymbolTable::new();
+
+        for &member_idx in &members.nodes {
+            if let Some(node) = self.node_arena.get(member_idx) {
+                match node {
+                    Node::PropertySignature(ps) => {
+                        // Get property name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(ps.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get property type
+                        let prop_type = if !ps.type_annotation.is_none() {
+                            self.get_type_of_node(ps.type_annotation)
+                        } else {
+                            self.types.any_type
+                        };
+
+                        // Create a symbol for this property
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::PROPERTY, name.clone());
+
+                        // Cache the symbol's type
+                        self.symbol_types.insert(symbol_id, prop_type);
+                        properties.push(symbol_id);
+                        members_table.set(name, symbol_id);
+                    }
+                    Node::MethodSignature(ms) => {
+                        // Get method name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(ms.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get method type
+                        let method_type = self.get_type_of_function_like_with_type_params(
+                            member_idx,
+                            &ms.parameters,
+                            ms.type_annotation,
+                            ms.type_parameters.as_ref(),
+                        );
+
+                        // Create a symbol for this method
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::METHOD, name.clone());
+
+                        // Cache the symbol's type
+                        self.symbol_types.insert(symbol_id, method_type);
+                        properties.push(symbol_id);
+                        members_table.set(name, symbol_id);
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Create object type with members table for keyof
+        self.types.create_object_type_with_members(properties, members_table)
+    }
+
+    /// Get the type of a property access expression (obj.prop).
+    fn get_type_of_property_access(&mut self, expression: NodeIndex, name: NodeIndex) -> TypeId {
+        use crate::parser::Node;
+
+        // Get the type of the expression
+        let expr_type = self.get_type_of_node(expression);
+
+        // Get the property name
+        let prop_name = if let Some(Node::Identifier(id)) = self.node_arena.get(name) {
+            id.escaped_text.clone()
+        } else {
+            return self.types.any_type;
+        };
+
+        // Check for 'any' or 'unknown' type - no need to check properties
+        if let Some(typ) = self.types.get(expr_type) {
+            if typ.has_flags(type_flags::ANY) {
+                return self.types.any_type;
+            }
+            if typ.has_flags(type_flags::UNKNOWN) {
+                self.error(
+                    name,
+                    "Object is of type 'unknown'.",
+                    diagnostic_codes::OBJECT_IS_OF_TYPE_UNKNOWN
+                );
+                return self.types.any_type;
+            }
+        }
+
+        // Look up the property on the expression type
+        let (prop_type, found) = self.get_property_type_with_check(expr_type, &prop_name);
+
+        // Report error if property not found
+        if !found && expr_type != self.types.any_type {
+            let type_str = self.type_to_string(expr_type);
+            self.error(
+                name,
+                &format!("Property '{}' does not exist on type '{}'.", prop_name, type_str),
+                diagnostic_codes::PROPERTY_DOES_NOT_EXIST_ON_TYPE
+            );
+        }
+
+        prop_type
+    }
+
+    /// Get the type of a property on an object type, with a flag indicating if it was found.
+    fn get_property_type_with_check(&mut self, object_type: TypeId, prop_name: &str) -> (TypeId, bool) {
+        let Some(typ) = self.types.get(object_type) else {
+            return (self.types.any_type, false);
+        };
+
+        match typ {
+            Type::Object(obj) => {
+                // Look up property in object's members
+                let members_clone = obj.members.clone();
+                if let Some(symbol_id) = members_clone.get(prop_name) {
+                    let prop_type = self.symbol_types.get(&symbol_id).copied().unwrap_or(self.types.any_type);
+                    return (prop_type, true);
+                }
+                // Fallback to properties list
+                for &prop_id in &obj.properties.clone() {
+                    if let Some(sym) = self.get_symbol(prop_id) {
+                        if sym.escaped_name == prop_name {
+                            let prop_type = self.symbol_types.get(&prop_id).copied().unwrap_or(self.types.any_type);
+                            return (prop_type, true);
+                        }
+                    }
+                }
+                (self.types.any_type, false)
+            }
+            Type::Union(union) => {
+                // For union types, get the property type from each member and union them
+                let member_types = union.types.clone();
+                let mut prop_types = Vec::new();
+                let mut all_found = true;
+
+                for member in member_types {
+                    let (prop_type, found) = self.get_property_type_with_check(member, prop_name);
+                    if !found {
+                        all_found = false;
+                    }
+                    if found && !prop_types.contains(&prop_type) {
+                        prop_types.push(prop_type);
+                    }
+                }
+
+                if prop_types.is_empty() {
+                    return (self.types.any_type, false);
+                }
+                if prop_types.len() == 1 {
+                    return (prop_types[0], all_found);
+                }
+                (self.types.create_union(prop_types), all_found)
+            }
+            Type::Intersection(intersection) => {
+                // For intersection types, get the property type from any member that has it
+                let member_types = intersection.types.clone();
+                for member in member_types {
+                    let (prop_type, found) = self.get_property_type_with_check(member, prop_name);
+                    if found {
+                        return (prop_type, true);
+                    }
+                }
+                (self.types.any_type, false)
+            }
+            Type::Enum(enum_type) => {
+                // For enum types, look up the member by name
+                let members = enum_type.members.clone();
+                for (member_name, member_type) in members {
+                    if member_name == prop_name {
+                        return (member_type, true);
+                    }
+                }
+                (self.types.any_type, false)
+            }
+            _ => (self.types.any_type, false),
+        }
+    }
+
+    /// Get the type of a property on an object type.
+    /// For union types, returns the union of property types from each member.
+    fn get_property_type(&mut self, object_type: TypeId, prop_name: &str) -> TypeId {
+        // Use the with_check version but ignore the found flag
+        let (prop_type, _) = self.get_property_type_with_check(object_type, prop_name);
+        prop_type
+    }
+
+    /// Get the type of an element access expression (e.g., obj["key"], arr[0]).
+    fn get_type_of_element_access(&mut self, expression: NodeIndex, argument: NodeIndex) -> TypeId {
+        // Get the type of the expression being indexed
+        let expr_type = self.get_type_of_node(expression);
+
+        // Get the type of the index/key
+        let index_type = self.get_type_of_node(argument);
+
+        // Try to get the index info from the expression type
+        self.get_indexed_access_type(expr_type, index_type)
+    }
+
+    /// Get the type resulting from indexing an object type with an index type.
+    fn get_indexed_access_type(&mut self, object_type: TypeId, index_type: TypeId) -> TypeId {
+        let Some(typ) = self.types.get(object_type).cloned() else {
+            return self.types.any_type;
+        };
+
+        match typ {
+            Type::Object(obj) => {
+                // First, check if index_type is a string literal - try property lookup
+                if let Some(Type::Literal(lit)) = self.types.get(index_type) {
+                    if let LiteralValue::String(key_name) = &lit.value {
+                        // Look up the property by name in members
+                        if let Some(symbol_id) = obj.members.get(key_name) {
+                            if let Some(&prop_type) = self.symbol_types.get(&symbol_id) {
+                                return prop_type;
+                            }
+                        }
+                    }
+                }
+
+                // Check if the object has an applicable index signature
+                for index_info in &obj.index_infos {
+                    // Check if the index type is assignable to the key type
+                    if self.is_type_assignable_to(index_type, index_info.key_type) {
+                        return index_info.value_type;
+                    }
+                }
+                // No matching index signature, return any
+                self.types.any_type
+            }
+            Type::Array(arr) => {
+                // For arrays, if indexed with number, return element type
+                let index_typ = self.types.get(index_type);
+                let is_number_index = match index_typ {
+                    Some(Type::Intrinsic(intrinsic)) => intrinsic.intrinsic_name == "number",
+                    Some(Type::Literal(lit)) => matches!(lit.value, LiteralValue::Number(_)),
+                    _ => false,
+                };
+                if is_number_index {
+                    return arr.element_type;
+                }
+                self.types.any_type
+            }
+            Type::Tuple(tuple) => {
+                // For tuples, check if we have a number literal index
+                if let Some(Type::Literal(lit)) = self.types.get(index_type) {
+                    if let LiteralValue::Number(n) = &lit.value {
+                        let idx = *n as usize;
+                        if idx < tuple.element_types.len() {
+                            return tuple.element_types[idx];
+                        }
+                        // Out of bounds - return undefined
+                        return self.types.undefined_type;
+                    }
+                }
+                // Check if index is number type (not literal)
+                let is_number_type = if let Some(Type::Intrinsic(intrinsic)) = self.types.get(index_type) {
+                    intrinsic.intrinsic_name == "number"
+                } else {
+                    false
+                };
+                if is_number_type {
+                    // Return union of all element types
+                    if tuple.element_types.is_empty() {
+                        return self.types.never_type;
+                    }
+                    if tuple.element_types.len() == 1 {
+                        return tuple.element_types[0];
+                    }
+                    return self.types.create_union(tuple.element_types.clone());
+                }
+                self.types.any_type
+            }
+            Type::Union(union) => {
+                // For union types, get indexed access from each member and union the results
+                let member_types = union.types.clone();
+                let mut result_types = Vec::new();
+
+                for member in member_types {
+                    let member_result = self.get_indexed_access_type(member, index_type);
+                    if member_result != self.types.any_type && !result_types.contains(&member_result) {
+                        result_types.push(member_result);
+                    }
+                }
+
+                if result_types.is_empty() {
+                    return self.types.any_type;
+                }
+                if result_types.len() == 1 {
+                    return result_types[0];
+                }
+                self.types.create_union(result_types)
+            }
+            _ => self.types.any_type,
+        }
+    }
+
+    /// Get the type of an object literal ({ x: 1, y: "hello" }).
+    /// Returns a fresh object literal type that is subject to excess property checks.
+    fn get_type_of_object_literal(&mut self, properties: &crate::parser::NodeList) -> TypeId {
+        use crate::parser::Node;
+
+        let mut prop_symbols = Vec::new();
+        let mut members_table = SymbolTable::new();
+
+        for &prop_idx in &properties.nodes {
+            if let Some(node) = self.node_arena.get(prop_idx) {
+                match node {
+                    Node::PropertyAssignment(pa) => {
+                        // Get property name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(pa.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get property type from initializer
+                        let prop_type = self.get_type_of_node(pa.initializer);
+
+                        // Create a symbol for this property
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::PROPERTY, name.clone());
+
+                        // Cache the symbol's type
+                        self.symbol_types.insert(symbol_id, prop_type);
+                        prop_symbols.push(symbol_id);
+                        members_table.set(name, symbol_id);
+                    }
+                    Node::ShorthandPropertyAssignment(spa) => {
+                        // Get property name
+                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(spa.name) {
+                            id.escaped_text.clone()
+                        } else {
+                            continue;
+                        };
+
+                        // Get property type from the name identifier (which should resolve to a variable)
+                        let prop_type = self.get_type_of_node(spa.name);
+
+                        // Create a symbol for this property
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::PROPERTY, name.clone());
+
+                        // Cache the symbol's type
+                        self.symbol_types.insert(symbol_id, prop_type);
+                        prop_symbols.push(symbol_id);
+                        members_table.set(name, symbol_id);
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Create fresh object literal type (subject to excess property checks)
+        self.types.create_fresh_object_literal_type(prop_symbols, members_table)
+    }
+
+    /// Get a mutable reference to the local symbol arena (for creating new symbols during type checking).
+    fn local_symbols_mut(&mut self) -> &mut SymbolArena {
+        &mut self.local_symbols
+    }
+
+    /// Look up a symbol by ID in both binder and local symbols.
+    fn get_symbol(&self, id: SymbolId) -> Option<&crate::binder::Symbol> {
+        // Check local_symbols first to avoid ID collision with binder symbols
+        self.local_symbols.get(id).or_else(|| self.symbol_arena.get(id))
+    }
+
+    /// Get the type of a function-like declaration (function, method, arrow, etc.)
+    fn get_type_of_function_like(
+        &mut self,
+        declaration: NodeIndex,
+        parameters: &crate::parser::NodeList,
+        return_type_annotation: NodeIndex,
+    ) -> TypeId {
+        self.get_type_of_function_like_with_type_params(
+            declaration,
+            parameters,
+            return_type_annotation,
+            None,
+        )
+    }
+
+    /// Get the type of a function-like declaration with type parameters.
+    fn get_type_of_function_like_with_type_params(
+        &mut self,
+        declaration: NodeIndex,
+        parameters: &crate::parser::NodeList,
+        return_type_annotation: NodeIndex,
+        type_parameters: Option<&crate::parser::NodeList>,
+    ) -> TypeId {
+        use crate::parser::Node;
+
+        // Track the type parameter names we add so we can remove them later
+        // We preserve the parent scope so that infer types created in return position
+        // can be found when parsing subsequent parts of the type
+        let mut added_param_names: Vec<String> = Vec::new();
+
+        // Create type parameters and add them to the scope
+        let type_param_ids: Vec<TypeId> = if let Some(type_params) = type_parameters {
+            type_params.nodes.iter()
+                .filter_map(|&tp_idx| {
+                    let type_id = self.create_type_parameter(tp_idx)?;
+                    // Add to type parameter scope for name lookup during signature processing
+                    if let Some(name) = self.type_parameter_names.get(&type_id) {
+                        self.type_parameter_scope.insert(name.clone(), type_id);
+                        added_param_names.push(name.clone());
+                    }
+                    Some(type_id)
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+
+        // Collect parameter types and names
+        let mut param_types = Vec::new();
+        let mut param_names = Vec::new();
+        let mut min_arg_count = 0u32;
+        let mut has_rest = false;
+
+        // Get contextual parameter types if available
+        let contextual_param_types: Option<Vec<TypeId>> = self.contextual_type
+            .and_then(|ctx| {
+                if let Some(Type::Function(f)) = self.types.get(ctx) {
+                    Some(f.parameter_types.clone())
+                } else {
+                    None
+                }
+            });
+
+        for (param_index, &param_idx) in parameters.nodes.iter().enumerate() {
+            if let Some(Node::ParameterDeclaration(param)) = self.node_arena.get(param_idx) {
+                // Get parameter name
+                let name = if let Some(Node::Identifier(id)) = self.node_arena.get(param.name) {
+                    id.escaped_text.clone()
+                } else {
+                    String::new()
+                };
+                param_names.push(name);
+
+                // Get parameter type
+                let param_type = if !param.type_annotation.is_none() {
+                    // Explicit type annotation takes precedence
+                    self.get_type_of_node(param.type_annotation)
+                } else if let Some(ref ctx_params) = contextual_param_types {
+                    // Use contextual type if available
+                    ctx_params.get(param_index).copied().unwrap_or(self.types.any_type)
+                } else if !param.initializer.is_none() {
+                    // Infer from initializer
+                    self.get_type_of_node(param.initializer)
+                } else {
+                    self.types.any_type
+                };
+                param_types.push(param_type);
+
+                // Track min argument count and rest parameter
+                if param.dot_dot_dot_token {
+                    has_rest = true;
+                } else if !param.question_token && param.initializer.is_none() {
+                    min_arg_count += 1;
+                }
+            }
+        }
+
+        // Get return type
+        let return_type = if !return_type_annotation.is_none() {
+            self.get_type_of_node(return_type_annotation)
+        } else {
+            // Return type inference would happen here
+            // For now, default to any
+            self.types.any_type
+        };
+
+        // Remove only the type parameters we added (preserve parent scope entries)
+        for name in added_param_names {
+            self.type_parameter_scope.remove(&name);
+        }
+
+        self.types.create_function_type_with_type_params(
+            declaration,
+            param_types,
+            param_names,
+            return_type,
+            type_param_ids,
+            min_arg_count,
+            has_rest,
+        )
+    }
+
+    /// Create a TypeParameter from a TypeParameterDeclaration node.
+    fn create_type_parameter(&mut self, node: NodeIndex) -> Option<TypeId> {
+        use crate::parser::Node;
+
+        let tp = match self.node_arena.get(node)? {
+            Node::TypeParameterDeclaration(tp) => tp,
+            _ => return None,
+        };
+
+        // Get the name of the type parameter
+        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(tp.name) {
+            id.escaped_text.clone()
+        } else {
+            return None;
+        };
+
+        // Create a symbol for the type parameter
+        let symbol_id = self.local_symbols.alloc(symbol_flags::TYPE_PARAMETER, name.clone());
+
+        // Get constraint type if present
+        let constraint = if !tp.constraint.is_none() {
+            self.get_type_of_node(tp.constraint)
+        } else {
+            TypeId::NONE
+        };
+
+        // Get default type if present
+        let default = if !tp.default.is_none() {
+            self.get_type_of_node(tp.default)
+        } else {
+            TypeId::NONE
+        };
+
+        // Create and allocate the type parameter
+        let type_param = TypeParameter {
+            flags: type_flags::TYPE_PARAMETER,
+            symbol: symbol_id,
+            constraint,
+            default,
+            target: TypeId::NONE,
+            is_this_type: false,
+        };
+
+        // Store the name for type_to_string
+        let type_id = self.types.alloc(Type::TypeParameter(type_param));
+
+        // Cache the type parameter name for later lookup
+        self.type_parameter_names.insert(type_id, name);
+
+        Some(type_id)
+    }
+
+    /// Instantiate a generic type with type arguments.
+    /// Replaces type parameters with the provided type arguments.
+    pub fn instantiate_type(&mut self, type_id: TypeId, type_arguments: &[TypeId], type_parameters: &[TypeId]) -> TypeId {
+        // If no type arguments, return the original type
+        if type_arguments.is_empty() || type_parameters.is_empty() {
+            return type_id;
+        }
+
+        // Create a mapping from type parameters to type arguments
+        let mapper: std::collections::HashMap<TypeId, TypeId> = type_parameters.iter()
+            .zip(type_arguments.iter())
+            .map(|(&param, &arg)| (param, arg))
+            .collect();
+
+        self.instantiate_type_with_mapper(type_id, &mapper)
+    }
+
+    /// Instantiate a type using a type parameter mapper.
+    fn instantiate_type_with_mapper(&mut self, type_id: TypeId, mapper: &std::collections::HashMap<TypeId, TypeId>) -> TypeId {
+        // Check if this type parameter is in the mapper
+        if let Some(&mapped_type) = mapper.get(&type_id) {
+            return mapped_type;
+        }
+
+        // Extract data from the type to avoid borrowing issues
+        enum TypeInfo {
+            TypeParameter,
+            Function {
+                declaration: NodeIndex,
+                parameter_types: Vec<TypeId>,
+                parameter_names: Vec<String>,
+                return_type: TypeId,
+                min_argument_count: u32,
+                has_rest_parameter: bool,
+            },
+            Union {
+                types: Vec<TypeId>,
+            },
+            Intersection {
+                types: Vec<TypeId>,
+            },
+            Mapped {
+                type_parameter: TypeId,
+                constraint_type: TypeId,
+                template_type: TypeId,
+            },
+            IndexedAccess {
+                object_type: TypeId,
+                index_type: TypeId,
+            },
+            Index {
+                source_type: TypeId,
+            },
+            Conditional {
+                check_type: TypeId,
+                extends_type: TypeId,
+                true_type: TypeId,
+                false_type: TypeId,
+                is_distributive: bool,
+            },
+            Array {
+                element_type: TypeId,
+                is_readonly: bool,
+            },
+            Other,
+        }
+
+        let type_info = match self.types.get(type_id) {
+            Some(Type::TypeParameter(_)) => TypeInfo::TypeParameter,
+            Some(Type::Function(f)) => TypeInfo::Function {
+                declaration: f.declaration,
+                parameter_types: f.parameter_types.clone(),
+                parameter_names: f.parameter_names.clone(),
+                return_type: f.return_type,
+                min_argument_count: f.min_argument_count,
+                has_rest_parameter: f.has_rest_parameter,
+            },
+            Some(Type::Union(u)) => TypeInfo::Union {
+                types: u.types.clone(),
+            },
+            Some(Type::Intersection(i)) => TypeInfo::Intersection {
+                types: i.types.clone(),
+            },
+            Some(Type::Mapped(m)) => TypeInfo::Mapped {
+                type_parameter: m.type_parameter,
+                constraint_type: m.constraint_type,
+                template_type: m.template_type,
+            },
+            Some(Type::IndexedAccess(ia)) => TypeInfo::IndexedAccess {
+                object_type: ia.object_type,
+                index_type: ia.index_type,
+            },
+            Some(Type::Index(i)) => TypeInfo::Index {
+                source_type: i.source_type,
+            },
+            Some(Type::Conditional(c)) => TypeInfo::Conditional {
+                check_type: c.check_type,
+                extends_type: c.extends_type,
+                true_type: c.true_type,
+                false_type: c.false_type,
+                is_distributive: c.is_distributive,
+            },
+            Some(Type::Array(arr)) => TypeInfo::Array {
+                element_type: arr.element_type,
+                is_readonly: arr.is_readonly,
+            },
+            Some(_) => TypeInfo::Other,
+            None => return type_id,
+        };
+
+        match type_info {
+            // Type parameter - already checked above
+            TypeInfo::TypeParameter => type_id,
+
+            // Function type - instantiate return type and parameter types
+            TypeInfo::Function {
+                declaration,
+                parameter_types,
+                parameter_names,
+                return_type,
+                min_argument_count,
+                has_rest_parameter,
+            } => {
+                let new_param_types: Vec<TypeId> = parameter_types.iter()
+                    .map(|&pt| self.instantiate_type_with_mapper(pt, mapper))
+                    .collect();
+                let new_return_type = self.instantiate_type_with_mapper(return_type, mapper);
+
+                // Check if anything changed
+                if new_param_types == parameter_types && new_return_type == return_type {
+                    return type_id;
+                }
+
+                self.types.create_function_type(
+                    declaration,
+                    new_param_types,
+                    parameter_names,
+                    new_return_type,
+                    min_argument_count,
+                    has_rest_parameter,
+                )
+            }
+
+            // Union type - instantiate each constituent
+            TypeInfo::Union { types } => {
+                let new_types: Vec<TypeId> = types.iter()
+                    .map(|&t| self.instantiate_type_with_mapper(t, mapper))
+                    .collect();
+
+                if new_types == types {
+                    return type_id;
+                }
+
+                self.types.create_union_type(new_types)
+            }
+
+            // Intersection type - instantiate each constituent
+            TypeInfo::Intersection { types } => {
+                let new_types: Vec<TypeId> = types.iter()
+                    .map(|&t| self.instantiate_type_with_mapper(t, mapper))
+                    .collect();
+
+                if new_types == types {
+                    return type_id;
+                }
+
+                self.types.create_intersection(new_types)
+            }
+
+            // Mapped type - instantiate to concrete object type
+            TypeInfo::Mapped { type_parameter, constraint_type, template_type } => {
+                // First, instantiate the constraint type to get the concrete keys
+                let instantiated_constraint = self.instantiate_type_with_mapper(constraint_type, mapper);
+
+                // Get the keys from the instantiated constraint
+                let keys = self.get_keys_from_type(instantiated_constraint);
+
+                if keys.is_empty() {
+                    // If no keys, return empty object type
+                    return self.types.create_object_type(Vec::new());
+                }
+
+                // For each key, instantiate the template type with K bound to that key
+                let mut properties = Vec::new();
+                let mut members_table = SymbolTable::new();
+
+                for key_name in keys {
+                    // Create a string literal type for this key
+                    let key_type = self.types.create_string_literal(key_name.clone());
+
+                    // Create a new mapper with the type parameter bound to this key
+                    let mut inner_mapper = mapper.clone();
+                    inner_mapper.insert(type_parameter, key_type);
+
+                    // Instantiate the template type with the key bound
+                    let property_type = self.instantiate_type_with_mapper(template_type, &inner_mapper);
+
+                    // Create a symbol for this property
+                    let symbol_id = self.local_symbols_mut().alloc(symbol_flags::PROPERTY, key_name.clone());
+                    self.symbol_types.insert(symbol_id, property_type);
+                    properties.push(symbol_id);
+                    members_table.set(key_name, symbol_id);
+                }
+
+                self.types.create_object_type_with_members(properties, members_table)
+            }
+
+            // Indexed access type - instantiate object and index types
+            TypeInfo::IndexedAccess { object_type, index_type } => {
+                let new_object = self.instantiate_type_with_mapper(object_type, mapper);
+                let new_index = self.instantiate_type_with_mapper(index_type, mapper);
+
+                if new_object == object_type && new_index == index_type {
+                    return type_id;
+                }
+
+                // Try to resolve the indexed access
+                self.get_indexed_access_type(new_object, new_index)
+            }
+
+            // Index type (keyof) - instantiate the source type
+            TypeInfo::Index { source_type } => {
+                let new_source = self.instantiate_type_with_mapper(source_type, mapper);
+
+                if new_source == source_type {
+                    return type_id;
+                }
+
+                // Compute keyof for the new source type
+                self.get_keyof_type(new_source)
+            }
+
+            // Conditional type - instantiate and evaluate
+            TypeInfo::Conditional { check_type, extends_type, true_type, false_type, is_distributive } => {
+                let new_check = self.instantiate_type_with_mapper(check_type, mapper);
+                let new_extends = self.instantiate_type_with_mapper(extends_type, mapper);
+                let new_true = self.instantiate_type_with_mapper(true_type, mapper);
+                let new_false = self.instantiate_type_with_mapper(false_type, mapper);
+
+                // Check if the check type still contains type parameters
+                if self.type_contains_type_parameter(new_check) {
+                    // Still deferred - create new conditional type
+                    if new_check == check_type && new_extends == extends_type
+                        && new_true == true_type && new_false == false_type {
+                        return type_id;
+                    }
+                    return self.types.create_conditional_type(new_check, new_extends, new_true, new_false);
+                }
+
+                // Handle distributive conditional types over unions
+                // If the original conditional was distributive and new_check is a union,
+                // distribute the conditional over each union member
+                if is_distributive {
+                    if let Some(Type::Union(union)) = self.types.get(new_check) {
+                        let member_types = union.types.clone();
+                        let mut result_types = Vec::new();
+
+                        for member in member_types {
+                            // Check if extends type contains infer types
+                            if self.type_contains_infer(new_extends) {
+                                let mut inferences: std::collections::HashMap<TypeId, TypeId> = std::collections::HashMap::new();
+                                if self.infer_from_type(member, new_extends, &mut inferences) {
+                                    let result = self.instantiate_type_with_mapper(new_true, &inferences);
+                                    if !result_types.contains(&result) {
+                                        result_types.push(result);
+                                    }
+                                } else {
+                                    if !result_types.contains(&new_false) {
+                                        result_types.push(new_false);
+                                    }
+                                }
+                            } else {
+                                // Simple assignability check
+                                let result = if self.is_type_assignable_to(member, new_extends) {
+                                    new_true
+                                } else {
+                                    new_false
+                                };
+                                if !result_types.contains(&result) {
+                                    result_types.push(result);
+                                }
+                            }
+                        }
+
+                        if result_types.is_empty() {
+                            return self.types.never_type;
+                        }
+                        if result_types.len() == 1 {
+                            return result_types[0];
+                        }
+                        return self.types.create_union(result_types);
+                    }
+                }
+
+                // Check if extends type contains infer types
+                if self.type_contains_infer(new_extends) {
+                    let mut inferences: std::collections::HashMap<TypeId, TypeId> = std::collections::HashMap::new();
+                    if self.infer_from_type(new_check, new_extends, &mut inferences) {
+                        // Pattern matched - substitute inferences in true branch
+                        return self.instantiate_type_with_mapper(new_true, &inferences);
+                    } else {
+                        return new_false;
+                    }
+                }
+
+                // Evaluate the condition
+                if self.is_type_assignable_to(new_check, new_extends) {
+                    new_true
+                } else {
+                    new_false
+                }
+            }
+
+            // Array type - instantiate element type
+            TypeInfo::Array { element_type, is_readonly } => {
+                let new_element = self.instantiate_type_with_mapper(element_type, mapper);
+
+                if new_element == element_type {
+                    return type_id;
+                }
+
+                self.types.create_array_type(new_element, is_readonly)
+            }
+
+            // Other types - return as-is for now
+            TypeInfo::Other => type_id,
+        }
+    }
+
+    /// Get property names from a type (for mapped type instantiation).
+    fn get_keys_from_type(&mut self, type_id: TypeId) -> Vec<String> {
+        let mut keys = Vec::new();
+
+        let Some(typ) = self.types.get(type_id) else {
+            return keys;
+        };
+
+        match typ {
+            // Union of string literals
+            Type::Union(u) => {
+                let types = u.types.clone();
+                for t in types {
+                    if let Some(Type::Literal(lit)) = self.types.get(t) {
+                        if let LiteralValue::String(s) = &lit.value {
+                            keys.push(s.clone());
+                        }
+                    }
+                }
+            }
+            // Single string literal
+            Type::Literal(lit) => {
+                if let LiteralValue::String(s) = &lit.value {
+                    keys.push(s.clone());
+                }
+            }
+            // Object type - get property names
+            Type::Object(obj) => {
+                for (name, _) in obj.members.iter() {
+                    keys.push(name.clone());
+                }
+            }
+            _ => {}
+        }
+
+        keys
+    }
+
+    /// Get the type of a type reference with type arguments (e.g., Array<T>, Map<K, V>).
+    fn get_type_of_type_reference_with_args(&mut self, type_name: NodeIndex, type_arguments: &crate::parser::NodeList) -> TypeId {
+        use crate::parser::Node;
+
+        // Get the base type name
+        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(type_name) {
+            id.escaped_text.as_str()
+        } else {
+            return self.types.object_type;
+        };
+
+        // Resolve type arguments
+        let type_args: Vec<TypeId> = type_arguments.nodes.iter()
+            .map(|&arg| self.get_type_of_node(arg))
+            .collect();
+
+        // Look up the type in the symbol table
+        if let Some(symbol_id) = self.file_locals.get(name) {
+            // Check if this is a type alias with type parameters
+            if let Some(symbol) = self.symbol_arena.get(symbol_id) {
+                if symbol.has_flags(crate::binder::symbol_flags::TYPE_ALIAS) {
+                    if let Some(&decl_idx) = symbol.declarations.first() {
+                        if let Some(Node::TypeAliasDeclaration(ta)) = self.node_arena.get(decl_idx) {
+                            if let Some(ref type_params) = ta.type_parameters {
+                                // Collect type parameter TypeIds
+                                let mut param_type_ids = Vec::new();
+
+                                // Save current type parameter scope
+                                let saved_scope = std::mem::take(&mut self.type_parameter_scope);
+
+                                // Create type parameters and build the scope
+                                for &tp_idx in &type_params.nodes {
+                                    if let Some(type_id) = self.create_type_parameter(tp_idx) {
+                                        param_type_ids.push(type_id);
+                                        if let Some(name) = self.type_parameter_names.get(&type_id) {
+                                            self.type_parameter_scope.insert(name.clone(), type_id);
+                                        }
+                                    }
+                                }
+
+                                // Get the body type with type parameters in scope
+                                let body_type = self.get_type_of_node(ta.type_node);
+
+                                // Restore scope
+                                self.type_parameter_scope = saved_scope;
+
+                                // Instantiate with the provided type arguments
+                                if !param_type_ids.is_empty() && !type_args.is_empty() {
+                                    return self.instantiate_type(body_type, &type_args, &param_type_ids);
+                                }
+
+                                return body_type;
+                            }
+                        }
+                    }
+                }
+            }
+
+            let base_type = self.get_type_of_symbol(symbol_id);
+
+            // Check if it's a generic function type that needs instantiation
+            if let Some(Type::Function(f)) = self.types.get(base_type) {
+                if !f.type_parameters.is_empty() {
+                    return self.instantiate_type(base_type, &type_args, &f.type_parameters.clone());
+                }
+            }
+
+            return base_type;
+        }
+
+        // Built-in generic types
+        match name {
+            "Array" => {
+                // Array<T> becomes a mutable array type with element type T
+                let element_type = type_args.first().copied().unwrap_or(self.types.any_type);
+                self.types.create_array_type(element_type, false)
+            }
+            "ReadonlyArray" => {
+                // ReadonlyArray<T> becomes a readonly array type with element type T
+                let element_type = type_args.first().copied().unwrap_or(self.types.any_type);
+                self.types.create_array_type(element_type, true)
+            }
+            "Promise" => {
+                self.types.object_type
+            }
+            "Map" | "Set" | "WeakMap" | "WeakSet" => {
+                self.types.object_type
+            }
+            _ => self.types.object_type,
+        }
+    }
+
+    /// Get the type of a symbol (with caching).
+    pub fn get_type_of_symbol(&mut self, symbol_id: SymbolId) -> TypeId {
+        // Check cache first
+        if let Some(&cached) = self.symbol_types.get(&symbol_id) {
+            return cached;
+        }
+
+        // Track recursion to catch infinite loops
+        if self.symbol_resolution_stack.contains(&symbol_id) {
+            // Circular reference - return any_type to break the loop
+            return self.types.any_type;
+        }
+        self.symbol_resolution_stack.push(symbol_id);
+
+        let type_id = self.get_type_of_symbol_worker(symbol_id);
+        self.symbol_types.insert(symbol_id, type_id);
+
+        self.symbol_resolution_stack.pop();
+        type_id
+    }
+
+    /// Get type of symbol (worker, no caching).
+    fn get_type_of_symbol_worker(&mut self, symbol_id: SymbolId) -> TypeId {
+        use crate::binder::symbol_flags;
+
+        let Some(symbol) = self.symbol_arena.get(symbol_id) else {
+            return self.types.any_type;
+        };
+
+        // For type aliases, use the first declaration
+        if symbol.has_flags(symbol_flags::TYPE_ALIAS) {
+            if let Some(&decl) = symbol.declarations.first() {
+                return self.get_type_of_node(decl);
+            }
+        }
+
+        // Get type from value declaration
+        if !symbol.value_declaration.is_none() {
+            return self.get_type_of_node(symbol.value_declaration);
+        }
+
+        // Fallback: try first declaration
+        if let Some(&decl) = symbol.declarations.first() {
+            return self.get_type_of_node(decl);
+        }
+
+        self.types.any_type
+    }
+
+}
