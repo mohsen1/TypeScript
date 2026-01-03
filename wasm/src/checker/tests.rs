@@ -6636,3 +6636,127 @@ interface TreeNode {
             panic!("Expected Mapped type");
         }
     }
+
+    // ============== 5.112: Infer with extends constraints ==============
+    #[test]
+    fn test_infer_type_parameter_with_constraint() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+        use crate::binder::SymbolId;
+
+        let code = "let x: number;";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Create a constrained infer type parameter (simulating `infer T extends string`)
+        let constraint = checker.types.string_type;
+        let infer_param = checker.types.create_type_parameter(
+            SymbolId::NONE, // NONE symbol indicates infer type
+            constraint,      // extends string
+            TypeId::NONE,
+        );
+
+        // Verify the constraint is stored
+        if let Some(super::types::Type::TypeParameter(tp)) = checker.types.get(infer_param) {
+            assert!(!tp.constraint.is_none(), "Infer type parameter should have constraint");
+            assert_eq!(tp.constraint, constraint, "Constraint should be string type");
+            assert!(tp.symbol.is_none(), "Symbol should be NONE for infer types");
+        } else {
+            panic!("Expected TypeParameter");
+        }
+    }
+
+    #[test]
+    fn test_infer_from_type_respects_constraint() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+        use crate::binder::SymbolId;
+        use std::collections::HashMap;
+
+        let code = "let x: number;";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Create an infer type with string constraint (infer T extends string)
+        let string_constraint = checker.types.string_type;
+        let infer_string = checker.types.create_type_parameter(
+            SymbolId::NONE,
+            string_constraint,
+            TypeId::NONE,
+        );
+
+        // Test 1: "hello" should match (satisfies string constraint)
+        let hello_literal = checker.types.create_string_literal("hello".to_string());
+        let mut inferences: HashMap<TypeId, TypeId> = HashMap::new();
+        let matches = checker.infer_from_type(hello_literal, infer_string, &mut inferences);
+        assert!(matches, "String literal should match infer extends string");
+        assert_eq!(inferences.get(&infer_string), Some(&hello_literal));
+
+        // Test 2: 42 should NOT match (number doesn't satisfy string constraint)
+        let num_literal = checker.types.create_number_literal(42.0);
+        let mut inferences2: HashMap<TypeId, TypeId> = HashMap::new();
+        let matches2 = checker.infer_from_type(num_literal, infer_string, &mut inferences2);
+        assert!(!matches2, "Number should not match infer extends string");
+        assert!(inferences2.is_empty(), "No inference should be made");
+    }
+
+    #[test]
+    fn test_infer_extends_with_array_constraint() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+        use crate::binder::SymbolId;
+        use std::collections::HashMap;
+
+        let code = "let x: number;";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Create an infer type with any[] constraint (infer T extends any[])
+        let any_array = checker.types.create_array_type(checker.types.any_type, false);
+        let infer_array = checker.types.create_type_parameter(
+            SymbolId::NONE,
+            any_array,
+            TypeId::NONE,
+        );
+
+        // Test 1: number[] should match (satisfies any[] constraint)
+        let num_array = checker.types.create_array_type(checker.types.number_type, false);
+        let mut inferences: HashMap<TypeId, TypeId> = HashMap::new();
+        let matches = checker.infer_from_type(num_array, infer_array, &mut inferences);
+        assert!(matches, "number[] should match infer extends any[]");
+
+        // Test 2: string should NOT match (not an array)
+        let mut inferences2: HashMap<TypeId, TypeId> = HashMap::new();
+        let matches2 = checker.infer_from_type(checker.types.string_type, infer_array, &mut inferences2);
+        assert!(!matches2, "string should not match infer extends any[]");
+    }

@@ -1192,7 +1192,7 @@ impl<'a> CheckerState<'a> {
     /// Match a source type against a pattern type, extracting inferred types.
     /// Returns true if the pattern matches, false otherwise.
     /// Inferred bindings are stored in the inferences map (pattern TypeId -> matched TypeId).
-    fn infer_from_type(
+    pub(crate) fn infer_from_type(
         &self,
         source: TypeId,
         pattern: TypeId,
@@ -1205,7 +1205,17 @@ impl<'a> CheckerState<'a> {
         // If pattern is an infer type parameter, bind it to source
         if let Type::TypeParameter(tp) = pattern_type {
             if tp.symbol.is_none() {
-                // This is an infer type - bind it
+                // This is an infer type
+                // Check if there's a constraint (from `infer T extends U` syntax)
+                let constraint = tp.constraint;
+                if !constraint.is_none() {
+                    // Validate that source satisfies the constraint
+                    if !self.is_type_assignable_to(source, constraint) {
+                        // Source doesn't satisfy the constraint - match fails
+                        return false;
+                    }
+                }
+                // Bind the infer type to source
                 inferences.insert(pattern, source);
                 return true;
             }
@@ -1430,6 +1440,7 @@ impl<'a> CheckerState<'a> {
 
     /// Get the type of an infer type (infer T in conditional types).
     /// Creates a special type parameter that can be bound during pattern matching.
+    /// Supports `infer T extends U` syntax where the constraint limits valid inferences.
     fn get_type_of_infer_type(
         &mut self,
         _node: NodeIndex,
@@ -1438,20 +1449,33 @@ impl<'a> CheckerState<'a> {
         use crate::parser::Node;
         use crate::binder::SymbolId;
 
-        // Get the type parameter name from the type parameter declaration
-        let name = if let Some(Node::TypeParameterDeclaration(tp)) = self.node_arena.get(it.type_parameter) {
-            if let Some(Node::Identifier(id)) = self.node_arena.get(tp.name) {
+        // Get the type parameter name and constraint from the type parameter declaration
+        let (name, constraint_node) = if let Some(Node::TypeParameterDeclaration(tp)) = self.node_arena.get(it.type_parameter) {
+            let name = if let Some(Node::Identifier(id)) = self.node_arena.get(tp.name) {
                 id.escaped_text.clone()
             } else {
                 "T".to_string()
-            }
+            };
+            let constraint = if !tp.constraint.is_none() {
+                tp.constraint
+            } else {
+                NodeIndex::NONE
+            };
+            (name, constraint)
         } else {
-            "T".to_string()
+            ("T".to_string(), NodeIndex::NONE)
+        };
+
+        // Get the constraint type if one exists (for `infer T extends U` syntax)
+        let constraint_type = if !constraint_node.is_none() {
+            self.get_type_of_node(constraint_node)
+        } else {
+            TypeId::NONE
         };
 
         // Create a type parameter for this infer type
         // The symbol is NONE since infer types don't have symbols in the symbol table
-        let type_param = self.types.create_type_parameter(SymbolId::NONE, TypeId::NONE, TypeId::NONE);
+        let type_param = self.types.create_type_parameter(SymbolId::NONE, constraint_type, TypeId::NONE);
 
         // Cache the name for type_to_string
         self.type_parameter_names.insert(type_param, name.clone());
