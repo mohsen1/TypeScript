@@ -182,6 +182,12 @@ impl<'a> CheckerState<'a> {
             return true;
         }
 
+        // ThisType<T> is a marker type - always compatible in assignability
+        // It specifies the 'this' type in object literal methods but doesn't affect structure
+        if matches!(source_type, Type::ThisType(_)) || matches!(target_type, Type::ThisType(_)) {
+            return true;
+        }
+
         false
     }
 

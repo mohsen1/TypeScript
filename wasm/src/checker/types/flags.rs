@@ -92,6 +92,8 @@ pub mod object_flags {
     pub const REVERSE_MAPPED: u32       = 1 << 14;
     pub const JSX_ATTRIBUTES: u32       = 1 << 15;
     pub const MARKER: u32               = 1 << 16;
+    /// ThisType<T> marker - specifies the type of 'this' in object literal methods
+    pub const IS_THIS_TYPE: u32         = 1 << 17;
     pub const CLASS_OR_INTERFACE: u32   = CLASS | INTERFACE;
 }
 

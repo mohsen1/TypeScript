@@ -719,6 +719,10 @@ impl<'a> CheckerState<'a> {
             Type::Enum(e) => {
                 format!("typeof {}", e.name)
             }
+            Type::ThisType(t) => {
+                let constraint_str = self.type_to_string(t.constraint);
+                format!("ThisType<{}>", constraint_str)
+            }
         }
     }
 

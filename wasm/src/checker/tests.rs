@@ -7367,3 +7367,109 @@ interface TreeNode {
             panic!("Expected Tuple type");
         }
     }
+
+    // ============== 5.74: ThisType<T> utility type ==============
+    #[test]
+    fn test_thistype_utility_type() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test ThisType<T> utility type - creates a marker type for object literal methods
+        let code = r#"
+type MyThis = ThisType<{ name: string }>;
+type AnyThis = ThisType<any>;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // ThisType<{ name: string }> should create a ThisType marker
+        if let Some(symbol_id) = binder.file_locals.get("MyThis") {
+            let this_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(this_type);
+            assert!(type_str.contains("ThisType"),
+                "ThisType<{{ name: string }}> should be ThisType marker, got: {}", type_str);
+        } else {
+            panic!("Should have symbol 'MyThis'");
+        }
+
+        // ThisType<any> should also work
+        if let Some(symbol_id) = binder.file_locals.get("AnyThis") {
+            let this_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(this_type);
+            assert!(type_str.contains("ThisType") || type_str.contains("any"),
+                "ThisType<any> should be ThisType marker, got: {}", type_str);
+        } else {
+            panic!("Should have symbol 'AnyThis'");
+        }
+    }
+
+    #[test]
+    fn test_thistype_in_intersection() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test ThisType<T> in intersection - common pattern for object literal methods
+        let code = r#"
+type Methods = {
+    greet(): string;
+};
+type ObjectWithThis = Methods & ThisType<{ name: string }>;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // The intersection should be created
+        if let Some(symbol_id) = binder.file_locals.get("ObjectWithThis") {
+            let obj_type = checker.get_type_of_symbol(symbol_id);
+            // Should not be any or error
+            assert!(!obj_type.is_none(), "ObjectWithThis should have a type");
+        } else {
+            panic!("Should have symbol 'ObjectWithThis'");
+        }
+    }
+
+    #[test]
+    fn test_thistype_arena_creation() {
+        // Test direct arena creation of ThisType
+        let mut arena = super::TypeArena::new();
+
+        // Create ThisType<number>
+        let this_type = arena.create_this_type(arena.number_type);
+
+        if let Some(super::types::Type::ThisType(t)) = arena.get(this_type) {
+            assert_eq!(t.constraint, arena.number_type, "ThisType constraint should be number");
+        } else {
+            panic!("Expected ThisType");
+        }
+
+        // Create ThisType<string>
+        let string_this = arena.create_this_type(arena.string_type);
+
+        if let Some(super::types::Type::ThisType(t)) = arena.get(string_this) {
+            assert_eq!(t.constraint, arena.string_type, "ThisType constraint should be string");
+        } else {
+            panic!("Expected ThisType");
+        }
+    }

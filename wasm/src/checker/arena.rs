@@ -12,7 +12,7 @@ use super::types::{
     ObjectType, UnionType, IntersectionType, TypeParameter,
     ConditionalType, MappedType, MappedTypeModifier, IndexType, IndexedAccessType,
     TemplateLiteralType, FunctionType, ArrayTypeInfo, TupleTypeInfo,
-    EnumTypeInfo, Signature, IndexInfo,
+    EnumTypeInfo, ThisTypeMarker, Signature, IndexInfo,
 };
 
 /// Arena allocator for types with singleton caching.
@@ -395,6 +395,15 @@ impl TypeArena {
             flags: type_flags::ENUM,
             name,
             members,
+        })))
+    }
+
+    /// Create a ThisType<T> marker type.
+    /// ThisType<T> specifies the type of 'this' within object literal methods.
+    pub fn create_this_type(&mut self, constraint: TypeId) -> TypeId {
+        self.alloc(Type::ThisType(Box::new(ThisTypeMarker {
+            flags: type_flags::OBJECT,
+            constraint,
         })))
     }
 

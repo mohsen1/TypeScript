@@ -3476,6 +3476,11 @@ impl<'a> CheckerState<'a> {
             "ReturnType" | "Parameters" | "InstanceType" | "ConstructorParameters" => {
                 self.types.any_type
             }
+            // ThisType<T> - marker type for 'this' in object literal methods
+            "ThisType" => {
+                let constraint = type_args.first().copied().unwrap_or(self.types.any_type);
+                self.types.create_this_type(constraint)
+            }
             _ => self.types.object_type,
         }
     }

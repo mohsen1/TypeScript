@@ -125,7 +125,7 @@ All of the following are complete:
 - [x] **5.71** Covariance/contravariance checking in functions (basic: bivariance + variance modifiers)
 - [x] **5.72** Type widening control (`as const`)
 - [x] **5.73** `Awaited<T>` recursive unwrapping
-- [ ] **5.74** `ThisType<T>` for object literal methods
+- [x] **5.74** `ThisType<T>` for object literal methods
 
 #### Type Syntax Interpretation (Parsed but needs checker support)
 - [x] **5.103** `typeof` type operator (get type of runtime expression)

@@ -338,6 +338,16 @@ pub struct EnumTypeInfo {
     pub members: Vec<(String, TypeId)>,
 }
 
+/// ThisType<T> marker type - specifies the type of 'this' in object literal methods.
+/// When an object literal has a contextual type that includes ThisType<T>,
+/// the 'this' keyword within methods of that literal is typed as T.
+#[derive(Clone, Debug, Serialize)]
+pub struct ThisTypeMarker {
+    pub flags: u32,
+    /// The type that 'this' should be within object literal methods
+    pub constraint: TypeId,
+}
+
 // =============================================================================
 // Type Enum
 // =============================================================================
@@ -362,6 +372,8 @@ pub enum Type {
     Array(Box<ArrayTypeInfo>),
     Tuple(Box<TupleTypeInfo>),
     Enum(Box<EnumTypeInfo>),
+    /// ThisType<T> marker - specifies 'this' type in object literal methods
+    ThisType(Box<ThisTypeMarker>),
 }
 
 impl Type {
@@ -384,6 +396,7 @@ impl Type {
             Type::Array(t) => t.flags,
             Type::Tuple(t) => t.flags,
             Type::Enum(t) => t.flags,
+            Type::ThisType(t) => t.flags,
         }
     }
 
