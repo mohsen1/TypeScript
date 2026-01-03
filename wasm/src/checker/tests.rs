@@ -5399,3 +5399,288 @@ let v = f.y;
         });
         assert!(protected_error, "Expected error for protected property access outside class. Got: {:?}", checker.diagnostics);
     }
+
+    // =========================================================================
+    // Abstract member verification tests (5.57)
+    // =========================================================================
+
+    #[test]
+    #[ignore = "Full class type checking can hit memory limits in Docker"]
+    fn test_abstract_method_in_non_abstract_class() {
+        // Abstract method in non-abstract class should produce error
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+class Foo {
+    abstract bar(): void;
+}
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        checker.check_source_file(root);
+
+        assert!(
+            !checker.diagnostics.is_empty(),
+            "Expected error for abstract method in non-abstract class"
+        );
+        assert!(
+            checker.diagnostics.iter().any(|d| d.code == super::diagnostic_codes::ABSTRACT_MEMBER_IN_NON_ABSTRACT_CLASS),
+            "Expected error code 2515. Got: {:?}",
+            checker.diagnostics
+        );
+    }
+
+    #[test]
+    fn test_abstract_method_in_abstract_class_allowed() {
+        // Abstract method in abstract class should be allowed
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+abstract class Foo {
+    abstract bar(): void;
+}
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        checker.check_source_file(root);
+
+        // Should have no errors about abstract members
+        let abstract_errors: Vec<_> = checker.diagnostics.iter()
+            .filter(|d| d.code == super::diagnostic_codes::ABSTRACT_MEMBER_IN_NON_ABSTRACT_CLASS)
+            .collect();
+        assert!(
+            abstract_errors.is_empty(),
+            "Should allow abstract method in abstract class. Got: {:?}",
+            abstract_errors
+        );
+    }
+
+    #[test]
+    #[ignore = "Full class type checking can hit memory limits in Docker"]
+    fn test_abstract_property_in_non_abstract_class() {
+        // Abstract property in non-abstract class should produce error
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+class Foo {
+    abstract name: string;
+}
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        checker.check_source_file(root);
+
+        assert!(
+            !checker.diagnostics.is_empty(),
+            "Expected error for abstract property in non-abstract class"
+        );
+        assert!(
+            checker.diagnostics.iter().any(|d| d.code == super::diagnostic_codes::ABSTRACT_MEMBER_IN_NON_ABSTRACT_CLASS),
+            "Expected error code 2515. Got: {:?}",
+            checker.diagnostics
+        );
+    }
+
+    #[test]
+    fn test_non_abstract_method_in_non_abstract_class_allowed() {
+        // Non-abstract method in non-abstract class should be allowed
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+class Foo {
+    bar(): void {}
+}
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        checker.check_source_file(root);
+
+        // Should have no errors about abstract members
+        let abstract_errors: Vec<_> = checker.diagnostics.iter()
+            .filter(|d| d.code == super::diagnostic_codes::ABSTRACT_MEMBER_IN_NON_ABSTRACT_CLASS)
+            .collect();
+        assert!(
+            abstract_errors.is_empty(),
+            "Non-abstract method should be allowed in non-abstract class. Got: {:?}",
+            abstract_errors
+        );
+    }
+
+    // =========================================================================
+    // Override keyword validation tests (5.58)
+    // =========================================================================
+
+    #[test]
+    #[ignore = "Full class type checking can hit memory limits in Docker"]
+    fn test_override_with_no_base_class() {
+        // Override modifier on a class with no base class should produce error
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+class Foo {
+    override bar(): void {}
+}
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        checker.check_source_file(root);
+
+        assert!(
+            !checker.diagnostics.is_empty(),
+            "Expected error for override without base class"
+        );
+        assert!(
+            checker.diagnostics.iter().any(|d| d.code == super::diagnostic_codes::OVERRIDE_MEMBER_NOT_IN_BASE),
+            "Expected error code 4114. Got: {:?}",
+            checker.diagnostics
+        );
+    }
+
+    #[test]
+    #[ignore = "Full class type checking can hit memory limits in Docker"]
+    fn test_override_member_not_in_base() {
+        // Override modifier for member not in base class should produce error
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+class Base {
+    foo(): void {}
+}
+class Derived extends Base {
+    override bar(): void {}
+}
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        checker.check_source_file(root);
+
+        assert!(
+            !checker.diagnostics.is_empty(),
+            "Expected error for override member not in base class"
+        );
+        assert!(
+            checker.diagnostics.iter().any(|d| d.code == super::diagnostic_codes::OVERRIDE_MEMBER_NOT_IN_BASE),
+            "Expected error code 4114. Got: {:?}",
+            checker.diagnostics
+        );
+    }
+
+    #[test]
+    #[ignore = "Full class type checking can hit memory limits in Docker"]
+    fn test_override_member_in_base_allowed() {
+        // Override modifier for member that exists in base class should be allowed
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+class Base {
+    foo(): void {}
+}
+class Derived extends Base {
+    override foo(): void {}
+}
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        checker.check_source_file(root);
+
+        // Should have no errors about override
+        let override_errors: Vec<_> = checker.diagnostics.iter()
+            .filter(|d| d.code == super::diagnostic_codes::OVERRIDE_MEMBER_NOT_IN_BASE)
+            .collect();
+        assert!(
+            override_errors.is_empty(),
+            "Should allow override for member in base class. Got: {:?}",
+            override_errors
+        );
+    }

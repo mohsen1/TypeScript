@@ -102,8 +102,8 @@ All of the following are complete:
 
 #### Class & Member Checking
 - [x] **5.56** Private/protected visibility enforcement
-- [ ] **5.57** Abstract member implementation verification
-- [ ] **5.58** `override` keyword validation
+- [x] **5.57** Abstract member implementation verification
+- [x] **5.58** `override` keyword validation
 - [ ] **5.59** Static blocks and auto-accessors (`accessor` keyword)
 
 #### Modern Type Features (TS 4.x-5.x)

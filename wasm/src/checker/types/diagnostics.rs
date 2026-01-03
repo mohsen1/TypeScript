@@ -129,6 +129,7 @@ pub mod diagnostic_codes {
     pub const THIS_CANNOT_BE_REFERENCED: u32 = 2332;
     pub const PROPERTY_HAS_NO_INITIALIZER: u32 = 2564;
     pub const ABSTRACT_PROPERTY_IN_NON_ABSTRACT_CLASS: u32 = 2515;
+    pub const ABSTRACT_MEMBER_IN_NON_ABSTRACT_CLASS: u32 = 2515;  // Same code for methods
     pub const CANNOT_ASSIGN_TO_READONLY_PROPERTY: u32 = 2540;
     pub const CLASS_INCORRECTLY_IMPLEMENTS_INTERFACE: u32 = 2420;
     pub const CLASS_INCORRECTLY_EXTENDS_BASE_CLASS: u32 = 2415;
@@ -138,6 +139,8 @@ pub mod diagnostic_codes {
     pub const CANNOT_EXTEND_SEALED_CLASS: u32 = 2509;
     pub const CONSTRUCTOR_CANNOT_HAVE_RETURN_TYPE: u32 = 2380;
     pub const STATIC_MEMBERS_CANNOT_REFERENCE_TYPE_PARAMETERS: u32 = 2302;
+    pub const OVERRIDE_MEMBER_NOT_IN_BASE: u32 = 4114;  // This member cannot have an 'override' modifier because it is not declared in the base class
+    pub const OVERRIDE_MEMBER_REQUIRED: u32 = 4113;  // This member must have an 'override' modifier because it overrides a member in the base class
 
     // Interface/type errors
     pub const INTERFACE_CAN_ONLY_EXTEND_INTERFACE: u32 = 2422;

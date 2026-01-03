@@ -47,6 +47,7 @@ pub mod symbol_flags {
     pub const MODULE_EXPORTS: u32 = 1 << 27;            // CommonJS module.exports
     pub const PRIVATE: u32 = 1 << 28;                   // Private member
     pub const PROTECTED: u32 = 1 << 29;                 // Protected member
+    pub const ABSTRACT: u32 = 1 << 30;                  // Abstract member
 
     // Composite flags
     pub const ENUM: u32 = REGULAR_ENUM | CONST_ENUM;
@@ -935,8 +936,8 @@ impl BinderState {
         }
     }
 
-    /// Get visibility flags (PRIVATE, PROTECTED) from modifier list.
-    fn get_visibility_flags(&self, arena: &NodeArena, modifiers: &Option<crate::parser::NodeList>) -> u32 {
+    /// Get modifier flags (PRIVATE, PROTECTED, ABSTRACT) from modifier list.
+    fn get_modifier_flags(&self, arena: &NodeArena, modifiers: &Option<crate::parser::NodeList>) -> u32 {
         let mut flags = 0u32;
         if let Some(mods) = modifiers {
             for &mod_idx in &mods.nodes {
@@ -945,6 +946,8 @@ impl BinderState {
                         flags |= symbol_flags::PRIVATE;
                     } else if base.kind == SyntaxKind::ProtectedKeyword as u16 {
                         flags |= symbol_flags::PROTECTED;
+                    } else if base.kind == SyntaxKind::AbstractKeyword as u16 {
+                        flags |= symbol_flags::ABSTRACT;
                     }
                 }
             }
@@ -1064,13 +1067,13 @@ impl BinderState {
             match node {
                 Node::MethodDeclaration(method) => {
                     if let Some(name) = self.get_identifier_name(arena, method.name) {
-                        let visibility = self.get_visibility_flags(arena, &method.modifiers);
+                        let visibility = self.get_modifier_flags(arena, &method.modifiers);
                         self.declare_symbol(name, symbol_flags::METHOD | visibility, idx);
                     }
                 }
                 Node::PropertyDeclaration(prop) => {
                     if let Some(name) = self.get_identifier_name(arena, prop.name) {
-                        let visibility = self.get_visibility_flags(arena, &prop.modifiers);
+                        let visibility = self.get_modifier_flags(arena, &prop.modifiers);
                         self.declare_symbol(name, symbol_flags::PROPERTY | visibility, idx);
                     }
                 }

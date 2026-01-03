@@ -329,6 +329,162 @@ impl<'a> CheckerState<'a> {
         self.error(node, &message, diagnostic_codes::EXPECTED_ARGUMENTS);
     }
 
+    // =========================================================================
+    // Modifier helpers
+    // =========================================================================
+
+    /// Check if a modifier list contains a specific modifier keyword.
+    pub fn has_modifier(
+        &self,
+        modifiers: &Option<crate::parser::NodeList>,
+        kind: crate::scanner::SyntaxKind,
+    ) -> bool {
+        use crate::parser::Node;
+
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(Node::Token(base)) = self.node_arena.get(mod_idx) {
+                    if base.kind == kind as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if a class member has the abstract modifier.
+    pub fn is_abstract_member(&self, member_idx: NodeIndex) -> bool {
+        use crate::parser::Node;
+
+        match self.node_arena.get(member_idx) {
+            Some(Node::MethodDeclaration(md)) => {
+                self.has_modifier(&md.modifiers, crate::scanner::SyntaxKind::AbstractKeyword)
+            }
+            Some(Node::PropertyDeclaration(pd)) => {
+                self.has_modifier(&pd.modifiers, crate::scanner::SyntaxKind::AbstractKeyword)
+            }
+            Some(Node::GetAccessorDeclaration(ga)) => {
+                self.has_modifier(&ga.modifiers, crate::scanner::SyntaxKind::AbstractKeyword)
+            }
+            Some(Node::SetAccessorDeclaration(sa)) => {
+                self.has_modifier(&sa.modifiers, crate::scanner::SyntaxKind::AbstractKeyword)
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if a class member has the override modifier.
+    pub fn has_override_modifier(&self, member_idx: NodeIndex) -> bool {
+        use crate::parser::Node;
+
+        match self.node_arena.get(member_idx) {
+            Some(Node::MethodDeclaration(md)) => {
+                self.has_modifier(&md.modifiers, crate::scanner::SyntaxKind::OverrideKeyword)
+            }
+            Some(Node::PropertyDeclaration(pd)) => {
+                self.has_modifier(&pd.modifiers, crate::scanner::SyntaxKind::OverrideKeyword)
+            }
+            Some(Node::GetAccessorDeclaration(ga)) => {
+                self.has_modifier(&ga.modifiers, crate::scanner::SyntaxKind::OverrideKeyword)
+            }
+            Some(Node::SetAccessorDeclaration(sa)) => {
+                self.has_modifier(&sa.modifiers, crate::scanner::SyntaxKind::OverrideKeyword)
+            }
+            _ => false,
+        }
+    }
+
+    /// Get the name of a class member.
+    pub fn get_member_name(&self, member_idx: NodeIndex) -> Option<String> {
+        use crate::parser::Node;
+
+        match self.node_arena.get(member_idx) {
+            Some(Node::MethodDeclaration(md)) => {
+                self.get_identifier_text(md.name)
+            }
+            Some(Node::PropertyDeclaration(pd)) => {
+                self.get_identifier_text(pd.name)
+            }
+            Some(Node::GetAccessorDeclaration(ga)) => {
+                self.get_identifier_text(ga.name)
+            }
+            Some(Node::SetAccessorDeclaration(sa)) => {
+                self.get_identifier_text(sa.name)
+            }
+            _ => None,
+        }
+    }
+
+    /// Get the text of an identifier node.
+    fn get_identifier_text(&self, node_idx: NodeIndex) -> Option<String> {
+        use crate::parser::Node;
+
+        match self.node_arena.get(node_idx) {
+            Some(Node::Identifier(id)) => Some(id.escaped_text.clone()),
+            _ => None,
+        }
+    }
+
+    /// Get the base class symbol from a class declaration's heritage clauses.
+    /// Returns None if there's no extends clause.
+    pub fn get_base_class_symbol(&self, heritage_clauses: &Option<crate::parser::NodeList>) -> Option<crate::binder::SymbolId> {
+        use crate::parser::Node;
+        use crate::scanner::SyntaxKind;
+
+        let clauses = heritage_clauses.as_ref()?;
+
+        for &clause_idx in &clauses.nodes {
+            if let Some(Node::HeritageClause(hc)) = self.node_arena.get(clause_idx) {
+                // Check if this is an extends clause
+                if hc.token == SyntaxKind::ExtendsKeyword as u16 {
+                    // Get the first type (the base class)
+                    if let Some(&type_idx) = hc.types.nodes.first() {
+                        if let Some(Node::ExpressionWithTypeArguments(ewta)) = self.node_arena.get(type_idx) {
+                            // Get the identifier from the expression
+                            if let Some(Node::Identifier(id)) = self.node_arena.get(ewta.expression) {
+                                // Look up the symbol
+                                if let Some(symbol_id) = self.file_locals.get(&id.escaped_text) {
+                                    return Some(symbol_id);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Check if a base class has a member with the given name.
+    pub fn base_class_has_member(&self, base_symbol: crate::binder::SymbolId, member_name: &str) -> bool {
+        use crate::parser::Node;
+
+        // Get the base class symbol and its declaration
+        if let Some(symbol) = self.symbol_arena.get(base_symbol) {
+            if let Some(&decl_idx) = symbol.declarations.first() {
+                if let Some(Node::ClassDeclaration(cd)) = self.node_arena.get(decl_idx) {
+                    // Check all members of the base class
+                    for &member_idx in &cd.members.nodes {
+                        if let Some(name) = self.get_member_name(member_idx) {
+                            if name == member_name {
+                                return true;
+                            }
+                        }
+                    }
+
+                    // Recursively check the base class's base class
+                    if let Some(grand_base_symbol) = self.get_base_class_symbol(&cd.heritage_clauses) {
+                        if self.base_class_has_member(grand_base_symbol, member_name) {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
     /// Get the diagnostics as JSON.
     pub fn get_diagnostics_json(&self) -> String {
         serde_json::to_string(&self.diagnostics).unwrap_or_else(|_| "[]".to_string())
@@ -534,10 +690,52 @@ impl<'a> CheckerState<'a> {
                 // Save and set enclosing class for visibility checks
                 let prev_enclosing_class = self.enclosing_class;
                 self.enclosing_class = Some(stmt_idx);
+
+                // Check if class is abstract
+                let is_abstract_class = self.has_modifier(&cd.modifiers, crate::scanner::SyntaxKind::AbstractKeyword);
+
+                // Get base class symbol for override checking
+                let base_class_symbol = self.get_base_class_symbol(&cd.heritage_clauses);
+
                 // Check class members
                 for &member_idx in &cd.members.nodes {
                     self.check_class_member(member_idx);
+
+                    // Verify abstract member is not in non-abstract class
+                    if !is_abstract_class {
+                        if self.is_abstract_member(member_idx) {
+                            self.error(
+                                member_idx,
+                                "Abstract methods can only appear within an abstract class.",
+                                super::diagnostic_codes::ABSTRACT_MEMBER_IN_NON_ABSTRACT_CLASS
+                            );
+                        }
+                    }
+
+                    // Check override modifier
+                    if self.has_override_modifier(member_idx) {
+                        if let Some(member_name) = self.get_member_name(member_idx) {
+                            // If member has override modifier, there must be a base class with that member
+                            if let Some(base_symbol) = base_class_symbol {
+                                if !self.base_class_has_member(base_symbol, &member_name) {
+                                    self.error(
+                                        member_idx,
+                                        &format!("This member cannot have an 'override' modifier because it is not declared in the base class."),
+                                        super::diagnostic_codes::OVERRIDE_MEMBER_NOT_IN_BASE
+                                    );
+                                }
+                            } else {
+                                // No base class, so override is invalid
+                                self.error(
+                                    member_idx,
+                                    "This member cannot have an 'override' modifier because the class does not extend any class.",
+                                    super::diagnostic_codes::OVERRIDE_MEMBER_NOT_IN_BASE
+                                );
+                            }
+                        }
+                    }
                 }
+
                 // Restore enclosing class (handles nested classes)
                 self.enclosing_class = prev_enclosing_class;
             }
