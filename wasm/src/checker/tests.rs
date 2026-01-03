@@ -6760,3 +6760,115 @@ interface TreeNode {
         let matches2 = checker.infer_from_type(checker.types.string_type, infer_array, &mut inferences2);
         assert!(!matches2, "string should not match infer extends any[]");
     }
+
+    // ============== 5.84: Apparent type cache ==============
+    #[test]
+    fn test_apparent_type_of_literals() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = "let x: number;";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // String literal "hello" -> string
+        let str_lit = checker.types.create_string_literal("hello".to_string());
+        let apparent_str = checker.get_apparent_type(str_lit);
+        assert_eq!(apparent_str, checker.types.string_type,
+            "Apparent type of string literal should be string");
+
+        // Number literal 42 -> number
+        let num_lit = checker.types.create_number_literal(42.0);
+        let apparent_num = checker.get_apparent_type(num_lit);
+        assert_eq!(apparent_num, checker.types.number_type,
+            "Apparent type of number literal should be number");
+
+        // Boolean true -> boolean
+        let apparent_bool = checker.get_apparent_type(checker.types.true_type);
+        assert_eq!(apparent_bool, checker.types.boolean_type,
+            "Apparent type of boolean literal should be boolean");
+    }
+
+    #[test]
+    fn test_apparent_type_of_type_parameter() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+        use crate::binder::SymbolId;
+
+        let code = "let x: number;";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Type parameter with string constraint: T extends string
+        let type_param = checker.types.create_type_parameter(
+            SymbolId::NONE,
+            checker.types.string_type, // constraint
+            TypeId::NONE,
+        );
+
+        let apparent = checker.get_apparent_type(type_param);
+        assert_eq!(apparent, checker.types.string_type,
+            "Apparent type of T extends string should be string");
+
+        // Type parameter without constraint
+        let unconstrained = checker.types.create_type_parameter(
+            SymbolId::NONE,
+            TypeId::NONE, // no constraint
+            TypeId::NONE,
+        );
+
+        let apparent_unconstrained = checker.get_apparent_type(unconstrained);
+        assert_eq!(apparent_unconstrained, checker.types.unknown_type,
+            "Apparent type of unconstrained type parameter should be unknown");
+    }
+
+    #[test]
+    fn test_apparent_type_caching() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = "let x: number;";
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Call get_apparent_type twice on the same type
+        let str_lit = checker.types.create_string_literal("hello".to_string());
+        let apparent1 = checker.get_apparent_type(str_lit);
+        let apparent2 = checker.get_apparent_type(str_lit);
+
+        assert_eq!(apparent1, apparent2, "Cached result should be same");
+
+        // Verify it's in the cache
+        let cached = checker.apparent_type_cache.borrow().get(&str_lit).copied();
+        assert!(cached.is_some(), "Result should be cached");
+    }

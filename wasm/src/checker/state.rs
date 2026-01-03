@@ -207,6 +207,12 @@ pub struct CheckerState<'a> {
     /// For literal types, this is their base type (e.g., "hello" → string).
     /// For union of literals with same base, this is the base type.
     pub(crate) widened_type_cache: RefCell<FxHashMap<TypeId, TypeId>>,
+
+    /// Cache for apparent type results: TypeId → apparent TypeId.
+    /// The apparent type is the type that a value appears to have when used.
+    /// For primitives, this is their wrapper object type (e.g., string → String).
+    /// For type parameters, this is the constraint (or its apparent type).
+    pub(crate) apparent_type_cache: RefCell<FxHashMap<TypeId, TypeId>>,
 }
 
 /// Maximum depth for recursive type instantiation (conditional types, etc.).
@@ -243,6 +249,7 @@ impl<'a> CheckerState<'a> {
             instantiation_depth: RefCell::new(0),
             awaited_type_cache: RefCell::new(FxHashMap::default()),
             widened_type_cache: RefCell::new(FxHashMap::default()),
+            apparent_type_cache: RefCell::new(FxHashMap::default()),
         }
     }
 

@@ -306,6 +306,86 @@ impl<'a> CheckerState<'a> {
         }
     }
 
+    /// Get the apparent type of a type.
+    /// The apparent type is the type that a value appears to have when used.
+    /// For primitives, this is the base type (since we don't have global String/Number objects).
+    /// For type parameters, this is the constraint (or its apparent type).
+    /// For unions/intersections, this is the union/intersection of apparent types.
+    pub fn get_apparent_type(&mut self, type_id: TypeId) -> TypeId {
+        // Check cache first
+        if let Some(&cached) = self.apparent_type_cache.borrow().get(&type_id) {
+            return cached;
+        }
+
+        let result = self.get_apparent_type_worker(type_id);
+        self.apparent_type_cache.borrow_mut().insert(type_id, result);
+        result
+    }
+
+    /// Worker function for get_apparent_type.
+    fn get_apparent_type_worker(&mut self, type_id: TypeId) -> TypeId {
+        let Some(ty) = self.types.get(type_id) else {
+            return type_id;
+        };
+
+        match ty {
+            // Type parameters: return the constraint's apparent type
+            Type::TypeParameter(tp) => {
+                if !tp.constraint.is_none() {
+                    self.get_apparent_type_worker(tp.constraint)
+                } else {
+                    // No constraint means extends unknown
+                    self.types.unknown_type
+                }
+            }
+
+            // Index types: return string | number | symbol (the possible key types)
+            Type::Index(_) => {
+                // keyof T appears as string | number | symbol
+                self.types.create_union(vec![
+                    self.types.string_type,
+                    self.types.number_type,
+                ])
+            }
+
+            // Union types: return union of apparent types
+            Type::Union(u) => {
+                let types = u.types.clone();
+                let apparent_types: Vec<TypeId> = types.iter()
+                    .map(|&t| self.get_apparent_type_worker(t))
+                    .collect();
+                self.types.create_union(apparent_types)
+            }
+
+            // Intersection types: return intersection of apparent types
+            Type::Intersection(i) => {
+                let types = i.types.clone();
+                let apparent_types: Vec<TypeId> = types.iter()
+                    .map(|&t| self.get_apparent_type_worker(t))
+                    .collect();
+                self.types.create_intersection(apparent_types)
+            }
+
+            // Literal types: return the base type
+            Type::Literal(lit) => {
+                if (lit.flags & type_flags::STRING_LITERAL) != 0 {
+                    self.types.string_type
+                } else if (lit.flags & type_flags::NUMBER_LITERAL) != 0 {
+                    self.types.number_type
+                } else if (lit.flags & type_flags::BOOLEAN_LITERAL) != 0 {
+                    self.types.boolean_type
+                } else if (lit.flags & type_flags::BIG_INT_LITERAL) != 0 {
+                    self.types.big_int_type
+                } else {
+                    type_id
+                }
+            }
+
+            // For other types, the apparent type is the type itself
+            _ => type_id,
+        }
+    }
+
     /// Make a type readonly by setting the readonly flag on arrays and tuples.
     /// For other types, returns the type unchanged.
     pub fn make_type_readonly(&mut self, type_id: TypeId) -> TypeId {
