@@ -271,7 +271,21 @@ impl<'a> CheckerState<'a> {
                             }
                             // Otherwise, look up in symbol table
                             else if let Some(symbol_id) = self.file_locals.get(&id.escaped_text) {
-                                self.get_type_of_symbol(symbol_id)
+                                let base_type = self.get_type_of_symbol(symbol_id);
+                                // For classes, a type reference like `let x: MyClass` should resolve
+                                // to the instance type, not the constructor type
+                                if let Some(Type::Object(obj)) = self.types.get(base_type) {
+                                    if obj.has_object_flags(object_flags::CLASS)
+                                        && !obj.construct_signatures.is_empty()
+                                    {
+                                        if let Some(instance_type) =
+                                            obj.construct_signatures[0].resolved_return_type
+                                        {
+                                            return instance_type;
+                                        }
+                                    }
+                                }
+                                base_type
                             } else {
                                 self.types.object_type
                             }
@@ -1254,8 +1268,9 @@ impl<'a> CheckerState<'a> {
     fn get_type_of_mapped_type(&mut self, node: NodeIndex, mt: &crate::parser::MappedType) -> TypeId {
         use crate::parser::Node;
 
-        // Track if we added a type parameter to remove it later
-        let mut added_param_name: Option<String> = None;
+        // Track if we added a type parameter - save its name and previous value for restoration
+        // This handles shadowing correctly in nested mapped types
+        let mut shadowed_param: Option<(String, Option<TypeId>)> = None;
 
         // Get the type parameter (K in "K in keyof T") and add it to scope
         let type_param_type = if !mt.type_parameter.is_none() {
@@ -1263,9 +1278,11 @@ impl<'a> CheckerState<'a> {
             // Get the name of the type parameter and add to current scope
             if let Some(Node::TypeParameterDeclaration(tp)) = self.node_arena.get(mt.type_parameter) {
                 if let Some(Node::Identifier(id)) = self.node_arena.get(tp.name) {
-                    self.type_parameter_scope.insert(id.escaped_text.clone(), type_id);
-                    self.type_parameter_names.insert(type_id, id.escaped_text.clone());
-                    added_param_name = Some(id.escaped_text.clone());
+                    let name = id.escaped_text.clone();
+                    // Save previous value (if any) before inserting
+                    let prev_value = self.type_parameter_scope.insert(name.clone(), type_id);
+                    self.type_parameter_names.insert(type_id, name.clone());
+                    shadowed_param = Some((name, prev_value));
                 }
             }
             type_id
@@ -1300,9 +1317,13 @@ impl<'a> CheckerState<'a> {
             self.types.any_type
         };
 
-        // Remove the type parameter we added
-        if let Some(name) = added_param_name {
-            self.type_parameter_scope.remove(&name);
+        // Restore the previous type parameter scope entry (handles shadowing correctly)
+        if let Some((name, prev_value)) = shadowed_param {
+            if let Some(prev_id) = prev_value {
+                self.type_parameter_scope.insert(name, prev_id);
+            } else {
+                self.type_parameter_scope.remove(&name);
+            }
         }
 
         // Create a deferred mapped type (evaluation happens during instantiation)
@@ -1673,17 +1694,16 @@ impl<'a> CheckerState<'a> {
             vec![implicit_sig]
         };
 
-        // Create the constructor type - this is the type of the class itself
-        // It has construct signatures that return the instance type
-        let constructor_type = self.types.create_class_type(properties, construct_signatures, vec![]);
-
-        // Update the cache with the final type (overwriting the placeholder)
-        self.node_types.insert(node, constructor_type);
-        if !class_symbol_id.is_none() {
-            self.symbol_types.insert(class_symbol_id, constructor_type);
+        // Update the placeholder type in-place with the resolved members
+        // This ensures any recursive references (like `class Node { parent: Node }`)
+        // correctly point to the final type, not an empty placeholder.
+        if let Some(Type::Object(obj)) = self.types.get_mut(placeholder_type_id) {
+            obj.properties = properties;
+            obj.construct_signatures = construct_signatures;
         }
 
-        constructor_type
+        // The placeholder is now the constructor type - return it
+        placeholder_type_id
     }
 
     /// Get the type of an interface declaration.
@@ -2381,10 +2401,10 @@ impl<'a> CheckerState<'a> {
     ) -> TypeId {
         use crate::parser::Node;
 
-        // Track the type parameter names we add so we can remove them later
-        // We preserve the parent scope so that infer types created in return position
-        // can be found when parsing subsequent parts of the type
-        let mut added_param_names: Vec<String> = Vec::new();
+        // Track the type parameter names we add and their previous values for restoration.
+        // This handles shadowing correctly: `function outer<T>() { function inner<T>() { } }`
+        // After inner finishes, we restore outer's T rather than removing it entirely.
+        let mut shadowed_params: Vec<(String, Option<TypeId>)> = Vec::new();
 
         // Create type parameters and add them to the scope
         let type_param_ids: Vec<TypeId> = if let Some(type_params) = type_parameters {
@@ -2393,8 +2413,9 @@ impl<'a> CheckerState<'a> {
                     let type_id = self.create_type_parameter(tp_idx)?;
                     // Add to type parameter scope for name lookup during signature processing
                     if let Some(name) = self.type_parameter_names.get(&type_id) {
-                        self.type_parameter_scope.insert(name.clone(), type_id);
-                        added_param_names.push(name.clone());
+                        // Save the previous value (if any) so we can restore it later
+                        let prev_value = self.type_parameter_scope.insert(name.clone(), type_id);
+                        shadowed_params.push((name.clone(), prev_value));
                     }
                     Some(type_id)
                 })
@@ -2462,9 +2483,15 @@ impl<'a> CheckerState<'a> {
             self.types.any_type
         };
 
-        // Remove only the type parameters we added (preserve parent scope entries)
-        for name in added_param_names {
-            self.type_parameter_scope.remove(&name);
+        // Restore the previous type parameter scope entries (handles shadowing correctly)
+        for (name, prev_value) in shadowed_params {
+            if let Some(prev_id) = prev_value {
+                // Restore the shadowed outer scope's type parameter
+                self.type_parameter_scope.insert(name, prev_id);
+            } else {
+                // No previous value existed, so remove the entry
+                self.type_parameter_scope.remove(&name);
+            }
         }
 
         self.types.create_function_type_with_type_params(
@@ -2961,6 +2988,17 @@ impl<'a> CheckerState<'a> {
             if let Some(Type::Function(f)) = self.types.get(base_type) {
                 if !f.type_parameters.is_empty() {
                     return self.instantiate_type(base_type, &type_args, &f.type_parameters.clone());
+                }
+            }
+
+            // For classes, a type reference like `let x: MyClass` should resolve to the
+            // instance type, not the constructor type. The constructor type has construct
+            // signatures that return the instance type.
+            if let Some(Type::Object(obj)) = self.types.get(base_type) {
+                if obj.has_object_flags(object_flags::CLASS) && !obj.construct_signatures.is_empty() {
+                    if let Some(instance_type) = obj.construct_signatures[0].resolved_return_type {
+                        return instance_type;
+                    }
                 }
             }
 

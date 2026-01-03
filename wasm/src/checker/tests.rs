@@ -4864,3 +4864,75 @@ const instance = new Foo();
             assert!(obj.members.has("add"), "Calculator should have add method");
         }
     }
+
+    // =========================================================================
+    // Diagnostic Message Formatting Tests
+    // =========================================================================
+
+    #[test]
+    fn test_diagnostic_message_formatting() {
+        use super::types::diagnostics::{format_message, diagnostic_messages};
+
+        // Test basic placeholder replacement
+        let msg = format_message(diagnostic_messages::TYPE_NOT_ASSIGNABLE, &["string", "number"]);
+        assert_eq!(msg, "Type 'string' is not assignable to type 'number'.");
+
+        // Test cannot find name
+        let msg = format_message(diagnostic_messages::CANNOT_FIND_NAME, &["foo"]);
+        assert_eq!(msg, "Cannot find name 'foo'.");
+
+        // Test property does not exist
+        let msg = format_message(diagnostic_messages::PROPERTY_DOES_NOT_EXIST, &["bar", "MyType"]);
+        assert_eq!(msg, "Property 'bar' does not exist on type 'MyType'.");
+
+        // Test argument count error
+        let msg = format_message(diagnostic_messages::EXPECTED_ARGUMENTS, &["2", "3"]);
+        assert_eq!(msg, "Expected 2 arguments, but got 3.");
+
+        // Test no placeholders
+        let msg = format_message(diagnostic_messages::CANNOT_INVOKE_EXPRESSION, &[]);
+        assert_eq!(msg, "This expression is not callable.");
+    }
+
+    #[test]
+    fn test_diagnostic_codes() {
+        use super::types::diagnostics::diagnostic_codes;
+
+        // Type checking errors should be in 2xxx range
+        assert_eq!(diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE, 2322);
+        assert_eq!(diagnostic_codes::CANNOT_FIND_NAME, 2304);
+        assert_eq!(diagnostic_codes::PROPERTY_DOES_NOT_EXIST_ON_TYPE, 2339);
+        assert_eq!(diagnostic_codes::EXPECTED_ARGUMENTS, 2554);
+
+        // Parser errors should be in 1xxx range
+        assert_eq!(diagnostic_codes::IDENTIFIER_EXPECTED, 1003);
+        assert_eq!(diagnostic_codes::TOKEN_EXPECTED, 1005);
+    }
+
+    #[test]
+    fn test_diagnostic_with_related_info() {
+        use super::state::{Diagnostic, DiagnosticCategory, DiagnosticRelatedInformation};
+
+        let related = DiagnosticRelatedInformation {
+            file: "other.ts".to_string(),
+            start: 100,
+            length: 10,
+            message_text: "See declaration of 'foo' here.".to_string(),
+            category: DiagnosticCategory::Message,
+            code: 6203, // "'foo' is declared here"
+        };
+
+        let diagnostic = Diagnostic {
+            file: "test.ts".to_string(),
+            start: 50,
+            length: 5,
+            message_text: "Cannot find name 'foo'.".to_string(),
+            category: DiagnosticCategory::Error,
+            code: 2304,
+            related_information: vec![related],
+        };
+
+        assert_eq!(diagnostic.code, 2304);
+        assert_eq!(diagnostic.related_information.len(), 1);
+        assert_eq!(diagnostic.related_information[0].file, "other.ts");
+    }

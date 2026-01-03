@@ -1,6 +1,65 @@
-//! Diagnostic codes for the type checker.
+//! Diagnostic codes and message templates for the type checker.
 //!
 //! The Diagnostic struct itself is in state.rs.
+//! Message templates match TypeScript's diagnosticMessages.json exactly.
+
+/// Format a diagnostic message by replacing {0}, {1}, etc. with arguments.
+pub fn format_message(template: &str, args: &[&str]) -> String {
+    let mut result = template.to_string();
+    for (i, arg) in args.iter().enumerate() {
+        result = result.replace(&format!("{{{}}}", i), arg);
+    }
+    result
+}
+
+/// Diagnostic message templates matching TypeScript exactly.
+/// Use format_message() to fill in placeholders.
+pub mod diagnostic_messages {
+    // Basic type errors
+    pub const TYPE_NOT_ASSIGNABLE: &str = "Type '{0}' is not assignable to type '{1}'.";
+    pub const CANNOT_FIND_NAME: &str = "Cannot find name '{0}'.";
+    pub const PROPERTY_DOES_NOT_EXIST: &str = "Property '{0}' does not exist on type '{1}'.";
+    pub const PROPERTY_MISSING: &str = "Property '{0}' is missing in type '{1}'.";
+    pub const PROPERTY_MISSING_BUT_REQUIRED: &str = "Property '{0}' is missing in type '{1}' but required in type '{2}'.";
+    pub const TYPES_OF_PROPERTY_INCOMPATIBLE: &str = "Types of property '{0}' are incompatible.";
+
+    // Function/call errors
+    pub const EXPECTED_ARGUMENTS: &str = "Expected {0} arguments, but got {1}.";
+    pub const EXPECTED_AT_LEAST_ARGUMENTS: &str = "Expected at least {0} arguments, but got {1}.";
+    pub const ARGUMENT_NOT_ASSIGNABLE: &str = "Argument of type '{0}' is not assignable to parameter of type '{1}'.";
+    pub const CANNOT_INVOKE_EXPRESSION: &str = "This expression is not callable.";
+    pub const NO_OVERLOAD_MATCHES: &str = "No overload matches this call.";
+    pub const OVERLOAD_SIGNATURE: &str = "Overload {0} of {1}, '{2}', gave the following error.";
+
+    // Object literal errors
+    pub const EXCESS_PROPERTY: &str = "Object literal may only specify known properties, and '{0}' does not exist in type '{1}'.";
+
+    // Null/undefined errors
+    pub const OBJECT_POSSIBLY_UNDEFINED: &str = "Object is possibly 'undefined'.";
+    pub const OBJECT_POSSIBLY_NULL: &str = "Object is possibly 'null'.";
+    pub const OBJECT_POSSIBLY_NULL_OR_UNDEFINED: &str = "Object is possibly 'null' or 'undefined'.";
+    pub const OBJECT_IS_OF_TYPE_UNKNOWN: &str = "Object is of type 'unknown'.";
+
+    // Class errors
+    pub const CLASS_INCORRECTLY_IMPLEMENTS: &str = "Class '{0}' incorrectly implements interface '{1}'.";
+    pub const CLASS_INCORRECTLY_EXTENDS: &str = "Class '{0}' incorrectly extends base class '{1}'.";
+    pub const PROPERTY_HAS_NO_INITIALIZER: &str = "Property '{0}' has no initializer and is not definitely assigned in the constructor.";
+    pub const CANNOT_ASSIGN_READONLY: &str = "Cannot assign to '{0}' because it is a read-only property.";
+    pub const MEMBER_NOT_ACCESSIBLE: &str = "Property '{0}' is {1} and only accessible within class '{2}'.";
+
+    // Enum errors
+    pub const ENUM_MEMBER_MUST_HAVE_INITIALIZER: &str = "Enum member must have initializer.";
+    pub const CONST_ENUM_MEMBER_INITIALIZER: &str = "In 'const' enum declarations member initializer must be constant expression.";
+
+    // Switch exhaustiveness
+    pub const NOT_EXHAUSTIVE: &str = "Not all code paths return a value.";
+    pub const SWITCH_NOT_EXHAUSTIVE: &str = "Switch is not exhaustive. Did you forget to handle '{0}'?";
+
+    // Generic/type parameter errors
+    pub const TYPE_NOT_SATISFY_CONSTRAINT: &str = "Type '{0}' does not satisfy the constraint '{1}'.";
+    pub const GENERIC_TYPE_REQUIRES_ARGS: &str = "Generic type '{0}' requires {1} type argument(s).";
+    pub const TYPE_IS_NOT_GENERIC: &str = "Type '{0}' is not generic.";
+}
 
 /// TypeScript diagnostic error codes.
 /// Matches codes from TypeScript's diagnosticMessages.json

@@ -16,7 +16,18 @@ use super::types::TypeId;
 // Diagnostic
 // =============================================================================
 
-/// A type-checking diagnostic message.
+/// Related information for a diagnostic (e.g., "see also" locations).
+#[derive(Clone, Debug, Serialize)]
+pub struct DiagnosticRelatedInformation {
+    pub file: String,
+    pub start: u32,
+    pub length: u32,
+    pub message_text: String,
+    pub category: DiagnosticCategory,
+    pub code: u32,
+}
+
+/// A type-checking diagnostic message with optional related information.
 #[derive(Clone, Debug, Serialize)]
 pub struct Diagnostic {
     pub file: String,
@@ -25,6 +36,37 @@ pub struct Diagnostic {
     pub message_text: String,
     pub category: DiagnosticCategory,
     pub code: u32,
+    /// Related information spans (e.g., where a type was declared)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub related_information: Vec<DiagnosticRelatedInformation>,
+}
+
+impl Diagnostic {
+    /// Create a new error diagnostic.
+    pub fn error(file: String, start: u32, length: u32, message: String, code: u32) -> Self {
+        Diagnostic {
+            file,
+            start,
+            length,
+            message_text: message,
+            category: DiagnosticCategory::Error,
+            code,
+            related_information: Vec::new(),
+        }
+    }
+
+    /// Add related information to this diagnostic.
+    pub fn with_related(mut self, file: String, start: u32, length: u32, message: String) -> Self {
+        self.related_information.push(DiagnosticRelatedInformation {
+            file,
+            start,
+            length,
+            message_text: message,
+            category: DiagnosticCategory::Message,
+            code: 0,
+        });
+        self
+    }
 }
 
 /// Diagnostic category.
@@ -190,15 +232,97 @@ impl<'a> CheckerState<'a> {
     pub fn error(&mut self, node: NodeIndex, message: &str, code: u32) {
         if let Some(n) = self.node_arena.get(node) {
             let base = n.base();
-            self.diagnostics.push(Diagnostic {
-                file: self.file_name.clone(),
-                start: base.pos,
-                length: base.end - base.pos,
-                message_text: message.to_string(),
-                category: DiagnosticCategory::Error,
+            self.diagnostics.push(Diagnostic::error(
+                self.file_name.clone(),
+                base.pos,
+                base.end - base.pos,
+                message.to_string(),
                 code,
-            });
+            ));
         }
+    }
+
+    /// Report a diagnostic error with related information.
+    pub fn error_with_related(
+        &mut self,
+        node: NodeIndex,
+        message: &str,
+        code: u32,
+        related_node: NodeIndex,
+        related_message: &str,
+    ) {
+        if let Some(n) = self.node_arena.get(node) {
+            let base = n.base();
+            let mut diag = Diagnostic::error(
+                self.file_name.clone(),
+                base.pos,
+                base.end - base.pos,
+                message.to_string(),
+                code,
+            );
+
+            // Add related information if the related node exists
+            if let Some(related) = self.node_arena.get(related_node) {
+                let related_base = related.base();
+                diag = diag.with_related(
+                    self.file_name.clone(),
+                    related_base.pos,
+                    related_base.end - related_base.pos,
+                    related_message.to_string(),
+                );
+            }
+
+            self.diagnostics.push(diag);
+        }
+    }
+
+    /// Report a type assignability error with proper formatting.
+    pub fn error_type_not_assignable(
+        &mut self,
+        node: NodeIndex,
+        source_type: TypeId,
+        target_type: TypeId,
+    ) {
+        use super::types::{diagnostic_codes, diagnostic_messages, format_message};
+
+        let source_str = self.type_to_string(source_type);
+        let target_str = self.type_to_string(target_type);
+        let message = format_message(
+            diagnostic_messages::TYPE_NOT_ASSIGNABLE,
+            &[&source_str, &target_str],
+        );
+        self.error(node, &message, diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE);
+    }
+
+    /// Report a "cannot find name" error.
+    pub fn error_cannot_find_name(&mut self, node: NodeIndex, name: &str) {
+        use super::types::{diagnostic_codes, diagnostic_messages, format_message};
+
+        let message = format_message(diagnostic_messages::CANNOT_FIND_NAME, &[name]);
+        self.error(node, &message, diagnostic_codes::CANNOT_FIND_NAME);
+    }
+
+    /// Report a "property does not exist" error.
+    pub fn error_property_not_found(&mut self, node: NodeIndex, prop_name: &str, type_id: TypeId) {
+        use super::types::{diagnostic_codes, diagnostic_messages, format_message};
+
+        let type_str = self.type_to_string(type_id);
+        let message = format_message(
+            diagnostic_messages::PROPERTY_DOES_NOT_EXIST,
+            &[prop_name, &type_str],
+        );
+        self.error(node, &message, diagnostic_codes::PROPERTY_DOES_NOT_EXIST_ON_TYPE);
+    }
+
+    /// Report an argument count mismatch error.
+    pub fn error_argument_count(&mut self, node: NodeIndex, expected: usize, actual: usize) {
+        use super::types::{diagnostic_codes, diagnostic_messages, format_message};
+
+        let message = format_message(
+            diagnostic_messages::EXPECTED_ARGUMENTS,
+            &[&expected.to_string(), &actual.to_string()],
+        );
+        self.error(node, &message, diagnostic_codes::EXPECTED_ARGUMENTS);
     }
 
     /// Get the diagnostics as JSON.
