@@ -15,10 +15,10 @@ Run autonomously overnight to complete Phase 5 (Type Checker) and beyond.
 LOOP:
   1. Read @fix_plan.md → pick next unchecked task
   2. Implement in wasm/src/*.rs
-  3. Run: cd wasm && cargo test <test_name>
+  3. Run: ./wasm/test.sh <test_name>
   4. If pass → mark complete in @fix_plan.md, commit, continue
   5. If fail 3x → add to Blocked section, skip, continue
-  6. After 5 tasks → run full test suite
+  6. After 5 tasks → run full test suite: ./wasm/test.sh
 ```
 
 ## Commands
@@ -26,11 +26,27 @@ LOOP:
 ### ⚠️ ALWAYS USE DOCKER FOR RUST (prevents RAM explosion)
 
 ```bash
-# Rust tests (do this constantly)
-cd wasm && docker build -t rust-wasm-tests . && docker run --rm --memory="1g" --cpus="2.0" rust-wasm-tests
+# PREFERRED: Use the test script (handles everything)
+./wasm/test.sh              # Run all tests
+./wasm/test.sh test_name    # Run specific test
+./wasm/test.sh --rebuild    # Force rebuild image
+./wasm/test.sh --clean      # Clean cached volumes
+
+# Manual Docker commands (if needed):
+# Build with BuildKit caching (first time slower, subsequent builds fast)
+DOCKER_BUILDKIT=1 docker build -t rust-wasm-tests ./wasm
+
+# Run tests with cached volumes (40-60% faster with nextest)
+docker run --rm --memory="1g" --cpus="2.0" \
+  -v cargo-registry:/usr/local/cargo/registry \
+  -v cargo-git:/usr/local/cargo/git \
+  rust-wasm-tests
 
 # Specific test
-cd wasm && docker build -t rust-wasm-tests . && docker run --rm --memory="1g" --cpus="2.0" rust-wasm-tests cargo test test_name
+docker run --rm --memory="1g" --cpus="2.0" \
+  -v cargo-registry:/usr/local/cargo/registry \
+  -v cargo-git:/usr/local/cargo/git \
+  rust-wasm-tests cargo nextest run test_name
 
 # Full TypeScript test suite (before committing)
 docker run --rm -v $(pwd):/workspace typescript-wasm npx hereby runtests-parallel
