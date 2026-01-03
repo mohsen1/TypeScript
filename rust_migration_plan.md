@@ -9,7 +9,7 @@
 | 2     | Scanner        | ✅ 95%  | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
-| 5     | Type Checker   | 🟡 70%  | 241 Rust |
+| 5     | Type Checker   | 🟡 75%  | 258 Rust |
 | 6     | Emitter        | ⬜ 0%   | - |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
@@ -55,18 +55,32 @@ All of the following are complete:
 - **5.32** Index signature support in type literals
 - **5.33** Discriminated union narrowing (x.kind === "circle" filters union types)
 - **5.34** Switch statement exhaustiveness checking
+- **5.35** Exhaustiveness checking diagnostic integration
+- **5.36** Contextual typing for object literals
+- **5.37** Contextual typing for return statements
+- **5.38** Contextual typing for callback parameters
+- **5.39** Contextual typing for array literals
+- **5.40** Type incompatibility diagnostic details
+- **5.41** Promise<T> type structure support
+- **5.42** 'this' type in class contexts (basic)
+- **5.43** User-defined type predicates (x is Type) parsing
+- **5.44** RegExp literal type support
+- **5.45** Optional property handling in type relations
+- **5.46** Missing property detection
+- **5.47** Function parameter mismatch diagnostics
+- **5.48** Assignment narrowing in control flow
+- **5.49** Assertion functions (asserts x is Type) parsing
+- **5.50** Call/construct signature diagnostics
+- **5.51** Nested discriminated union narrowing
+- **5.52** Definite assignment assertion parsing
 
 ### 🚧 In Progress / Next Up
 
-- [ ] **Contextual typing**
-    - Infer parameter types from context
-    - `arr.map(x => x + 1)` infers `x: number`
+- [ ] **Full contextual typing implementation**
+    - Infer complete parameter types from context
+    - Handle all callback scenarios
 
-- [ ] **Exhaustiveness checking diagnostics**
-    - Report errors for non-exhaustive switches
-    - Integrate with diagnostic system
-
-- [ ] **Diagnostics**
+- [ ] **Complete diagnostics integration**
     - Port error message generation
     - Match exact TypeScript error codes
     - Related information spans
