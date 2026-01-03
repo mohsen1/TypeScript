@@ -605,14 +605,24 @@ mod tests {
     #[test]
     fn test_type_sizes() {
         use std::mem::size_of;
+
         // Track Node enum size to monitor memory usage over time.
         // Large variants (ClassDeclaration: 200B, SourceFile/FunctionDeclaration: 168B)
         // drive enum size to ~208 bytes. This is acceptable because:
         // 1. Nodes are arena-allocated (NodeArena), not individually heap-allocated
-        // 2. Boxing large variants would require updating many pattern matches
+        // 2. Boxing large variants would require updating ~50+ pattern matches across
+        //    binder.rs, parser_impl.rs, checker/*.rs - high churn for marginal gain
         // 3. The arena pattern already provides memory efficiency
-        // Future optimization: Box variants > 64B if stack size becomes an issue
+        //
+        // PERFORMANCE NOTE (2024-01): Investigated enum compaction (boxing large variants).
+        // Decision: Deferred. The zero-copy scanner and string interner provide larger
+        // wins. Boxing would reduce enum from 208B to ~32B (6x smaller), but requires
+        // extensive code changes. Revisit if profiling shows cache misses as bottleneck.
         let node_size = size_of::<crate::parser::Node>();
         assert!(node_size <= 256, "Node enum unexpectedly large: {} bytes", node_size);
+
+        // Verify key type sizes for performance awareness
+        assert_eq!(size_of::<crate::parser::base::NodeIndex>(), 4, "NodeIndex should be 4 bytes");
+        assert_eq!(size_of::<crate::interner::Atom>(), 4, "Atom should be 4 bytes");
     }
 }
