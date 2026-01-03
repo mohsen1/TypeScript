@@ -53,7 +53,10 @@ Rust components progressively replace TypeScript while compiler stays functional
 
 ```bash
 # Run all Rust tests (do this frequently!)
-source ~/.cargo/env && cd wasm && cargo test
+cd wasm && docker build -t rust-wasm-tests . && docker run --rm --memory="1g" --cpus="2.0" rust-wasm-tests
+
+# Run Rust benchmarks
+cd wasm && docker build -t rust-wasm-tests . && docker run --rm --memory="2g" --cpus="4.0" rust-wasm-tests cargo bench
 
 # Build everything including WASM
 source ~/.cargo/env && npx hereby local

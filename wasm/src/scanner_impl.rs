@@ -1261,6 +1261,489 @@ impl ScannerState {
             }
         }
     }
+
+    // =========================================================================
+    // JSX Scanning Methods
+    // =========================================================================
+
+    /// Scan a JSX identifier.
+    /// In JSX, identifiers can contain hyphens (like `data-testid`).
+    #[wasm_bindgen(js_name = scanJsxIdentifier)]
+    pub fn scan_jsx_identifier(&mut self) -> SyntaxKind {
+        if self.token == SyntaxKind::Identifier {
+            // Continue scanning to include any hyphenated parts
+            // JSX identifiers can be like: foo-bar-baz
+            while self.pos < self.end {
+                let ch = self.char_code_unchecked(self.pos);
+                if ch == CharacterCodes::MINUS {
+                    // In JSX, hyphens are allowed in identifiers
+                    self.pos += 1;
+                    // After hyphen, we need more identifier characters
+                    if self.pos < self.end && is_identifier_start(self.char_code_unchecked(self.pos)) {
+                        self.pos += 1;
+                        while self.pos < self.end && is_identifier_part(self.char_code_unchecked(self.pos)) {
+                            self.pos += 1;
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+            self.token_value = self.substring(self.token_start, self.pos);
+        }
+        self.token
+    }
+
+    /// Re-scan the current token as a JSX token.
+    /// Used when the parser enters JSX context and needs to rescan.
+    #[wasm_bindgen(js_name = reScanJsxToken)]
+    pub fn re_scan_jsx_token(&mut self, allow_multiline_jsx_text: bool) -> SyntaxKind {
+        self.pos = self.token_start;
+        self.scan_jsx_token(allow_multiline_jsx_text)
+    }
+
+    /// Scan a JSX token (text, open element, close element, etc.)
+    fn scan_jsx_token(&mut self, allow_multiline_jsx_text: bool) -> SyntaxKind {
+        self.full_start_pos = self.pos;
+        self.token_start = self.pos;
+
+        if self.pos >= self.end {
+            self.token = SyntaxKind::EndOfFileToken;
+            return self.token;
+        }
+
+        let ch = self.char_code_unchecked(self.pos);
+
+        // Check for JSX opening/closing angle brackets
+        if ch == CharacterCodes::LESS_THAN {
+            // Check for </
+            if self.char_code_at(self.pos + 1) == Some(CharacterCodes::SLASH) {
+                self.pos += 2;
+                self.token = SyntaxKind::LessThanSlashToken;
+                return self.token;
+            }
+            self.pos += 1;
+            self.token = SyntaxKind::LessThanToken;
+            return self.token;
+        }
+
+        if ch == CharacterCodes::OPEN_BRACE {
+            self.pos += 1;
+            self.token = SyntaxKind::OpenBraceToken;
+            return self.token;
+        }
+
+        // Scan JSX text
+        let mut text = String::new();
+        while self.pos < self.end {
+            let c = self.char_code_unchecked(self.pos);
+
+            // Stop on JSX special characters
+            if c == CharacterCodes::OPEN_BRACE || c == CharacterCodes::LESS_THAN {
+                break;
+            }
+
+            // Handle newlines in JSX text
+            if is_line_break(c) {
+                if !allow_multiline_jsx_text {
+                    break;
+                }
+                self.token_flags |= TokenFlags::PrecedingLineBreak as u32;
+            }
+
+            if let Some(char) = char::from_u32(c) {
+                text.push(char);
+            }
+            self.pos += 1;
+        }
+
+        if !text.is_empty() {
+            self.token_value = text;
+            self.token = SyntaxKind::JsxText;
+            return self.token;
+        }
+
+        self.token = SyntaxKind::Unknown;
+        self.token
+    }
+
+    /// Scan a JSX attribute value (string literal or expression).
+    #[wasm_bindgen(js_name = scanJsxAttributeValue)]
+    pub fn scan_jsx_attribute_value(&mut self) -> SyntaxKind {
+        self.full_start_pos = self.pos;
+
+        // Skip whitespace
+        while self.pos < self.end && is_white_space_single_line(self.char_code_unchecked(self.pos)) {
+            self.pos += 1;
+        }
+
+        self.token_start = self.pos;
+
+        if self.pos >= self.end {
+            self.token = SyntaxKind::EndOfFileToken;
+            return self.token;
+        }
+
+        let ch = self.char_code_unchecked(self.pos);
+
+        // String literal
+        if ch == CharacterCodes::DOUBLE_QUOTE || ch == CharacterCodes::SINGLE_QUOTE {
+            self.scan_jsx_string_literal(ch);
+            return self.token;
+        }
+
+        // Expression container
+        if ch == CharacterCodes::OPEN_BRACE {
+            self.pos += 1;
+            self.token = SyntaxKind::OpenBraceToken;
+            return self.token;
+        }
+
+        self.token = SyntaxKind::Unknown;
+        self.token
+    }
+
+    /// Scan a JSX string literal (used for attribute values).
+    /// Unlike regular strings, JSX strings don't support escape sequences.
+    fn scan_jsx_string_literal(&mut self, quote: u32) {
+        self.pos += 1; // Skip opening quote
+        let mut result = String::new();
+
+        while self.pos < self.end {
+            let ch = self.char_code_unchecked(self.pos);
+            if ch == quote {
+                self.pos += 1; // Closing quote
+                self.token_value = result;
+                self.token = SyntaxKind::StringLiteral;
+                return;
+            }
+            // JSX strings don't process escape sequences - they're literal
+            if let Some(c) = char::from_u32(ch) {
+                result.push(c);
+            }
+            self.pos += 1;
+        }
+
+        // Unterminated string
+        self.token_flags |= TokenFlags::Unterminated as u32;
+        self.token_value = result;
+        self.token = SyntaxKind::StringLiteral;
+    }
+
+    /// Re-scan a `<` token in JSX context.
+    /// Returns LessThanSlashToken if followed by `/`, otherwise LessThanToken.
+    #[wasm_bindgen(js_name = reScanLessThanToken)]
+    pub fn re_scan_less_than_token(&mut self) -> SyntaxKind {
+        if self.token == SyntaxKind::LessThanToken {
+            if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::SLASH {
+                self.pos += 1;
+                self.token = SyntaxKind::LessThanSlashToken;
+            }
+        }
+        self.token
+    }
+
+    /// Re-scan the current `#` token as a hash token or private identifier.
+    #[wasm_bindgen(js_name = reScanHashToken)]
+    pub fn re_scan_hash_token(&mut self) -> SyntaxKind {
+        if self.token == SyntaxKind::HashToken {
+            if self.pos < self.end && is_identifier_start(self.char_code_unchecked(self.pos)) {
+                self.pos += 1;
+                while self.pos < self.end && is_identifier_part(self.char_code_unchecked(self.pos)) {
+                    self.pos += 1;
+                }
+                self.token_value = self.substring(self.token_start, self.pos);
+                self.token = SyntaxKind::PrivateIdentifier;
+            }
+        }
+        self.token
+    }
+
+    /// Re-scan the current `?` token for optional chaining.
+    #[wasm_bindgen(js_name = reScanQuestionToken)]
+    pub fn re_scan_question_token(&mut self) -> SyntaxKind {
+        if self.token == SyntaxKind::QuestionToken {
+            let ch = self.char_code_at(self.pos);
+            if ch == Some(CharacterCodes::DOT) {
+                // Check it's not ?. followed by a digit
+                let next = self.char_code_at(self.pos + 1);
+                if !next.map(|c| is_digit(c)).unwrap_or(false) {
+                    self.pos += 1;
+                    self.token = SyntaxKind::QuestionDotToken;
+                }
+            } else if ch == Some(CharacterCodes::QUESTION) {
+                if self.char_code_at(self.pos + 1) == Some(CharacterCodes::EQUALS) {
+                    self.pos += 2;
+                    self.token = SyntaxKind::QuestionQuestionEqualsToken;
+                } else {
+                    self.pos += 1;
+                    self.token = SyntaxKind::QuestionQuestionToken;
+                }
+            }
+        }
+        self.token
+    }
+
+    // =========================================================================
+    // JSDoc Scanning Methods
+    // =========================================================================
+
+    /// Scan a JSDoc token.
+    /// Used when parsing JSDoc comments.
+    #[wasm_bindgen(js_name = scanJsDocToken)]
+    pub fn scan_jsdoc_token(&mut self) -> SyntaxKind {
+        self.full_start_pos = self.pos;
+        self.token_flags = 0;
+
+        if self.pos >= self.end {
+            self.token = SyntaxKind::EndOfFileToken;
+            return self.token;
+        }
+
+        self.token_start = self.pos;
+        let ch = self.char_code_unchecked(self.pos);
+
+        // Handle newlines
+        if ch == CharacterCodes::LINE_FEED || ch == CharacterCodes::CARRIAGE_RETURN {
+            self.token_flags |= TokenFlags::PrecedingLineBreak as u32;
+            self.pos += 1;
+            if ch == CharacterCodes::CARRIAGE_RETURN && self.pos < self.end
+                && self.char_code_unchecked(self.pos) == CharacterCodes::LINE_FEED {
+                self.pos += 1;
+            }
+            self.token = SyntaxKind::NewLineTrivia;
+            return self.token;
+        }
+
+        // Handle whitespace
+        if is_white_space_single_line(ch) {
+            while self.pos < self.end && is_white_space_single_line(self.char_code_unchecked(self.pos)) {
+                self.pos += 1;
+            }
+            self.token = SyntaxKind::WhitespaceTrivia;
+            return self.token;
+        }
+
+        // JSDoc special tokens
+        match ch {
+            CharacterCodes::AT => {
+                self.pos += 1;
+                self.token = SyntaxKind::AtToken;
+                return self.token;
+            }
+            CharacterCodes::ASTERISK => {
+                self.pos += 1;
+                self.token = SyntaxKind::AsteriskToken;
+                return self.token;
+            }
+            CharacterCodes::OPEN_BRACE => {
+                self.pos += 1;
+                self.token = SyntaxKind::OpenBraceToken;
+                return self.token;
+            }
+            CharacterCodes::CLOSE_BRACE => {
+                self.pos += 1;
+                self.token = SyntaxKind::CloseBraceToken;
+                return self.token;
+            }
+            CharacterCodes::OPEN_BRACKET => {
+                self.pos += 1;
+                self.token = SyntaxKind::OpenBracketToken;
+                return self.token;
+            }
+            CharacterCodes::CLOSE_BRACKET => {
+                self.pos += 1;
+                self.token = SyntaxKind::CloseBracketToken;
+                return self.token;
+            }
+            CharacterCodes::LESS_THAN => {
+                self.pos += 1;
+                self.token = SyntaxKind::LessThanToken;
+                return self.token;
+            }
+            CharacterCodes::GREATER_THAN => {
+                self.pos += 1;
+                self.token = SyntaxKind::GreaterThanToken;
+                return self.token;
+            }
+            CharacterCodes::EQUALS => {
+                self.pos += 1;
+                self.token = SyntaxKind::EqualsToken;
+                return self.token;
+            }
+            CharacterCodes::COMMA => {
+                self.pos += 1;
+                self.token = SyntaxKind::CommaToken;
+                return self.token;
+            }
+            CharacterCodes::DOT => {
+                self.pos += 1;
+                self.token = SyntaxKind::DotToken;
+                return self.token;
+            }
+            CharacterCodes::BACKTICK => {
+                // Scan backtick-quoted string in JSDoc
+                self.pos += 1;
+                while self.pos < self.end && self.char_code_unchecked(self.pos) != CharacterCodes::BACKTICK {
+                    self.pos += 1;
+                }
+                if self.pos < self.end {
+                    self.pos += 1; // consume closing backtick
+                }
+                self.token_value = self.substring(self.token_start, self.pos);
+                self.token = SyntaxKind::NoSubstitutionTemplateLiteral;
+                return self.token;
+            }
+            _ => {}
+        }
+
+        // Check for identifier
+        if is_identifier_start(ch) {
+            self.pos += 1;
+            while self.pos < self.end && is_identifier_part(self.char_code_unchecked(self.pos)) {
+                self.pos += 1;
+            }
+            self.token_value = self.substring(self.token_start, self.pos);
+            self.token = crate::scanner::text_to_keyword(&self.token_value).unwrap_or(SyntaxKind::Identifier);
+            return self.token;
+        }
+
+        // Unknown character - advance and return Unknown
+        self.pos += 1;
+        self.token = SyntaxKind::Unknown;
+        self.token
+    }
+
+    /// Scan JSDoc comment text token.
+    /// Used for scanning the text content within JSDoc comments.
+    #[wasm_bindgen(js_name = scanJsDocCommentTextToken)]
+    pub fn scan_jsdoc_comment_text_token(&mut self, in_backticks: bool) -> SyntaxKind {
+        self.full_start_pos = self.pos;
+        self.token_flags = 0;
+        self.token_start = self.pos;
+
+        if self.pos >= self.end {
+            self.token = SyntaxKind::EndOfFileToken;
+            return self.token;
+        }
+
+        // Scan until we hit a special character
+        while self.pos < self.end {
+            let ch = self.char_code_unchecked(self.pos);
+
+            // Check for end markers
+            match ch {
+                // Always stop on newline
+                CharacterCodes::LINE_FEED | CharacterCodes::CARRIAGE_RETURN => {
+                    break;
+                }
+                // Stop on @ unless in backticks
+                CharacterCodes::AT if !in_backticks => {
+                    break;
+                }
+                // Stop on backtick - it toggles the mode
+                CharacterCodes::BACKTICK => {
+                    if self.pos > self.token_start {
+                        break; // Return text first
+                    }
+                    // Return the backtick token
+                    self.pos += 1;
+                    self.token = SyntaxKind::Unknown; // Use Unknown to signal backtick
+                    return self.token;
+                }
+                // Stop on { and } for type expressions
+                CharacterCodes::OPEN_BRACE | CharacterCodes::CLOSE_BRACE if !in_backticks => {
+                    break;
+                }
+                _ => {
+                    self.pos += 1;
+                }
+            }
+        }
+
+        if self.pos > self.token_start {
+            self.token_value = self.substring(self.token_start, self.pos);
+            // JSDocText token would be returned here, but we use Identifier as a stand-in
+            self.token = SyntaxKind::Identifier;
+        } else {
+            self.token = SyntaxKind::EndOfFileToken;
+        }
+        self.token
+    }
+
+    // =========================================================================
+    // Shebang Handling
+    // =========================================================================
+
+    /// Scan a shebang (#!) at the start of the file.
+    /// Returns the length of the shebang line (including newline), or 0 if no shebang.
+    #[wasm_bindgen(js_name = scanShebangTrivia)]
+    pub fn scan_shebang_trivia(&mut self) -> usize {
+        // Shebang must be at the very start of the file
+        if self.pos != 0 {
+            return 0;
+        }
+
+        // Check for #!
+        if self.pos + 1 < self.end
+            && self.char_code_unchecked(self.pos) == CharacterCodes::HASH
+            && self.char_code_unchecked(self.pos + 1) == CharacterCodes::EXCLAMATION
+        {
+            let start = self.pos;
+            self.pos += 2;
+
+            // Scan to end of line
+            while self.pos < self.end {
+                let ch = self.char_code_unchecked(self.pos);
+                if ch == CharacterCodes::LINE_FEED || ch == CharacterCodes::CARRIAGE_RETURN {
+                    break;
+                }
+                self.pos += 1;
+            }
+
+            // Include the newline in the shebang
+            if self.pos < self.end {
+                let ch = self.char_code_unchecked(self.pos);
+                if ch == CharacterCodes::CARRIAGE_RETURN {
+                    self.pos += 1;
+                    if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LINE_FEED {
+                        self.pos += 1;
+                    }
+                } else if ch == CharacterCodes::LINE_FEED {
+                    self.pos += 1;
+                }
+            }
+
+            return self.pos - start;
+        }
+
+        0
+    }
+
+    /// Re-scan an invalid identifier to check if it's valid in a specific context.
+    #[wasm_bindgen(js_name = reScanInvalidIdentifier)]
+    pub fn re_scan_invalid_identifier(&mut self) -> SyntaxKind {
+        // This method is used when the parser encounters an invalid identifier
+        // and wants to check if it could be valid in certain contexts (like keywords)
+        if self.token == SyntaxKind::Unknown && !self.token_value.is_empty() {
+            // Check if the token value is a valid identifier
+            let chars: Vec<char> = self.token_value.chars().collect();
+            if !chars.is_empty() && is_identifier_start(chars[0] as u32) {
+                let mut all_valid = true;
+                for c in chars.iter().skip(1) {
+                    if !is_identifier_part(*c as u32) {
+                        all_valid = false;
+                        break;
+                    }
+                }
+                if all_valid {
+                    self.token = crate::scanner::text_to_keyword(&self.token_value)
+                        .unwrap_or(SyntaxKind::Identifier);
+                }
+            }
+        }
+        self.token
+    }
 }
 
 // =============================================================================

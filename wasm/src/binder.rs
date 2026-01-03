@@ -358,6 +358,56 @@ impl FlowNodeArena {
 use wasm_bindgen::prelude::*;
 use crate::parser::{Node, NodeArena};
 
+/// Container kind - tracks what kind of scope we're in
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ContainerKind {
+    /// Source file (global scope)
+    SourceFile,
+    /// Function/method body (creates function scope)
+    Function,
+    /// Module/namespace body
+    Module,
+    /// Class body
+    Class,
+    /// Block (if, while, for, etc.) - only creates block scope
+    Block,
+}
+
+/// Scope context - tracks scope chain and hoisting
+#[derive(Clone, Debug)]
+pub struct ScopeContext {
+    /// The symbol table for this scope
+    pub locals: SymbolTable,
+    /// Parent scope (for scope chain lookup)
+    pub parent_idx: Option<usize>,
+    /// The kind of container this scope belongs to
+    pub container_kind: ContainerKind,
+    /// Node index of the container
+    pub container_node: NodeIndex,
+    /// Hoisted var declarations (for function scope)
+    pub hoisted_vars: Vec<(String, NodeIndex)>,
+    /// Hoisted function declarations (for function scope)
+    pub hoisted_functions: Vec<(String, NodeIndex)>,
+}
+
+impl ScopeContext {
+    pub fn new(kind: ContainerKind, node: NodeIndex, parent: Option<usize>) -> Self {
+        ScopeContext {
+            locals: SymbolTable::new(),
+            parent_idx: parent,
+            container_kind: kind,
+            container_node: node,
+            hoisted_vars: Vec::new(),
+            hoisted_functions: Vec::new(),
+        }
+    }
+
+    /// Check if this scope is a function scope (where var hoisting happens)
+    pub fn is_function_scope(&self) -> bool {
+        matches!(self.container_kind, ContainerKind::SourceFile | ContainerKind::Function | ContainerKind::Module)
+    }
+}
+
 /// Binder state for walking the AST and creating symbols.
 #[wasm_bindgen]
 pub struct BinderState {
@@ -379,6 +429,10 @@ pub struct BinderState {
     current_flow: FlowNodeId,
     /// Unreachable flow node (for never-returning code)
     unreachable_flow: FlowNodeId,
+    /// Scope chain - stack of scope contexts
+    scope_chain: Vec<ScopeContext>,
+    /// Current scope index in scope_chain
+    current_scope_idx: usize,
 }
 
 impl BinderState {
@@ -395,12 +449,17 @@ impl BinderState {
             flow_nodes,
             current_flow: FlowNodeId::NONE,
             unreachable_flow,
+            scope_chain: Vec::new(),
+            current_scope_idx: 0,
         }
     }
 
     /// Bind a source file, creating symbols for all declarations.
     pub fn bind_source_file(&mut self, arena: &NodeArena, root: NodeIndex) {
-        // Start with file scope
+        // Initialize scope chain with source file scope
+        self.scope_chain.clear();
+        self.scope_chain.push(ScopeContext::new(ContainerKind::SourceFile, root, None));
+        self.current_scope_idx = 0;
         self.current_scope = SymbolTable::new();
 
         // Create START flow node for the file
@@ -409,7 +468,13 @@ impl BinderState {
 
         if let Some(node) = arena.get(root) {
             if let Node::SourceFile(sf) = node {
-                // Bind each statement
+                // First pass: collect hoisted declarations
+                self.collect_hoisted_declarations(arena, &sf.statements.nodes);
+
+                // Process hoisted function declarations first
+                self.process_hoisted_functions(arena);
+
+                // Second pass: bind each statement
                 for &stmt_idx in &sf.statements.nodes {
                     self.bind_node(arena, stmt_idx);
                 }
@@ -418,6 +483,165 @@ impl BinderState {
 
         // Store file locals
         self.file_locals = std::mem::take(&mut self.current_scope);
+    }
+
+    /// Collect hoisted declarations from statements.
+    /// var declarations are hoisted to the containing function scope.
+    /// function declarations are hoisted to the top of the containing function scope.
+    fn collect_hoisted_declarations(&mut self, arena: &NodeArena, statements: &[NodeIndex]) {
+        for &stmt_idx in statements {
+            if let Some(node) = arena.get(stmt_idx) {
+                match node {
+                    // var declarations are hoisted
+                    Node::VariableStatement(stmt) => {
+                        if let Some(Node::VariableDeclarationList(list)) = arena.get(stmt.declaration_list) {
+                            // Check if this is a var declaration (not let/const)
+                            // We check the flags on the list
+                            let is_var = (list.base.flags & 0x03) == 0; // Neither Let (1) nor Const (2)
+                            if is_var {
+                                for &decl_idx in &list.declarations.nodes {
+                                    if let Some(Node::VariableDeclaration(decl)) = arena.get(decl_idx) {
+                                        if let Some(name) = self.get_identifier_name(arena, decl.name) {
+                                            self.add_hoisted_var(name, decl_idx);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // function declarations are hoisted
+                    Node::FunctionDeclaration(func) => {
+                        if let Some(name) = self.get_identifier_name(arena, func.name) {
+                            self.add_hoisted_function(name, stmt_idx);
+                        }
+                    }
+                    // Recurse into blocks for var hoisting (but not let/const)
+                    Node::Block(block) => {
+                        self.collect_hoisted_declarations(arena, &block.statements.nodes);
+                    }
+                    Node::IfStatement(if_stmt) => {
+                        if let Some(Node::Block(block)) = arena.get(if_stmt.then_statement) {
+                            self.collect_hoisted_declarations(arena, &block.statements.nodes);
+                        }
+                        if !if_stmt.else_statement.is_none() {
+                            if let Some(Node::Block(block)) = arena.get(if_stmt.else_statement) {
+                                self.collect_hoisted_declarations(arena, &block.statements.nodes);
+                            }
+                        }
+                    }
+                    Node::WhileStatement(while_stmt) => {
+                        if let Some(Node::Block(block)) = arena.get(while_stmt.statement) {
+                            self.collect_hoisted_declarations(arena, &block.statements.nodes);
+                        }
+                    }
+                    Node::ForStatement(for_stmt) => {
+                        if let Some(Node::Block(block)) = arena.get(for_stmt.statement) {
+                            self.collect_hoisted_declarations(arena, &block.statements.nodes);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    /// Add a hoisted var declaration to the current function scope
+    fn add_hoisted_var(&mut self, name: String, decl_idx: NodeIndex) {
+        if let Some(scope) = self.scope_chain.get_mut(self.current_scope_idx) {
+            scope.hoisted_vars.push((name, decl_idx));
+        }
+    }
+
+    /// Add a hoisted function declaration to the current function scope
+    fn add_hoisted_function(&mut self, name: String, decl_idx: NodeIndex) {
+        if let Some(scope) = self.scope_chain.get_mut(self.current_scope_idx) {
+            scope.hoisted_functions.push((name, decl_idx));
+        }
+    }
+
+    /// Process hoisted function declarations (declare them before other code)
+    fn process_hoisted_functions(&mut self, arena: &NodeArena) {
+        // Get hoisted functions from current scope
+        let hoisted = if let Some(scope) = self.scope_chain.get(self.current_scope_idx) {
+            scope.hoisted_functions.clone()
+        } else {
+            return;
+        };
+
+        // Declare each hoisted function
+        for (name, decl_idx) in hoisted {
+            if let Some(Node::FunctionDeclaration(_)) = arena.get(decl_idx) {
+                self.declare_symbol(name, symbol_flags::FUNCTION, decl_idx);
+            }
+        }
+    }
+
+    /// Enter a new scope (function, block, etc.)
+    fn enter_scope(&mut self, kind: ContainerKind, node: NodeIndex) {
+        let parent = Some(self.current_scope_idx);
+        let new_idx = self.scope_chain.len();
+        self.scope_chain.push(ScopeContext::new(kind, node, parent));
+        self.current_scope_idx = new_idx;
+
+        // Also push to the legacy scope stack for compatibility
+        let old_scope = std::mem::take(&mut self.current_scope);
+        self.scope_stack.push(old_scope);
+        self.current_scope = SymbolTable::new();
+    }
+
+    /// Exit the current scope
+    fn exit_scope(&mut self) {
+        // Pop from scope chain
+        if let Some(scope) = self.scope_chain.get(self.current_scope_idx) {
+            if let Some(parent_idx) = scope.parent_idx {
+                self.current_scope_idx = parent_idx;
+            }
+        }
+
+        // Pop from legacy scope stack
+        if let Some(parent_scope) = self.scope_stack.pop() {
+            self.current_scope = parent_scope;
+        }
+    }
+
+    /// Find the enclosing function scope for var hoisting
+    fn find_function_scope_idx(&self) -> usize {
+        let mut idx = self.current_scope_idx;
+        while let Some(scope) = self.scope_chain.get(idx) {
+            if scope.is_function_scope() {
+                return idx;
+            }
+            if let Some(parent_idx) = scope.parent_idx {
+                idx = parent_idx;
+            } else {
+                break;
+            }
+        }
+        0 // Fall back to source file scope
+    }
+
+    /// Look up a symbol in the scope chain
+    pub fn lookup_symbol(&self, name: &str) -> Option<SymbolId> {
+        // First check current scope
+        if let Some(id) = self.current_scope.get(name) {
+            return Some(id);
+        }
+
+        // Walk up the scope chain
+        let mut idx = self.current_scope_idx;
+        while let Some(scope) = self.scope_chain.get(idx) {
+            if let Some(id) = scope.locals.get(name) {
+                return Some(id);
+            }
+            if let Some(parent_idx) = scope.parent_idx {
+                idx = parent_idx;
+            } else {
+                break;
+            }
+        }
+
+        // Finally check file locals
+        self.file_locals.get(name)
     }
 
     /// Create a new flow node and set it as current.
@@ -503,13 +727,13 @@ impl BinderState {
                 self.bind_enum_declaration(arena, enum_decl, idx);
             }
 
-            // Block - creates a new scope
+            // Block - creates a new block scope (for let/const)
             Node::Block(block) => {
-                self.push_scope();
+                self.enter_scope(ContainerKind::Block, idx);
                 for &stmt_idx in &block.statements.nodes {
                     self.bind_node(arena, stmt_idx);
                 }
-                self.pop_scope();
+                self.exit_scope();
             }
 
             // Other statements - recurse into children with flow analysis
@@ -520,10 +744,29 @@ impl BinderState {
                 self.bind_while_statement(arena, while_stmt, idx);
             }
             Node::ForStatement(for_stmt) => {
-                self.push_scope();
+                // For statement creates its own block scope for the initializer
+                self.enter_scope(ContainerKind::Block, idx);
                 self.bind_node(arena, for_stmt.initializer);
                 self.bind_node(arena, for_stmt.statement);
-                self.pop_scope();
+                self.exit_scope();
+            }
+            Node::ForInStatement(for_in) => {
+                self.enter_scope(ContainerKind::Block, idx);
+                self.bind_node(arena, for_in.initializer);
+                self.bind_node(arena, for_in.statement);
+                self.exit_scope();
+            }
+            Node::ForOfStatement(for_of) => {
+                self.enter_scope(ContainerKind::Block, idx);
+                self.bind_node(arena, for_of.initializer);
+                self.bind_node(arena, for_of.statement);
+                self.exit_scope();
+            }
+            Node::SwitchStatement(switch_stmt) => {
+                self.bind_switch_statement(arena, switch_stmt, idx);
+            }
+            Node::TryStatement(try_stmt) => {
+                self.bind_try_statement(arena, try_stmt, idx);
             }
 
             // Import declarations
@@ -542,7 +785,7 @@ impl BinderState {
                 self.bind_module_declaration(arena, module, idx);
             }
             Node::ModuleBlock(block) => {
-                // Module block creates a new scope
+                // Module block - the scope is already created by module declaration
                 for &stmt_idx in &block.statements.nodes {
                     self.bind_node(arena, stmt_idx);
                 }
@@ -661,6 +904,20 @@ impl BinderState {
     // Declaration Binding
     // =========================================================================
 
+    /// Check if this is a var declaration (not let/const) by looking at parent list
+    fn is_var_declaration(&self, arena: &NodeArena, decl_idx: NodeIndex) -> bool {
+        // We need to look at the parent VariableDeclarationList to determine this
+        // For now, use a simple heuristic based on the declaration flags
+        // In a full implementation, we'd track this during parsing
+        if let Some(Node::VariableDeclaration(decl)) = arena.get(decl_idx) {
+            // Check the base node flags - if neither Let nor Const, it's var
+            let flags = decl.base.flags;
+            (flags & 0x03) == 0  // Neither Let (1) nor Const (2)
+        } else {
+            false
+        }
+    }
+
     fn bind_variable_declaration(
         &mut self,
         arena: &NodeArena,
@@ -668,10 +925,28 @@ impl BinderState {
         decl_idx: NodeIndex,
     ) {
         if let Some(name) = self.get_identifier_name(arena, decl.name) {
-            // Determine flags based on parent (let/const vs var)
-            // For simplicity, treat all as block-scoped for now
-            let flags = symbol_flags::BLOCK_SCOPED_VARIABLE;
-            self.declare_symbol(name, flags, decl_idx);
+            // Determine if this is var (function-scoped) or let/const (block-scoped)
+            let is_var = self.is_var_declaration(arena, decl_idx);
+
+            if is_var {
+                // var: function-scoped, declares in nearest function scope
+                // Note: hoisting already declared it, but we need to handle the
+                // actual binding point for flow analysis
+                let flags = symbol_flags::FUNCTION_SCOPED_VARIABLE;
+
+                // For var, check if already declared (from hoisting)
+                if self.current_scope.has(&name) || self.lookup_symbol(&name).is_some() {
+                    // Already declared via hoisting, just bind the initializer
+                    // The symbol was already created during hoisting
+                } else {
+                    // Declare in function scope
+                    self.declare_symbol(name.clone(), flags, decl_idx);
+                }
+            } else {
+                // let/const: block-scoped, declares in current block
+                let flags = symbol_flags::BLOCK_SCOPED_VARIABLE;
+                self.declare_symbol(name, flags, decl_idx);
+            }
         }
     }
 
@@ -681,14 +956,25 @@ impl BinderState {
         func: &crate::parser::FunctionDeclaration,
         func_idx: NodeIndex,
     ) {
+        // Function declarations are hoisted, so the symbol may already exist
         if let Some(name) = self.get_identifier_name(arena, func.name) {
-            self.declare_symbol(name, symbol_flags::FUNCTION, func_idx);
+            // Check if already declared via hoisting
+            if !self.current_scope.has(&name) {
+                self.declare_symbol(name, symbol_flags::FUNCTION, func_idx);
+            }
         }
 
-        // Bind function body in new scope
+        // Bind function body in new function scope
         if !func.body.is_none() {
-            self.push_scope();
-            // Bind parameters
+            self.enter_scope(ContainerKind::Function, func_idx);
+
+            // Collect hoisted declarations within function
+            if let Some(Node::Block(block)) = arena.get(func.body) {
+                self.collect_hoisted_declarations(arena, &block.statements.nodes);
+                self.process_hoisted_functions(arena);
+            }
+
+            // Bind parameters first (they're in function scope)
             for &param_idx in &func.parameters.nodes {
                 if let Some(Node::ParameterDeclaration(param)) = arena.get(param_idx) {
                     if let Some(name) = self.get_identifier_name(arena, param.name) {
@@ -696,8 +982,10 @@ impl BinderState {
                     }
                 }
             }
+
+            // Bind the function body
             self.bind_node(arena, func.body);
-            self.pop_scope();
+            self.exit_scope();
         }
     }
 
@@ -923,9 +1211,125 @@ impl BinderState {
 
         // Bind module body in new scope
         if !module.body.is_none() {
-            self.push_scope();
+            self.enter_scope(ContainerKind::Module, module_idx);
             self.bind_node(arena, module.body);
-            self.pop_scope();
+            self.exit_scope();
+        }
+    }
+
+    /// Bind a switch statement.
+    fn bind_switch_statement(
+        &mut self,
+        arena: &NodeArena,
+        switch_stmt: &crate::parser::SwitchStatement,
+        node_idx: NodeIndex,
+    ) {
+        // Save flow before switch
+        let pre_switch_flow = self.current_flow;
+
+        // Create a branch label for the end of switch (for break statements)
+        let end_label = self.create_branch_label();
+
+        // Bind the case block
+        if let Some(Node::CaseBlock(case_block)) = arena.get(switch_stmt.case_block) {
+            for &clause_idx in &case_block.clauses.nodes {
+                if let Some(node) = arena.get(clause_idx) {
+                    match node {
+                        Node::CaseClause(clause) => {
+                            // Create switch clause flow node
+                            let clause_flow = self.create_flow_node(
+                                flow_flags::SWITCH_CLAUSE,
+                                pre_switch_flow,
+                                clause.expression,
+                            );
+                            self.current_flow = clause_flow;
+
+                            // Bind statements in the clause (new block scope for let/const)
+                            self.enter_scope(ContainerKind::Block, clause_idx);
+                            for &stmt_idx in &clause.statements.nodes {
+                                self.bind_node(arena, stmt_idx);
+                            }
+                            self.exit_scope();
+
+                            // Add to end label
+                            self.add_antecedent(end_label, self.current_flow);
+                        }
+                        Node::DefaultClause(clause) => {
+                            // Default clause is always reachable
+                            let clause_flow = self.create_flow_node(
+                                flow_flags::SWITCH_CLAUSE,
+                                pre_switch_flow,
+                                node_idx,
+                            );
+                            self.current_flow = clause_flow;
+
+                            self.enter_scope(ContainerKind::Block, clause_idx);
+                            for &stmt_idx in &clause.statements.nodes {
+                                self.bind_node(arena, stmt_idx);
+                            }
+                            self.exit_scope();
+
+                            self.add_antecedent(end_label, self.current_flow);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+
+        self.current_flow = end_label;
+    }
+
+    /// Bind a try statement.
+    fn bind_try_statement(
+        &mut self,
+        arena: &NodeArena,
+        try_stmt: &crate::parser::TryStatement,
+        _node_idx: NodeIndex,
+    ) {
+        let pre_try_flow = self.current_flow;
+
+        // Create merge label for after try/catch/finally
+        let end_label = self.create_branch_label();
+
+        // Bind try block
+        self.bind_node(arena, try_stmt.try_block);
+        let post_try_flow = self.current_flow;
+
+        // Bind catch clause if present
+        if !try_stmt.catch_clause.is_none() {
+            if let Some(Node::CatchClause(catch)) = arena.get(try_stmt.catch_clause) {
+                // Catch clause has its own scope
+                self.enter_scope(ContainerKind::Block, try_stmt.catch_clause);
+
+                // Bind catch variable if present
+                if !catch.variable_declaration.is_none() {
+                    if let Some(Node::VariableDeclaration(decl)) = arena.get(catch.variable_declaration) {
+                        if let Some(name) = self.get_identifier_name(arena, decl.name) {
+                            self.declare_symbol(name, symbol_flags::BLOCK_SCOPED_VARIABLE, catch.variable_declaration);
+                        }
+                    }
+                }
+
+                // Reset flow - catch can be entered from any point in try
+                self.current_flow = pre_try_flow;
+                self.bind_node(arena, catch.block);
+                self.add_antecedent(end_label, self.current_flow);
+
+                self.exit_scope();
+            }
+        }
+
+        // Add post-try flow to end label
+        self.add_antecedent(end_label, post_try_flow);
+
+        // Bind finally block if present
+        if !try_stmt.finally_block.is_none() {
+            // Finally is always executed
+            self.current_flow = end_label;
+            self.bind_node(arena, try_stmt.finally_block);
+        } else {
+            self.current_flow = end_label;
         }
     }
 }

@@ -9,9 +9,11 @@ Run the full test suite for both Rust and TypeScript.
 
 ## Steps
 
-1. Build and test Rust:
+1. Build and test Rust (in Docker):
 ```bash
-source ~/.cargo/env && cd /Users/mohsenazimi/code/TypeScript/wasm && cargo build && cargo test
+cd /Users/mohsenazimi/code/TypeScript/wasm && \
+docker build -t rust-wasm-tests . && \
+docker run --rm --memory="1g" --cpus="2.0" rust-wasm-tests
 ```
 
 2. Build TypeScript:
