@@ -566,6 +566,27 @@ impl ParserState {
             SyntaxKind::ImportKeyword => self.parse_import_declaration(),
             SyntaxKind::ExportKeyword => self.parse_export_declaration(),
             SyntaxKind::ModuleKeyword | SyntaxKind::NamespaceKeyword => self.parse_module_declaration(),
+            // Handle declare keyword - it's a modifier for various declarations
+            SyntaxKind::DeclareKeyword => {
+                self.next_token(); // consume 'declare'
+                // Now parse the actual declaration
+                match self.token() {
+                    SyntaxKind::VarKeyword | SyntaxKind::LetKeyword | SyntaxKind::ConstKeyword => {
+                        self.parse_variable_statement()
+                    }
+                    SyntaxKind::FunctionKeyword => self.parse_function_declaration(),
+                    SyntaxKind::ClassKeyword => self.parse_class_declaration(),
+                    SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
+                    SyntaxKind::TypeKeyword => self.parse_type_alias_declaration(),
+                    SyntaxKind::EnumKeyword => self.parse_enum_declaration(),
+                    SyntaxKind::ModuleKeyword | SyntaxKind::NamespaceKeyword => self.parse_module_declaration(),
+                    _ => {
+                        // Unexpected token after declare
+                        self.parse_error_at_current_token("Declaration expected after 'declare'");
+                        self.parse_expression_statement()
+                    }
+                }
+            }
             _ => self.parse_expression_or_labeled_statement(),
         }
     }

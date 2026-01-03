@@ -1105,6 +1105,12 @@ pub struct CheckerState<'a> {
     /// Diagnostics produced during type checking.
     pub diagnostics: Vec<Diagnostic>,
 
+    /// Stack of symbols being resolved (to detect circular references).
+    symbol_resolution_stack: Vec<SymbolId>,
+
+    /// Stack of nodes being resolved (to detect circular references).
+    node_resolution_stack: Vec<NodeIndex>,
+
     /// Current file name.
     pub file_name: String,
 }
@@ -1166,12 +1172,14 @@ impl<'a> CheckerState<'a> {
             symbol_arena,
             file_locals,
             types: TypeArena::new(),
-            local_symbols: SymbolArena::new(),
+            local_symbols: SymbolArena::new_with_base(SymbolArena::CHECKER_SYMBOL_BASE),
             symbol_types: std::collections::HashMap::new(),
             node_types: std::collections::HashMap::new(),
             type_parameter_names: std::collections::HashMap::new(),
             type_parameter_scope: std::collections::HashMap::new(),
             diagnostics: Vec::new(),
+            symbol_resolution_stack: Vec::new(),
+            node_resolution_stack: Vec::new(),
             file_name,
         }
     }
@@ -1207,8 +1215,17 @@ impl<'a> CheckerState<'a> {
             return cached;
         }
 
+        // Track recursion to catch infinite loops
+        if self.node_resolution_stack.contains(&node) {
+            // Circular reference - return any_type to break the loop
+            return self.types.any_type;
+        }
+        self.node_resolution_stack.push(node);
+
         let type_id = self.get_type_of_node_worker(node);
         self.node_types.insert(node, type_id);
+
+        self.node_resolution_stack.pop();
         type_id
     }
 
@@ -2511,6 +2528,7 @@ impl<'a> CheckerState<'a> {
         }
 
         let mut properties = Vec::new();
+        let mut members_table = SymbolTable::new();
         let mut call_signatures = Vec::new();
         let mut construct_signatures = Vec::new();
         let mut index_infos = Vec::new();
@@ -2538,6 +2556,7 @@ impl<'a> CheckerState<'a> {
                         // Create a symbol for this property
                         let symbol_id = self.local_symbols_mut().alloc(symbol_flags::PROPERTY, name.clone());
                         self.symbol_types.insert(symbol_id, prop_type);
+                        members_table.set(name, symbol_id);
                         properties.push(symbol_id);
                     }
 
@@ -2561,6 +2580,7 @@ impl<'a> CheckerState<'a> {
                         // Create a symbol for this method
                         let symbol_id = self.local_symbols_mut().alloc(symbol_flags::METHOD, name.clone());
                         self.symbol_types.insert(symbol_id, method_type);
+                        members_table.set(name, symbol_id);
                         properties.push(symbol_id);
                     }
 
@@ -2617,6 +2637,7 @@ impl<'a> CheckerState<'a> {
         // Update the placeholder type with the resolved members
         if let Some(Type::Object(obj)) = self.types.get_mut(type_id) {
             obj.properties = properties;
+            obj.members = members_table;
             obj.construct_signatures = construct_signatures;
             obj.call_signatures = call_signatures;
             obj.index_infos = index_infos;
@@ -3574,8 +3595,17 @@ impl<'a> CheckerState<'a> {
             return cached;
         }
 
+        // Track recursion to catch infinite loops
+        if self.symbol_resolution_stack.contains(&symbol_id) {
+            // Circular reference - return any_type to break the loop
+            return self.types.any_type;
+        }
+        self.symbol_resolution_stack.push(symbol_id);
+
         let type_id = self.get_type_of_symbol_worker(symbol_id);
         self.symbol_types.insert(symbol_id, type_id);
+
+        self.symbol_resolution_stack.pop();
         type_id
     }
 
@@ -6086,7 +6116,6 @@ mod tests {
     }
 
     #[test]
-    // #[ignore] // TODO: Fix infinite loop - likely in interface/variable type resolution chain
     fn test_simple_interface_variable() {
         use crate::parser_impl::ParserState;
         use crate::binder::BinderState;
@@ -6116,12 +6145,12 @@ mod tests {
         let a_type = checker.get_type_of_symbol(a_symbol);
         let a_str = checker.type_to_string(a_type);
 
-        // a should be of type A (an interface)
+        // a should be of type A (an interface with property x: string)
         assert!(checker.types.get(a_type).is_some(), "a should have a valid type");
+        assert!(a_str.contains("x"), "a should have property x, got: {}", a_str);
     }
 
     #[test]
-    #[ignore] // TODO: Fix infinite loop in interface type resolution
     fn test_property_access_on_union() {
         use crate::parser_impl::ParserState;
         use crate::binder::BinderState;

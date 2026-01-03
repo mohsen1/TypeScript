@@ -785,6 +785,7 @@ Next Step: Phase 3 - Parser Integration (first target: simple statement parsing)
   - try_parse_decorator() for @expression syntax
   - parse_decorators() to collect multiple decorators
   - parse_decorated_declaration() with class/function support
+  - Decorators stored in modifiers field
 - 81 Rust tests passing
 - Commits: `95c53a3cf`, `0cd24e122`
 

@@ -189,21 +189,45 @@ impl SymbolTable {
 // =============================================================================
 
 /// Arena allocator for symbols.
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Serialize)]
 pub struct SymbolArena {
     symbols: Vec<Symbol>,
+    /// Base offset for symbol IDs (0 for binder, high value for checker-local symbols)
+    base_offset: u32,
+}
+
+impl Default for SymbolArena {
+    fn default() -> Self {
+        SymbolArena {
+            symbols: Vec::new(),
+            base_offset: 0,
+        }
+    }
 }
 
 impl SymbolArena {
+    /// Base offset for checker-local symbols to avoid ID collisions.
+    pub const CHECKER_SYMBOL_BASE: u32 = 0x10000000;
+
     pub fn new() -> Self {
         SymbolArena {
             symbols: Vec::new(),
+            base_offset: 0,
+        }
+    }
+
+    /// Create a new symbol arena with a base offset for symbol IDs.
+    /// Used for checker-local symbols to avoid collisions with binder symbols.
+    pub fn new_with_base(base: u32) -> Self {
+        SymbolArena {
+            symbols: Vec::new(),
+            base_offset: base,
         }
     }
 
     /// Allocate a new symbol and return its ID.
     pub fn alloc(&mut self, flags: u32, name: String) -> SymbolId {
-        let id = SymbolId(self.symbols.len() as u32);
+        let id = SymbolId(self.base_offset + self.symbols.len() as u32);
         self.symbols.push(Symbol::new(id, flags, name));
         id
     }
@@ -212,8 +236,11 @@ impl SymbolArena {
     pub fn get(&self, id: SymbolId) -> Option<&Symbol> {
         if id.is_none() {
             None
+        } else if id.0 < self.base_offset {
+            // ID is from a different arena (e.g., binder vs checker)
+            None
         } else {
-            self.symbols.get(id.0 as usize)
+            self.symbols.get((id.0 - self.base_offset) as usize)
         }
     }
 
@@ -221,8 +248,11 @@ impl SymbolArena {
     pub fn get_mut(&mut self, id: SymbolId) -> Option<&mut Symbol> {
         if id.is_none() {
             None
+        } else if id.0 < self.base_offset {
+            // ID is from a different arena
+            None
         } else {
-            self.symbols.get_mut(id.0 as usize)
+            self.symbols.get_mut((id.0 - self.base_offset) as usize)
         }
     }
 
