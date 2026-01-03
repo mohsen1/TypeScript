@@ -14,6 +14,14 @@ use super::types::{
 use super::arena::TypeArena;
 use super::state::{CheckerState, Diagnostic, DiagnosticCategory};
 
+/// Information about the contextual array/tuple element types.
+enum ContextualArrayInfo {
+    /// Array<T> - single element type for all elements
+    Array(TypeId),
+    /// Tuple - different type for each position
+    Tuple(Vec<TypeId>),
+}
+
 impl<'a> CheckerState<'a> {
     /// Get the type of a node (with caching).
     pub fn get_type_of_node(&mut self, node: NodeIndex) -> TypeId {
@@ -879,17 +887,40 @@ impl<'a> CheckerState<'a> {
     fn get_type_of_array_literal(&mut self, elements: &crate::parser::NodeList) -> TypeId {
         use crate::parser::Node;
 
+        // Get contextual element type(s) if available
+        let contextual_element_info = self.get_contextual_array_element_type();
+
         // Collect element types
         let mut element_types = Vec::new();
-        for &elem_idx in &elements.nodes {
+        for (i, &elem_idx) in elements.nodes.iter().enumerate() {
             if let Some(elem_node) = self.node_arena.get(elem_idx) {
+                // Determine the contextual type for this element
+                let elem_contextual = match &contextual_element_info {
+                    Some(ContextualArrayInfo::Array(elem_type)) => Some(*elem_type),
+                    Some(ContextualArrayInfo::Tuple(tuple_types)) => {
+                        tuple_types.get(i).copied()
+                    }
+                    None => None,
+                };
+
                 let elem_type = match elem_node {
                     Node::SpreadElement(spread) => {
                         // For spread element, get the element type of the spread's array
                         let spread_type = self.get_type_of_node(spread.expression);
                         self.get_element_type_of_spread(spread_type)
                     }
-                    _ => self.get_type_of_node(elem_idx),
+                    _ => {
+                        // Apply contextual type when evaluating the element
+                        if let Some(ctx_type) = elem_contextual {
+                            let prev_contextual = self.contextual_type;
+                            self.contextual_type = Some(ctx_type);
+                            let t = self.get_type_of_node(elem_idx);
+                            self.contextual_type = prev_contextual;
+                            t
+                        } else {
+                            self.get_type_of_node(elem_idx)
+                        }
+                    }
                 };
                 if !element_types.contains(&elem_type) {
                     element_types.push(elem_type);
@@ -899,14 +930,30 @@ impl<'a> CheckerState<'a> {
 
         // Create a union of element types (if multiple) or the single type
         if element_types.is_empty() {
-            // Empty array - never[]
-            self.types.never_type
+            // Empty array - use contextual type if available, otherwise never[]
+            match contextual_element_info {
+                Some(ContextualArrayInfo::Array(elem_type)) => elem_type,
+                Some(ContextualArrayInfo::Tuple(_)) => self.types.never_type,
+                None => self.types.never_type,
+            }
         } else if element_types.len() == 1 {
             // Single type - return as is (would be Array<T> in full impl)
             element_types[0]
         } else {
             // Multiple types - create union (would be Array<T | U | ...> in full impl)
             self.types.create_union_type(element_types)
+        }
+    }
+
+    /// Get the element type from the contextual type if it's an array or tuple.
+    fn get_contextual_array_element_type(&self) -> Option<ContextualArrayInfo> {
+        let ctx_type_id = self.contextual_type?;
+        let ctx_type = self.types.get(ctx_type_id)?;
+
+        match ctx_type {
+            Type::Array(arr) => Some(ContextualArrayInfo::Array(arr.element_type)),
+            Type::Tuple(tup) => Some(ContextualArrayInfo::Tuple(tup.element_types.clone())),
+            _ => None,
         }
     }
 
@@ -2143,6 +2190,9 @@ impl<'a> CheckerState<'a> {
         let mut prop_symbols = Vec::new();
         let mut members_table = SymbolTable::new();
 
+        // Get contextual property types if we have a contextual object type
+        let contextual_members = self.get_contextual_object_members();
+
         for &prop_idx in &properties.nodes {
             if let Some(node) = self.node_arena.get(prop_idx) {
                 match node {
@@ -2152,8 +2202,21 @@ impl<'a> CheckerState<'a> {
                             continue;
                         };
 
-                        // Get property type from initializer
-                        let prop_type = self.get_type_of_node(pa.initializer);
+                        // Get contextual type for this property (enables callback inference)
+                        let contextual_prop_type = contextual_members
+                            .as_ref()
+                            .and_then(|m| m.get(&name).copied());
+
+                        // Get property type from initializer with contextual type
+                        let prop_type = if let Some(ctx_type) = contextual_prop_type {
+                            let prev_contextual = self.contextual_type;
+                            self.contextual_type = Some(ctx_type);
+                            let t = self.get_type_of_node(pa.initializer);
+                            self.contextual_type = prev_contextual;
+                            t
+                        } else {
+                            self.get_type_of_node(pa.initializer)
+                        };
 
                         // Create a symbol for this property
                         let symbol_id = self.local_symbols_mut().alloc(symbol_flags::PROPERTY, name.clone());
@@ -2180,6 +2243,36 @@ impl<'a> CheckerState<'a> {
                         prop_symbols.push(symbol_id);
                         members_table.set(name, symbol_id);
                     }
+                    Node::MethodDeclaration(md) => {
+                        // Handle method declarations in object literals
+                        let Some(name) = self.get_property_name_text(md.name) else {
+                            continue;
+                        };
+
+                        // Get contextual type for this method
+                        let contextual_method_type = contextual_members
+                            .as_ref()
+                            .and_then(|m| m.get(&name).copied());
+
+                        // Get method type with contextual type
+                        let method_type = if let Some(ctx_type) = contextual_method_type {
+                            let prev_contextual = self.contextual_type;
+                            self.contextual_type = Some(ctx_type);
+                            let t = self.get_type_of_function_like(prop_idx, &md.parameters, md.type_annotation);
+                            self.contextual_type = prev_contextual;
+                            t
+                        } else {
+                            self.get_type_of_function_like(prop_idx, &md.parameters, md.type_annotation)
+                        };
+
+                        // Create a symbol for this method
+                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::METHOD, name.clone());
+
+                        // Cache the symbol's type
+                        self.symbol_types.insert(symbol_id, method_type);
+                        prop_symbols.push(symbol_id);
+                        members_table.set(name, symbol_id);
+                    }
                     _ => {}
                 }
             }
@@ -2187,6 +2280,40 @@ impl<'a> CheckerState<'a> {
 
         // Create fresh object literal type (subject to excess property checks)
         self.types.create_fresh_object_literal_type(prop_symbols, members_table)
+    }
+
+    /// Get the member types from the contextual type if it's an object type.
+    /// Returns a map from property name to property type.
+    fn get_contextual_object_members(&self) -> Option<std::collections::HashMap<String, TypeId>> {
+        let ctx_type_id = self.contextual_type?;
+        let ctx_type = self.types.get(ctx_type_id)?;
+
+        match ctx_type {
+            Type::Object(obj) => {
+                let mut members = std::collections::HashMap::new();
+                // Use both properties list and members table for completeness
+                for &sym_id in &obj.properties {
+                    if let Some(sym) = self.get_symbol(sym_id) {
+                        if let Some(&prop_type) = self.symbol_types.get(&sym_id) {
+                            members.insert(sym.escaped_name.clone(), prop_type);
+                        }
+                    }
+                }
+                // Also check members table for interface-like objects
+                for (name, &sym_id) in obj.members.iter() {
+                    if let Some(&prop_type) = self.symbol_types.get(&sym_id) {
+                        members.insert(name.clone(), prop_type);
+                    }
+                }
+                Some(members)
+            }
+            Type::Function(f) => {
+                // Function types can also provide contextual typing via their parameter types
+                // e.g., for a callback like (x: number) => void passed to object literal property
+                None // Function itself doesn't have object members
+            }
+            _ => None,
+        }
     }
 
     /// Get a mutable reference to the local symbol arena (for creating new symbols during type checking).

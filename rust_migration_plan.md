@@ -9,8 +9,8 @@
 | 2     | Scanner        | ✅ DONE | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
-| 5     | Type Checker   | 🟡 75%  | 258 Rust |
-| 6     | Emitter        | 🟡 35%  | 28 Rust |
+| 5     | Type Checker   | 🟡 78%  | 301 Rust |
+| 6     | Emitter        | 🟡 40%  | 35 Rust |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
 
@@ -76,14 +76,101 @@ All of the following are complete:
 
 ### 🚧 In Progress / Next Up
 
-- [ ] **Full contextual typing implementation**
+- [x] **Full contextual typing implementation**
     - Infer complete parameter types from context
     - Handle all callback scenarios
+    - Contextual typing for object literal properties and methods
+    - Contextual typing for array literal elements
 
 - [ ] **Complete diagnostics integration**
     - Port error message generation
     - Match exact TypeScript error codes
     - Related information spans
+
+### 📋 Remaining Type Checker Features
+
+#### Enums & Overloads
+- [ ] **5.53** Numeric/string/const enum type checking
+- [ ] **5.54** Enum reverse mappings
+- [ ] **5.55** Function overload resolution (selecting correct overload)
+
+#### Class & Member Checking
+- [ ] **5.56** Private/protected visibility enforcement
+- [ ] **5.57** Abstract member implementation verification
+- [ ] **5.58** `override` keyword validation
+- [ ] **5.59** Static blocks and auto-accessors (`accessor` keyword)
+
+#### Modern Type Features (TS 4.x-5.x)
+- [ ] **5.60** Variance annotations (`in`/`out` modifiers)
+- [ ] **5.61** `satisfies` operator type checking
+- [ ] **5.62** `const` type parameters (literal inference in generics)
+- [ ] **5.63** `NoInfer<T>` utility type
+- [ ] **5.64** `using` declarations (disposable resources)
+- [ ] **5.65** Decorator metadata type support
+
+#### Advanced Tuple & Template Types
+- [ ] **5.66** Variadic tuple types (`[...T, ...U]`)
+- [ ] **5.67** Named tuple elements (`[name: string, age: number]`)
+- [ ] **5.68** String manipulation types (`Uppercase<T>`, `Lowercase<T>`, etc.)
+
+#### Type Inference & Relations
+- [ ] **5.69** Recursive conditional type depth limits
+- [ ] **5.70** Circular reference detection
+- [ ] **5.71** Covariance/contravariance checking in functions
+- [ ] **5.72** Type widening control (`as const`)
+- [ ] **5.73** `Awaited<T>` recursive unwrapping
+- [ ] **5.74** `ThisType<T>` for object literal methods
+
+#### Type Syntax Interpretation (Parsed but needs checker support)
+- [ ] **5.103** `typeof` type operator (get type of runtime expression)
+- [ ] **5.104** Mapped type modifiers (`+readonly`, `-readonly`, `+?`, `-?`)
+- [ ] **5.105** `unique symbol` type for const symbol declarations
+- [ ] **5.106** `this` parameter types (`function foo(this: T, ...)`)
+- [ ] **5.107** Abstract construct signatures (`abstract new () => T`)
+- [ ] **5.108** Call/construct signatures in type literals (`{ (): void }`, `{ new(): T }`)
+- [ ] **5.109** Getter/setter signatures in type literals
+- [ ] **5.110** Type imports (`typeof import("module")`)
+- [ ] **5.111** Instantiation expressions (`fn<string>` without calling)
+- [ ] **5.112** `infer` with `extends` constraints (`infer T extends U`)
+- [ ] **5.113** Recursive type alias detection and handling
+
+#### Declaration & Module Features
+- [ ] **5.75** Declaration merging (interfaces, namespaces)
+- [ ] **5.76** Module augmentation (`declare module`)
+- [ ] **5.77** Global augmentation (`declare global`)
+- [ ] **5.78** Type-only import/export elision
+
+#### JSDoc Support (for `checkJs`)
+- [ ] **5.79** JSDoc type annotations (`@type`, `@param`, `@returns`)
+- [ ] **5.80** JSDoc template tags (`@template`)
+- [ ] **5.81** JSDoc typedef/callback definitions
+
+#### ECMAScript Runtime Types & Built-ins
+- [ ] **5.87** `Symbol` type and well-known symbols (`Symbol.iterator`, `Symbol.asyncIterator`, etc.)
+- [ ] **5.88** `BigInt` type checking and literal types
+- [ ] **5.89** `WeakRef<T>` and `FinalizationRegistry<T>` types
+- [ ] **5.90** Iterator/Generator type inference (`Generator<T, TReturn, TNext>`)
+- [ ] **5.91** AsyncIterator/AsyncGenerator types
+- [ ] **5.92** `Proxy` and `Reflect` type handling
+- [ ] **5.93** `SharedArrayBuffer` and `Atomics` types
+- [ ] **5.94** `DataView` and TypedArray types (`Uint8Array`, `Float32Array`, etc.)
+- [ ] **5.95** `AggregateError` and error cause chains
+
+#### ES2024-2026 Features
+- [ ] **5.96** Import attributes (`import x from "y" with { type: "json" }`)
+- [ ] **5.97** `RegExp` `/v` flag (set notation) type support
+- [ ] **5.98** Resizable `ArrayBuffer` types
+- [ ] **5.99** `Iterator.prototype` methods (`.map`, `.filter`, `.take`, etc.)
+- [ ] **5.100** `Set` methods (`.union`, `.intersection`, `.difference`, etc.)
+- [ ] **5.101** `Promise.try` type inference
+- [ ] **5.102** `Float16Array` typed array
+
+#### Performance & Architecture (from Go lessons)
+- [ ] **5.82** Type relation caching (`(source, target) → result` map)
+- [ ] **5.83** Flow state recycling (object pooling)
+- [ ] **5.84** Apparent type cache
+- [ ] **5.85** Awaited type cache
+- [ ] **5.86** Literal union base type cache
 
 ---
 

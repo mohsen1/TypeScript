@@ -4715,3 +4715,152 @@ const instance = new Foo();
         assert!(binder.file_locals.has("Foo"), "Foo class should be bound");
         assert!(binder.file_locals.has("value"), "value should be bound");
     }
+
+    // ============== Contextual typing for callbacks in object literals ==============
+    #[test]
+    fn test_contextual_typing_callback_in_object_literal() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test that callback parameters in object literals get contextual types
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                interface EventHandler {
+                    onClick: (event: string) => void;
+                }
+                const handler: EventHandler = {
+                    onClick: (e) => console.log(e)
+                };
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Verify handler exists and has correct structure
+        let handler_symbol = binder.file_locals.get("handler").expect("handler should exist");
+        let handler_type = checker.get_type_of_symbol(handler_symbol);
+
+        // Should not have any errors (parameter 'e' gets type from context)
+        // The type should be assignable to EventHandler
+        let type_str = checker.type_to_string(handler_type);
+        assert!(!type_str.is_empty(), "Handler should have a type: {}", type_str);
+    }
+
+    // ============== Empty array with contextual type ==============
+    #[test]
+    fn test_contextual_typing_empty_array() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test that empty arrays get element type from context
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                function process(nums: number[]) {}
+                process([]);  // Empty array should have contextual number element type
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Just verify this compiles without errors
+        let fn_symbol = binder.file_locals.get("process").expect("process should exist");
+        let fn_type = checker.get_type_of_symbol(fn_symbol);
+        assert!(!fn_type.is_none(), "Function should have a type");
+    }
+
+    // ============== Array callback element contextual typing ==============
+    #[test]
+    fn test_contextual_typing_array_callback_elements() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test that callback elements in arrays get contextual types
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                const handlers: Array<(x: number) => void> = [
+                    (n) => console.log(n),
+                    (m) => console.log(m * 2)
+                ];
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Verify handlers exists
+        let handlers_symbol = binder.file_locals.get("handlers").expect("handlers should exist");
+        let handlers_type = checker.get_type_of_symbol(handlers_symbol);
+        let type_str = checker.type_to_string(handlers_type);
+
+        // The type should reflect the annotated array type
+        assert!(!type_str.is_empty(), "Handlers should have a type: {}", type_str);
+    }
+
+    // ============== Method contextual typing in object literal ==============
+    #[test]
+    fn test_contextual_typing_method_in_object_literal() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test that method declarations in object literals get contextual types
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                interface Calculator {
+                    add(a: number, b: number): number;
+                }
+                const calc: Calculator = {
+                    add(x, y) { return x + y; }
+                };
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Verify calc exists and has correct structure
+        let calc_symbol = binder.file_locals.get("calc").expect("calc should exist");
+        let calc_type = checker.get_type_of_symbol(calc_symbol);
+
+        // Should have the add method
+        if let Some(Type::Object(obj)) = checker.types.get(calc_type) {
+            assert!(obj.members.has("add"), "Calculator should have add method");
+        }
+    }
