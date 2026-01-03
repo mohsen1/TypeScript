@@ -51,11 +51,21 @@ Rust components progressively replace TypeScript while compiler stays functional
 
 ## Commands
 
+### ⚠️ CRITICAL: ALWAYS USE DOCKER FOR RUST TESTS/BENCHMARKS ⚠️
+
+**NEVER run `cargo test` or `cargo bench` directly on the host machine!**
+This WILL consume excessive RAM and crash the system.
+
+**ALWAYS use Docker with memory limits:**
+
 ```bash
 # Run all Rust tests (do this frequently!)
 cd wasm && docker build -t rust-wasm-tests . && docker run --rm --memory="1g" --cpus="2.0" rust-wasm-tests
 
-# Run Rust benchmarks
+# Run specific test (MUST use Docker)
+cd wasm && docker build -t rust-wasm-tests . && docker run --rm --memory="1g" --cpus="2.0" rust-wasm-tests cargo test test_name_here
+
+# Run Rust benchmarks (MUST use Docker)
 cd wasm && docker build -t rust-wasm-tests . && docker run --rm --memory="2g" --cpus="4.0" rust-wasm-tests cargo bench
 
 # Build everything including WASM

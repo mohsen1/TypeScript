@@ -2259,8 +2259,13 @@ impl ParserState {
             return self.parse_arrow_function_expression();
         }
 
-        // Parse left-hand side (binary/conditional expression)
+        // Parse left-hand side (binary expression)
         let left = self.parse_binary_expression(0);
+
+        // Check for conditional expression: condition ? whenTrue : whenFalse
+        if self.is_token(SyntaxKind::QuestionToken) {
+            return self.parse_conditional_expression(left);
+        }
 
         // Check for assignment operator
         if self.is_assignment_operator() {
@@ -2284,6 +2289,34 @@ impl ParserState {
         }
 
         left
+    }
+
+    /// Parse a conditional expression: condition ? whenTrue : whenFalse
+    fn parse_conditional_expression(&mut self, condition: NodeIndex) -> NodeIndex {
+        let pos = self.arena.get(condition).map(|n| n.base().pos).unwrap_or(0);
+
+        // Consume '?'
+        self.next_token();
+
+        // Parse the "true" branch
+        let when_true = self.parse_assignment_expression_or_higher();
+
+        // Expect ':'
+        self.parse_expected(SyntaxKind::ColonToken);
+
+        // Parse the "false" branch
+        let when_false = self.parse_assignment_expression_or_higher();
+
+        let end = self.arena.get(when_false).map(|n| n.base().end).unwrap_or(0);
+
+        let expr = crate::parser::ConditionalExpression {
+            base: NodeBase::new_ext(syntax_kind_ext::CONDITIONAL_EXPRESSION, pos, end),
+            condition,
+            when_true,
+            when_false,
+        };
+
+        self.alloc_node(Node::ConditionalExpression(expr))
     }
 
     /// Check if current token is an assignment operator.
@@ -2694,8 +2727,9 @@ impl ParserState {
     /// Try to parse type arguments followed by a call expression: <T>(args)
     /// Returns Some((type_args, arguments)) if successful, None otherwise.
     fn try_parse_call_with_type_arguments(&mut self) -> Option<(NodeList, NodeList)> {
-        // Save position for potential rollback
+        // Save position for potential rollback (must save both scanner state and current token)
         let saved_state = self.scanner.save_state();
+        let saved_token = self.current_token;
 
         // Consume the '<'
         if !self.is_token(SyntaxKind::LessThanToken) {
@@ -2721,16 +2755,18 @@ impl ParserState {
 
         // Expect '>' followed by '('
         if !self.is_token(SyntaxKind::GreaterThanToken) {
-            // Failed - rollback
+            // Failed - rollback (restore both scanner state and current token)
             self.scanner.restore_state(saved_state);
+            self.current_token = saved_token;
             return None;
         }
         let type_args_end = self.get_token_start();
         self.next_token(); // consume '>'
 
         if !self.is_token(SyntaxKind::OpenParenToken) {
-            // Not a call expression - rollback
+            // Not a call expression - rollback (restore both scanner state and current token)
             self.scanner.restore_state(saved_state);
+            self.current_token = saved_token;
             return None;
         }
 
@@ -2759,6 +2795,7 @@ impl ParserState {
             SyntaxKind::TrueKeyword | SyntaxKind::FalseKeyword => self.parse_boolean_literal(),
             SyntaxKind::NullKeyword => self.parse_null_literal(),
             SyntaxKind::ThisKeyword => self.parse_this_expression(),
+            SyntaxKind::NewKeyword => self.parse_new_expression(),
             SyntaxKind::LessThanToken => {
                 // JSX element or fragment: <Foo> or <>
                 self.parse_jsx_element_or_self_closing_or_fragment(true)
@@ -2769,6 +2806,51 @@ impl ParserState {
                 self.create_missing_identifier()
             }
         }
+    }
+
+    /// Parse a new expression: new expression(arguments?)
+    fn parse_new_expression(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.next_token(); // consume 'new'
+
+        // Parse the constructor expression (e.g., Foo or Foo.Bar)
+        let mut expression = self.parse_primary_expression();
+
+        // Handle member accesses: new Foo.Bar()
+        while self.is_token(SyntaxKind::DotToken) {
+            self.next_token();
+            let name = self.parse_identifier();
+            let end = self.get_token_start();
+
+            let access = PropertyAccessExpression {
+                base: NodeBase::new_ext(syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION, pos, end),
+                expression,
+                question_dot_token: false,
+                name,
+            };
+            expression = self.alloc_node(Node::PropertyAccessExpression(access));
+        }
+
+        // TODO: Parse optional type arguments: new Foo<T>()
+        let type_arguments: Option<NodeList> = None;
+
+        // Parse optional arguments: new Foo() or new Foo
+        let arguments = if self.is_token(SyntaxKind::OpenParenToken) {
+            Some(self.parse_argument_list())
+        } else {
+            None
+        };
+
+        let end = self.get_token_start();
+
+        let new_expr = NewExpression {
+            base: NodeBase::new_ext(syntax_kind_ext::NEW_EXPRESSION, pos, end),
+            expression,
+            type_arguments,
+            arguments,
+        };
+
+        self.alloc_node(Node::NewExpression(new_expr))
     }
 
     /// Parse an identifier.
@@ -2962,9 +3044,23 @@ impl ParserState {
         match self.token() {
             SyntaxKind::StringLiteral => self.parse_string_literal(),
             SyntaxKind::NumericLiteral => self.parse_numeric_literal(),
-            // TODO: Handle computed property names
+            SyntaxKind::OpenBracketToken => self.parse_computed_property_name(),
             _ => self.parse_identifier(),
         }
+    }
+
+    /// Parse a computed property name: [expression]
+    fn parse_computed_property_name(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::OpenBracketToken);
+        let expression = self.parse_assignment_expression_or_higher();
+        self.parse_expected(SyntaxKind::CloseBracketToken);
+        let end = self.get_token_start();
+
+        self.alloc_node(Node::ComputedPropertyName {
+            base: NodeBase::new_ext(syntax_kind_ext::COMPUTED_PROPERTY_NAME, pos, end),
+            expression,
+        })
     }
 
     /// Parse a parenthesized expression.
@@ -3108,7 +3204,7 @@ impl ParserState {
 
         let type_params = self.parse_delimited_list(
             SyntaxKind::GreaterThanToken,
-            |p| p.scanner.is_identifier(),
+            |p| p.is_type_parameter_start(),
             |p| p.parse_type_parameter(),
         );
 
@@ -3121,12 +3217,70 @@ impl ParserState {
         list
     }
 
+    /// Check if current token can start a type parameter.
+    /// Type parameters can start with 'in', 'out', or an identifier.
+    fn is_type_parameter_start(&self) -> bool {
+        self.scanner.is_identifier()
+            || self.is_token(SyntaxKind::InKeyword)
+            || self.is_token(SyntaxKind::OutKeyword)
+    }
+
+    /// Parse variance modifiers (in/out) for type parameters.
+    fn parse_type_parameter_modifiers(&mut self) -> Option<NodeList> {
+        // Check for 'in' or 'out' modifiers
+        if !self.is_token(SyntaxKind::InKeyword) && !self.is_token(SyntaxKind::OutKeyword) {
+            return None;
+        }
+
+        let pos = self.get_full_start();
+        let mut modifiers = Vec::new();
+
+        // Parse 'in' modifier
+        if self.is_token(SyntaxKind::InKeyword) {
+            let mod_pos = self.get_full_start();
+            self.next_token();
+            let mod_end = self.get_token_start();
+            let modifier = self.alloc_node(Node::Token(NodeBase::new(SyntaxKind::InKeyword, mod_pos, mod_end)));
+            modifiers.push(modifier);
+        }
+
+        // Parse 'out' modifier (can come before or after 'in')
+        if self.is_token(SyntaxKind::OutKeyword) {
+            let mod_pos = self.get_full_start();
+            self.next_token();
+            let mod_end = self.get_token_start();
+            let modifier = self.alloc_node(Node::Token(NodeBase::new(SyntaxKind::OutKeyword, mod_pos, mod_end)));
+            modifiers.push(modifier);
+        }
+
+        // Check if 'in' comes after 'out'
+        if self.is_token(SyntaxKind::InKeyword) && !modifiers.is_empty() {
+            let mod_pos = self.get_full_start();
+            self.next_token();
+            let mod_end = self.get_token_start();
+            let modifier = self.alloc_node(Node::Token(NodeBase::new(SyntaxKind::InKeyword, mod_pos, mod_end)));
+            modifiers.push(modifier);
+        }
+
+        if modifiers.is_empty() {
+            None
+        } else {
+            let end = self.get_token_start();
+            Some(NodeList {
+                nodes: modifiers,
+                pos,
+                end,
+                has_trailing_comma: false,
+            })
+        }
+    }
+
     /// Parse a single type parameter.
     fn parse_type_parameter(&mut self) -> NodeIndex {
         let pos = self.get_full_start();
 
         // Parse variance modifiers (in/out)
-        let modifiers = None; // TODO: parse variance modifiers
+        let modifiers = self.parse_type_parameter_modifiers();
 
         // Parse name
         let name = self.parse_identifier();

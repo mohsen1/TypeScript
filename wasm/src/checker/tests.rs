@@ -3429,3 +3429,551 @@ let x = d["key"];
         assert_eq!(diagnostic_codes::EXPECTED_ARGUMENTS, 2554);
         assert_eq!(diagnostic_codes::OBJECT_IS_OF_TYPE_UNKNOWN, 2571);
     }
+
+    #[test]
+    fn test_binary_expression_arithmetic() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                const a = 1 + 2;
+                const b = 3 - 4;
+                const c = 5 * 6;
+                const d = 7 / 8;
+                const e = 9 % 10;
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Check that arithmetic operations produce number type
+        for name in ["a", "b", "c", "d", "e"] {
+            if let Some(symbol_id) = binder.file_locals.get(name) {
+                let var_type = checker.get_type_of_symbol(symbol_id);
+                let type_str = checker.type_to_string(var_type);
+                assert_eq!(type_str, "number", "{} should be number, got: {}", name, type_str);
+            }
+        }
+    }
+
+    #[test]
+    fn test_binary_expression_string_concat() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                const s = "hello" + "world";
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // String concatenation should produce string type
+        if let Some(symbol_id) = binder.file_locals.get("s") {
+            let var_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(var_type);
+            assert_eq!(type_str, "string", "String concat should be string, got: {}", type_str);
+        }
+    }
+
+    #[test]
+    fn test_binary_expression_comparison() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+        use crate::parser::Node;
+
+        // Test simple binary comparison expression
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "const a = 1 < 2;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        // First verify the parser is creating a BinaryExpression
+        let mut found_binary = false;
+        for i in 0..parser.arena.len() {
+            let idx = crate::parser::NodeIndex(i as u32);
+            if let Some(Node::BinaryExpression(be)) = parser.arena.get(idx) {
+                found_binary = true;
+                assert_eq!(be.operator_token, crate::scanner::SyntaxKind::LessThanToken,
+                    "Expected LessThanToken, got {:?}", be.operator_token);
+            }
+        }
+        assert!(found_binary, "Parser should create a BinaryExpression for '1 < 2'");
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Check that comparison operations produce boolean type
+        if let Some(symbol_id) = binder.file_locals.get("a") {
+            let var_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(var_type);
+            assert_eq!(type_str, "boolean", "a should be boolean, got: {}", type_str);
+        }
+    }
+
+    #[test]
+    fn test_conditional_expression() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                const x = true ? 1 : "hello";
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Conditional should produce union of both branches
+        if let Some(symbol_id) = binder.file_locals.get("x") {
+            let var_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(var_type);
+            // Should be number | string (order may vary)
+            assert!(type_str.contains("1") || type_str.contains("number"),
+                "Ternary should include number type, got: {}", type_str);
+            assert!(type_str.contains("hello") || type_str.contains("string"),
+                "Ternary should include string type, got: {}", type_str);
+        }
+    }
+
+    #[test]
+    fn test_unary_expressions() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                const x = 5;
+                const a = -x;
+                const b = +x;
+                const c = !x;
+                const d = ~x;
+                const e = typeof x;
+                const f = void x;
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Test unary minus: number
+        if let Some(symbol_id) = binder.file_locals.get("a") {
+            let var_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(var_type);
+            assert_eq!(type_str, "number", "Unary minus should be number, got: {}", type_str);
+        }
+
+        // Test unary plus: number
+        if let Some(symbol_id) = binder.file_locals.get("b") {
+            let var_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(var_type);
+            assert_eq!(type_str, "number", "Unary plus should be number, got: {}", type_str);
+        }
+
+        // Test logical not: boolean
+        if let Some(symbol_id) = binder.file_locals.get("c") {
+            let var_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(var_type);
+            assert_eq!(type_str, "boolean", "Logical not should be boolean, got: {}", type_str);
+        }
+
+        // Test bitwise not: number
+        if let Some(symbol_id) = binder.file_locals.get("d") {
+            let var_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(var_type);
+            assert_eq!(type_str, "number", "Bitwise not should be number, got: {}", type_str);
+        }
+
+        // Test typeof: string
+        if let Some(symbol_id) = binder.file_locals.get("e") {
+            let var_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(var_type);
+            assert_eq!(type_str, "string", "typeof should be string, got: {}", type_str);
+        }
+
+        // Test void: undefined
+        if let Some(symbol_id) = binder.file_locals.get("f") {
+            let var_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(var_type);
+            assert_eq!(type_str, "undefined", "void should be undefined, got: {}", type_str);
+        }
+    }
+
+    #[test]
+    fn test_nullish_coalescing() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                const x: number | null = null;
+                const y = x ?? 0;
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Nullish coalescing should produce union of non-null left and right
+        if let Some(symbol_id) = binder.file_locals.get("y") {
+            let var_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(var_type);
+            // Should contain number (from both the non-null part and the 0)
+            assert!(type_str.contains("number") || type_str.contains("0"),
+                "Nullish coalescing should produce number type, got: {}", type_str);
+        }
+    }
+
+    #[test]
+    fn test_logical_and_or() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+                const a = true && 1;
+                const b = false || "hello";
+            "#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Logical AND: should include both types
+        if let Some(symbol_id) = binder.file_locals.get("a") {
+            let var_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(var_type);
+            // Should be union of true and 1
+            assert!(type_str.contains("true") || type_str.contains("1"),
+                "Logical AND should produce union, got: {}", type_str);
+        }
+
+        // Logical OR: should include both types
+        if let Some(symbol_id) = binder.file_locals.get("b") {
+            let var_type = checker.get_type_of_symbol(symbol_id);
+            let type_str = checker.type_to_string(var_type);
+            // Should be union of false and "hello"
+            assert!(type_str.contains("false") || type_str.contains("hello"),
+                "Logical OR should produce union, got: {}", type_str);
+        }
+    }
+
+    #[test]
+    fn test_computed_property_name() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test computed property names with static expressions
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"const obj = { ["foo"]: 1, ["bar"]: "hello" };"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("obj"));
+        if let Some(symbol) = binder.file_locals.get("obj") {
+            let obj_type = checker.get_type_of_symbol(symbol);
+
+            // Should be an object type with 2 properties
+            if let Some(Type::Object(obj)) = checker.types.get(obj_type) {
+                assert_eq!(obj.properties.len(), 2, "Expected 2 properties for computed property object");
+
+                // Verify properties are named correctly
+                assert!(obj.members.has("foo"), "Should have 'foo' property");
+                assert!(obj.members.has("bar"), "Should have 'bar' property");
+            } else {
+                panic!("Expected Object type for object literal with computed properties");
+            }
+        }
+    }
+
+    #[test]
+    fn test_computed_property_name_numeric() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test computed property names with numeric expressions
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"const obj = { [42]: "answer" };"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        assert!(binder.file_locals.has("obj"));
+        if let Some(symbol) = binder.file_locals.get("obj") {
+            let obj_type = checker.get_type_of_symbol(symbol);
+
+            // Should be an object type with 1 property
+            if let Some(Type::Object(obj)) = checker.types.get(obj_type) {
+                assert_eq!(obj.properties.len(), 1, "Expected 1 property for numeric computed property");
+                assert!(obj.members.has("42"), "Should have '42' property");
+            } else {
+                panic!("Expected Object type for object literal with numeric computed property");
+            }
+        }
+    }
+
+    #[test]
+    fn test_variance_modifiers_out() {
+        use crate::parser_impl::ParserState;
+        use crate::parser::Node;
+
+        // Test 'out' variance modifier (covariant)
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "interface Producer<out T> { produce(): T; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        // Find the interface declaration
+        if let Some(Node::SourceFile(sf)) = parser.arena.get(root) {
+            assert!(!sf.statements.nodes.is_empty(), "Should have statements");
+
+            if let Some(Node::InterfaceDeclaration(iface)) = parser.arena.get(sf.statements.nodes[0]) {
+                // Check type parameters
+                let type_params = iface.type_parameters.as_ref().expect("Should have type parameters");
+                assert!(!type_params.is_empty(), "Should have type parameters");
+
+                if let Some(Node::TypeParameterDeclaration(tp)) = parser.arena.get(type_params.nodes[0]) {
+                    // Check for 'out' modifier
+                    assert!(tp.modifiers.is_some(), "Should have modifiers");
+                    let modifiers = tp.modifiers.as_ref().unwrap();
+                    assert_eq!(modifiers.len(), 1, "Should have one modifier");
+
+                    // The modifier should be 'out'
+                    if let Some(Node::Token(base)) = parser.arena.get(modifiers.nodes[0]) {
+                        assert_eq!(base.kind, crate::scanner::SyntaxKind::OutKeyword as u16, "Should be 'out' keyword");
+                    } else {
+                        panic!("Expected token node for modifier");
+                    }
+                } else {
+                    panic!("Expected TypeParameterDeclaration");
+                }
+            } else {
+                panic!("Expected InterfaceDeclaration");
+            }
+        }
+    }
+
+    #[test]
+    fn test_variance_modifiers_in() {
+        use crate::parser_impl::ParserState;
+        use crate::parser::Node;
+
+        // Test 'in' variance modifier (contravariant)
+        // Use simpler syntax - just the type alias
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "type Consumer<in T> = T;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        // Find the type alias declaration
+        if let Some(Node::SourceFile(sf)) = parser.arena.get(root) {
+            if let Some(Node::TypeAliasDeclaration(alias)) = parser.arena.get(sf.statements.nodes[0]) {
+                let type_params = alias.type_parameters.as_ref().expect("Should have type parameters");
+                if let Some(Node::TypeParameterDeclaration(tp)) = parser.arena.get(type_params.nodes[0]) {
+                    assert!(tp.modifiers.is_some(), "Should have modifiers");
+                    let modifiers = tp.modifiers.as_ref().unwrap();
+                    assert_eq!(modifiers.len(), 1, "Should have one modifier");
+
+                    if let Some(Node::Token(base)) = parser.arena.get(modifiers.nodes[0]) {
+                        assert_eq!(base.kind, crate::scanner::SyntaxKind::InKeyword as u16, "Should be 'in' keyword");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_variance_modifiers_in_out() {
+        use crate::parser_impl::ParserState;
+        use crate::parser::Node;
+
+        // Test 'in out' variance modifier (invariant)
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            "type Mapper<in out T> = T;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        // Find the type alias declaration
+        if let Some(Node::SourceFile(sf)) = parser.arena.get(root) {
+            if let Some(Node::TypeAliasDeclaration(alias)) = parser.arena.get(sf.statements.nodes[0]) {
+                let type_params = alias.type_parameters.as_ref().expect("Should have type parameters");
+                if let Some(Node::TypeParameterDeclaration(tp)) = parser.arena.get(type_params.nodes[0]) {
+                    assert!(tp.modifiers.is_some(), "Should have modifiers for 'in out'");
+                    let modifiers = tp.modifiers.as_ref().unwrap();
+                    assert_eq!(modifiers.len(), 2, "Should have two modifiers for 'in out'");
+
+                    // First should be 'in'
+                    if let Some(Node::Token(base)) = parser.arena.get(modifiers.nodes[0]) {
+                        assert_eq!(base.kind, crate::scanner::SyntaxKind::InKeyword as u16, "First should be 'in'");
+                    }
+                    // Second should be 'out'
+                    if let Some(Node::Token(base)) = parser.arena.get(modifiers.nodes[1]) {
+                        assert_eq!(base.kind, crate::scanner::SyntaxKind::OutKeyword as u16, "Second should be 'out'");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_new_expression_basic() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test class type inference with new expression
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"class Foo {} const x = new Foo();"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the type of 'x'
+        assert!(binder.file_locals.has("x"), "Should have 'x' symbol");
+        if let Some(symbol) = binder.file_locals.get("x") {
+            let x_type = checker.get_type_of_symbol(symbol);
+            let type_str = checker.type_to_string(x_type);
+            eprintln!("Instance type: {}", type_str);
+            // Should not be 'any' - should be the class instance type
+            assert_ne!(x_type, checker.types.any_type, "x should not be 'any'");
+        }
+    }
+
+    #[test]
+    fn test_new_expression_class_with_members() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test that new Foo() returns the class instance type for class with members
+        let mut parser = ParserState::new(
+            "test.ts".to_string(),
+            r#"
+class Foo {
+    x: number = 1;
+    greet(): string { return "hello"; }
+}
+const instance = new Foo();
+"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Get the type of 'instance'
+        assert!(binder.file_locals.has("instance"), "Should have 'instance' symbol");
+        if let Some(symbol) = binder.file_locals.get("instance") {
+            let instance_type = checker.get_type_of_symbol(symbol);
+            let type_str = checker.type_to_string(instance_type);
+            eprintln!("Instance type of class with members: {}", type_str);
+            // Should not be 'any'
+            assert_ne!(instance_type, checker.types.any_type, "instance should not be 'any'");
+        }
+    }

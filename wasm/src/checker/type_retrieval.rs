@@ -86,6 +86,12 @@ impl<'a> CheckerState<'a> {
                     self.types.big_int_type
                 } else if kind == SyntaxKind::SymbolKeyword as u16 {
                     self.types.es_symbol_type
+                } else if kind == SyntaxKind::ThisKeyword as u16 {
+                    // TODO: Get the actual 'this' type from the enclosing class/function
+                    self.types.any_type
+                } else if kind == SyntaxKind::SuperKeyword as u16 {
+                    // TODO: Get the superclass type from the enclosing class
+                    self.types.any_type
                 } else {
                     self.types.any_type
                 }
@@ -357,14 +363,26 @@ impl<'a> CheckerState<'a> {
                 self.get_type_of_type_literal(&tl.members)
             }
 
-            // Property access expressions (e.g., obj.prop)
+            // Property access expressions (e.g., obj.prop, obj?.prop)
             Node::PropertyAccessExpression(pa) => {
-                self.get_type_of_property_access(pa.expression, pa.name)
+                let prop_type = self.get_type_of_property_access(pa.expression, pa.name);
+                // If optional chaining, add undefined to the result type
+                if pa.question_dot_token {
+                    self.types.create_union(vec![prop_type, self.types.undefined_type])
+                } else {
+                    prop_type
+                }
             }
 
-            // Element access expressions (e.g., obj[key], arr[0])
+            // Element access expressions (e.g., obj[key], arr[0], obj?.[key])
             Node::ElementAccessExpression(ea) => {
-                self.get_type_of_element_access(ea.expression, ea.argument_expression)
+                let elem_type = self.get_type_of_element_access(ea.expression, ea.argument_expression);
+                // If optional chaining, add undefined to the result type
+                if ea.question_dot_token {
+                    self.types.create_union(vec![elem_type, self.types.undefined_type])
+                } else {
+                    elem_type
+                }
             }
 
             // Object literals (e.g., { x: 1, y: "hello" })
@@ -446,6 +464,147 @@ impl<'a> CheckerState<'a> {
             // Enum declarations
             Node::EnumDeclaration(ed) => {
                 self.get_type_of_enum_declaration(node, ed)
+            }
+
+            // Prefix unary expressions (++x, --x, !x, ~x, -x, +x, typeof x, void x, delete x, await x)
+            Node::PrefixUnaryExpression(pue) => {
+                match pue.operator {
+                    // ++x, --x: operand must be numeric, result is number
+                    SyntaxKind::PlusPlusToken | SyntaxKind::MinusMinusToken => {
+                        let operand_type = self.get_type_of_node(pue.operand);
+                        // Check that operand is assignable to number
+                        if !self.is_type_assignable_to(operand_type, self.types.number_type) {
+                            let operand_str = self.type_to_string(operand_type);
+                            self.error(
+                                node,
+                                &format!("An arithmetic operand must be of type 'any', 'number', 'bigint' or an enum type. Type '{}' is not assignable.", operand_str),
+                                diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE
+                            );
+                        }
+                        self.types.number_type
+                    }
+                    // +x, -x: unary plus/minus - result is number
+                    SyntaxKind::PlusToken | SyntaxKind::MinusToken => {
+                        self.types.number_type
+                    }
+                    // !x: logical not - result is boolean
+                    SyntaxKind::ExclamationToken => {
+                        self.types.boolean_type
+                    }
+                    // ~x: bitwise not - result is number
+                    SyntaxKind::TildeToken => {
+                        self.types.number_type
+                    }
+                    // typeof x: result is string (actually a union of literal types)
+                    SyntaxKind::TypeOfKeyword => {
+                        // TypeScript returns a union of literal string types
+                        // For simplicity, we return string type
+                        self.types.string_type
+                    }
+                    // void x: result is undefined
+                    SyntaxKind::VoidKeyword => {
+                        self.types.undefined_type
+                    }
+                    // delete x: result is boolean
+                    SyntaxKind::DeleteKeyword => {
+                        self.types.boolean_type
+                    }
+                    // await x: unwrap Promise type
+                    SyntaxKind::AwaitKeyword => {
+                        let operand_type = self.get_type_of_node(pue.operand);
+                        // TODO: Properly unwrap Promise<T> to T
+                        // For now, return the operand type
+                        operand_type
+                    }
+                    _ => self.types.any_type
+                }
+            }
+
+            // Postfix unary expressions (x++, x--)
+            Node::PostfixUnaryExpression(pue) => {
+                match pue.operator {
+                    // x++, x--: operand must be numeric, result is number
+                    SyntaxKind::PlusPlusToken | SyntaxKind::MinusMinusToken => {
+                        let operand_type = self.get_type_of_node(pue.operand);
+                        // Check that operand is assignable to number
+                        if !self.is_type_assignable_to(operand_type, self.types.number_type) {
+                            let operand_str = self.type_to_string(operand_type);
+                            self.error(
+                                node,
+                                &format!("An arithmetic operand must be of type 'any', 'number', 'bigint' or an enum type. Type '{}' is not assignable.", operand_str),
+                                diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE
+                            );
+                        }
+                        self.types.number_type
+                    }
+                    _ => self.types.any_type
+                }
+            }
+
+            // Binary expressions (a + b, a && b, etc.)
+            Node::BinaryExpression(be) => {
+                self.get_type_of_binary_expression(be)
+            }
+
+            // Conditional expressions (a ? b : c)
+            Node::ConditionalExpression(ce) => {
+                let when_true_type = self.get_type_of_node(ce.when_true);
+                let when_false_type = self.get_type_of_node(ce.when_false);
+                // The type is the union of both branches
+                self.types.create_union(vec![when_true_type, when_false_type])
+            }
+
+            // Template expressions (`hello ${world}`)
+            Node::TemplateExpression(_) => {
+                // Template expressions always produce string type
+                self.types.string_type
+            }
+
+            // Tagged template expressions (tag`template`)
+            Node::TaggedTemplateExpression(tte) => {
+                // The return type is determined by the tag function
+                let tag_type = self.get_type_of_node(tte.tag);
+                // Try to get the return type of the tag function
+                if let Some(crate::checker::types::Type::Function(f)) = self.types.get(tag_type) {
+                    f.return_type
+                } else {
+                    self.types.any_type
+                }
+            }
+
+            // Yield expressions (yield x, yield* x)
+            Node::YieldExpression(ye) => {
+                // The type of yield is the yield type from the generator
+                // For now, return any if no expression, otherwise the expression type
+                if !ye.expression.is_none() {
+                    self.get_type_of_node(ye.expression)
+                } else {
+                    self.types.undefined_type
+                }
+            }
+
+            // Await expressions (await x)
+            Node::AwaitExpression(ae) => {
+                let operand_type = self.get_type_of_node(ae.expression);
+                // TODO: Properly unwrap Promise<T> to T
+                operand_type
+            }
+
+            // Template literal type (TemplateLiteralType is a type node, not expression)
+            Node::NoSubstitutionTemplateLiteral(_) => {
+                self.types.string_type
+            }
+
+            // RegExp literal
+            Node::RegularExpressionLiteral(_) => {
+                // TODO: Create proper RegExp type
+                self.types.any_type
+            }
+
+            // Computed property name: [expression]
+            Node::ComputedPropertyName { expression, .. } => {
+                // Return the type of the expression (for property key type checking)
+                self.get_type_of_node(*expression)
             }
 
             // Default: return any
@@ -750,30 +909,35 @@ impl<'a> CheckerState<'a> {
     }
 
     /// Get the element type when spreading an array/tuple into another array.
-    fn get_element_type_of_spread(&self, spread_type: TypeId) -> TypeId {
-        if let Some(ty) = self.types.get(spread_type) {
+    fn get_element_type_of_spread(&mut self, spread_type: TypeId) -> TypeId {
+        // Need to extract the element types before creating a union to avoid borrow issues
+        let spread_info = if let Some(ty) = self.types.get(spread_type) {
             match ty {
-                Type::Array(arr) => arr.element_type,
-                Type::Tuple(tup) => {
-                    // For tuples, create a union of all element types
-                    if tup.element_types.is_empty() {
-                        self.types.never_type
-                    } else if tup.element_types.len() == 1 {
-                        tup.element_types[0]
-                    } else {
-                        // Note: We can't create a union here since we only have &self
-                        // For now, return the first element type
-                        // A proper implementation would need &mut self
-                        tup.element_types[0]
-                    }
-                }
-                _ => {
-                    // For other types (like any), just return the type
-                    spread_type
-                }
+                Type::Array(arr) => Some((vec![arr.element_type], false)),
+                Type::Tuple(tup) => Some((tup.element_types.clone(), true)),
+                _ => None,
             }
         } else {
-            self.types.any_type
+            None
+        };
+
+        match spread_info {
+            Some((types, is_tuple)) => {
+                if types.is_empty() {
+                    self.types.never_type
+                } else if types.len() == 1 {
+                    types[0]
+                } else if is_tuple {
+                    // For tuples, create a union of all element types
+                    self.types.create_union_type(types)
+                } else {
+                    types[0]
+                }
+            }
+            None => {
+                // For other types (like any), just return the type
+                spread_type
+            }
         }
     }
 
@@ -1287,6 +1451,27 @@ impl<'a> CheckerState<'a> {
     ) -> TypeId {
         use crate::parser::Node;
 
+        // Early caching to handle recursive types (like interfaces)
+        // 1. Resolve the symbol for this class
+        let class_symbol_id = if let Some(Node::Identifier(id)) = self.node_arena.get(class.name) {
+            self.file_locals.get(&id.escaped_text).unwrap_or(SymbolId::NONE)
+        } else {
+            SymbolId::NONE
+        };
+
+        // 2. Check if we already have a cached type for this node
+        if let Some(&cached) = self.node_types.get(&node) {
+            return cached;
+        }
+
+        // 3. Create a placeholder ObjectType and cache it immediately to break recursion cycles
+        let placeholder = ObjectType::new(object_flags::CLASS, class_symbol_id);
+        let placeholder_type_id = self.types.alloc(Type::Object(placeholder));
+        self.node_types.insert(node, placeholder_type_id);
+        if !class_symbol_id.is_none() {
+            self.symbol_types.insert(class_symbol_id, placeholder_type_id);
+        }
+
         let mut properties = Vec::new();
         let mut constructor_params: Vec<(NodeIndex, SymbolId)> = Vec::new();
         let mut has_constructor = false;
@@ -1442,6 +1627,13 @@ impl<'a> CheckerState<'a> {
         // Create the constructor type - this is the type of the class itself
         // It has construct signatures that return the instance type
         let constructor_type = self.types.create_class_type(properties, construct_signatures, vec![]);
+
+        // Update the cache with the final type (overwriting the placeholder)
+        self.node_types.insert(node, constructor_type);
+        if !class_symbol_id.is_none() {
+            self.symbol_types.insert(class_symbol_id, constructor_type);
+        }
+
         constructor_type
     }
 
@@ -1905,10 +2097,8 @@ impl<'a> CheckerState<'a> {
             if let Some(node) = self.node_arena.get(prop_idx) {
                 match node {
                     Node::PropertyAssignment(pa) => {
-                        // Get property name
-                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(pa.name) {
-                            id.escaped_text.clone()
-                        } else {
+                        // Get property name (supports identifier, string/number literals, computed)
+                        let Some(name) = self.get_property_name_text(pa.name) else {
                             continue;
                         };
 
@@ -1924,10 +2114,8 @@ impl<'a> CheckerState<'a> {
                         members_table.set(name, symbol_id);
                     }
                     Node::ShorthandPropertyAssignment(spa) => {
-                        // Get property name
-                        let name = if let Some(Node::Identifier(id)) = self.node_arena.get(spa.name) {
-                            id.escaped_text.clone()
-                        } else {
+                        // Get property name (only identifiers valid for shorthand)
+                        let Some(name) = self.get_property_name_text(spa.name) else {
                             continue;
                         };
 
@@ -1960,6 +2148,35 @@ impl<'a> CheckerState<'a> {
     fn get_symbol(&self, id: SymbolId) -> Option<&crate::binder::Symbol> {
         // Check local_symbols first to avoid ID collision with binder symbols
         self.local_symbols.get(id).or_else(|| self.symbol_arena.get(id))
+    }
+
+    /// Get the name string from a property name node.
+    /// Returns None for computed property names that can't be statically resolved.
+    fn get_property_name_text(&self, name_idx: NodeIndex) -> Option<String> {
+        use crate::parser::Node;
+
+        let Some(node) = self.node_arena.get(name_idx) else {
+            return None;
+        };
+
+        match node {
+            Node::Identifier(id) => Some(id.escaped_text.clone()),
+            Node::StringLiteral(sl) => Some(sl.text.clone()),
+            Node::NumericLiteral(nl) => Some(nl.text.clone()),
+            Node::ComputedPropertyName { expression, .. } => {
+                // For computed property names, check if the expression is a string literal
+                if let Some(Node::StringLiteral(sl)) = self.node_arena.get(*expression) {
+                    Some(sl.text.clone())
+                } else if let Some(Node::NumericLiteral(nl)) = self.node_arena.get(*expression) {
+                    Some(nl.text.clone())
+                } else {
+                    // Dynamic computed property - for now return None
+                    // In a full implementation, we'd create an index signature
+                    None
+                }
+            }
+            _ => None,
+        }
     }
 
     /// Get the type of a function-like declaration (function, method, arrow, etc.)
@@ -2642,6 +2859,139 @@ impl<'a> CheckerState<'a> {
         }
 
         self.types.any_type
+    }
+
+    /// Get the type of a binary expression.
+    fn get_type_of_binary_expression(&mut self, be: &crate::parser::BinaryExpression) -> TypeId {
+        use crate::scanner::SyntaxKind;
+
+        let left_type = self.get_type_of_node(be.left);
+        let right_type = self.get_type_of_node(be.right);
+
+        match be.operator_token {
+            // Arithmetic operators: +, -, *, /, %, **
+            SyntaxKind::PlusToken => {
+                // + can be string concatenation or numeric addition
+                if self.is_type_assignable_to(left_type, self.types.string_type)
+                    || self.is_type_assignable_to(right_type, self.types.string_type)
+                {
+                    self.types.string_type
+                } else {
+                    self.types.number_type
+                }
+            }
+            SyntaxKind::MinusToken
+            | SyntaxKind::AsteriskToken
+            | SyntaxKind::SlashToken
+            | SyntaxKind::PercentToken
+            | SyntaxKind::AsteriskAsteriskToken => {
+                self.types.number_type
+            }
+
+            // Bitwise operators: &, |, ^, <<, >>, >>>
+            SyntaxKind::AmpersandToken
+            | SyntaxKind::BarToken
+            | SyntaxKind::CaretToken
+            | SyntaxKind::LessThanLessThanToken
+            | SyntaxKind::GreaterThanGreaterThanToken
+            | SyntaxKind::GreaterThanGreaterThanGreaterThanToken => {
+                self.types.number_type
+            }
+
+            // Comparison operators: <, >, <=, >=
+            SyntaxKind::LessThanToken
+            | SyntaxKind::GreaterThanToken
+            | SyntaxKind::LessThanEqualsToken
+            | SyntaxKind::GreaterThanEqualsToken => {
+                self.types.boolean_type
+            }
+
+            // Equality operators: ==, !=, ===, !==
+            SyntaxKind::EqualsEqualsToken
+            | SyntaxKind::ExclamationEqualsToken
+            | SyntaxKind::EqualsEqualsEqualsToken
+            | SyntaxKind::ExclamationEqualsEqualsToken => {
+                self.types.boolean_type
+            }
+
+            // Logical operators: &&, ||
+            SyntaxKind::AmpersandAmpersandToken => {
+                // && returns left if falsy, otherwise right
+                // Type is union of narrowed left type and right type
+                // Simplified: return union of both types
+                self.types.create_union(vec![left_type, right_type])
+            }
+            SyntaxKind::BarBarToken => {
+                // || returns left if truthy, otherwise right
+                // Simplified: return union of both types
+                self.types.create_union(vec![left_type, right_type])
+            }
+
+            // Nullish coalescing: ??
+            SyntaxKind::QuestionQuestionToken => {
+                // ?? returns left if not null/undefined, otherwise right
+                let non_null_left = self.get_non_nullable_type(left_type);
+                self.types.create_union(vec![non_null_left, right_type])
+            }
+
+            // Assignment operators: =, +=, -=, etc.
+            SyntaxKind::EqualsToken => {
+                // Assignment returns the right-hand side type
+                right_type
+            }
+            SyntaxKind::PlusEqualsToken => {
+                // += can be string concatenation or numeric addition
+                if self.is_type_assignable_to(left_type, self.types.string_type)
+                    || self.is_type_assignable_to(right_type, self.types.string_type)
+                {
+                    self.types.string_type
+                } else {
+                    self.types.number_type
+                }
+            }
+            SyntaxKind::MinusEqualsToken
+            | SyntaxKind::AsteriskEqualsToken
+            | SyntaxKind::SlashEqualsToken
+            | SyntaxKind::PercentEqualsToken
+            | SyntaxKind::AsteriskAsteriskEqualsToken => {
+                self.types.number_type
+            }
+            SyntaxKind::AmpersandEqualsToken
+            | SyntaxKind::BarEqualsToken
+            | SyntaxKind::CaretEqualsToken
+            | SyntaxKind::LessThanLessThanEqualsToken
+            | SyntaxKind::GreaterThanGreaterThanEqualsToken
+            | SyntaxKind::GreaterThanGreaterThanGreaterThanEqualsToken => {
+                self.types.number_type
+            }
+            SyntaxKind::AmpersandAmpersandEqualsToken => {
+                self.types.create_union(vec![left_type, right_type])
+            }
+            SyntaxKind::BarBarEqualsToken => {
+                self.types.create_union(vec![left_type, right_type])
+            }
+            SyntaxKind::QuestionQuestionEqualsToken => {
+                let non_null_left = self.get_non_nullable_type(left_type);
+                self.types.create_union(vec![non_null_left, right_type])
+            }
+
+            // instanceof: returns boolean
+            SyntaxKind::InstanceOfKeyword => {
+                self.types.boolean_type
+            }
+
+            // in: returns boolean
+            SyntaxKind::InKeyword => {
+                self.types.boolean_type
+            }
+
+            // Comma operator: returns right operand type
+            SyntaxKind::CommaToken => {
+                right_type
+            }
+
+            _ => self.types.any_type
+        }
     }
 
 }
