@@ -9,7 +9,7 @@
 | 2     | Scanner        | ✅ DONE | 22 Rust |
 | 3     | Parser         | ✅ 98%  | 81 Rust + 19 TS |
 | 4     | Binder         | ✅ DONE | 10 TS |
-| 5     | Type Checker   | 🟡 95%  | 356 Rust |
+| 5     | Type Checker   | 🟡 95%  | 359 Rust |
 | 6     | Emitter        | 🟡 40%  | 38 Rust |
 | 7     | Language Svc   | ⬜ 0%   | - |
 | 8     | Full Rust      | ⬜ 0%   | - |
@@ -115,7 +115,7 @@ All of the following are complete:
 - [ ] **5.65** Decorator metadata type support
 
 #### Advanced Tuple & Template Types
-- [ ] **5.66** Variadic tuple types (`[...T, ...U]`)
+- [x] **5.66** Variadic tuple types (`[...T, ...U]`)
 - [x] **5.67** Named tuple elements (`[name: string, age: number]`)
 - [x] **5.68** String manipulation types (`Uppercase<T>`, `Lowercase<T>`, etc.)
 

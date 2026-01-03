@@ -7,7 +7,7 @@ use serde::Serialize;
 use crate::binder::{SymbolId, SymbolTable};
 use crate::parser::NodeIndex;
 use super::types::{
-    type_flags, object_flags,
+    type_flags, object_flags, element_flags,
     Type, TypeId, LiteralValue, LiteralType, IntrinsicType,
     ObjectType, UnionType, IntersectionType, TypeParameter,
     ConditionalType, MappedType, MappedTypeModifier, IndexType, IndexedAccessType,
@@ -312,12 +312,47 @@ impl TypeArena {
         has_rest_element: bool,
         is_readonly: bool,
     ) -> TypeId {
+        // Generate default element flags: all required except last if has_rest_element
+        let len = element_types.len();
+        let element_flags: Vec<u32> = (0..len)
+            .map(|i| {
+                if has_rest_element && i == len - 1 {
+                    element_flags::REST
+                } else {
+                    element_flags::REQUIRED
+                }
+            })
+            .collect();
+
         self.alloc(Type::Tuple(Box::new(TupleTypeInfo {
             flags: type_flags::OBJECT,
             element_types,
+            element_flags,
             element_names: None,
             has_optional_elements,
             has_rest_element,
+            is_readonly,
+        })))
+    }
+
+    /// Create a tuple type with explicit element flags (for variadic tuples).
+    pub fn create_variadic_tuple_type(
+        &mut self,
+        element_types: Vec<TypeId>,
+        element_flags: Vec<u32>,
+        element_names: Option<Vec<Option<String>>>,
+        is_readonly: bool,
+    ) -> TypeId {
+        let has_optional = element_flags.iter().any(|&f| f & element_flags::OPTIONAL != 0);
+        let has_rest = element_flags.iter().any(|&f| f & (element_flags::REST | element_flags::VARIADIC) != 0);
+
+        self.alloc(Type::Tuple(Box::new(TupleTypeInfo {
+            flags: type_flags::OBJECT,
+            element_types,
+            element_flags,
+            element_names,
+            has_optional_elements: has_optional,
+            has_rest_element: has_rest,
             is_readonly,
         })))
     }
@@ -331,9 +366,22 @@ impl TypeArena {
         has_rest_element: bool,
         is_readonly: bool,
     ) -> TypeId {
+        // Generate default element flags: all required except last if has_rest_element
+        let len = element_types.len();
+        let element_flags: Vec<u32> = (0..len)
+            .map(|i| {
+                if has_rest_element && i == len - 1 {
+                    element_flags::REST
+                } else {
+                    element_flags::REQUIRED
+                }
+            })
+            .collect();
+
         self.alloc(Type::Tuple(Box::new(TupleTypeInfo {
             flags: type_flags::OBJECT,
             element_types,
+            element_flags,
             element_names: Some(element_names),
             has_optional_elements,
             has_rest_element,

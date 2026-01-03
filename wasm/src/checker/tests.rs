@@ -7287,3 +7287,83 @@ interface TreeNode {
         // This verifies that `const out T` parses correctly
         assert!(true, "const + variance modifiers should parse together");
     }
+
+    // =========================================================================
+    // 5.66: Variadic tuple types
+    // =========================================================================
+
+    #[test]
+    fn test_variadic_tuple_element_flags() {
+        // Test that element_flags are properly set for tuple types
+        let mut arena = super::TypeArena::new();
+
+        // Create a simple tuple [number, string]
+        let tuple = arena.create_tuple_type(
+            vec![arena.number_type, arena.string_type],
+            false, // has_optional
+            false, // has_rest
+            false, // is_readonly
+        );
+
+        if let Some(super::types::Type::Tuple(t)) = arena.get(tuple) {
+            assert_eq!(t.element_flags.len(), 2, "Should have 2 element flags");
+            assert_eq!(t.element_flags[0], super::types::element_flags::REQUIRED);
+            assert_eq!(t.element_flags[1], super::types::element_flags::REQUIRED);
+        } else {
+            panic!("Expected Tuple type");
+        }
+    }
+
+    #[test]
+    fn test_variadic_tuple_with_rest() {
+        // Test that rest element is properly flagged
+        let mut arena = super::TypeArena::new();
+
+        // Create tuple [number, ...string[]] (rest in last position)
+        let tuple = arena.create_tuple_type(
+            vec![arena.number_type, arena.string_type], // string represents element type of rest
+            false, // has_optional
+            true,  // has_rest
+            false, // is_readonly
+        );
+
+        if let Some(super::types::Type::Tuple(t)) = arena.get(tuple) {
+            assert_eq!(t.element_flags.len(), 2, "Should have 2 element flags");
+            assert_eq!(t.element_flags[0], super::types::element_flags::REQUIRED);
+            assert_eq!(t.element_flags[1], super::types::element_flags::REST);
+            assert!(t.has_rest_element, "has_rest_element should be true");
+        } else {
+            panic!("Expected Tuple type");
+        }
+    }
+
+    #[test]
+    fn test_variadic_tuple_explicit_flags() {
+        // Test create_variadic_tuple_type with explicit element flags
+        let mut arena = super::TypeArena::new();
+
+        // Create variadic tuple [...T, number, ...U]
+        // where T and U are variadic (spread tuples)
+        let element_flags = vec![
+            super::types::element_flags::VARIADIC,  // ...T
+            super::types::element_flags::REQUIRED,  // number
+            super::types::element_flags::VARIADIC,  // ...U
+        ];
+
+        let tuple = arena.create_variadic_tuple_type(
+            vec![arena.any_type, arena.number_type, arena.any_type],
+            element_flags.clone(),
+            None, // no names
+            false, // not readonly
+        );
+
+        if let Some(super::types::Type::Tuple(t)) = arena.get(tuple) {
+            assert_eq!(t.element_flags.len(), 3, "Should have 3 element flags");
+            assert_eq!(t.element_flags[0], super::types::element_flags::VARIADIC);
+            assert_eq!(t.element_flags[1], super::types::element_flags::REQUIRED);
+            assert_eq!(t.element_flags[2], super::types::element_flags::VARIADIC);
+            assert!(t.has_rest_element, "has_rest_element should be true (variadic counts as rest)");
+        } else {
+            panic!("Expected Tuple type");
+        }
+    }

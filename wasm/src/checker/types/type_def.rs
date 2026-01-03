@@ -296,11 +296,26 @@ pub struct ArrayTypeInfo {
     pub is_readonly: bool,
 }
 
+/// Flags for individual tuple element kinds
+pub mod element_flags {
+    /// A required element (no modifier)
+    pub const REQUIRED: u32 = 1 << 0;
+    /// An optional element (name?: type)
+    pub const OPTIONAL: u32 = 1 << 1;
+    /// A rest element (...type)
+    pub const REST: u32 = 1 << 2;
+    /// A variadic element (spread of another tuple: ...T where T is a tuple type)
+    pub const VARIADIC: u32 = 1 << 3;
+}
+
 /// A tuple type ([T, U, V] or [name: T, name2: U]).
 #[derive(Clone, Debug, Serialize)]
 pub struct TupleTypeInfo {
     pub flags: u32,
     pub element_types: Vec<TypeId>,
+    /// Per-element flags (element_flags::REQUIRED, OPTIONAL, REST, VARIADIC)
+    /// This allows variadic tuples like [...T, ...U] where multiple rest elements are allowed.
+    pub element_flags: Vec<u32>,
     /// Element names for named tuples (e.g., [x: number, y: number]).
     /// None means all elements are unnamed.
     /// Some(vec) contains Option<String> for each position - None means unnamed, Some(name) means named.
