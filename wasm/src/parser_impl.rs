@@ -692,7 +692,7 @@ impl ParserState {
         // Parse declarations
         let mut declarations = NodeList::new();
         loop {
-            let decl = self.parse_variable_declaration();
+            let decl = self.parse_variable_declaration(flags);
             declarations.push(decl);
 
             if !self.parse_optional(SyntaxKind::CommaToken) {
@@ -714,7 +714,8 @@ impl ParserState {
     }
 
     /// Parse a single variable declaration.
-    fn parse_variable_declaration(&mut self) -> NodeIndex {
+    /// `flags` should be 0 for var, node_flags::LET for let, node_flags::CONST for const.
+    fn parse_variable_declaration(&mut self, flags: u32) -> NodeIndex {
         let pos = self.get_full_start();
 
         // Parse binding name (identifier or pattern)
@@ -736,8 +737,11 @@ impl ParserState {
 
         let end = self.get_token_start();
 
+        let mut base = NodeBase::new_ext(syntax_kind_ext::VARIABLE_DECLARATION, pos, end);
+        base.flags = flags;
+
         let decl = VariableDeclaration {
-            base: NodeBase::new_ext(syntax_kind_ext::VARIABLE_DECLARATION, pos, end),
+            base,
             name,
             exclamation_token: false,
             type_annotation,
@@ -1200,7 +1204,8 @@ impl ParserState {
         self.parse_expected(SyntaxKind::CatchKeyword);
 
         let variable_declaration = if self.parse_optional(SyntaxKind::OpenParenToken) {
-            let decl = self.parse_variable_declaration();
+            // Catch variables are block-scoped like let
+            let decl = self.parse_variable_declaration(node_flags::LET);
             self.parse_expected(SyntaxKind::CloseParenToken);
             decl
         } else {
