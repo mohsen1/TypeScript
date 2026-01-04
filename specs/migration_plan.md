@@ -527,6 +527,10 @@ building up to full inference.
 
 Verification Gate: 439 Rust tests passing, 2 skipped. Full baseline matching pending.
 
+**Known limitations**:
+- Function parameter scoping not yet implemented (parameters aren't visible in function bodies)
+- super.method() calls cause infinite recursion in some cases
+
 Progress: **Phase 5 ~92% complete! Core type checking working. 439 tests passing (2 skipped).**
 
 ==============================================================================
