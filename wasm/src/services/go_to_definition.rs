@@ -3,10 +3,9 @@
 //! This module provides the ability to navigate to symbol definitions,
 //! type definitions, and implementations.
 
-use crate::binder::{Symbol, SymbolId, SymbolFlags, SymbolTable};
-use crate::checker::{Type, TypeId, CheckerState};
-use crate::parser::ast::{Node, NodeId};
-use crate::parser::arena::NodeArena;
+use crate::binder::{Symbol, SymbolId, SymbolFlags};
+use crate::checker::{TypeId, CheckerState};
+use crate::parser::{Node, NodeIndex, NodeArena};
 use crate::scanner::SyntaxKind;
 
 use super::text_span::TextSpan;
@@ -116,10 +115,10 @@ pub fn get_definition_at_position(
     position: u32,
 ) -> Option<Vec<DefinitionInfo>> {
     // Find the node at the position
-    let node_id = find_node_at_position(ctx.arena, position)?;
+    let node_idx = find_node_at_position(ctx.arena, position)?;
 
     // Get the symbol for this node
-    let symbol = get_symbol_at_location(ctx, node_id)?;
+    let symbol = get_symbol_at_location(ctx, node_idx)?;
 
     // Get definitions from the symbol's declarations
     let definitions = get_definitions_from_symbol(ctx, &symbol);
@@ -137,13 +136,13 @@ pub fn get_definition_and_bound_span(
     position: u32,
 ) -> DefinitionInfoAndBoundSpan {
     // Find the node at the position
-    let node_id = match find_node_at_position(ctx.arena, position) {
-        Some(id) => id,
+    let node_idx = match find_node_at_position(ctx.arena, position) {
+        Some(idx) => idx,
         None => return DefinitionInfoAndBoundSpan::empty(),
     };
 
     // Get the span of the triggering node
-    let text_span = match ctx.arena.get(node_id) {
+    let text_span = match ctx.arena.get(node_idx) {
         Some(node) => TextSpan::from_bounds(node.pos(), node.end()),
         None => TextSpan::new(position, 0),
     };
@@ -160,10 +159,10 @@ pub fn get_type_definition_at_position(
     position: u32,
 ) -> Option<Vec<DefinitionInfo>> {
     // Find the node at the position
-    let node_id = find_node_at_position(ctx.arena, position)?;
+    let node_idx = find_node_at_position(ctx.arena, position)?;
 
     // Get the type of this node
-    let type_id = ctx.checker.get_type_at_location(node_id)?;
+    let type_id = ctx.checker.get_type_at_location(node_idx)?;
 
     // Get the symbol of the type
     let type_symbol = ctx.checker.get_type_symbol(type_id)?;
@@ -184,10 +183,10 @@ pub fn get_implementation_at_position(
     position: u32,
 ) -> Option<Vec<DefinitionInfo>> {
     // Find the node at the position
-    let node_id = find_node_at_position(ctx.arena, position)?;
+    let node_idx = find_node_at_position(ctx.arena, position)?;
 
     // Get the symbol for this node
-    let symbol = get_symbol_at_location(ctx, node_id)?;
+    let symbol = get_symbol_at_location(ctx, node_idx)?;
 
     // If it's an interface or abstract member, find implementations
     if symbol.flags.contains(SymbolFlags::Interface) {
@@ -205,7 +204,7 @@ pub fn get_implementation_at_position(
 // =============================================================================
 
 /// Find the node at a position in the AST.
-fn find_node_at_position(arena: &NodeArena, position: u32) -> Option<NodeId> {
+fn find_node_at_position(arena: &NodeArena, position: u32) -> Option<NodeIndex> {
     // This would do a proper AST walk to find the deepest node
     // containing the position. For now, simplified implementation.
 
@@ -216,10 +215,10 @@ fn find_node_at_position(arena: &NodeArena, position: u32) -> Option<NodeId> {
 
 fn find_deepest_node_at_position(
     arena: &NodeArena,
-    node_id: NodeId,
+    node_idx: NodeIndex,
     position: u32,
-) -> Option<NodeId> {
-    let node = arena.get(node_id)?;
+) -> Option<NodeIndex> {
+    let node = arena.get(node_idx)?;
 
     // Check if position is within this node
     if position < node.pos() || position >= node.end() {
@@ -227,21 +226,20 @@ fn find_deepest_node_at_position(
     }
 
     // Check children
-    for child_id in node.children() {
-        if let Some(deeper) = find_deepest_node_at_position(arena, child_id, position) {
+    for child_idx in node.children() {
+        if let Some(deeper) = find_deepest_node_at_position(arena, child_idx, position) {
             return Some(deeper);
         }
     }
 
     // No child contains the position, return this node
-    Some(node_id)
+    Some(node_idx)
 }
 
 /// Get the symbol at a node location.
-fn get_symbol_at_location(ctx: &GoToDefinitionContext, node_id: NodeId) -> Option<Symbol> {
-    // In a full implementation, this would use the type checker
-    // to resolve the symbol at this location
-    ctx.checker.get_symbol_at_location(node_id)
+fn get_symbol_at_location(ctx: &GoToDefinitionContext, node_idx: NodeIndex) -> Option<Symbol> {
+    // Use the type checker to resolve the symbol at this location
+    ctx.checker.get_symbol_at_location(node_idx)
 }
 
 /// Get definitions from a symbol.

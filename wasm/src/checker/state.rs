@@ -778,6 +778,242 @@ impl<'a> CheckerState<'a> {
         }
     }
 
+    // =========================================================================
+    // Language Service Support Methods
+    // =========================================================================
+
+    /// Get the symbol at a specific node location.
+    /// Used by go-to-definition, find-references, etc.
+    pub fn get_symbol_at_location(&self, node_idx: NodeIndex) -> Option<crate::binder::Symbol> {
+        use crate::parser::Node;
+
+        let node = self.node_arena.get(node_idx)?;
+
+        match node {
+            // For identifiers, look up the symbol by name
+            Node::Identifier(id) => {
+                let name = &id.escaped_text;
+                // Try to find in symbol table
+                if let Some(symbol_id) = self.resolve_name(name) {
+                    return self.symbol_arena.get(symbol_id).cloned();
+                }
+                None
+            }
+            // For property access, get the property symbol
+            Node::PropertyAccessExpression(pae) => {
+                // Get the type of the object
+                let obj_type = self.get_type_of_node_internal(pae.expression);
+                if let Some(prop_name) = self.get_identifier_text(pae.name) {
+                    // Look up property on the type
+                    if let Some(prop_symbol) = self.get_property_symbol(obj_type, &prop_name) {
+                        return Some(prop_symbol);
+                    }
+                }
+                None
+            }
+            // For declarations, return the declared symbol
+            Node::VariableDeclaration(vd) => {
+                if let Some(name) = self.get_binding_name(&vd.name) {
+                    if let Some(symbol_id) = self.resolve_name(&name) {
+                        return self.symbol_arena.get(symbol_id).cloned();
+                    }
+                }
+                None
+            }
+            Node::FunctionDeclaration(fd) => {
+                if let Some(name_idx) = fd.name {
+                    if let Some(name) = self.get_identifier_text(name_idx) {
+                        if let Some(symbol_id) = self.resolve_name(&name) {
+                            return self.symbol_arena.get(symbol_id).cloned();
+                        }
+                    }
+                }
+                None
+            }
+            Node::ClassDeclaration(cd) => {
+                if let Some(name_idx) = cd.name {
+                    if let Some(name) = self.get_identifier_text(name_idx) {
+                        if let Some(symbol_id) = self.resolve_name(&name) {
+                            return self.symbol_arena.get(symbol_id).cloned();
+                        }
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    /// Get the type at a specific node location.
+    /// Used by hover/quick info, type definition, etc.
+    pub fn get_type_at_location(&self, node_idx: NodeIndex) -> Option<TypeId> {
+        // Use the cached type if available
+        if let Some(&type_id) = self.node_types.borrow().get(&node_idx) {
+            if type_id != TypeId::NONE {
+                return Some(type_id);
+            }
+        }
+        None
+    }
+
+    /// Get the symbol for a type (e.g., the class/interface symbol for an object type).
+    pub fn get_type_symbol(&self, type_id: TypeId) -> Option<SymbolId> {
+        use super::types::Type;
+
+        let typ = self.types.get(type_id)?;
+        match typ {
+            Type::Object(obj) => obj.symbol,
+            Type::TypeReference(tr) => Some(tr.symbol),
+            Type::Enum(e) => Some(e.symbol),
+            _ => None,
+        }
+    }
+
+    /// Helper: get identifier text from a node index
+    fn get_identifier_text(&self, node_idx: NodeIndex) -> Option<String> {
+        use crate::parser::Node;
+
+        if let Some(Node::Identifier(id)) = self.node_arena.get(node_idx) {
+            return Some(id.escaped_text.clone());
+        }
+        None
+    }
+
+    /// Helper: get binding name from a BindingName node
+    fn get_binding_name(&self, node_idx: NodeIndex) -> Option<String> {
+        use crate::parser::Node;
+
+        match self.node_arena.get(node_idx)? {
+            Node::Identifier(id) => Some(id.escaped_text.clone()),
+            // For destructuring patterns, we'd need more complex handling
+            _ => None,
+        }
+    }
+
+    /// Helper: get property symbol from a type
+    fn get_property_symbol(&self, type_id: TypeId, prop_name: &str) -> Option<crate::binder::Symbol> {
+        use super::types::Type;
+
+        let typ = self.types.get(type_id)?;
+        match typ {
+            Type::Object(obj) => {
+                // Look up in the object's members
+                if let Some(members) = &obj.members {
+                    if let Some(&symbol_id) = members.get(prop_name) {
+                        return self.symbol_arena.get(symbol_id).cloned();
+                    }
+                }
+                None
+            }
+            Type::TypeReference(tr) => {
+                // Resolve the reference and look up property
+                if let Some(resolved) = tr.resolved {
+                    return self.get_property_symbol(resolved, prop_name);
+                }
+                None
+            }
+            Type::Union(u) => {
+                // For unions, find property on first type that has it
+                for &member_type in &u.types {
+                    if let Some(symbol) = self.get_property_symbol(member_type, prop_name) {
+                        return Some(symbol);
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    /// Internal version of get_type_of_node that doesn't mutate (for language service).
+    fn get_type_of_node_internal(&self, node_idx: NodeIndex) -> TypeId {
+        // Return cached type if available
+        if let Some(&type_id) = self.node_types.borrow().get(&node_idx) {
+            return type_id;
+        }
+        TypeId::NONE
+    }
+
+    /// Get all symbols in scope at a position.
+    /// Used for completions.
+    pub fn get_symbols_in_scope(&self, _position: u32) -> Vec<(String, SymbolId)> {
+        let mut symbols = Vec::new();
+
+        // Add all symbols from the symbol table
+        for (name, &symbol_id) in self.symbol_table.iter() {
+            symbols.push((name.clone(), symbol_id));
+        }
+
+        // Add symbols from local scopes
+        for scope in &self.local_scope_stack {
+            for (name, &_type_id) in scope.iter() {
+                // For locals, we'd need to track their symbol IDs too
+                // For now, just return what we have
+                if let Some(symbol_id) = self.resolve_name(name) {
+                    symbols.push((name.clone(), symbol_id));
+                }
+            }
+        }
+
+        symbols
+    }
+
+    /// Get completions for a member access expression.
+    /// Returns property names and their symbol IDs.
+    pub fn get_member_completions(&self, type_id: TypeId) -> Vec<(String, SymbolId)> {
+        use super::types::Type;
+
+        let mut completions = Vec::new();
+
+        let Some(typ) = self.types.get(type_id) else {
+            return completions;
+        };
+
+        match typ {
+            Type::Object(obj) => {
+                if let Some(members) = &obj.members {
+                    for (name, &symbol_id) in members.iter() {
+                        completions.push((name.clone(), symbol_id));
+                    }
+                }
+            }
+            Type::TypeReference(tr) => {
+                if let Some(resolved) = tr.resolved {
+                    return self.get_member_completions(resolved);
+                }
+            }
+            Type::Union(u) => {
+                // Get common members across all union types
+                if let Some(&first_type) = u.types.first() {
+                    let first_members = self.get_member_completions(first_type);
+                    for (name, symbol_id) in first_members {
+                        // Check if this member exists on all other types
+                        let exists_on_all = u.types[1..].iter().all(|&t| {
+                            self.get_property_symbol(t, &name).is_some()
+                        });
+                        if exists_on_all {
+                            completions.push((name, symbol_id));
+                        }
+                    }
+                }
+            }
+            Type::Intersection(i) => {
+                // Collect all members from all intersection types
+                for &member_type in &i.types {
+                    let members = self.get_member_completions(member_type);
+                    for (name, symbol_id) in members {
+                        if !completions.iter().any(|(n, _)| n == &name) {
+                            completions.push((name, symbol_id));
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        completions
+    }
+
     /// Check a source file and populate diagnostics.
     /// This is the entry point for type checking a parsed and bound file.
     pub fn check_source_file(&mut self, root_idx: crate::parser::NodeIndex) {
