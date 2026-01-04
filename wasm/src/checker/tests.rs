@@ -10818,3 +10818,4 @@ fn test_falsy_narrowing_boolean_literal() {
     assert!(checker.diagnostics.is_empty(),
         "Expected no errors for boolean literal falsy narrowing, got: {:?}", checker.diagnostics);
 }
+

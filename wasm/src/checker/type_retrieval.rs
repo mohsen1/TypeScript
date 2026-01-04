@@ -1048,30 +1048,100 @@ impl<'a> CheckerState<'a> {
             }
             // Infer from return type
             self.infer_from_types(*pattern_return, *actual_return, type_parameters, inferred);
+            return;
         }
 
-        // TODO: Handle object types, array types, etc.
+        // Handle array types: T[] with number[] infers T=number
+        if let (Some(Type::Array(pattern_arr)), Some(Type::Array(actual_arr))) =
+            (self.types.get(pattern_type), self.types.get(actual_type))
+        {
+            let pattern_elem = pattern_arr.element_type;
+            let actual_elem = actual_arr.element_type;
+            self.infer_from_types(pattern_elem, actual_elem, type_parameters, inferred);
+            return;
+        }
+
+        // Handle tuple types: [T, U] with [string, number] infers T=string, U=number
+        if let (Some(Type::Tuple(pattern_tuple)), Some(Type::Tuple(actual_tuple))) =
+            (self.types.get(pattern_type), self.types.get(actual_type))
+        {
+            let pattern_elems = pattern_tuple.element_types.clone();
+            let actual_elems = actual_tuple.element_types.clone();
+            for (pattern_elem, actual_elem) in pattern_elems.iter().zip(actual_elems.iter()) {
+                self.infer_from_types(*pattern_elem, *actual_elem, type_parameters, inferred);
+            }
+            return;
+        }
+
+        // Handle object types: { x: T } with { x: string } infers T=string
+        if let (Some(Type::Object(pattern_obj)), Some(Type::Object(actual_obj))) =
+            (self.types.get(pattern_type), self.types.get(actual_type))
+        {
+            // Match properties by name
+            let pattern_props = pattern_obj.properties.clone();
+            let actual_props = actual_obj.properties.clone();
+
+            // Collect property info to avoid borrow issues
+            let pattern_prop_infos: Vec<(SymbolId, String, TypeId)> = pattern_props.iter()
+                .filter_map(|&prop_id| {
+                    // Try local_symbols first, then symbol_arena
+                    let name = self.local_symbols.get(prop_id)
+                        .map(|s| s.escaped_name.clone())
+                        .or_else(|| self.symbol_arena.get(prop_id).map(|s| s.escaped_name.clone()))?;
+                    let prop_type = self.symbol_types.get(&prop_id).copied()
+                        .unwrap_or(self.types.any_type);
+                    Some((prop_id, name, prop_type))
+                })
+                .collect();
+
+            let actual_prop_infos: Vec<(SymbolId, String, TypeId)> = actual_props.iter()
+                .filter_map(|&prop_id| {
+                    let name = self.local_symbols.get(prop_id)
+                        .map(|s| s.escaped_name.clone())
+                        .or_else(|| self.symbol_arena.get(prop_id).map(|s| s.escaped_name.clone()))?;
+                    let prop_type = self.symbol_types.get(&prop_id).copied()
+                        .unwrap_or(self.types.any_type);
+                    Some((prop_id, name, prop_type))
+                })
+                .collect();
+
+            for (_, pattern_name, pattern_prop_type) in &pattern_prop_infos {
+                for (_, actual_name, actual_prop_type) in &actual_prop_infos {
+                    if pattern_name == actual_name {
+                        self.infer_from_types(*pattern_prop_type, *actual_prop_type, type_parameters, inferred);
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     /// Get the type of a new expression.
+    /// Handles class types (ObjectType with construct signatures) and callable constructors.
     fn get_type_of_new_expression(&mut self, expression: NodeIndex, _arguments: &Option<crate::parser::NodeList>) -> TypeId {
         // Get the type of the constructor
         let constructor_type = self.get_type_of_node(expression);
 
-        // If it's a function type, create an instance type
-        // For now, just return any - proper class instantiation is complex
-        if let Some(Type::Function(_)) = self.types.get(constructor_type) {
-            // TODO: Return the instance type
-            return self.types.any_type;
-        }
-
         // If it's an object with construct signatures, use those
+        // This handles class types properly - classes have construct signatures with instance return types
         if let Some(Type::Object(obj)) = self.types.get(constructor_type) {
             if !obj.construct_signatures.is_empty() {
                 if let Some(return_type) = obj.construct_signatures[0].resolved_return_type {
                     return return_type;
                 }
             }
+            // If object has call signatures but no construct signatures, it might be usable as a constructor
+            // This is for advanced patterns - for now, return any
+            if !obj.call_signatures.is_empty() {
+                return self.types.any_type;
+            }
+        }
+
+        // For legacy constructor functions (not classes), return any
+        // This is for patterns like `function Foo() { this.x = 1; }; new Foo()`
+        // Modern TypeScript uses classes which have proper construct signatures
+        if let Some(Type::Function(_)) = self.types.get(constructor_type) {
+            return self.types.any_type;
         }
 
         self.types.any_type
