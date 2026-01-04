@@ -7835,6 +7835,43 @@ fn test_super_type_basic() {
 }
 
 #[test]
+fn test_class_inheritance_simple() {
+    // Test simple class inheritance without super call
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        class Animal {
+            name: string;
+        }
+        class Dog extends Animal {
+            bark() {}
+        }
+    "#;
+
+    let mut parser = ParserState::new(
+        "test.ts".to_string(),
+        code.to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    assert!(binder.file_locals.has("Animal"), "Animal class should be defined");
+    assert!(binder.file_locals.has("Dog"), "Dog class should be defined");
+}
+
+#[test]
 #[ignore = "TODO: Fix memory usage in super.method() type inference - needs deeper investigation"]
 fn test_super_method_call() {
     // Test that 'super.method()' works correctly in derived classes
