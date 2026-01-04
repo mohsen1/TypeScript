@@ -9683,3 +9683,41 @@ fn test_function_parameter_scoping() {
         .collect();
     assert!(name_errors.is_empty(), "Should have no 'Cannot find name' errors, got: {:?}", name_errors);
 }
+
+
+#[test]
+fn test_method_parameter_scoping() {
+    // Test that method parameters are visible inside the method body
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+    use super::state::CheckerState;
+
+    let code = r#"
+        class Calculator {
+            add(a: number, b: number): number {
+                return a + b;
+            }
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have no "Cannot find name" errors for method parameters
+    let name_errors: Vec<_> = checker.diagnostics.iter()
+        .filter(|d| d.message_text.contains("Cannot find name"))
+        .collect();
+    assert!(name_errors.is_empty(), "Should have no Cannot find name errors, got: {:?}", name_errors);
+}

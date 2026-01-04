@@ -1040,7 +1040,25 @@ impl<'a> CheckerState<'a> {
         match node {
             Node::MethodDeclaration(md) => {
                 if !md.body.is_none() {
+                    // Push a new scope for method parameters
+                    self.push_local_scope();
+
+                    // Add parameters to local scope
+                    for &param_idx in &md.parameters.nodes {
+                        if let Some(crate::parser::Node::ParameterDeclaration(param)) = self.node_arena.get(param_idx) {
+                            if let Some(crate::parser::Node::Identifier(id)) = self.node_arena.get(param.name) {
+                                let param_type = if !param.type_annotation.is_none() {
+                                    self.get_type_of_node(param.type_annotation)
+                                } else {
+                                    self.types.any_type
+                                };
+                                self.add_local(id.escaped_text.clone(), param_type);
+                            }
+                        }
+                    }
+
                     self.check_statement(md.body);
+                    self.pop_local_scope();
                 }
             }
             Node::PropertyDeclaration(pd) => {
@@ -1050,7 +1068,24 @@ impl<'a> CheckerState<'a> {
             }
             Node::ConstructorDeclaration(cd) => {
                 if !cd.body.is_none() {
+                    // Push a new scope for constructor parameters
+                    self.push_local_scope();
+
+                    // Add parameters to local scope
+                    for &param_idx in &cd.parameters.nodes {
+                        if let Some(crate::parser::Node::ParameterDeclaration(param)) = self.node_arena.get(param_idx) {
+                            if let Some(crate::parser::Node::Identifier(id)) = self.node_arena.get(param.name) {
+                                let param_type = if !param.type_annotation.is_none() {
+                                    self.get_type_of_node(param.type_annotation)
+                                } else {
+                                    self.types.any_type
+                                };
+                                self.add_local(id.escaped_text.clone(), param_type);
+                            }
+                        }
+                    }
                     self.check_statement(cd.body);
+                    self.pop_local_scope();
                 }
             }
             Node::GetAccessorDeclaration(gd) => {
@@ -1060,7 +1095,25 @@ impl<'a> CheckerState<'a> {
             }
             Node::SetAccessorDeclaration(sd) => {
                 if !sd.body.is_none() {
+                    // Push a new scope for setter parameter
+                    self.push_local_scope();
+
+                    // Add the setter parameter to local scope
+                    for &param_idx in &sd.parameters.nodes {
+                        if let Some(crate::parser::Node::ParameterDeclaration(param)) = self.node_arena.get(param_idx) {
+                            if let Some(crate::parser::Node::Identifier(id)) = self.node_arena.get(param.name) {
+                                let param_type = if !param.type_annotation.is_none() {
+                                    self.get_type_of_node(param.type_annotation)
+                                } else {
+                                    self.types.any_type
+                                };
+                                self.add_local(id.escaped_text.clone(), param_type);
+                            }
+                        }
+                    }
+
                     self.check_statement(sd.body);
+                    self.pop_local_scope();
                 }
             }
             _ => {}
