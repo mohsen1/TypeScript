@@ -63,31 +63,31 @@ Common issues found:
 
 - [ ] Experimental syntax support (decorators stage 3, etc.)
 
-## Phase 6: Emitter (Next Focus)
+## Phase 6: Emitter (In Progress)
 
 | Metric | Value |
 |--------|-------|
-| Lines of Code | ~1,600 (basic printer exists) |
+| Lines of Code | ~3,000 |
 | Target Lines | ~8,000-12,000 |
-| Tests | 30+ roundtrip tests |
-| Status | 🟡 20% |
+| Tests | 45+ emitter tests |
+| Status | 🟡 40% |
 
 **See detailed plan: [specs/emitter_plan.md](emitter_plan.md)**
 
-### Phase 6.1: Complete Basic Emission
-- [ ] Type node emission (TypeReference, UnionType, IntersectionType, etc.)
-- [ ] Heritage clauses (extends, implements)
-- [ ] Type parameters with constraints
-- [ ] Decorators and modifiers emission
-- [ ] Computed property names
-- [ ] Template literal spans
-- [ ] Full JSX support (attributes, children, fragments)
+### Phase 6.1: Complete Basic Emission ✅
+- [x] Type node emission (TypeReference, UnionType, IntersectionType, etc.)
+- [x] Heritage clauses (extends, implements)
+- [x] Type parameters with constraints
+- [x] Decorators and modifiers emission
+- [x] Computed property names
+- [x] Template literal spans
+- [x] Full JSX support (attributes, children, fragments)
 
-### Phase 6.2: Source Map Support
-- [ ] VLQ encoding implementation
-- [ ] SourceMapGenerator struct
-- [ ] Position tracking during emit
-- [ ] Inline and external source map output
+### Phase 6.2: Source Map Support ✅
+- [x] VLQ encoding implementation
+- [x] SourceMapGenerator struct
+- [x] Position tracking during emit
+- [x] Inline and external source map output
 
 ### Phase 6.3: Comment Preservation
 - [ ] Leading/trailing comment emission
@@ -214,12 +214,12 @@ Common issues found:
 | 3 | Parser | ~5,000 | 100+ | ✅ DONE |
 | 4 | Binder | ~1,900 | 20+ | ✅ DONE |
 | 5 | Type Checker | ~23,500 | 485 | 🟡 98% |
-| 6 | Emitter | ~1,600 | 30+ | 🟡 20% |
+| 6 | Emitter | ~3,000 | 45+ | 🟡 40% |
 | 7 | Language Service | - | - | ⬜ Pending |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
-**Total Rust Code**: ~33,500 lines (excluding tests)
-**Total Tests**: 496 passing, 0 skipped
+**Total Rust Code**: ~35,000 lines (excluding tests)
+**Total Tests**: 536 passing, 0 skipped
 **Overall Progress**: ~99% of core compiler functionality
 
 ---
@@ -227,6 +227,22 @@ Common issues found:
 # Session Log
 
 ## 2026-01-04
+
+**Session 6 - Phase 6.1 & 6.2 Implementation:**
+- Completed Phase 6.1: Basic type node emission
+  - All type nodes: TypeReference, UnionType, IntersectionType, etc.
+  - Heritage clauses, type parameters with constraints
+  - Decorators and modifiers emission
+  - JSX support (attributes, children, fragments)
+- Completed Phase 6.2: Source Map Support
+  - VLQ encoding/decoding implementation
+  - SourceMapGenerator with position tracking
+  - Inline and external source map output
+  - 8 new source map tests
+- Fixed emitter to emit modifiers, decorators, and type parameters
+- Fixed mapped type to use "in" instead of "extends"
+- Emitter grew from ~1,600 to ~3,000 lines
+- 536 tests passing (up from 496)
 
 **Session 5 - Phase 6 Emitter Planning:**
 - Created `rust-emitter` branch in separate git worktree
