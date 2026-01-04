@@ -1846,4 +1846,48 @@ mod tests {
         assert!(output.contains("Color"), "Expected 'Color' in output: {}", output);
         assert!(output.contains("Red"), "Expected 'Red' in output: {}", output);
     }
+
+    /// Full ThinNode pipeline integration test:
+    /// ThinParser → ThinBinder → ThinChecker → ThinEmitter
+    #[test]
+    fn test_thin_pipeline_integration() {
+        use crate::thin_binder::ThinBinderState;
+        use crate::thin_checker::ThinCheckerState;
+
+        let source = r#"
+            function add(a: number, b: number): number {
+                return a + b;
+            }
+            let result = add(1, 2);
+        "#;
+
+        // Step 1: Parse
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let source_file = parser.parse_source_file();
+        assert!(!source_file.is_none(), "Source file should be parsed");
+
+        // Step 2: Bind
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(&parser.arena, source_file);
+        // Verify symbols were created
+        let symbol_count = binder.symbols.len();
+        assert!(symbol_count >= 2, "Expected at least 2 symbols (add, result), got {}", symbol_count);
+
+        // Step 3: Check (type inference)
+        let checker = ThinCheckerState::new(&parser.arena, &binder, "test.ts".to_string());
+        // Basic check - the checker exists and can be created
+        let _ = &checker.types; // Access types arena to verify it exists
+
+        // Step 4: Emit
+        let mut printer = ThinPrinter::new(&parser.arena);
+        printer.emit(source_file);
+
+        let output = printer.get_output();
+        assert!(output.contains("function"), "Output should contain 'function': {}", output);
+        assert!(output.contains("add"), "Output should contain 'add': {}", output);
+        assert!(output.contains("number"), "Output should contain 'number': {}", output);
+        assert!(output.contains("return"), "Output should contain 'return': {}", output);
+        assert!(output.contains("let"), "Output should contain 'let': {}", output);
+        assert!(output.contains("result"), "Output should contain 'result': {}", output);
+    }
 }

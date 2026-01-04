@@ -152,6 +152,13 @@ Since we're going ThinNode-only (no backwards compatibility with old Node enum n
     - Interface declarations: `interface Point { ... }` → contains "interface", "Point"
     - Enum declarations: `enum Color { Red, Green, Blue }` → contains "enum", "Color", "Red"
   - 723 tests total passing
+- [x] Full pipeline integration test (Session 17)
+  - Test validates: ThinParser → ThinBinder → ThinChecker → ThinEmitter
+  - Parses `function add(a: number, b: number)` and `let result = add(1, 2)`
+  - Verifies binding creates 2+ symbols (add, result)
+  - Verifies checker creates type arena
+  - Verifies emitter produces output with function, add, number, return, let, result
+  - 724 tests total passing
 - [ ] Remove old Node enum and NodeArena
 
 ### Architecture (wasm/src/parser/thin_node.rs)
@@ -304,8 +311,8 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 | 7 | Language Service | ~1,500 | 5 | 🟡 55% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
-**Total Rust Code**: ~46,000 lines
-**Total Tests**: 716 passing
+**Total Rust Code**: ~48,000 lines
+**Total Tests**: 724 passing
 **Overall Progress**: ~90% of full compiler functionality
 
 ---
