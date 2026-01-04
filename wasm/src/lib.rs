@@ -30,6 +30,9 @@ pub mod checker;
 // Emitter types and implementation (Phase 6)
 pub mod emitter;
 
+// Language Service types and implementation (Phase 7)
+pub mod services;
+
 // =============================================================================
 // Scanner Factory Function
 // =============================================================================
