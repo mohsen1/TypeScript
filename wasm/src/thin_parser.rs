@@ -3309,6 +3309,12 @@ impl ThinParserState {
         let end_pos = self.token_end();
         self.arena.add_token(syntax_kind_ext::JSX_CLOSING_FRAGMENT, start_pos, end_pos)
     }
+
+    /// Consume the parser and return its parts.
+    /// This is useful for taking ownership of the arena after parsing.
+    pub fn into_parts(self) -> (ThinNodeArena, Vec<ParseDiagnostic>) {
+        (self.arena, self.parse_diagnostics)
+    }
 }
 
 // =============================================================================

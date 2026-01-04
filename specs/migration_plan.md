@@ -225,12 +225,24 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 - [ ] All allocations for `check` go into single arena
 - [ ] Deallocation = reset pointer (no `Drop` overhead)
 
-## Phase 0.4: Parallelism (Fearless Concurrency)
+## Phase 0.4: Parallelism (Fearless Concurrency) - 🟡 In Progress
+
+### Completed (Session 17)
+- [x] Add Rayon dependency (v1.10) for parallel iteration
+- [x] Create `parallel.rs` module with parallel parsing infrastructure
+- [x] `parse_files_parallel()` - Parse multiple files in parallel
+- [x] `parse_file_single()` - Single file parsing (for comparison)
+- [x] `parse_files_with_stats()` - Parse with statistics collection
+- [x] `ParseResult` struct with file_name, source_file, arena, errors
+- [x] `ParallelStats` struct with file_count, total_bytes, total_nodes, error_count
+- [x] Add `ThinParserState::into_parts()` for consuming parser and taking arena
+- [x] 5 parallel tests: single file, multiple files, consistency, large batch (100 files), stats
+- [x] 729 tests passing
 
 ### TODO
-- [ ] Parse files in parallel with `Rayon`
 - [ ] Pipeline: Parse → Bind (parallel) → Merge symbols (sequential) → Check bodies (parallel)
 - [ ] Check function bodies in parallel (local inference doesn't affect global scope)
+- [ ] Add parallel binding after symbol table design is finalized
 
 ## Phase 0.5: SIMD Scanning (Advanced)
 
@@ -311,8 +323,8 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 | 7 | Language Service | ~1,500 | 5 | 🟡 55% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
-**Total Rust Code**: ~48,000 lines
-**Total Tests**: 724 passing
+**Total Rust Code**: ~48,500 lines
+**Total Tests**: 729 passing
 **Overall Progress**: ~90% of full compiler functionality
 
 ---

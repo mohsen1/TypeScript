@@ -39,6 +39,9 @@ pub mod thin_checker;
 // ThinEmitter - Emitter using ThinNodeArena (Phase 0.1)
 pub mod thin_emitter;
 
+// Parallel processing with Rayon (Phase 0.4)
+pub mod parallel;
+
 // Emitter types and implementation (Phase 6)
 pub mod emitter;
 
