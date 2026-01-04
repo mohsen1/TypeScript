@@ -5,6 +5,7 @@
 //!
 //! The transforms follow TypeScript's transformer pipeline architecture.
 
+pub mod async_gen;
 pub mod class;
 pub mod es2015;
 pub mod helpers;
@@ -98,7 +99,11 @@ pub fn transform_source_file(
 
     // Only transform if targeting ES5 or lower
     if ctx.needs_downlevel(ScriptTarget::ES2015) {
-        // Run class transformer first (handles class declarations, super calls)
+        // Run async/generator transformer first (handles async functions, generators)
+        let mut async_transformer = async_gen::AsyncTransformer::new();
+        async_transformer.visit_node(source_file_idx, &mut ctx);
+
+        // Run class transformer (handles class declarations, super calls)
         let mut class_transformer = class::ClassTransformer::new();
         class_transformer.visit_node(source_file_idx, &mut ctx);
 
