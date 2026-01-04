@@ -9647,3 +9647,39 @@ fn test_template_literal_type() {
     assert!(binder.file_locals.has("Greeting"), "Greeting type should be defined");
     checker.check_source_file(root);
 }
+
+
+#[test]
+fn test_function_parameter_scoping() {
+    // Test that function parameters are visible inside the function body
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+    use super::state::CheckerState;
+
+    let code = r#"
+        function add(a: number, b: number): number {
+            return a + b;
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have no "Cannot find name 'a'" or "Cannot find name 'b'" errors
+    let name_errors: Vec<_> = checker.diagnostics.iter()
+        .filter(|d| d.message_text.contains("Cannot find name"))
+        .collect();
+    assert!(name_errors.is_empty(), "Should have no 'Cannot find name' errors, got: {:?}", name_errors);
+}

@@ -216,6 +216,10 @@ pub struct CheckerState<'a> {
 
     /// Current depth of call expression resolution (for depth limits).
     pub(crate) call_depth: RefCell<u32>,
+
+    /// Stack of local scopes for function parameters and block-scoped variables.
+    /// Each entry maps variable names to their types.
+    pub(crate) local_scope_stack: Vec<FxHashMap<String, TypeId>>,
 }
 
 /// Maximum depth for recursive type instantiation (conditional types, etc.).
@@ -258,7 +262,36 @@ impl<'a> CheckerState<'a> {
             widened_type_cache: RefCell::new(FxHashMap::default()),
             apparent_type_cache: RefCell::new(FxHashMap::default()),
             call_depth: RefCell::new(0),
+            local_scope_stack: Vec::new(),
         }
+    }
+
+    /// Push a new local scope onto the stack.
+    pub fn push_local_scope(&mut self) {
+        self.local_scope_stack.push(FxHashMap::default());
+    }
+
+    /// Pop the current local scope from the stack.
+    pub fn pop_local_scope(&mut self) {
+        self.local_scope_stack.pop();
+    }
+
+    /// Add a local variable to the current scope.
+    pub fn add_local(&mut self, name: String, type_id: TypeId) {
+        if let Some(scope) = self.local_scope_stack.last_mut() {
+            scope.insert(name, type_id);
+        }
+    }
+
+    /// Look up a local variable in the scope stack.
+    pub fn lookup_local(&self, name: &str) -> Option<TypeId> {
+        // Search from innermost to outermost scope
+        for scope in self.local_scope_stack.iter().rev() {
+            if let Some(&type_id) = scope.get(name) {
+                return Some(type_id);
+            }
+        }
+        None
     }
 
     /// Resolve a name to a symbol.
@@ -801,7 +834,25 @@ impl<'a> CheckerState<'a> {
             Node::FunctionDeclaration(fd) => {
                 // Check function body if present
                 if !fd.body.is_none() {
+                    // Push a new scope for function parameters
+                    self.push_local_scope();
+
+                    // Add parameters to local scope
+                    for &param_idx in &fd.parameters.nodes {
+                        if let Some(crate::parser::Node::ParameterDeclaration(param)) = self.node_arena.get(param_idx) {
+                            if let Some(crate::parser::Node::Identifier(id)) = self.node_arena.get(param.name) {
+                                let param_type = if !param.type_annotation.is_none() {
+                                    self.get_type_of_node(param.type_annotation)
+                                } else {
+                                    self.types.any_type
+                                };
+                                self.add_local(id.escaped_text.clone(), param_type);
+                            }
+                        }
+                    }
+
                     self.check_statement(fd.body);
+                    self.pop_local_scope();
                 }
             }
             Node::ClassDeclaration(cd) => {

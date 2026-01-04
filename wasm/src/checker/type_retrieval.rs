@@ -124,7 +124,11 @@ impl<'a> CheckerState<'a> {
             // Identifiers - look up in symbol table
             Node::Identifier(id) => {
                 let name = id.escaped_text.clone();
-                // Look up the identifier in the symbol table
+                // First check local scopes (function parameters, block-scoped variables)
+                if let Some(type_id) = self.lookup_local(&name) {
+                    return type_id;
+                }
+                // Then look up in file-level symbol table
                 if let Some(symbol_id) = self.file_locals.get(&name) {
                     self.get_type_of_symbol(symbol_id)
                 } else {
