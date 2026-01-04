@@ -7865,15 +7865,15 @@ fn test_class_inheritance_simple() {
 }
 
 #[test]
-#[ignore = "TODO: Fix memory usage in super.method() type inference - needs deeper investigation"]
+#[ignore = "TODO: Fix super.method() infinite recursion when processing class types"]
 fn test_super_method_call() {
     // Test that 'super.method()' works correctly in derived classes
     use crate::parser_impl::ParserState;
     use crate::binder::BinderState;
 
+    // Minimal test case - with super call
     let code = r#"
         class Animal {
-            name: string;
             speak() { return "sound"; }
         }
         class Dog extends Animal {
