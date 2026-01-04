@@ -2629,8 +2629,30 @@ impl ParserState {
             return self.parse_export_assignment(pos, false);
         }
 
-        // export type
-        let is_type_only = self.parse_optional(SyntaxKind::TypeKeyword);
+        // Check for "export type Foo = ..." (type alias) vs "export type { ... }" (type-only export)
+        // For type alias, the 'type' is part of the declaration, not a modifier on export
+        let is_type_only = if self.is_token(SyntaxKind::TypeKeyword) {
+            // Look ahead: if next token after 'type' is an identifier, this is a type alias declaration
+            // Otherwise ('{' or '*'), it's a type-only export
+            let snapshot = self.scanner.save_state();
+            let saved_token = self.current_token;
+            self.next_token(); // consume 'type' temporarily
+            let next_token = self.current_token;
+            self.scanner.restore_state(snapshot);
+            self.current_token = saved_token;
+
+            if next_token == SyntaxKind::Identifier {
+                // This is "export type Foo = ...", let parse_statement handle it
+                // Don't consume 'type' - it will be parsed as part of the type alias
+                false
+            } else {
+                // This is "export type { ... }" or similar, consume 'type'
+                self.next_token();
+                true
+            }
+        } else {
+            false
+        };
 
         // export { ... }
         if self.is_token(SyntaxKind::OpenBraceToken) {

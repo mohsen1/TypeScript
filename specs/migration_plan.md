@@ -18,12 +18,6 @@ compiler remains fully functional at every step.
 
 # REMAINING WORK
 
-## Before going back to work
-
-
-1. Split test out of source files into a separate tests directory in was dir. 
-2. Without going to deep into a rabbithole find opportunities for splitting large files into smaller ones in was directory
-
 ## Phase 6: Emitter (60% Complete)
 
 | Metric | Value |
@@ -32,7 +26,7 @@ compiler remains fully functional at every step.
 | Tests | 65+ |
 
 ### TODO
-- [ ] Declaration file emission (node filtering, export visibility, type-only imports)
+- [x] Declaration file emission (node filtering, export visibility, type-only imports)
 - [ ] ES2015+ transforms (class→prototype, arrow→function, destructuring)
 - [ ] Async/await → Promise chains
 - [ ] Generator → state machine
@@ -71,12 +65,12 @@ compiler remains fully functional at every step.
 | 3 | Parser | ~5,000 | 100+ | ✅ Done |
 | 4 | Binder | ~1,900 | 20+ | ✅ Done |
 | 5 | Type Checker | ~23,500 | 485 | ✅ 99% |
-| 6 | Emitter | ~4,500 | 65+ | 🟡 60% |
+| 6 | Emitter | ~4,500 | 75+ | 🟡 65% |
 | 7 | Language Service | ~1,300 | 3 | 🟡 50% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
 **Total Rust Code**: ~38,300 lines
-**Total Tests**: 577 passing
+**Total Tests**: 587 passing
 **Overall Progress**: ~85% of full compiler functionality
 
 ---
