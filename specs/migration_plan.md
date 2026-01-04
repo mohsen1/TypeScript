@@ -112,12 +112,39 @@ Common issues found:
 - [ ] ES modules → AMD/UMD
 - [ ] Import/export elision for type-only
 
-## Phase 7: Language Service (Pending)
+## Phase 7: Language Service (In Progress)
 
-- [ ] Port language service host
-- [ ] Completion provider
-- [ ] Definition/reference provider
-- [ ] Code fix provider
+| Metric | Value |
+|--------|-------|
+| Lines of Code | ~1,300 |
+| Tests | 3 |
+| Status | 🟡 50% |
+
+### Phase 7.1: Core Infrastructure ✅
+- [x] LanguageService struct with checker integration
+- [x] Node-to-symbol mapping (NodeSymbolMap) for local symbol resolution
+- [x] Type-based property access resolution
+- [x] Diagnostics API (get_semantic_diagnostics, get_syntactic_diagnostics)
+
+### Phase 7.2: Navigation Features ✅
+- [x] Go-to-definition (get_definition_at_position)
+- [x] Go-to-type-definition (get_type_definition_at_position)
+- [x] Find references (get_references_at_position)
+- [x] Document highlights (get_document_highlights)
+- [x] Navigation bar (get_navigation_bar_items)
+- [x] Outlining/folding spans (get_outlining_spans)
+
+### Phase 7.3: Editing Features (Partial)
+- [x] Quick info/hover (get_quick_info_at_position)
+- [x] Rename info (get_rename_info, find_rename_locations)
+- [ ] Signature help
+- [ ] Completions (context-aware)
+
+### Phase 7.4: Remaining Work
+- [ ] Cross-file navigation support
+- [ ] Context-aware completions (member completions, type completions)
+- [ ] Formatting engine
+- [ ] Code fixes and refactorings
 
 ## Phase 8: Full Rust Mode (Pending)
 
@@ -215,11 +242,11 @@ Common issues found:
 | 4 | Binder | ~1,900 | 20+ | ✅ DONE |
 | 5 | Type Checker | ~23,500 | 485 | 🟡 98% |
 | 6 | Emitter | ~4,500 | 65+ | 🟡 60% |
-| 7 | Language Service | - | - | ⬜ Pending |
+| 7 | Language Service | ~1,300 | 3 | 🟡 50% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
-**Total Rust Code**: ~37,000 lines (excluding tests)
-**Total Tests**: 510 passing, 0 skipped
+**Total Rust Code**: ~38,300 lines (excluding tests)
+**Total Tests**: 574 passing, 0 skipped
 **Overall Progress**: ~99% of core compiler functionality
 
 ---
@@ -227,6 +254,28 @@ Common issues found:
 # Session Log
 
 ## 2026-01-04
+
+**Session 9 - Language Service BLOCKER/CRITICAL Fixes (Gemini LS Review):**
+- Addressed 5 BLOCKER issues and 3 CRITICAL issues from Gemini language service review
+- BLOCKER #1: Fix symbol resolution for local variables
+  - Added NodeSymbolMap to binder for node-to-symbol mapping
+  - Updated declare_symbol to record mappings during binding
+  - Updated get_symbol_at_location to check node_symbols first
+- BLOCKER #2: Fix property access resolution
+  - Added get_property_symbol_of_type for type-based member lookup
+  - PropertyAccessExpression now correctly resolves obj.prop via object type
+- BLOCKER #3: Implement diagnostics API
+  - Added get_semantic_diagnostics() and get_syntactic_diagnostics()
+  - Added get_all_diagnostics() for combined results
+  - Added LSDiagnostic struct with proper serialization
+- CRITICAL #1: Remove type_to_string code duplication (~90 lines removed)
+  - LanguageService now delegates to CheckerState.type_to_string()
+- CRITICAL #2: Add get_type_definition_at_position
+  - Implements "Go to Type Definition" (e.g., `x: Foo` jumps to Foo)
+  - Added get_symbol_of_type helper in CheckerState
+- Updated CheckerState::new to take &NodeSymbolMap parameter
+- Updated all 200+ test call sites to use new signature
+- 574 tests passing (up from 573)
 
 **Session 8 - Scanner/Parser Bug Fixes (Gemini Review):**
 - Ran Rust checker against TypeScript's 6,397 compiler test files
