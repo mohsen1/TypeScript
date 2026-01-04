@@ -230,13 +230,27 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 | 7 | Language Service | ~1,500 | 5 | 🟡 55% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
-**Total Rust Code**: ~44,000 lines
-**Total Tests**: 698 passing
-**Overall Progress**: ~88% of full compiler functionality
+**Total Rust Code**: ~44,500 lines
+**Total Tests**: 706 passing
+**Overall Progress**: ~90% of full compiler functionality
 
 ---
 
 # MILESTONES
+
+## 2026-01-04: ThinParser JSX Parsing (Session 14)
+- Added full JSX parsing support to ThinParser
+- Self-closing elements (`<Component />`)
+- Elements with children (`<div><span /></div>`)
+- Attributes: string, expression, boolean (`className="foo" id={bar} disabled`)
+- Spread attributes (`{...props}`)
+- Fragments (`<>...</>`)
+- Namespaced tags (`<svg:rect />`)
+- Member expression tags (`<Foo.Bar.Baz />`)
+- JSX expressions in children (`{items.map(i => <span>{i}</span>)}`)
+- 8 new tests for JSX parsing
+- 706 tests passing
+- **ThinParser type system now complete!**
 
 ## 2026-01-04: ThinParser Template Literal Types (Session 13)
 - Added template literal type parsing (`` `hello` ``, `` `prefix${T}suffix` ``)
@@ -339,11 +353,12 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 - Statements: if/else, while, for, variable declarations, return, block
 - Declarations: function (sync/async/generator), class (with heritage), interface, type alias (with type params)
 - Types: type references, type keywords, union (`A | B`), intersection (`A & B`), array (`T[]`), tuple (`[T, U]`), generics (`Foo<T>`), function types (`(x: T) => U`), literal types (`"foo"`, `42`), typeof (`typeof x`), keyof (`keyof T`), readonly (`readonly T[]`), indexed access (`T[K]`), conditional (`T extends U ? X : Y`), infer (`infer R`), mapped types (`{ [K in T]: U }`), object type literals (`{ x: T }`), template literal types (`` `prefix${T}suffix` ``)
+- JSX: elements, self-closing, fragments, attributes (string, expression, boolean, spread), namespaced tags, member expression tags
 - Arrow functions: `x => expr`, `(a, b) => expr`, `() => { ... }`, `async () => ...`, `<T>(x: T) => x`
 - Generators: `function* gen()`, `yield value`, `yield* gen()`
 
 ### Remaining ThinParser Work
-- [ ] JSX parsing
+- [x] JSX parsing (completed Session 14)
 - [x] Template literal types (completed Session 13)
 - [x] Async/await (completed Session 3)
 - [x] Mapped types (completed Session 12)

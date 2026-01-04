@@ -1697,6 +1697,7 @@ impl ThinParserState {
             SyntaxKind::OpenBracketToken => self.parse_array_literal(),
             SyntaxKind::OpenBraceToken => self.parse_object_literal(),
             SyntaxKind::NewKeyword => self.parse_new_expression(),
+            SyntaxKind::LessThanToken => self.parse_jsx_element_or_self_closing_or_fragment(true),
             _ => {
                 // Unknown primary expression - create an error token
                 let start_pos = self.token_pos();
@@ -2867,6 +2868,388 @@ impl ThinParserState {
     pub fn get_node_count(&self) -> usize {
         self.arena.len()
     }
+
+    // =========================================================================
+    // JSX Parsing
+    // =========================================================================
+
+    /// Parse a JSX element, self-closing element, or fragment.
+    /// Called when we see `<` in an expression context.
+    fn parse_jsx_element_or_self_closing_or_fragment(&mut self, in_expression_context: bool) -> NodeIndex {
+        let start_pos = self.token_pos();
+        let opening = self.parse_jsx_opening_or_self_closing_or_fragment(in_expression_context);
+
+        // Check what type of opening element we got
+        let kind = self.arena.get(opening).map(|n| n.kind).unwrap_or(0);
+
+        if kind == syntax_kind_ext::JSX_OPENING_ELEMENT {
+            // Parse children and closing element
+            let children = self.parse_jsx_children();
+            let closing = self.parse_jsx_closing_element();
+            let end_pos = self.token_end();
+
+            self.arena.add_jsx_element(
+                syntax_kind_ext::JSX_ELEMENT,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::JsxElementData {
+                    opening_element: opening,
+                    children,
+                    closing_element: closing,
+                },
+            )
+        } else if kind == syntax_kind_ext::JSX_OPENING_FRAGMENT {
+            // Parse children and closing fragment
+            let children = self.parse_jsx_children();
+            let closing = self.parse_jsx_closing_fragment();
+            let end_pos = self.token_end();
+
+            self.arena.add_jsx_fragment(
+                syntax_kind_ext::JSX_FRAGMENT,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::JsxFragmentData {
+                    opening_fragment: opening,
+                    children,
+                    closing_fragment: closing,
+                },
+            )
+        } else {
+            // Self-closing element, already complete
+            opening
+        }
+    }
+
+    /// Parse JSX opening element, self-closing element, or opening fragment.
+    fn parse_jsx_opening_or_self_closing_or_fragment(&mut self, _in_expression_context: bool) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::LessThanToken);
+
+        // Check for fragment: <>
+        if self.is_token(SyntaxKind::GreaterThanToken) {
+            self.next_token(); // consume >
+            let end_pos = self.token_end();
+            return self.arena.add_token(syntax_kind_ext::JSX_OPENING_FRAGMENT, start_pos, end_pos);
+        }
+
+        // Parse tag name
+        let tag_name = self.parse_jsx_element_name();
+
+        // Parse optional type arguments
+        let type_arguments = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_arguments())
+        } else {
+            None
+        };
+
+        // Parse attributes
+        let attributes = self.parse_jsx_attributes();
+
+        // Check for self-closing: />
+        if self.is_token(SyntaxKind::SlashToken) {
+            self.next_token(); // consume /
+            self.parse_expected(SyntaxKind::GreaterThanToken);
+            let end_pos = self.token_end();
+            return self.arena.add_jsx_opening(
+                syntax_kind_ext::JSX_SELF_CLOSING_ELEMENT,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::JsxOpeningData {
+                    tag_name,
+                    type_arguments,
+                    attributes,
+                },
+            );
+        }
+
+        // Opening element: consume > and continue parsing children
+        self.parse_expected(SyntaxKind::GreaterThanToken);
+        let end_pos = self.token_end();
+        self.arena.add_jsx_opening(
+            syntax_kind_ext::JSX_OPENING_ELEMENT,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::JsxOpeningData {
+                tag_name,
+                type_arguments,
+                attributes,
+            },
+        )
+    }
+
+    /// Parse JSX element name (identifier, this, namespaced, or property access).
+    fn parse_jsx_element_name(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Parse the initial name (identifier or this)
+        let mut expr = if self.is_token(SyntaxKind::ThisKeyword) {
+            let pos = self.token_pos();
+            self.next_token();
+            let end_pos = self.token_end();
+            self.arena.add_token(SyntaxKind::ThisKeyword as u16, pos, end_pos)
+        } else {
+            let name = self.parse_identifier();
+
+            // Check for namespaced name (a:b)
+            if self.is_token(SyntaxKind::ColonToken) {
+                self.next_token(); // consume :
+                let local_name = self.parse_identifier();
+                let end_pos = self.token_end();
+                return self.arena.add_jsx_namespaced_name(
+                    syntax_kind_ext::JSX_NAMESPACED_NAME,
+                    start_pos,
+                    end_pos,
+                    crate::parser::thin_node::JsxNamespacedNameData {
+                        namespace: name,
+                        name: local_name,
+                    },
+                );
+            }
+
+            name
+        };
+
+        // Parse property access chain (Foo.Bar.Baz)
+        while self.is_token(SyntaxKind::DotToken) {
+            self.next_token(); // consume .
+            let name = self.parse_identifier();
+            let end_pos = self.token_end();
+            expr = self.arena.add_access_expr(
+                syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::AccessExprData {
+                    expression: expr,
+                    name_or_argument: name,
+                    question_dot_token: false,
+                },
+            );
+        }
+
+        expr
+    }
+
+    /// Parse JSX attributes list.
+    fn parse_jsx_attributes(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        let mut properties = Vec::new();
+
+        while !self.is_token(SyntaxKind::GreaterThanToken)
+            && !self.is_token(SyntaxKind::SlashToken)
+            && !self.is_token(SyntaxKind::EndOfFileToken)
+        {
+            if self.is_token(SyntaxKind::OpenBraceToken) {
+                // Spread attribute: {...props}
+                properties.push(self.parse_jsx_spread_attribute());
+            } else {
+                // Regular attribute: name="value" or name={expr} or just name
+                properties.push(self.parse_jsx_attribute());
+            }
+        }
+
+        let end_pos = self.token_end();
+        self.arena.add_jsx_attributes(
+            syntax_kind_ext::JSX_ATTRIBUTES,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::JsxAttributesData {
+                properties: self.make_node_list(properties),
+            },
+        )
+    }
+
+    /// Parse a single JSX attribute.
+    fn parse_jsx_attribute(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        let name = self.parse_jsx_attribute_name();
+
+        // Check for value: = followed by string, expression, or nested JSX
+        let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
+            if self.is_token(SyntaxKind::StringLiteral) {
+                self.parse_string_literal()
+            } else if self.is_token(SyntaxKind::OpenBraceToken) {
+                self.parse_jsx_expression()
+            } else if self.is_token(SyntaxKind::LessThanToken) {
+                self.parse_jsx_element_or_self_closing_or_fragment(true)
+            } else {
+                self.parse_error_at_current_token("JSX attribute value expected");
+                NodeIndex::NONE
+            }
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_jsx_attribute(
+            syntax_kind_ext::JSX_ATTRIBUTE,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::JsxAttributeData {
+                name,
+                initializer,
+            },
+        )
+    }
+
+    /// Parse JSX attribute name (possibly namespaced).
+    fn parse_jsx_attribute_name(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        let name = self.parse_identifier();
+
+        // Check for namespaced name (a:b)
+        if self.is_token(SyntaxKind::ColonToken) {
+            self.next_token(); // consume :
+            let local_name = self.parse_identifier();
+            let end_pos = self.token_end();
+            return self.arena.add_jsx_namespaced_name(
+                syntax_kind_ext::JSX_NAMESPACED_NAME,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::JsxNamespacedNameData {
+                    namespace: name,
+                    name: local_name,
+                },
+            );
+        }
+
+        name
+    }
+
+    /// Parse a JSX spread attribute: {...props}
+    fn parse_jsx_spread_attribute(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+        self.parse_expected(SyntaxKind::DotDotDotToken);
+        let expression = self.parse_expression();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end_pos = self.token_end();
+        self.arena.add_jsx_spread_attribute(
+            syntax_kind_ext::JSX_SPREAD_ATTRIBUTE,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::JsxSpreadAttributeData {
+                expression,
+            },
+        )
+    }
+
+    /// Parse a JSX expression: {expr} or {...expr}
+    fn parse_jsx_expression(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+
+        // Check for spread: {...}
+        let dot_dot_dot_token = self.parse_optional(SyntaxKind::DotDotDotToken);
+
+        // Check for empty expression: {}
+        let expression = if self.is_token(SyntaxKind::CloseBraceToken) {
+            NodeIndex::NONE
+        } else {
+            self.parse_expression()
+        };
+
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end_pos = self.token_end();
+        self.arena.add_jsx_expression(
+            syntax_kind_ext::JSX_EXPRESSION,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::JsxExpressionData {
+                dot_dot_dot_token,
+                expression,
+            },
+        )
+    }
+
+    /// Parse JSX children (elements, text, expressions).
+    fn parse_jsx_children(&mut self) -> NodeList {
+        let mut children = Vec::new();
+
+        loop {
+            // Check for closing tag or closing fragment
+            if self.is_token(SyntaxKind::LessThanToken) {
+                // Look ahead for </
+                let saved = self.scanner.save_state();
+                let saved_token = self.current_token;
+                self.next_token();
+
+                if self.is_token(SyntaxKind::SlashToken) {
+                    // Closing tag/fragment, restore and stop
+                    self.scanner.restore_state(saved);
+                    self.current_token = saved_token;
+                    break;
+                }
+
+                // Nested JSX element
+                self.scanner.restore_state(saved);
+                self.current_token = saved_token;
+                children.push(self.parse_jsx_element_or_self_closing_or_fragment(false));
+            } else if self.is_token(SyntaxKind::OpenBraceToken) {
+                // JSX expression: {expr}
+                children.push(self.parse_jsx_expression());
+            } else if self.is_token(SyntaxKind::JsxText) {
+                // Text node
+                children.push(self.parse_jsx_text());
+            } else if self.is_token(SyntaxKind::EndOfFileToken) {
+                break;
+            } else {
+                // Unknown token in JSX children - stop
+                break;
+            }
+        }
+
+        self.make_node_list(children)
+    }
+
+    /// Parse JSX text content.
+    fn parse_jsx_text(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        let text = self.scanner.get_token_value_ref().to_string();
+        self.next_token();
+        let end_pos = self.token_end();
+
+        self.arena.add_jsx_text(
+            SyntaxKind::JsxText as u16,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::JsxTextData {
+                text,
+                contains_only_trivia_white_spaces: false,
+            },
+        )
+    }
+
+    /// Parse a JSX closing element: </Foo>
+    fn parse_jsx_closing_element(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::LessThanToken);
+        self.parse_expected(SyntaxKind::SlashToken);
+        let tag_name = self.parse_jsx_element_name();
+        self.parse_expected(SyntaxKind::GreaterThanToken);
+
+        let end_pos = self.token_end();
+        self.arena.add_jsx_closing(
+            syntax_kind_ext::JSX_CLOSING_ELEMENT,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::JsxClosingData {
+                tag_name,
+            },
+        )
+    }
+
+    /// Parse a JSX closing fragment: </>
+    fn parse_jsx_closing_fragment(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::LessThanToken);
+        self.parse_expected(SyntaxKind::SlashToken);
+        self.parse_expected(SyntaxKind::GreaterThanToken);
+
+        let end_pos = self.token_end();
+        self.arena.add_token(syntax_kind_ext::JSX_CLOSING_FRAGMENT, start_pos, end_pos)
+    }
 }
 
 // =============================================================================
@@ -4015,6 +4398,114 @@ mod tests {
         let mut parser = ThinParserState::new(
             "test.ts".to_string(),
             "type Getter<K extends string> = `get${Uppercase<K>}`;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    // =========================================================================
+    // JSX Tests
+    // =========================================================================
+
+    #[test]
+    fn test_thin_parser_jsx_self_closing() {
+        // Self-closing JSX element
+        let mut parser = ThinParserState::new(
+            "test.tsx".to_string(),
+            "const x = <Component />;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_jsx_with_children() {
+        // JSX element with children
+        let mut parser = ThinParserState::new(
+            "test.tsx".to_string(),
+            "const x = <div><span /></div>;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_jsx_with_attributes() {
+        // JSX with attributes
+        let mut parser = ThinParserState::new(
+            "test.tsx".to_string(),
+            "const x = <div className=\"foo\" id={bar} disabled />;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_jsx_with_expression() {
+        // JSX with expression children
+        let mut parser = ThinParserState::new(
+            "test.tsx".to_string(),
+            "const x = <div>{items.map(i => <span>{i}</span>)}</div>;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_jsx_fragment() {
+        // JSX fragment
+        let mut parser = ThinParserState::new(
+            "test.tsx".to_string(),
+            "const x = <><span /><span /></>;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_jsx_spread_attribute() {
+        // JSX with spread attribute
+        let mut parser = ThinParserState::new(
+            "test.tsx".to_string(),
+            "const x = <Component {...props} />;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_jsx_namespaced() {
+        // JSX with namespaced tag name
+        let mut parser = ThinParserState::new(
+            "test.tsx".to_string(),
+            "const x = <svg:rect width={100} />;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_jsx_member_expression() {
+        // JSX with member expression tag
+        let mut parser = ThinParserState::new(
+            "test.tsx".to_string(),
+            "const x = <Foo.Bar.Baz />;".to_string(),
         );
         let root = parser.parse_source_file();
 
