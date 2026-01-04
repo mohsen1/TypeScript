@@ -77,15 +77,25 @@ pub struct ThinNode {
 - After: 16 bytes/node = 4 nodes per cache line
 - Improvement: **13x better cache locality**
 
-## Phase 0.2: Zero-Allocation Scanner (Massive Memory Reduction)
+## Phase 0.2: Zero-Allocation Scanner (Massive Memory Reduction) - 🟡 In Progress
 
 Current scanner does `self.source[...].to_string()` = malloc per token.
 
+### Completed (2026-01-04)
+- [x] Integrate `Interner` directly into `Scanner`
+  - ScannerState now has `interner: Interner` field
+  - Pre-interns common keywords via `intern_common()`
+- [x] All identifiers become `Atom` (u32) - O(1) string comparison
+  - `scan_identifier()` interns all identifiers during scanning
+  - `get_token_atom()` returns the interned Atom for identifier tokens
+  - `resolve_atom()` resolves Atom back to string
+  - Non-identifier tokens have `Atom::NONE`
+- [x] 3 new tests: identifier interning, non-identifier atoms, keyword interning
+- [x] 605 tests passing
+
 ### TODO
 - [ ] Scanner returns `&str` slices of source, never `String`
-- [ ] Integrate `Interner` directly into `Scanner`
-- [ ] All identifiers become `Atom` (u32) - O(1) string comparison
-- [ ] Zero heap allocations during parsing
+- [ ] Zero heap allocations during parsing (token_value still allocates)
 
 ## Phase 0.3: Arena-Based Type Checker (O(1) Cleanup)
 
@@ -174,12 +184,20 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
 **Total Rust Code**: ~42,000 lines
-**Total Tests**: 602 passing
+**Total Tests**: 605 passing
 **Overall Progress**: ~88% of full compiler functionality
 
 ---
 
 # MILESTONES
+
+## 2026-01-04: Scanner Interner Integration (Phase 0.2)
+- Integrated Interner directly into ScannerState
+- All identifiers now interned as Atom (u32) for O(1) string comparison
+- `get_token_atom()` and `resolve_atom()` methods
+- Pre-interning of common keywords via `intern_common()`
+- 3 new tests for interner functionality
+- 605 tests passing
 
 ## 2026-01-04: Thin Nodes Architecture + NodeAccess Trait
 - Implemented ThinNode struct (16 bytes vs 208 bytes = 13x improvement)
