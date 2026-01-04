@@ -4,7 +4,7 @@ import os from "os";
 const ci = ["1", "true"].includes(process.env.CI ?? "");
 
 const parsed = minimist(process.argv.slice(2), {
-    boolean: ["dirty", "light", "colors", "lkg", "soft", "fix", "failed", "keepFailed", "force", "built", "ci", "bundle", "typecheck", "lint", "coverage"],
+    boolean: ["dirty", "light", "colors", "lkg", "soft", "fix", "failed", "keepFailed", "force", "built", "ci", "bundle", "typecheck", "lint", "coverage", "useWasm"],
     string: ["browser", "tests", "break", "host", "reporter", "stackTraceLimit", "timeout", "shards", "shardId"],
     alias: {
         b: "browser",
@@ -41,6 +41,7 @@ const parsed = minimist(process.argv.slice(2), {
         typecheck: true,
         lint: true,
         coverage: false,
+        useWasm: false,
     },
 });
 
@@ -87,5 +88,6 @@ export default options;
  * @property {boolean} typecheck
  * @property {boolean} lint
  * @property {boolean} coverage
+ * @property {boolean} useWasm
  */
 void 0;

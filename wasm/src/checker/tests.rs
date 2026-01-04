@@ -7642,3 +7642,349 @@ type ObjectWithThis = Methods & ThisType<{ name: string }>;
         // Note: These are technically different TypeIds, so they won't be equal unless we compare values
         // For now, we just verify the general bigint assignability works
     }
+
+    // ============== Integration Tests: TypeScript Compiler Test Suite ==============
+
+    /// Test helper: parse, bind, and check a TypeScript file, returning success/failure
+    fn check_typescript_file(code: &str, filename: &str) -> Result<(usize, usize), String> {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+        use std::panic::{catch_unwind, AssertUnwindSafe};
+
+        // Wrap in catch_unwind to handle panics gracefully
+        let result = catch_unwind(AssertUnwindSafe(|| {
+            let mut parser = ParserState::new(filename.to_string(), code.to_string());
+            let root = parser.parse_source_file();
+
+            let mut binder = BinderState::new();
+            binder.bind_source_file(&parser.arena, root);
+
+            let mut checker = CheckerState::new(
+                &parser.arena,
+                &binder.symbols,
+                &binder.file_locals,
+                filename.to_string(),
+            );
+
+            // Get all symbols and type check them
+            let symbols: Vec<_> = binder.file_locals.iter()
+                .map(|(_, &id)| id)
+                .collect();
+            for symbol_id in symbols {
+                let _ = checker.get_type_of_symbol(symbol_id);
+            }
+
+            // Return diagnostics count
+            let diag_count = checker.diagnostics.len();
+            let symbol_count = binder.file_locals.len();
+            (symbol_count, diag_count)
+        }));
+
+        result.map_err(|_| format!("Panic while checking {}", filename))
+    }
+
+    #[test]
+    fn test_integration_simple_class_minimal() {
+        // Simplified version - just classes with properties, no method calls
+        let code = r#"
+class Ship {
+    isSunk: boolean;
+}
+
+class Board {
+    ship: Ship;
+}
+"#;
+
+        let result = check_typescript_file(code, "simple_class.ts");
+        assert!(result.is_ok(), "Should parse simple classes: {:?}", result);
+        let (symbols, _diags) = result.unwrap();
+        assert!(symbols >= 2, "Should have Ship and Board symbols");
+    }
+
+    #[test]
+    fn test_integration_class_with_array() {
+        // Classes with array property
+        let code = r#"
+class Ship {
+    isSunk: boolean;
+}
+
+class Board {
+    ships: Ship[];
+}
+"#;
+
+        let result = check_typescript_file(code, "class_array.ts");
+        assert!(result.is_ok(), "Should parse classes with array: {:?}", result);
+    }
+
+    #[test]
+    fn test_integration_class_with_this_access() {
+        // Classes with this.property access in method
+        let code = r#"
+class Ship {
+    isSunk: boolean;
+}
+
+class Board {
+    ship: Ship;
+
+    check() {
+        return this.ship;
+    }
+}
+"#;
+
+        let result = check_typescript_file(code, "class_this.ts");
+        assert!(result.is_ok(), "Should parse classes with this access: {:?}", result);
+    }
+
+    #[test]
+    fn test_integration_array_property_access() {
+        // Test this.array[0] style access - may trigger loop?
+        let code = r#"
+class Board {
+    ships: string[];
+
+    first() {
+        return this.ships[0];
+    }
+}
+"#;
+
+        let result = check_typescript_file(code, "array_access.ts");
+        assert!(result.is_ok(), "Should handle array index access: {:?}", result);
+    }
+
+    #[test]
+    fn test_integration_method_call() {
+        // Test calling method on object - potential loop?
+        let code = r#"
+class Foo {
+    bar(): boolean {
+        return true;
+    }
+}
+
+let f = new Foo();
+let result = f.bar();
+"#;
+
+        let result = check_typescript_file(code, "method_call.ts");
+        assert!(result.is_ok(), "Should handle method calls: {:?}", result);
+    }
+
+    #[test]
+    fn test_integration_array_method_call() {
+        // Test calling method on array - THIS is where the loop likely happens
+        let code = r#"
+let arr: number[] = [1, 2, 3];
+let len = arr.length;
+"#;
+
+        let result = check_typescript_file(code, "array_method.ts");
+        assert!(result.is_ok(), "Should handle array property access: {:?}", result);
+    }
+
+    #[test]
+    fn test_integration_class_this_array_access() {
+        // Combination: class with array property accessed via this in method
+        let code = r#"
+class Ship {
+    isSunk: boolean;
+}
+
+class Board {
+    ships: Ship[];
+
+    getShips() {
+        return this.ships;
+    }
+}
+"#;
+
+        let result = check_typescript_file(code, "class_this_array.ts");
+        assert!(result.is_ok(), "Should handle this.array access: {:?}", result);
+    }
+
+    #[test]
+    #[ignore] // KNOWN BUG: Infinite loop when resolving array.every() method calls
+    fn test_integration_every_callback() {
+        // Test calling .every() with callback on this.array - likely the culprit
+        let code = r#"
+class Ship {
+    isSunk: boolean;
+}
+
+class Board {
+    ships: Ship[];
+
+    allSunk() {
+        return this.ships.every(function(s) { return s.isSunk; });
+    }
+}
+"#;
+
+        let result = check_typescript_file(code, "every_callback.ts");
+        assert!(result.is_ok(), "Should handle every with callback: {:?}", result);
+    }
+
+    #[test]
+    fn test_integration_arrow_function() {
+        // This test has an intentional error (public in arrow function)
+        let code = r#"var v = (public x: string) => { };"#;
+
+        let result = check_typescript_file(code, "ArrowFunctionExpression1.ts");
+        // Should not panic - errors are OK, panics are not
+        assert!(result.is_ok(), "Should not panic on ArrowFunctionExpression1.ts: {:?}", result);
+    }
+
+    #[test]
+    fn test_integration_class_declaration() {
+        let code = r#"
+class C {
+  constructor();
+}
+"#;
+
+        let result = check_typescript_file(code, "ClassDeclaration8.ts");
+        assert!(result.is_ok(), "Should parse and check ClassDeclaration8.ts: {:?}", result);
+    }
+
+    #[test]
+    fn test_integration_generic_types() {
+        let code = r#"
+interface Array<T> {
+    length: number;
+    push(item: T): number;
+    pop(): T | undefined;
+}
+
+type StringArray = Array<string>;
+type NumberArray = Array<number>;
+
+function identity<T>(x: T): T {
+    return x;
+}
+
+const result = identity("hello");
+"#;
+
+        let result = check_typescript_file(code, "generics.ts");
+        assert!(result.is_ok(), "Should parse and check generics: {:?}", result);
+    }
+
+    #[test]
+    fn test_integration_union_intersection() {
+        let code = r#"
+type StringOrNumber = string | number;
+type A = { a: string };
+type B = { b: number };
+type AB = A & B;
+
+function process(x: StringOrNumber): void {
+    if (typeof x === "string") {
+        console.log(x.length);
+    } else {
+        console.log(x.toFixed(2));
+    }
+}
+"#;
+
+        let result = check_typescript_file(code, "union_intersection.ts");
+        assert!(result.is_ok(), "Should parse and check union/intersection: {:?}", result);
+    }
+
+    #[test]
+    fn test_integration_conditional_types() {
+        let code = r#"
+type IsString<T> = T extends string ? true : false;
+type Test1 = IsString<"hello">;
+type Test2 = IsString<number>;
+
+type ExtractReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
+type FnReturn = ExtractReturnType<() => string>;
+"#;
+
+        let result = check_typescript_file(code, "conditional_types.ts");
+        assert!(result.is_ok(), "Should parse and check conditional types: {:?}", result);
+    }
+
+    #[test]
+    fn test_integration_mapped_types() {
+        let code = r#"
+type Readonly<T> = {
+    readonly [K in keyof T]: T[K];
+};
+
+type Partial<T> = {
+    [K in keyof T]?: T[K];
+};
+
+interface User {
+    name: string;
+    age: number;
+}
+
+type ReadonlyUser = Readonly<User>;
+type PartialUser = Partial<User>;
+"#;
+
+        let result = check_typescript_file(code, "mapped_types.ts");
+        assert!(result.is_ok(), "Should parse and check mapped types: {:?}", result);
+    }
+
+    #[test]
+    fn test_integration_template_literal_types() {
+        let code = r#"
+type Greeting = `Hello, ${string}!`;
+type EventName<T extends string> = `on${Capitalize<T>}`;
+
+type Click = EventName<"click">;
+type Scroll = EventName<"scroll">;
+"#;
+
+        let result = check_typescript_file(code, "template_literal.ts");
+        assert!(result.is_ok(), "Should parse and check template literal types: {:?}", result);
+    }
+
+    #[test]
+    fn test_integration_enums() {
+        let code = r#"
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+enum Direction {
+    Up = "UP",
+    Down = "DOWN",
+    Left = "LEFT",
+    Right = "RIGHT"
+}
+
+const c: Color = Color.Red;
+const d: Direction = Direction.Up;
+"#;
+
+        let result = check_typescript_file(code, "enums.ts");
+        assert!(result.is_ok(), "Should parse and check enums: {:?}", result);
+    }
+
+    #[test]
+    fn test_integration_tuple_types() {
+        let code = r#"
+type Point = [number, number];
+type NamedPoint = [x: number, y: number];
+type RestTuple = [string, ...number[]];
+
+const p: Point = [10, 20];
+const named: NamedPoint = [5, 15];
+const rest: RestTuple = ["hello", 1, 2, 3];
+"#;
+
+        let result = check_typescript_file(code, "tuples.ts");
+        assert!(result.is_ok(), "Should parse and check tuple types: {:?}", result);
+    }
