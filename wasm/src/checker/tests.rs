@@ -10320,3 +10320,153 @@ fn test_rest_parameter_type_check() {
     assert!(!checker.diagnostics.is_empty(),
         "Expected type error for string in number[] rest parameter, got: {:?}", checker.diagnostics);
 }
+
+#[test]
+fn test_satisfies_expression() {
+    // Test that satisfies expression returns the original type
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        type RGB = [number, number, number];
+        const red = [255, 0, 0] satisfies RGB;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have no errors
+    assert!(checker.diagnostics.is_empty(),
+        "Expected no errors for satisfies with valid type, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_satisfies_expression_error() {
+    // Test that satisfies expression reports error when types don't match
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        const bad = "hello" satisfies number;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have error for string not satisfying number
+    assert!(!checker.diagnostics.is_empty(),
+        "Expected error for string not satisfying number, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_as_expression_unknown_to_string() {
+    // Test as expression with unknown to string
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        const value: unknown = "hello";
+        const str = value as string;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    assert!(checker.diagnostics.is_empty(),
+        "Expected no errors for valid as expression, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_as_expression() {
+    // Test as expression (expr as Type)
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        const value: unknown = 42;
+        const num = value as number;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    assert!(checker.diagnostics.is_empty(),
+        "Expected no errors for valid as expression, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_as_const_expression() {
+    // Test as const (preserves literal types)
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        const colors = ["red", "green", "blue"] as const;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    assert!(checker.diagnostics.is_empty(),
+        "Expected no errors for as const expression, got: {:?}", checker.diagnostics);
+}

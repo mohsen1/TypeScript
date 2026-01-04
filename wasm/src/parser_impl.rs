@@ -2509,7 +2509,18 @@ impl ParserState {
         }
 
         // Parse left-hand side (binary expression)
-        let left = self.parse_binary_expression(0);
+        let mut left = self.parse_binary_expression(0);
+
+        // Handle as/satisfies expressions (can be chained)
+        loop {
+            if self.is_token(SyntaxKind::AsKeyword) {
+                left = self.parse_as_expression(left);
+            } else if self.is_token(SyntaxKind::SatisfiesKeyword) {
+                left = self.parse_satisfies_expression(left);
+            } else {
+                break;
+            }
+        }
 
         // Check for conditional expression: condition ? whenTrue : whenFalse
         if self.is_token(SyntaxKind::QuestionToken) {
@@ -2566,6 +2577,48 @@ impl ParserState {
         };
 
         self.alloc_node(Node::ConditionalExpression(expr))
+    }
+
+    /// Parse an as expression: expr as Type
+    fn parse_as_expression(&mut self, expression: NodeIndex) -> NodeIndex {
+        let pos = self.arena.get(expression).map(|n| n.base().pos).unwrap_or(0);
+
+        // Consume 'as'
+        self.parse_expected(SyntaxKind::AsKeyword);
+
+        // Parse the type
+        let type_node = self.parse_type();
+
+        let end = self.arena.get(type_node).map(|n| n.base().end).unwrap_or(0);
+
+        let expr = crate::parser::AsExpression {
+            base: NodeBase::new_ext(syntax_kind_ext::AS_EXPRESSION, pos, end),
+            expression,
+            type_node,
+        };
+
+        self.alloc_node(Node::AsExpression(expr))
+    }
+
+    /// Parse a satisfies expression: expr satisfies Type
+    fn parse_satisfies_expression(&mut self, expression: NodeIndex) -> NodeIndex {
+        let pos = self.arena.get(expression).map(|n| n.base().pos).unwrap_or(0);
+
+        // Consume 'satisfies'
+        self.parse_expected(SyntaxKind::SatisfiesKeyword);
+
+        // Parse the type
+        let type_node = self.parse_type();
+
+        let end = self.arena.get(type_node).map(|n| n.base().end).unwrap_or(0);
+
+        let expr = crate::parser::SatisfiesExpression {
+            base: NodeBase::new_ext(syntax_kind_ext::SATISFIES_EXPRESSION, pos, end),
+            expression,
+            type_node,
+        };
+
+        self.alloc_node(Node::SatisfiesExpression(expr))
     }
 
     /// Check if current token is an assignment operator.

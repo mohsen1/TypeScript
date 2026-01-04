@@ -469,10 +469,15 @@ impl<'a> CheckerState<'a> {
             }
 
             // Satisfies expression (x satisfies Type)
-            // Returns the narrower type of the expression, but checks assignability
+            // Uses the constraint type as contextual type for the expression
             Node::SatisfiesExpression(se) => {
-                let expression_type = self.get_type_of_node(se.expression);
                 let constraint_type = self.get_type_of_node(se.type_node);
+
+                // Set contextual type for proper inference
+                let prev_contextual = self.contextual_type;
+                self.contextual_type = Some(constraint_type);
+                let expression_type = self.get_type_of_node(se.expression);
+                self.contextual_type = prev_contextual;
 
                 // Check that expression type is assignable to the constraint
                 if !self.is_type_assignable_to(expression_type, constraint_type) {
@@ -1069,7 +1074,39 @@ impl<'a> CheckerState<'a> {
         // Get contextual element type(s) if available
         let contextual_element_info = self.get_contextual_array_element_type();
 
-        // Collect element types
+        // If contextual type is a tuple with the same number of elements, create a tuple
+        if let Some(ContextualArrayInfo::Tuple(tuple_types)) = &contextual_element_info {
+            if tuple_types.len() == elements.nodes.len() {
+                // Collect element types with contextual typing (preserving order for tuple)
+                let mut tuple_element_types = Vec::new();
+                for (i, &elem_idx) in elements.nodes.iter().enumerate() {
+                    if let Some(elem_node) = self.node_arena.get(elem_idx) {
+                        let elem_contextual = tuple_types.get(i).copied();
+                        let elem_type = match elem_node {
+                            Node::SpreadElement(spread) => {
+                                let spread_type = self.get_type_of_node(spread.expression);
+                                self.get_element_type_of_spread(spread_type)
+                            }
+                            _ => {
+                                if let Some(ctx_type) = elem_contextual {
+                                    let prev_contextual = self.contextual_type;
+                                    self.contextual_type = Some(ctx_type);
+                                    let t = self.get_type_of_node(elem_idx);
+                                    self.contextual_type = prev_contextual;
+                                    t
+                                } else {
+                                    self.get_type_of_node(elem_idx)
+                                }
+                            }
+                        };
+                        tuple_element_types.push(elem_type);
+                    }
+                }
+                return self.types.create_tuple_type(tuple_element_types, false, false, false);
+            }
+        }
+
+        // Collect unique element types (for arrays)
         let mut element_types = Vec::new();
         for (i, &elem_idx) in elements.nodes.iter().enumerate() {
             if let Some(elem_node) = self.node_arena.get(elem_idx) {
