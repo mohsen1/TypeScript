@@ -94,6 +94,174 @@ pub fn create_binder() -> binder::BinderState {
 }
 
 // =============================================================================
+// ThinParser WASM Interface (High-Performance Parser)
+// =============================================================================
+
+use crate::thin_parser::ThinParserState;
+use crate::thin_binder::ThinBinderState;
+use crate::thin_checker::ThinCheckerState;
+use crate::thin_emitter::ThinEmitter;
+
+/// High-performance parser using ThinNode architecture (16 bytes/node).
+/// This is the optimized path for Phase 8 test suite evaluation.
+#[wasm_bindgen]
+pub struct ThinParser {
+    parser: ThinParserState,
+    source_file_idx: Option<parser::NodeIndex>,
+    binder: Option<ThinBinderState>,
+}
+
+#[wasm_bindgen]
+impl ThinParser {
+    /// Create a new ThinParser for the given source file.
+    #[wasm_bindgen(constructor)]
+    pub fn new(file_name: String, source_text: String) -> ThinParser {
+        ThinParser {
+            parser: ThinParserState::new(file_name, source_text),
+            source_file_idx: None,
+            binder: None,
+        }
+    }
+
+    /// Parse the source file and return the root node index.
+    #[wasm_bindgen(js_name = parseSourceFile)]
+    pub fn parse_source_file(&mut self) -> u32 {
+        let idx = self.parser.parse_source_file();
+        self.source_file_idx = Some(idx);
+        idx.0
+    }
+
+    /// Get the number of nodes in the AST.
+    #[wasm_bindgen(js_name = getNodeCount)]
+    pub fn get_node_count(&self) -> usize {
+        self.parser.get_node_count()
+    }
+
+    /// Get parse diagnostics as JSON.
+    #[wasm_bindgen(js_name = getDiagnosticsJson)]
+    pub fn get_diagnostics_json(&self) -> String {
+        let diags: Vec<_> = self.parser.get_diagnostics().iter().map(|d| {
+            serde_json::json!({
+                "message": d.message,
+                "start": d.start,
+                "end": d.end,
+            })
+        }).collect();
+        serde_json::to_string(&diags).unwrap_or_else(|_| "[]".to_string())
+    }
+
+    /// Bind the source file and return symbol count.
+    #[wasm_bindgen(js_name = bindSourceFile)]
+    pub fn bind_source_file(&mut self) -> String {
+        if let Some(root_idx) = self.source_file_idx {
+            let mut binder = ThinBinderState::new();
+            binder.bind_source_file(self.parser.get_arena(), root_idx);
+
+            // Collect symbol names for the result
+            let symbols: std::collections::HashMap<String, u32> = binder.file_locals
+                .iter()
+                .map(|(name, id)| (name.clone(), id.0))
+                .collect();
+
+            let result = serde_json::json!({
+                "symbols": symbols,
+                "symbolCount": binder.symbols.len(),
+            });
+
+            self.binder = Some(binder);
+            serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
+        } else {
+            r#"{"error": "Source file not parsed"}"#.to_string()
+        }
+    }
+
+    /// Type check the source file and return diagnostics.
+    #[wasm_bindgen(js_name = checkSourceFile)]
+    pub fn check_source_file(&mut self) -> String {
+        if self.binder.is_none() {
+            // Auto-bind if not done yet
+            if self.source_file_idx.is_some() {
+                self.bind_source_file();
+            }
+        }
+
+        if let (Some(root_idx), Some(binder)) = (self.source_file_idx, &self.binder) {
+            let file_name = format!("test.ts");
+            let mut checker = ThinCheckerState::new(
+                self.parser.get_arena(),
+                binder,
+                file_name,
+            );
+
+            // Check the source file
+            let _type_id = checker.get_type_of_node(root_idx);
+
+            let result = serde_json::json!({
+                "typeCount": checker.types.len(),
+                "diagnostics": checker.diagnostics.iter().map(|d| {
+                    serde_json::json!({
+                        "message": format!("{:?}", d.message_text),
+                        "category": format!("{:?}", d.category),
+                    })
+                }).collect::<Vec<_>>(),
+            });
+
+            serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
+        } else {
+            r#"{"error": "Source file not parsed or bound"}"#.to_string()
+        }
+    }
+
+    /// Get the type of a node as a string.
+    #[wasm_bindgen(js_name = getTypeOfNode)]
+    pub fn get_type_of_node(&mut self, node_idx: u32) -> String {
+        if let (Some(_), Some(binder)) = (self.source_file_idx, &self.binder) {
+            let file_name = format!("test.ts");
+            let mut checker = ThinCheckerState::new(
+                self.parser.get_arena(),
+                binder,
+                file_name,
+            );
+
+            let type_id = checker.get_type_of_node(parser::NodeIndex(node_idx));
+            checker.type_to_string(type_id)
+        } else {
+            "unknown".to_string()
+        }
+    }
+
+    /// Emit the source file as JavaScript.
+    #[wasm_bindgen(js_name = emit)]
+    pub fn emit(&self) -> String {
+        if let Some(root_idx) = self.source_file_idx {
+            let mut emitter = ThinEmitter::new(self.parser.get_arena());
+            emitter.emit_node(root_idx);
+            emitter.get_output().to_string()
+        } else {
+            String::new()
+        }
+    }
+
+    /// Get the AST as JSON (for debugging).
+    #[wasm_bindgen(js_name = getAstJson)]
+    pub fn get_ast_json(&self) -> String {
+        if let Some(root_idx) = self.source_file_idx {
+            let arena = self.parser.get_arena();
+            format!("{{\"nodeCount\": {}, \"rootIdx\": {}}}", arena.len(), root_idx.0)
+        } else {
+            "{}".to_string()
+        }
+    }
+}
+
+/// Create a new ThinParser for the given source text.
+/// This is the recommended parser for production use.
+#[wasm_bindgen(js_name = createThinParser)]
+pub fn create_thin_parser(file_name: String, source_text: String) -> ThinParser {
+    ThinParser::new(file_name, source_text)
+}
+
+// =============================================================================
 // Comparison enum - matches TypeScript's Comparison const enum
 // =============================================================================
 
