@@ -1746,22 +1746,25 @@ Commits:
 
 ### Phase 7 Status
 
-Core language service infrastructure implemented in Rust (2026-01-04):
-- 22 service modules with public APIs
-- LanguageService orchestration with 20+ IDE methods
-- MockLanguageServiceHost for testing
-- Foundation: utilities, text spans, text changes, document registry
-- Navigation: go-to-definition, document highlights, find references
-- Completions: member access, global scope, keyword, auto-import support
-- Modern features: inlay hints, call hierarchy, signature help
-- Code actions: 11 code fixes, 8 refactorings registered
-- Formatting: document and range formatting with rules
-- Additional: breakpoints, outlining, organize imports
+**Updated 2026-01-04:** Refactored to minimal skeleton with correct APIs.
 
+Current implementation:
+- `services/mod.rs` - Consolidated types and stub LanguageService (~730 lines)
+- All language service types (TextSpan, CompletionEntry, DefinitionInfo, etc.)
+- Stub LanguageService with placeholder methods for all IDE features
+- Added language service support methods to CheckerState:
+  - `get_symbol_at_location` - Resolve symbol at AST node
+  - `get_symbol_declarations` - Get declaration nodes for a symbol
+  - `get_symbol_name`, `get_symbol_flags` - Symbol metadata
+  - `get_file_symbols` - All symbols in file scope
+  - `get_node_span`, `get_node_kind` - Node position/type info
+  - `get_node_at_position` - Find node at text position
+- Test runner created: `scripts/runLanguageServiceTests.mjs`
+  - 15/15 tests pass with TypeScript language service
+
+Branch: `rust-language-service`
 Commits:
-- `f3cadf3cb5d` - Core language service modules (11,073 insertions)
-- `41470226e15` - Formatting, breakpoints, outlining, organize imports (2,075 insertions)
-- `93da4b91e0d` - LanguageService orchestration and tests (1,384 insertions)
+- `c632e58ae07` - Simplified services module with correct APIs (937 lines)
 
 ### Phase 7 Breakdown
 
