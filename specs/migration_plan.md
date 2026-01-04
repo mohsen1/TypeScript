@@ -278,6 +278,14 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 - [x] 5 symbol merging tests: single file, multiple files, ID remapping, file locals, large program (50 files)
 - [x] 752 tests passing
 
+### Completed (Session 17 continued) - Export Declaration Binding Fix
+- [x] Fix `bind_export_declaration()` to recursively bind inner declarations
+  - Handles: `export function`, `export class`, `export const/let/var`
+  - Handles: `export interface`, `export type`, `export enum`
+- [x] Add `is_declaration()` helper to check node kinds
+- [x] 4 new tests: exported function, exported class, exported const, compile with exports
+- [x] 756 tests passing
+
 ### TODO
 - [ ] Check function bodies in parallel (local inference doesn't affect global scope)
 
@@ -361,7 +369,7 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
 **Total Rust Code**: ~49,500 lines
-**Total Tests**: 752 passing
+**Total Tests**: 756 passing
 **Overall Progress**: ~90% of full compiler functionality
 
 ---

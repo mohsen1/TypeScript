@@ -667,4 +667,22 @@ mod tests {
             assert!(program.globals.has(&val_name), "Missing {}", val_name);
         }
     }
+
+    #[test]
+    fn test_compile_with_exports() {
+        // Test that export function/class/const are properly bound
+        let files = vec![
+            ("a.ts".to_string(), "export function add(x: number, y: number) { return x + y; }".to_string()),
+            ("b.ts".to_string(), "export class Calculator { add(x: number, y: number) { return x + y; } }".to_string()),
+            ("c.ts".to_string(), "export const PI = 3.14159;".to_string()),
+        ];
+
+        let program = compile_files(files);
+
+        assert_eq!(program.files.len(), 3);
+        // All exported declarations should be in globals
+        assert!(program.globals.has("add"), "Exported function 'add' should be in globals");
+        assert!(program.globals.has("Calculator"), "Exported class 'Calculator' should be in globals");
+        assert!(program.globals.has("PI"), "Exported const 'PI' should be in globals");
+    }
 }

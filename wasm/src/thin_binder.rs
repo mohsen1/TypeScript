@@ -615,6 +615,7 @@ impl ThinBinderState {
             // Export clause can be:
             // - NamedExports: export { foo, bar }
             // - NamespaceExport: export * as ns from 'mod'
+            // - Declaration: export function/class/const/etc
             // - or NONE for: export * from 'mod'
 
             if !export.export_clause.is_none() {
@@ -643,6 +644,12 @@ impl ThinBinderState {
                             }
                         }
                     }
+                    // Check if it's an exported declaration (function, class, variable, etc.)
+                    else if self.is_declaration(clause_node.kind) {
+                        // Recursively bind the declaration
+                        // This handles: export function foo() {}, export class Bar {}, export const x = 1
+                        self.bind_node(arena, export.export_clause);
+                    }
                     // Namespace export: export * as ns from 'mod'
                     else if let Some(name) = self.get_identifier_name(arena, export.export_clause) {
                         let sym_id = self.symbols.alloc(symbol_flags::ALIAS, name.to_string());
@@ -653,6 +660,16 @@ impl ThinBinderState {
             }
             // export * from 'mod' - no binding needed, just re-exports
         }
+    }
+
+    /// Check if a node kind is a declaration that should be bound
+    fn is_declaration(&self, kind: u16) -> bool {
+        kind == syntax_kind_ext::FUNCTION_DECLARATION ||
+        kind == syntax_kind_ext::CLASS_DECLARATION ||
+        kind == syntax_kind_ext::VARIABLE_STATEMENT ||
+        kind == syntax_kind_ext::INTERFACE_DECLARATION ||
+        kind == syntax_kind_ext::TYPE_ALIAS_DECLARATION ||
+        kind == syntax_kind_ext::ENUM_DECLARATION
     }
 
     fn bind_module_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
@@ -827,5 +844,51 @@ mod tests {
         // Export specifiers should have symbols (marked via node_symbols, not file_locals)
         // This ensures the binding runs without errors
         assert!(binder.symbols.len() > 1, "Should have created export symbols");
+    }
+
+    #[test]
+    fn test_thin_binder_exported_function() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            r#"export function foo() { return 1; }"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        // Exported function should be bound to file_locals
+        assert!(binder.file_locals.has("foo"), "Exported function 'foo' should be in file_locals");
+    }
+
+    #[test]
+    fn test_thin_binder_exported_class() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            r#"export class MyClass { x: number; }"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        // Exported class should be bound to file_locals
+        assert!(binder.file_locals.has("MyClass"), "Exported class 'MyClass' should be in file_locals");
+    }
+
+    #[test]
+    fn test_thin_binder_exported_const() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            r#"export const x = 1, y = 2;"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        // Exported variables should be bound to file_locals
+        assert!(binder.file_locals.has("x"), "Exported const 'x' should be in file_locals");
+        assert!(binder.file_locals.has("y"), "Exported const 'y' should be in file_locals");
     }
 }
