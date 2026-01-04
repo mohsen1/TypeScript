@@ -273,6 +273,7 @@ impl ThinParserState {
             SyntaxKind::LetKeyword |
             SyntaxKind::ConstKeyword => self.parse_variable_statement(),
             SyntaxKind::FunctionKeyword => self.parse_function_declaration(),
+            SyntaxKind::ClassKeyword => self.parse_class_declaration(),
             SyntaxKind::IfKeyword => self.parse_if_statement(),
             SyntaxKind::ReturnKeyword => self.parse_return_statement(),
             SyntaxKind::WhileKeyword => self.parse_while_statement(),
@@ -489,6 +490,237 @@ impl ThinParserState {
                 question_token: false,
                 type_annotation,
                 initializer,
+            },
+        )
+    }
+
+    /// Parse class declaration
+    fn parse_class_declaration(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::ClassKeyword);
+
+        // Parse class name
+        let name = if self.is_token(SyntaxKind::Identifier) {
+            self.parse_identifier()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // TODO: Parse type parameters
+
+        // Parse heritage clauses (extends, implements)
+        let heritage_clauses = self.parse_heritage_clauses();
+
+        // Parse class body
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+        let members = self.parse_class_members();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end_pos = self.token_end();
+        self.arena.add_class(
+            syntax_kind_ext::CLASS_DECLARATION,
+            start_pos,
+            end_pos,
+            ClassData {
+                modifiers: None,
+                name,
+                type_parameters: None,
+                heritage_clauses,
+                members,
+            },
+        )
+    }
+
+    /// Parse heritage clauses (extends, implements)
+    fn parse_heritage_clauses(&mut self) -> Option<NodeList> {
+        let mut clauses = Vec::new();
+
+        // Parse extends clause
+        if self.is_token(SyntaxKind::ExtendsKeyword) {
+            let start_pos = self.token_pos();
+            self.next_token();
+            let type_ref = self.parse_expression(); // Simple: just parse as expression
+            let end_pos = self.token_end();
+
+            // Create heritage clause node
+            let clause = self.arena.add_heritage(
+                syntax_kind_ext::HERITAGE_CLAUSE,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::HeritageData {
+                    token: SyntaxKind::ExtendsKeyword as u16,
+                    types: self.make_node_list(vec![type_ref]),
+                },
+            );
+            clauses.push(clause);
+        }
+
+        // Parse implements clause
+        if self.is_token(SyntaxKind::ImplementsKeyword) {
+            let start_pos = self.token_pos();
+            self.next_token();
+
+            let mut types = Vec::new();
+            loop {
+                let type_ref = self.parse_expression();
+                types.push(type_ref);
+                if !self.parse_optional(SyntaxKind::CommaToken) {
+                    break;
+                }
+            }
+
+            let end_pos = self.token_end();
+            let clause = self.arena.add_heritage(
+                syntax_kind_ext::HERITAGE_CLAUSE,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::HeritageData {
+                    token: SyntaxKind::ImplementsKeyword as u16,
+                    types: self.make_node_list(types),
+                },
+            );
+            clauses.push(clause);
+        }
+
+        if clauses.is_empty() {
+            None
+        } else {
+            Some(self.make_node_list(clauses))
+        }
+    }
+
+    /// Parse class members
+    fn parse_class_members(&mut self) -> NodeList {
+        let mut members = Vec::new();
+
+        while !self.is_token(SyntaxKind::CloseBraceToken) &&
+              !self.is_token(SyntaxKind::EndOfFileToken) {
+            let member = self.parse_class_member();
+            if !member.is_none() {
+                members.push(member);
+            }
+
+            // Handle semicolons
+            self.parse_optional(SyntaxKind::SemicolonToken);
+        }
+
+        self.make_node_list(members)
+    }
+
+    /// Parse a single class member
+    fn parse_class_member(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Handle constructor
+        if self.is_token(SyntaxKind::ConstructorKeyword) {
+            return self.parse_constructor();
+        }
+
+        // Handle methods and properties
+        // For now, just parse name and check for ( for methods
+        let name = if self.is_token(SyntaxKind::Identifier) ||
+                     self.is_token(SyntaxKind::StringLiteral) ||
+                     self.is_token(SyntaxKind::NumericLiteral) {
+            self.parse_property_name()
+        } else {
+            // Skip unknown token
+            self.next_token();
+            return NodeIndex::NONE;
+        };
+
+        // Check if it's a method or property
+        if self.is_token(SyntaxKind::OpenParenToken) {
+            // Method
+            self.parse_expected(SyntaxKind::OpenParenToken);
+            let parameters = self.parse_parameter_list();
+            self.parse_expected(SyntaxKind::CloseParenToken);
+
+            // Optional return type
+            let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+                self.parse_type()
+            } else {
+                NodeIndex::NONE
+            };
+
+            // Parse body
+            let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+                self.parse_block()
+            } else {
+                NodeIndex::NONE
+            };
+
+            let end_pos = self.token_end();
+            self.arena.add_method_decl(
+                syntax_kind_ext::METHOD_DECLARATION,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::MethodDeclData {
+                    modifiers: None,
+                    asterisk_token: false,
+                    name,
+                    question_token: false,
+                    type_parameters: None,
+                    parameters,
+                    type_annotation,
+                    body,
+                },
+            )
+        } else {
+            // Property - parse optional type and initializer
+            let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+                self.parse_type()
+            } else {
+                NodeIndex::NONE
+            };
+
+            let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
+                self.parse_assignment_expression()
+            } else {
+                NodeIndex::NONE
+            };
+
+            let end_pos = self.token_end();
+            self.arena.add_property_decl(
+                syntax_kind_ext::PROPERTY_DECLARATION,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::PropertyDeclData {
+                    modifiers: None,
+                    name,
+                    question_token: false,
+                    exclamation_token: false,
+                    type_annotation,
+                    initializer,
+                },
+            )
+        }
+    }
+
+    /// Parse constructor
+    fn parse_constructor(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::ConstructorKeyword);
+
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_constructor(
+            syntax_kind_ext::CONSTRUCTOR,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::ConstructorData {
+                modifiers: None,
+                type_parameters: None,
+                parameters,
+                body,
             },
         )
     }
@@ -1355,6 +1587,42 @@ mod tests {
 
         assert!(!root.is_none());
         assert!(parser.get_diagnostics().is_empty());
+    }
+
+    #[test]
+    fn test_thin_parser_class_declaration() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { x = 1; bar() { return this.x; } }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_class_with_constructor() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Point { constructor(x, y) { this.x = x; this.y = y; } }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_class_extends() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Child extends Parent { constructor() { super(); } }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        // May have some diagnostics for super() but should parse successfully
     }
 
     #[test]

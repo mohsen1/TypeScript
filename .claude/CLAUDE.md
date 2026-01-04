@@ -93,6 +93,7 @@ This submodule is read-only reference material for:
 
 When working on TypeScript compiler features, you may find it helpful to look at the corresponding Go implementation in `typescript-go/internal/` for inspiration or clarification.
 
+You can take a look at `specs/TYPESCRIPT_GO_ARCHITECTURE.md` for an overview
 ## ✅ Commit Format
 ```
 [wasm] <component>: <description>
