@@ -24,7 +24,7 @@ use crate::parser::{
         SwitchData, CaseClauseData, TryData, CatchClauseData,
         EnumData, EnumMemberData,
         ImportDeclData, ImportClauseData, NamedImportsData, SpecifierData,
-        ExportDeclData,
+        ExportDeclData, QualifiedNameData,
     },
     syntax_kind_ext,
 };
@@ -296,7 +296,14 @@ impl ThinParserState {
             SyntaxKind::ForKeyword => self.parse_for_statement(),
             SyntaxKind::SemicolonToken => self.parse_empty_statement(),
             SyntaxKind::ExportKeyword => self.parse_export_declaration(),
-            SyntaxKind::ImportKeyword => self.parse_import_declaration(),
+            SyntaxKind::ImportKeyword => {
+                // Check for import = (import equals declaration)
+                if self.look_ahead_is_import_equals() {
+                    self.parse_import_equals_declaration()
+                } else {
+                    self.parse_import_declaration()
+                }
+            }
             _ => self.parse_expression_statement(),
         }
     }
@@ -313,6 +320,101 @@ impl ThinParserState {
         self.scanner.restore_state(snapshot);
         self.current_token = current;
         is_function
+    }
+
+    /// Look ahead to see if we have "import identifier ="
+    fn look_ahead_is_import_equals(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        // Skip 'import'
+        self.next_token();
+        // Check for identifier
+        if !self.is_token(SyntaxKind::Identifier) {
+            self.scanner.restore_state(snapshot);
+            self.current_token = current;
+            return false;
+        }
+        // Skip identifier
+        self.next_token();
+        // Check for '='
+        let is_equals = self.is_token(SyntaxKind::EqualsToken);
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_equals
+    }
+
+    /// Parse import equals declaration: import X = require("...") or import X = Y.Z
+    fn parse_import_equals_declaration(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::ImportKeyword);
+
+        // Parse the name
+        let name = self.parse_identifier();
+
+        self.parse_expected(SyntaxKind::EqualsToken);
+
+        // Parse module reference: require("...") or qualified name
+        let module_reference = if self.is_token(SyntaxKind::RequireKeyword) {
+            self.parse_external_module_reference()
+        } else {
+            self.parse_entity_name()
+        };
+
+        self.parse_semicolon();
+        let end_pos = self.token_end();
+
+        // Use ImportDeclData with import_clause as the name and module_specifier as reference
+        // This is a simplified representation
+        self.arena.add_import_decl(
+            syntax_kind_ext::IMPORT_EQUALS_DECLARATION,
+            start_pos,
+            end_pos,
+            ImportDeclData {
+                modifiers: None,
+                import_clause: name,
+                module_specifier: module_reference,
+                attributes: NodeIndex::NONE,
+            },
+        )
+    }
+
+    /// Parse external module reference: require("...")
+    fn parse_external_module_reference(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::RequireKeyword);
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let expression = self.parse_string_literal();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+        let end_pos = self.token_end();
+
+        // Return the string literal as the module reference
+        expression
+    }
+
+    /// Parse entity name: A or A.B.C
+    fn parse_entity_name(&mut self) -> NodeIndex {
+        let mut left = self.parse_identifier();
+
+        while self.is_token(SyntaxKind::DotToken) {
+            self.next_token();
+            let right = self.parse_identifier();
+            let start_pos = if let Some(node) = self.arena.get(left) { node.pos } else { 0 };
+            let end_pos = self.token_end();
+
+            left = self.arena.add_qualified_name(
+                syntax_kind_ext::QUALIFIED_NAME,
+                start_pos,
+                end_pos,
+                QualifiedNameData {
+                    left,
+                    right,
+                },
+            );
+        }
+
+        left
     }
 
     /// Parse async function declaration
@@ -3104,31 +3206,6 @@ impl ThinParserState {
                 members: self.make_node_list(members),
             },
         )
-    }
-
-    /// Parse entity name: x or x.y.z
-    fn parse_entity_name(&mut self) -> NodeIndex {
-        let mut left = self.parse_identifier();
-
-        while self.parse_optional(SyntaxKind::DotToken) {
-            let start_pos = self.token_pos();
-            let right = self.parse_identifier();
-            let end_pos = self.token_end();
-
-            // Create a qualified name node
-            left = self.arena.add_access_expr(
-                syntax_kind_ext::QUALIFIED_NAME,
-                start_pos,
-                end_pos,
-                crate::parser::thin_node::AccessExprData {
-                    expression: left,
-                    name_or_argument: right,
-                    question_dot_token: false,
-                },
-            );
-        }
-
-        left
     }
 
     /// Parse type arguments: <T, U, V>
