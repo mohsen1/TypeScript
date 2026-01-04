@@ -1166,11 +1166,17 @@ fn test_type_flags() {
             let arr_type = checker.get_type_of_symbol(symbol);
             let typ = checker.types.get(arr_type).unwrap();
 
-            // The type should be a union of number and string literals
-            if let Type::Union(u) = typ {
-                assert_eq!(u.types.len(), 2);
+            // The type should be Array<number | string> (or Array<1 | "hello">)
+            if let Type::Array(arr) = typ {
+                // Element type should be a union of the literal types
+                let elem_type = checker.types.get(arr.element_type).unwrap();
+                if let Type::Union(u) = elem_type {
+                    assert_eq!(u.types.len(), 2, "Expected union of 2 types");
+                } else {
+                    panic!("Expected Union element type for mixed array, got {:?}", elem_type);
+                }
             } else {
-                panic!("Expected Union type for mixed array, got {:?}", typ);
+                panic!("Expected Array type for array literal, got {:?}", typ);
             }
         }
     }
@@ -2706,15 +2712,22 @@ let x = d["key"];
         let more_type = checker.get_type_of_symbol(more_symbol);
         let more_str = checker.type_to_string(more_type);
 
-        // more should be number (inferred from spread + literals)
-        // The type could be a union including number, or just number
-        let is_number = more_type == checker.types.number_type;
-        let contains_number = if let Some(Type::Union(u)) = checker.types.get(more_type) {
-            u.types.iter().any(|&t| t == checker.types.number_type)
+        // more should be an Array type with element type containing number (from spread and literals)
+        // The type should be number[] or (number | 4 | 5)[]
+        let is_array_with_number = if let Some(Type::Array(arr)) = checker.types.get(more_type) {
+            // Element type should be number or contain number
+            let elem_type = arr.element_type;
+            elem_type == checker.types.number_type || {
+                if let Some(Type::Union(u)) = checker.types.get(elem_type) {
+                    u.types.iter().any(|&t| t == checker.types.number_type)
+                } else {
+                    false
+                }
+            }
         } else {
             false
         };
-        assert!(is_number || contains_number, "more should be or contain number type, got: {}", more_str);
+        assert!(is_array_with_number, "more should be array with number element type, got: {}", more_str);
     }
 
     #[test]

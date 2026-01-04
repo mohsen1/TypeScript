@@ -1069,21 +1069,44 @@ impl<'a> CheckerState<'a> {
             }
         }
 
-        // Create a union of element types (if multiple) or the single type
-        if element_types.is_empty() {
+        // Create an Array type from the element types
+        // If contextual type is an array, use its element type to widen literals
+        let element_type = if element_types.is_empty() {
             // Empty array - use contextual type if available, otherwise never[]
-            match contextual_element_info {
-                Some(ContextualArrayInfo::Array(elem_type)) => elem_type,
+            match &contextual_element_info {
+                Some(ContextualArrayInfo::Array(elem_type)) => *elem_type,
                 Some(ContextualArrayInfo::Tuple(_)) => self.types.never_type,
                 None => self.types.never_type,
             }
         } else if element_types.len() == 1 {
-            // Single type - return as is (would be Array<T> in full impl)
-            element_types[0]
+            // Single element type
+            // If contextual is Array and element is assignable, use contextual element type for widening
+            if let Some(ContextualArrayInfo::Array(ctx_elem)) = &contextual_element_info {
+                if self.is_type_assignable_to(element_types[0], *ctx_elem) {
+                    *ctx_elem
+                } else {
+                    element_types[0]
+                }
+            } else {
+                element_types[0]
+            }
         } else {
-            // Multiple types - create union (would be Array<T | U | ...> in full impl)
-            self.types.create_union_type(element_types)
-        }
+            // Multiple element types
+            // Check if all are assignable to contextual element type
+            if let Some(ContextualArrayInfo::Array(ctx_elem)) = &contextual_element_info {
+                let all_assignable = element_types.iter().all(|&t| self.is_type_assignable_to(t, *ctx_elem));
+                if all_assignable {
+                    *ctx_elem
+                } else {
+                    self.types.create_union_type(element_types)
+                }
+            } else {
+                self.types.create_union_type(element_types)
+            }
+        };
+
+        // Return an Array type, not a union of element types
+        self.types.create_array_type(element_type, false)
     }
 
     /// Get the element type from the contextual type if it's an array or tuple.

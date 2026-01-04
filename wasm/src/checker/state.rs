@@ -948,11 +948,21 @@ impl<'a> CheckerState<'a> {
             if let Some(crate::parser::Node::VariableDeclaration(vd)) = self.node_arena.get(decl_idx) {
                 // If there's an initializer, check type compatibility
                 if !vd.initializer.is_none() {
-                    let init_type = self.get_type_of_node(vd.initializer);
+                    // If there's a type annotation, use it as contextual type for the initializer
+                    let (init_type, declared_type_opt) = if !vd.type_annotation.is_none() {
+                        let declared_type = self.get_type_of_node(vd.type_annotation);
+                        // Set contextual type to enable proper inference (e.g., array literals)
+                        let prev_contextual = self.contextual_type;
+                        self.contextual_type = Some(declared_type);
+                        let init_type = self.get_type_of_node(vd.initializer);
+                        self.contextual_type = prev_contextual;
+                        (init_type, Some(declared_type))
+                    } else {
+                        (self.get_type_of_node(vd.initializer), None)
+                    };
 
                     // If there's a type annotation, check assignability
-                    if !vd.type_annotation.is_none() {
-                        let declared_type = self.get_type_of_node(vd.type_annotation);
+                    if let Some(declared_type) = declared_type_opt {
                         if !self.is_type_assignable_to(init_type, declared_type) {
                             let init_str = self.type_to_string(init_type);
                             let decl_str = self.type_to_string(declared_type);
