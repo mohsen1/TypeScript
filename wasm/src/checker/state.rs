@@ -742,7 +742,8 @@ impl<'a> CheckerState<'a> {
     }
 
     /// Get the children of a node.
-    fn get_node_children(&self, node_idx: NodeIndex) -> Vec<NodeIndex> {
+    /// Used by language service for AST traversal.
+    pub fn get_node_children(&self, node_idx: NodeIndex) -> Vec<NodeIndex> {
         use crate::parser::Node;
         let mut children = Vec::new();
 
