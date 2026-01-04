@@ -24,13 +24,24 @@ try {
 }
 
 const limit = parseInt(process.argv[2]) || 50;
-const testDir = 'tests/cases/compiler';
+const testDir = process.argv[3] || 'tests/cases/compiler';
 
-// Get test files
-const files = readdirSync(testDir)
-    .filter(f => f.endsWith('.ts'))
-    .slice(0, limit)
-    .map(f => join(testDir, f));
+// Get test files recursively
+function getFiles(dir, files = []) {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) {
+            getFiles(path, files);
+        } else if (entry.name.endsWith('.ts')) {
+            files.push(path);
+        }
+    }
+    return files;
+}
+
+const allFiles = getFiles(testDir);
+const files = allFiles.slice(0, limit);
 
 console.log(`\n=== Batch Testing ${files.length} files ===\n`);
 
@@ -45,7 +56,14 @@ let totalCheckTime = 0;
 const failures = [];
 
 for (const file of files) {
+    // Skip very large files
     const source = readFileSync(file, 'utf-8');
+    if (source.length > 50000) {
+        failures.push({ file: basename(file, '.ts'), stage: 'skip', error: 'too large' });
+        failed++;
+        continue;
+    }
+
     const testName = basename(file, '.ts');
 
     try {
