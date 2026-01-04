@@ -525,13 +525,12 @@ building up to full inference.
       - `this is T` (this type predicates in methods)
 - [ ] Integrate with TypeScript's checker for full test suite
 
-Verification Gate: 439 Rust tests passing, 2 skipped. Full baseline matching pending.
+Verification Gate: 440 Rust tests passing, 2 skipped. Full baseline matching pending.
 
 **Known limitations**:
-- Function parameter scoping not yet implemented (parameters aren't visible in function bodies)
 - super.method() calls cause infinite recursion in some cases
 
-Progress: **Phase 5 ~92% complete! Core type checking working. 439 tests passing (2 skipped).**
+Progress: **Phase 5 ~93% complete! Core type checking working. 440 tests passing (2 skipped).**
 
 ==============================================================================
 PHASE 6: EMITTER
