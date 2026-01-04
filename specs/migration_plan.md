@@ -107,8 +107,17 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 
 ## Phase 0.3: Arena-Based Type Checker (O(1) Cleanup)
 
+### Analysis (2026-01-04)
+Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
+- Uses Box<T> for large variants (ObjectType: 144B → 8B pointer)
+- Non-boxed: IntrinsicType (32B), LiteralType (48B - determines enum size)
+- LiteralType = flags(4) + LiteralValue(32) + fresh_type(4) + regular_type(4) = 48B
+- Further optimization possible by interning intrinsic_name String → Atom (u32)
+- 1.33 types per cache line is acceptable for now
+
 ### TODO
-- [ ] Apply "Thin" pattern to `Type` enum (currently huge)
+- [x] Analyze Type enum size (48 bytes - already optimized with Boxing)
+- [ ] Consider interning String fields in IntrinsicType → Atom (minor gain)
 - [ ] Use `bumpalo` or `typed-arena` for Type objects
 - [ ] All allocations for `check` go into single arena
 - [ ] Deallocation = reset pointer (no `Drop` overhead)
