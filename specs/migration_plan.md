@@ -23,13 +23,13 @@ compiler remains fully functional at every step.
 | Metric | Value |
 |--------|-------|
 | Lines of Code | ~23,500 |
-| Tests Passing | 483 |
+| Tests Passing | 485 |
 | Status | 🟡 98% |
 
 ### TODO List
 
 1. [x] ~~JSX intrinsic element types~~ - Basic JSX type support added
-2. [ ] **Namespace merging** - Handle class+namespace, enum+namespace merging
+2. [x] ~~Namespace merging~~ - Binder and checker both working
 3. [ ] **Module augmentation** - Support `declare module` augmentations
 4. [ ] **Overload resolution** - Improve function overload selection
 5. [ ] **Recursive type aliases** - Better handling of self-referential types
@@ -134,7 +134,7 @@ compiler remains fully functional at every step.
 | Metric | Value |
 |--------|-------|
 | Lines of Code | ~23,500 |
-| Tests | 483 |
+| Tests | 485 |
 | Status | 🟡 98% |
 
 **Completed:**
@@ -158,13 +158,13 @@ compiler remains fully functional at every step.
 | 2 | Scanner | ~2,500 | 22 | ✅ DONE |
 | 3 | Parser | ~5,000 | 100+ | ✅ DONE |
 | 4 | Binder | ~1,900 | 20+ | ✅ DONE |
-| 5 | Type Checker | ~23,500 | 483 | 🟡 98% |
+| 5 | Type Checker | ~23,500 | 485 | 🟡 98% |
 | 6 | Emitter | ~100 | - | ⬜ Pending |
 | 7 | Language Service | - | - | ⬜ Pending |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
 **Total Rust Code**: ~33,500 lines (excluding tests)
-**Total Tests**: 483 passing, 0 skipped
+**Total Tests**: 485 passing, 0 skipped
 **Overall Progress**: ~96% of core compiler functionality
 
 ---

@@ -11054,3 +11054,62 @@ fn test_enum_namespace_merging_type_check() {
     // Should complete without errors - Color.parse should resolve
 }
 
+#[test]
+fn test_declare_module_basic() {
+    // Test basic declare module syntax
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        declare module "my-module" {
+            export function helper(x: number): number;
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.d.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.d.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+    // Should complete without errors
+}
+
+#[test]
+fn test_ambient_namespace() {
+    // Test ambient namespace declarations
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        declare namespace MyLib {
+            interface Config {
+                name: string;
+            }
+            function init(config: Config): void;
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.d.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.d.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+    // Should complete without errors
+}
+
