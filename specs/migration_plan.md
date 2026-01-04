@@ -30,9 +30,9 @@ Current `Node` enum is sized to largest variant (~208 bytes). This destroys cach
 - [x] Size analysis complete: Node=208B, ClassDeclaration=200B, FunctionDeclaration=168B
 - [x] ThinNode struct implemented: exactly 16 bytes (4 nodes per cache line)
 - [x] 60+ typed data pool structs defined for all node categories
-- [x] ThinNodeArena with basic add/get methods
-- [ ] Add remaining arena methods for all node types
-- [ ] Add node accessor helper traits
+- [x] ThinNodeArena with all typed storage pools
+- [x] NodeView wrapper for ergonomic node access
+- [x] Kind utilities (is_identifier, is_function_like, is_statement, etc.)
 - [ ] Migrate parser to use ThinNodeArena
 - [ ] Update binder, checker, emitter to use new structure
 
@@ -148,8 +148,8 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 | 7 | Language Service | ~1,500 | 3 | 🟡 55% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
-**Total Rust Code**: ~39,000 lines
-**Total Tests**: 593 passing
+**Total Rust Code**: ~39,500 lines
+**Total Tests**: 595 passing
 **Overall Progress**: ~85% of full compiler functionality
 
 ---
@@ -159,8 +159,10 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 ## 2026-01-04: Thin Nodes Architecture
 - Implemented ThinNode struct (16 bytes vs 208 bytes = 13x improvement)
 - Created 60+ typed data pool structures for all node categories
-- ThinNodeArena foundation complete
-- 593 tests passing
+- ThinNodeArena with all typed storage pools
+- NodeView wrapper for ergonomic node access
+- Kind utilities (is_identifier, is_function_like, is_statement, etc.)
+- 595 tests passing
 
 ## 2026-01-04: Architecture Fixes
 - Fixed 4 BLOCKER/CRITICAL issues from Gemini architecture review
