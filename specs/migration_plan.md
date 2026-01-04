@@ -63,13 +63,54 @@ Common issues found:
 
 - [ ] Experimental syntax support (decorators stage 3, etc.)
 
-## Phase 6: Emitter (Pending)
+## Phase 6: Emitter (Next Focus)
 
-- [ ] Port complete AST → text printing logic
-- [ ] Handle formatting and whitespace
-- [ ] Source map generation
-- [ ] Declaration file emission
-- [ ] JavaScript downlevel transforms
+| Metric | Value |
+|--------|-------|
+| Lines of Code | ~1,600 (basic printer exists) |
+| Target Lines | ~8,000-12,000 |
+| Tests | 30+ roundtrip tests |
+| Status | 🟡 20% |
+
+**See detailed plan: [specs/emitter_plan.md](emitter_plan.md)**
+
+### Phase 6.1: Complete Basic Emission
+- [ ] Type node emission (TypeReference, UnionType, IntersectionType, etc.)
+- [ ] Heritage clauses (extends, implements)
+- [ ] Type parameters with constraints
+- [ ] Decorators and modifiers emission
+- [ ] Computed property names
+- [ ] Template literal spans
+- [ ] Full JSX support (attributes, children, fragments)
+
+### Phase 6.2: Source Map Support
+- [ ] VLQ encoding implementation
+- [ ] SourceMapGenerator struct
+- [ ] Position tracking during emit
+- [ ] Inline and external source map output
+
+### Phase 6.3: Comment Preservation
+- [ ] Leading/trailing comment emission
+- [ ] Detached comment handling
+- [ ] JSDoc comment formatting
+
+### Phase 6.4: Declaration File Emission
+- [ ] Declaration-only node filtering
+- [ ] Export visibility tracking
+- [ ] Type-only imports/exports
+- [ ] Triple-slash reference handling
+
+### Phase 6.5-6.7: JavaScript Transforms
+- [ ] ES2015 class → prototype
+- [ ] Arrow function → function expression
+- [ ] Destructuring transform
+- [ ] Async/await → Promise chains
+- [ ] Generator → state machine
+
+### Phase 6.8: Module System Transforms
+- [ ] ES modules → CommonJS
+- [ ] ES modules → AMD/UMD
+- [ ] Import/export elision for type-only
 
 ## Phase 7: Language Service (Pending)
 
@@ -173,7 +214,7 @@ Common issues found:
 | 3 | Parser | ~5,000 | 100+ | ✅ DONE |
 | 4 | Binder | ~1,900 | 20+ | ✅ DONE |
 | 5 | Type Checker | ~23,500 | 485 | 🟡 98% |
-| 6 | Emitter | ~100 | - | ⬜ Pending |
+| 6 | Emitter | ~1,600 | 30+ | 🟡 20% |
 | 7 | Language Service | - | - | ⬜ Pending |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
@@ -186,6 +227,15 @@ Common issues found:
 # Session Log
 
 ## 2026-01-04
+
+**Session 5 - Phase 6 Emitter Planning:**
+- Created `rust-emitter` branch in separate git worktree
+- Analyzed TypeScript emitter.ts (6,361 lines) architecture
+- Created detailed implementation plan: `specs/emitter_plan.md`
+- Identified 9 sub-phases for Emitter implementation
+- Estimated 22-28 days of work for full feature parity
+- Current emitter.rs has basic Printer with 30+ roundtrip tests
+- Key gaps: source maps, declaration emit, JS transforms
 
 **Session 4 - Complete Phase 5 TODO:**
 - Verified all 9 Phase 5 TODO items complete
