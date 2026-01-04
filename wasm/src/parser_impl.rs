@@ -1529,7 +1529,7 @@ impl ParserState {
 
             let mut types = NodeList::new();
             loop {
-                let expr = self.parse_left_hand_side_expression();
+                let expr = self.parse_expression_with_type_arguments();
                 types.push(expr);
                 if !self.parse_optional(SyntaxKind::CommaToken) {
                     break;
@@ -1546,6 +1546,74 @@ impl ParserState {
         }
 
         Some(clauses)
+    }
+
+    /// Parse an expression with optional type arguments (for heritage clauses).
+    /// e.g., `BaseClass`, `IList<T>`, `Foo.Bar<A, B>`
+    fn parse_expression_with_type_arguments(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let expression = self.parse_left_hand_side_expression();
+
+        // Try to parse type arguments (<T, U, ...>)
+        let type_arguments = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_arguments())
+        } else {
+            None
+        };
+
+        // Always wrap in ExpressionWithTypeArguments for heritage clauses
+        let end = self.get_token_start();
+        let ewta = crate::parser::ExpressionWithTypeArguments {
+            base: NodeBase::new_ext(syntax_kind_ext::EXPRESSION_WITH_TYPE_ARGUMENTS, pos, end),
+            expression,
+            type_arguments,
+        };
+        self.alloc_node(Node::ExpressionWithTypeArguments(ewta))
+    }
+
+    /// Check if current token can start a type.
+    fn is_start_of_type(&self) -> bool {
+        match self.token() {
+            // Type keywords
+            SyntaxKind::AnyKeyword
+            | SyntaxKind::UnknownKeyword
+            | SyntaxKind::StringKeyword
+            | SyntaxKind::NumberKeyword
+            | SyntaxKind::BigIntKeyword
+            | SyntaxKind::BooleanKeyword
+            | SyntaxKind::ReadonlyKeyword
+            | SyntaxKind::SymbolKeyword
+            | SyntaxKind::UniqueKeyword
+            | SyntaxKind::VoidKeyword
+            | SyntaxKind::UndefinedKeyword
+            | SyntaxKind::NullKeyword
+            | SyntaxKind::NeverKeyword
+            | SyntaxKind::ObjectKeyword
+            // Literal types
+            | SyntaxKind::StringLiteral
+            | SyntaxKind::NumericLiteral
+            | SyntaxKind::BigIntLiteral
+            | SyntaxKind::TrueKeyword
+            | SyntaxKind::FalseKeyword
+            // Type constructors
+            | SyntaxKind::OpenBraceToken  // object type: { ... }
+            | SyntaxKind::OpenBracketToken  // tuple type: [...]
+            | SyntaxKind::OpenParenToken  // parenthesized or function type
+            | SyntaxKind::LessThanToken  // generic type: <T>(...) => ...
+            | SyntaxKind::NewKeyword  // constructor type: new (...) => T
+            | SyntaxKind::TypeOfKeyword  // typeof
+            | SyntaxKind::KeyOfKeyword  // keyof
+            | SyntaxKind::InferKeyword  // infer T
+            | SyntaxKind::BarToken  // union: | T
+            | SyntaxKind::AmpersandToken  // intersection: & T
+            | SyntaxKind::ThisKeyword  // this type
+            | SyntaxKind::ImportKeyword  // import type: import("...")
+            | SyntaxKind::AssertsKeyword  // asserts
+            | SyntaxKind::MinusToken  // negative number literal type
+            => true,
+            // Identifier (type reference)
+            _ => self.scanner.is_identifier(),
+        }
     }
 
     /// Parse class members.
