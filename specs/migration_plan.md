@@ -281,7 +281,7 @@ scanner and shares data structures with the type checker.
       - convertRustAstToTypeScript() converts JSON AST to TS nodes
       - Graceful fallback to TypeScript parser on errors
       - Supports: identifiers, literals, expressions, statements, functions
-- [ ] Roundtrip test: parse → emit → parse must be identical
+- [x] Roundtrip test: parse → emit → parse must be identical (16 roundtrip tests in emitter.rs)
 
 Verification Gate: All parser baselines match.
 
