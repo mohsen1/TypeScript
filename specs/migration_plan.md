@@ -437,10 +437,21 @@ This is the ultimate validation milestone. The TypeScript test suite contains th
 - Parse failures: missing syntax support (decorators, `import =`, etc.)
 
 ### Current Blockers
-- ThinChecker needs control flow narrowing
-- ThinChecker needs full type inference for all expressions
+
+**Parser (causing parse failures):**
+- `import X = require("...")` - CommonJS import equals syntax
+- `export import X = Y` - re-export import equals
+- `declare module "name" { }` - ambient module declarations
+- Empty accessor bodies: `get foo() { }` edge cases
+
+**Checker (causing crashes):**
+- `abstract class` inside expressions (IIFE, arrow functions)
+- Some class heritage expressions
+- Certain decorator patterns
+
+**Emitter:**
 - Declaration emit needs to match TypeScript exactly
-- Some parser edge cases may need fixing
+- Class transforms for ES5 output
 
 ## Phase 9: Full Rust Mode - ⬜ Future
 

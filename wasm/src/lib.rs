@@ -224,7 +224,8 @@ impl ThinParser {
             );
 
             let type_id = checker.get_type_of_node(parser::NodeIndex(node_idx));
-            checker.type_to_string(type_id)
+            // Use basic type display since ThinCheckerState doesn't have type_to_string
+            format!("TypeId({})", type_id.0)
         } else {
             "unknown".to_string()
         }
@@ -234,9 +235,9 @@ impl ThinParser {
     #[wasm_bindgen(js_name = emit)]
     pub fn emit(&self) -> String {
         if let Some(root_idx) = self.source_file_idx {
-            let mut emitter = ThinEmitter::new(self.parser.get_arena());
-            emitter.emit_node(root_idx);
-            emitter.get_output().to_string()
+            let mut printer = ThinPrinter::new(self.parser.get_arena());
+            printer.emit(root_idx);
+            printer.get_output().to_string()
         } else {
             String::new()
         }
