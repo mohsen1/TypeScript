@@ -17,7 +17,7 @@ use crate::parser::{
     BinaryExpression, CallExpression, PropertyAccessExpression,
     ArrayLiteralExpression, ObjectLiteralExpression, PropertyAssignment,
     NewExpression, ElementAccessExpression, SpreadElement,
-    AwaitExpression, YieldExpression,
+    AwaitExpression, YieldExpression, FunctionExpression,
     // Statements
     Block, ExpressionStatement, VariableStatement,
     VariableDeclarationList, VariableDeclaration,
@@ -3024,6 +3024,7 @@ impl ParserState {
             SyntaxKind::NullKeyword => self.parse_null_literal(),
             SyntaxKind::ThisKeyword => self.parse_this_expression(),
             SyntaxKind::NewKeyword => self.parse_new_expression(),
+            SyntaxKind::FunctionKeyword => self.parse_function_expression(),
             SyntaxKind::LessThanToken => {
                 // JSX element or fragment: <Foo> or <>
                 self.parse_jsx_element_or_self_closing_or_fragment(true)
@@ -3079,6 +3080,68 @@ impl ParserState {
         };
 
         self.alloc_node(Node::NewExpression(new_expr))
+    }
+
+    /// Parse a function expression: function name?<T>(params): type { body }
+    fn parse_function_expression(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        // Parse optional async modifier (could come before function keyword)
+        // Note: For simplicity, we assume 'async' is parsed elsewhere if present
+
+        // Consume 'function' keyword
+        self.parse_expected(SyntaxKind::FunctionKeyword);
+
+        // Check for generator: function*
+        let asterisk = self.parse_optional(SyntaxKind::AsteriskToken);
+
+        // Optional name for named function expressions like: function foo() {}
+        let name = if self.is_token(SyntaxKind::Identifier) {
+            self.parse_identifier()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse type parameters: <T>
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        // Parse parameters
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Parse return type annotation
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse body
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end = self.get_token_start();
+
+        let func_expr = FunctionExpression {
+            base: NodeBase::new_ext(syntax_kind_ext::FUNCTION_EXPRESSION, pos, end),
+            modifiers: None,
+            asterisk_token: asterisk,
+            name,
+            type_parameters,
+            parameters,
+            type_annotation,
+            body,
+        };
+
+        self.alloc_node(Node::FunctionExpression(func_expr))
     }
 
     /// Parse an identifier.
