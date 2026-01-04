@@ -399,22 +399,16 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 This is the ultimate validation milestone. The TypeScript test suite contains thousands of real-world test cases covering all language features.
 
 ### Infrastructure
-- [x] Created test runner script: `scripts/test-rust-compiler.mjs`
-  - Reads test file and displays source
-  - Checks for baseline files (.js, .types, .errors.txt)
-- [x] WASM integration with test runner
-  - Loads WASM module and runs parse/bind/check
-  - Shows timing for each phase
-  - Displays node count, symbol count, type count
-  - Shows parse errors and type errors
-- [x] First successful run: `tests/cases/compiler/2dArrays.ts`
-  - Parse: 1.82ms, 41 nodes, 0 errors
-  - Bind: 0.48ms, 1 symbol
-  - Check: 2.12ms, 24 types
-  - Total: 4.79ms
+- [x] `scripts/test-rust-compiler.mjs` - Single file test runner
+  - Loads WASM and runs parse/bind/check
+  - Shows timing, node/symbol/type counts, errors
+- [x] `scripts/batch-test-rust.mjs` - Batch test runner
+  - Recursive directory scanning
+  - Aggregates pass/fail statistics
+  - Skip files > 50KB
+- [x] First successful test: `tests/cases/compiler/2dArrays.ts` (4.79ms)
 - [ ] Compare output against TypeScript baseline files
 - [ ] Measure and track compilation times vs TypeScript-Go
-- [ ] Track pass/fail rate and blockers
 
 ### Categories to Support
 - [ ] `tests/cases/compiler/` - Core compiler functionality
