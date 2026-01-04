@@ -439,7 +439,8 @@ This is the ultimate validation milestone. The TypeScript test suite contains th
 ### Current Blockers
 
 **Parser (causing parse failures):**
-- `import X = require("...")` - CommonJS import equals syntax
+- [x] `import X = require("...")` - Added in Session 18
+- [x] `import X = Y.Z` - Entity name imports added
 - `export import X = Y` - re-export import equals
 - `declare module "name" { }` - ambient module declarations
 - Empty accessor bodies: `get foo() { }` edge cases
