@@ -36,8 +36,8 @@ fn test_type_flags() {
         assert!(!arena.null_type.is_none());
         assert!(!arena.never_type.is_none());
 
-        // Total: 14 singleton types (12 intrinsic + 2 boolean literals)
-        assert_eq!(arena.len(), 14);
+        // Total: 15 singleton types (13 intrinsic + 2 boolean literals)
+        assert_eq!(arena.len(), 15);
     }
 
     #[test]

@@ -32,6 +32,8 @@ pub struct TypeArena {
     pub null_type: TypeId,
     pub never_type: TypeId,
     pub object_type: TypeId,
+    // Global object types
+    pub regexp_type: TypeId,
     // Literal singletons
     pub true_type: TypeId,
     pub false_type: TypeId,
@@ -53,6 +55,7 @@ impl TypeArena {
             null_type: TypeId::NONE,
             never_type: TypeId::NONE,
             object_type: TypeId::NONE,
+            regexp_type: TypeId::NONE,
             true_type: TypeId::NONE,
             false_type: TypeId::NONE,
         };
@@ -70,6 +73,9 @@ impl TypeArena {
         arena.null_type = arena.create_intrinsic(type_flags::NULL, "null");
         arena.never_type = arena.create_intrinsic(type_flags::NEVER, "never");
         arena.object_type = arena.create_intrinsic(type_flags::NON_PRIMITIVE, "object");
+
+        // Global object type singletons
+        arena.regexp_type = arena.create_intrinsic(type_flags::OBJECT, "RegExp");
 
         // Boolean literal singletons
         arena.true_type = arena.create_boolean_literal(true);

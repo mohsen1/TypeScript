@@ -650,8 +650,7 @@ impl<'a> CheckerState<'a> {
 
             // RegExp literal
             Node::RegularExpressionLiteral(_) => {
-                // TODO: Create proper RegExp type
-                self.types.any_type
+                self.types.regexp_type
             }
 
             // Computed property name: [expression]
