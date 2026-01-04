@@ -1749,22 +1749,33 @@ Commits:
 **Updated 2026-01-04:** Refactored to minimal skeleton with correct APIs.
 
 Current implementation:
-- `services/mod.rs` - Consolidated types and stub LanguageService (~730 lines)
+- `services/mod.rs` - Full LanguageService with checker integration (~1200 lines)
 - All language service types (TextSpan, CompletionEntry, DefinitionInfo, etc.)
-- Stub LanguageService with placeholder methods for all IDE features
-- Added language service support methods to CheckerState:
+- Implemented LanguageService with real functionality:
+  - [x] `get_definition_at_position` - Go to definition using symbol declarations
+  - [x] `get_quick_info_at_position` - Hover info with type display
+  - [x] `get_references_at_position` - Find all references via AST traversal
+  - [x] `get_completions_at_position` - File symbols + TypeScript keywords
+  - [x] `get_document_highlights` - Symbol highlighting in file
+  - [x] `get_navigation_bar_items` - Outline view with functions/classes/etc
+  - [x] `get_outlining_spans` - Code folding for blocks/functions/classes
+  - [x] `get_rename_info` + `find_rename_locations` - Rename support
+  - [x] `type_to_string` - Convert TypeId to display string
+- CheckerState language service support methods:
   - `get_symbol_at_location` - Resolve symbol at AST node
   - `get_symbol_declarations` - Get declaration nodes for a symbol
   - `get_symbol_name`, `get_symbol_flags` - Symbol metadata
   - `get_file_symbols` - All symbols in file scope
   - `get_node_span`, `get_node_kind` - Node position/type info
   - `get_node_at_position` - Find node at text position
+  - `get_node_children` - AST traversal for references/highlights
 - Test runner created: `scripts/runLanguageServiceTests.mjs`
-  - 15/15 tests pass with TypeScript language service
+- Integration test: `test_language_service_with_checker` (509 tests pass)
 
 Branch: `rust-language-service`
 Commits:
 - `c632e58ae07` - Simplified services module with correct APIs (937 lines)
+- `2ca97b9f99f` - Language service with checker integration (~1200 lines)
 
 ### Phase 7 Breakdown
 
