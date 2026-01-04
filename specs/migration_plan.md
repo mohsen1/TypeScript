@@ -57,13 +57,16 @@ Current `Node` enum is sized to largest variant (~208 bytes). This destroys cach
 - [x] Created ThinParserState using ThinNodeArena
 - [x] Core parse methods: expressions, statements, functions, variable declarations
 - [x] Class declarations with methods, properties, constructors, and heritage
-- [x] 15 passing tests (expressions, functions, if/while/for, objects, arrays, classes)
+- [x] Interface declarations with property/method signatures and index signatures
+- [x] Type alias declarations with type keyword support
+- [x] Arrow function parsing with expression and block bodies
+- [x] 25 passing tests (expressions, functions, if/while/for, objects, arrays, classes, interfaces, types, arrow functions)
 - [x] Benchmark: compare ThinParser vs Parser performance
   - Regular Parser: 10.9 µs, 20.9 MiB/s (small source)
   - ThinParser: 11.5 µs, 19.7 MiB/s (small source)
   - ThinParser scales better with larger files: 42→52 MiB/s throughput
   - Memory savings: 13x (16 bytes vs 208 bytes per node)
-- [ ] Complete remaining parse methods (interfaces, types, JSX)
+- [ ] Complete remaining parse methods (JSX, async/await)
 
 ### Next Steps
 - [ ] Update binder to use NodeAccess trait
@@ -220,8 +223,8 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 | 7 | Language Service | ~1,500 | 5 | 🟡 55% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
-**Total Rust Code**: ~43,000 lines
-**Total Tests**: 624 passing
+**Total Rust Code**: ~44,000 lines
+**Total Tests**: 634 passing
 **Overall Progress**: ~88% of full compiler functionality
 
 ---

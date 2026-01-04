@@ -1096,9 +1096,154 @@ impl ThinParserState {
 
     /// Parse assignment expression
     fn parse_assignment_expression(&mut self) -> NodeIndex {
+        // Check for arrow function first
+        if self.is_start_of_arrow_function() {
+            return self.parse_arrow_function_expression();
+        }
+
         // Start at precedence 2 to skip comma operator (precedence 1)
         // Comma expressions are only valid in certain contexts (e.g., for loop)
         self.parse_binary_expression(2)
+    }
+
+    /// Check if we're at the start of an arrow function
+    fn is_start_of_arrow_function(&mut self) -> bool {
+        match self.token() {
+            // (params) => ...
+            SyntaxKind::OpenParenToken => self.look_ahead_is_arrow_function(),
+            // identifier => ...
+            SyntaxKind::Identifier => self.look_ahead_is_simple_arrow_function(),
+            _ => false,
+        }
+    }
+
+    /// Look ahead to see if ( starts an arrow function: () => or (x) => or (x, y) =>
+    fn look_ahead_is_arrow_function(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        // Skip (
+        self.next_token();
+
+        // Empty params: () =>
+        if self.is_token(SyntaxKind::CloseParenToken) {
+            self.next_token();
+            let is_arrow = self.is_token(SyntaxKind::EqualsGreaterThanToken);
+            self.scanner.restore_state(snapshot);
+            self.current_token = current;
+            return is_arrow;
+        }
+
+        // Skip to matching ) to check for =>
+        let mut depth = 1;
+        while depth > 0 && !self.is_token(SyntaxKind::EndOfFileToken) {
+            if self.is_token(SyntaxKind::OpenParenToken) {
+                depth += 1;
+            } else if self.is_token(SyntaxKind::CloseParenToken) {
+                depth -= 1;
+            }
+            self.next_token();
+        }
+
+        // Check for optional return type annotation
+        if self.is_token(SyntaxKind::ColonToken) {
+            self.next_token();
+            // Skip the type (simplified - just skip until =>)
+            while !self.is_token(SyntaxKind::EqualsGreaterThanToken)
+                && !self.is_token(SyntaxKind::EndOfFileToken)
+                && !self.is_token(SyntaxKind::SemicolonToken)
+                && !self.is_token(SyntaxKind::CloseBraceToken) {
+                self.next_token();
+            }
+        }
+
+        let is_arrow = self.is_token(SyntaxKind::EqualsGreaterThanToken);
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_arrow
+    }
+
+    /// Look ahead to see if identifier is followed by => (simple arrow function)
+    fn look_ahead_is_simple_arrow_function(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        // Skip identifier
+        self.next_token();
+        let is_arrow = self.is_token(SyntaxKind::EqualsGreaterThanToken);
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_arrow
+    }
+
+    /// Parse arrow function expression: (params) => body or x => body
+    fn parse_arrow_function_expression(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Parse parameters
+        let parameters = if self.is_token(SyntaxKind::OpenParenToken) {
+            // Parenthesized parameter list: (a, b) =>
+            self.parse_expected(SyntaxKind::OpenParenToken);
+            let params = self.parse_parameter_list();
+            self.parse_expected(SyntaxKind::CloseParenToken);
+            params
+        } else {
+            // Single identifier parameter: x =>
+            let param_start = self.token_pos();
+            let name = self.parse_identifier();
+            let param_end = self.token_end();
+
+            let param = self.arena.add_parameter(
+                syntax_kind_ext::PARAMETER,
+                param_start,
+                param_end,
+                crate::parser::thin_node::ParameterData {
+                    modifiers: None,
+                    dot_dot_dot_token: false,
+                    name,
+                    question_token: false,
+                    type_annotation: NodeIndex::NONE,
+                    initializer: NodeIndex::NONE,
+                },
+            );
+            self.make_node_list(vec![param])
+        };
+
+        // Parse optional return type annotation
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse =>
+        self.parse_expected(SyntaxKind::EqualsGreaterThanToken);
+
+        // Parse body (block or expression)
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            self.parse_assignment_expression()
+        };
+
+        let end_pos = self.token_end();
+
+        self.arena.add_function(
+            syntax_kind_ext::ARROW_FUNCTION,
+            start_pos,
+            end_pos,
+            FunctionData {
+                modifiers: None,
+                asterisk_token: false,
+                name: NodeIndex::NONE,
+                type_parameters: None,
+                parameters,
+                type_annotation,
+                body,
+                equals_greater_than_token: true,
+            },
+        )
     }
 
     /// Parse binary expression with precedence climbing
@@ -1972,6 +2117,54 @@ mod tests {
         let mut parser = ThinParserState::new(
             "test.ts".to_string(),
             "interface StringMap { [key: string]: string; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_arrow_function_simple() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "const add = (a, b) => a + b;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_arrow_function_single_param() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "const double = x => x * 2;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_arrow_function_block_body() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "const greet = (name) => { return name; };".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_arrow_function_no_params() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "const getTime = () => Date.now();".to_string(),
         );
         let root = parser.parse_source_file();
 
