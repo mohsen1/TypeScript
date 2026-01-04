@@ -10986,3 +10986,71 @@ fn test_jsx_self_closing_element() {
     }
 }
 
+#[test]
+fn test_class_namespace_merging_type_check() {
+    // Test class+namespace merging - accessing static members
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        class Foo {
+            x: number;
+        }
+        namespace Foo {
+            export const bar = 1;
+        }
+        const val = Foo.bar;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+    // Should complete without errors - Foo.bar should resolve
+}
+
+#[test]
+fn test_enum_namespace_merging_type_check() {
+    // Test enum+namespace merging
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        enum Color {
+            Red,
+            Green,
+            Blue
+        }
+        namespace Color {
+            export function parse(s: string): Color {
+                return Color.Red;
+            }
+        }
+        const c = Color.parse("red");
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+    // Should complete without errors - Color.parse should resolve
+}
+
