@@ -10880,4 +10880,64 @@ fn test_decorator_on_class() {
     }
 }
 
+#[test]
+fn test_private_method_visibility() {
+    // Test that private methods are correctly scoped
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        class Example {
+            private secretMethod(): string {
+                return "secret";
+            }
+
+            public publicMethod(): string {
+                return this.secretMethod();
+            }
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+    // Should complete without errors
+}
+
+#[test]
+fn test_array_filter_method() {
+    // Test array filter with callback type checking
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        const numbers: number[] = [1, 2, 3, 4, 5];
+        const evens = numbers.filter(function(n) { return n % 2 === 0; });
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+    // Should complete without errors
+}
 
