@@ -406,7 +406,7 @@ Strategy: Migrate in layers, starting with primitive type operations and
 building up to full inference.
 
 **Current Stats**: ~23,500 lines of Rust production code (excluding 9,500+ lines of tests)
-**Tests**: 428 checker tests passing, 9 skipped
+**Tests**: 436 checker tests passing, 5 skipped
 
 5.1 Type Representation (COMPLETE)
 ----------------------------------
@@ -525,9 +525,9 @@ building up to full inference.
       - `this is T` (this type predicates in methods)
 - [ ] Integrate with TypeScript's checker for full test suite
 
-Verification Gate: 428 Rust tests passing, 9 skipped. Full baseline matching pending.
+Verification Gate: 436 Rust tests passing, 5 skipped. Full baseline matching pending.
 
-Progress: **Phase 5 ~85% complete! Core type checking working. 428 tests passing (9 skipped).**
+Progress: **Phase 5 ~90% complete! Core type checking working. 436 tests passing (5 skipped).**
 
 ==============================================================================
 PHASE 6: EMITTER
