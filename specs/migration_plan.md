@@ -133,7 +133,7 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 - [x] ES2015+ transforms: arrow function → function expression
 - [x] Module transforms: CommonJS import rewriting (require, __importDefault, __importStar)
 - [x] Module transforms: CommonJS export rewriting (exports.x, __exportStar)
-- [~] Async/await transforms (helper detection done, AST rewriting pending)
+- [x] Async/await transforms: await→yield + __awaiter helper creation
 - [~] Generator transforms (helper detection done, state machine pending)
 
 ## Phase 7: Language Service (50% Complete)
@@ -173,9 +173,9 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 | 7 | Language Service | ~1,500 | 3 | 🟡 55% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
-**Total Rust Code**: ~41,500 lines
-**Total Tests**: 600 passing
-**Overall Progress**: ~87% of full compiler functionality
+**Total Rust Code**: ~42,000 lines
+**Total Tests**: 602 passing
+**Overall Progress**: ~88% of full compiler functionality
 
 ---
 
