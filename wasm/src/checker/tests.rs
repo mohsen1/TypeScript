@@ -10682,3 +10682,33 @@ fn test_postfix_increment_decrement() {
     assert!(checker.diagnostics.is_empty(),
         "Expected no errors for postfix increment/decrement, got: {:?}", checker.diagnostics);
 }
+
+#[test]
+fn test_array_with_contextual_type() {
+    // Test array literal with contextual type annotation
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        const arr: number[] = [1, 2, 3];
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have no errors - [1, 2, 3] should be assignable to number[]
+    assert!(checker.diagnostics.is_empty(),
+        "Expected no errors for array literal with number[] type, got: {:?}", checker.diagnostics);
+}

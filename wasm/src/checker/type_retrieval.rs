@@ -34,9 +34,15 @@ pub enum StringMappingKind {
 impl<'a> CheckerState<'a> {
     /// Get the type of a node (with caching).
     pub fn get_type_of_node(&mut self, node: NodeIndex) -> TypeId {
-        // Check cache first
-        if let Some(&cached) = self.node_types.get(&node) {
-            return cached;
+        // Only use cache if there's no contextual type set
+        // (contextually typed expressions like array literals depend on context)
+        let has_contextual_type = self.contextual_type.is_some();
+
+        // Check cache first (only when not contextually typing)
+        if !has_contextual_type {
+            if let Some(&cached) = self.node_types.get(&node) {
+                return cached;
+            }
         }
 
         // Track recursion to catch infinite loops (O(1) lookup using HashSet)
@@ -48,7 +54,11 @@ impl<'a> CheckerState<'a> {
         self.node_resolution_set.insert(node);
 
         let type_id = self.get_type_of_node_worker(node);
-        self.node_types.insert(node, type_id);
+
+        // Only cache when not contextually typing
+        if !has_contextual_type {
+            self.node_types.insert(node, type_id);
+        }
 
         self.node_resolution_stack.pop();
         self.node_resolution_set.remove(&node);
