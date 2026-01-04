@@ -52,12 +52,19 @@ LOOP:
 ## 🛠️ Commands
 
 ```bash
-# Rust tests (use Docker to prevent RAM explosion)
-./wasm/test.sh                    # All tests
-./wasm/test.sh <test_name>        # Specific test
+# ⚠️ CRITICAL: ALWAYS use Docker for Rust tests and benchmarks!
+# Running cargo test/bench directly on host can use 60GB+ RAM and crash the system
 
-# Benchmarks (TODO: add criterion benchmarks)
-# cargo bench --bench parser_bench
+# Rust tests (MUST use Docker wrapper)
+./wasm/test.sh                    # All tests (in Docker)
+./wasm/test.sh <test_name>        # Specific test (in Docker)
+
+# ❌ NEVER run these directly:
+# cargo test          # Will explode host memory
+# cargo bench         # Will explode host memory
+
+# Benchmarks (in Docker)
+# ./wasm/bench.sh                 # Run benchmarks safely in Docker
 
 # TypeScript integration
 npx hereby local                  # Build compiler
@@ -103,8 +110,9 @@ You can take a look at `specs/TYPESCRIPT_GO_ARCHITECTURE.md` for an overview
 
 1. **Architecture before features** - Phase 0 (ThinNode, parallelism) before Phase 6-8
 2. **Never break the build** - tests must pass
-3. **Measure impact** - add benchmarks for perf claims
-4. **Update the plan** - mark tasks complete, add new discoveries
-5. **Separate test files** - `foo.rs` and `foo_tests.rs` or `tests/foo.rs`
-6. **Gemini at milestones** - not every commit, but every major component
+3. **ALWAYS use Docker for Rust** - ./wasm/test.sh only, NEVER raw cargo commands
+4. **Measure impact** - add benchmarks for perf claims
+5. **Update the plan** - mark tasks complete, add new discoveries
+6. **Separate test files** - `foo.rs` and `foo_tests.rs` or `tests/foo.rs`
+7. **Gemini at milestones** - not every commit, but every major component
 
