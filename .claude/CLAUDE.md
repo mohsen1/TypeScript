@@ -80,6 +80,19 @@ node scripts/verifyChecker.mjs
 - `specs/migration_plan.md` - THE PLAN
 - `specs/gemini_review_*.md` - Review findings to address
 
+
+
+## Reference: typescript-go Submodule
+
+The `typescript-go/` directory contains a submodule with a native Go port of the TypeScript compiler and language server. **Feel free to explore and reference this codebase** for understanding alternative implementations or comparing approaches, but **do not modify any files within the `typescript-go/` directory**.
+
+This submodule is read-only reference material for:
+- Understanding how compiler features are implemented in Go
+- Comparing type checking strategies
+- Seeing alternative approaches to parsing and binding
+
+When working on TypeScript compiler features, you may find it helpful to look at the corresponding Go implementation in `typescript-go/internal/` for inspiration or clarification.
+
 ## ✅ Commit Format
 ```
 [wasm] <component>: <description>
@@ -94,13 +107,3 @@ node scripts/verifyChecker.mjs
 5. **Separate test files** - `foo.rs` and `foo_tests.rs` or `tests/foo.rs`
 6. **Gemini at milestones** - not every commit, but every major component
 
-## 🏗️ Current Priority (Phase 0: Performance)
-
-| Task | Impact | Status |
-|------|--------|--------|
-| ThinNode parser migration | 13x memory, cache locality | 🔴 Not started |
-| Scanner lazy token_value | Eliminate alloc per token | 🟡 Partial (has zero-copy accessors) |
-| Rayon parallelism | Multi-core parsing/checking | 🔴 Not started |
-| Arena-based type checker | O(1) cleanup | 🔴 Not started |
-
-**Start with ThinNode** - it's the biggest win and the infrastructure already exists.

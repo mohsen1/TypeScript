@@ -340,3 +340,14 @@ When fixing bugs or implementing features, follow this workflow:
    - **REQUIRED:** Run `npx hereby format` before you're done
    - **YOU CANNOT FINISH WITHOUT THESE STEPS**
    - Double-check your line endings. Source files in this repo typically use CRLF line endings. Fix all line endings to be consistent before you wrap up
+
+## Reference: typescript-go Submodule
+
+The `typescript-go/` directory contains a submodule with a native Go port of the TypeScript compiler and language server. **Feel free to explore and reference this codebase** for understanding alternative implementations or comparing approaches, but **do not modify any files within the `typescript-go/` directory**.
+
+This submodule is read-only reference material for:
+- Understanding how compiler features are implemented in Go
+- Comparing type checking strategies
+- Seeing alternative approaches to parsing and binding
+
+When working on TypeScript compiler features, you may find it helpful to look at the corresponding Go implementation in `typescript-go/internal/` for inspiration or clarification.
