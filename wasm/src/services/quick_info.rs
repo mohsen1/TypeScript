@@ -4,9 +4,8 @@
 //! including type information, documentation, and JSDoc tags.
 
 use crate::binder::{Symbol, SymbolId, SymbolFlags};
-use crate::checker::{Type, TypeId, CheckerState};
-use crate::parser::ast::{Node, NodeId};
-use crate::parser::arena::NodeArena;
+use crate::checker::{TypeId, CheckerState};
+use crate::parser::{Node, NodeIndex, NodeArena};
 use crate::scanner::SyntaxKind;
 
 use super::symbol_display::{
@@ -183,7 +182,7 @@ fn get_type_display_parts(
 /// Get quick info for keywords.
 fn get_quick_info_for_keyword(
     ctx: &QuickInfoContext,
-    node_id: NodeId,
+    node_id: NodeIndex,
 ) -> Option<QuickInfo> {
     let node = ctx.arena.get(node_id)?;
     let kind = node.kind();
@@ -269,16 +268,16 @@ fn get_keyword_documentation(kind: SyntaxKind) -> String {
 // Helper Functions
 // =============================================================================
 
-fn find_node_at_position(arena: &NodeArena, position: u32) -> Option<NodeId> {
+fn find_node_at_position(arena: &NodeArena, position: u32) -> Option<NodeIndex> {
     let root = arena.root()?;
     find_deepest_node_at_position(arena, root, position)
 }
 
 fn find_deepest_node_at_position(
     arena: &NodeArena,
-    node_id: NodeId,
+    node_id: NodeIndex,
     position: u32,
-) -> Option<NodeId> {
+) -> Option<NodeIndex> {
     let node = arena.get(node_id)?;
 
     if position < node.pos() || position >= node.end() {

@@ -958,6 +958,15 @@ impl<'a> CheckerState<'a> {
         symbols
     }
 
+    /// Get properties of a type as symbols.
+    /// Used by completions.
+    pub fn get_properties_of_type(&self, type_id: TypeId) -> Vec<crate::binder::Symbol> {
+        self.get_member_completions(type_id)
+            .into_iter()
+            .filter_map(|(_, symbol_id)| self.symbol_arena.get(symbol_id).cloned())
+            .collect()
+    }
+
     /// Get completions for a member access expression.
     /// Returns property names and their symbol IDs.
     pub fn get_member_completions(&self, type_id: TypeId) -> Vec<(String, SymbolId)> {

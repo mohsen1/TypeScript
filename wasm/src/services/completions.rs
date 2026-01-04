@@ -9,9 +9,8 @@
 
 use std::collections::HashSet;
 use crate::binder::{Symbol, SymbolId, SymbolFlags};
-use crate::checker::{Type, TypeId, CheckerState};
-use crate::parser::ast::{Node, NodeId};
-use crate::parser::arena::NodeArena;
+use crate::checker::{TypeId, CheckerState};
+use crate::parser::{Node, NodeIndex, NodeArena};
 use crate::scanner::SyntaxKind;
 
 use super::symbol_display::{SymbolDisplayPart, DisplayPartsBuilder};
@@ -384,7 +383,7 @@ enum CompletionKind {
 
 fn get_completion_kind(
     arena: &NodeArena,
-    node_id: NodeId,
+    node_id: NodeIndex,
     position: u32,
 ) -> CompletionKind {
     let node = match arena.get(node_id) {
@@ -424,7 +423,7 @@ fn get_completion_kind(
 
 fn get_member_completions(
     ctx: &CompletionsContext,
-    node_id: NodeId,
+    node_id: NodeIndex,
 ) -> Option<CompletionInfo> {
     let node = ctx.arena.get(node_id)?;
 
@@ -450,7 +449,7 @@ fn get_member_completions(
 
 fn get_string_completions(
     ctx: &CompletionsContext,
-    node_id: NodeId,
+    node_id: NodeIndex,
 ) -> Option<CompletionInfo> {
     // Delegate to string_completions module
     super::string_completions::get_string_literal_completions(ctx, node_id)
@@ -458,7 +457,7 @@ fn get_string_completions(
 
 fn get_keyword_completions(
     ctx: &CompletionsContext,
-    node_id: NodeId,
+    node_id: NodeIndex,
 ) -> Option<CompletionInfo> {
     let mut entries = Vec::new();
 
@@ -480,7 +479,7 @@ fn get_keyword_completions(
 
 fn get_global_completions(
     ctx: &CompletionsContext,
-    node_id: NodeId,
+    node_id: NodeIndex,
 ) -> Option<CompletionInfo> {
     let mut entries = Vec::new();
     let mut seen_names = HashSet::new();
@@ -531,7 +530,7 @@ fn get_global_completions(
 
 fn get_import_completions(
     ctx: &CompletionsContext,
-    node_id: NodeId,
+    node_id: NodeIndex,
 ) -> Option<CompletionInfo> {
     let mut entries = Vec::new();
 
@@ -561,7 +560,7 @@ fn get_import_completions(
 
 fn get_type_completions(
     ctx: &CompletionsContext,
-    node_id: NodeId,
+    node_id: NodeIndex,
 ) -> Option<CompletionInfo> {
     let mut entries = Vec::new();
 
@@ -599,16 +598,16 @@ fn get_type_completions(
 // Helper Functions
 // =============================================================================
 
-fn find_node_at_position(arena: &NodeArena, position: u32) -> Option<NodeId> {
+fn find_node_at_position(arena: &NodeArena, position: u32) -> Option<NodeIndex> {
     let root = arena.root()?;
     find_deepest_node_at_position(arena, root, position)
 }
 
 fn find_deepest_node_at_position(
     arena: &NodeArena,
-    node_id: NodeId,
+    node_id: NodeIndex,
     position: u32,
-) -> Option<NodeId> {
+) -> Option<NodeIndex> {
     let node = arena.get(node_id)?;
 
     if position < node.pos() || position >= node.end() {
@@ -624,7 +623,7 @@ fn find_deepest_node_at_position(
     Some(node_id)
 }
 
-fn is_identifier_position(arena: &NodeArena, node_id: NodeId) -> bool {
+fn is_identifier_position(arena: &NodeArena, node_id: NodeIndex) -> bool {
     let node = match arena.get(node_id) {
         Some(n) => n,
         None => return false,
@@ -636,15 +635,15 @@ fn is_identifier_position(arena: &NodeArena, node_id: NodeId) -> bool {
     )
 }
 
-fn is_keyword_position(arena: &NodeArena, node_id: NodeId) -> bool {
+fn is_keyword_position(arena: &NodeArena, node_id: NodeIndex) -> bool {
     // Check if we're at a position where keywords are expected
     false // Simplified
 }
 
 fn get_expression_for_member_access(
     arena: &NodeArena,
-    node_id: NodeId,
-) -> Option<NodeId> {
+    node_id: NodeIndex,
+) -> Option<NodeIndex> {
     // In a full implementation, this would navigate to the expression part
     // of a property access or element access
     None
@@ -652,7 +651,7 @@ fn get_expression_for_member_access(
 
 fn get_symbols_in_scope(
     ctx: &CompletionsContext,
-    node_id: NodeId,
+    node_id: NodeIndex,
 ) -> Option<Vec<Symbol>> {
     // In a full implementation, this would get all symbols visible
     // from the current scope
@@ -661,7 +660,7 @@ fn get_symbols_in_scope(
 
 fn get_type_symbols_in_scope(
     ctx: &CompletionsContext,
-    node_id: NodeId,
+    node_id: NodeIndex,
 ) -> Option<Vec<Symbol>> {
     // In a full implementation, this would filter to only type symbols
     get_symbols_in_scope(ctx, node_id).map(|symbols| {
@@ -679,7 +678,7 @@ fn get_type_symbols_in_scope(
 
 fn find_symbol_by_name(
     ctx: &CompletionsContext,
-    node_id: NodeId,
+    node_id: NodeIndex,
     name: &str,
 ) -> Option<Symbol> {
     let symbols = get_symbols_in_scope(ctx, node_id)?;
@@ -688,7 +687,7 @@ fn find_symbol_by_name(
 
 fn get_applicable_keywords(
     arena: &NodeArena,
-    node_id: NodeId,
+    node_id: NodeIndex,
 ) -> Vec<&'static str> {
     // Return keywords based on context
     // This is a simplified version - full implementation would analyze context
