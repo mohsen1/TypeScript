@@ -1880,6 +1880,41 @@ impl ScannerState {
     pub fn interner_mut(&mut self) -> &mut Interner {
         &mut self.interner
     }
+
+    /// ZERO-COPY: Get the current token value as a reference.
+    /// For identifiers/keywords, returns the interned string.
+    /// For other tokens, returns a slice of the source text.
+    /// This avoids allocation compared to get_token_value().
+    #[inline]
+    pub fn get_token_value_ref(&self) -> &str {
+        // For identifiers with an interned atom, return the interned string
+        if self.token_atom != Atom::NONE {
+            return self.interner.resolve(self.token_atom);
+        }
+        // For other tokens, return the source slice
+        // Note: This won't work for tokens with escape processing,
+        // which is why we still keep token_value for now
+        &self.token_value
+    }
+
+    /// ZERO-COPY: Get the raw token text directly from source.
+    /// This is the unprocessed text from token_start to current pos.
+    #[inline]
+    pub fn get_token_text_ref(&self) -> &str {
+        &self.source[self.token_start..self.pos]
+    }
+
+    /// ZERO-COPY: Get a slice of the source text by positions.
+    #[inline]
+    pub fn source_slice(&self, start: usize, end: usize) -> &str {
+        &self.source[start..end]
+    }
+
+    /// Get the source text reference.
+    #[inline]
+    pub fn source_text(&self) -> &str {
+        &self.source
+    }
 }
 
 // =============================================================================
@@ -2216,5 +2251,39 @@ mod tests {
         assert_ne!(const_atom1, let_atom);
         assert_ne!(const_atom1, var_atom);
         assert_ne!(let_atom, var_atom);
+    }
+
+    #[test]
+    fn test_zero_copy_accessors() {
+        let mut scanner = ScannerState::new("foo bar baz".to_string(), true);
+
+        // Scan first identifier
+        assert_eq!(scanner.scan(), SyntaxKind::Identifier);
+
+        // Zero-copy access should return same as regular access
+        assert_eq!(scanner.get_token_value_ref(), "foo");
+        assert_eq!(scanner.get_token_text_ref(), "foo");
+
+        // Scan second identifier
+        assert_eq!(scanner.scan(), SyntaxKind::Identifier);
+        assert_eq!(scanner.get_token_value_ref(), "bar");
+
+        // Source slice access
+        assert_eq!(scanner.source_slice(0, 3), "foo");
+        assert_eq!(scanner.source_slice(4, 7), "bar");
+        assert_eq!(scanner.source_text(), "foo bar baz");
+    }
+
+    #[test]
+    fn test_zero_copy_vs_allocating() {
+        let mut scanner = ScannerState::new("identifier".to_string(), true);
+        assert_eq!(scanner.scan(), SyntaxKind::Identifier);
+
+        // Both methods should return the same value
+        let allocated = scanner.get_token_value();
+        let zero_copy = scanner.get_token_value_ref();
+
+        assert_eq!(allocated, zero_copy);
+        assert_eq!(zero_copy, "identifier");
     }
 }
