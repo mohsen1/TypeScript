@@ -623,34 +623,111 @@ mod tests {
     #[test]
     fn test_type_sizes() {
         use std::mem::size_of;
+        use crate::parser::ast::*;
 
-        // PRIORITY ZERO: Design for speed
-        // Current Node enum is ~208 bytes - destroys cache locality
-        // Target: 16 bytes (8 nodes per 64-byte cache line)
-        //
-        // PERFORMANCE NOTE (2024-01): Investigated enum compaction (boxing large variants).
-        // Decision: Deferred. The zero-copy scanner and string interner provide larger
-        // wins. Boxing would reduce enum from 208B to ~32B (6x smaller), but requires
-        // extensive code changes. Revisit if profiling shows cache misses as bottleneck.
-        let node_size = size_of::<crate::parser::Node>();
-        // Node size reported in assertion message for visibility
-        assert!(
-            node_size <= 256,
-            "📏 Node: {} bytes, {:.1} nodes/cache-line (target: 16B, 4 nodes/line)",
-            node_size,
-            64.0 / node_size as f64
-        );
+        // =========================================================================
+        // SIZE ANALYSIS: Node enum variant sizes
+        // To see sizes: run with RUST_TEST_PRINT=1 or check the panic message
+        // =========================================================================
 
-        // Verify key type sizes for performance awareness
-        assert_eq!(size_of::<crate::parser::base::NodeIndex>(), 4, "NodeIndex should be 4 bytes");
+        // Building blocks (exact values verified)
+        assert_eq!(size_of::<NodeIndex>(), 4, "NodeIndex should be 4 bytes");
         assert_eq!(size_of::<crate::interner::Atom>(), 4, "Atom should be 4 bytes");
 
-        // Type size check
+        // Capture sizes for analysis
+        let sizes = [
+            ("NodeBase", size_of::<NodeBase>()),
+            ("NodeList", size_of::<NodeList>()),
+            ("Option<NodeList>", size_of::<Option<NodeList>>()),
+            ("String", size_of::<String>()),
+            ("Option<String>", size_of::<Option<String>>()),
+            ("Vec<String>", size_of::<Vec<String>>()),
+            // Largest variants
+            ("SourceFile", size_of::<SourceFile>()),
+            ("Identifier", size_of::<Identifier>()),
+            ("FunctionDeclaration", size_of::<FunctionDeclaration>()),
+            ("FunctionExpression", size_of::<FunctionExpression>()),
+            ("ClassDeclaration", size_of::<ClassDeclaration>()),
+            ("MethodDeclaration", size_of::<MethodDeclaration>()),
+            ("ArrowFunction", size_of::<ArrowFunction>()),
+            ("StringLiteral", size_of::<StringLiteral>()),
+            // Medium
+            ("BinaryExpression", size_of::<BinaryExpression>()),
+            ("CallExpression", size_of::<CallExpression>()),
+            ("IfStatement", size_of::<IfStatement>()),
+            ("Block", size_of::<Block>()),
+            // Small
+            ("ReturnStatement", size_of::<ReturnStatement>()),
+            ("EmptyStatement", size_of::<EmptyStatement>()),
+            // Node enum
+            ("Node", size_of::<crate::parser::Node>()),
+            ("Type", size_of::<crate::checker::Type>()),
+        ];
+
+        // Build a report
+        let mut report = String::from("\n\n=== SIZE ANALYSIS ===\n");
+        for (name, size) in &sizes {
+            report.push_str(&format!("{:25} {:4} bytes\n", name, size));
+        }
+
+        let node_size = size_of::<crate::parser::Node>();
         let type_size = size_of::<crate::checker::Type>();
-        assert!(
-            type_size <= 256,
-            "📏 Type: {} bytes (large enum variants should be boxed)",
-            type_size
-        );
+
+        report.push_str(&format!(
+            "\n📏 Node: {} bytes = {:.2} nodes/cache-line (target: 4)",
+            node_size, 64.0 / node_size as f64
+        ));
+        report.push_str(&format!("\n📏 Type: {} bytes\n", type_size));
+
+        // Uncomment to see the report as a test "failure":
+        // panic!("{}", report);
+
+        // Verify constraints
+        assert!(node_size <= 256, "Node enum too large: {} bytes{}", node_size, report);
+        assert!(type_size <= 256, "Type enum too large: {} bytes", type_size);
+    }
+
+    /// Run this test to print the size analysis:
+    /// cargo test test_print_type_sizes -- --nocapture --ignored
+    #[test]
+    #[ignore]
+    fn test_print_type_sizes() {
+        use std::mem::size_of;
+        use crate::parser::ast::*;
+
+        eprintln!("\n=== BUILDING BLOCKS ===");
+        eprintln!("NodeBase:         {:4} bytes", size_of::<NodeBase>());
+        eprintln!("NodeList:         {:4} bytes", size_of::<NodeList>());
+        eprintln!("NodeIndex:        {:4} bytes", size_of::<NodeIndex>());
+        eprintln!("String:           {:4} bytes", size_of::<String>());
+        eprintln!("Option<NodeList>: {:4} bytes", size_of::<Option<NodeList>>());
+        eprintln!("Vec<String>:      {:4} bytes", size_of::<Vec<String>>());
+
+        eprintln!("\n=== LARGEST VARIANTS ===");
+        eprintln!("SourceFile:          {:4} bytes", size_of::<SourceFile>());
+        eprintln!("Identifier:          {:4} bytes", size_of::<Identifier>());
+        eprintln!("FunctionDeclaration: {:4} bytes", size_of::<FunctionDeclaration>());
+        eprintln!("FunctionExpression:  {:4} bytes", size_of::<FunctionExpression>());
+        eprintln!("ClassDeclaration:    {:4} bytes", size_of::<ClassDeclaration>());
+        eprintln!("MethodDeclaration:   {:4} bytes", size_of::<MethodDeclaration>());
+        eprintln!("ArrowFunction:       {:4} bytes", size_of::<ArrowFunction>());
+        eprintln!("StringLiteral:       {:4} bytes", size_of::<StringLiteral>());
+
+        eprintln!("\n=== MEDIUM VARIANTS ===");
+        eprintln!("BinaryExpression: {:4} bytes", size_of::<BinaryExpression>());
+        eprintln!("CallExpression:   {:4} bytes", size_of::<CallExpression>());
+        eprintln!("IfStatement:      {:4} bytes", size_of::<IfStatement>());
+        eprintln!("Block:            {:4} bytes", size_of::<Block>());
+
+        eprintln!("\n=== SMALL VARIANTS ===");
+        eprintln!("ReturnStatement: {:4} bytes", size_of::<ReturnStatement>());
+        eprintln!("EmptyStatement:  {:4} bytes", size_of::<EmptyStatement>());
+
+        eprintln!("\n=== TOTAL ===");
+        let node_size = size_of::<crate::parser::Node>();
+        let type_size = size_of::<crate::checker::Type>();
+        eprintln!("📏 Node enum: {:4} bytes ({:.2} nodes/cache-line)", node_size, 64.0 / node_size as f64);
+        eprintln!("📏 Type enum: {:4} bytes", type_size);
+        eprintln!("   Target: 16 bytes (4 nodes/cache-line)\n");
     }
 }

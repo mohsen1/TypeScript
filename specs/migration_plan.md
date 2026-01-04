@@ -22,23 +22,36 @@ compiler remains fully functional at every step.
 
 Stop "porting" TypeScript line-by-line. Start **architecting for the hardware**.
 
-## Phase 0.1: Thin Nodes (2-3x Parser Speedup)
+## Phase 0.1: Thin Nodes (2-3x Parser Speedup) - 🟡 In Progress
 
-Current `Node` enum is sized to largest variant (~200+ bytes). This destroys cache locality.
+Current `Node` enum is sized to largest variant (~208 bytes). This destroys cache locality.
 
-### TODO
-- [ ] Refactor `Node` enum to use 8-byte headers + indices into type-specific arrays
-- [ ] Target: `sizeof(Node)` ≤ 16 bytes (8 nodes per 64-byte cache line)
-- [ ] Split `NodeArena` into separate vectors per node type
+### Progress
+- [x] Size analysis complete: Node=208B, ClassDeclaration=200B, FunctionDeclaration=168B
+- [x] ThinNode struct implemented: exactly 16 bytes (4 nodes per cache line)
+- [x] 60+ typed data pool structs defined for all node categories
+- [x] ThinNodeArena with basic add/get methods
+- [ ] Add remaining arena methods for all node types
+- [ ] Add node accessor helper traits
+- [ ] Migrate parser to use ThinNodeArena
+- [ ] Update binder, checker, emitter to use new structure
 
+### Architecture (wasm/src/parser/thin_node.rs)
 ```rust
 #[repr(C)]
-pub struct NodeHeader {
-    kind: SyntaxKind,  // u16
-    flags: NodeFlags,  // u16
-    data_index: u32,   // index into specific Vec
-}
+pub struct ThinNode {
+    kind: u16,        // SyntaxKind
+    flags: u16,       // Packed NodeFlags
+    pos: u32,         // Start position
+    end: u32,         // End position
+    data_index: u32,  // Index into type-specific pool
+}  // = 16 bytes total (13x improvement from 208 bytes)
 ```
+
+### Performance Impact
+- Before: 208 bytes/node = 0.31 nodes per cache line
+- After: 16 bytes/node = 4 nodes per cache line
+- Improvement: **13x better cache locality**
 
 ## Phase 0.2: Zero-Allocation Scanner (Massive Memory Reduction)
 
@@ -135,13 +148,19 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 | 7 | Language Service | ~1,500 | 3 | 🟡 55% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
-**Total Rust Code**: ~38,300 lines
-**Total Tests**: 590 passing
+**Total Rust Code**: ~39,000 lines
+**Total Tests**: 593 passing
 **Overall Progress**: ~85% of full compiler functionality
 
 ---
 
 # MILESTONES
+
+## 2026-01-04: Thin Nodes Architecture
+- Implemented ThinNode struct (16 bytes vs 208 bytes = 13x improvement)
+- Created 60+ typed data pool structures for all node categories
+- ThinNodeArena foundation complete
+- 593 tests passing
 
 ## 2026-01-04: Architecture Fixes
 - Fixed 4 BLOCKER/CRITICAL issues from Gemini architecture review

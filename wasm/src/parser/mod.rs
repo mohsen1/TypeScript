@@ -9,10 +9,16 @@
 //! - All nodes have common fields: kind, flags, pos, end
 //! - Node-specific data is stored in enum variants
 //! - This design allows efficient serialization to/from JavaScript
+//!
+//! PERFORMANCE NOTES:
+//! - The `thin_node` module provides a cache-optimized 16-byte node representation
+//! - Current `Node` enum is 208 bytes (0.31 nodes/cache-line)
+//! - ThinNode is 16 bytes (4 nodes/cache-line) - 13x better cache locality
 
 pub mod flags;
 pub mod ast;
 pub mod arena;
+pub mod thin_node;
 
 #[cfg(test)]
 mod tests;
