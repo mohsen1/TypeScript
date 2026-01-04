@@ -526,9 +526,9 @@ building up to full inference.
       - `this is T` (this type predicates in methods)
 - [ ] Integrate with TypeScript's checker for full test suite
 
-Verification Gate: 460 Rust tests passing, 0 skipped. Full baseline matching pending.
+Verification Gate: 465 Rust tests passing, 0 skipped. Full baseline matching pending.
 
-Progress: **Phase 5 ~98% complete! Core type checking working. 460 tests passing.**
+Progress: **Phase 5 ~98% complete! Core type checking working. 465 tests passing.**
 
 ==============================================================================
 PHASE 6: EMITTER
