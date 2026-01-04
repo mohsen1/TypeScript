@@ -30,6 +30,15 @@ pub mod checker;
 // Emitter types and implementation (Phase 6)
 pub mod emitter;
 
+// Source Map generation (Phase 6.2)
+pub mod source_map;
+
+// Declaration file emitter (Phase 6.4)
+pub mod declaration_emitter;
+
+// JavaScript transforms (Phase 6.5+)
+pub mod transforms;
+
 // Language Service types and implementation (Phase 7)
 pub mod services;
 
