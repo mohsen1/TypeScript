@@ -217,10 +217,18 @@ impl SyntaxKind {
     /// Safely convert a u16 to SyntaxKind if it's a valid token kind.
     /// Returns None for extended syntax kinds (AST nodes > 166).
     pub fn try_from_u16(value: u16) -> Option<SyntaxKind> {
+        // Static assertion: SyntaxKind must be repr(u16) and same size as u16
+        const _: () = assert!(
+            std::mem::size_of::<SyntaxKind>() == std::mem::size_of::<u16>(),
+            "SyntaxKind must be same size as u16 for transmute safety"
+        );
+
         // Valid token range is 0 to LAST_TOKEN (Unknown to DeferKeyword)
         if value <= Self::LAST_TOKEN as u16 {
-            // SAFETY: We've verified the value is in the valid enum range.
-            // SyntaxKind is #[repr(u16)] with contiguous values 0-166.
+            // SAFETY: We've verified that:
+            // 1. SyntaxKind is #[repr(u16)] (checked at compile time above)
+            // 2. The value is in the valid enum range (0..=LAST_TOKEN)
+            // 3. SyntaxKind has contiguous values starting from 0
             Some(unsafe { std::mem::transmute(value) })
         } else {
             None
