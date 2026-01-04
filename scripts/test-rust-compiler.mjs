@@ -7,9 +7,21 @@
  *   node scripts/test-rust-compiler.mjs tests/cases/compiler/2dArrays.ts
  */
 
-import { execSync } from 'child_process';
 import { readFileSync, existsSync } from 'fs';
-import { basename, dirname, join } from 'path';
+import { basename, join } from 'path';
+import { createRequire } from 'module';
+
+const require = createRequire(import.meta.url);
+
+// Load WASM module
+let wasm;
+try {
+    wasm = require('../wasm/pkg/wasm.js');
+} catch (e) {
+    console.error('Failed to load WASM module. Run: wasm-pack build wasm --target nodejs');
+    console.error(e.message);
+    process.exit(1);
+}
 
 const testFile = process.argv[2];
 
@@ -42,11 +54,73 @@ console.log('Baseline files:');
 console.log(`  .js:     ${existsSync(jsBaseline) ? '✓' : '✗'}`);
 console.log(`  .types:  ${existsSync(typesBaseline) ? '✓' : '✗'}`);
 console.log(`  .errors: ${existsSync(errorsBaseline) ? '✓' : '✗'}`);
+console.log('');
 
-// TODO: Once WASM is built, we can call the Rust compiler here
-// For now, just report what would need to be tested
+// Run Rust compiler
+console.log('=== Rust Compiler Output ===\n');
 
-console.log('\n--- Next Steps ---');
-console.log('1. Build WASM: wasm-pack build wasm --target nodejs');
-console.log('2. Import and call Rust compiler');
-console.log('3. Compare output against baselines');
+const startTime = performance.now();
+
+// Parse
+const parser = wasm.createParser(testFile, source);
+const rootIdx = parser.parseSourceFile();
+const parseTime = performance.now() - startTime;
+
+console.log(`Parse time: ${parseTime.toFixed(2)}ms`);
+console.log(`Node count: ${parser.getNodeCount()}`);
+
+// Check for parse errors
+const diagnosticsJson = parser.getDiagnosticsJson();
+const diagnostics = JSON.parse(diagnosticsJson);
+if (diagnostics.length > 0) {
+    console.log(`\nParse errors (${diagnostics.length}):`);
+    diagnostics.forEach((d, i) => {
+        console.log(`  ${i + 1}. ${d.message} (${d.start}-${d.end})`);
+    });
+}
+
+// Bind
+const bindStart = performance.now();
+const bindingJson = parser.bindSourceFile(rootIdx);
+const bindTime = performance.now() - bindStart;
+const binding = JSON.parse(bindingJson);
+
+console.log(`\nBind time: ${bindTime.toFixed(2)}ms`);
+console.log(`Symbols: ${Object.keys(binding).length}`);
+if (Object.keys(binding).length > 0) {
+    console.log('  ' + Object.keys(binding).slice(0, 10).join(', ') + (Object.keys(binding).length > 10 ? '...' : ''));
+}
+
+// Type check
+const checkStart = performance.now();
+const checkJson = parser.checkSourceFile();
+const checkTime = performance.now() - checkStart;
+const checkResult = JSON.parse(checkJson);
+
+console.log(`\nCheck time: ${checkTime.toFixed(2)}ms`);
+console.log(`Types created: ${checkResult.typeCount}`);
+if (checkResult.diagnostics && checkResult.diagnostics.length > 0) {
+    console.log(`Type errors (${checkResult.diagnostics.length}):`);
+    checkResult.diagnostics.slice(0, 5).forEach((d, i) => {
+        console.log(`  ${i + 1}. ${d.message}`);
+    });
+    if (checkResult.diagnostics.length > 5) {
+        console.log(`  ... and ${checkResult.diagnostics.length - 5} more`);
+    }
+}
+
+// Summary
+const totalTime = performance.now() - startTime;
+console.log(`\n=== Summary ===`);
+console.log(`Total time: ${totalTime.toFixed(2)}ms`);
+console.log(`Parse errors: ${diagnostics.length}`);
+console.log(`Type errors: ${checkResult.diagnostics?.length || 0}`);
+
+// Cleanup
+parser.free();
+
+// Compare with baselines (TODO)
+console.log('\n=== Baseline Comparison (TODO) ===');
+console.log('- Compare emitted JS against .js baseline');
+console.log('- Compare types against .types baseline');
+console.log('- Compare errors against .errors.txt baseline');
