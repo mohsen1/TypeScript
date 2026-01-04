@@ -397,7 +397,7 @@ Verification Gate: ✓ 20+ binder tests passing.
 Progress: **Phase 4 100% complete! Full binder with flow analysis working.**
 
 ==============================================================================
-PHASE 5: TYPE CHECKER (IN PROGRESS - ~70% COMPLETE)
+PHASE 5: TYPE CHECKER (IN PROGRESS - ~85% COMPLETE)
 ==============================================================================
 Target: The heart of TypeScript—structural type checking, inference, and
 diagnostics. This is ~50% of the compiler complexity.
@@ -405,8 +405,8 @@ diagnostics. This is ~50% of the compiler complexity.
 Strategy: Migrate in layers, starting with primitive type operations and
 building up to full inference.
 
-**Current Stats**: ~7,600 lines of checker code (excluding 8,700+ lines of tests)
-**Tests**: 414 checker tests passing, 9 skipped
+**Current Stats**: ~7,600 lines of checker code (excluding 9,200+ lines of tests)
+**Tests**: 419 checker tests passing, 9 skipped
 
 5.1 Type Representation (COMPLETE)
 ----------------------------------
@@ -517,12 +517,17 @@ building up to full inference.
 - [x] Improve `super` type in class methods (DONE - get_super_type())
 - [x] Complete async/await type inference (DONE - wired get_awaited_type to await expressions)
 - [x] Add exhaustiveness checking for switch (DONE - check_switch_exhaustiveness in narrowing.rs)
-- [ ] Add assertion function support (asserts x is T)
+- [x] Add type predicate parsing support (x is T, asserts x is T)
+      Added TypePredicate AST node and parse_return_type() that handles:
+      - `x is T` (user-defined type guards)
+      - `asserts x is T` (assertion functions with type guard)
+      - `asserts x` (assertion functions)
+      - `this is T` (this type predicates in methods)
 - [ ] Integrate with TypeScript's checker for full test suite
 
-Verification Gate: 414 Rust tests passing, 9 skipped. Full baseline matching pending.
+Verification Gate: 419 Rust tests passing, 9 skipped. Full baseline matching pending.
 
-Progress: **Phase 5 ~80% complete! Core type checking working. 414 tests passing (9 skipped).**
+Progress: **Phase 5 ~85% complete! Core type checking working. 419 tests passing (9 skipped).**
 
 ==============================================================================
 PHASE 6: EMITTER

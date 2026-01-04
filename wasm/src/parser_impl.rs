@@ -40,7 +40,7 @@ use crate::parser::{
     TypeReference, ArrayType, TupleType, UnionType, IntersectionType,
     FunctionType, ConstructorType, TypeLiteral, ParenthesizedType, TypeParameterDeclaration,
     LiteralType, ConditionalType, InferType, TypeOperator, TypeQuery, MappedType, IndexedAccessType,
-    OptionalType, RestType, TemplateLiteralType, TemplateSpan,
+    OptionalType, RestType, TemplateLiteralType, TemplateSpan, TypePredicate,
     // JSX
     JsxElement, JsxSelfClosingElement, JsxOpeningElement, JsxClosingElement,
     JsxFragment, JsxOpeningFragment, JsxClosingFragment,
@@ -877,9 +877,9 @@ impl ParserState {
         let parameters = self.parse_parameter_list();
         self.parse_expected(SyntaxKind::CloseParenToken);
 
-        // Parse return type
+        // Parse return type (may be a type predicate like `x is T`)
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-            self.parse_type()
+            self.parse_return_type()
         } else {
             NodeIndex::NONE
         };
@@ -1633,8 +1633,9 @@ impl ParserState {
         let parameters = self.parse_parameter_list();
         self.parse_expected(SyntaxKind::CloseParenToken);
 
+        // Parse return type (may be a type predicate)
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-            self.parse_type()
+            self.parse_return_type()
         } else {
             NodeIndex::NONE
         };
@@ -1710,8 +1711,9 @@ impl ParserState {
         self.parse_expected(SyntaxKind::OpenParenToken);
         self.parse_expected(SyntaxKind::CloseParenToken);
 
+        // Parse return type (may be a type predicate)
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-            self.parse_type()
+            self.parse_return_type()
         } else {
             NodeIndex::NONE
         };
@@ -1847,8 +1849,9 @@ impl ParserState {
                 self.parse_expected(SyntaxKind::OpenParenToken);
                 let parameters = self.parse_parameter_list();
                 self.parse_expected(SyntaxKind::CloseParenToken);
+                // Parse return type (may be a type predicate)
                 let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-                    self.parse_type()
+                    self.parse_return_type()
                 } else {
                     NodeIndex::NONE
                 };
@@ -1950,9 +1953,9 @@ impl ParserState {
         let parameters = self.parse_parameter_list();
         self.parse_expected(SyntaxKind::CloseParenToken);
 
-        // Parse optional return type
+        // Parse optional return type (may be a type predicate)
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-            self.parse_type()
+            self.parse_return_type()
         } else {
             NodeIndex::NONE
         };
@@ -1986,9 +1989,9 @@ impl ParserState {
         let parameters = self.parse_parameter_list();
         self.parse_expected(SyntaxKind::CloseParenToken);
 
-        // Parse optional return type
+        // Parse optional return type (may be a type predicate)
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-            self.parse_type()
+            self.parse_return_type()
         } else {
             NodeIndex::NONE
         };
@@ -2739,10 +2742,10 @@ impl ParserState {
             params
         };
 
-        // Parse return type annotation if present
+        // Parse return type annotation if present (may be a type predicate)
         let type_annotation = if self.is_token(SyntaxKind::ColonToken) {
             self.next_token();
-            self.parse_type()
+            self.parse_return_type()
         } else {
             NodeIndex::NONE
         };
@@ -3176,9 +3179,9 @@ impl ParserState {
         let parameters = self.parse_parameter_list();
         self.parse_expected(SyntaxKind::CloseParenToken);
 
-        // Parse return type annotation
+        // Parse return type annotation (may be a type predicate)
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-            self.parse_type()
+            self.parse_return_type()
         } else {
             NodeIndex::NONE
         };
@@ -3719,6 +3722,89 @@ impl ParserState {
     // Type Parsing
     // =========================================================================
 
+    /// Parse a return type which may include a type predicate.
+    /// This is used after `:` in function declarations or after `=>` in function types.
+    /// Supports: `x is T`, `asserts x`, `asserts x is T`, `this is T`, or regular types.
+    fn parse_return_type(&mut self) -> NodeIndex {
+        // Check for type predicate forms:
+        // - asserts identifier
+        // - asserts identifier is Type
+        // - asserts this is Type
+        // - identifier is Type
+        // - this is Type
+        let pos = self.get_full_start();
+
+        // Check for `asserts` keyword
+        if self.is_token(SyntaxKind::AssertsKeyword) {
+            return self.parse_type_predicate_prefix(pos, true);
+        }
+
+        // Check for `identifier is` or `this is`
+        if self.is_type_predicate_start() {
+            return self.parse_type_predicate_prefix(pos, false);
+        }
+
+        // Otherwise parse a regular type
+        self.parse_type()
+    }
+
+    /// Check if this looks like the start of a type predicate (identifier is ... or this is ...).
+    fn is_type_predicate_start(&mut self) -> bool {
+        if !self.scanner.is_identifier() && !self.is_token(SyntaxKind::ThisKeyword) {
+            return false;
+        }
+
+        // Look ahead to see if we have `is` keyword after the identifier
+        let snapshot = self.scanner.save_state();
+        let saved_token = self.current_token;
+
+        self.next_token();
+        let is_predicate = self.is_token(SyntaxKind::IsKeyword);
+
+        // Restore
+        self.scanner.restore_state(snapshot);
+        self.current_token = saved_token;
+
+        is_predicate
+    }
+
+    /// Parse a type predicate, starting with optional `asserts`.
+    fn parse_type_predicate_prefix(&mut self, pos: u32, has_asserts: bool) -> NodeIndex {
+        // Consume `asserts` if present
+        if has_asserts {
+            self.parse_expected(SyntaxKind::AssertsKeyword);
+        }
+
+        // Parse the parameter name (identifier or `this`)
+        let parameter_name = if self.is_token(SyntaxKind::ThisKeyword) {
+            let this_pos = self.get_full_start();
+            self.next_token();
+            let this_end = self.get_token_start();
+            let base = NodeBase::new(SyntaxKind::ThisKeyword, this_pos, this_end);
+            self.alloc_node(Node::Token(base))
+        } else {
+            self.parse_identifier()
+        };
+
+        // Check for `is Type`
+        let type_node = if self.parse_optional(SyntaxKind::IsKeyword) {
+            self.parse_type()
+        } else {
+            // Just `asserts x` without `is Type`
+            NodeIndex::NONE
+        };
+
+        let end = self.get_token_start();
+
+        let predicate = TypePredicate {
+            base: NodeBase::new_ext(syntax_kind_ext::TYPE_PREDICATE, pos, end),
+            asserts_modifier: has_asserts,
+            parameter_name,
+            type_node,
+        };
+        self.alloc_node(Node::TypePredicate(predicate))
+    }
+
     /// Parse a type.
     fn parse_type(&mut self) -> NodeIndex {
         // Check for function type or constructor type first
@@ -3922,9 +4008,9 @@ impl ParserState {
         // Parse parameters
         let parameters = self.parse_function_type_parameters();
 
-        // Parse => and return type
+        // Parse => and return type (may be a type predicate)
         self.parse_expected(SyntaxKind::EqualsGreaterThanToken);
-        let return_type = self.parse_type();
+        let return_type = self.parse_return_type();
 
         let end = self.get_token_start();
 

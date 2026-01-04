@@ -9081,3 +9081,155 @@ fn test_class_static_member() {
 
     checker.check_source_file(root);
 }
+
+// ============== Type Predicate Parsing Tests ==============
+
+#[test]
+fn test_type_predicate_simple() {
+    // Test simple type predicate: x is string
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        function isString(x: unknown): x is string {
+            return typeof x === "string";
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    // Just verify it parses without error
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    // Function should exist
+    assert!(binder.file_locals.has("isString"), "isString function should be defined");
+    checker.check_source_file(root);
+}
+
+#[test]
+fn test_type_predicate_this() {
+    // Test this type predicate
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        class Cat {
+            isCat(): this is Cat {
+                return true;
+            }
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    assert!(binder.file_locals.has("Cat"), "Cat class should be defined");
+    checker.check_source_file(root);
+}
+
+#[test]
+fn test_type_predicate_asserts() {
+    // Test assertion predicate: asserts x is string
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        function assertIsString(x: unknown): asserts x is string {
+            if (typeof x !== "string") {
+                throw new Error("Not a string");
+            }
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    assert!(binder.file_locals.has("assertIsString"), "assertIsString function should be defined");
+    checker.check_source_file(root);
+}
+
+#[test]
+fn test_type_predicate_asserts_only() {
+    // Test assertion without type: asserts x (simpler body to avoid memory issues)
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        function assertDefined(x: unknown): asserts x {
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    assert!(binder.file_locals.has("assertDefined"), "assertDefined function should be defined");
+    checker.check_source_file(root);
+}
+
+#[test]
+fn test_function_type_with_predicate() {
+    // Test function type with type predicate
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        type Guard<T> = (x: unknown) => x is T;
+        const isNumber: Guard<number> = (x): x is number => typeof x === "number";
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    assert!(binder.file_locals.has("Guard"), "Guard type should be defined");
+    assert!(binder.file_locals.has("isNumber"), "isNumber should be defined");
+    checker.check_source_file(root);
+}

@@ -163,3 +163,12 @@ pub struct NamedTupleMember {
     pub question_token: bool,
     pub type_node: NodeIndex,
 }
+
+/// A type predicate (x is T, asserts x, asserts x is T).
+#[derive(Clone, Debug, Serialize)]
+pub struct TypePredicate {
+    pub base: NodeBase,
+    pub asserts_modifier: bool,       // true if `asserts` keyword present
+    pub parameter_name: NodeIndex,    // Identifier or ThisKeyword token
+    pub type_node: NodeIndex,         // The type after 'is' (optional, NONE for just `asserts x`)
+}

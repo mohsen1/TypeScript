@@ -134,6 +134,7 @@ pub enum Node {
     LiteralType(LiteralType),
     TemplateLiteralType(TemplateLiteralType),
     NamedTupleMember(NamedTupleMember),
+    TypePredicate(TypePredicate),
 
     // Class members
     PropertyDeclaration(PropertyDeclaration),
@@ -286,6 +287,7 @@ impl Node {
             Node::LiteralType(n) => &n.base,
             Node::TemplateLiteralType(n) => &n.base,
             Node::NamedTupleMember(n) => &n.base,
+            Node::TypePredicate(n) => &n.base,
             Node::PropertyDeclaration(n) => &n.base,
             Node::MethodDeclaration(n) => &n.base,
             Node::ConstructorDeclaration(n) => &n.base,
@@ -423,6 +425,7 @@ impl Node {
             Node::LiteralType(n) => &mut n.base,
             Node::TemplateLiteralType(n) => &mut n.base,
             Node::NamedTupleMember(n) => &mut n.base,
+            Node::TypePredicate(n) => &mut n.base,
             Node::PropertyDeclaration(n) => &mut n.base,
             Node::MethodDeclaration(n) => &mut n.base,
             Node::ConstructorDeclaration(n) => &mut n.base,
