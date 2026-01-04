@@ -10470,3 +10470,184 @@ fn test_as_const_expression() {
     assert!(checker.diagnostics.is_empty(),
         "Expected no errors for as const expression, got: {:?}", checker.diagnostics);
 }
+
+#[test]
+fn test_non_null_assertion() {
+    // Test non-null assertion (expr!)
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        function greet(name: string | null) {
+            const length = name!.length;
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    assert!(checker.diagnostics.is_empty(),
+        "Expected no errors for non-null assertion, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_typeof_operator() {
+    // Test typeof in expression context
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        const x = 42;
+        const t = typeof x;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    assert!(checker.diagnostics.is_empty(),
+        "Expected no errors for typeof expression, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_delete_operator() {
+    // Test delete operator
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        const obj: { x?: number } = { x: 1 };
+        delete obj.x;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    assert!(checker.diagnostics.is_empty(),
+        "Expected no errors for delete expression, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_void_operator() {
+    // Test void operator
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        const x = void 0;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    assert!(checker.diagnostics.is_empty(),
+        "Expected no errors for void expression, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_prefix_increment_decrement() {
+    // Test prefix ++/-- operators
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        let x = 5;
+        ++x;
+        --x;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    assert!(checker.diagnostics.is_empty(),
+        "Expected no errors for prefix increment/decrement, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_bitwise_not() {
+    // Test bitwise NOT (~) operator
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        const x = ~5;
+        const y = ~0b1010;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    assert!(checker.diagnostics.is_empty(),
+        "Expected no errors for bitwise NOT expression, got: {:?}", checker.diagnostics);
+}
