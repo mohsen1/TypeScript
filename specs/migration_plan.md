@@ -349,7 +349,7 @@ building up to full inference.
 |--------|-------|
 | Lines of Code | ~23,500 (production) |
 | Test Lines | ~10,800 |
-| Tests Passing | 476 |
+| Tests Passing | 478 |
 | Tests Skipped | 0 |
 
 ### 5.1 Type Representation ✅
@@ -951,7 +951,30 @@ Next Step: Phase 3 - Parser Integration (first target: simple statement parsing)
   - [wasm] checker: implement falsy type narrowing
   - [wasm] checker: improve type inference for arrays, tuples, and objects
 
+[2026-01-04] Parser Enhancement - using/await using Declarations
+-----------------------------------------------------------------
+- Added `using` and `await using` declaration parsing (TypeScript 5.2+)
+  - Explicit Resource Management proposal
+  - Added UsingKeyword to is_statement_start()
+  - Added is_await_using_declaration() lookahead helper
+  - Added tests for both using and await using patterns
+- 478 tests passing (0 skipped)
+- Commits:
+  - [wasm] parser: add using/await using declaration support
+
 Next: Continue improving type checker coverage
+
+### Performance Benchmarks (Scanner - 2026-01-04)
+
+| Benchmark | Time | Throughput |
+|-----------|------|------------|
+| scan_small (5 lines) | 540 ns | - |
+| scan_medium (100 lines) | 6.6 µs | - |
+| scanner_throughput | - | ~230 MiB/s |
+| keyword_lookup | 34 ns | - |
+
+The Rust scanner demonstrates excellent performance with consistent ~230 MiB/s
+throughput across various file sizes.
 
 ---
 
@@ -964,13 +987,13 @@ Next: Continue improving type checker coverage
 | 2     | Scanner             | ~2,500        | 22      | ✅ DONE
 | 3     | Parser              | ~5,000        | 100+    | ✅ DONE (98%)
 | 4     | Binder              | ~1,900        | 20+     | ✅ DONE
-| 5     | Type Checker        | ~23,500       | 476     | 🟡 98%
+| 5     | Type Checker        | ~23,500       | 478     | 🟡 98%
 | 6     | Emitter             | ~100          | -       | ⬜ Pending
 | 7     | Language Service    | -             | -       | ⬜ Pending
 | 8     | Full Rust Mode      | -             | -       | ⬜ Pending
 
 **Total Rust Code**: ~33,500 lines (excluding tests)
-**Total Tests**: 476 passing, 0 skipped
+**Total Tests**: 478 passing, 0 skipped
 **Overall Progress**: ~96% of core compiler functionality (scanner, parser, binder, checker)
 
 Current Focus:
