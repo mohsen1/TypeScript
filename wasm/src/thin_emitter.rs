@@ -1890,4 +1890,34 @@ mod tests {
         assert!(output.contains("let"), "Output should contain 'let': {}", output);
         assert!(output.contains("result"), "Output should contain 'result': {}", output);
     }
+
+    #[test]
+    fn test_thin_emit_import() {
+        let source = r#"import { foo, bar } from "module";"#;
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut printer = ThinPrinter::new(&parser.arena);
+        printer.emit(root);
+
+        let output = printer.get_output();
+        assert!(output.contains("import"), "Output should contain 'import': {}", output);
+        assert!(output.contains("foo"), "Output should contain 'foo': {}", output);
+        assert!(output.contains("from"), "Output should contain 'from': {}", output);
+    }
+
+    #[test]
+    fn test_thin_emit_export() {
+        let source = "export function greet() { return 'hello'; }";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut printer = ThinPrinter::new(&parser.arena);
+        printer.emit(root);
+
+        let output = printer.get_output();
+        assert!(output.contains("export"), "Output should contain 'export': {}", output);
+        assert!(output.contains("function"), "Output should contain 'function': {}", output);
+        assert!(output.contains("greet"), "Output should contain 'greet': {}", output);
+    }
 }

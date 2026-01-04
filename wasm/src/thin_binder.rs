@@ -303,6 +303,11 @@ impl ThinBinderState {
                 self.bind_import_declaration(arena, node, idx);
             }
 
+            // Export declarations - bind the exported declaration
+            k if k == syntax_kind_ext::EXPORT_DECLARATION => {
+                self.bind_export_declaration(arena, node, idx);
+            }
+
             // Module/namespace declarations
             k if k == syntax_kind_ext::MODULE_DECLARATION => {
                 self.bind_module_declaration(arena, node, idx);
@@ -605,6 +610,51 @@ impl ThinBinderState {
         }
     }
 
+    fn bind_export_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, _idx: NodeIndex) {
+        if let Some(export) = arena.get_export_decl(node) {
+            // Export clause can be:
+            // - NamedExports: export { foo, bar }
+            // - NamespaceExport: export * as ns from 'mod'
+            // - or NONE for: export * from 'mod'
+
+            if !export.export_clause.is_none() {
+                if let Some(clause_node) = arena.get(export.export_clause) {
+                    // Check if it's named exports { foo, bar }
+                    if let Some(named) = arena.get_named_imports(clause_node) {
+                        // Bind each export specifier as an EXPORT_VALUE
+                        for &spec_idx in &named.elements.nodes {
+                            if let Some(spec_node) = arena.get(spec_idx) {
+                                if let Some(spec) = arena.get_specifier(spec_node) {
+                                    // For export { foo }, property_name is NONE, name is "foo"
+                                    // For export { foo as bar }, property_name is "foo", name is "bar"
+                                    let exported_name = if !spec.name.is_none() {
+                                        self.get_identifier_name(arena, spec.name)
+                                    } else {
+                                        self.get_identifier_name(arena, spec.property_name)
+                                    };
+
+                                    if let Some(name) = exported_name {
+                                        // Create export symbol (EXPORT_VALUE for value exports)
+                                        // This marks the name as exported from this module
+                                        let sym_id = self.symbols.alloc(symbol_flags::EXPORT_VALUE, name.to_string());
+                                        self.node_symbols.insert(spec_idx.0, sym_id);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // Namespace export: export * as ns from 'mod'
+                    else if let Some(name) = self.get_identifier_name(arena, export.export_clause) {
+                        let sym_id = self.symbols.alloc(symbol_flags::ALIAS, name.to_string());
+                        self.current_scope.set(name.to_string(), sym_id);
+                        self.node_symbols.insert(export.export_clause.0, sym_id);
+                    }
+                }
+            }
+            // export * from 'mod' - no binding needed, just re-exports
+        }
+    }
+
     fn bind_module_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
         if let Some(module) = arena.get_module(node) {
             if let Some(name) = self.get_identifier_name(arena, module.name) {
@@ -740,5 +790,42 @@ mod tests {
 
         // Check that enum symbol was created
         assert!(binder.file_locals.has("Color"));
+    }
+
+    #[test]
+    fn test_thin_binder_import_declaration() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            r#"import foo from 'module'; import { bar, baz as qux } from 'other';"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        // Default import creates alias symbol
+        assert!(binder.file_locals.has("foo"));
+        // Named imports create alias symbols
+        assert!(binder.file_locals.has("bar"));
+        assert!(binder.file_locals.has("qux"));  // aliased from baz
+    }
+
+    #[test]
+    fn test_thin_binder_export_declaration() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            r#"const x = 1; export { x, x as y };"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        // Variable should be bound
+        assert!(binder.file_locals.has("x"));
+
+        // Export specifiers should have symbols (marked via node_symbols, not file_locals)
+        // This ensures the binding runs without errors
+        assert!(binder.symbols.len() > 1, "Should have created export symbols");
     }
 }

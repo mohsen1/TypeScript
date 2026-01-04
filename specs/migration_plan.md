@@ -166,6 +166,17 @@ Since we're going ThinNode-only (no backwards compatibility with old Node enum n
   - Support for re-exports: `export { x } from "mod"`
   - 9 new import/export tests
   - 738 tests total passing
+- [x] Import/export emit for ThinEmitter (Session 17 continued)
+  - 2 new tests validating import/export emission
+  - 740 tests total passing
+- [x] Import/export binding for ThinBinder (Session 17 continued)
+  - Updated `get_named_imports()` accessor to work for both NAMED_IMPORTS and NAMED_EXPORTS
+  - Implemented `bind_export_declaration()` method
+    - Binds named exports: `export { x, y as z }`
+    - Creates EXPORT_VALUE symbols for each export specifier
+    - Supports namespace exports: `export * as ns from 'mod'`
+  - Added 2 new tests: import binding, export binding
+  - 742 tests total passing
 - [ ] Remove old Node enum and NodeArena
 
 ### Architecture (wasm/src/parser/thin_node.rs)
@@ -246,10 +257,18 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 - [x] 5 parallel tests: single file, multiple files, consistency, large batch (100 files), stats
 - [x] 729 tests passing
 
+### Completed (Session 17 continued) - Parallel Binding
+- [x] `BindResult` struct with file_name, source_file, arena, symbols, file_locals, node_symbols
+- [x] `parse_and_bind_parallel()` - Parse and bind multiple files in parallel
+- [x] `parse_and_bind_single()` - Single file parse+bind (for comparison)
+- [x] `parse_and_bind_with_stats()` - Parse+bind with statistics collection
+- [x] `BindStats` struct with file_count, total_nodes, total_symbols, parse_error_count
+- [x] 5 parallel binding tests: single file, multiple files, consistency, stats, large batch (100 files)
+- [x] 747 tests passing
+
 ### TODO
-- [ ] Pipeline: Parse → Bind (parallel) → Merge symbols (sequential) → Check bodies (parallel)
+- [ ] Symbol merging: Merge file_locals into global scope (sequential)
 - [ ] Check function bodies in parallel (local inference doesn't affect global scope)
-- [ ] Add parallel binding after symbol table design is finalized
 
 ## Phase 0.5: SIMD Scanning (Advanced)
 
@@ -331,7 +350,7 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
 **Total Rust Code**: ~49,000 lines
-**Total Tests**: 738 passing
+**Total Tests**: 747 passing
 **Overall Progress**: ~90% of full compiler functionality
 
 ---
