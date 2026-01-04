@@ -402,11 +402,12 @@ This is the ultimate validation milestone. The TypeScript test suite contains th
 - [ ] JS output baseline matching (`.js` files)
 
 ### Progress Tracking
-| Category | Total | Passing | Blocked By |
-|----------|-------|---------|------------|
-| compiler | TBD | 0 | - |
-| conformance | TBD | 0 | - |
-| fourslash | TBD | 0 | - |
+| Category | Total | Passing | % | Blocked By |
+|----------|-------|---------|---|------------|
+| compiler | 6,397 | 0 | 0% | - |
+| conformance | 5,691 | 0 | 0% | - |
+| fourslash | 6,563 | 0 | 0% | - |
+| **Total** | **18,651** | **0** | **0%** | - |
 
 ### Current Blockers
 - ThinChecker needs control flow narrowing
