@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use std::cell::RefCell;
 use rustc_hash::FxHashMap;
 use serde::Serialize;
-use crate::binder::{SymbolId, SymbolArena, SymbolTable};
+use crate::binder::{SymbolId, SymbolArena, SymbolTable, NodeSymbolMap};
 use crate::parser::NodeIndex;
 use super::arena::TypeArena;
 use super::types::TypeId;
@@ -150,6 +150,9 @@ pub struct CheckerState<'a> {
     /// Symbol table for file-local name lookup.
     pub file_locals: &'a SymbolTable,
 
+    /// Node-to-symbol mapping from the binder for language service support.
+    pub node_symbols: &'a NodeSymbolMap,
+
     /// The type arena for allocating types.
     pub types: TypeArena,
 
@@ -236,12 +239,14 @@ impl<'a> CheckerState<'a> {
         node_arena: &'a crate::parser::NodeArena,
         symbol_arena: &'a SymbolArena,
         file_locals: &'a SymbolTable,
+        node_symbols: &'a NodeSymbolMap,
         file_name: String,
     ) -> Self {
         CheckerState {
             node_arena,
             symbol_arena,
             file_locals,
+            node_symbols,
             types: TypeArena::new(),
             local_symbols: SymbolArena::new_with_base(SymbolArena::CHECKER_SYMBOL_BASE),
             symbol_types: FxHashMap::default(),
@@ -607,14 +612,29 @@ impl<'a> CheckerState<'a> {
     pub fn get_symbol_at_location(&self, node_idx: NodeIndex) -> Option<SymbolId> {
         use crate::parser::Node;
 
+        // First, check if we have a direct mapping from the binder
+        if let Some(symbol_id) = self.node_symbols.get(node_idx) {
+            return Some(symbol_id);
+        }
+
         match self.node_arena.get(node_idx) {
             Some(Node::Identifier(id)) => {
                 // Look up in file locals (top-level declarations)
+                // This handles references to symbols, not just declarations
                 self.file_locals.get(&id.escaped_text)
             }
             Some(Node::PropertyAccessExpression(pae)) => {
-                // For property access, get the symbol of the property name
-                self.get_symbol_at_location(pae.name)
+                // For property access (obj.prop), we need type-based member lookup
+                // Get the type of the left-hand side expression
+                if let Some(obj_type) = self.node_types.get(&pae.expression).copied() {
+                    // Get the property name
+                    if let Some(Node::Identifier(prop_id)) = self.node_arena.get(pae.name) {
+                        // Look up the member symbol in the object's type
+                        return self.get_property_symbol_of_type(obj_type, &prop_id.escaped_text);
+                    }
+                }
+                // Fallback: try to get the symbol of the property name directly
+                self.node_symbols.get(pae.name)
             }
             Some(Node::TypeReference(tr)) => {
                 // For type references, get the symbol of the type name
@@ -626,39 +646,81 @@ impl<'a> CheckerState<'a> {
             }
             Some(Node::VariableDeclaration(vd)) => {
                 // For variable declarations, get the symbol from the name
-                self.get_symbol_at_location(vd.name)
+                self.node_symbols.get(node_idx).or_else(|| self.get_symbol_at_location(vd.name))
             }
             Some(Node::FunctionDeclaration(fd)) => {
                 if !fd.name.is_none() {
-                    self.get_symbol_at_location(fd.name)
+                    self.node_symbols.get(node_idx).or_else(|| self.get_symbol_at_location(fd.name))
                 } else {
                     None
                 }
             }
             Some(Node::ClassDeclaration(cd)) => {
                 if !cd.name.is_none() {
-                    self.get_symbol_at_location(cd.name)
+                    self.node_symbols.get(node_idx).or_else(|| self.get_symbol_at_location(cd.name))
                 } else {
                     None
                 }
             }
             Some(Node::InterfaceDeclaration(id)) => {
-                self.get_symbol_at_location(id.name)
+                self.node_symbols.get(node_idx).or_else(|| self.get_symbol_at_location(id.name))
             }
             Some(Node::TypeAliasDeclaration(tad)) => {
-                self.get_symbol_at_location(tad.name)
+                self.node_symbols.get(node_idx).or_else(|| self.get_symbol_at_location(tad.name))
             }
             Some(Node::EnumDeclaration(ed)) => {
-                self.get_symbol_at_location(ed.name)
+                self.node_symbols.get(node_idx).or_else(|| self.get_symbol_at_location(ed.name))
             }
             Some(Node::ParameterDeclaration(pd)) => {
-                self.get_symbol_at_location(pd.name)
+                self.node_symbols.get(node_idx).or_else(|| self.get_symbol_at_location(pd.name))
             }
             Some(Node::PropertyDeclaration(pd)) => {
-                self.get_symbol_at_location(pd.name)
+                self.node_symbols.get(node_idx).or_else(|| self.get_symbol_at_location(pd.name))
             }
             Some(Node::MethodDeclaration(md)) => {
-                self.get_symbol_at_location(md.name)
+                self.node_symbols.get(node_idx).or_else(|| self.get_symbol_at_location(md.name))
+            }
+            _ => None,
+        }
+    }
+
+    /// Get a property symbol from a type by name.
+    /// Used for property access resolution in language service.
+    fn get_property_symbol_of_type(&self, type_id: TypeId, property_name: &str) -> Option<SymbolId> {
+        use super::types::Type;
+
+        let ty = self.types.get(type_id)?;
+
+        match ty {
+            Type::Object(obj) => {
+                // Look up in members (SymbolTable)
+                obj.members.get(property_name)
+            }
+            Type::TypeReference(tr) => {
+                // Resolve the type reference and look up in its target
+                if let Some(&resolved) = self.symbol_types.get(&tr.symbol) {
+                    return self.get_property_symbol_of_type(resolved, property_name);
+                }
+                None
+            }
+            Type::Union(u) => {
+                // For unions, all constituent types must have the property
+                // For now, return the first one that has it
+                for &constituent in &u.types {
+                    if let Some(symbol) = self.get_property_symbol_of_type(constituent, property_name) {
+                        return Some(symbol);
+                    }
+                }
+                None
+            }
+            Type::Intersection(i) => {
+                // For intersections, any constituent type can have the property
+                for &constituent in &i.types {
+                    if let Some(symbol) = self.get_property_symbol_of_type(constituent, property_name) {
+                        return Some(symbol);
+                    }
+                }
+                None
             }
             _ => None,
         }

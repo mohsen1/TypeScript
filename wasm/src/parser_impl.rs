@@ -253,6 +253,7 @@ impl ParserState {
             &self.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             self.file_name.clone(),
         );
 
@@ -282,6 +283,7 @@ impl ParserState {
             &self.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             self.file_name.clone(),
         );
 

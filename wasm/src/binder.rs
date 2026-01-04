@@ -202,6 +202,58 @@ pub struct SymbolArena {
     base_offset: u32,
 }
 
+/// Node-to-symbol mapping for language service support.
+/// Maps AST node indices to their corresponding symbols.
+#[derive(Debug, Default, Serialize)]
+pub struct NodeSymbolMap {
+    /// Maps NodeIndex to SymbolId
+    map: FxHashMap<u32, SymbolId>,
+}
+
+impl NodeSymbolMap {
+    pub fn new() -> Self {
+        Self {
+            map: FxHashMap::default(),
+        }
+    }
+
+    /// Associate a node with a symbol.
+    pub fn set(&mut self, node: NodeIndex, symbol: SymbolId) {
+        if !node.is_none() && !symbol.is_none() {
+            self.map.insert(node.0, symbol);
+        }
+    }
+
+    /// Get the symbol for a node.
+    pub fn get(&self, node: NodeIndex) -> Option<SymbolId> {
+        if node.is_none() {
+            None
+        } else {
+            self.map.get(&node.0).copied()
+        }
+    }
+
+    /// Check if a node has a symbol.
+    pub fn has(&self, node: NodeIndex) -> bool {
+        !node.is_none() && self.map.contains_key(&node.0)
+    }
+
+    /// Get the number of mappings.
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+
+    /// Check if empty.
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
+    /// Iterate over all mappings.
+    pub fn iter(&self) -> impl Iterator<Item = (&u32, &SymbolId)> {
+        self.map.iter()
+    }
+}
+
 impl Default for SymbolArena {
     fn default() -> Self {
         SymbolArena {
@@ -469,6 +521,9 @@ pub struct BinderState {
     scope_chain: Vec<ScopeContext>,
     /// Current scope index in scope_chain
     current_scope_idx: usize,
+    /// Node-to-symbol mapping for language service support
+    #[wasm_bindgen(skip)]
+    pub node_symbols: NodeSymbolMap,
 }
 
 impl BinderState {
@@ -487,6 +542,7 @@ impl BinderState {
             unreachable_flow,
             scope_chain: Vec::new(),
             current_scope_idx: 0,
+            node_symbols: NodeSymbolMap::new(),
         }
     }
 
@@ -869,6 +925,8 @@ impl BinderState {
                     sym.declarations.push(declaration);
                 }
             }
+            // Record node-to-symbol mapping for merged declaration
+            self.node_symbols.set(declaration, existing_id);
             return existing_id;
         }
 
@@ -881,6 +939,8 @@ impl BinderState {
             }
         }
         self.current_scope.set(name, id);
+        // Record node-to-symbol mapping for the declaration
+        self.node_symbols.set(declaration, id);
         id
     }
 

@@ -42,6 +42,7 @@ pub fn check_source(file_name: &str, source: &str) -> Vec<u32> {
         &parser.arena,
         &binder.symbols,
         &binder.file_locals,
+        &binder.node_symbols,
         file_name.to_string(),
     );
     checker.check_source_file(root);
@@ -102,6 +103,7 @@ test.ts(3,5): error TS2304: Cannot find name 'y'.
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
         checker.check_source_file(root);
@@ -125,6 +127,7 @@ test.ts(3,5): error TS2304: Cannot find name 'y'.
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
         checker.check_source_file(root);

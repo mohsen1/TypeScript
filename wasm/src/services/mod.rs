@@ -563,6 +563,40 @@ pub struct LanguageService<'a> {
     root: NodeIndex,
 }
 
+/// Diagnostic information for language service.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LSDiagnostic {
+    /// Source file name
+    pub file_name: String,
+    /// Span of the diagnostic
+    pub text_span: TextSpan,
+    /// Diagnostic message
+    pub message_text: String,
+    /// Diagnostic category (Error, Warning, Suggestion, Message)
+    pub category: DiagnosticCategory,
+    /// Diagnostic code (e.g., 2304 for "Cannot find name")
+    pub code: u32,
+    /// Related information spans
+    pub related_information: Vec<DiagnosticRelatedInfo>,
+}
+
+/// Related diagnostic information.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiagnosticRelatedInfo {
+    pub file_name: String,
+    pub text_span: TextSpan,
+    pub message_text: String,
+}
+
+/// Diagnostic category.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DiagnosticCategory {
+    Warning = 0,
+    Error = 1,
+    Suggestion = 2,
+    Message = 3,
+}
+
 impl<'a> LanguageService<'a> {
     /// Create a new language service for a checked file.
     pub fn new(checker: &'a CheckerState<'a>, file_name: String, root: NodeIndex) -> Self {
@@ -571,6 +605,48 @@ impl<'a> LanguageService<'a> {
             file_name,
             root,
         }
+    }
+
+    /// Get semantic (type checking) diagnostics for the file.
+    /// Returns all type errors, missing imports, etc.
+    pub fn get_semantic_diagnostics(&self) -> Vec<LSDiagnostic> {
+        self.checker.diagnostics.iter().map(|d| {
+            LSDiagnostic {
+                file_name: d.file.clone(),
+                text_span: TextSpan::new(d.start, d.length),
+                message_text: d.message_text.clone(),
+                category: match d.category {
+                    crate::checker::DiagnosticCategory::Warning => DiagnosticCategory::Warning,
+                    crate::checker::DiagnosticCategory::Error => DiagnosticCategory::Error,
+                    crate::checker::DiagnosticCategory::Suggestion => DiagnosticCategory::Suggestion,
+                    crate::checker::DiagnosticCategory::Message => DiagnosticCategory::Message,
+                },
+                code: d.code,
+                related_information: d.related_information.iter().map(|ri| {
+                    DiagnosticRelatedInfo {
+                        file_name: ri.file.clone(),
+                        text_span: TextSpan::new(ri.start, ri.length),
+                        message_text: ri.message_text.clone(),
+                    }
+                }).collect(),
+            }
+        }).collect()
+    }
+
+    /// Get syntactic (parse) diagnostics for the file.
+    /// Currently returns an empty list as parse errors are handled by the parser.
+    /// TODO: Integrate parser diagnostics when available.
+    pub fn get_syntactic_diagnostics(&self) -> Vec<LSDiagnostic> {
+        // Parser doesn't currently expose diagnostics through the checker
+        // In the future, this would return parse errors from the parser
+        Vec::new()
+    }
+
+    /// Get all diagnostics (both syntactic and semantic) for the file.
+    pub fn get_all_diagnostics(&self) -> Vec<LSDiagnostic> {
+        let mut diagnostics = self.get_syntactic_diagnostics();
+        diagnostics.extend(self.get_semantic_diagnostics());
+        diagnostics
     }
 
     /// Get definition at a position.
@@ -1290,6 +1366,7 @@ const y = add(x, 10);
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
         checker.check_source_file(root);
@@ -1308,5 +1385,49 @@ const y = add(x, 10);
         // Test outlining spans (should find the function block)
         let outlining = ls.get_outlining_spans();
         assert!(!outlining.is_empty());
+
+        // Test diagnostics API - this code has no errors
+        let diagnostics = ls.get_semantic_diagnostics();
+        assert!(diagnostics.is_empty(), "Expected no diagnostics for valid code");
+
+        let all_diagnostics = ls.get_all_diagnostics();
+        assert!(all_diagnostics.is_empty(), "Expected no diagnostics for valid code");
+    }
+
+    #[test]
+    fn test_language_service_diagnostics() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+        use crate::checker::CheckerState;
+
+        // Parse TypeScript code with a type error
+        let source = r#"
+const x: number = "hello"; // Error: string not assignable to number
+"#;
+        let mut parser = ParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        // Bind the file
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        // Type check
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
+        checker.check_source_file(root);
+
+        // Create language service
+        let ls = LanguageService::new(&checker, "test.ts".to_string(), root);
+
+        // Test diagnostics API - should have a type error
+        let diagnostics = ls.get_semantic_diagnostics();
+        assert!(!diagnostics.is_empty(), "Expected diagnostics for type error");
+        assert_eq!(diagnostics[0].code, 2322, "Expected TS2322 type error");
+        assert_eq!(diagnostics[0].category, DiagnosticCategory::Error);
     }
 }

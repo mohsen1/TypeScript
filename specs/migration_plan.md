@@ -67,10 +67,10 @@ Common issues found:
 
 | Metric | Value |
 |--------|-------|
-| Lines of Code | ~3,000 |
+| Lines of Code | ~3,500 |
 | Target Lines | ~8,000-12,000 |
-| Tests | 45+ emitter tests |
-| Status | 🟡 40% |
+| Tests | 55+ emitter tests |
+| Status | 🟡 50% |
 
 **See detailed plan: [specs/emitter_plan.md](emitter_plan.md)**
 
@@ -89,10 +89,10 @@ Common issues found:
 - [x] Position tracking during emit
 - [x] Inline and external source map output
 
-### Phase 6.3: Comment Preservation
-- [ ] Leading/trailing comment emission
-- [ ] Detached comment handling
-- [ ] JSDoc comment formatting
+### Phase 6.3: Comment Preservation ✅
+- [x] Leading/trailing comment emission
+- [x] Detached comment handling
+- [x] JSDoc comment formatting
 
 ### Phase 6.4: Declaration File Emission
 - [ ] Declaration-only node filtering
@@ -219,7 +219,7 @@ Common issues found:
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
 **Total Rust Code**: ~37,000 lines (excluding tests)
-**Total Tests**: 552 passing, 0 skipped
+**Total Tests**: 510 passing, 0 skipped
 **Overall Progress**: ~99% of core compiler functionality
 
 ---
@@ -227,6 +227,30 @@ Common issues found:
 # Session Log
 
 ## 2026-01-04
+
+**Session 8 - Scanner/Parser Bug Fixes (Gemini Review):**
+- Ran Rust checker against TypeScript's 6,397 compiler test files
+- Identified and fixed critical UTF-8 handling bugs:
+  - Scanner panicked on multi-byte characters (strings, comments, identifiers)
+  - Fixed by using `char_len_at()` instead of `pos += 1` throughout scanner
+  - Affected: string literals, template literals, comments, identifiers, JSX text
+- Fixed BOM (Byte Order Mark) handling:
+  - Added BYTE_ORDER_MARK to whitespace handling
+  - Fixed 3-byte UTF-8 advancement for BOM character
+- Added destructuring binding pattern support:
+  - `parse_object_binding_pattern` for `{ a, b: c, ...rest }`
+  - `parse_array_binding_pattern` for `[a, b]`
+  - Updated `parse_parameter` to handle patterns in function parameters
+- Fixed SyntaxKind safety: changed hardcoded `166` to `Self::LAST_TOKEN`
+- Test results: ~40% of single-file compiler tests now pass
+- Remaining issues identified:
+  - Decorators on class members crash
+  - Class extends expression (`class A extends class {} {}`) crashes
+  - Static blocks (`static { }`) crash
+  - Template literal return types in arrows crash
+  - `this` type in constraints crashes
+- 510 Rust tests passing
+- Commit: `cbf2d0d0ee4`
 
 **Session 7 - Phase 6.4-6.8 Transforms Implementation:**
 - Completed Phase 6.4: Declaration emitter scaffold
