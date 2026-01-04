@@ -36,6 +36,9 @@ pub mod source_map;
 // Declaration file emitter (Phase 6.4)
 pub mod declaration_emitter;
 
+// JavaScript transforms (Phase 6.5+)
+pub mod transforms;
+
 // =============================================================================
 // Scanner Factory Function
 // =============================================================================
