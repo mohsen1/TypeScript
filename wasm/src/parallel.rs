@@ -349,6 +349,268 @@ pub fn compile_files(files: Vec<(String, String)>) -> MergedProgram {
     merge_bind_results(bind_results)
 }
 
+// =============================================================================
+// Parallel Type Checking
+// =============================================================================
+
+use crate::thin_checker::ThinCheckerState;
+use crate::checker::types::TypeId;
+use crate::checker::state::Diagnostic;
+use crate::parser::syntax_kind_ext;
+
+/// Result of type checking a single function body
+#[derive(Debug)]
+pub struct FunctionCheckResult {
+    /// Function node index within its file
+    pub function_idx: NodeIndex,
+    /// File index in the program
+    pub file_idx: usize,
+    /// Inferred return type
+    pub return_type: TypeId,
+    /// Diagnostics produced
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+/// Result of type checking all function bodies in a file
+pub struct FileCheckResult {
+    /// File index
+    pub file_idx: usize,
+    /// File name
+    pub file_name: String,
+    /// Function check results
+    pub function_results: Vec<FunctionCheckResult>,
+    /// File-level diagnostics
+    pub diagnostics: Vec<Diagnostic>,
+}
+
+/// Result of parallel type checking
+pub struct CheckResult {
+    /// Per-file check results
+    pub file_results: Vec<FileCheckResult>,
+    /// Total functions checked
+    pub function_count: usize,
+    /// Total diagnostics
+    pub diagnostic_count: usize,
+}
+
+/// Collect all function declarations from a source file
+fn collect_functions(arena: &ThinNodeArena, source_file: NodeIndex) -> Vec<NodeIndex> {
+    let mut functions = Vec::new();
+
+    let Some(node) = arena.get(source_file) else {
+        return functions;
+    };
+
+    let Some(sf) = arena.get_source_file(node) else {
+        return functions;
+    };
+
+    for &stmt_idx in &sf.statements.nodes {
+        collect_functions_from_node(arena, stmt_idx, &mut functions);
+    }
+
+    functions
+}
+
+/// Recursively collect functions from a node
+fn collect_functions_from_node(arena: &ThinNodeArena, node_idx: NodeIndex, functions: &mut Vec<NodeIndex>) {
+    let Some(node) = arena.get(node_idx) else {
+        return;
+    };
+
+    match node.kind {
+        k if k == syntax_kind_ext::FUNCTION_DECLARATION ||
+             k == syntax_kind_ext::FUNCTION_EXPRESSION ||
+             k == syntax_kind_ext::ARROW_FUNCTION => {
+            functions.push(node_idx);
+            // Also collect nested functions in the body
+            if let Some(func) = arena.get_function(node) {
+                if !func.body.is_none() {
+                    collect_functions_from_node(arena, func.body, functions);
+                }
+            }
+        }
+        k if k == syntax_kind_ext::METHOD_DECLARATION => {
+            functions.push(node_idx);
+            // Also collect nested functions in the body
+            if let Some(method) = arena.get_method_decl(node) {
+                if !method.body.is_none() {
+                    collect_functions_from_node(arena, method.body, functions);
+                }
+            }
+        }
+        k if k == syntax_kind_ext::CLASS_DECLARATION => {
+            if let Some(class) = arena.get_class(node) {
+                for &member_idx in &class.members.nodes {
+                    collect_functions_from_node(arena, member_idx, functions);
+                }
+            }
+        }
+        k if k == syntax_kind_ext::BLOCK => {
+            if let Some(block) = arena.get_block(node) {
+                for &stmt_idx in &block.statements.nodes {
+                    collect_functions_from_node(arena, stmt_idx, &mut *functions);
+                }
+            }
+        }
+        k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+            // Variable statement might contain arrow functions or function expressions
+            if let Some(var_stmt) = arena.get_variable(node) {
+                for &decl_idx in &var_stmt.declarations.nodes {
+                    if let Some(decl_node) = arena.get(decl_idx) {
+                        if let Some(decl) = arena.get_variable_declaration(decl_node) {
+                            if !decl.initializer.is_none() {
+                                collect_functions_from_node(arena, decl.initializer, functions);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        k if k == syntax_kind_ext::EXPORT_DECLARATION => {
+            // Export declarations may contain function/class declarations
+            if let Some(export) = arena.get_export_decl(node) {
+                if !export.export_clause.is_none() {
+                    collect_functions_from_node(arena, export.export_clause, functions);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Type check function bodies in parallel
+///
+/// After binding is complete and symbols are merged, function bodies
+/// can be type-checked in parallel because:
+/// 1. Each function body only uses local variables and global symbols
+/// 2. Local type inference doesn't modify global state
+/// 3. Each function is independent
+///
+/// # Arguments
+/// * `program` - The merged program with global symbols
+///
+/// # Returns
+/// CheckResult with diagnostics from all functions
+pub fn check_functions_parallel(program: &MergedProgram) -> CheckResult {
+    // First, collect all functions from all files (sequential)
+    let mut all_functions: Vec<(usize, NodeIndex)> = Vec::new();
+
+    for (file_idx, file) in program.files.iter().enumerate() {
+        let functions = collect_functions(&file.arena, file.source_file);
+        for func_idx in functions {
+            all_functions.push((file_idx, func_idx));
+        }
+    }
+
+    let function_count = all_functions.len();
+
+    // Check functions in parallel
+    // Note: We need to be careful here - ThinCheckerState holds mutable references
+    // For now, we group by file and check each file's functions together
+    let file_results: Vec<FileCheckResult> = program.files
+        .par_iter()
+        .enumerate()
+        .map(|(file_idx, file)| {
+            let functions = collect_functions(&file.arena, file.source_file);
+
+            // Create a binder state from the node_symbols
+            let binder = create_binder_from_bound_file(file, program, file_idx);
+
+            // Create checker for this file
+            let mut checker = ThinCheckerState::new(
+                &file.arena,
+                &binder,
+                file.file_name.clone(),
+            );
+
+            let mut function_results = Vec::new();
+
+            for func_idx in functions {
+                // Check the function
+                let return_type = checker.get_type_of_node(func_idx);
+
+                function_results.push(FunctionCheckResult {
+                    function_idx: func_idx,
+                    file_idx,
+                    return_type,
+                    diagnostics: Vec::new(), // Diagnostics are collected at file level
+                });
+            }
+
+            // Collect diagnostics from checker
+            let diagnostics = std::mem::take(&mut checker.diagnostics);
+
+            FileCheckResult {
+                file_idx,
+                file_name: file.file_name.clone(),
+                function_results,
+                diagnostics,
+            }
+        })
+        .collect();
+
+    let diagnostic_count: usize = file_results.iter()
+        .map(|r| r.diagnostics.len())
+        .sum();
+
+    CheckResult {
+        file_results,
+        function_count,
+        diagnostic_count,
+    }
+}
+
+/// Create a ThinBinderState from a BoundFile for type checking
+fn create_binder_from_bound_file(file: &BoundFile, program: &MergedProgram, file_idx: usize) -> ThinBinderState {
+    // Get file locals for this specific file
+    let mut file_locals = SymbolTable::new();
+
+    // Copy from program.file_locals if available
+    if file_idx < program.file_locals.len() {
+        for (name, &sym_id) in program.file_locals[file_idx].iter() {
+            file_locals.set(name.clone(), sym_id);
+        }
+    }
+
+    // Also add globals (for cross-file references)
+    for (name, &sym_id) in program.globals.iter() {
+        if !file_locals.has(name) {
+            file_locals.set(name.clone(), sym_id);
+        }
+    }
+
+    ThinBinderState::from_bound_state(
+        program.symbols.clone(),
+        file_locals,
+        file.node_symbols.clone(),
+    )
+}
+
+/// Check function bodies with statistics
+pub fn check_functions_with_stats(program: &MergedProgram) -> (CheckResult, CheckStats) {
+    let result = check_functions_parallel(program);
+
+    let stats = CheckStats {
+        file_count: result.file_results.len(),
+        function_count: result.function_count,
+        diagnostic_count: result.diagnostic_count,
+    };
+
+    (result, stats)
+}
+
+/// Statistics about parallel type checking
+#[derive(Debug, Clone)]
+pub struct CheckStats {
+    /// Number of files checked
+    pub file_count: usize,
+    /// Number of functions checked
+    pub function_count: usize,
+    /// Number of diagnostics produced
+    pub diagnostic_count: usize,
+}
+
 /// Parse files and collect statistics
 pub fn parse_files_with_stats(files: Vec<(String, String)>) -> (Vec<ParseResult>, ParallelStats) {
     let total_bytes: usize = files.iter().map(|(_, src)| src.len()).sum();
@@ -684,5 +946,161 @@ mod tests {
         assert!(program.globals.has("add"), "Exported function 'add' should be in globals");
         assert!(program.globals.has("Calculator"), "Exported class 'Calculator' should be in globals");
         assert!(program.globals.has("PI"), "Exported const 'PI' should be in globals");
+    }
+
+    // =========================================================================
+    // Parallel Type Checking Tests
+    // =========================================================================
+
+    #[test]
+    fn test_check_single_function() {
+        let files = vec![
+            ("a.ts".to_string(), "function add(x: number, y: number): number { return x + y; }".to_string()),
+        ];
+
+        let program = compile_files(files);
+        let result = check_functions_parallel(&program);
+
+        assert_eq!(result.file_results.len(), 1);
+        assert_eq!(result.function_count, 1);
+        assert_eq!(result.file_results[0].function_results.len(), 1);
+    }
+
+    #[test]
+    fn test_check_multiple_functions_parallel() {
+        let files = vec![
+            ("a.ts".to_string(), "function foo() { return 1; } function bar() { return 2; }".to_string()),
+            ("b.ts".to_string(), "function baz(x: number) { return x * 2; }".to_string()),
+        ];
+
+        let program = compile_files(files);
+        let result = check_functions_parallel(&program);
+
+        assert_eq!(result.file_results.len(), 2);
+        // File a has 2 functions, file b has 1
+        let total_functions: usize = result.file_results.iter()
+            .map(|r| r.function_results.len())
+            .sum();
+        assert_eq!(total_functions, 3);
+    }
+
+    #[test]
+    fn test_check_arrow_functions() {
+        let files = vec![
+            ("a.ts".to_string(), "const add = (x: number, y: number) => x + y;".to_string()),
+            ("b.ts".to_string(), "const double = (x: number) => { return x * 2; };".to_string()),
+        ];
+
+        let program = compile_files(files);
+        let result = check_functions_parallel(&program);
+
+        // Should find the arrow functions
+        let total_functions: usize = result.file_results.iter()
+            .map(|r| r.function_results.len())
+            .sum();
+        assert!(total_functions >= 2, "Should find at least 2 arrow functions");
+    }
+
+    #[test]
+    fn test_check_class_methods() {
+        let files = vec![
+            ("a.ts".to_string(), "class Calculator { add(x: number, y: number) { return x + y; } subtract(x: number, y: number) { return x - y; } }".to_string()),
+        ];
+
+        let program = compile_files(files);
+        let result = check_functions_parallel(&program);
+
+        // Should find the class methods
+        let total_functions: usize = result.file_results.iter()
+            .map(|r| r.function_results.len())
+            .sum();
+        assert!(total_functions >= 2, "Should find at least 2 class methods");
+    }
+
+    #[test]
+    fn test_check_with_stats() {
+        let files = vec![
+            ("a.ts".to_string(), "function foo() { return 1; }".to_string()),
+            ("b.ts".to_string(), "function bar() { return 2; }".to_string()),
+            ("c.ts".to_string(), "function baz() { return 3; }".to_string()),
+        ];
+
+        let program = compile_files(files);
+        let (result, stats) = check_functions_with_stats(&program);
+
+        assert_eq!(stats.file_count, 3);
+        assert_eq!(stats.function_count, 3);
+        assert_eq!(result.file_results.len(), 3);
+    }
+
+    #[test]
+    fn test_check_large_program_parallel() {
+        // Test parallel checking with many files
+        let files: Vec<_> = (0..50)
+            .map(|i| {
+                let source = format!(
+                    "function fn{}(x: number): number {{ return x * {}; }} const val{} = fn{}(10);",
+                    i, i, i, i
+                );
+                (format!("module{}.ts", i), source)
+            })
+            .collect();
+
+        let program = compile_files(files);
+        let (result, stats) = check_functions_with_stats(&program);
+
+        assert_eq!(stats.file_count, 50);
+        // Each file has 1 function declaration
+        assert!(stats.function_count >= 50, "Expected at least 50 functions, got {}", stats.function_count);
+    }
+
+    #[test]
+    fn test_check_consistency() {
+        // Check the same program multiple times - results should be consistent
+        let files = vec![
+            ("a.ts".to_string(), "function add(x: number, y: number): number { return x + y; }".to_string()),
+        ];
+
+        let program = compile_files(files);
+
+        let result1 = check_functions_parallel(&program);
+        let result2 = check_functions_parallel(&program);
+
+        assert_eq!(result1.function_count, result2.function_count);
+        assert_eq!(result1.diagnostic_count, result2.diagnostic_count);
+        assert_eq!(result1.file_results.len(), result2.file_results.len());
+    }
+
+    #[test]
+    fn test_check_nested_functions() {
+        let files = vec![
+            ("a.ts".to_string(), "function outer() { function inner() { return 1; } return inner(); }".to_string()),
+        ];
+
+        let program = compile_files(files);
+        let result = check_functions_parallel(&program);
+
+        // Should find both outer and inner functions
+        let total_functions: usize = result.file_results.iter()
+            .map(|r| r.function_results.len())
+            .sum();
+        assert!(total_functions >= 2, "Should find both outer and inner functions");
+    }
+
+    #[test]
+    fn test_check_exported_functions() {
+        let files = vec![
+            ("a.ts".to_string(), "export function add(x: number, y: number) { return x + y; }".to_string()),
+            ("b.ts".to_string(), "export function subtract(x: number, y: number) { return x - y; }".to_string()),
+        ];
+
+        let program = compile_files(files);
+        let result = check_functions_parallel(&program);
+
+        // Should find the exported functions
+        let total_functions: usize = result.file_results.iter()
+            .map(|r| r.function_results.len())
+            .sum();
+        assert!(total_functions >= 2, "Should find exported functions");
     }
 }

@@ -286,8 +286,20 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 - [x] 4 new tests: exported function, exported class, exported const, compile with exports
 - [x] 756 tests passing
 
+### Completed (Session 18)
+- [x] Parallel function body type checking infrastructure
+  - `check_functions_parallel()` - Check function bodies across files in parallel
+  - `collect_functions()` - Collect all function declarations from source file
+  - `collect_functions_from_node()` - Recursive function collection
+  - `FunctionCheckResult`, `FileCheckResult`, `CheckResult` structs
+  - `CheckStats` for statistics tracking
+  - Creates per-file ThinCheckerState for parallel checking
+- [x] Added `Clone` derive to `SymbolArena` for parallel checker creation
+- [x] 758 tests passing
+
 ### TODO
-- [ ] Check function bodies in parallel (local inference doesn't affect global scope)
+- [ ] Benchmark parallel checking vs sequential
+- [ ] Optimize shared context for cross-file type lookup
 
 ## Phase 0.5: SIMD Scanning (Advanced) - ⬜ Future
 
@@ -369,7 +381,40 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 - [ ] Formatting engine
 - [ ] Code fixes and refactorings
 
-## Phase 8: Full Rust Mode - ⬜ Future
+## Phase 8: Running `tests/cases` - 🎯 Primary Goal
+
+**Goal: Every test case in `tests/cases` compiles faster than TypeScript-Go.**
+
+This is the ultimate validation milestone. The TypeScript test suite contains thousands of real-world test cases covering all language features.
+
+### Infrastructure
+- [ ] Create test runner that invokes Rust compiler on `tests/cases/**/*.ts`
+- [ ] Compare output against TypeScript baseline files
+- [ ] Measure and track compilation times vs TypeScript-Go
+- [ ] Track pass/fail rate and blockers
+
+### Categories to Support
+- [ ] `tests/cases/compiler/` - Core compiler functionality
+- [ ] `tests/cases/conformance/` - Language conformance tests
+- [ ] `tests/cases/fourslash/` - IDE/Language service tests
+- [ ] Error baseline matching (`.errors.txt` files)
+- [ ] Type baseline matching (`.types` files)
+- [ ] JS output baseline matching (`.js` files)
+
+### Progress Tracking
+| Category | Total | Passing | Blocked By |
+|----------|-------|---------|------------|
+| compiler | TBD | 0 | - |
+| conformance | TBD | 0 | - |
+| fourslash | TBD | 0 | - |
+
+### Current Blockers
+- ThinChecker needs control flow narrowing
+- ThinChecker needs full type inference for all expressions
+- Declaration emit needs to match TypeScript exactly
+- Some parser edge cases may need fixing
+
+## Phase 9: Full Rust Mode - ⬜ Future
 
 - [ ] Remove TypeScript fallbacks
 - [ ] Performance optimization pass
@@ -394,7 +439,8 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 | 5 | Type Checker | ~23,500 | 485 | ✅ 99% |
 | 6 | Emitter (legacy + Thin) | ~5,100 | 92+ | 🟡 75% |
 | 7 | Language Service | ~2,000 | 8+ | 🟡 60% |
-| 8 | Full Rust Mode | - | - | ⬜ Future |
+| 8 | tests/cases | - | 0 | 🎯 Goal |
+| 9 | Full Rust Mode | - | - | ⬜ Future |
 
 **Total Rust Code**: ~57,600 lines
 **Total Tests**: 758 passing

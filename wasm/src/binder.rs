@@ -195,7 +195,7 @@ impl SymbolTable {
 // =============================================================================
 
 /// Arena allocator for symbols.
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct SymbolArena {
     symbols: Vec<Symbol>,
     /// Base offset for symbol IDs (0 for binder, high value for checker-local symbols)

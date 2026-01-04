@@ -62,6 +62,34 @@ impl ThinBinderState {
         }
     }
 
+    /// Create a ThinBinderState from existing bound state.
+    ///
+    /// This is used for type checking after parallel binding and symbol merging.
+    /// The symbols and node_symbols come from the merged program state.
+    pub fn from_bound_state(
+        symbols: SymbolArena,
+        file_locals: SymbolTable,
+        node_symbols: FxHashMap<u32, SymbolId>,
+    ) -> Self {
+        let mut flow_nodes = FlowNodeArena::new();
+        let unreachable_flow = flow_nodes.alloc(flow_flags::UNREACHABLE);
+
+        ThinBinderState {
+            symbols,
+            current_scope: SymbolTable::new(),
+            scope_stack: Vec::new(),
+            file_locals,
+            flow_nodes,
+            current_flow: FlowNodeId::NONE,
+            unreachable_flow,
+            scope_chain: Vec::new(),
+            current_scope_idx: 0,
+            node_symbols,
+            hoisted_vars: Vec::new(),
+            hoisted_functions: Vec::new(),
+        }
+    }
+
     /// Bind a source file using ThinNodeArena.
     pub fn bind_source_file(&mut self, arena: &ThinNodeArena, root: NodeIndex) {
         // Initialize scope chain with source file scope
