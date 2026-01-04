@@ -238,6 +238,117 @@ pub fn parse_and_bind_with_stats(files: Vec<(String, String)>) -> (Vec<BindResul
     (results, stats)
 }
 
+// =============================================================================
+// Symbol Merging
+// =============================================================================
+
+/// A bound file ready for type checking
+pub struct BoundFile {
+    /// File name
+    pub file_name: String,
+    /// The parsed source file node index
+    pub source_file: NodeIndex,
+    /// The arena containing all nodes (owned by this file)
+    pub arena: ThinNodeArena,
+    /// Node-to-symbol mapping (symbol IDs are global after merge)
+    pub node_symbols: FxHashMap<u32, SymbolId>,
+    /// Parse errors
+    pub parse_errors: Vec<String>,
+}
+
+/// Merged program state after parallel binding
+pub struct MergedProgram {
+    /// All bound files
+    pub files: Vec<BoundFile>,
+    /// Global symbol arena (all symbols from all files, with remapped IDs)
+    pub symbols: SymbolArena,
+    /// Global symbol table (exports from all files)
+    pub globals: SymbolTable,
+    /// Per-file symbol tables (file-local symbols, symbol IDs remapped)
+    pub file_locals: Vec<SymbolTable>,
+}
+
+/// Merge bind results into a unified program state
+///
+/// This is a sequential operation that combines:
+/// - All symbol arenas into a single global arena
+/// - All file_locals into the global scope (for now, simple merge)
+/// - Remaps symbol IDs in node_symbols to use global IDs
+///
+/// # Arguments
+/// * `results` - Vector of BindResult from parallel binding
+///
+/// # Returns
+/// MergedProgram with unified symbol space
+pub fn merge_bind_results(results: Vec<BindResult>) -> MergedProgram {
+    // Calculate total symbols needed
+    let total_symbols: usize = results.iter().map(|r| r.symbols.len()).sum();
+
+    // Create global symbol arena with pre-allocated capacity
+    let mut global_symbols = SymbolArena::with_capacity(total_symbols);
+    let mut globals = SymbolTable::new();
+    let mut files = Vec::with_capacity(results.len());
+    let mut file_locals_list = Vec::with_capacity(results.len());
+
+    for result in results {
+        // Track the base offset for this file's symbols
+        let base_offset = global_symbols.len() as u32;
+
+        // Copy symbols from this file to global arena, getting new IDs
+        let mut id_remap: FxHashMap<SymbolId, SymbolId> = FxHashMap::default();
+        for i in 0..result.symbols.len() {
+            let old_id = SymbolId(i as u32);
+            if let Some(sym) = result.symbols.get(old_id) {
+                let new_id = global_symbols.alloc(sym.flags, sym.escaped_name.clone());
+                id_remap.insert(old_id, new_id);
+            }
+        }
+
+        // Remap node_symbols to use global IDs
+        let mut remapped_node_symbols = FxHashMap::default();
+        for (node_idx, old_sym_id) in result.node_symbols {
+            if let Some(&new_sym_id) = id_remap.get(&old_sym_id) {
+                remapped_node_symbols.insert(node_idx, new_sym_id);
+            }
+        }
+
+        // Remap file_locals to use global IDs
+        let mut remapped_file_locals = SymbolTable::new();
+        for (name, old_sym_id) in result.file_locals.iter() {
+            if let Some(&new_sym_id) = id_remap.get(old_sym_id) {
+                remapped_file_locals.set(name.clone(), new_sym_id);
+                // Also add to globals (all top-level declarations visible globally)
+                globals.set(name.clone(), new_sym_id);
+            }
+        }
+
+        file_locals_list.push(remapped_file_locals);
+
+        files.push(BoundFile {
+            file_name: result.file_name,
+            source_file: result.source_file,
+            arena: result.arena,
+            node_symbols: remapped_node_symbols,
+            parse_errors: result.parse_errors,
+        });
+    }
+
+    MergedProgram {
+        files,
+        symbols: global_symbols,
+        globals,
+        file_locals: file_locals_list,
+    }
+}
+
+/// Full pipeline: Parse → Bind (parallel) → Merge (sequential)
+///
+/// This is the main entry point for multi-file compilation.
+pub fn compile_files(files: Vec<(String, String)>) -> MergedProgram {
+    let bind_results = parse_and_bind_parallel(files);
+    merge_bind_results(bind_results)
+}
+
 /// Parse files and collect statistics
 pub fn parse_files_with_stats(files: Vec<(String, String)>) -> (Vec<ParseResult>, ParallelStats) {
     let total_bytes: usize = files.iter().map(|(_, src)| src.len()).sum();
@@ -450,6 +561,110 @@ mod tests {
             let var_name = format!("val{}", i);
             assert!(result.file_locals.has(&fn_name), "File {} missing {}", i, fn_name);
             assert!(result.file_locals.has(&var_name), "File {} missing {}", i, var_name);
+        }
+    }
+
+    // =========================================================================
+    // Symbol Merging Tests
+    // =========================================================================
+
+    #[test]
+    fn test_merge_single_file() {
+        let files = vec![
+            ("a.ts".to_string(), "let x = 1; function foo() {}".to_string()),
+        ];
+
+        let program = compile_files(files);
+
+        assert_eq!(program.files.len(), 1);
+        assert!(program.globals.has("x"));
+        assert!(program.globals.has("foo"));
+        // Symbols should be in global arena
+        assert!(program.symbols.len() >= 2);
+    }
+
+    #[test]
+    fn test_merge_multiple_files() {
+        let files = vec![
+            ("a.ts".to_string(), "let a = 1;".to_string()),
+            ("b.ts".to_string(), "function b() {}".to_string()),
+            ("c.ts".to_string(), "class C {}".to_string()),
+        ];
+
+        let program = compile_files(files);
+
+        assert_eq!(program.files.len(), 3);
+        // All symbols should be in globals
+        assert!(program.globals.has("a"));
+        assert!(program.globals.has("b"));
+        assert!(program.globals.has("C"));
+        // All symbols merged into global arena
+        assert!(program.symbols.len() >= 3);
+    }
+
+    #[test]
+    fn test_merge_symbol_id_remapping() {
+        let files = vec![
+            ("a.ts".to_string(), "let x = 1;".to_string()),
+            ("b.ts".to_string(), "let y = 2;".to_string()),
+        ];
+
+        let program = compile_files(files);
+
+        // Get the symbol IDs from globals
+        let x_id = program.globals.get("x").expect("x should exist");
+        let y_id = program.globals.get("y").expect("y should exist");
+
+        // IDs should be different (remapped properly)
+        assert_ne!(x_id, y_id);
+
+        // Both should be resolvable from global arena
+        assert!(program.symbols.get(x_id).is_some());
+        assert!(program.symbols.get(y_id).is_some());
+    }
+
+    #[test]
+    fn test_merge_preserves_file_locals() {
+        let files = vec![
+            ("a.ts".to_string(), "let a1 = 1; let a2 = 2;".to_string()),
+            ("b.ts".to_string(), "let b1 = 1; let b2 = 2;".to_string()),
+        ];
+
+        let program = compile_files(files);
+
+        // Each file should have its own locals
+        assert_eq!(program.file_locals.len(), 2);
+        assert!(program.file_locals[0].has("a1"));
+        assert!(program.file_locals[0].has("a2"));
+        assert!(program.file_locals[1].has("b1"));
+        assert!(program.file_locals[1].has("b2"));
+    }
+
+    #[test]
+    fn test_compile_large_program() {
+        // Simulate a larger program with many files
+        let files: Vec<_> = (0..50)
+            .map(|i| {
+                let source = format!(
+                    "function fn{}() {{ return {}; }} const val{} = fn{}();",
+                    i, i, i, i
+                );
+                (format!("module{}.ts", i), source)
+            })
+            .collect();
+
+        let program = compile_files(files);
+
+        assert_eq!(program.files.len(), 50);
+        // Should have at least 100 symbols (2 per file: fn + val)
+        assert!(program.symbols.len() >= 100, "Expected at least 100 symbols, got {}", program.symbols.len());
+
+        // All function and value names should be in globals
+        for i in 0..50 {
+            let fn_name = format!("fn{}", i);
+            let val_name = format!("val{}", i);
+            assert!(program.globals.has(&fn_name), "Missing {}", fn_name);
+            assert!(program.globals.has(&val_name), "Missing {}", val_name);
         }
     }
 }

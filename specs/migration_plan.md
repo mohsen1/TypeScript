@@ -266,8 +266,19 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 - [x] 5 parallel binding tests: single file, multiple files, consistency, stats, large batch (100 files)
 - [x] 747 tests passing
 
+### Completed (Session 17 continued) - Symbol Merging
+- [x] `BoundFile` struct - file ready for type checking with remapped symbol IDs
+- [x] `MergedProgram` struct - unified program state with global symbols
+- [x] `merge_bind_results()` - Merge bind results into unified symbol space
+  - Combines all symbol arenas into single global arena
+  - Remaps symbol IDs in node_symbols to use global IDs
+  - Merges file_locals into global scope
+- [x] `compile_files()` - Full pipeline: Parse → Bind (parallel) → Merge (sequential)
+- [x] `SymbolArena::with_capacity()` - Pre-allocate symbol arena
+- [x] 5 symbol merging tests: single file, multiple files, ID remapping, file locals, large program (50 files)
+- [x] 752 tests passing
+
 ### TODO
-- [ ] Symbol merging: Merge file_locals into global scope (sequential)
 - [ ] Check function bodies in parallel (local inference doesn't affect global scope)
 
 ## Phase 0.5: SIMD Scanning (Advanced)
@@ -349,8 +360,8 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 | 7 | Language Service | ~1,500 | 5 | 🟡 55% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
-**Total Rust Code**: ~49,000 lines
-**Total Tests**: 747 passing
+**Total Rust Code**: ~49,500 lines
+**Total Tests**: 752 passing
 **Overall Progress**: ~90% of full compiler functionality
 
 ---

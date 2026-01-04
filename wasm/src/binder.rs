@@ -283,6 +283,14 @@ impl SymbolArena {
         }
     }
 
+    /// Create a new symbol arena with pre-allocated capacity.
+    pub fn with_capacity(capacity: usize) -> Self {
+        SymbolArena {
+            symbols: Vec::with_capacity(capacity),
+            base_offset: 0,
+        }
+    }
+
     /// Allocate a new symbol and return its ID.
     pub fn alloc(&mut self, flags: u32, name: String) -> SymbolId {
         let id = SymbolId(self.base_offset + self.symbols.len() as u32);
