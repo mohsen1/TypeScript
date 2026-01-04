@@ -159,6 +159,13 @@ Since we're going ThinNode-only (no backwards compatibility with old Node enum n
   - Verifies checker creates type arena
   - Verifies emitter produces output with function, add, number, return, let, result
   - 724 tests total passing
+- [x] Import/export parsing for ThinParser (Session 17)
+  - Import declarations: default, named, namespace (* as), side-effect
+  - Export declarations: function, class, const, default, star, named
+  - Support for type-only imports/exports
+  - Support for re-exports: `export { x } from "mod"`
+  - 9 new import/export tests
+  - 738 tests total passing
 - [ ] Remove old Node enum and NodeArena
 
 ### Architecture (wasm/src/parser/thin_node.rs)
@@ -323,8 +330,8 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 | 7 | Language Service | ~1,500 | 5 | 🟡 55% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
-**Total Rust Code**: ~48,500 lines
-**Total Tests**: 729 passing
+**Total Rust Code**: ~49,000 lines
+**Total Tests**: 738 passing
 **Overall Progress**: ~90% of full compiler functionality
 
 ---

@@ -23,6 +23,8 @@ use crate::parser::{
         SourceFileData, VariableData, VariableDeclarationData, ForInOfData,
         SwitchData, CaseClauseData, TryData, CatchClauseData,
         EnumData, EnumMemberData,
+        ImportDeclData, ImportClauseData, NamedImportsData, SpecifierData,
+        ExportDeclData,
     },
     syntax_kind_ext,
 };
@@ -293,6 +295,8 @@ impl ThinParserState {
             SyntaxKind::WhileKeyword => self.parse_while_statement(),
             SyntaxKind::ForKeyword => self.parse_for_statement(),
             SyntaxKind::SemicolonToken => self.parse_empty_statement(),
+            SyntaxKind::ExportKeyword => self.parse_export_declaration(),
+            SyntaxKind::ImportKeyword => self.parse_import_declaration(),
             _ => self.parse_expression_statement(),
         }
     }
@@ -1044,6 +1048,457 @@ impl ThinParserState {
         }
 
         self.make_node_list(members)
+    }
+
+    // =========================================================================
+    // Import/Export Declarations
+    // =========================================================================
+
+    /// Parse import declaration
+    /// import x from "mod";
+    /// import { x, y } from "mod";
+    /// import * as x from "mod";
+    /// import "mod";
+    fn parse_import_declaration(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::ImportKeyword);
+
+        // Check for import "module" (no import clause)
+        let import_clause = if self.is_token(SyntaxKind::StringLiteral) {
+            NodeIndex::NONE
+        } else {
+            self.parse_import_clause()
+        };
+
+        // Parse module specifier
+        let module_specifier = if !import_clause.is_none() {
+            self.parse_expected(SyntaxKind::FromKeyword);
+            self.parse_string_literal()
+        } else {
+            self.parse_string_literal()
+        };
+
+        self.parse_semicolon();
+        let end_pos = self.token_end();
+
+        self.arena.add_import_decl(
+            syntax_kind_ext::IMPORT_DECLARATION,
+            start_pos,
+            end_pos,
+            ImportDeclData {
+                modifiers: None,
+                import_clause,
+                module_specifier,
+                attributes: NodeIndex::NONE,
+            },
+        )
+    }
+
+    /// Parse import clause: default, namespace, or named imports
+    fn parse_import_clause(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        let mut is_type_only = false;
+
+        // Check for "type" keyword (import type { ... })
+        if self.is_token(SyntaxKind::TypeKeyword) {
+            // Look ahead to see if this is "type" followed by identifier or "{"
+            let snapshot = self.scanner.save_state();
+            let current = self.current_token;
+            self.next_token();
+            if self.is_token(SyntaxKind::Identifier) || self.is_token(SyntaxKind::OpenBraceToken) ||
+               self.is_token(SyntaxKind::AsteriskToken) {
+                is_type_only = true;
+            } else {
+                self.scanner.restore_state(snapshot);
+                self.current_token = current;
+            }
+        }
+
+        // Parse default import (identifier followed by "from" or ",")
+        // For "import foo from", next token is "from"
+        // For "import foo, { bar } from", next token is ","
+        let name = if self.is_token(SyntaxKind::Identifier) {
+            self.parse_identifier()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse comma if we have both default and named/namespace
+        if !name.is_none() && self.parse_optional(SyntaxKind::CommaToken) {
+            // Continue to parse named bindings
+        }
+
+        // Parse named bindings: * as ns or { x, y }
+        let named_bindings = if self.is_token(SyntaxKind::AsteriskToken) {
+            self.parse_namespace_import()
+        } else if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_named_imports()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_import_clause(
+            syntax_kind_ext::IMPORT_CLAUSE,
+            start_pos,
+            end_pos,
+            ImportClauseData {
+                is_type_only,
+                name,
+                named_bindings,
+            },
+        )
+    }
+
+    /// Check if next token is "from" keyword
+    fn is_next_token_from(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+        self.next_token();
+        let is_from = self.is_token(SyntaxKind::FromKeyword);
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_from
+    }
+
+    /// Parse namespace import: * as name
+    fn parse_namespace_import(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::AsteriskToken);
+        self.parse_expected(SyntaxKind::AsKeyword);
+        let name = self.parse_identifier();
+        let end_pos = self.token_end();
+
+        // Store the namespace import with the name
+        // For namespace import, we return the name identifier directly
+        // The caller knows we're in a namespace import context
+        name
+    }
+
+    /// Parse named imports: { x, y as z }
+    fn parse_named_imports(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+
+        let mut elements = Vec::new();
+        while !self.is_token(SyntaxKind::CloseBraceToken) && !self.is_token(SyntaxKind::EndOfFileToken) {
+            let spec = self.parse_import_specifier();
+            elements.push(spec);
+
+            if !self.parse_optional(SyntaxKind::CommaToken) {
+                break;
+            }
+        }
+
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+        let end_pos = self.token_end();
+
+        self.arena.add_named_imports(
+            syntax_kind_ext::NAMED_IMPORTS,
+            start_pos,
+            end_pos,
+            NamedImportsData {
+                name: NodeIndex::NONE,  // Not a namespace import
+                elements: self.make_node_list(elements),
+            },
+        )
+    }
+
+    /// Parse import specifier: x or x as y
+    fn parse_import_specifier(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        let mut is_type_only = false;
+
+        // Check for "type" keyword
+        if self.is_token(SyntaxKind::TypeKeyword) {
+            let snapshot = self.scanner.save_state();
+            let current = self.current_token;
+            self.next_token();
+            if self.is_token(SyntaxKind::Identifier) {
+                is_type_only = true;
+            } else {
+                self.scanner.restore_state(snapshot);
+                self.current_token = current;
+            }
+        }
+
+        let first_name = self.parse_identifier();
+
+        // Check for "as" alias
+        let (property_name, name) = if self.parse_optional(SyntaxKind::AsKeyword) {
+            let alias = self.parse_identifier();
+            (first_name, alias)
+        } else {
+            (NodeIndex::NONE, first_name)
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_specifier(
+            syntax_kind_ext::IMPORT_SPECIFIER,
+            start_pos,
+            end_pos,
+            SpecifierData {
+                is_type_only,
+                property_name,
+                name,
+            },
+        )
+    }
+
+    /// Parse export declaration
+    /// export { x, y };
+    /// export { x } from "mod";
+    /// export * from "mod";
+    /// export default x;
+    /// export function f() {}
+    /// export class C {}
+    fn parse_export_declaration(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::ExportKeyword);
+
+        // Check for type-only export
+        let is_type_only = self.parse_optional(SyntaxKind::TypeKeyword);
+
+        // export default ...
+        if self.is_token(SyntaxKind::DefaultKeyword) {
+            return self.parse_export_default(start_pos);
+        }
+
+        // export * from "mod"
+        if self.is_token(SyntaxKind::AsteriskToken) {
+            return self.parse_export_star(start_pos, is_type_only);
+        }
+
+        // export { ... }
+        if self.is_token(SyntaxKind::OpenBraceToken) {
+            return self.parse_export_named(start_pos, is_type_only);
+        }
+
+        // export function/class/const/let/var/interface/type/enum
+        self.parse_export_declaration_or_statement(start_pos)
+    }
+
+    /// Parse export default
+    fn parse_export_default(&mut self, start_pos: u32) -> NodeIndex {
+        self.parse_expected(SyntaxKind::DefaultKeyword);
+
+        // Parse the default expression or declaration
+        let expression = match self.token() {
+            SyntaxKind::FunctionKeyword => self.parse_function_declaration(),
+            SyntaxKind::ClassKeyword => self.parse_class_declaration(),
+            _ => {
+                let expr = self.parse_assignment_expression();
+                self.parse_semicolon();
+                expr
+            }
+        };
+
+        let end_pos = self.token_end();
+        // Use export assignment for default exports
+        self.arena.add_export_decl(
+            syntax_kind_ext::EXPORT_DECLARATION,
+            start_pos,
+            end_pos,
+            ExportDeclData {
+                modifiers: None,
+                is_type_only: false,
+                export_clause: expression,
+                module_specifier: NodeIndex::NONE,
+                attributes: NodeIndex::NONE,
+            },
+        )
+    }
+
+    /// Parse export * from "mod"
+    fn parse_export_star(&mut self, start_pos: u32, is_type_only: bool) -> NodeIndex {
+        self.parse_expected(SyntaxKind::AsteriskToken);
+
+        // Optional "as namespace" for re-export
+        let export_clause = if self.parse_optional(SyntaxKind::AsKeyword) {
+            self.parse_identifier()
+        } else {
+            NodeIndex::NONE
+        };
+
+        self.parse_expected(SyntaxKind::FromKeyword);
+        let module_specifier = self.parse_string_literal();
+        self.parse_semicolon();
+
+        let end_pos = self.token_end();
+        self.arena.add_export_decl(
+            syntax_kind_ext::EXPORT_DECLARATION,
+            start_pos,
+            end_pos,
+            ExportDeclData {
+                modifiers: None,
+                is_type_only,
+                export_clause,
+                module_specifier,
+                attributes: NodeIndex::NONE,
+            },
+        )
+    }
+
+    /// Parse export { x, y } or export { x } from "mod"
+    fn parse_export_named(&mut self, start_pos: u32, is_type_only: bool) -> NodeIndex {
+        let export_clause = self.parse_named_exports();
+
+        let module_specifier = if self.parse_optional(SyntaxKind::FromKeyword) {
+            self.parse_string_literal()
+        } else {
+            NodeIndex::NONE
+        };
+
+        self.parse_semicolon();
+        let end_pos = self.token_end();
+
+        self.arena.add_export_decl(
+            syntax_kind_ext::EXPORT_DECLARATION,
+            start_pos,
+            end_pos,
+            ExportDeclData {
+                modifiers: None,
+                is_type_only,
+                export_clause,
+                module_specifier,
+                attributes: NodeIndex::NONE,
+            },
+        )
+    }
+
+    /// Parse named exports: { x, y as z }
+    fn parse_named_exports(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+
+        let mut elements = Vec::new();
+        while !self.is_token(SyntaxKind::CloseBraceToken) && !self.is_token(SyntaxKind::EndOfFileToken) {
+            let spec = self.parse_export_specifier();
+            elements.push(spec);
+
+            if !self.parse_optional(SyntaxKind::CommaToken) {
+                break;
+            }
+        }
+
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+        let end_pos = self.token_end();
+
+        self.arena.add_named_imports(
+            syntax_kind_ext::NAMED_EXPORTS,
+            start_pos,
+            end_pos,
+            NamedImportsData {
+                name: NodeIndex::NONE,  // Not a namespace export
+                elements: self.make_node_list(elements),
+            },
+        )
+    }
+
+    /// Parse export specifier: x or x as y
+    fn parse_export_specifier(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        let mut is_type_only = false;
+
+        // Check for "type" keyword
+        if self.is_token(SyntaxKind::TypeKeyword) {
+            let snapshot = self.scanner.save_state();
+            let current = self.current_token;
+            self.next_token();
+            if self.is_token(SyntaxKind::Identifier) {
+                is_type_only = true;
+            } else {
+                self.scanner.restore_state(snapshot);
+                self.current_token = current;
+            }
+        }
+
+        let first_name = self.parse_identifier();
+
+        // Check for "as" alias
+        let (property_name, name) = if self.parse_optional(SyntaxKind::AsKeyword) {
+            let alias = self.parse_identifier();
+            (first_name, alias)
+        } else {
+            (NodeIndex::NONE, first_name)
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_specifier(
+            syntax_kind_ext::EXPORT_SPECIFIER,
+            start_pos,
+            end_pos,
+            SpecifierData {
+                is_type_only,
+                property_name,
+                name,
+            },
+        )
+    }
+
+    /// Parse exported declaration (export function, export class, etc.)
+    fn parse_export_declaration_or_statement(&mut self, start_pos: u32) -> NodeIndex {
+        // Parse the declaration and wrap it
+        let declaration = match self.token() {
+            SyntaxKind::FunctionKeyword => self.parse_function_declaration(),
+            SyntaxKind::AsyncKeyword => {
+                if self.look_ahead_is_async_function() {
+                    self.parse_async_function_declaration()
+                } else {
+                    self.parse_expression_statement()
+                }
+            }
+            SyntaxKind::ClassKeyword => self.parse_class_declaration(),
+            SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
+            SyntaxKind::TypeKeyword => self.parse_type_alias_declaration(),
+            SyntaxKind::EnumKeyword => self.parse_enum_declaration(),
+            SyntaxKind::VarKeyword |
+            SyntaxKind::LetKeyword |
+            SyntaxKind::ConstKeyword => self.parse_variable_statement(),
+            _ => {
+                // Unsupported export
+                self.parse_error_at_current_token("Declaration or statement expected");
+                self.parse_expression_statement()
+            }
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_export_decl(
+            syntax_kind_ext::EXPORT_DECLARATION,
+            start_pos,
+            end_pos,
+            ExportDeclData {
+                modifiers: None,
+                is_type_only: false,
+                export_clause: declaration,
+                module_specifier: NodeIndex::NONE,
+                attributes: NodeIndex::NONE,
+            },
+        )
+    }
+
+    /// Parse a string literal (used for module specifiers)
+    fn parse_string_literal(&mut self) -> NodeIndex {
+        if !self.is_token(SyntaxKind::StringLiteral) {
+            self.parse_error_at_current_token("String literal expected");
+            return NodeIndex::NONE;
+        }
+
+        let start_pos = self.token_pos();
+        let text = self.scanner.get_token_value_ref().to_string();
+        self.next_token();
+        let end_pos = self.token_end();
+
+        self.arena.add_literal(
+            SyntaxKind::StringLiteral as u16,
+            start_pos,
+            end_pos,
+            LiteralData {
+                text,
+                raw_text: None,
+                value: None,
+            },
+        )
     }
 
     /// Parse if statement
@@ -1806,23 +2261,6 @@ impl ThinParserState {
             start_pos,
             end_pos,
             LiteralData { text, raw_text: None, value },
-        )
-    }
-
-    /// Parse string literal
-    /// Uses zero-copy accessor, clones only when storing
-    fn parse_string_literal(&mut self) -> NodeIndex {
-        let start_pos = self.token_pos();
-        // Use zero-copy accessor
-        let text = self.scanner.get_token_value_ref().to_string();
-        self.next_token();
-        let end_pos = self.token_end();
-
-        self.arena.add_literal(
-            SyntaxKind::StringLiteral as u16,
-            start_pos,
-            end_pos,
-            LiteralData { text, raw_text: None, value: None },
         )
     }
 
@@ -4571,6 +5009,118 @@ mod tests {
         let mut parser = ThinParserState::new(
             "test.tsx".to_string(),
             "const x = <Foo.Bar.Baz />;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    // =========================================================================
+    // Import/Export Tests
+    // =========================================================================
+
+    #[test]
+    fn test_thin_parser_import_default() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            r#"import foo from "bar";"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_import_named() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            r#"import { foo, bar } from "baz";"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_import_namespace() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            r#"import * as foo from "bar";"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_import_side_effect() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            r#"import "foo";"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_export_function() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "export function foo() { return 1; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_export_const() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "export const x = 42;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_export_default() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "export default function foo() { }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_re_export() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            r#"export { foo } from "bar";"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_export_star() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            r#"export * from "foo";"#.to_string(),
         );
         let root = parser.parse_source_file();
 
