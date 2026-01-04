@@ -339,112 +339,55 @@ Target: Walk the AST and create symbol table, establishing scope and name resolu
 
 ## Phase 5: Type Checker (~98% Complete)
 
-Target: The heart of TypeScript—structural type checking, inference, and
-diagnostics. This is ~50% of the compiler complexity.
-
-**Strategy:** Migrate in layers, starting with primitive type operations and
-building up to full inference.
+Target: The heart of TypeScript—structural type checking, inference, and diagnostics.
 
 | Metric | Value |
 |--------|-------|
-| Lines of Code | ~23,500 (production) |
-| Test Lines | ~10,900 |
+| Lines of Code | ~23,500 |
 | Tests Passing | 481 |
-| Tests Skipped | 0 |
+| Status | 🟡 98% |
 
-### 5.1 Type Representation ✅
+### Remaining TODO (Priority Order)
 
-- [x] `Type` enum (~20 variants): Intrinsic, Literal, Union, Intersection, Object, TypeParameter, Conditional, Mapped, IndexedAccess, Index, TemplateLiteral, Function, Array, Tuple, Enum, TypeReference, ThisType, UniqueSymbol
-- [x] `TypeFlags` (30+ flags) and type predicates
-- [x] Intrinsic types: string, number, boolean, void, null, undefined, never, any, unknown, object, bigint, symbol, RegExp
-- [x] `TypeArena` with 15 singleton types
-- [x] `TypeId` with NONE sentinel
-- [x] Boolean literal singletons (true/false)
+1. [ ] **JSX intrinsic element types** - Add JSX.IntrinsicElements lookup
+2. [ ] **Namespace merging** - Handle class+namespace, enum+namespace merging
+3. [ ] **Module augmentation** - Support `declare module` augmentations
+4. [ ] **Overload resolution** - Improve function overload selection
+5. [ ] **Recursive type aliases** - Better handling of self-referential types
+6. [ ] **Const assertions in generics** - `as const` type parameter inference
+7. [ ] **Variadic tuple types** - Spread in tuple type positions
+8. [ ] **Key remapping in mapped types** - `as` clause in mapped types
+9. [ ] **Integrate with TypeScript's full test suite** - Run baselines
 
-### 5.2 Subtype & Assignability ✅
+### Completed ✅
 
-- [x] `isTypeRelatedTo()` core logic
-- [x] Structural compatibility checks
-- [x] Variance handling (covariance, contravariance)
-- [x] Excess property checks (fresh object literals)
-- [x] Relation caching with `RefCell<FxHashMap>`
-- [x] Union type distribution
-- [x] Intersection type handling
-- [x] Nullable type handling
-- [x] Primitive type compatibility
-- [x] Literal type widening
-- [x] Object/Array/Tuple/Function type compatibility
+**Type Representation**
+- `Type` enum (20+ variants), `TypeFlags` (30+ flags), `TypeArena`
+- Intrinsic types: string, number, boolean, void, null, undefined, never, any, unknown, object, bigint, symbol, RegExp
+- Literal types, union/intersection, conditional, mapped, template literal
 
-### 5.3 Type Inference ✅
+**Subtype & Assignability**
+- `isTypeRelatedTo()`, structural compatibility, variance handling
+- Excess property checks, relation caching, union distribution
 
-- [x] Inference context (`contextual_type`)
-- [x] `inferTypes()` and constraint solving
-- [x] Generic instantiation (`instantiate_type`)
-- [x] Contextual typing: array literals, object literals, function expressions, arrow functions, callbacks
-- [x] Type argument inference from call expressions
-- [x] Type parameter scope tracking
-- [x] Array/Tuple/Object pattern inference
+**Type Inference**
+- Contextual typing, `inferTypes()`, generic instantiation
+- Array/Tuple/Object pattern inference, type argument inference
 
-### 5.4 Control Flow Analysis ✅
+**Control Flow Analysis**
+- Type narrowing (typeof, instanceof, truthiness, falsy, discriminated unions)
+- Equality narrowing, negated guards, exhaustiveness checking, type predicates
 
-- [x] Type narrowing (`narrowing.rs` - 1,200+ lines)
-- [x] `typeof` guards, `instanceof` guards
-- [x] Truthiness narrowing, falsy narrowing
-- [x] Discriminated union narrowing
-- [x] `in` operator narrowing
-- [x] Equality narrowing (===, !==)
-- [x] Negated type guards
-- [x] Exhaustiveness checking (`check_switch_exhaustiveness`)
-- [x] Type predicates parsing (`x is T`, `asserts x is T`)
+**Diagnostics**
+- Error codes (2304, 2322, 2339, 2345, 2551, etc.), type-to-string, spans
 
-### 5.5 Diagnostics ✅
+**Type Checking**
+- `check_source_file()`, all statement/expression types
+- Class members, visibility, abstract/override validation
 
-- [x] Error message generation
-- [x] Related information spans
-- [x] TypeScript-compatible error codes (2304, 2322, 2339, 2345, 2551, etc.)
-- [x] Type-to-string for error messages
-- [x] Property access/assignability/missing name/argument count errors
-- [x] Abstract/override modifier errors
-
-### 5.6 Type Checking ✅
-
-- [x] `check_source_file()` entry point
-- [x] `check_statement()` for all statement types
-- [x] `check_variable_statement()` with type annotations
-- [x] `check_class_member()` for methods, properties, accessors
-- [x] Property visibility checks (private, protected)
-- [x] Abstract/override member validation
-
-### 5.7 Type Retrieval ✅
-
-- [x] `get_type_of_node()` with caching and recursion detection
-- [x] Literals: string, number, bigint, boolean
-- [x] Expressions: binary, unary, conditional, call, new, property/element access, `as`, `satisfies`, postfix `++`/`--`
-- [x] Declarations: function, class, interface, type alias, enum
-- [x] Type nodes: union, intersection, array, tuple, function type, conditional type
-- [x] Mapped types, template literal types, `infer` types
-- [x] `this`/`super` type resolution
-- [x] Awaited types for async/await
-
-### 5.8 Remaining Work
-
-- [ ] Integrate with TypeScript's full test suite
-
-### Recent Progress (2026-01-04)
-
-**Session 1 - Expression Parsing:**
-- RegExp intrinsic type
-- `as`/`satisfies` expression parsing
-- Postfix `++`/`--` parsing
-- Contextual typing cache fix
-- 13 new operator tests
-
-**Session 2 - Type Narrowing & Inference:**
-- Falsy type narrowing (`get_falsy_type`)
-- Array/Tuple/Object type inference in generics
-- Improved `new` expression handling
-
-**Verification:** 476 tests passing, 0 skipped
+**Type Retrieval**
+- `get_type_of_node()` with caching, all expression/declaration types
+- `this`/`super` resolution, awaited types
 
 ---
 
