@@ -9,6 +9,7 @@
 use wasm_bindgen::prelude::*;
 use crate::scanner::SyntaxKind;
 use crate::char_codes::CharacterCodes;
+use crate::interner::{Atom, Interner};
 
 // =============================================================================
 // Token Flags
@@ -79,6 +80,11 @@ pub struct ScannerState {
     token_flags: u32,
     /// Whether to skip trivia (whitespace, comments)
     skip_trivia: bool,
+    /// String interner for identifier deduplication
+    #[wasm_bindgen(skip)]
+    pub interner: Interner,
+    /// Interned atom for current identifier token (avoids string comparison)
+    token_atom: Atom,
 }
 
 #[wasm_bindgen]
@@ -88,6 +94,8 @@ impl ScannerState {
     #[wasm_bindgen(constructor)]
     pub fn new(text: String, skip_trivia: bool) -> ScannerState {
         let end = text.len(); // byte length
+        let mut interner = Interner::new();
+        interner.intern_common(); // Pre-intern common keywords
         ScannerState {
             source: text,
             pos: 0,
@@ -98,6 +106,8 @@ impl ScannerState {
             token_value: String::new(),
             token_flags: 0,
             skip_trivia,
+            interner,
+            token_atom: Atom::NONE,
         }
     }
 
@@ -298,6 +308,7 @@ impl ScannerState {
     pub fn scan(&mut self) -> SyntaxKind {
         self.full_start_pos = self.pos;
         self.token_flags = 0;
+        self.token_atom = Atom::NONE; // Reset atom for non-identifier tokens
 
         loop {
             self.token_start = self.pos;
@@ -978,6 +989,7 @@ impl ScannerState {
     }
 
     /// Scan an identifier.
+    /// ZERO-ALLOCATION: Identifiers are interned, returning an Atom (u32) for O(1) comparison.
     fn scan_identifier(&mut self) {
         let start = self.pos;
         // Advance past first character (may be multi-byte)
@@ -991,11 +1003,17 @@ impl ScannerState {
             self.pos += self.char_len_at(self.pos); // Handle multi-byte UTF-8
         }
 
-        let text = self.substring(start, self.pos);
-        self.token_value = text.clone();
+        // Get slice reference instead of allocating new String
+        let text_slice = &self.source[start..self.pos];
 
-        // Check if it's a keyword
-        self.token = crate::scanner::text_to_keyword(&text).unwrap_or(SyntaxKind::Identifier);
+        // Check if it's a keyword first (common keywords are pre-interned)
+        self.token = crate::scanner::text_to_keyword(text_slice).unwrap_or(SyntaxKind::Identifier);
+
+        // Intern the identifier for O(1) comparison (reuses existing interned string)
+        self.token_atom = self.interner.intern(text_slice);
+
+        // Store token value (still needed for compatibility, but could be lazy in future)
+        self.token_value = text_slice.to_string();
     }
 
     // =========================================================================
@@ -1839,6 +1857,29 @@ impl ScannerState {
         self.token_value = snapshot.token_value;
         self.token_flags = snapshot.token_flags;
     }
+
+    /// Get the interned atom for the current identifier token.
+    /// Returns Atom::NONE if the current token is not an identifier.
+    /// This enables O(1) string comparison for identifiers.
+    pub fn get_token_atom(&self) -> Atom {
+        self.token_atom
+    }
+
+    /// Resolve an atom back to its string value.
+    /// Panics if the atom is invalid.
+    pub fn resolve_atom(&self, atom: Atom) -> &str {
+        self.interner.resolve(atom)
+    }
+
+    /// Get a reference to the interner for direct use by the parser.
+    pub fn interner(&self) -> &Interner {
+        &self.interner
+    }
+
+    /// Get a mutable reference to the interner.
+    pub fn interner_mut(&mut self) -> &mut Interner {
+        &mut self.interner
+    }
 }
 
 // =============================================================================
@@ -2085,5 +2126,95 @@ mod tests {
         assert_eq!(scanner.get_token_value(), "42");
         assert_eq!(scanner.scan(), SyntaxKind::SemicolonToken);
         assert_eq!(scanner.scan(), SyntaxKind::EndOfFileToken);
+    }
+
+    #[test]
+    fn test_identifier_interning() {
+        use crate::interner::Atom;
+
+        let mut scanner = ScannerState::new("foo bar foo baz foo".to_string(), true);
+
+        // Scan first "foo"
+        assert_eq!(scanner.scan(), SyntaxKind::Identifier);
+        assert_eq!(scanner.get_token_value(), "foo");
+        let foo_atom1 = scanner.get_token_atom();
+        assert_ne!(foo_atom1, Atom::NONE);
+
+        // Scan "bar"
+        assert_eq!(scanner.scan(), SyntaxKind::Identifier);
+        assert_eq!(scanner.get_token_value(), "bar");
+        let bar_atom = scanner.get_token_atom();
+        assert_ne!(bar_atom, Atom::NONE);
+        assert_ne!(bar_atom, foo_atom1); // Different identifier = different atom
+
+        // Scan second "foo" - should get same atom
+        assert_eq!(scanner.scan(), SyntaxKind::Identifier);
+        assert_eq!(scanner.get_token_value(), "foo");
+        let foo_atom2 = scanner.get_token_atom();
+        assert_eq!(foo_atom1, foo_atom2); // Same identifier = same atom (O(1) comparison!)
+
+        // Scan "baz"
+        assert_eq!(scanner.scan(), SyntaxKind::Identifier);
+        let baz_atom = scanner.get_token_atom();
+        assert_ne!(baz_atom, foo_atom1);
+        assert_ne!(baz_atom, bar_atom);
+
+        // Scan third "foo" - still same atom
+        assert_eq!(scanner.scan(), SyntaxKind::Identifier);
+        let foo_atom3 = scanner.get_token_atom();
+        assert_eq!(foo_atom1, foo_atom3);
+
+        // Verify we can resolve atoms back to strings
+        assert_eq!(scanner.resolve_atom(foo_atom1), "foo");
+        assert_eq!(scanner.resolve_atom(bar_atom), "bar");
+        assert_eq!(scanner.resolve_atom(baz_atom), "baz");
+    }
+
+    #[test]
+    fn test_non_identifier_atom_is_none() {
+        use crate::interner::Atom;
+
+        let mut scanner = ScannerState::new("42 + 'hello'".to_string(), true);
+
+        // Numeric literal - atom should be NONE
+        assert_eq!(scanner.scan(), SyntaxKind::NumericLiteral);
+        assert_eq!(scanner.get_token_atom(), Atom::NONE);
+
+        // Operator - atom should be NONE
+        assert_eq!(scanner.scan(), SyntaxKind::PlusToken);
+        assert_eq!(scanner.get_token_atom(), Atom::NONE);
+
+        // String literal - atom should be NONE
+        assert_eq!(scanner.scan(), SyntaxKind::StringLiteral);
+        assert_eq!(scanner.get_token_atom(), Atom::NONE);
+    }
+
+    #[test]
+    fn test_keyword_interning() {
+        use crate::interner::Atom;
+
+        let mut scanner = ScannerState::new("const let var const".to_string(), true);
+
+        // Keywords are also interned (but they have their own SyntaxKind)
+        assert_eq!(scanner.scan(), SyntaxKind::ConstKeyword);
+        let const_atom1 = scanner.get_token_atom();
+        assert_ne!(const_atom1, Atom::NONE);
+
+        assert_eq!(scanner.scan(), SyntaxKind::LetKeyword);
+        let let_atom = scanner.get_token_atom();
+        assert_ne!(let_atom, const_atom1);
+
+        assert_eq!(scanner.scan(), SyntaxKind::VarKeyword);
+        let var_atom = scanner.get_token_atom();
+
+        // Second "const" should get same atom
+        assert_eq!(scanner.scan(), SyntaxKind::ConstKeyword);
+        let const_atom2 = scanner.get_token_atom();
+        assert_eq!(const_atom1, const_atom2);
+
+        // All atoms are distinct
+        assert_ne!(const_atom1, let_atom);
+        assert_ne!(const_atom1, var_atom);
+        assert_ne!(let_atom, var_atom);
     }
 }
