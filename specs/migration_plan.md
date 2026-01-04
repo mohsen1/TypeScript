@@ -216,6 +216,12 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 
 # MILESTONES
 
+## 2026-01-04: Performance Optimizations (Post-Review)
+- Iterator-based case-insensitive comparison (no allocation)
+- Binder returns &str instead of String to avoid cloning in hot path
+- Type enum size analysis: 48 bytes (already well-optimized with Boxing)
+- Detailed Type variant size test added
+
 ## 2026-01-04: Scanner Zero-Copy Accessors
 - Added get_token_value_ref(), get_token_text_ref() for zero-copy access
 - Added source_slice(), source_text() for direct source access
