@@ -349,7 +349,7 @@ building up to full inference.
 |--------|-------|
 | Lines of Code | ~23,500 (production) |
 | Test Lines | ~10,900 |
-| Tests Passing | 479 |
+| Tests Passing | 481 |
 | Tests Skipped | 0 |
 
 ### 5.1 Type Representation ✅
@@ -987,13 +987,13 @@ throughput across various file sizes.
 | 2     | Scanner             | ~2,500        | 22      | ✅ DONE
 | 3     | Parser              | ~5,000        | 100+    | ✅ DONE (98%)
 | 4     | Binder              | ~1,900        | 20+     | ✅ DONE
-| 5     | Type Checker        | ~23,500       | 479     | 🟡 98%
+| 5     | Type Checker        | ~23,500       | 481     | 🟡 98%
 | 6     | Emitter             | ~100          | -       | ⬜ Pending
 | 7     | Language Service    | -             | -       | ⬜ Pending
 | 8     | Full Rust Mode      | -             | -       | ⬜ Pending
 
 **Total Rust Code**: ~33,500 lines (excluding tests)
-**Total Tests**: 479 passing, 0 skipped
+**Total Tests**: 481 passing, 0 skipped
 **Overall Progress**: ~96% of core compiler functionality (scanner, parser, binder, checker)
 
 Current Focus:
