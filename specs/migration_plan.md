@@ -246,7 +246,7 @@ Common issues found:
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
 **Total Rust Code**: ~38,300 lines (excluding tests)
-**Total Tests**: 574 passing, 0 skipped
+**Total Tests**: 577 passing, 0 skipped
 **Overall Progress**: ~99% of core compiler functionality
 
 ---
@@ -254,6 +254,28 @@ Common issues found:
 # Session Log
 
 ## 2026-01-04
+
+**Session 10 - Architecture BLOCKER/CRITICAL Fixes (Gemini Architecture Review):**
+- Addressed 4 issues from gemini-architecture-guidance.md review
+- BLOCKER #1: String literal escaping in emitter
+  - Added emit_escaped_string() for proper escape handling
+  - Handles: backslash, quotes, newlines, tabs, control characters
+  - Added test_emit_string_literal_escaping test
+- CRITICAL #1: Optional property type checking
+  - Fixed is_object_type_related to check symbol_flags::OPTIONAL
+  - Missing properties in source OK if target property is optional
+  - Added test_optional_property_assignability test
+- CRITICAL #2: Enum compatibility logic (nominal typing)
+  - Changed from string name comparison to TypeId comparison
+  - Two enums with same name are NOT compatible unless same TypeId
+  - Fixed test_same_enum_assignability to reflect correct semantics
+- CRITICAL #3: Function arity check in signature comparison
+  - Fixed is_signature_related to check min_argument_count vs target params
+  - Added test_function_arity_checking test
+- VERIFIED: Borrow violations in narrowing.rs are non-issue
+  - Code already clones union types before iterating and mutating
+  - Pattern is correct: collect into Vec<TypeId> before mutable calls
+- 577 tests passing (up from 574)
 
 **Session 9 - Language Service BLOCKER/CRITICAL Fixes (Gemini LS Review):**
 - Addressed 5 BLOCKER issues and 3 CRITICAL issues from Gemini language service review
