@@ -145,14 +145,32 @@ pub fn compare_strings_case_insensitive(a: Option<String>, b: Option<String>) ->
             if a == b {
                 return Comparison::EqualTo;
             }
-            let a_upper = a.to_uppercase();
-            let b_upper = b.to_uppercase();
-            if a_upper < b_upper {
-                Comparison::LessThan
-            } else if a_upper > b_upper {
-                Comparison::GreaterThan
-            } else {
-                Comparison::EqualTo
+            // Use iterator-based comparison to avoid allocating new strings
+            compare_strings_case_insensitive_iter(&a, &b)
+        }
+    }
+}
+
+/// Iterator-based case-insensitive comparison (no allocation).
+/// Maps characters to uppercase on-the-fly without creating new strings.
+#[inline]
+fn compare_strings_case_insensitive_iter(a: &str, b: &str) -> Comparison {
+    use std::cmp::Ordering;
+
+    let mut a_chars = a.chars().flat_map(char::to_uppercase);
+    let mut b_chars = b.chars().flat_map(char::to_uppercase);
+
+    loop {
+        match (a_chars.next(), b_chars.next()) {
+            (None, None) => return Comparison::EqualTo,
+            (None, Some(_)) => return Comparison::LessThan,
+            (Some(_), None) => return Comparison::GreaterThan,
+            (Some(a_char), Some(b_char)) => {
+                match a_char.cmp(&b_char) {
+                    Ordering::Less => return Comparison::LessThan,
+                    Ordering::Greater => return Comparison::GreaterThan,
+                    Ordering::Equal => continue,
+                }
             }
         }
     }
@@ -176,14 +194,32 @@ pub fn compare_strings_case_insensitive_eslint_compatible(
             if a == b {
                 return Comparison::EqualTo;
             }
-            let a_lower = a.to_lowercase();
-            let b_lower = b.to_lowercase();
-            if a_lower < b_lower {
-                Comparison::LessThan
-            } else if a_lower > b_lower {
-                Comparison::GreaterThan
-            } else {
-                Comparison::EqualTo
+            // Use iterator-based comparison to avoid allocating new strings
+            compare_strings_case_insensitive_lower_iter(&a, &b)
+        }
+    }
+}
+
+/// Iterator-based case-insensitive comparison using lowercase (no allocation).
+/// Used for eslint compatibility.
+#[inline]
+fn compare_strings_case_insensitive_lower_iter(a: &str, b: &str) -> Comparison {
+    use std::cmp::Ordering;
+
+    let mut a_chars = a.chars().flat_map(char::to_lowercase);
+    let mut b_chars = b.chars().flat_map(char::to_lowercase);
+
+    loop {
+        match (a_chars.next(), b_chars.next()) {
+            (None, None) => return Comparison::EqualTo,
+            (None, Some(_)) => return Comparison::LessThan,
+            (Some(_), None) => return Comparison::GreaterThan,
+            (Some(a_char), Some(b_char)) => {
+                match a_char.cmp(&b_char) {
+                    Ordering::Less => return Comparison::LessThan,
+                    Ordering::Greater => return Comparison::GreaterThan,
+                    Ordering::Equal => continue,
+                }
             }
         }
     }
@@ -196,9 +232,16 @@ pub fn equate_strings_case_sensitive(a: &str, b: &str) -> bool {
 }
 
 /// Check if two strings are equal (case-insensitive).
+/// Uses iterator-based comparison to avoid allocating new strings.
 #[wasm_bindgen(js_name = equateStringsCaseInsensitive)]
 pub fn equate_strings_case_insensitive(a: &str, b: &str) -> bool {
-    a.to_uppercase() == b.to_uppercase()
+    if a.len() != b.len() {
+        // Quick length check - but note that uppercase/lowercase might change length
+        // for some unicode characters, so we need the full comparison
+    }
+    a.chars()
+        .flat_map(char::to_uppercase)
+        .eq(b.chars().flat_map(char::to_uppercase))
 }
 
 // =============================================================================
