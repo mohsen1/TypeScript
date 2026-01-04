@@ -9800,3 +9800,143 @@ fn test_super_in_constructor() {
     assert_eq!(checker.diagnostics.len(), 0,
         "No type errors expected for super(name), got: {:?}", checker.diagnostics);
 }
+
+#[test]
+fn test_pick_utility_type() {
+    // Test Pick<T, K> utility type behavior
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        type Pick<T, K extends keyof T> = { [P in K]: T[P] };
+        interface User {
+            id: number;
+            name: string;
+            email: string;
+        }
+        type PickedUser = Pick<User, "id" | "name">;
+        const user: PickedUser = { id: 1, name: "John" };
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // No type errors expected - object has exactly the picked properties
+    assert_eq!(checker.diagnostics.len(), 0,
+        "No type errors expected for Pick usage, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_omit_utility_type() {
+    // Test Omit<T, K> utility type behavior
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        type Exclude<T, U> = T extends U ? never : T;
+        type Omit<T, K extends keyof any> = { [P in Exclude<keyof T, K>]: T[P] };
+        interface User {
+            id: number;
+            name: string;
+            password: string;
+        }
+        type SafeUser = Omit<User, "password">;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // No type errors expected
+    assert_eq!(checker.diagnostics.len(), 0,
+        "No type errors expected for Omit usage, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_extract_utility_type() {
+    // Test Extract<T, U> utility type
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        type Extract<T, U> = T extends U ? T : never;
+        type StringOrNumber = string | number | boolean;
+        type OnlyStrings = Extract<StringOrNumber, string>;
+        const s: OnlyStrings = "hello";
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // No type errors expected
+    assert_eq!(checker.diagnostics.len(), 0,
+        "No type errors expected for Extract usage, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_exclude_utility_type() {
+    // Test Exclude<T, U> utility type
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        type Exclude<T, U> = T extends U ? never : T;
+        type StringOrNumber = string | number | boolean;
+        type NoStrings = Exclude<StringOrNumber, string>;
+        const n: NoStrings = 42;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // No type errors expected
+    assert_eq!(checker.diagnostics.len(), 0,
+        "No type errors expected for Exclude usage, got: {:?}", checker.diagnostics);
+}
