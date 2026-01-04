@@ -754,6 +754,23 @@ impl<'a> CheckerState<'a> {
             .unwrap_or(0)
     }
 
+    /// Get the symbol associated with a type.
+    /// Returns the symbol for TypeReferences, TypeParameters, and class/interface types.
+    /// Used for go-to-type-definition.
+    pub fn get_symbol_of_type(&self, type_id: TypeId) -> Option<SymbolId> {
+        use super::types::Type;
+
+        let ty = self.types.get(type_id)?;
+
+        match ty {
+            Type::TypeReference(tr) => Some(tr.symbol),
+            Type::TypeParameter(tp) => Some(tp.symbol),
+            Type::Object(obj) if !obj.symbol.is_none() => Some(obj.symbol),
+            // Note: Enum types don't currently store a symbol reference
+            _ => None,
+        }
+    }
+
     /// Get all symbols in the file's local scope.
     /// Used for completions at global/module level.
     pub fn get_file_symbols(&self) -> impl Iterator<Item = (&String, &SymbolId)> {

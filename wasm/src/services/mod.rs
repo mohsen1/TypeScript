@@ -10,7 +10,7 @@
 //! - Code fixes and refactorings
 
 use serde::{Deserialize, Serialize};
-use crate::checker::{CheckerState, TypeId, Type};
+use crate::checker::{CheckerState, TypeId};
 use crate::parser::{NodeIndex, Node};
 use crate::binder::SymbolId;
 use crate::scanner::SyntaxKind;
@@ -683,6 +683,51 @@ impl<'a> LanguageService<'a> {
             .collect()
     }
 
+    /// Get type definition at a position.
+    /// Returns the location of the type that the symbol references.
+    /// For example, if `x: Foo`, go-to-type-definition on `x` jumps to `Foo`'s definition.
+    pub fn get_type_definition_at_position(&self, position: u32) -> Vec<DefinitionInfo> {
+        // Find the node at this position
+        let Some(node_idx) = self.checker.get_node_at_position(self.root, position) else {
+            return Vec::new();
+        };
+
+        // Get the symbol at this node
+        let Some(symbol_id) = self.checker.get_symbol_at_location(node_idx) else {
+            return Vec::new();
+        };
+
+        // Get the type of this symbol
+        let Some(type_id) = self.checker.get_cached_type_of_symbol(symbol_id) else {
+            return Vec::new();
+        };
+
+        // Get the type's symbol (if it has one)
+        let Some(type_symbol) = self.checker.get_symbol_of_type(type_id) else {
+            return Vec::new();
+        };
+
+        // Return definition locations for the type symbol
+        let declarations = self.checker.get_symbol_declarations(type_symbol);
+        let symbol_name = self.checker.get_symbol_name(type_symbol).unwrap_or_default();
+        let symbol_flags = self.checker.get_symbol_flags(type_symbol);
+
+        declarations
+            .into_iter()
+            .filter_map(|decl_idx| {
+                let (start, end) = self.checker.get_node_span(decl_idx)?;
+                let kind = self.symbol_flags_to_script_element_kind(symbol_flags);
+                Some(DefinitionInfo {
+                    file_name: self.file_name.clone(),
+                    text_span: TextSpan::from_bounds(start, end),
+                    kind,
+                    name: symbol_name.clone(),
+                    container_name: None,
+                })
+            })
+            .collect()
+    }
+
     /// Get quick info (hover) at a position.
     pub fn get_quick_info_at_position(&self, position: u32) -> Option<QuickInfo> {
         // Find the node at this position
@@ -1137,92 +1182,9 @@ impl<'a> LanguageService<'a> {
     }
 
     /// Convert a type to a display string.
+    /// Delegates to the checker's type_to_string to avoid code duplication.
     fn type_to_string(&self, type_id: TypeId) -> String {
-        if type_id.is_none() {
-            return "unknown".to_string();
-        }
-
-        let Some(ty) = self.checker.types.get(type_id) else {
-            return "unknown".to_string();
-        };
-
-        match ty {
-            Type::Intrinsic(intrinsic) => intrinsic.intrinsic_name.clone(),
-            Type::Literal(lit) => {
-                match &lit.value {
-                    crate::checker::LiteralValue::String(s) => format!("\"{}\"", s),
-                    crate::checker::LiteralValue::Number(n) => format!("{}", n),
-                    crate::checker::LiteralValue::Boolean(b) => format!("{}", b),
-                    crate::checker::LiteralValue::BigInt(s) => format!("{}n", s),
-                }
-            }
-            Type::Union(u) => {
-                let parts: Vec<String> = u.types.iter()
-                    .map(|t| self.type_to_string(*t))
-                    .collect();
-                parts.join(" | ")
-            }
-            Type::Intersection(i) => {
-                let parts: Vec<String> = i.types.iter()
-                    .map(|t| self.type_to_string(*t))
-                    .collect();
-                parts.join(" & ")
-            }
-            Type::Object(obj) => {
-                if obj.members.is_empty() {
-                    "{}".to_string()
-                } else {
-                    // Object members is a SymbolTable, not a simple HashMap of types
-                    // For now, just show the number of members
-                    format!("{{ {} member(s) }}", obj.members.len())
-                }
-            }
-            Type::Function(func) => {
-                // FunctionType has parameter_types and parameter_names
-                let params: Vec<String> = func.parameter_names.iter()
-                    .zip(func.parameter_types.iter())
-                    .map(|(name, type_id)| format!("{}: {}", name, self.type_to_string(*type_id)))
-                    .collect();
-                format!("({}) => {}", params.join(", "), self.type_to_string(func.return_type))
-            }
-            Type::Array(arr) => {
-                format!("{}[]", self.type_to_string(arr.element_type))
-            }
-            Type::Tuple(tup) => {
-                let elements: Vec<String> = tup.element_types.iter()
-                    .map(|t| self.type_to_string(*t))
-                    .collect();
-                format!("[{}]", elements.join(", "))
-            }
-            Type::TypeParameter(tp) => {
-                // TypeParameter uses symbol, not name directly
-                // Get name from the symbol if possible
-                if let Some(sym_name) = self.checker.get_symbol_name(tp.symbol) {
-                    sym_name
-                } else {
-                    "T".to_string()
-                }
-            }
-            Type::TypeReference(tr) => {
-                // Get the symbol name for the target type
-                let name = if let Some(sym_name) = self.checker.get_symbol_name(tr.symbol) {
-                    sym_name
-                } else {
-                    // Fall back to the target type name
-                    "Type".to_string()
-                };
-
-                if tr.type_arguments.is_empty() {
-                    name
-                } else {
-                    let args: Vec<String> = tr.type_arguments.iter()
-                        .map(|t| self.type_to_string(*t))
-                        .collect();
-                    format!("{}<{}>", name, args.join(", "))
-                }
-            }
-            _ => "unknown".to_string(),
-        }
+        self.checker.type_to_string(type_id)
     }
 
     /// Get the text of an identifier node.
