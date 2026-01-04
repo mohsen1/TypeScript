@@ -53,12 +53,17 @@ Current `Node` enum is sized to largest variant (~208 bytes). This destroys cach
 - [x] NodeArena implements NodeAccess
 - 596 tests passing
 
+### ThinParserState (In Progress)
+- [x] Created ThinParserState using ThinNodeArena
+- [x] Core parse methods: expressions, statements, functions, classes
+- [x] 12 passing tests (expressions, functions, if/while/for, objects, arrays)
+- [ ] Complete remaining parse methods (classes, interfaces, types, JSX)
+- [ ] Benchmark: compare ThinParser vs Parser performance
+
 ### Next Steps
-- [ ] Migrate parser to output ThinNodeArena
 - [ ] Update binder to use NodeAccess trait
 - [ ] Update checker to use NodeAccess trait
 - [ ] Update emitter to use NodeAccess trait
-- [ ] Benchmark: compare ThinNodeArena vs NodeArena parsing performance
 
 ### Architecture (wasm/src/parser/thin_node.rs)
 ```rust
