@@ -9,7 +9,12 @@
 //! - for-await-of → async iteration protocol
 
 use super::{TransformContext, Transformer, HelpersNeeded};
-use crate::parser::{Node, NodeIndex};
+use crate::parser::{Node, NodeIndex, NodeBase, NodeList, syntax_kind_ext};
+use crate::parser::ast::{
+    Identifier, CallExpression, FunctionExpression, Block, ReturnStatement,
+    YieldExpression,
+};
+use crate::scanner::SyntaxKind;
 
 /// Async/generator transformation state
 pub struct AsyncTransformer {
@@ -160,11 +165,128 @@ impl AsyncTransformer {
     /// In async context: `await x` → `yield x`
     pub fn transform_await_expression(
         &mut self,
-        _node_idx: NodeIndex,
-        _ctx: &mut TransformContext,
+        node_idx: NodeIndex,
+        ctx: &mut TransformContext,
     ) -> Option<NodeIndex> {
-        // Transform await to yield inside the generator wrapper
-        None
+        // Get the await expression
+        let await_expr = match ctx.arena.get(node_idx) {
+            Some(Node::AwaitExpression(expr)) => expr.clone(),
+            _ => return None,
+        };
+
+        // Transform await to yield
+        // await x → yield x
+        let yield_expr = YieldExpression {
+            base: NodeBase::new_ext(syntax_kind_ext::YIELD_EXPRESSION, 0, 0),
+            asterisk_token: false,
+            expression: await_expr.expression,
+        };
+        Some(ctx.arena.add(Node::YieldExpression(yield_expr)))
+    }
+
+    /// Create an identifier node
+    fn create_identifier(name: &str, ctx: &mut TransformContext) -> NodeIndex {
+        let id = Identifier {
+            base: NodeBase::new(SyntaxKind::Identifier, 0, 0),
+            escaped_text: name.to_string(),
+            original_text: None,
+            type_arguments: None,
+        };
+        ctx.arena.add(Node::Identifier(id))
+    }
+
+    /// Create a void 0 expression (for undefined)
+    fn create_void_0(&self, ctx: &mut TransformContext) -> NodeIndex {
+        use crate::parser::ast::PrefixUnaryExpression;
+        use crate::parser::ast::NumericLiteral;
+
+        // Create the numeric literal 0
+        let zero = NumericLiteral {
+            base: NodeBase::new(SyntaxKind::NumericLiteral, 0, 0),
+            text: "0".to_string(),
+            value: 0.0,
+        };
+        let zero_idx = ctx.arena.add(Node::NumericLiteral(zero));
+
+        // Create void 0 using PrefixUnaryExpression with VoidKeyword
+        let void_expr = PrefixUnaryExpression {
+            base: NodeBase::new_ext(syntax_kind_ext::PREFIX_UNARY_EXPRESSION, 0, 0),
+            operator: SyntaxKind::VoidKeyword,
+            operand: zero_idx,
+        };
+        ctx.arena.add(Node::PrefixUnaryExpression(void_expr))
+    }
+
+    /// Create a generator function expression for __awaiter
+    fn create_generator_wrapper(
+        &self,
+        body_idx: NodeIndex,
+        ctx: &mut TransformContext,
+    ) -> NodeIndex {
+        // Create function* () { body }
+        let params = NodeList::new();
+
+        let func_expr = FunctionExpression {
+            base: NodeBase::new_ext(syntax_kind_ext::FUNCTION_EXPRESSION, 0, 0),
+            modifiers: None,
+            asterisk_token: true,  // This is a generator
+            name: NodeIndex::NONE,
+            type_parameters: None,
+            parameters: params,
+            type_annotation: NodeIndex::NONE,
+            body: body_idx,
+        };
+        ctx.arena.add(Node::FunctionExpression(func_expr))
+    }
+
+    /// Create __awaiter(this, void 0, void 0, function* () { body }) call
+    fn create_awaiter_call(
+        &self,
+        body_idx: NodeIndex,
+        ctx: &mut TransformContext,
+    ) -> NodeIndex {
+        // Create __awaiter identifier
+        let awaiter_id = Self::create_identifier("__awaiter", ctx);
+
+        // Create 'this' reference
+        let this_id = ctx.arena.add(Node::Token(NodeBase::new(SyntaxKind::ThisKeyword, 0, 0)));
+
+        // Create void 0 (undefined)
+        let void_0_1 = self.create_void_0(ctx);
+        let void_0_2 = self.create_void_0(ctx);
+
+        // Create generator wrapper
+        let generator_func = self.create_generator_wrapper(body_idx, ctx);
+
+        // Create call: __awaiter(this, void 0, void 0, function* () { body })
+        let mut args = NodeList::new();
+        args.push(this_id);
+        args.push(void_0_1);
+        args.push(void_0_2);
+        args.push(generator_func);
+
+        let call_expr = CallExpression {
+            base: NodeBase::new_ext(syntax_kind_ext::CALL_EXPRESSION, 0, 0),
+            expression: awaiter_id,
+            type_arguments: None,
+            arguments: args,
+        };
+        ctx.arena.add(Node::CallExpression(call_expr))
+    }
+
+    /// Create a return statement with the __awaiter call
+    fn create_awaiter_return(
+        &self,
+        body_idx: NodeIndex,
+        ctx: &mut TransformContext,
+    ) -> NodeIndex {
+        let awaiter_call = self.create_awaiter_call(body_idx, ctx);
+
+        let return_stmt = ReturnStatement {
+            base: NodeBase::new_ext(syntax_kind_ext::RETURN_STATEMENT, 0, 0),
+            expression: awaiter_call,
+        };
+        ctx.arena.add(Node::ReturnStatement(return_stmt))
     }
 
     /// Transform yield expression
@@ -379,6 +501,71 @@ mod tests {
             ScriptTarget::ES5,
         );
         assert!(helpers.async_values);
+    }
+
+    #[test]
+    fn test_await_to_yield_transform() {
+        use crate::parser::{Node, NodeBase, NodeList, syntax_kind_ext};
+        use crate::parser::ast::{AwaitExpression, Identifier};
+        use crate::scanner::SyntaxKind;
+        use super::AsyncTransformer;
+        use super::super::TransformContext;
+
+        let mut parser = ParserState::new("test.ts".to_string(), "".to_string());
+        let _source_file = parser.parse_source_file();
+        let mut arena = parser.arena;
+
+        // Manually create an await expression for testing
+        let bar_id = Identifier {
+            base: NodeBase::new(SyntaxKind::Identifier, 0, 3),
+            escaped_text: "bar".to_string(),
+            original_text: None,
+            type_arguments: None,
+        };
+        let bar_idx = arena.add(Node::Identifier(bar_id));
+
+        let await_expr = AwaitExpression {
+            base: NodeBase::new_ext(syntax_kind_ext::AWAIT_EXPRESSION, 0, 10),
+            expression: bar_idx,
+        };
+        let await_idx = arena.add(Node::AwaitExpression(await_expr));
+
+        // Now transform
+        let mut ctx = TransformContext::new(ScriptTarget::ES5, &mut arena);
+        let mut transformer = AsyncTransformer::new();
+        let result = transformer.transform_await_expression(await_idx, &mut ctx);
+
+        // Verify transformation produced a yield expression
+        assert!(result.is_some(), "Await transform should produce a result");
+        let result_idx = result.unwrap();
+        assert!(matches!(ctx.arena.get(result_idx), Some(Node::YieldExpression(_))),
+            "Await should be transformed to yield");
+    }
+
+    #[test]
+    fn test_awaiter_helper_creation() {
+        use super::AsyncTransformer;
+        use super::super::TransformContext;
+        use crate::parser::Node;
+
+        let mut parser = ParserState::new("test.ts".to_string(), "{}".to_string());
+        let source_file = parser.parse_source_file();
+        let mut arena = parser.arena;
+
+        let mut ctx = TransformContext::new(ScriptTarget::ES5, &mut arena);
+        let transformer = AsyncTransformer::new();
+
+        // Get the block from source file
+        if let Some(Node::SourceFile(sf)) = ctx.arena.get(source_file) {
+            if let Some(&block_idx) = sf.statements.nodes.first() {
+                // Create awaiter call
+                let awaiter_return = transformer.create_awaiter_return(block_idx, &mut ctx);
+
+                // Verify it's a return statement
+                assert!(matches!(ctx.arena.get(awaiter_return), Some(Node::ReturnStatement(_))),
+                    "Should create a return statement");
+            }
+        }
     }
 
     // Note: async arrow test would require more complex modifier parsing
