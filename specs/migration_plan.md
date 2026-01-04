@@ -13,6 +13,7 @@ compiler remains fully functional at every step.
 2. **Iterate in Small Slices** – One function, one module at a time.
 3. **Test Before & After** – Existing test suite is the source of truth.
 4. **Performance First** – we are building for performance
+5. **Use Gemini** - for code reviews
 
 ---
 
@@ -60,13 +61,19 @@ Current `Node` enum is sized to largest variant (~208 bytes). This destroys cach
 - [x] Interface declarations with property/method signatures and index signatures
 - [x] Type alias declarations with type keyword support
 - [x] Arrow function parsing with expression and block bodies
-- [x] 25 passing tests (expressions, functions, if/while/for, objects, arrays, classes, interfaces, types, arrow functions)
+- [x] Async function declarations (`async function foo() { ... }`)
+- [x] Async arrow functions (`async () => ...`, `async x => ...`)
+- [x] Generator functions with asterisk token (`function* gen() { ... }`)
+- [x] Yield expressions (`yield`, `yield value`, `yield* generator`)
+- [x] Await expressions (`await promise`)
+- [x] 63 passing tests (expressions, functions, if/while/for, objects, arrays, classes, interfaces, types, arrow functions, async, generators, union/intersection, tuples, generics, function types, literal types, typeof, generic arrows)
 - [x] Benchmark: compare ThinParser vs Parser performance
   - Regular Parser: 10.9 µs, 20.9 MiB/s (small source)
   - ThinParser: 11.5 µs, 19.7 MiB/s (small source)
   - ThinParser scales better with larger files: 42→52 MiB/s throughput
   - Memory savings: 13x (16 bytes vs 208 bytes per node)
-- [ ] Complete remaining parse methods (JSX, async/await)
+- [x] Generic arrow functions with type parameters (`<T>(x: T) => x`)
+- [ ] Complete remaining parse methods (JSX, mapped types, conditional types)
 
 ### Next Steps
 - [ ] Update binder to use NodeAccess trait
@@ -224,12 +231,98 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
 **Total Rust Code**: ~44,000 lines
-**Total Tests**: 634 passing
+**Total Tests**: 698 passing
 **Overall Progress**: ~88% of full compiler functionality
 
 ---
 
 # MILESTONES
+
+## 2026-01-04: ThinParser Template Literal Types (Session 13)
+- Added template literal type parsing (`` `hello` ``, `` `prefix${T}suffix` ``)
+- Supports simple templates with no substitutions
+- Supports templates with type substitutions and intrinsic types (Uppercase, etc.)
+- Uses scanner's `re_scan_template_token()` for template continuation
+- 5 new tests for template literal types
+- 698 tests passing
+
+## 2026-01-04: ThinParser Mapped Types (Session 12)
+- Added mapped type parsing (`{ [K in keyof T]: U }`)
+- Added object type literal parsing (`{ prop: T; method(): U }`)
+- Supports readonly modifier, optional modifier (-?), and key remapping (as clause)
+- 6 new tests for mapped types and type literals
+- 693 tests passing
+
+## 2026-01-04: ThinParser Conditional Types (Session 11)
+- Added conditional type parsing (`T extends U ? X : Y`)
+- Added infer type parsing (`infer R`) for use in conditional types
+- Added type parameters to type alias declarations (`type Foo<T> = ...`)
+- Supports nested conditional types and distributive conditionals
+- 5 new tests for conditional and infer types
+- 687 tests passing
+
+## 2026-01-04: ThinParser Indexed Access Types (Session 10)
+- Added indexed access type parsing (`T[K]`, `T["prop"]`, `T[keyof T]`)
+- Supports chained access (`T[K1][K2]`) and mixed with array (`T[K][]`)
+- Modified `parse_array_type` to distinguish `T[]` from `T[K]`
+- 5 new tests for indexed access types
+- 682 tests passing
+
+## 2026-01-04: ThinParser Type Operators (Session 9)
+- Added keyof type parsing (`keyof T`, `keyof typeof obj`)
+- Added readonly type parsing (`readonly T[]`, `readonly [T, U]`)
+- Type operators work in unions and intersections
+- 5 new tests for keyof and readonly types
+- 677 tests passing
+
+## 2026-01-04: ThinParser Generic Arrow Functions (Session 8)
+- Added generic arrow function parsing (`<T>(x: T) => x`)
+- Added type parameter parsing with constraints (`<T extends Foo>`) and defaults (`<T = Default>`)
+- Added lookahead to detect generic arrow functions (`<T>(...) =>`)
+- Support for async generic arrow functions (`async <T>(...) => ...`)
+- 7 new tests for generic arrow functions
+- 672 tests passing
+
+## 2026-01-04: ThinParser Literal and Typeof Types (Session 7)
+- Added literal type parsing (`"foo"`, `42`, `true`, `false`)
+- Added typeof type parsing (`typeof x`, `typeof x.y.z`)
+- Added entity name parsing for qualified typeof expressions
+- 5 new tests for literal and typeof types
+- 665 tests passing
+
+## 2026-01-04: ThinParser Function Types (Session 6)
+- Added function type parsing (`(x: T) => U`)
+- Added lookahead to distinguish function types from parenthesized types
+- Support for optional params (`x?:`), rest params (`...args:`), void return
+- 6 new tests for function types
+- 660 tests passing
+
+## 2026-01-04: ThinParser Tuple and Generic Types (Session 5)
+- Added tuple type parsing (`[T, U, V]`)
+- Added tuple arrays (`[T, U][]`)
+- Added type arguments/generics (`Array<T>`, `Map<K, V>`)
+- Added nested generics (`Map<string, Array<number>>`)
+- 7 new tests for tuples and generics
+- 654 tests passing
+
+## 2026-01-04: ThinParser Union/Intersection Types (Session 4)
+- Added union type parsing (`A | B | C`)
+- Added intersection type parsing (`A & B & C`)
+- Added array type parsing (`T[]`, `T[][]`)
+- Added parenthesized type parsing with array suffix (`(A | B)[]`)
+- Intersection binds tighter than union (correct precedence)
+- 6 new tests for union, intersection, array, and mixed types
+- 647 tests passing
+
+## 2026-01-04: ThinParser Async/Await Support (Session 3)
+- Added async function declarations (`async function foo() { ... }`)
+- Added async arrow functions (`async () => ...`, `async x => ...`)
+- Added generator function support with asterisk token
+- Added yield expressions (`yield`, `yield value`, `yield* gen()`)
+- Added `is_async` field to `FunctionData` struct
+- Added lookahead methods for async function and async arrow detection
+- 7 new tests for async functions, async arrows, generators, yield, await
+- 641 tests passing
 
 ## 2026-01-04: ThinParser Complete (Session 2)
 - Added interface parsing with property/method signatures and index signatures
@@ -242,18 +335,27 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 - 634 tests passing
 
 ### ThinParser Capabilities
-- Expressions: binary, unary, conditional, call, property access, array, object
+- Expressions: binary, unary, conditional, call, property access, array, object, await, yield
 - Statements: if/else, while, for, variable declarations, return, block
-- Declarations: function, class (with heritage), interface, type alias
-- Types: type references, type keywords (string, number, boolean, etc.)
-- Arrow functions: `x => expr`, `(a, b) => expr`, `() => { ... }`
+- Declarations: function (sync/async/generator), class (with heritage), interface, type alias (with type params)
+- Types: type references, type keywords, union (`A | B`), intersection (`A & B`), array (`T[]`), tuple (`[T, U]`), generics (`Foo<T>`), function types (`(x: T) => U`), literal types (`"foo"`, `42`), typeof (`typeof x`), keyof (`keyof T`), readonly (`readonly T[]`), indexed access (`T[K]`), conditional (`T extends U ? X : Y`), infer (`infer R`), mapped types (`{ [K in T]: U }`), object type literals (`{ x: T }`), template literal types (`` `prefix${T}suffix` ``)
+- Arrow functions: `x => expr`, `(a, b) => expr`, `() => { ... }`, `async () => ...`, `<T>(x: T) => x`
+- Generators: `function* gen()`, `yield value`, `yield* gen()`
 
 ### Remaining ThinParser Work
 - [ ] JSX parsing
-- [ ] Async/await
-- [ ] Generics in arrow functions
-- [ ] Union/intersection types
-- [ ] Mapped types, conditional types
+- [x] Template literal types (completed Session 13)
+- [x] Async/await (completed Session 3)
+- [x] Mapped types (completed Session 12)
+- [x] Generics in arrow functions (completed Session 8)
+- [x] Union/intersection types (completed Session 4)
+- [x] Conditional types (completed Session 11)
+- [x] Tuple types (completed Session 5)
+- [x] Generic type arguments (completed Session 5)
+- [x] Function type literals (completed Session 6)
+- [x] Literal types and typeof (completed Session 7)
+- [x] keyof and readonly types (completed Session 9)
+- [x] Indexed access types (completed Session 10)
 
 ### Gemini Review Findings (Session 2)
 These issues were identified by Gemini but NOT yet fixed:
