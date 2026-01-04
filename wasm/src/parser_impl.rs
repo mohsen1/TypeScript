@@ -3088,6 +3088,7 @@ impl ParserState {
             SyntaxKind::TrueKeyword | SyntaxKind::FalseKeyword => self.parse_boolean_literal(),
             SyntaxKind::NullKeyword => self.parse_null_literal(),
             SyntaxKind::ThisKeyword => self.parse_this_expression(),
+            SyntaxKind::SuperKeyword => self.parse_super_expression(),
             SyntaxKind::NewKeyword => self.parse_new_expression(),
             SyntaxKind::FunctionKeyword => self.parse_function_expression(),
             SyntaxKind::LessThanToken => {
@@ -3492,6 +3493,16 @@ impl ParserState {
         let end = self.get_token_start();
 
         let base = NodeBase::new(SyntaxKind::ThisKeyword, pos, end);
+        self.alloc_node(Node::Token(base))
+    }
+
+    /// Parse a super expression.
+    fn parse_super_expression(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.next_token();
+        let end = self.get_token_start();
+
+        let base = NodeBase::new(SyntaxKind::SuperKeyword, pos, end);
         self.alloc_node(Node::Token(base))
     }
 

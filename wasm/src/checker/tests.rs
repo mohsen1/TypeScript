@@ -7878,7 +7878,6 @@ fn test_class_inheritance_simple() {
 }
 
 #[test]
-#[ignore = "TODO: Fix super.method() infinite recursion when processing class types"]
 fn test_super_method_call() {
     // Test that 'super.method()' works correctly in derived classes
     use crate::parser_impl::ParserState;
