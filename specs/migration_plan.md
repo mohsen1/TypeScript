@@ -80,7 +80,18 @@ Since we're going ThinNode-only (no backwards compatibility with old Node enum n
 
 - [x] Add accessor methods to ThinNodeArena for all node types (Session 15)
   - Added 20+ accessor methods: get_variable, get_variable_declaration, get_interface, get_type_alias, get_enum, get_enum_member, get_module, get_if_statement, get_loop, get_for_in_of, get_switch, get_case_clause, get_try, get_catch_clause, get_import_decl, get_import_clause, get_named_imports, get_specifier, get_export_decl, get_parameter, get_property_decl, get_method_decl, get_constructor
-- [ ] Migrate binder to use ThinNodeArena directly
+- [x] Add enum parsing to ThinParser (Session 16)
+  - Added parse_enum_declaration and parse_enum_members methods
+  - Enum declarations now bound properly by ThinBinder
+- [x] ThinBinder implementation (Session 15-16) - Created thin_binder.rs
+  - ~650 lines implementing symbol creation for all declaration types
+  - Uses ThinNodeArena directly (no old Node enum)
+  - Binds: variables, functions, classes, interfaces, type aliases, enums
+  - Handles scope management: block scopes, function scopes
+  - Tracks hoisted variables and functions
+  - Flow control for control flow analysis
+  - 6 tests passing for core binding scenarios
+  - 712 tests total passing
 - [ ] Migrate checker to use ThinNodeArena directly
 - [ ] Migrate emitter to use ThinNodeArena directly
 - [ ] Remove old Node enum and NodeArena

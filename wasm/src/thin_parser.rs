@@ -22,6 +22,7 @@ use crate::parser::{
         ExprStatementData, IfStatementData, LoopData, FunctionData, ClassData,
         SourceFileData, VariableData, VariableDeclarationData, ForInOfData,
         SwitchData, CaseClauseData, TryData, CatchClauseData,
+        EnumData, EnumMemberData,
     },
     syntax_kind_ext,
 };
@@ -286,6 +287,7 @@ impl ThinParserState {
             SyntaxKind::ClassKeyword => self.parse_class_declaration(),
             SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
             SyntaxKind::TypeKeyword => self.parse_type_alias_declaration(),
+            SyntaxKind::EnumKeyword => self.parse_enum_declaration(),
             SyntaxKind::IfKeyword => self.parse_if_statement(),
             SyntaxKind::ReturnKeyword => self.parse_return_statement(),
             SyntaxKind::WhileKeyword => self.parse_while_statement(),
@@ -985,6 +987,63 @@ impl ThinParserState {
                 type_node,
             },
         )
+    }
+
+    /// Parse enum declaration
+    fn parse_enum_declaration(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::EnumKeyword);
+
+        let name = self.parse_identifier();
+
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+
+        let members = self.parse_enum_members();
+
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end_pos = self.token_end();
+        self.arena.add_enum(
+            syntax_kind_ext::ENUM_DECLARATION,
+            start_pos,
+            end_pos,
+            EnumData {
+                modifiers: None,
+                name,
+                members,
+            },
+        )
+    }
+
+    /// Parse enum members
+    fn parse_enum_members(&mut self) -> NodeList {
+        let mut members = Vec::new();
+
+        while !self.is_token(SyntaxKind::CloseBraceToken) && !self.is_token(SyntaxKind::EndOfFileToken) {
+            let start_pos = self.token_pos();
+            let name = self.parse_identifier();
+
+            let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
+                self.parse_assignment_expression()
+            } else {
+                NodeIndex::NONE
+            };
+
+            let end_pos = self.token_end();
+            let member = self.arena.add_enum_member(
+                syntax_kind_ext::ENUM_MEMBER,
+                start_pos,
+                end_pos,
+                EnumMemberData { name, initializer },
+            );
+            members.push(member);
+
+            if !self.parse_optional(SyntaxKind::CommaToken) {
+                break;
+            }
+        }
+
+        self.make_node_list(members)
     }
 
     /// Parse if statement

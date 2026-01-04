@@ -27,6 +27,9 @@ pub mod thin_parser;
 // Binder types and implementation (Phase 4)
 pub mod binder;
 
+// ThinBinder - Binder using ThinNodeArena (Phase 0.1)
+pub mod thin_binder;
+
 // Checker types and implementation (Phase 5)
 pub mod checker;
 
