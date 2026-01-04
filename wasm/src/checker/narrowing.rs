@@ -174,6 +174,82 @@ impl<'a> CheckerState<'a> {
         self.get_type_with_facts(type_id, false, false)
     }
 
+    /// Narrow a type to only falsy types.
+    /// In TypeScript, falsy types are: false, 0, "", null, undefined, 0n.
+    /// For non-primitive types (objects, arrays, functions), they cannot be falsy
+    /// so the result is narrowed to null | undefined if present in the original type.
+    pub fn get_falsy_type(&mut self, type_id: TypeId) -> TypeId {
+        let Some(typ) = self.types.get(type_id) else {
+            return type_id;
+        };
+
+        // For union types, extract only falsy constituents
+        if let Type::Union(u) = typ {
+            let types = u.types.clone();
+            let falsy_types: Vec<TypeId> = types
+                .iter()
+                .filter(|&&t| self.is_type_falsy(t))
+                .copied()
+                .collect();
+
+            if falsy_types.is_empty() {
+                return self.types.never_type;
+            } else if falsy_types.len() == 1 {
+                return falsy_types[0];
+            } else {
+                return self.types.create_union_type(falsy_types);
+            }
+        }
+
+        // For single types, check if falsy
+        if self.is_type_falsy(type_id) {
+            type_id
+        } else {
+            self.types.never_type
+        }
+    }
+
+    /// Check if a type can be falsy.
+    /// Returns true for: null, undefined, false, 0, "", 0n, void
+    /// For string/number/boolean/bigint base types, they could be falsy,
+    /// but literal types are checked specifically.
+    fn is_type_falsy(&self, type_id: TypeId) -> bool {
+        let Some(typ) = self.types.get(type_id) else {
+            return false;
+        };
+
+        let flags = typ.flags();
+
+        // null and undefined are always falsy
+        if (flags & type_flags::NULL) != 0 || (flags & type_flags::UNDEFINED) != 0 || (flags & type_flags::VOID) != 0 {
+            return true;
+        }
+
+        // Check literal types
+        if let Type::Literal(lit) = typ {
+            match &lit.value {
+                LiteralValue::Boolean(b) => return !b, // false is falsy
+                LiteralValue::String(s) => return s.is_empty(), // "" is falsy
+                LiteralValue::Number(n) => return *n == 0.0, // 0 is falsy
+                LiteralValue::BigInt(s) => return s == "0" || s == "0n", // 0n is falsy
+            }
+        }
+
+        // For non-literal primitives, they could potentially be falsy
+        // (e.g., a string variable could be ""), but TypeScript doesn't narrow to never
+        // However, objects/functions/arrays are always truthy
+        if (flags & type_flags::OBJECT) != 0 {
+            return false; // Objects are always truthy
+        }
+
+        // Non-literal primitives could be falsy
+        if (flags & (type_flags::STRING | type_flags::NUMBER | type_flags::BOOLEAN | type_flags::BIG_INT)) != 0 {
+            return true; // Could be falsy (empty string, 0, false, 0n)
+        }
+
+        false
+    }
+
     /// Get the awaited type of a Promise-like type.
     /// Recursively unwraps Promise<T> to get T.
     /// For non-Promise types, returns the type unchanged.
@@ -1020,8 +1096,8 @@ impl<'a> CheckerState<'a> {
                     // Remove null and undefined for truthy check
                     self.get_non_nullable_type(type_id)
                 } else {
-                    // For falsy, keep only null/undefined (if present in union)
-                    type_id // TODO: Implement proper falsy narrowing
+                    // For falsy, keep only falsy types (null, undefined, false, 0, "", 0n)
+                    self.get_falsy_type(type_id)
                 }
             }
             TypeGuard::Discriminant { property_name, discriminant_value, is_equality, .. } => {

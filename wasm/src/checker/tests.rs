@@ -10712,3 +10712,109 @@ fn test_array_with_contextual_type() {
     assert!(checker.diagnostics.is_empty(),
         "Expected no errors for array literal with number[] type, got: {:?}", checker.diagnostics);
 }
+
+#[test]
+fn test_falsy_narrowing_null_undefined() {
+    // Test falsy narrowing for union with null/undefined
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        function test(x: string | null | undefined) {
+            if (!x) {
+                // x should be narrowed to null | undefined here
+                let y = x;
+            }
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have no errors
+    assert!(checker.diagnostics.is_empty(),
+        "Expected no errors for falsy narrowing, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_falsy_narrowing_object_type() {
+    // Test falsy narrowing - objects are always truthy, so falsy branch narrows to null
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        interface Person { name: string; }
+        function test(x: Person | null) {
+            if (!x) {
+                // x should be narrowed to null here (objects are truthy)
+                let y = x;
+            }
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have no errors
+    assert!(checker.diagnostics.is_empty(),
+        "Expected no errors for object falsy narrowing, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_falsy_narrowing_boolean_literal() {
+    // Test falsy narrowing with boolean literal types
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        function test(x: true | false | null) {
+            if (!x) {
+                // x should be narrowed to false | null here
+                let y = x;
+            }
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have no errors
+    assert!(checker.diagnostics.is_empty(),
+        "Expected no errors for boolean literal falsy narrowing, got: {:?}", checker.diagnostics);
+}
