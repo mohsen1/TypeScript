@@ -405,8 +405,8 @@ diagnostics. This is ~50% of the compiler complexity.
 Strategy: Migrate in layers, starting with primitive type operations and
 building up to full inference.
 
-**Current Stats**: ~7,500 lines of checker code (excluding 8,000+ lines of tests)
-**Tests**: 367+ checker tests passing
+**Current Stats**: ~7,600 lines of checker code (excluding 8,700+ lines of tests)
+**Tests**: 414 checker tests passing, 9 skipped
 
 5.1 Type Representation (COMPLETE)
 ----------------------------------
@@ -509,20 +509,20 @@ building up to full inference.
 
 5.8 Remaining Work
 ------------------
-- [ ] Fix memory issue with method call type inference (Array.every, super.method)
-      Known issue: Some method call patterns cause memory explosion (>1GB)
-      Root cause: Complex type inference during callback/method resolution
-      Affected: Array prototype methods with callbacks, super.method() calls
+- [x] Fix memory issue with class member parsing (DONE - was missing modifier parsing in parser)
+      Root cause: Parser wasn't consuming public/private/static/etc. modifiers,
+      causing tokens to be misinterpreted and leading to infinite loops.
+      Fixed by adding parse_class_element_modifiers() in parser_impl.rs.
 - [x] Improve `this` type in class methods (DONE - get_this_type())
 - [x] Improve `super` type in class methods (DONE - get_super_type())
 - [x] Complete async/await type inference (DONE - wired get_awaited_type to await expressions)
 - [x] Add exhaustiveness checking for switch (DONE - check_switch_exhaustiveness in narrowing.rs)
-- [ ] Add assertion function support
+- [ ] Add assertion function support (asserts x is T)
 - [ ] Integrate with TypeScript's checker for full test suite
 
-Verification Gate: 389 Rust tests passing. Full baseline matching pending.
+Verification Gate: 414 Rust tests passing, 9 skipped. Full baseline matching pending.
 
-Progress: **Phase 5 ~75% complete! Core type checking working. 389 tests passing (9 skipped).**
+Progress: **Phase 5 ~80% complete! Core type checking working. 414 tests passing (9 skipped).**
 
 ==============================================================================
 PHASE 6: EMITTER
