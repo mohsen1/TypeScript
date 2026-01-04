@@ -258,11 +258,11 @@ impl Printer {
     }
 
     // =========================================================================
-    // Output helpers
+    // Output helpers (pub(crate) for declaration_emitter access)
     // =========================================================================
 
     /// Write a string to the output.
-    fn write(&mut self, s: &str) {
+    pub(crate) fn write(&mut self, s: &str) {
         if self.at_line_start && !s.is_empty() {
             self.write_indent();
             self.at_line_start = false;
@@ -288,7 +288,7 @@ impl Printer {
     }
 
     /// Write a new line.
-    fn write_line(&mut self) {
+    pub(crate) fn write_line(&mut self) {
         self.output.push_str(&self.new_line);
         self.at_line_start = true;
         self.output_line += 1;
@@ -308,12 +308,12 @@ impl Printer {
     }
 
     /// Increase indentation.
-    fn increase_indent(&mut self) {
+    pub(crate) fn increase_indent(&mut self) {
         self.indent_level += 1;
     }
 
     /// Decrease indentation.
-    fn decrease_indent(&mut self) {
+    pub(crate) fn decrease_indent(&mut self) {
         if self.indent_level > 0 {
             self.indent_level -= 1;
         }
