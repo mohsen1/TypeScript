@@ -402,7 +402,16 @@ This is the ultimate validation milestone. The TypeScript test suite contains th
 - [x] Created test runner script: `scripts/test-rust-compiler.mjs`
   - Reads test file and displays source
   - Checks for baseline files (.js, .types, .errors.txt)
-- [ ] Build WASM and integrate with test runner
+- [x] WASM integration with test runner
+  - Loads WASM module and runs parse/bind/check
+  - Shows timing for each phase
+  - Displays node count, symbol count, type count
+  - Shows parse errors and type errors
+- [x] First successful run: `tests/cases/compiler/2dArrays.ts`
+  - Parse: 1.82ms, 41 nodes, 0 errors
+  - Bind: 0.48ms, 1 symbol
+  - Check: 2.12ms, 24 types
+  - Total: 4.79ms
 - [ ] Compare output against TypeScript baseline files
 - [ ] Measure and track compilation times vs TypeScript-Go
 - [ ] Track pass/fail rate and blockers
