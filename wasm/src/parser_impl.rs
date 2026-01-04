@@ -3679,13 +3679,43 @@ impl ParserState {
     }
 
     /// Parse a property name.
+    /// Property names can be identifiers, string literals, numeric literals,
+    /// computed expressions, or any keyword (which is treated as an identifier).
     fn parse_property_name(&mut self) -> NodeIndex {
         match self.token() {
             SyntaxKind::StringLiteral => self.parse_string_literal(),
             SyntaxKind::NumericLiteral => self.parse_numeric_literal(),
             SyntaxKind::OpenBracketToken => self.parse_computed_property_name(),
-            _ => self.parse_identifier(),
+            // Any identifier or keyword can be a property name
+            _ if self.scanner.is_identifier() || self.is_keyword() => self.parse_property_name_identifier(),
+            _ => {
+                // Error recovery: create a missing identifier
+                self.parse_error_at_current_token("Property name expected");
+                self.create_missing_identifier()
+            }
         }
+    }
+
+    /// Parse a property name that is an identifier or keyword.
+    fn parse_property_name_identifier(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let text = self.get_token_value();
+        self.next_token();
+        let end = self.get_token_start();
+
+        let id = Identifier {
+            base: NodeBase::new(SyntaxKind::Identifier, pos, end),
+            escaped_text: text,
+            original_text: None,
+            type_arguments: None,
+        };
+        self.alloc_node(Node::Identifier(id))
+    }
+
+    /// Check if current token is a keyword.
+    fn is_keyword(&self) -> bool {
+        let kind = self.token() as u16;
+        kind >= SyntaxKind::BreakKeyword as u16 && kind <= SyntaxKind::WithKeyword as u16
     }
 
     /// Parse a computed property name: [expression]
