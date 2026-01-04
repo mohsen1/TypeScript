@@ -5377,7 +5377,7 @@ const instance = new Foo();
     // - check_property_visibility() reports errors when accessing private/protected outside class
     // - enclosing_class tracking is implemented in CheckerState
     #[test]
-    #[ignore = "Full class type checking with new expressions can hit memory limits"]
+    #[ignore = "TODO: Implement private property visibility checking"]
     fn test_private_property_access_outside_class() {
         // Test: private properties should error when accessed outside class
         // class Foo { private x: number; }
@@ -5418,7 +5418,7 @@ let v = f.x;
     }
 
     #[test]
-    #[ignore = "Full class type checking with new expressions can hit memory limits"]
+    #[ignore = "TODO: Implement protected property visibility checking"]
     fn test_protected_property_access_outside_class() {
         // Test: protected properties should error when accessed outside class
         // class Foo { protected y: string; }
@@ -5463,7 +5463,6 @@ let v = f.y;
     // =========================================================================
 
     #[test]
-    #[ignore = "Full class type checking can hit memory limits in Docker"]
     fn test_abstract_method_in_non_abstract_class() {
         // Abstract method in non-abstract class should produce error
         use crate::parser_impl::ParserState;
@@ -5540,7 +5539,6 @@ abstract class Foo {
     }
 
     #[test]
-    #[ignore = "Full class type checking can hit memory limits in Docker"]
     fn test_abstract_property_in_non_abstract_class() {
         // Abstract property in non-abstract class should produce error
         use crate::parser_impl::ParserState;
@@ -5621,7 +5619,6 @@ class Foo {
     // =========================================================================
 
     #[test]
-    #[ignore = "Full class type checking can hit memory limits in Docker"]
     fn test_override_with_no_base_class() {
         // Override modifier on a class with no base class should produce error
         use crate::parser_impl::ParserState;
@@ -5660,7 +5657,6 @@ class Foo {
     }
 
     #[test]
-    #[ignore = "Full class type checking can hit memory limits in Docker"]
     fn test_override_member_not_in_base() {
         // Override modifier for member not in base class should produce error
         use crate::parser_impl::ParserState;
@@ -5702,7 +5698,7 @@ class Derived extends Base {
     }
 
     #[test]
-    #[ignore = "Full class type checking can hit memory limits in Docker"]
+    #[ignore = "TODO: Fix base class member detection for override validation"]
     fn test_override_member_in_base_allowed() {
         // Override modifier for member that exists in base class should be allowed
         use crate::parser_impl::ParserState;
@@ -9490,6 +9486,127 @@ fn test_arrow_function_with_body() {
     );
 
     assert!(binder.file_locals.has("add"), "add function should be defined");
+    checker.check_source_file(root);
+}
+
+#[test]
+fn test_new_expression_simple() {
+    // Test simple new expression
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+class Foo {
+    x: number;
+}
+let f = new Foo();
+"#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    assert!(binder.file_locals.has("Foo"), "Foo class should be defined");
+    assert!(binder.file_locals.has("f"), "f variable should be defined");
+    checker.check_source_file(root);
+}
+
+#[test]
+fn test_new_expression_with_property_access() {
+    // Test new expression with property access
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+class Foo {
+    x: number;
+}
+let f = new Foo();
+let v = f.x;
+"#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+}
+
+#[test]
+fn test_private_property_access() {
+    // Test private property access (simpler version)
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+class Foo {
+    private x: number;
+}
+let f = new Foo();
+let v = f.x;
+"#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+}
+
+#[test]
+fn test_private_property_with_initializer() {
+    // Test private property with initializer
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+class Foo {
+    private x: number = 1;
+}
+let f = new Foo();
+let v = f.x;
+"#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
     checker.check_source_file(root);
 }
 
