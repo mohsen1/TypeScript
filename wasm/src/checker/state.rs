@@ -598,6 +598,220 @@ impl<'a> CheckerState<'a> {
         serde_json::to_string(&self.diagnostics).unwrap_or_else(|_| "[]".to_string())
     }
 
+    // =========================================================================
+    // Language Service Support Methods
+    // =========================================================================
+
+    /// Get the symbol at a given node position.
+    /// Used by go-to-definition, find-references, rename, etc.
+    pub fn get_symbol_at_location(&self, node_idx: NodeIndex) -> Option<SymbolId> {
+        use crate::parser::Node;
+
+        match self.node_arena.get(node_idx) {
+            Some(Node::Identifier(id)) => {
+                // Look up in file locals (top-level declarations)
+                self.file_locals.get(&id.escaped_text)
+            }
+            Some(Node::PropertyAccessExpression(pae)) => {
+                // For property access, get the symbol of the property name
+                self.get_symbol_at_location(pae.name)
+            }
+            Some(Node::TypeReference(tr)) => {
+                // For type references, get the symbol of the type name
+                self.get_symbol_at_location(tr.type_name)
+            }
+            Some(Node::QualifiedName { right, .. }) => {
+                // For qualified names (A.B), get the symbol of the right side
+                self.get_symbol_at_location(*right)
+            }
+            Some(Node::VariableDeclaration(vd)) => {
+                // For variable declarations, get the symbol from the name
+                self.get_symbol_at_location(vd.name)
+            }
+            Some(Node::FunctionDeclaration(fd)) => {
+                if !fd.name.is_none() {
+                    self.get_symbol_at_location(fd.name)
+                } else {
+                    None
+                }
+            }
+            Some(Node::ClassDeclaration(cd)) => {
+                if !cd.name.is_none() {
+                    self.get_symbol_at_location(cd.name)
+                } else {
+                    None
+                }
+            }
+            Some(Node::InterfaceDeclaration(id)) => {
+                self.get_symbol_at_location(id.name)
+            }
+            Some(Node::TypeAliasDeclaration(tad)) => {
+                self.get_symbol_at_location(tad.name)
+            }
+            Some(Node::EnumDeclaration(ed)) => {
+                self.get_symbol_at_location(ed.name)
+            }
+            Some(Node::ParameterDeclaration(pd)) => {
+                self.get_symbol_at_location(pd.name)
+            }
+            Some(Node::PropertyDeclaration(pd)) => {
+                self.get_symbol_at_location(pd.name)
+            }
+            Some(Node::MethodDeclaration(md)) => {
+                self.get_symbol_at_location(md.name)
+            }
+            _ => None,
+        }
+    }
+
+    /// Get the type of a symbol (if cached).
+    /// Returns the declared type for the symbol from the cache.
+    pub fn get_cached_type_of_symbol(&self, symbol_id: SymbolId) -> Option<TypeId> {
+        self.symbol_types.get(&symbol_id).copied()
+    }
+
+    /// Get all declarations for a symbol.
+    /// Used for go-to-definition.
+    pub fn get_symbol_declarations(&self, symbol_id: SymbolId) -> Vec<NodeIndex> {
+        if let Some(symbol) = self.symbol_arena.get(symbol_id) {
+            symbol.declarations.clone()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get the name of a symbol.
+    pub fn get_symbol_name(&self, symbol_id: SymbolId) -> Option<String> {
+        self.symbol_arena.get(symbol_id).map(|s| s.escaped_name.clone())
+    }
+
+    /// Get the flags of a symbol.
+    pub fn get_symbol_flags(&self, symbol_id: SymbolId) -> u32 {
+        self.symbol_arena.get(symbol_id)
+            .map(|s| s.flags)
+            .unwrap_or(0)
+    }
+
+    /// Get all symbols in the file's local scope.
+    /// Used for completions at global/module level.
+    pub fn get_file_symbols(&self) -> impl Iterator<Item = (&String, &SymbolId)> {
+        self.file_locals.iter()
+    }
+
+    /// Get the position (start, end) of a node.
+    pub fn get_node_span(&self, node_idx: NodeIndex) -> Option<(u32, u32)> {
+        self.node_arena.get(node_idx).map(|n| {
+            let base = n.base();
+            (base.pos, base.end)
+        })
+    }
+
+    /// Get the kind of a node.
+    pub fn get_node_kind(&self, node_idx: NodeIndex) -> Option<crate::scanner::SyntaxKind> {
+        self.node_arena.get(node_idx).map(|n| {
+            // Convert the u16 kind to SyntaxKind
+            unsafe { std::mem::transmute(n.base().kind) }
+        })
+    }
+
+    /// Find the innermost node at a given position.
+    /// Used by language service to find what the user is hovering over.
+    /// The root_idx should be the source file node.
+    pub fn get_node_at_position(&self, root_idx: NodeIndex, position: u32) -> Option<NodeIndex> {
+        self.find_node_at_position_recursive(root_idx, position)
+    }
+
+    fn find_node_at_position_recursive(&self, node_idx: NodeIndex, position: u32) -> Option<NodeIndex> {
+        let node = self.node_arena.get(node_idx)?;
+        let base = node.base();
+
+        // Check if position is within this node
+        if position < base.pos || position >= base.end {
+            return None;
+        }
+
+        // Try to find a more specific child node
+        for child_idx in self.get_node_children(node_idx) {
+            if let Some(found) = self.find_node_at_position_recursive(child_idx, position) {
+                return Some(found);
+            }
+        }
+
+        // No child contains this position, return this node
+        Some(node_idx)
+    }
+
+    /// Get the children of a node.
+    fn get_node_children(&self, node_idx: NodeIndex) -> Vec<NodeIndex> {
+        use crate::parser::Node;
+        let mut children = Vec::new();
+
+        if let Some(node) = self.node_arena.get(node_idx) {
+            match node {
+                Node::SourceFile(sf) => {
+                    children.extend(sf.statements.nodes.iter().copied());
+                }
+                Node::Block(b) => {
+                    children.extend(b.statements.nodes.iter().copied());
+                }
+                Node::VariableStatement(vs) => {
+                    children.push(vs.declaration_list);
+                }
+                Node::VariableDeclarationList(vdl) => {
+                    children.extend(vdl.declarations.nodes.iter().copied());
+                }
+                Node::VariableDeclaration(vd) => {
+                    children.push(vd.name);
+                    if !vd.type_annotation.is_none() {
+                        children.push(vd.type_annotation);
+                    }
+                    if !vd.initializer.is_none() {
+                        children.push(vd.initializer);
+                    }
+                }
+                Node::FunctionDeclaration(fd) => {
+                    if !fd.name.is_none() {
+                        children.push(fd.name);
+                    }
+                    // parameters is a NodeList, not Option
+                    children.extend(fd.parameters.nodes.iter().copied());
+                    if !fd.type_annotation.is_none() {
+                        children.push(fd.type_annotation);
+                    }
+                    if !fd.body.is_none() {
+                        children.push(fd.body);
+                    }
+                }
+                Node::ClassDeclaration(cd) => {
+                    if !cd.name.is_none() {
+                        children.push(cd.name);
+                    }
+                    children.extend(cd.members.nodes.iter().copied());
+                }
+                Node::InterfaceDeclaration(id) => {
+                    children.push(id.name);
+                    children.extend(id.members.nodes.iter().copied());
+                }
+                Node::CallExpression(ce) => {
+                    children.push(ce.expression);
+                    children.extend(ce.arguments.nodes.iter().copied());
+                }
+                Node::PropertyAccessExpression(pae) => {
+                    children.push(pae.expression);
+                    children.push(pae.name);
+                }
+                Node::BinaryExpression(be) => {
+                    children.push(be.left);
+                    children.push(be.right);
+                }
+                // Add more node types as needed
+                _ => {}
+            }
+        }
+
+        children
+    }
+
     /// Get the number of types allocated.
     pub fn get_type_count(&self) -> usize {
         self.types.len()
@@ -776,251 +990,6 @@ impl<'a> CheckerState<'a> {
                 format!("typeof {}", s.name)
             }
         }
-    }
-
-    // =========================================================================
-    // Language Service Support Methods
-    // =========================================================================
-
-    /// Get the symbol at a specific node location.
-    /// Used by go-to-definition, find-references, etc.
-    pub fn get_symbol_at_location(&self, node_idx: NodeIndex) -> Option<crate::binder::Symbol> {
-        use crate::parser::Node;
-
-        let node = self.node_arena.get(node_idx)?;
-
-        match node {
-            // For identifiers, look up the symbol by name
-            Node::Identifier(id) => {
-                let name = &id.escaped_text;
-                // Try to find in symbol table
-                if let Some(symbol_id) = self.resolve_name(name) {
-                    return self.symbol_arena.get(symbol_id).cloned();
-                }
-                None
-            }
-            // For property access, get the property symbol
-            Node::PropertyAccessExpression(pae) => {
-                // Get the type of the object
-                let obj_type = self.get_type_of_node_internal(pae.expression);
-                if let Some(prop_name) = self.get_identifier_text(pae.name) {
-                    // Look up property on the type
-                    if let Some(prop_symbol) = self.get_property_symbol(obj_type, &prop_name) {
-                        return Some(prop_symbol);
-                    }
-                }
-                None
-            }
-            // For declarations, return the declared symbol
-            Node::VariableDeclaration(vd) => {
-                if let Some(name) = self.get_binding_name(&vd.name) {
-                    if let Some(symbol_id) = self.resolve_name(&name) {
-                        return self.symbol_arena.get(symbol_id).cloned();
-                    }
-                }
-                None
-            }
-            Node::FunctionDeclaration(fd) => {
-                if let Some(name_idx) = fd.name {
-                    if let Some(name) = self.get_identifier_text(name_idx) {
-                        if let Some(symbol_id) = self.resolve_name(&name) {
-                            return self.symbol_arena.get(symbol_id).cloned();
-                        }
-                    }
-                }
-                None
-            }
-            Node::ClassDeclaration(cd) => {
-                if let Some(name_idx) = cd.name {
-                    if let Some(name) = self.get_identifier_text(name_idx) {
-                        if let Some(symbol_id) = self.resolve_name(&name) {
-                            return self.symbol_arena.get(symbol_id).cloned();
-                        }
-                    }
-                }
-                None
-            }
-            _ => None,
-        }
-    }
-
-    /// Get the type at a specific node location.
-    /// Used by hover/quick info, type definition, etc.
-    pub fn get_type_at_location(&self, node_idx: NodeIndex) -> Option<TypeId> {
-        // Use the cached type if available
-        if let Some(&type_id) = self.node_types.borrow().get(&node_idx) {
-            if type_id != TypeId::NONE {
-                return Some(type_id);
-            }
-        }
-        None
-    }
-
-    /// Get the symbol for a type (e.g., the class/interface symbol for an object type).
-    pub fn get_type_symbol(&self, type_id: TypeId) -> Option<SymbolId> {
-        use super::types::Type;
-
-        let typ = self.types.get(type_id)?;
-        match typ {
-            Type::Object(obj) => obj.symbol,
-            Type::TypeReference(tr) => Some(tr.symbol),
-            Type::Enum(e) => Some(e.symbol),
-            _ => None,
-        }
-    }
-
-    /// Helper: get identifier text from a node index
-    fn get_identifier_text(&self, node_idx: NodeIndex) -> Option<String> {
-        use crate::parser::Node;
-
-        if let Some(Node::Identifier(id)) = self.node_arena.get(node_idx) {
-            return Some(id.escaped_text.clone());
-        }
-        None
-    }
-
-    /// Helper: get binding name from a BindingName node
-    fn get_binding_name(&self, node_idx: NodeIndex) -> Option<String> {
-        use crate::parser::Node;
-
-        match self.node_arena.get(node_idx)? {
-            Node::Identifier(id) => Some(id.escaped_text.clone()),
-            // For destructuring patterns, we'd need more complex handling
-            _ => None,
-        }
-    }
-
-    /// Helper: get property symbol from a type
-    fn get_property_symbol(&self, type_id: TypeId, prop_name: &str) -> Option<crate::binder::Symbol> {
-        use super::types::Type;
-
-        let typ = self.types.get(type_id)?;
-        match typ {
-            Type::Object(obj) => {
-                // Look up in the object's members
-                if let Some(members) = &obj.members {
-                    if let Some(&symbol_id) = members.get(prop_name) {
-                        return self.symbol_arena.get(symbol_id).cloned();
-                    }
-                }
-                None
-            }
-            Type::TypeReference(tr) => {
-                // Resolve the reference and look up property
-                if let Some(resolved) = tr.resolved {
-                    return self.get_property_symbol(resolved, prop_name);
-                }
-                None
-            }
-            Type::Union(u) => {
-                // For unions, find property on first type that has it
-                for &member_type in &u.types {
-                    if let Some(symbol) = self.get_property_symbol(member_type, prop_name) {
-                        return Some(symbol);
-                    }
-                }
-                None
-            }
-            _ => None,
-        }
-    }
-
-    /// Internal version of get_type_of_node that doesn't mutate (for language service).
-    fn get_type_of_node_internal(&self, node_idx: NodeIndex) -> TypeId {
-        // Return cached type if available
-        if let Some(&type_id) = self.node_types.borrow().get(&node_idx) {
-            return type_id;
-        }
-        TypeId::NONE
-    }
-
-    /// Get all symbols in scope at a position.
-    /// Used for completions.
-    pub fn get_symbols_in_scope(&self, _position: u32) -> Vec<(String, SymbolId)> {
-        let mut symbols = Vec::new();
-
-        // Add all symbols from the symbol table
-        for (name, &symbol_id) in self.symbol_table.iter() {
-            symbols.push((name.clone(), symbol_id));
-        }
-
-        // Add symbols from local scopes
-        for scope in &self.local_scope_stack {
-            for (name, &_type_id) in scope.iter() {
-                // For locals, we'd need to track their symbol IDs too
-                // For now, just return what we have
-                if let Some(symbol_id) = self.resolve_name(name) {
-                    symbols.push((name.clone(), symbol_id));
-                }
-            }
-        }
-
-        symbols
-    }
-
-    /// Get properties of a type as symbols.
-    /// Used by completions.
-    pub fn get_properties_of_type(&self, type_id: TypeId) -> Vec<crate::binder::Symbol> {
-        self.get_member_completions(type_id)
-            .into_iter()
-            .filter_map(|(_, symbol_id)| self.symbol_arena.get(symbol_id).cloned())
-            .collect()
-    }
-
-    /// Get completions for a member access expression.
-    /// Returns property names and their symbol IDs.
-    pub fn get_member_completions(&self, type_id: TypeId) -> Vec<(String, SymbolId)> {
-        use super::types::Type;
-
-        let mut completions = Vec::new();
-
-        let Some(typ) = self.types.get(type_id) else {
-            return completions;
-        };
-
-        match typ {
-            Type::Object(obj) => {
-                if let Some(members) = &obj.members {
-                    for (name, &symbol_id) in members.iter() {
-                        completions.push((name.clone(), symbol_id));
-                    }
-                }
-            }
-            Type::TypeReference(tr) => {
-                if let Some(resolved) = tr.resolved {
-                    return self.get_member_completions(resolved);
-                }
-            }
-            Type::Union(u) => {
-                // Get common members across all union types
-                if let Some(&first_type) = u.types.first() {
-                    let first_members = self.get_member_completions(first_type);
-                    for (name, symbol_id) in first_members {
-                        // Check if this member exists on all other types
-                        let exists_on_all = u.types[1..].iter().all(|&t| {
-                            self.get_property_symbol(t, &name).is_some()
-                        });
-                        if exists_on_all {
-                            completions.push((name, symbol_id));
-                        }
-                    }
-                }
-            }
-            Type::Intersection(i) => {
-                // Collect all members from all intersection types
-                for &member_type in &i.types {
-                    let members = self.get_member_completions(member_type);
-                    for (name, symbol_id) in members {
-                        if !completions.iter().any(|(n, _)| n == &name) {
-                            completions.push((name, symbol_id));
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-
-        completions
     }
 
     /// Check a source file and populate diagnostics.

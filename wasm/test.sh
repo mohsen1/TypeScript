@@ -52,23 +52,24 @@ WORKDIR /app
 EOF
 fi
 
-# Run tests with source mounted (ensures latest code is always used)
+# Run tests
 echo "🧪 Running tests..."
+
+# We use a workaround: copy source to a writable location inside the container
+# This avoids the ro mount conflict with the target cache
 if [ -n "$TEST_FILTER" ]; then
     echo "   Filter: $TEST_FILTER"
-    docker run --rm --memory="1g" --cpus="2.0" \
-        -v "$SCRIPT_DIR:/app:ro" \
-        -v wasm-target-cache:/app/target \
+    docker run --rm --memory="2g" --cpus="2.0" \
+        -v "$SCRIPT_DIR:/source:ro" \
         -v cargo-registry:/usr/local/cargo/registry \
         -v cargo-git:/usr/local/cargo/git \
-        "$IMAGE_NAME" cargo nextest run "$TEST_FILTER"
+        "$IMAGE_NAME" bash -c "rm -rf /app/* && cp -r /source/* /app/ && cargo nextest run $TEST_FILTER"
 else
-    docker run --rm --memory="1g" --cpus="2.0" \
-        -v "$SCRIPT_DIR:/app:ro" \
-        -v wasm-target-cache:/app/target \
+    docker run --rm --memory="2g" --cpus="2.0" \
+        -v "$SCRIPT_DIR:/source:ro" \
         -v cargo-registry:/usr/local/cargo/registry \
         -v cargo-git:/usr/local/cargo/git \
-        "$IMAGE_NAME" cargo nextest run
+        "$IMAGE_NAME" bash -c "rm -rf /app/* && cp -r /source/* /app/ && cargo nextest run"
 fi
 
 echo "✅ Tests complete!"
