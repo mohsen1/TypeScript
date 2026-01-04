@@ -10,13 +10,18 @@
 //! - let/const → var
 
 use super::{TransformContext, Transformer};
-use crate::parser::{Node, NodeIndex};
+use crate::parser::{Node, NodeIndex, NodeBase, NodeList};
+use crate::parser::expressions::FunctionExpression;
+use crate::parser::statements::{Block, ReturnStatement};
+use crate::parser::syntax_kind_ext;
 
 /// Node kind enumeration for pattern matching without borrowing
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum NodeKind {
     ArrowFunction,
     TemplateExpression,
+    VariableStatement,
+    VariableDeclarationList,
     VariableDeclaration,
     SpreadElement,
     ForOfStatement,
@@ -39,6 +44,8 @@ fn get_node_kind(node_idx: NodeIndex, ctx: &TransformContext) -> NodeKind {
     match ctx.arena.get(node_idx) {
         Some(Node::ArrowFunction(_)) => NodeKind::ArrowFunction,
         Some(Node::TemplateExpression(_)) => NodeKind::TemplateExpression,
+        Some(Node::VariableStatement(_)) => NodeKind::VariableStatement,
+        Some(Node::VariableDeclarationList(_)) => NodeKind::VariableDeclarationList,
         Some(Node::VariableDeclaration(_)) => NodeKind::VariableDeclaration,
         Some(Node::SpreadElement(_)) => NodeKind::SpreadElement,
         Some(Node::ForOfStatement(_)) => NodeKind::ForOfStatement,
@@ -75,6 +82,18 @@ fn collect_children(node_idx: NodeIndex, ctx: &TransformContext) -> Vec<NodeInde
         }
         Some(Node::ArrowFunction(f)) => {
             children.push(f.body);
+        }
+        // Variable handling for arrow function detection
+        Some(Node::VariableStatement(vs)) => {
+            children.push(vs.declaration_list);
+        }
+        Some(Node::VariableDeclarationList(vdl)) => {
+            children.extend(vdl.declarations.nodes.iter().copied());
+        }
+        Some(Node::VariableDeclaration(vd)) => {
+            if !vd.initializer.is_none() {
+                children.push(vd.initializer);
+            }
         }
         Some(Node::IfStatement(if_stmt)) => {
             children.push(if_stmt.expression);
@@ -154,21 +173,66 @@ impl ES2015Transformer {
             self.this_bindings.push(None);
         }
 
-        // Get body index before mutably borrowing ctx
-        let body_idx = match ctx.arena.get(node_idx) {
-            Some(Node::ArrowFunction(arrow)) => arrow.body,
+        // Extract arrow function data
+        let (base, modifiers, type_params, params, type_ann, body_idx) = match ctx.arena.get(node_idx) {
+            Some(Node::ArrowFunction(arrow)) => (
+                arrow.base.clone(),
+                arrow.modifiers.clone(),
+                arrow.type_parameters.clone(),
+                arrow.parameters.clone(),
+                arrow.type_annotation,
+                arrow.body,
+            ),
             _ => return None,
         };
 
-        // Transform body
+        // Transform body recursively first
         self.visit_node(body_idx, ctx);
+
+        // Check if body is an expression (not a block) - needs return statement wrapping
+        let body_is_block = matches!(ctx.arena.get(body_idx), Some(Node::Block(_)));
+
+        let final_body = if !body_is_block {
+            // Wrap expression in return statement, then wrap in block
+            // Create: { return <expr>; }
+            let return_stmt = ReturnStatement {
+                base: NodeBase::new_ext(syntax_kind_ext::RETURN_STATEMENT, base.pos, base.end),
+                expression: body_idx,
+            };
+            let return_idx = ctx.arena.add(Node::ReturnStatement(return_stmt));
+
+            let mut statements = NodeList::new();
+            statements.push(return_idx);
+
+            let block = Block {
+                base: NodeBase::new_ext(syntax_kind_ext::BLOCK, base.pos, base.end),
+                statements,
+                multi_line: false,
+            };
+            ctx.arena.add(Node::Block(block))
+        } else {
+            body_idx
+        };
+
+        // Create function expression to replace arrow function
+        let func_expr = FunctionExpression {
+            base: NodeBase::new_ext(syntax_kind_ext::FUNCTION_EXPRESSION, base.pos, base.end),
+            modifiers,
+            asterisk_token: false,
+            name: NodeIndex::NONE,  // Anonymous function
+            type_parameters: type_params,
+            parameters: params,
+            type_annotation: type_ann,
+            body: final_body,
+        };
 
         self.this_bindings.pop();
 
-        // Note: In a full implementation, we would create a new FunctionExpression node
-        // and replace this node. For now, we just mark that transformation is needed.
-        // The actual node creation would require arena allocation.
-        None
+        // Replace the arrow function node in-place with the function expression
+        ctx.arena.replace(node_idx, Node::FunctionExpression(func_expr));
+
+        // Return the same index since we replaced in-place
+        Some(node_idx)
     }
 
     /// Check if an arrow function uses 'this' or 'arguments'
@@ -221,9 +285,6 @@ impl Transformer for ES2015Transformer {
             NodeKind::TemplateExpression => {
                 return self.transform_template_literal(node_idx, ctx);
             }
-            NodeKind::VariableDeclaration => {
-                return self.transform_variable_declaration(node_idx, ctx);
-            }
             NodeKind::SpreadElement => {
                 return self.transform_spread_in_array(node_idx, ctx);
             }
@@ -252,36 +313,79 @@ impl Transformer for ES2015Transformer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::emitter::ScriptTarget;
     use crate::parser_impl::ParserState;
+    use crate::parser::{Node, NodeArena};
 
-    fn parse_and_transform(source: &str, target: ScriptTarget) -> super::super::HelpersNeeded {
+    fn parse_and_transform(source: &str, target: ScriptTarget) -> (super::super::HelpersNeeded, NodeArena) {
         let mut parser = ParserState::new("test.ts".to_string(), source.to_string());
         let source_file = parser.parse_source_file();
         let mut arena = parser.arena;
 
-        super::super::transform_source_file(source_file, target, &mut arena)
+        let helpers = super::super::transform_source_file(source_file, target, &mut arena);
+        (helpers, arena)
     }
 
     #[test]
     fn test_transformer_creates_context() {
-        let helpers = parse_and_transform("let x = 1;", ScriptTarget::ES5);
+        let (helpers, _) = parse_and_transform("let x = 1;", ScriptTarget::ES5);
         // Just verify it doesn't crash
         assert!(!helpers.extends);
     }
 
     #[test]
     fn test_arrow_function_transform() {
-        let _helpers = parse_and_transform("const fn = (x) => x * 2;", ScriptTarget::ES5);
-        // Arrow function detection should work
-        // Full transform creates function expression
+        let (_, arena) = parse_and_transform("const fn = (x) => x * 2;", ScriptTarget::ES5);
+
+        // Find if a FunctionExpression was created (arrow → function transform)
+        let has_func_expr = arena.nodes.iter().any(|node| {
+            matches!(node, Node::FunctionExpression(_))
+        });
+
+        // The transform should have replaced the ArrowFunction with FunctionExpression
+        assert!(has_func_expr, "Arrow function should be transformed to FunctionExpression");
+    }
+
+    #[test]
+    fn test_arrow_function_with_block_body() {
+        let (_, arena) = parse_and_transform("const fn = (x) => { return x * 2; };", ScriptTarget::ES5);
+
+        // Find if a FunctionExpression was created
+        let has_func_expr = arena.nodes.iter().any(|node| {
+            matches!(node, Node::FunctionExpression(_))
+        });
+
+        assert!(has_func_expr, "Arrow function with block body should be transformed");
+    }
+
+    #[test]
+    fn test_arrow_function_expression_body_gets_return() {
+        let (_, arena) = parse_and_transform("const add = (a, b) => a + b;", ScriptTarget::ES5);
+
+        // The expression body should be wrapped in a return statement
+        let has_return_stmt = arena.nodes.iter().any(|node| {
+            matches!(node, Node::ReturnStatement(_))
+        });
+
+        assert!(has_return_stmt, "Expression body should be wrapped in return statement");
     }
 
     #[test]
     fn test_for_of_needs_values_helper() {
-        let helpers = parse_and_transform("for (const x of arr) { console.log(x); }", ScriptTarget::ES5);
+        let (helpers, _) = parse_and_transform("for (const x of arr) { console.log(x); }", ScriptTarget::ES5);
         // For-of should require __values helper
         assert!(helpers.values);
+    }
+
+    #[test]
+    fn test_no_transform_for_es2015_target() {
+        let (_, arena) = parse_and_transform("const fn = (x) => x * 2;", ScriptTarget::ES2015);
+
+        // Arrow functions should NOT be transformed when targeting ES2015
+        let has_func_expr = arena.nodes.iter().any(|node| {
+            matches!(node, Node::FunctionExpression(_))
+        });
+
+        assert!(!has_func_expr, "Arrow function should NOT be transformed for ES2015 target");
     }
 }

@@ -44,6 +44,18 @@ impl NodeArena {
         }
     }
 
+    /// Replace a node at the given index
+    /// Returns the old node if successful
+    pub fn replace(&mut self, index: NodeIndex, new_node: Node) -> Option<Node> {
+        if index.is_none() {
+            None
+        } else {
+            self.nodes.get_mut(index.0 as usize).map(|old| {
+                std::mem::replace(old, new_node)
+            })
+        }
+    }
+
     /// Get the number of nodes
     pub fn len(&self) -> usize {
         self.nodes.len()

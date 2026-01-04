@@ -27,7 +27,7 @@ compiler remains fully functional at every step.
 
 ### TODO
 - [x] Declaration file emission (node filtering, export visibility, type-only imports)
-- [ ] ES2015+ transforms (class→prototype, arrow→function, destructuring)
+- [x] ES2015+ transforms: arrow function → function expression
 - [ ] Async/await → Promise chains
 - [ ] Generator → state machine
 - [ ] Module transforms (ES→CommonJS, ES→AMD/UMD)
@@ -65,12 +65,12 @@ compiler remains fully functional at every step.
 | 3 | Parser | ~5,000 | 100+ | ✅ Done |
 | 4 | Binder | ~1,900 | 20+ | ✅ Done |
 | 5 | Type Checker | ~23,500 | 485 | ✅ 99% |
-| 6 | Emitter | ~4,500 | 75+ | 🟡 65% |
+| 6 | Emitter | ~4,800 | 80+ | 🟡 70% |
 | 7 | Language Service | ~1,300 | 3 | 🟡 50% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
 **Total Rust Code**: ~38,300 lines
-**Total Tests**: 587 passing
+**Total Tests**: 590 passing
 **Overall Progress**: ~85% of full compiler functionality
 
 ---
