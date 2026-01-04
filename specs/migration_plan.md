@@ -93,9 +93,17 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 - [x] 3 new tests: identifier interning, non-identifier atoms, keyword interning
 - [x] 605 tests passing
 
+### Completed (2026-01-04) - Zero-Copy Accessors
+- [x] `get_token_value_ref()` - returns `&str` without allocation
+- [x] `get_token_text_ref()` - returns raw source slice
+- [x] `source_slice()` - arbitrary source range access
+- [x] `source_text()` - full source reference
+- [x] 2 new tests for zero-copy accessors
+- [x] 609 tests passing
+
 ### TODO
-- [ ] Scanner returns `&str` slices of source, never `String`
-- [ ] Zero heap allocations during parsing (token_value still allocates)
+- [ ] Update parser to use zero-copy accessors
+- [ ] Remove remaining to_string() calls from scanner hot paths
 
 ## Phase 0.3: Arena-Based Type Checker (O(1) Cleanup)
 
@@ -192,12 +200,18 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
 **Total Rust Code**: ~42,000 lines
-**Total Tests**: 607 passing
+**Total Tests**: 609 passing
 **Overall Progress**: ~88% of full compiler functionality
 
 ---
 
 # MILESTONES
+
+## 2026-01-04: Scanner Zero-Copy Accessors
+- Added get_token_value_ref(), get_token_text_ref() for zero-copy access
+- Added source_slice(), source_text() for direct source access
+- 2 new tests for zero-copy functionality
+- 609 tests passing
 
 ## 2026-01-04: Language Service Member Completions
 - Added `get_properties_of_type()` to checker for enumerating type properties
