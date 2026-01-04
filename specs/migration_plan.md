@@ -405,7 +405,7 @@ diagnostics. This is ~50% of the compiler complexity.
 Strategy: Migrate in layers, starting with primitive type operations and
 building up to full inference.
 
-**Current Stats**: ~7,600 lines of checker code (excluding 9,500+ lines of tests)
+**Current Stats**: ~23,500 lines of Rust production code (excluding 9,500+ lines of tests)
 **Tests**: 428 checker tests passing, 9 skipped
 
 5.1 Type Representation (COMPLETE)
