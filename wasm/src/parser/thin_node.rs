@@ -826,21 +826,120 @@ pub struct ThinNodeArena {
     /// The thin node headers (16 bytes each)
     pub nodes: Vec<ThinNode>,
 
-    // Typed data pools
+    // ==========================================================================
+    // Typed data pools - organized by category
+    // ==========================================================================
+
+    // Names and identifiers
     pub identifiers: Vec<IdentifierData>,
+    pub qualified_names: Vec<QualifiedNameData>,
+    pub computed_properties: Vec<ComputedPropertyData>,
+
+    // Literals
     pub literals: Vec<LiteralData>,
+
+    // Expressions
     pub binary_exprs: Vec<BinaryExprData>,
     pub unary_exprs: Vec<UnaryExprData>,
     pub call_exprs: Vec<CallExprData>,
     pub access_exprs: Vec<AccessExprData>,
+    pub conditional_exprs: Vec<ConditionalExprData>,
+    pub literal_exprs: Vec<LiteralExprData>,
+    pub parenthesized: Vec<ParenthesizedData>,
+    pub unary_exprs_ex: Vec<UnaryExprDataEx>,
+    pub type_assertions: Vec<TypeAssertionData>,
+    pub template_exprs: Vec<TemplateExprData>,
+    pub template_spans: Vec<TemplateSpanData>,
+    pub tagged_templates: Vec<TaggedTemplateData>,
+
+    // Functions and classes
     pub functions: Vec<FunctionData>,
     pub classes: Vec<ClassData>,
+    pub interfaces: Vec<InterfaceData>,
+    pub type_aliases: Vec<TypeAliasData>,
+    pub enums: Vec<EnumData>,
+    pub enum_members: Vec<EnumMemberData>,
+    pub modules: Vec<ModuleData>,
+
+    // Signatures and members
+    pub signatures: Vec<SignatureData>,
+    pub index_signatures: Vec<IndexSignatureData>,
+    pub property_decls: Vec<PropertyDeclData>,
+    pub method_decls: Vec<MethodDeclData>,
+    pub constructors: Vec<ConstructorData>,
+    pub accessors: Vec<AccessorData>,
+    pub parameters: Vec<ParameterData>,
+    pub type_parameters: Vec<TypeParameterData>,
+    pub decorators: Vec<DecoratorData>,
+    pub heritage_clauses: Vec<HeritageData>,
+    pub expr_with_type_args: Vec<ExprWithTypeArgsData>,
+
+    // Statements
     pub if_statements: Vec<IfStatementData>,
     pub loops: Vec<LoopData>,
     pub blocks: Vec<BlockData>,
     pub variables: Vec<VariableData>,
+    pub return_data: Vec<ReturnData>,
+    pub expr_statements: Vec<ExprStatementData>,
+    pub switch_data: Vec<SwitchData>,
+    pub case_clauses: Vec<CaseClauseData>,
+    pub try_data: Vec<TryData>,
+    pub catch_clauses: Vec<CatchClauseData>,
+    pub labeled_data: Vec<LabeledData>,
+    pub jump_data: Vec<JumpData>,
+    pub with_data: Vec<WithData>,
+
+    // Types
     pub type_refs: Vec<TypeRefData>,
     pub composite_types: Vec<CompositeTypeData>,
+    pub function_types: Vec<FunctionTypeData>,
+    pub type_queries: Vec<TypeQueryData>,
+    pub type_literals: Vec<TypeLiteralData>,
+    pub array_types: Vec<ArrayTypeData>,
+    pub tuple_types: Vec<TupleTypeData>,
+    pub wrapped_types: Vec<WrappedTypeData>,
+    pub conditional_types: Vec<ConditionalTypeData>,
+    pub infer_types: Vec<InferTypeData>,
+    pub type_operators: Vec<TypeOperatorData>,
+    pub indexed_access_types: Vec<IndexedAccessTypeData>,
+    pub mapped_types: Vec<MappedTypeData>,
+    pub literal_types: Vec<LiteralTypeData>,
+    pub template_literal_types: Vec<TemplateLiteralTypeData>,
+    pub named_tuple_members: Vec<NamedTupleMemberData>,
+    pub type_predicates: Vec<TypePredicateData>,
+
+    // Import/export
+    pub import_decls: Vec<ImportDeclData>,
+    pub import_clauses: Vec<ImportClauseData>,
+    pub named_imports: Vec<NamedImportsData>,
+    pub specifiers: Vec<SpecifierData>,
+    pub export_decls: Vec<ExportDeclData>,
+    pub export_assignments: Vec<ExportAssignmentData>,
+    pub import_attributes: Vec<ImportAttributesData>,
+    pub import_attribute: Vec<ImportAttributeData>,
+
+    // Binding patterns
+    pub binding_patterns: Vec<BindingPatternData>,
+    pub binding_elements: Vec<BindingElementData>,
+
+    // Object literal members
+    pub property_assignments: Vec<PropertyAssignmentData>,
+    pub shorthand_properties: Vec<ShorthandPropertyData>,
+    pub spread_data: Vec<SpreadData>,
+
+    // JSX
+    pub jsx_elements: Vec<JsxElementData>,
+    pub jsx_opening: Vec<JsxOpeningData>,
+    pub jsx_closing: Vec<JsxClosingData>,
+    pub jsx_fragments: Vec<JsxFragmentData>,
+    pub jsx_attributes: Vec<JsxAttributesData>,
+    pub jsx_attribute: Vec<JsxAttributeData>,
+    pub jsx_spread_attributes: Vec<JsxSpreadAttributeData>,
+    pub jsx_expressions: Vec<JsxExpressionData>,
+    pub jsx_text: Vec<JsxTextData>,
+    pub jsx_namespaced_names: Vec<JsxNamespacedNameData>,
+
+    // Source file
     pub source_files: Vec<SourceFileData>,
 
     // Extended node info (for nodes that need parent, id, full flags)
@@ -861,26 +960,27 @@ impl ThinNodeArena {
         ThinNodeArena::default()
     }
 
+    /// Create an arena with pre-allocated capacity.
+    /// Uses heuristic ratios based on typical TypeScript AST composition.
     pub fn with_capacity(capacity: usize) -> ThinNodeArena {
-        ThinNodeArena {
-            nodes: Vec::with_capacity(capacity),
-            identifiers: Vec::with_capacity(capacity / 4),
-            literals: Vec::with_capacity(capacity / 8),
-            binary_exprs: Vec::with_capacity(capacity / 8),
-            unary_exprs: Vec::with_capacity(capacity / 16),
-            call_exprs: Vec::with_capacity(capacity / 8),
-            access_exprs: Vec::with_capacity(capacity / 8),
-            functions: Vec::with_capacity(capacity / 16),
-            classes: Vec::with_capacity(capacity / 32),
-            if_statements: Vec::with_capacity(capacity / 16),
-            loops: Vec::with_capacity(capacity / 32),
-            blocks: Vec::with_capacity(capacity / 8),
-            variables: Vec::with_capacity(capacity / 16),
-            type_refs: Vec::with_capacity(capacity / 8),
-            composite_types: Vec::with_capacity(capacity / 16),
-            source_files: Vec::with_capacity(1),
-            extended_info: Vec::with_capacity(capacity),
-        }
+        // Use Default for all the new pools, just set capacity for main ones
+        let mut arena = ThinNodeArena::default();
+
+        // Pre-allocate the most commonly used pools
+        arena.nodes = Vec::with_capacity(capacity);
+        arena.extended_info = Vec::with_capacity(capacity);
+        arena.identifiers = Vec::with_capacity(capacity / 4);       // ~25% identifiers
+        arena.literals = Vec::with_capacity(capacity / 8);          // ~12% literals
+        arena.binary_exprs = Vec::with_capacity(capacity / 8);      // ~12% binary
+        arena.call_exprs = Vec::with_capacity(capacity / 8);        // ~12% calls
+        arena.access_exprs = Vec::with_capacity(capacity / 8);      // ~12% property access
+        arena.blocks = Vec::with_capacity(capacity / 8);            // ~12% blocks
+        arena.variables = Vec::with_capacity(capacity / 16);        // ~6% variables
+        arena.functions = Vec::with_capacity(capacity / 16);        // ~6% functions
+        arena.type_refs = Vec::with_capacity(capacity / 8);         // ~12% type refs
+        arena.source_files = Vec::with_capacity(1);                 // Usually 1
+
+        arena
     }
 
     /// Add a token node (no additional data)
