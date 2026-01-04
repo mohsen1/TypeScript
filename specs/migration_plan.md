@@ -73,12 +73,17 @@ Current `Node` enum is sized to largest variant (~208 bytes). This destroys cach
   - ThinParser scales better with larger files: 42→52 MiB/s throughput
   - Memory savings: 13x (16 bytes vs 208 bytes per node)
 - [x] Generic arrow functions with type parameters (`<T>(x: T) => x`)
-- [ ] Complete remaining parse methods (JSX, mapped types, conditional types)
+- [x] Complete remaining parse methods (JSX, mapped types, conditional types) - **All done!**
 
-### Next Steps
-- [ ] Update binder to use NodeAccess trait
-- [ ] Update checker to use NodeAccess trait
-- [ ] Update emitter to use NodeAccess trait
+### Next Steps - ThinNode Migration
+Since we're going ThinNode-only (no backwards compatibility with old Node enum needed):
+
+- [x] Add accessor methods to ThinNodeArena for all node types (Session 15)
+  - Added 20+ accessor methods: get_variable, get_variable_declaration, get_interface, get_type_alias, get_enum, get_enum_member, get_module, get_if_statement, get_loop, get_for_in_of, get_switch, get_case_clause, get_try, get_catch_clause, get_import_decl, get_import_clause, get_named_imports, get_specifier, get_export_decl, get_parameter, get_property_decl, get_method_decl, get_constructor
+- [ ] Migrate binder to use ThinNodeArena directly
+- [ ] Migrate checker to use ThinNodeArena directly
+- [ ] Migrate emitter to use ThinNodeArena directly
+- [ ] Remove old Node enum and NodeArena
 
 ### Architecture (wasm/src/parser/thin_node.rs)
 ```rust
@@ -237,6 +242,14 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 ---
 
 # MILESTONES
+
+## 2026-01-04: ThinNodeArena Accessor Methods (Session 15)
+- Added 20+ accessor methods to ThinNodeArena for binder/checker/emitter migration
+- Accessors for: variables, interfaces, type aliases, enums, modules
+- Accessors for: if/loop/switch/try/catch statements
+- Accessors for: imports, exports, parameters, class members
+- Foundation for migrating binder from Node enum to ThinNode
+- 706 tests passing
 
 ## 2026-01-04: ThinParser JSX Parsing (Session 14)
 - Added full JSX parsing support to ThinParser

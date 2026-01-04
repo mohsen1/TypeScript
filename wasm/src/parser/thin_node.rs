@@ -174,7 +174,8 @@ pub struct AccessExprData {
 #[derive(Clone, Debug, Serialize)]
 pub struct FunctionData {
     pub modifiers: Option<NodeList>,
-    pub asterisk_token: bool,
+    pub is_async: bool,           // Async function
+    pub asterisk_token: bool,     // Generator function
     pub name: NodeIndex,
     pub type_parameters: Option<NodeList>,
     pub parameters: NodeList,
@@ -2065,6 +2066,259 @@ impl ThinNodeArena {
         use super::syntax_kind_ext::SOURCE_FILE;
         if node.has_data() && node.kind == SOURCE_FILE {
             self.source_files.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get variable data (VariableStatement or VariableDeclarationList).
+    #[inline]
+    pub fn get_variable(&self, node: &ThinNode) -> Option<&VariableData> {
+        use super::syntax_kind_ext::{VARIABLE_STATEMENT, VARIABLE_DECLARATION_LIST};
+        if node.has_data() && (node.kind == VARIABLE_STATEMENT || node.kind == VARIABLE_DECLARATION_LIST) {
+            self.variables.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get variable declaration data.
+    #[inline]
+    pub fn get_variable_declaration(&self, node: &ThinNode) -> Option<&VariableDeclarationData> {
+        use super::syntax_kind_ext::VARIABLE_DECLARATION;
+        if node.has_data() && node.kind == VARIABLE_DECLARATION {
+            self.variable_declarations.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get interface data.
+    #[inline]
+    pub fn get_interface(&self, node: &ThinNode) -> Option<&InterfaceData> {
+        use super::syntax_kind_ext::INTERFACE_DECLARATION;
+        if node.has_data() && node.kind == INTERFACE_DECLARATION {
+            self.interfaces.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get type alias data.
+    #[inline]
+    pub fn get_type_alias(&self, node: &ThinNode) -> Option<&TypeAliasData> {
+        use super::syntax_kind_ext::TYPE_ALIAS_DECLARATION;
+        if node.has_data() && node.kind == TYPE_ALIAS_DECLARATION {
+            self.type_aliases.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get enum data.
+    #[inline]
+    pub fn get_enum(&self, node: &ThinNode) -> Option<&EnumData> {
+        use super::syntax_kind_ext::ENUM_DECLARATION;
+        if node.has_data() && node.kind == ENUM_DECLARATION {
+            self.enums.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get enum member data.
+    #[inline]
+    pub fn get_enum_member(&self, node: &ThinNode) -> Option<&EnumMemberData> {
+        use super::syntax_kind_ext::ENUM_MEMBER;
+        if node.has_data() && node.kind == ENUM_MEMBER {
+            self.enum_members.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get module data.
+    #[inline]
+    pub fn get_module(&self, node: &ThinNode) -> Option<&ModuleData> {
+        use super::syntax_kind_ext::MODULE_DECLARATION;
+        if node.has_data() && node.kind == MODULE_DECLARATION {
+            self.modules.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get if statement data.
+    #[inline]
+    pub fn get_if_statement(&self, node: &ThinNode) -> Option<&IfStatementData> {
+        use super::syntax_kind_ext::IF_STATEMENT;
+        if node.has_data() && node.kind == IF_STATEMENT {
+            self.if_statements.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get loop data (while, for, do-while).
+    #[inline]
+    pub fn get_loop(&self, node: &ThinNode) -> Option<&LoopData> {
+        use super::syntax_kind_ext::{WHILE_STATEMENT, DO_STATEMENT, FOR_STATEMENT};
+        if node.has_data() && (node.kind == WHILE_STATEMENT || node.kind == DO_STATEMENT || node.kind == FOR_STATEMENT) {
+            self.loops.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get for-in/for-of data.
+    #[inline]
+    pub fn get_for_in_of(&self, node: &ThinNode) -> Option<&ForInOfData> {
+        use super::syntax_kind_ext::{FOR_IN_STATEMENT, FOR_OF_STATEMENT};
+        if node.has_data() && (node.kind == FOR_IN_STATEMENT || node.kind == FOR_OF_STATEMENT) {
+            self.for_in_of.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get switch data.
+    #[inline]
+    pub fn get_switch(&self, node: &ThinNode) -> Option<&SwitchData> {
+        use super::syntax_kind_ext::SWITCH_STATEMENT;
+        if node.has_data() && node.kind == SWITCH_STATEMENT {
+            self.switch_data.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get case clause data.
+    #[inline]
+    pub fn get_case_clause(&self, node: &ThinNode) -> Option<&CaseClauseData> {
+        use super::syntax_kind_ext::{CASE_CLAUSE, DEFAULT_CLAUSE};
+        if node.has_data() && (node.kind == CASE_CLAUSE || node.kind == DEFAULT_CLAUSE) {
+            self.case_clauses.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get try data.
+    #[inline]
+    pub fn get_try(&self, node: &ThinNode) -> Option<&TryData> {
+        use super::syntax_kind_ext::TRY_STATEMENT;
+        if node.has_data() && node.kind == TRY_STATEMENT {
+            self.try_data.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get catch clause data.
+    #[inline]
+    pub fn get_catch_clause(&self, node: &ThinNode) -> Option<&CatchClauseData> {
+        use super::syntax_kind_ext::CATCH_CLAUSE;
+        if node.has_data() && node.kind == CATCH_CLAUSE {
+            self.catch_clauses.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get import declaration data.
+    #[inline]
+    pub fn get_import_decl(&self, node: &ThinNode) -> Option<&ImportDeclData> {
+        use super::syntax_kind_ext::IMPORT_DECLARATION;
+        if node.has_data() && node.kind == IMPORT_DECLARATION {
+            self.import_decls.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get import clause data.
+    #[inline]
+    pub fn get_import_clause(&self, node: &ThinNode) -> Option<&ImportClauseData> {
+        use super::syntax_kind_ext::IMPORT_CLAUSE;
+        if node.has_data() && node.kind == IMPORT_CLAUSE {
+            self.import_clauses.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get named imports data.
+    #[inline]
+    pub fn get_named_imports(&self, node: &ThinNode) -> Option<&NamedImportsData> {
+        use super::syntax_kind_ext::NAMED_IMPORTS;
+        if node.has_data() && node.kind == NAMED_IMPORTS {
+            self.named_imports.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get import/export specifier data.
+    #[inline]
+    pub fn get_specifier(&self, node: &ThinNode) -> Option<&SpecifierData> {
+        use super::syntax_kind_ext::{IMPORT_SPECIFIER, EXPORT_SPECIFIER};
+        if node.has_data() && (node.kind == IMPORT_SPECIFIER || node.kind == EXPORT_SPECIFIER) {
+            self.specifiers.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get export declaration data.
+    #[inline]
+    pub fn get_export_decl(&self, node: &ThinNode) -> Option<&ExportDeclData> {
+        use super::syntax_kind_ext::EXPORT_DECLARATION;
+        if node.has_data() && node.kind == EXPORT_DECLARATION {
+            self.export_decls.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get parameter data.
+    #[inline]
+    pub fn get_parameter(&self, node: &ThinNode) -> Option<&ParameterData> {
+        use super::syntax_kind_ext::PARAMETER;
+        if node.has_data() && node.kind == PARAMETER {
+            self.parameters.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get property declaration data.
+    #[inline]
+    pub fn get_property_decl(&self, node: &ThinNode) -> Option<&PropertyDeclData> {
+        use super::syntax_kind_ext::PROPERTY_DECLARATION;
+        if node.has_data() && node.kind == PROPERTY_DECLARATION {
+            self.property_decls.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get method declaration data.
+    #[inline]
+    pub fn get_method_decl(&self, node: &ThinNode) -> Option<&MethodDeclData> {
+        use super::syntax_kind_ext::METHOD_DECLARATION;
+        if node.has_data() && node.kind == METHOD_DECLARATION {
+            self.method_decls.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get constructor data.
+    #[inline]
+    pub fn get_constructor(&self, node: &ThinNode) -> Option<&ConstructorData> {
+        use super::syntax_kind_ext::CONSTRUCTOR;
+        if node.has_data() && node.kind == CONSTRUCTOR {
+            self.constructors.get(node.data_index as usize)
         } else {
             None
         }
