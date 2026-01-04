@@ -6,6 +6,8 @@ Migrate TypeScript compiler to Rust/WASM. **Run in an infinite loop until comple
 ## 📋 The Plan
 **`specs/migration_plan.md`** is the single source of truth. Read it. Follow it. Update it.
 
+Commit frequently
+
 ## 🔁 INFINITE LOOP
 
 ```

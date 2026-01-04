@@ -610,11 +610,41 @@ impl Printer {
     }
 
     fn emit_string_literal(&mut self, lit: &crate::parser::literals::StringLiteral) {
-        let quote = if self.options.single_quote { "'" } else { "\"" };
-        self.write(quote);
-        // TODO: Escape special characters
-        self.write(&lit.text);
-        self.write(quote);
+        let quote = if self.options.single_quote { '\'' } else { '"' };
+        self.output.push(quote);
+        self.emit_escaped_string(&lit.text, quote);
+        self.output.push(quote);
+    }
+
+    /// Escape special characters in a string literal.
+    /// Handles: backslash, quotes, newlines, tabs, carriage returns, and other control characters.
+    fn emit_escaped_string(&mut self, s: &str, quote_char: char) {
+        for c in s.chars() {
+            match c {
+                '\\' => self.output.push_str("\\\\"),
+                '\n' => self.output.push_str("\\n"),
+                '\r' => self.output.push_str("\\r"),
+                '\t' => self.output.push_str("\\t"),
+                '\x00' => self.output.push_str("\\0"),
+                '\x08' => self.output.push_str("\\b"), // backspace
+                '\x0C' => self.output.push_str("\\f"), // form feed
+                '\x0B' => self.output.push_str("\\v"), // vertical tab
+                c if c == quote_char => {
+                    self.output.push('\\');
+                    self.output.push(c);
+                }
+                c if c.is_control() => {
+                    // Escape other control characters as \xNN or \uNNNN
+                    let code = c as u32;
+                    if code < 0x100 {
+                        self.output.push_str(&format!("\\x{:02x}", code));
+                    } else {
+                        self.output.push_str(&format!("\\u{:04x}", code));
+                    }
+                }
+                c => self.output.push(c),
+            }
+        }
     }
 
     fn emit_numeric_literal(&mut self, lit: &crate::parser::literals::NumericLiteral) {
@@ -2558,6 +2588,36 @@ mod tests {
         let output = parse_and_emit("const fn = (x) => x * 2;");
         assert!(output.contains("=>"), "Should contain '=>': {}", output);
         assert!(output.contains("const"), "Should contain 'const': {}", output);
+    }
+
+    #[test]
+    fn test_emit_string_literal_escaping() {
+        // Test that string literals with special characters are properly escaped
+
+        // Test basic escaping (newline)
+        let mut printer = Printer::new();
+        printer.emit_escaped_string("hello\nworld", '"');
+        assert_eq!(printer.take_output(), "hello\\nworld");
+
+        // Test quote escaping
+        let mut printer = Printer::new();
+        printer.emit_escaped_string("say \"hello\"", '"');
+        assert_eq!(printer.take_output(), "say \\\"hello\\\"");
+
+        // Test single quote in double-quoted string (no escape needed for other quote)
+        let mut printer = Printer::new();
+        printer.emit_escaped_string("it's fine", '"');
+        assert_eq!(printer.take_output(), "it's fine");
+
+        // Test backslash escaping
+        let mut printer = Printer::new();
+        printer.emit_escaped_string("path\\to\\file", '"');
+        assert_eq!(printer.take_output(), "path\\\\to\\\\file");
+
+        // Test tab and carriage return
+        let mut printer = Printer::new();
+        printer.emit_escaped_string("a\tb\rc", '"');
+        assert_eq!(printer.take_output(), "a\\tb\\rc");
     }
 
     // =========================================================================

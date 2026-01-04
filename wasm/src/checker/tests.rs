@@ -4678,6 +4678,42 @@ const instance = new Foo();
         assert!(!is_assignable, "Object missing property 'y' should not be assignable");
     }
 
+    // ============== TASK 13b: Optional property assignability ==============
+    #[test]
+    fn test_optional_property_assignability() {
+        let mut arena = super::TypeArena::new();
+        let mut local_symbols = crate::binder::SymbolArena::new_with_base(crate::binder::SymbolArena::CHECKER_SYMBOL_BASE);
+        let mut symbol_types = rustc_hash::FxHashMap::default();
+
+        // Source: { x: number }
+        let src_x = local_symbols.alloc(crate::binder::symbol_flags::PROPERTY, "x".to_string());
+        symbol_types.insert(src_x, arena.number_type);
+        let mut src_members = SymbolTable::new();
+        src_members.set("x".to_string(), src_x);
+        let source = arena.create_object_type_with_members(vec![src_x], src_members);
+
+        // Target: { x: number; y?: string } - y is OPTIONAL
+        let tgt_x = local_symbols.alloc(crate::binder::symbol_flags::PROPERTY, "x".to_string());
+        let tgt_y = local_symbols.alloc(crate::binder::symbol_flags::PROPERTY | crate::binder::symbol_flags::OPTIONAL, "y".to_string());
+        symbol_types.insert(tgt_x, arena.number_type);
+        symbol_types.insert(tgt_y, arena.string_type);
+        let mut tgt_members = SymbolTable::new();
+        tgt_members.set("x".to_string(), tgt_x);
+        tgt_members.set("y".to_string(), tgt_y);
+        let target = arena.create_object_type_with_members(vec![tgt_x, tgt_y], tgt_members);
+
+        let node_arena = crate::parser::NodeArena::new();
+        let file_locals = SymbolTable::new();
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &local_symbols, &file_locals, &node_symbols, "test.ts".to_string());
+        checker.types = arena;
+        checker.symbol_types = symbol_types;
+
+        // Source is assignable to target because 'y' is optional
+        let is_assignable = checker.is_type_assignable_to(source, target);
+        assert!(is_assignable, "Object should be assignable when missing property is optional in target");
+    }
+
     // ============== TASK 14: Function parameter mismatch diagnostics ==============
     #[test]
     fn test_function_parameter_mismatch() {
@@ -4717,6 +4753,67 @@ const instance = new Foo();
         let fn2_str = checker.type_to_string(fn2);
         assert!(fn1_str.contains("string"), "fn1 should have string param");
         assert!(fn2_str.contains("number"), "fn2 should have number param");
+    }
+
+    // ============== TASK 14b: Function arity checking ==============
+    #[test]
+    fn test_function_arity_checking() {
+        let mut arena = super::TypeArena::new();
+
+        // fn1: (x: number) => void (requires 1 param)
+        let fn1 = arena.create_function_type(
+            NodeIndex::NONE,
+            vec![arena.number_type],
+            vec!["x".to_string()],
+            arena.void_type,
+            1, // min_argument_count = 1
+            false,
+        );
+
+        // fn2: (x: number, y: number) => void (requires 2 params)
+        let fn2 = arena.create_function_type(
+            NodeIndex::NONE,
+            vec![arena.number_type, arena.number_type],
+            vec!["x".to_string(), "y".to_string()],
+            arena.void_type,
+            2, // min_argument_count = 2
+            false,
+        );
+
+        // fn3: (x: number, y?: number) => void (requires 1 param, accepts 2)
+        let fn3 = arena.create_function_type(
+            NodeIndex::NONE,
+            vec![arena.number_type, arena.number_type],
+            vec!["x".to_string(), "y".to_string()],
+            arena.void_type,
+            1, // min_argument_count = 1 (y is optional)
+            false,
+        );
+
+        let node_arena = crate::parser::NodeArena::new();
+        let binder_symbols = crate::binder::SymbolArena::new();
+        let file_locals = SymbolTable::new();
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &binder_symbols, &file_locals, &node_symbols, "test.ts".to_string());
+        checker.types = arena;
+
+        // fn1 IS assignable to fn2 - a function requiring fewer params can be used
+        // where more params are expected (extra params are ignored)
+        assert!(checker.is_type_assignable_to(fn1, fn2),
+            "Function with fewer required params should be assignable to function expecting more");
+
+        // fn2 is NOT assignable to fn1 - a function requiring 2 params can't be used
+        // where only 1 is provided
+        assert!(!checker.is_type_assignable_to(fn2, fn1),
+            "Function requiring more params should NOT be assignable to function providing fewer");
+
+        // fn3 IS assignable to fn2 - fn3 requires only 1 param
+        assert!(checker.is_type_assignable_to(fn3, fn2),
+            "Function with optional param should be assignable");
+
+        // fn1 IS assignable to fn3 - both require 1 param
+        assert!(checker.is_type_assignable_to(fn1, fn3),
+            "Functions with same min_argument_count should be assignable");
     }
 
     // ============== TASK 15: Assignment narrowing in control flow ==============
@@ -5301,20 +5398,26 @@ const instance = new Foo();
         let red1 = checker.types.create_number_literal(0.0);
         let red2 = checker.types.create_number_literal(0.0);
 
-        // Create two enums with the same name (simulating same declaration)
+        // Create one enum type
         let color1 = checker.types.create_enum_type(
             "Color".to_string(),
             vec![("Red".to_string(), red1)],
         );
 
-        let color2 = checker.types.create_enum_type(
+        // Use the same TypeId for both - simulating references to the same enum declaration
+        let color2 = color1;
+
+        // Same enum type (same TypeId) is compatible with itself
+        assert!(checker.is_type_assignable_to(color1, color2));
+        assert!(checker.is_type_assignable_to(color2, color1));
+
+        // But two different enum types with same name are NOT compatible (nominal typing)
+        let different_color = checker.types.create_enum_type(
             "Color".to_string(),
             vec![("Red".to_string(), red2)],
         );
-
-        // Same-name enums are compatible
-        assert!(checker.is_type_assignable_to(color1, color2));
-        assert!(checker.is_type_assignable_to(color2, color1));
+        assert!(!checker.is_type_assignable_to(color1, different_color),
+            "Different enum declarations with same name should NOT be compatible");
     }
 
     #[test]

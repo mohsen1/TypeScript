@@ -8,6 +8,7 @@ use super::types::{
     Type, TypeId, Signature,
 };
 use super::state::{CheckerState, TypeRelation};
+use crate::binder::symbol_flags;
 
 impl<'a> CheckerState<'a> {
     /// Check if source type is related to target type under the given relation.
@@ -302,7 +303,14 @@ impl<'a> CheckerState<'a> {
                 Some(s) => s,
                 None => {
                     // Missing property - check if it's optional in target
-                    // For now, assume all properties are required
+                    let is_optional = self.symbol_arena.get(target_symbol)
+                        .map(|sym| (sym.flags & symbol_flags::OPTIONAL) != 0)
+                        .unwrap_or(false);
+                    if is_optional {
+                        // Property is optional in target, source doesn't need it
+                        continue;
+                    }
+                    // Property is required but missing
                     return false;
                 }
             };
@@ -400,14 +408,28 @@ impl<'a> CheckerState<'a> {
     }
 
     /// Check if call/construct signatures are related.
+    ///
+    /// For function assignability in TypeScript:
+    /// - Source must accept at least as many arguments as target's min_argument_count
+    /// - A function with fewer required params CAN be assigned to a type expecting more params
+    ///   because the extra params are simply ignored when the function is called
+    /// - A function requiring MORE params than target provides CANNOT be assigned
+    ///   because calls would fail to provide the required arguments
     fn is_signature_related(&self, source: &Signature, target: &Signature, relation: TypeRelation) -> bool {
-        // Target signature can have more required parameters than source
-        // (source with fewer params is callable with more args)
-
-        // Check parameter count compatibility
-        if source.min_argument_count > target.min_argument_count {
-            // Source requires more params than target - not compatible
-            // Actually this is backwards - revisit TypeScript semantics
+        // Check parameter count compatibility:
+        // Source must be able to handle calls with target's parameter count.
+        // If source requires more parameters than target provides, it's incompatible.
+        //
+        // Example: source = (a, b) => ... (min_argument_count = 2)
+        //          target = (a) => ...    (min_argument_count = 1)
+        // Source requires 2 args, but target only provides 1 → NOT compatible
+        //
+        // Example: source = (a) => ...    (min_argument_count = 1)
+        //          target = (a, b) => ... (min_argument_count = 2)
+        // Source requires 1 arg, target provides 2, extra ignored → compatible
+        if source.min_argument_count > target.parameters.len() as u32 {
+            // Source requires more parameters than target's signature has
+            return false;
         }
 
         // For each parameter position up to min(source, target), check types
@@ -536,32 +558,27 @@ impl<'a> CheckerState<'a> {
     }
 
     /// Check if enum types are related.
-    /// Enums are only compatible with:
-    /// - The same enum (by name)
-    /// - Numbers (for numeric enums)
-    /// - Specific string literals (for string enums)
+    /// Enums are nominally typed in TypeScript, meaning:
+    /// - Only the exact same enum type (same TypeId) is compatible with itself
+    /// - Different enum declarations with the same name are NOT compatible
+    /// - Numeric enums can be assigned to/from number in some contexts (handled elsewhere)
     fn is_enum_type_related(
         &self,
-        _source: TypeId,
+        source: TypeId,
         source_type: &Type,
-        _target: TypeId,
+        target: TypeId,
         target_type: &Type,
         _relation: TypeRelation,
     ) -> bool {
         // Both must be enum types for this function
-        let (source_enum, target_enum) = match (source_type, target_type) {
-            (Type::Enum(s), Type::Enum(t)) => (s, t),
-            _ => return false,
-        };
-
-        // Same enum types are compatible (by name)
-        if source_enum.name == target_enum.name {
-            return true;
+        if !matches!(source_type, Type::Enum(_)) || !matches!(target_type, Type::Enum(_)) {
+            return false;
         }
 
-        // Different enums are NOT compatible with each other
-        // (unlike plain numbers)
-        false
+        // Enums are nominally typed: only the exact same enum type (by TypeId) is compatible.
+        // This is different from structural typing used for interfaces/objects.
+        // Two enum declarations with the same name are still different types.
+        source == target
     }
 
     /// Check if function types are related.
