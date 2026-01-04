@@ -10856,3 +10856,28 @@ fn test_await_using_declaration_parsing() {
     // The async function contains an await using declaration
 }
 
+#[test]
+fn test_decorator_on_class() {
+    // Test that decorators on classes are parsed correctly
+    use crate::parser_impl::ParserState;
+
+    let code = r#"
+        @sealed
+        class Greeter {
+            greeting: string;
+            constructor(message: string) {
+                this.greeting = message;
+            }
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    // Check that we have 1 class declaration
+    if let Some(crate::parser::Node::SourceFile(sf)) = parser.arena.get(root) {
+        assert_eq!(sf.statements.len(), 1, "Expected 1 statement (decorated class)");
+    }
+}
+
+
