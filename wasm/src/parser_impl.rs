@@ -17,7 +17,7 @@ use crate::parser::{
     BinaryExpression, CallExpression, PropertyAccessExpression,
     ArrayLiteralExpression, ObjectLiteralExpression, PropertyAssignment,
     NewExpression, ElementAccessExpression, SpreadElement,
-    AwaitExpression, YieldExpression, FunctionExpression,
+    AwaitExpression, YieldExpression, FunctionExpression, PostfixUnaryExpression,
     // Statements
     Block, ExpressionStatement, VariableStatement,
     VariableDeclarationList, VariableDeclaration,
@@ -2987,7 +2987,26 @@ impl ParserState {
     fn parse_postfix_expression(&mut self) -> NodeIndex {
         let expr = self.parse_left_hand_side_expression();
 
-        // TODO: Handle postfix ++/--
+        // Handle postfix ++/--
+        // Note: must not be preceded by a newline
+        if !self.has_preceding_line_break() {
+            match self.token() {
+                SyntaxKind::PlusPlusToken | SyntaxKind::MinusMinusToken => {
+                    let pos = self.arena.get(expr).map(|n| n.base().pos).unwrap_or(0);
+                    let operator = self.token();
+                    self.next_token();
+                    let end = self.get_token_start();
+
+                    let postfix = PostfixUnaryExpression {
+                        base: NodeBase::new_ext(syntax_kind_ext::POSTFIX_UNARY_EXPRESSION, pos, end),
+                        operand: expr,
+                        operator,
+                    };
+                    return self.alloc_node(Node::PostfixUnaryExpression(postfix));
+                }
+                _ => {}
+            }
+        }
 
         expr
     }

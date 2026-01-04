@@ -10651,3 +10651,34 @@ fn test_bitwise_not() {
     assert!(checker.diagnostics.is_empty(),
         "Expected no errors for bitwise NOT expression, got: {:?}", checker.diagnostics);
 }
+
+#[test]
+fn test_postfix_increment_decrement() {
+    // Test postfix ++/-- operators
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        let x = 5;
+        x++;
+        x--;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    assert!(checker.diagnostics.is_empty(),
+        "Expected no errors for postfix increment/decrement, got: {:?}", checker.diagnostics);
+}
