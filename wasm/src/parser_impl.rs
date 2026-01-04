@@ -893,9 +893,10 @@ impl ParserState {
         self.alloc_node(Node::VariableDeclaration(decl))
     }
 
-    /// Parse a binding name (identifier for now).
+    /// Parse a binding name (identifier or binding pattern).
+    /// Variable names can be binding identifiers including contextual keywords.
     fn parse_binding_name(&mut self) -> NodeIndex {
-        self.parse_identifier()
+        self.parse_binding_identifier()
     }
 
     /// Parse a function declaration.
@@ -908,7 +909,8 @@ impl ParserState {
         self.parse_expected(SyntaxKind::FunctionKeyword);
 
         let asterisk = self.parse_optional(SyntaxKind::AsteriskToken);
-        let name = self.parse_identifier();
+        // Function names can be binding identifiers including contextual keywords
+        let name = self.parse_binding_identifier();
 
         // Parse type parameters
         let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
@@ -1379,8 +1381,9 @@ impl ParserState {
         self.parse_expected(SyntaxKind::ClassKeyword);
 
         // Optional name (anonymous for default exports)
-        let name = if self.is_token(SyntaxKind::Identifier) {
-            self.parse_identifier()
+        // Class names can be binding identifiers including non-reserved keywords like `any`, `string`
+        let name = if self.is_binding_identifier() {
+            self.parse_binding_identifier()
         } else {
             NodeIndex::NONE
         };
@@ -1423,8 +1426,9 @@ impl ParserState {
         self.parse_expected(SyntaxKind::ClassKeyword);
 
         // Optional name (anonymous for default exports)
-        let name = if self.is_token(SyntaxKind::Identifier) {
-            self.parse_identifier()
+        // Class names can be binding identifiers including non-reserved keywords like `any`, `string`
+        let name = if self.is_binding_identifier() {
+            self.parse_binding_identifier()
         } else {
             NodeIndex::NONE
         };
@@ -1464,8 +1468,8 @@ impl ParserState {
         // Asterisk for generators
         let asterisk = self.parse_optional(SyntaxKind::AsteriskToken);
 
-        // Name
-        let name = self.parse_identifier();
+        // Function names can be binding identifiers including contextual keywords
+        let name = self.parse_binding_identifier();
 
         // Type parameters
         let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
@@ -1578,6 +1582,38 @@ impl ParserState {
                 | SyntaxKind::AsyncKeyword
                 | SyntaxKind::DeclareKeyword
                 | SyntaxKind::AccessorKeyword => self.token(),
+                _ => break,
+            };
+
+            let mod_pos = self.get_full_start();
+            self.next_token();
+            let mod_end = self.get_token_start();
+
+            let base = NodeBase::new(modifier_kind, mod_pos, mod_end);
+            modifiers.push(self.alloc_node(Node::Token(base)));
+        }
+
+        if modifiers.is_empty() {
+            None
+        } else {
+            let end = self.get_token_start();
+            Some(NodeList { pos, end, nodes: modifiers, has_trailing_comma: false })
+        }
+    }
+
+    /// Parse parameter modifiers (public, private, protected, readonly, override).
+    /// These are only valid in constructor parameters.
+    fn parse_parameter_modifiers(&mut self) -> Option<NodeList> {
+        let pos = self.get_full_start();
+        let mut modifiers = Vec::new();
+
+        loop {
+            let modifier_kind = match self.token() {
+                SyntaxKind::PublicKeyword
+                | SyntaxKind::PrivateKeyword
+                | SyntaxKind::ProtectedKeyword
+                | SyntaxKind::ReadonlyKeyword
+                | SyntaxKind::OverrideKeyword => self.token(),
                 _ => break,
             };
 
@@ -1822,7 +1858,8 @@ impl ParserState {
     fn parse_interface_declaration(&mut self) -> NodeIndex {
         let pos = self.get_full_start();
         self.parse_expected(SyntaxKind::InterfaceKeyword);
-        let name = self.parse_identifier();
+        // Interface names can be binding identifiers including contextual keywords
+        let name = self.parse_binding_identifier();
 
         let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
             Some(self.parse_type_parameters())
@@ -2055,7 +2092,8 @@ impl ParserState {
     fn parse_type_alias_declaration(&mut self) -> NodeIndex {
         let pos = self.get_full_start();
         self.parse_expected(SyntaxKind::TypeKeyword);
-        let name = self.parse_identifier();
+        // Type alias names can be binding identifiers including contextual keywords
+        let name = self.parse_binding_identifier();
 
         let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
             Some(self.parse_type_parameters())
@@ -2083,7 +2121,8 @@ impl ParserState {
     fn parse_enum_declaration(&mut self) -> NodeIndex {
         let pos = self.get_full_start();
         self.parse_expected(SyntaxKind::EnumKeyword);
-        let name = self.parse_identifier();
+        // Enum names can be binding identifiers including contextual keywords
+        let name = self.parse_binding_identifier();
 
         self.parse_expected(SyntaxKind::OpenBraceToken);
         let members = self.parse_enum_members();
@@ -3379,6 +3418,35 @@ impl ParserState {
         self.alloc_node(Node::Identifier(id))
     }
 
+    /// Parse a binding identifier (class names, function names, variable names).
+    /// This accepts identifiers and non-reserved keywords (like `any`, `string`, `number`).
+    fn parse_binding_identifier(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let text = self.get_token_value();
+
+        if self.scanner.is_identifier() {
+            self.identifiers.push(text.clone());
+            self.next_token();
+        } else {
+            self.parse_error_at_current_token("Identifier expected");
+        }
+
+        let end = self.get_token_start();
+
+        let id = Identifier {
+            base: NodeBase::new(SyntaxKind::Identifier, pos, end),
+            escaped_text: text,
+            original_text: None,
+            type_arguments: None,
+        };
+        self.alloc_node(Node::Identifier(id))
+    }
+
+    /// Check if the current token is a binding identifier.
+    fn is_binding_identifier(&self) -> bool {
+        self.scanner.is_identifier()
+    }
+
     /// Parse `this` keyword as an identifier for `this` parameter: function foo(this: T)
     fn parse_this_as_identifier(&mut self) -> NodeIndex {
         let pos = self.get_full_start();
@@ -3666,11 +3734,7 @@ impl ParserState {
     fn parse_parameter_list(&mut self) -> NodeList {
         self.parse_delimited_list(
             SyntaxKind::CloseParenToken,
-            |p| {
-                p.is_token(SyntaxKind::Identifier)
-                    || p.is_token(SyntaxKind::DotDotDotToken)
-                    || p.is_token(SyntaxKind::ThisKeyword)
-            },
+            |p| p.is_parameter_start(),
             |p| p.parse_parameter(),
         )
     }
@@ -3679,6 +3743,10 @@ impl ParserState {
     fn parse_parameter(&mut self) -> NodeIndex {
         let pos = self.get_full_start();
 
+        // Parse optional modifiers (public, private, protected, readonly, override)
+        // These are only valid in constructor parameters but we parse them and let checker report errors
+        let modifiers = self.parse_parameter_modifiers();
+
         // Check for rest parameter (...args)
         let dot_dot_dot_token = self.parse_optional(SyntaxKind::DotDotDotToken);
 
@@ -3686,7 +3754,7 @@ impl ParserState {
         let name = if self.is_token(SyntaxKind::ThisKeyword) {
             self.parse_this_as_identifier()
         } else {
-            self.parse_identifier()
+            self.parse_binding_identifier()
         };
 
         // Check for optional parameter (name?)
@@ -3708,7 +3776,7 @@ impl ParserState {
 
         let param = crate::parser::ParameterDeclaration {
             base: NodeBase::new_ext(syntax_kind_ext::PARAMETER, pos, end),
-            modifiers: None,
+            modifiers,
             dot_dot_dot_token,
             name,
             question_token,

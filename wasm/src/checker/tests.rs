@@ -8974,6 +8974,33 @@ fn test_function_with_parameters_in_return() {
 }
 
 #[test]
+fn test_class_with_reserved_keyword_name() {
+    // Test: class any {} - should parse (reserved type keywords can be class names)
+    use crate::parser_impl::ParserState;
+
+    let code = r#"class any {}"#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    // Should parse without panicking
+    assert!(!root.is_none(), "Should parse class with 'any' as name");
+}
+
+#[test]
+fn test_class_with_number_keyword_name() {
+    // Test: class number {} - should parse
+    use crate::parser_impl::ParserState;
+
+    let code = r#"class number {}"#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none(), "Should parse class with 'number' as name");
+}
+
+#[test]
 fn test_mapped_type_basic() {
     use crate::parser_impl::ParserState;
     use crate::binder::BinderState;
@@ -11412,5 +11439,70 @@ fn test_function_overload_resolution() {
 
     checker.check_source_file(root);
     // Should resolve overloads correctly based on argument types
+}
+
+#[test]
+fn test_class_with_various_reserved_keyword_names() {
+    // Test: class declarations with various reserved type keywords as names
+    // These should all parse successfully since they're binding identifiers, not type keywords
+    use crate::parser_impl::ParserState;
+
+    // Only contextual keywords (> SyntaxKind::WithKeyword = 118) are valid binding identifiers
+    // Reserved keywords like void (116), null (106) are NOT valid class names
+    let test_cases = vec![
+        "class any {}",       // AnyKeyword = 133
+        "class number {}",    // NumberKeyword = 150
+        "class string {}",    // StringKeyword = 154
+        "class boolean {}",   // BooleanKeyword = 136
+        "class symbol {}",    // SymbolKeyword = 155
+        "class never {}",     // NeverKeyword = 146
+        "class unknown {}",   // UnknownKeyword = 159
+        "class object {}",    // ObjectKeyword = 151
+        "class undefined {}", // UndefinedKeyword = 157
+    ];
+
+    for code in test_cases {
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        // Should parse without panicking or infinite looping
+        assert!(!root.is_none(), "Should parse: {}", code);
+    }
+}
+
+#[test]
+fn test_interface_with_reserved_keyword_name() {
+    // Test: interface declarations with reserved type keywords as names
+    use crate::parser_impl::ParserState;
+
+    let test_cases = vec![
+        "interface any {}",
+        "interface number {}",
+        "interface string {}",
+    ];
+
+    for code in test_cases {
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+        assert!(!root.is_none(), "Should parse: {}", code);
+    }
+}
+
+#[test]
+fn test_function_with_reserved_keyword_name() {
+    // Test: function declarations with reserved type keywords as names
+    use crate::parser_impl::ParserState;
+
+    let test_cases = vec![
+        "function any() {}",
+        "function number() {}",
+        "function string() {}",
+    ];
+
+    for code in test_cases {
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+        assert!(!root.is_none(), "Should parse: {}", code);
+    }
 }
 
