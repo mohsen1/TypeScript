@@ -6,8 +6,6 @@ Migrate TypeScript compiler to Rust/WASM. **Run in an infinite loop until comple
 ## 📋 The Plan
 **`specs/migration_plan.md`** is the single source of truth. Read it. Follow it. Update it.
 
-Commit frequently
-
 ## 🔁 INFINITE LOOP
 
 ```
@@ -58,3 +56,6 @@ node scripts/verifyChecker.mjs
 2. **Small commits** - One task, one commit
 3. **Update the plan** - Mark tasks complete in `specs/migration_plan.md`
 4. **Keep going** - This is an infinite loop. Work NEVER ENDS! 
+5. **Commit frequently** - when in a good shape
+6. **Separate files for tests** - source and test should not be on the same file
+7. **Leverage ask-gemini.mjs** - when things are difficult and you need another pair of eyes
