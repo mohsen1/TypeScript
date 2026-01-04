@@ -875,8 +875,186 @@ impl<'a> LanguageService<'a> {
             return Some(member_completions);
         }
 
+        // Check if we're in a type annotation context (after ':' or in type position)
+        if let Some(type_completions) = self.get_type_completions_at_position(position) {
+            return Some(type_completions);
+        }
+
         // Fall back to global completions
         self.get_global_completions()
+    }
+
+    /// Try to get type completions if we're in a type annotation context.
+    /// Returns Some if we're after a ':' in a type annotation position.
+    fn get_type_completions_at_position(&self, position: u32) -> Option<CompletionInfo> {
+        // Find if we're in a type annotation context
+        if !self.is_in_type_context(self.root, position) {
+            return None;
+        }
+
+        self.get_type_completions()
+    }
+
+    /// Check if position is in a type annotation context.
+    /// This includes: after ':' in variable/parameter declarations, after 'extends', 'implements',
+    /// inside generic type arguments, etc.
+    fn is_in_type_context(&self, node_idx: NodeIndex, position: u32) -> bool {
+        let (start, end) = match self.checker.get_node_span(node_idx) {
+            Some(span) => span,
+            None => return false,
+        };
+
+        // Check if position is within this node
+        if position < start || position > end {
+            return false;
+        }
+
+        // Check for type-related node kinds
+        let node = match self.checker.node_arena.get(node_idx) {
+            Some(n) => n,
+            None => return false,
+        };
+
+        match node {
+            // Direct type contexts
+            Node::TypeReference(_) |
+            Node::TypeLiteral(_) |
+            Node::ArrayType(_) |
+            Node::UnionType(_) |
+            Node::IntersectionType(_) |
+            Node::FunctionType(_) |
+            Node::TypeQuery(_) |
+            Node::TupleType(_) |
+            Node::ParenthesizedType(_) |
+            Node::ConditionalType(_) |
+            Node::IndexedAccessType(_) |
+            Node::MappedType(_) => return true,
+
+            // Variable declaration - check if we're in the type part
+            Node::VariableDeclaration(vd) => {
+                if !vd.type_annotation.is_none() {
+                    if let Some((type_start, _)) = self.checker.get_node_span(vd.type_annotation) {
+                        if position >= type_start {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            // Parameter declaration - check if we're in the type part
+            Node::ParameterDeclaration(p) => {
+                if !p.type_annotation.is_none() {
+                    if let Some((type_start, _)) = self.checker.get_node_span(p.type_annotation) {
+                        if position >= type_start {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            Node::FunctionDeclaration(fd) => {
+                // Check if we're in the return type
+                if !fd.type_annotation.is_none() {
+                    if let Some((type_start, _)) = self.checker.get_node_span(fd.type_annotation) {
+                        if position >= type_start {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            Node::PropertyDeclaration(pd) => {
+                if !pd.type_annotation.is_none() {
+                    if let Some((type_start, _)) = self.checker.get_node_span(pd.type_annotation) {
+                        if position >= type_start {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            Node::PropertySignature(ps) => {
+                if !ps.type_annotation.is_none() {
+                    if let Some((type_start, _)) = self.checker.get_node_span(ps.type_annotation) {
+                        if position >= type_start {
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            _ => {}
+        }
+
+        // Check children recursively
+        for child_idx in self.checker.get_node_children(node_idx) {
+            if self.is_in_type_context(child_idx, position) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Get type completions (interfaces, type aliases, classes, enums, and primitive types).
+    fn get_type_completions(&self) -> Option<CompletionInfo> {
+        use crate::binder::symbol_flags;
+
+        let mut entries = Vec::new();
+
+        // Add primitive types first
+        for primitive in &["string", "number", "boolean", "void", "null", "undefined", "never", "unknown", "any", "object", "symbol", "bigint"] {
+            entries.push(CompletionEntry {
+                name: primitive.to_string(),
+                kind: ScriptElementKind::PrimitiveType,
+                kind_modifiers: String::new(),
+                sort_text: format!("0{}", primitive), // Sort primitives first
+                insert_text: None,
+                replacement_span: None,
+                has_action: false,
+                source: None,
+                is_recommended: false,
+                is_from_unchecked_file: false,
+            });
+        }
+
+        // Add type symbols from file scope
+        for (name, symbol_id) in self.checker.get_file_symbols() {
+            let flags = self.checker.get_symbol_flags(*symbol_id);
+
+            // Only include type-related symbols
+            if (flags & symbol_flags::INTERFACE) != 0 ||
+               (flags & symbol_flags::TYPE_ALIAS) != 0 ||
+               (flags & symbol_flags::CLASS) != 0 ||
+               (flags & symbol_flags::REGULAR_ENUM) != 0 ||
+               (flags & symbol_flags::CONST_ENUM) != 0 {
+                let kind = self.symbol_flags_to_script_element_kind(flags);
+
+                entries.push(CompletionEntry {
+                    name: name.clone(),
+                    kind,
+                    kind_modifiers: String::new(),
+                    sort_text: format!("1{}", name), // Sort after primitives
+                    insert_text: None,
+                    replacement_span: None,
+                    has_action: false,
+                    source: None,
+                    is_recommended: false,
+                    is_from_unchecked_file: false,
+                });
+            }
+        }
+
+        if entries.is_empty() {
+            return None;
+        }
+
+        Some(CompletionInfo {
+            is_global_completion: false,
+            is_member_completion: false,
+            is_new_identifier_location: true,
+            entries,
+        })
     }
 
     /// Try to get member completions if we're in a property access context.
@@ -1758,5 +1936,73 @@ const p: Point = { x: 1, y: 2, move(dx, dy) {} };
                     "Should have properties or be unresolved type");
             }
         }
+    }
+
+    #[test]
+    fn test_type_completions() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+        use crate::checker::CheckerState;
+
+        // Parse TypeScript code with type annotations
+        let source = r#"
+interface Person {
+    name: string;
+    age: number;
+}
+
+type Status = "active" | "inactive";
+
+class User implements Person {
+    name: string;
+    age: number;
+}
+
+enum Color { Red, Green, Blue }
+
+const x: number = 1;
+"#;
+        let mut parser = ParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        // Bind the file
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        // Type check
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
+        checker.check_source_file(root);
+
+        // Create language service
+        let ls = LanguageService::new(&checker, "test.ts".to_string(), root);
+
+        // Get type completions
+        let type_completions = ls.get_type_completions();
+        assert!(type_completions.is_some(), "Should get type completions");
+
+        let completions = type_completions.unwrap();
+        let entry_names: Vec<_> = completions.entries.iter()
+            .map(|e| e.name.as_str())
+            .collect();
+
+        // Should have primitive types
+        assert!(entry_names.contains(&"string"), "Should have 'string' primitive");
+        assert!(entry_names.contains(&"number"), "Should have 'number' primitive");
+        assert!(entry_names.contains(&"boolean"), "Should have 'boolean' primitive");
+
+        // Should have user-defined types
+        assert!(entry_names.contains(&"Person"), "Should have 'Person' interface");
+        assert!(entry_names.contains(&"Status"), "Should have 'Status' type alias");
+        assert!(entry_names.contains(&"User"), "Should have 'User' class");
+        assert!(entry_names.contains(&"Color"), "Should have 'Color' enum");
+
+        // Should NOT have value-only symbols
+        assert!(!entry_names.contains(&"x"), "Should NOT have 'x' variable in type completions");
     }
 }

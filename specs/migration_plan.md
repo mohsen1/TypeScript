@@ -339,8 +339,21 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
   - Global completions refactored to separate method
 - [x] 2 new tests: member completions, get_properties_of_type
 
+### Completed (Session 17 continued) - Type Completions
+- [x] `get_type_completions_at_position()` - Check if in type context and return type completions
+- [x] `is_in_type_context()` - Detect type annotation contexts:
+  - TypeReference, TypeLiteral, ArrayType, UnionType, IntersectionType
+  - Variable/parameter type annotations
+  - Function return types
+  - Property declarations and signatures
+- [x] `get_type_completions()` - Return type-appropriate completions:
+  - Primitive types: string, number, boolean, void, null, undefined, never, unknown, any, object, symbol, bigint
+  - User-defined types: interfaces, type aliases, classes, enums
+  - Excludes value-only symbols (variables, functions without type meaning)
+- [x] 1 new test: type completions
+- [x] 757 tests passing
+
 ### TODO
-- [ ] Type completions (after `:` or in type position)
 - [ ] Cross-file navigation support
 - [ ] Formatting engine
 - [ ] Code fixes and refactorings
@@ -368,8 +381,8 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 | 7 | Language Service | ~1,500 | 5 | 🟡 55% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
-**Total Rust Code**: ~49,500 lines
-**Total Tests**: 756 passing
+**Total Rust Code**: ~49,700 lines
+**Total Tests**: 757 passing
 **Overall Progress**: ~90% of full compiler functionality
 
 ---
