@@ -515,14 +515,14 @@ building up to full inference.
       Affected: Array prototype methods with callbacks, super.method() calls
 - [x] Improve `this` type in class methods (DONE - get_this_type())
 - [x] Improve `super` type in class methods (DONE - get_super_type())
-- [ ] Complete async/await type inference
+- [x] Complete async/await type inference (DONE - wired get_awaited_type to await expressions)
 - [ ] Add assertion function support
 - [ ] Add exhaustiveness checking for switch
 - [ ] Integrate with TypeScript's checker for full test suite
 
-Verification Gate: 367+ checker tests passing. Full baseline matching pending.
+Verification Gate: 389 Rust tests passing. Full baseline matching pending.
 
-Progress: **Phase 5 ~70% complete! Core type checking working. 367 tests passing.**
+Progress: **Phase 5 ~75% complete! Core type checking working. 389 tests passing (9 skipped).**
 
 ==============================================================================
 PHASE 6: EMITTER
@@ -992,7 +992,7 @@ Next Step: Phase 3 - Parser Integration (first target: simple statement parsing)
 - All 384 tests passing (8 skipped for known issues)
 - Updated migration plan with accurate progress tracking
 
-Next: Continue Phase 5 completion - `this` type in class methods, async/await
+Next: Phase 5 remaining - memory optimization, assertion functions, exhaustiveness
 
 ==============================================================================
 PROGRESS SUMMARY (Updated 2026-01-04)
@@ -1005,13 +1005,13 @@ PROGRESS SUMMARY (Updated 2026-01-04)
 | 2     | Scanner             | ~2,500        | 22      | ✅ DONE
 | 3     | Parser              | ~5,000        | 100+    | ✅ DONE (98%)
 | 4     | Binder              | ~1,900        | 20+     | ✅ DONE
-| 5     | Type Checker        | ~7,500        | 367     | 🟡 70%
+| 5     | Type Checker        | ~7,500        | 370+    | 🟡 75%
 | 6     | Emitter             | ~100          | -       | ⬜ Pending
 | 7     | Language Service    | -             | -       | ⬜ Pending
 | 8     | Full Rust Mode      | -             | -       | ⬜ Pending
 
 **Total Rust Code**: ~17,500 lines (excluding tests)
-**Total Tests**: 384 passing, 8 skipped
+**Total Tests**: 389 passing, 9 skipped
 **Overall Progress**: ~65% of core compiler functionality
 
 Remaining major work:
