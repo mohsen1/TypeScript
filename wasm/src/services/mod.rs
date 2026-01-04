@@ -170,6 +170,18 @@ impl SymbolDisplayPart {
     pub fn space() -> Self {
         Self::new(" ", "space")
     }
+
+    pub fn parameter_name(s: impl Into<String>) -> Self {
+        Self::new(s, "parameterName")
+    }
+
+    pub fn type_parameter_name(s: impl Into<String>) -> Self {
+        Self::new(s, "typeParameterName")
+    }
+
+    pub fn property_name(s: impl Into<String>) -> Self {
+        Self::new(s, "propertyName")
+    }
 }
 
 /// JSDoc tag information.
@@ -901,6 +913,161 @@ impl<'a> LanguageService<'a> {
             is_new_identifier_location: true,
             entries,
         })
+    }
+
+    /// Get signature help at a position (inside a function call).
+    /// Returns function signatures and parameter info when cursor is inside parentheses.
+    pub fn get_signature_help_at_position(&self, position: u32) -> Option<SignatureHelpItems> {
+        // Find the call expression containing this position
+        let (call_idx, arg_index, arg_count) = self.find_containing_call_expression(self.root, position)?;
+
+        // Get the expression being called
+        let call_expression = match self.checker.node_arena.get(call_idx) {
+            Some(Node::CallExpression(c)) => c.expression,
+            Some(Node::NewExpression(n)) => n.expression,
+            _ => return None,
+        };
+
+        // Get the symbol of the called function
+        let symbol_id = self.checker.get_symbol_at_location(call_expression)?;
+        let symbol_name = self.checker.get_symbol_name(symbol_id)?;
+        let type_id = self.checker.get_cached_type_of_symbol(symbol_id)?;
+
+        // Build the signature help item
+        let mut parameters = Vec::new();
+        let mut prefix_display_parts = vec![
+            SymbolDisplayPart::text(symbol_name.clone()),
+            SymbolDisplayPart::punctuation("("),
+        ];
+        let suffix_display_parts = vec![SymbolDisplayPart::punctuation(")")];
+        let separator_display_parts = vec![
+            SymbolDisplayPart::punctuation(","),
+            SymbolDisplayPart::space(),
+        ];
+
+        // Try to get function parameter info from the type
+        if let Some(signatures) = self.checker.get_signatures_of_type(type_id) {
+            for (i, sig) in signatures.iter().enumerate() {
+                if i == 0 { // Use first signature for now
+                    for param_info in sig {
+                        parameters.push(SignatureHelpParameter {
+                            name: param_info.name.clone(),
+                            documentation: Vec::new(),
+                            display_parts: vec![
+                                SymbolDisplayPart::parameter_name(param_info.name.clone()),
+                                SymbolDisplayPart::punctuation(":"),
+                                SymbolDisplayPart::space(),
+                                SymbolDisplayPart::text(param_info.type_display.clone()),
+                            ],
+                            is_optional: param_info.is_optional,
+                            is_rest: param_info.is_rest,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Get the applicable span (the argument list area)
+        let (call_start, call_end) = self.checker.get_node_span(call_idx)?;
+        let applicable_span = TextSpan::from_bounds(call_start, call_end);
+
+        let item = SignatureHelpItem {
+            is_variadic: parameters.iter().any(|p| p.is_rest),
+            prefix_display_parts,
+            suffix_display_parts,
+            separator_display_parts,
+            parameters,
+            documentation: Vec::new(),
+            tags: Vec::new(),
+        };
+
+        Some(SignatureHelpItems {
+            items: vec![item],
+            applicable_span,
+            selected_item_index: 0,
+            argument_index: arg_index,
+            argument_count: arg_count,
+        })
+    }
+
+    /// Find the call expression containing the given position and return the argument index.
+    fn find_containing_call_expression(
+        &self,
+        start_node: NodeIndex,
+        position: u32,
+    ) -> Option<(NodeIndex, usize, usize)> {
+        self.find_call_at_position(start_node, position)
+    }
+
+    /// Recursively search for a call expression containing the position.
+    fn find_call_at_position(&self, node_idx: NodeIndex, position: u32) -> Option<(NodeIndex, usize, usize)> {
+        let (start, end) = self.checker.get_node_span(node_idx)?;
+
+        // Check if position is within this node
+        if position < start || position > end {
+            return None;
+        }
+
+        // If this is a call expression, check if we're in the argument list
+        match self.checker.node_arena.get(node_idx) {
+            Some(Node::CallExpression(call)) => {
+                // Calculate the argument index based on position
+                let (arg_index, arg_count) = self.get_argument_index(&call.arguments, position);
+                if arg_count > 0 || self.is_in_parentheses(node_idx, position) {
+                    return Some((node_idx, arg_index, arg_count));
+                }
+            }
+            Some(Node::NewExpression(new_expr)) => {
+                if let Some(ref args) = new_expr.arguments {
+                    let (arg_index, arg_count) = self.get_argument_index(args, position);
+                    if arg_count > 0 || self.is_in_parentheses(node_idx, position) {
+                        return Some((node_idx, arg_index, arg_count));
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        // Check children
+        for child_idx in self.checker.get_node_children(node_idx) {
+            if let Some(result) = self.find_call_at_position(child_idx, position) {
+                return Some(result);
+            }
+        }
+
+        None
+    }
+
+    /// Get the current argument index based on position within argument list.
+    fn get_argument_index(&self, args: &crate::parser::NodeList, position: u32) -> (usize, usize) {
+        let arg_count = args.nodes.len();
+        if arg_count == 0 {
+            return (0, 0);
+        }
+
+        // Find which argument we're in based on position
+        for (i, arg_idx) in args.nodes.iter().enumerate() {
+            if let Some((start, end)) = self.checker.get_node_span(*arg_idx) {
+                if position <= start {
+                    return (i, arg_count);
+                }
+                if position <= end {
+                    return (i, arg_count);
+                }
+            }
+        }
+
+        // If we're past all arguments, we're in the last/next position
+        (arg_count, arg_count)
+    }
+
+    /// Check if position is inside the parentheses of a call expression.
+    fn is_in_parentheses(&self, call_idx: NodeIndex, position: u32) -> bool {
+        // Simple check: if we have the call expression span, position should be inside
+        if let Some((start, end)) = self.checker.get_node_span(call_idx) {
+            return position > start && position < end;
+        }
+        false
     }
 
     /// Get document highlights at a position.

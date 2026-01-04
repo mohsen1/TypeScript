@@ -31,4 +31,4 @@ pub use types::{
     EnumTypeInfo, TypeReference, Signature, IndexInfo,
 };
 pub use arena::TypeArena;
-pub use state::{CheckerState, Diagnostic, DiagnosticCategory, TypeGuard, TypeRelation};
+pub use state::{CheckerState, Diagnostic, DiagnosticCategory, TypeGuard, TypeRelation, ParameterInfo};

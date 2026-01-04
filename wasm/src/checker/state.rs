@@ -13,6 +13,23 @@ use super::arena::TypeArena;
 use super::types::TypeId;
 
 // =============================================================================
+// Parameter Info (for signature help)
+// =============================================================================
+
+/// Information about a function parameter for signature help.
+#[derive(Clone, Debug)]
+pub struct ParameterInfo {
+    /// Parameter name
+    pub name: String,
+    /// Display string for the parameter type
+    pub type_display: String,
+    /// Whether this parameter is optional
+    pub is_optional: bool,
+    /// Whether this is a rest parameter
+    pub is_rest: bool,
+}
+
+// =============================================================================
 // Diagnostic
 // =============================================================================
 
@@ -767,6 +784,83 @@ impl<'a> CheckerState<'a> {
             Type::TypeParameter(tp) => Some(tp.symbol),
             Type::Object(obj) if !obj.symbol.is_none() => Some(obj.symbol),
             // Note: Enum types don't currently store a symbol reference
+            _ => None,
+        }
+    }
+
+    /// Get the call signatures of a type (for signature help).
+    /// Returns a list of signatures, each containing parameter information.
+    pub fn get_signatures_of_type(&self, type_id: TypeId) -> Option<Vec<Vec<ParameterInfo>>> {
+        use super::types::Type;
+
+        let ty = self.types.get(type_id)?;
+
+        match ty {
+            Type::Function(func) => {
+                // Build parameter info from the function type
+                let mut params = Vec::new();
+                for (i, &param_type_id) in func.parameter_types.iter().enumerate() {
+                    let name = if i < func.parameter_names.len() {
+                        func.parameter_names[i].clone()
+                    } else {
+                        format!("arg{}", i)
+                    };
+
+                    let is_optional = if i < func.min_argument_count as usize {
+                        false
+                    } else {
+                        !func.has_rest_parameter || i < func.parameter_types.len() - 1
+                    };
+
+                    let is_rest = func.has_rest_parameter && i == func.parameter_types.len() - 1;
+
+                    params.push(ParameterInfo {
+                        name,
+                        type_display: self.type_to_string(param_type_id),
+                        is_optional,
+                        is_rest,
+                    });
+                }
+                Some(vec![params])
+            }
+            Type::Object(obj) => {
+                // Get call signatures from object type
+                let mut all_sigs = Vec::new();
+                for sig in &obj.call_signatures {
+                    let mut params = Vec::new();
+                    for (i, &param_symbol) in sig.parameters.iter().enumerate() {
+                        let name = if let Some(sym) = self.symbol_arena.get(param_symbol) {
+                            sym.escaped_name.clone()
+                        } else {
+                            format!("arg{}", i)
+                        };
+
+                        // Get the type of the parameter symbol
+                        let type_display = if let Some(&param_type) = self.symbol_types.get(&param_symbol) {
+                            self.type_to_string(param_type)
+                        } else {
+                            "any".to_string()
+                        };
+
+                        let is_optional = i >= sig.min_argument_count as usize;
+                        let is_rest = (sig.flags & super::types::signature_flags::HAS_REST_PARAMETER) != 0
+                            && i == sig.parameters.len() - 1;
+
+                        params.push(ParameterInfo {
+                            name,
+                            type_display,
+                            is_optional,
+                            is_rest,
+                        });
+                    }
+                    all_sigs.push(params);
+                }
+                if all_sigs.is_empty() {
+                    None
+                } else {
+                    Some(all_sigs)
+                }
+            }
             _ => None,
         }
     }

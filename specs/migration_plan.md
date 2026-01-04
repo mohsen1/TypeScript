@@ -16,6 +16,72 @@ compiler remains fully functional at every step.
 
 ---
 
+# 🚀 PRIORITY ZERO: DESIGN FOR SPEED
+
+**Goal: Beat TypeScript-Go in performance.**
+
+Stop "porting" TypeScript line-by-line. Start **architecting for the hardware**.
+
+## Phase 0.1: Thin Nodes (2-3x Parser Speedup)
+
+Current `Node` enum is sized to largest variant (~200+ bytes). This destroys cache locality.
+
+### TODO
+- [ ] Refactor `Node` enum to use 8-byte headers + indices into type-specific arrays
+- [ ] Target: `sizeof(Node)` ≤ 16 bytes (8 nodes per 64-byte cache line)
+- [ ] Split `NodeArena` into separate vectors per node type
+
+```rust
+#[repr(C)]
+pub struct NodeHeader {
+    kind: SyntaxKind,  // u16
+    flags: NodeFlags,  // u16
+    data_index: u32,   // index into specific Vec
+}
+```
+
+## Phase 0.2: Zero-Allocation Scanner (Massive Memory Reduction)
+
+Current scanner does `self.source[...].to_string()` = malloc per token.
+
+### TODO
+- [ ] Scanner returns `&str` slices of source, never `String`
+- [ ] Integrate `Interner` directly into `Scanner`
+- [ ] All identifiers become `Atom` (u32) - O(1) string comparison
+- [ ] Zero heap allocations during parsing
+
+## Phase 0.3: Arena-Based Type Checker (O(1) Cleanup)
+
+### TODO
+- [ ] Apply "Thin" pattern to `Type` enum (currently huge)
+- [ ] Use `bumpalo` or `typed-arena` for Type objects
+- [ ] All allocations for `check` go into single arena
+- [ ] Deallocation = reset pointer (no `Drop` overhead)
+
+## Phase 0.4: Parallelism (Fearless Concurrency)
+
+### TODO
+- [ ] Parse files in parallel with `Rayon`
+- [ ] Pipeline: Parse → Bind (parallel) → Merge symbols (sequential) → Check bodies (parallel)
+- [ ] Check function bodies in parallel (local inference doesn't affect global scope)
+
+## Phase 0.5: SIMD Scanning (Advanced)
+
+### TODO
+- [ ] Use portable SIMD for whitespace/identifier scanning
+- [ ] Reference: swc, oxc scanner implementations
+
+## Why Rust Beats Go
+
+| Feature | TypeScript-Go | Rust (This Project) |
+|---------|---------------|---------------------|
+| Memory | Heap + GC | Arena (O(1) free) |
+| Data Layout | Pointers (scattered) | Contiguous arrays (cache-friendly) |
+| Strings | GC Strings | Interned Atoms (u32) |
+| Concurrency | Goroutines | Rayon (no races on AST) |
+
+---
+
 # REMAINING WORK
 
 ## Phase 6: Emitter (60% Complete)
@@ -28,9 +94,9 @@ compiler remains fully functional at every step.
 ### TODO
 - [x] Declaration file emission (node filtering, export visibility, type-only imports)
 - [x] ES2015+ transforms: arrow function → function expression
-- [ ] Async/await → Promise chains
-- [ ] Generator → state machine
-- [ ] Module transforms (ES→CommonJS, ES→AMD/UMD)
+- [~] Async/await transforms (helper detection done, AST rewriting pending)
+- [~] Generator transforms (helper detection done, state machine pending)
+- [~] Module transforms (helper detection done, import/export rewriting pending)
 
 ## Phase 7: Language Service (50% Complete)
 
@@ -40,7 +106,7 @@ compiler remains fully functional at every step.
 | Tests | 3 |
 
 ### TODO
-- [ ] Signature help
+- [x] Signature help (basic implementation)
 - [ ] Context-aware completions (member completions, type completions)
 - [ ] Cross-file navigation support
 - [ ] Formatting engine
@@ -66,7 +132,7 @@ compiler remains fully functional at every step.
 | 4 | Binder | ~1,900 | 20+ | ✅ Done |
 | 5 | Type Checker | ~23,500 | 485 | ✅ 99% |
 | 6 | Emitter | ~4,800 | 80+ | 🟡 70% |
-| 7 | Language Service | ~1,300 | 3 | 🟡 50% |
+| 7 | Language Service | ~1,500 | 3 | 🟡 55% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
 **Total Rust Code**: ~38,300 lines
