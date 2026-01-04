@@ -256,14 +256,27 @@ impl<'a> ThinCheckerState<'a> {
 
             // Call expressions
             k if k == syntax_kind_ext::CALL_EXPRESSION => {
-                // TODO: Implement properly
-                self.types.any_type
+                self.get_type_of_call_expression(idx)
+            }
+
+            // New expressions
+            k if k == syntax_kind_ext::NEW_EXPRESSION => {
+                self.get_type_of_new_expression(idx)
             }
 
             // Property access
             k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
-                // TODO: Implement properly
-                self.types.any_type
+                self.get_type_of_property_access(idx)
+            }
+
+            // Element access
+            k if k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
+                self.get_type_of_element_access(idx)
+            }
+
+            // Conditional expression (ternary)
+            k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
+                self.get_type_of_conditional_expression(idx)
             }
 
             // Variable declaration
@@ -273,32 +286,32 @@ impl<'a> ThinCheckerState<'a> {
 
             // Function declaration
             k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
-                // TODO: Build function type
-                self.types.any_type
+                self.get_type_of_function(idx)
+            }
+
+            // Function expression
+            k if k == syntax_kind_ext::FUNCTION_EXPRESSION => {
+                self.get_type_of_function(idx)
             }
 
             // Arrow function
             k if k == syntax_kind_ext::ARROW_FUNCTION => {
-                // TODO: Build function type
-                self.types.any_type
+                self.get_type_of_function(idx)
             }
 
             // Array literal
             k if k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION => {
-                // TODO: Implement properly
-                self.types.any_type
+                self.get_type_of_array_literal(idx)
             }
 
             // Object literal
             k if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION => {
-                // TODO: Implement properly
-                self.types.any_type
+                self.get_type_of_object_literal(idx)
             }
 
             // Prefix unary expression
             k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION => {
-                // TODO: Implement properly based on operator
-                self.types.any_type
+                self.get_type_of_prefix_unary(idx)
             }
 
             // Postfix unary expression
@@ -500,6 +513,275 @@ impl<'a> ThinCheckerState<'a> {
 
         // No initializer - implicit any
         self.types.any_type
+    }
+
+    /// Get type of call expression.
+    fn get_type_of_call_expression(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.arena.get(idx) else {
+            return self.types.any_type;
+        };
+
+        let Some(call) = self.arena.get_call_expr(node) else {
+            return self.types.any_type;
+        };
+
+        // Get the type of the callee
+        let callee_type = self.get_type_of_node(call.expression);
+
+        // For now, return any for function calls
+        // TODO: Extract return type from function type
+        self.types.any_type
+    }
+
+    /// Get type of new expression.
+    fn get_type_of_new_expression(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.arena.get(idx) else {
+            return self.types.any_type;
+        };
+
+        let Some(new_expr) = self.arena.get_call_expr(node) else {
+            return self.types.any_type;
+        };
+
+        // Get the type of the constructor
+        let constructor_type = self.get_type_of_node(new_expr.expression);
+
+        // For now, return any for new expressions
+        // TODO: Extract instance type from constructor
+        self.types.any_type
+    }
+
+    /// Get type of property access expression.
+    fn get_type_of_property_access(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.arena.get(idx) else {
+            return self.types.any_type;
+        };
+
+        let Some(access) = self.arena.get_access_expr(node) else {
+            return self.types.any_type;
+        };
+
+        // Get the type of the object
+        let object_type = self.get_type_of_node(access.expression);
+
+        // Get the property name
+        let Some(name_node) = self.arena.get(access.name_or_argument) else {
+            return self.types.any_type;
+        };
+
+        // If it's an identifier, look up the property
+        if let Some(ident) = self.arena.get_identifier(name_node) {
+            let property_name = &ident.escaped_text;
+
+            // Check for built-in properties on known types
+            if let Some(prop_type) = self.get_property_of_type(object_type, property_name) {
+                return prop_type;
+            }
+        }
+
+        self.types.any_type
+    }
+
+    /// Get type of element access expression (e.g., arr[0], obj["prop"]).
+    fn get_type_of_element_access(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.arena.get(idx) else {
+            return self.types.any_type;
+        };
+
+        let Some(access) = self.arena.get_access_expr(node) else {
+            return self.types.any_type;
+        };
+
+        // Get the type of the object
+        let _object_type = self.get_type_of_node(access.expression);
+
+        // Get the index type
+        let _index_type = self.get_type_of_node(access.name_or_argument);
+
+        // For now, return any for element access
+        // TODO: Extract element type from array/tuple types
+        self.types.any_type
+    }
+
+    /// Get type of conditional expression (ternary: a ? b : c).
+    fn get_type_of_conditional_expression(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.arena.get(idx) else {
+            return self.types.any_type;
+        };
+
+        let Some(cond) = self.arena.get_conditional_expr(node) else {
+            return self.types.any_type;
+        };
+
+        let when_true = self.get_type_of_node(cond.when_true);
+        let when_false = self.get_type_of_node(cond.when_false);
+
+        if when_true == when_false {
+            when_true
+        } else {
+            self.types.create_union_type(vec![when_true, when_false])
+        }
+    }
+
+    /// Get type of function declaration/expression/arrow.
+    fn get_type_of_function(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.arena.get(idx) else {
+            return self.types.any_type;
+        };
+
+        let Some(func) = self.arena.get_function(node) else {
+            return self.types.any_type;
+        };
+
+        // Collect parameter types and names
+        let mut param_types = Vec::new();
+        let mut param_names = Vec::new();
+        let mut min_argument_count = 0u32;
+        let mut has_rest_parameter = false;
+
+        for &param_idx in &func.parameters.nodes {
+            if let Some(param_node) = self.arena.get(param_idx) {
+                if let Some(param) = self.arena.get_parameter(param_node) {
+                    // Get parameter name
+                    if let Some(name_node) = self.arena.get(param.name) {
+                        if let Some(name_data) = self.arena.get_identifier(name_node) {
+                            param_names.push(name_data.escaped_text.clone());
+                        } else {
+                            param_names.push(String::new());
+                        }
+                    } else {
+                        param_names.push(String::new());
+                    }
+
+                    // Use type annotation if present, otherwise any
+                    let param_type = if !param.type_annotation.is_none() {
+                        self.get_type_from_type_node(param.type_annotation)
+                    } else {
+                        self.types.any_type
+                    };
+                    param_types.push(param_type);
+
+                    // Check if optional or has initializer
+                    let is_optional = param.question_token || !param.initializer.is_none();
+                    if !is_optional && !has_rest_parameter {
+                        min_argument_count += 1;
+                    }
+
+                    // Check for rest parameter (dotDotDotToken)
+                    if param.dot_dot_dot_token {
+                        has_rest_parameter = true;
+                    }
+                }
+            }
+        }
+
+        // Get return type from annotation or infer
+        let return_type = if !func.type_annotation.is_none() {
+            self.get_type_from_type_node(func.type_annotation)
+        } else {
+            // TODO: Infer return type from body
+            self.types.any_type
+        };
+
+        self.types.create_function_type(
+            idx,
+            param_types,
+            param_names,
+            return_type,
+            min_argument_count,
+            has_rest_parameter,
+        )
+    }
+
+    /// Get type of array literal.
+    fn get_type_of_array_literal(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.arena.get(idx) else {
+            return self.types.any_type;
+        };
+
+        let Some(array) = self.arena.get_literal_expr(node) else {
+            return self.types.any_type;
+        };
+
+        if array.elements.nodes.is_empty() {
+            // Empty array literal: infer from context or use never[]
+            if let Some(contextual) = self.contextual_type {
+                return contextual;
+            }
+            return self.types.create_array_type(self.types.never_type, false);
+        }
+
+        // Get types of all elements
+        let mut element_types = Vec::new();
+        for &elem_idx in &array.elements.nodes {
+            if !elem_idx.is_none() {
+                element_types.push(self.get_type_of_node(elem_idx));
+            }
+        }
+
+        // Create union of element types
+        let element_type = if element_types.len() == 1 {
+            element_types[0]
+        } else if element_types.is_empty() {
+            self.types.never_type
+        } else {
+            self.types.create_union_type(element_types)
+        };
+
+        self.types.create_array_type(element_type, false)
+    }
+
+    /// Get type of object literal.
+    fn get_type_of_object_literal(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.arena.get(idx) else {
+            return self.types.any_type;
+        };
+
+        let Some(_obj) = self.arena.get_literal_expr(node) else {
+            return self.types.any_type;
+        };
+
+        // TODO: Create symbols for object literal properties and build proper object type
+        // For now, return an empty anonymous object type
+        self.types.create_object_type(Vec::new())
+    }
+
+    /// Get type of prefix unary expression.
+    fn get_type_of_prefix_unary(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.arena.get(idx) else {
+            return self.types.any_type;
+        };
+
+        let Some(unary) = self.arena.get_unary_expr(node) else {
+            return self.types.any_type;
+        };
+
+        match unary.operator {
+            k if k == SyntaxKind::ExclamationToken as u16 => {
+                // ! returns boolean
+                self.types.boolean_type
+            }
+            k if k == SyntaxKind::PlusToken as u16 || k == SyntaxKind::MinusToken as u16 => {
+                // Unary + and - return number
+                self.types.number_type
+            }
+            k if k == SyntaxKind::TildeToken as u16 => {
+                // ~ returns number
+                self.types.number_type
+            }
+            k if k == SyntaxKind::PlusPlusToken as u16 || k == SyntaxKind::MinusMinusToken as u16 => {
+                // ++ and -- return number
+                self.types.number_type
+            }
+            _ => self.types.any_type,
+        }
+    }
+
+    /// Get a property type from an object type.
+    fn get_property_of_type(&self, _type_id: TypeId, _property_name: &str) -> Option<TypeId> {
+        // TODO: Implement property lookup on types
+        // For now, return None to indicate property not found
+        None
     }
 
     // =========================================================================

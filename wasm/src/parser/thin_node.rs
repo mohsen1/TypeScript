@@ -218,6 +218,12 @@ pub struct BlockData {
     pub multi_line: bool,
 }
 
+/// Data for expression statements
+#[derive(Clone, Copy, Debug)]
+pub struct ExpressionStatementData {
+    pub expression: NodeIndex,
+}
+
 /// Data for variable declarations
 #[derive(Clone, Debug, Serialize)]
 pub struct VariableData {
@@ -2021,6 +2027,66 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get access expression data (property access or element access).
+    /// Returns None if node is not an access expression or has no data.
+    #[inline]
+    pub fn get_access_expr(&self, node: &ThinNode) -> Option<&AccessExprData> {
+        use super::syntax_kind_ext::{PROPERTY_ACCESS_EXPRESSION, ELEMENT_ACCESS_EXPRESSION};
+        if node.has_data() && (node.kind == PROPERTY_ACCESS_EXPRESSION || node.kind == ELEMENT_ACCESS_EXPRESSION) {
+            self.access_exprs.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get conditional expression data (ternary: a ? b : c).
+    /// Returns None if node is not a conditional expression or has no data.
+    #[inline]
+    pub fn get_conditional_expr(&self, node: &ThinNode) -> Option<&ConditionalExprData> {
+        use super::syntax_kind_ext::CONDITIONAL_EXPRESSION;
+        if node.has_data() && node.kind == CONDITIONAL_EXPRESSION {
+            self.conditional_exprs.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get literal expression data (array or object literal).
+    /// Returns None if node is not a literal expression or has no data.
+    #[inline]
+    pub fn get_literal_expr(&self, node: &ThinNode) -> Option<&LiteralExprData> {
+        use super::syntax_kind_ext::{ARRAY_LITERAL_EXPRESSION, OBJECT_LITERAL_EXPRESSION};
+        if node.has_data() && (node.kind == ARRAY_LITERAL_EXPRESSION || node.kind == OBJECT_LITERAL_EXPRESSION) {
+            self.literal_exprs.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get property assignment data.
+    /// Returns None if node is not a property assignment or has no data.
+    #[inline]
+    pub fn get_property_assignment(&self, node: &ThinNode) -> Option<&PropertyAssignmentData> {
+        use super::syntax_kind_ext::PROPERTY_ASSIGNMENT;
+        if node.has_data() && node.kind == PROPERTY_ASSIGNMENT {
+            self.property_assignments.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get unary expression data (prefix or postfix).
+    /// Returns None if node is not a unary expression or has no data.
+    #[inline]
+    pub fn get_unary_expr(&self, node: &ThinNode) -> Option<&UnaryExprData> {
+        use super::syntax_kind_ext::{PREFIX_UNARY_EXPRESSION, POSTFIX_UNARY_EXPRESSION};
+        if node.has_data() && (node.kind == PREFIX_UNARY_EXPRESSION || node.kind == POSTFIX_UNARY_EXPRESSION) {
+            self.unary_exprs.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Get function data.
     /// Returns None if node is not a function-like node or has no data.
     #[inline]
@@ -2319,6 +2385,141 @@ impl ThinNodeArena {
         use super::syntax_kind_ext::CONSTRUCTOR;
         if node.has_data() && node.kind == CONSTRUCTOR {
             self.constructors.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get type reference data.
+    #[inline]
+    pub fn get_type_ref(&self, node: &ThinNode) -> Option<&TypeRefData> {
+        use super::syntax_kind_ext::TYPE_REFERENCE;
+        if node.has_data() && node.kind == TYPE_REFERENCE {
+            self.type_refs.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get expression statement data (returns the expression node index).
+    #[inline]
+    pub fn get_expression_statement(&self, node: &ThinNode) -> Option<ExpressionStatementData> {
+        use super::syntax_kind_ext::EXPRESSION_STATEMENT;
+        if node.kind == EXPRESSION_STATEMENT {
+            // Expression statement stores expression index in data_index
+            Some(ExpressionStatementData {
+                expression: NodeIndex(node.data_index),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Get JSX element data.
+    #[inline]
+    pub fn get_jsx_element(&self, node: &ThinNode) -> Option<&JsxElementData> {
+        use super::syntax_kind_ext::JSX_ELEMENT;
+        if node.has_data() && node.kind == JSX_ELEMENT {
+            self.jsx_elements.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get JSX opening/self-closing element data.
+    #[inline]
+    pub fn get_jsx_opening(&self, node: &ThinNode) -> Option<&JsxOpeningData> {
+        use super::syntax_kind_ext::{JSX_OPENING_ELEMENT, JSX_SELF_CLOSING_ELEMENT};
+        if node.has_data() && (node.kind == JSX_OPENING_ELEMENT || node.kind == JSX_SELF_CLOSING_ELEMENT) {
+            self.jsx_opening.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get JSX closing element data.
+    #[inline]
+    pub fn get_jsx_closing(&self, node: &ThinNode) -> Option<&JsxClosingData> {
+        use super::syntax_kind_ext::JSX_CLOSING_ELEMENT;
+        if node.has_data() && node.kind == JSX_CLOSING_ELEMENT {
+            self.jsx_closing.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get JSX fragment data.
+    #[inline]
+    pub fn get_jsx_fragment(&self, node: &ThinNode) -> Option<&JsxFragmentData> {
+        use super::syntax_kind_ext::JSX_FRAGMENT;
+        if node.has_data() && node.kind == JSX_FRAGMENT {
+            self.jsx_fragments.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get JSX attributes data.
+    #[inline]
+    pub fn get_jsx_attributes(&self, node: &ThinNode) -> Option<&JsxAttributesData> {
+        use super::syntax_kind_ext::JSX_ATTRIBUTES;
+        if node.has_data() && node.kind == JSX_ATTRIBUTES {
+            self.jsx_attributes.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get JSX attribute data.
+    #[inline]
+    pub fn get_jsx_attribute(&self, node: &ThinNode) -> Option<&JsxAttributeData> {
+        use super::syntax_kind_ext::JSX_ATTRIBUTE;
+        if node.has_data() && node.kind == JSX_ATTRIBUTE {
+            self.jsx_attribute.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get JSX spread attribute data.
+    #[inline]
+    pub fn get_jsx_spread_attribute(&self, node: &ThinNode) -> Option<&JsxSpreadAttributeData> {
+        use super::syntax_kind_ext::JSX_SPREAD_ATTRIBUTE;
+        if node.has_data() && node.kind == JSX_SPREAD_ATTRIBUTE {
+            self.jsx_spread_attributes.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get JSX expression data.
+    #[inline]
+    pub fn get_jsx_expression(&self, node: &ThinNode) -> Option<&JsxExpressionData> {
+        use super::syntax_kind_ext::JSX_EXPRESSION;
+        if node.has_data() && node.kind == JSX_EXPRESSION {
+            self.jsx_expressions.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get JSX text data.
+    #[inline]
+    pub fn get_jsx_text(&self, node: &ThinNode) -> Option<&JsxTextData> {
+        use crate::scanner::SyntaxKind;
+        if node.has_data() && node.kind == SyntaxKind::JsxText as u16 {
+            self.jsx_text.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get JSX namespaced name data.
+    #[inline]
+    pub fn get_jsx_namespaced_name(&self, node: &ThinNode) -> Option<&JsxNamespacedNameData> {
+        use super::syntax_kind_ext::JSX_NAMESPACED_NAME;
+        if node.has_data() && node.kind == JSX_NAMESPACED_NAME {
+            self.jsx_namespaced_names.get(node.data_index as usize)
         } else {
             None
         }
