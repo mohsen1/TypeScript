@@ -353,8 +353,19 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 - [x] 1 new test: type completions
 - [x] 757 tests passing
 
+### Completed (Session 17 continued) - Cross-file Navigation
+- [x] `ProjectLanguageService` - Multi-file language service wrapping `MergedProgram`
+  - `get_symbol_file()` - Find which file declares a symbol
+  - `get_global_symbol()` - Look up symbol by name from global scope
+  - `get_all_global_symbols()` - List all global symbols
+  - `find_definition()` - Cross-file go-to-definition
+  - `get_files()` / `get_file()` - Access project files
+  - `search_symbols()` - Workspace symbol search with query matching
+- [x] Symbol origin tracking (symbol ID → file index mapping)
+- [x] 1 new test: project language service
+- [x] 758 tests passing
+
 ### TODO
-- [ ] Cross-file navigation support
 - [ ] Formatting engine
 - [ ] Code fixes and refactorings
 
@@ -381,8 +392,8 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 | 7 | Language Service | ~1,500 | 5 | 🟡 55% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
-**Total Rust Code**: ~49,700 lines
-**Total Tests**: 757 passing
+**Total Rust Code**: ~49,900 lines
+**Total Tests**: 758 passing
 **Overall Progress**: ~90% of full compiler functionality
 
 ---

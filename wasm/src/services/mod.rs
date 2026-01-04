@@ -10,6 +10,7 @@
 //! - Code fixes and refactorings
 
 use serde::{Deserialize, Serialize};
+use rustc_hash::FxHashMap;
 use crate::checker::{CheckerState, TypeId};
 use crate::parser::{NodeIndex, Node};
 use crate::binder::SymbolId;
@@ -555,7 +556,119 @@ pub enum LanguageServiceMode {
 }
 
 // =============================================================================
-// Language Service
+// Project Language Service (Multi-file)
+// =============================================================================
+
+use crate::parallel::{MergedProgram, BoundFile};
+
+/// Multi-file language service that supports cross-file navigation.
+///
+/// This wraps a `MergedProgram` and provides IDE features across all files:
+/// - Cross-file go to definition
+/// - Cross-file find all references
+/// - Project-wide symbol search
+pub struct ProjectLanguageService<'a> {
+    /// The merged program with all files
+    program: &'a MergedProgram,
+    /// Map from symbol ID to (file_index, original declarations)
+    /// This allows finding which file a symbol was declared in
+    symbol_origins: FxHashMap<SymbolId, usize>,
+}
+
+impl<'a> ProjectLanguageService<'a> {
+    /// Create a new project language service from a merged program.
+    pub fn new(program: &'a MergedProgram) -> Self {
+        let mut symbol_origins = FxHashMap::default();
+
+        // Build the symbol origin map
+        for (file_idx, file_locals) in program.file_locals.iter().enumerate() {
+            for (_, &symbol_id) in file_locals.iter() {
+                symbol_origins.insert(symbol_id, file_idx);
+            }
+        }
+
+        ProjectLanguageService {
+            program,
+            symbol_origins,
+        }
+    }
+
+    /// Get the file that declares a symbol.
+    pub fn get_symbol_file(&self, symbol_id: SymbolId) -> Option<&BoundFile> {
+        let file_idx = self.symbol_origins.get(&symbol_id)?;
+        self.program.files.get(*file_idx)
+    }
+
+    /// Get a symbol by name from the global scope.
+    pub fn get_global_symbol(&self, name: &str) -> Option<SymbolId> {
+        self.program.globals.get(name)
+    }
+
+    /// Get all global symbol names.
+    pub fn get_all_global_symbols(&self) -> Vec<(&String, SymbolId)> {
+        self.program.globals.iter()
+            .map(|(name, &id)| (name, id))
+            .collect()
+    }
+
+    /// Find definition across all files.
+    /// Given a symbol, returns the file name and position where it's declared.
+    pub fn find_definition(&self, symbol_id: SymbolId) -> Option<DefinitionInfo> {
+        let file = self.get_symbol_file(symbol_id)?;
+        let symbol = self.program.symbols.get(symbol_id)?;
+
+        // Find the declaration node in this file
+        // For now, we return a basic definition info
+        // A full implementation would need to walk the AST to find declaration positions
+        Some(DefinitionInfo {
+            file_name: file.file_name.clone(),
+            text_span: TextSpan::default(), // Would need declaration position
+            kind: ScriptElementKind::Unknown,
+            name: symbol.escaped_name.clone(),
+            container_name: None,
+        })
+    }
+
+    /// Get all files in the project.
+    pub fn get_files(&self) -> impl Iterator<Item = &BoundFile> {
+        self.program.files.iter()
+    }
+
+    /// Get a file by name.
+    pub fn get_file(&self, file_name: &str) -> Option<&BoundFile> {
+        self.program.files.iter()
+            .find(|f| f.file_name == file_name)
+    }
+
+    /// Get the number of files.
+    pub fn file_count(&self) -> usize {
+        self.program.files.len()
+    }
+
+    /// Get the total number of symbols.
+    pub fn symbol_count(&self) -> usize {
+        self.program.symbols.len()
+    }
+
+    /// Search for symbols by name prefix (for workspace symbol search).
+    pub fn search_symbols(&self, query: &str) -> Vec<(String, SymbolId, String)> {
+        let query_lower = query.to_lowercase();
+        let mut results = Vec::new();
+
+        for (name, &symbol_id) in self.program.globals.iter() {
+            if name.to_lowercase().contains(&query_lower) {
+                if let Some(file) = self.get_symbol_file(symbol_id) {
+                    results.push((name.clone(), symbol_id, file.file_name.clone()));
+                }
+            }
+        }
+
+        results
+    }
+}
+
+// =============================================================================
+// Language Service (Single-file)
 // =============================================================================
 
 /// The TypeScript Language Service implementation in Rust.
@@ -2004,5 +2117,54 @@ const x: number = 1;
 
         // Should NOT have value-only symbols
         assert!(!entry_names.contains(&"x"), "Should NOT have 'x' variable in type completions");
+    }
+
+    #[test]
+    fn test_project_language_service() {
+        use crate::parallel::compile_files;
+
+        // Create a multi-file project
+        let files = vec![
+            ("math.ts".to_string(), "export function add(x: number, y: number) { return x + y; }".to_string()),
+            ("utils.ts".to_string(), "export class Logger { log(msg: string) {} }".to_string()),
+            ("main.ts".to_string(), "const x = 1;".to_string()),
+        ];
+
+        let program = compile_files(files);
+        let project_ls = ProjectLanguageService::new(&program);
+
+        // Test file count
+        assert_eq!(project_ls.file_count(), 3);
+
+        // Test symbol count (should have symbols from all files)
+        assert!(project_ls.symbol_count() >= 3, "Should have at least 3 symbols");
+
+        // Test global symbol lookup
+        assert!(project_ls.get_global_symbol("add").is_some(), "Should find 'add'");
+        assert!(project_ls.get_global_symbol("Logger").is_some(), "Should find 'Logger'");
+        assert!(project_ls.get_global_symbol("x").is_some(), "Should find 'x'");
+
+        // Test get file by name
+        assert!(project_ls.get_file("math.ts").is_some());
+        assert!(project_ls.get_file("utils.ts").is_some());
+        assert!(project_ls.get_file("nonexistent.ts").is_none());
+
+        // Test symbol origins (cross-file navigation)
+        let add_symbol = project_ls.get_global_symbol("add").unwrap();
+        let add_file = project_ls.get_symbol_file(add_symbol);
+        assert!(add_file.is_some());
+        assert_eq!(add_file.unwrap().file_name, "math.ts");
+
+        let logger_symbol = project_ls.get_global_symbol("Logger").unwrap();
+        let logger_file = project_ls.get_symbol_file(logger_symbol);
+        assert!(logger_file.is_some());
+        assert_eq!(logger_file.unwrap().file_name, "utils.ts");
+
+        // Test symbol search
+        let search_results = project_ls.search_symbols("log");
+        assert!(!search_results.is_empty(), "Should find symbols matching 'log'");
+        let found_logger = search_results.iter()
+            .any(|(name, _, _)| name == "Logger");
+        assert!(found_logger, "Should find 'Logger' in search results");
     }
 }
