@@ -659,6 +659,12 @@ impl ParserState {
             }
             SyntaxKind::FunctionKeyword => self.parse_function_declaration(),
             SyntaxKind::ClassKeyword => self.parse_class_declaration(),
+            // Handle abstract class declarations
+            SyntaxKind::AbstractKeyword => {
+                // abstract class declaration
+                let pos = self.get_full_start();
+                self.parse_class_declaration_with_decorators(None, pos)
+            }
             SyntaxKind::IfKeyword => self.parse_if_statement(),
             SyntaxKind::WhileKeyword => self.parse_while_statement(),
             SyntaxKind::DoKeyword => self.parse_do_statement(),
@@ -896,7 +902,139 @@ impl ParserState {
     /// Parse a binding name (identifier or binding pattern).
     /// Variable names can be binding identifiers including contextual keywords.
     fn parse_binding_name(&mut self) -> NodeIndex {
-        self.parse_binding_identifier()
+        match self.token() {
+            SyntaxKind::OpenBraceToken => self.parse_object_binding_pattern(),
+            SyntaxKind::OpenBracketToken => self.parse_array_binding_pattern(),
+            _ => self.parse_binding_identifier(),
+        }
+    }
+
+    /// Parse an object binding pattern: { a, b: c, ...rest }
+    fn parse_object_binding_pattern(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+
+        let elements = self.parse_delimited_list(
+            SyntaxKind::CloseBraceToken,
+            |p| p.is_binding_element_start(),
+            |p| p.parse_binding_element(),
+        );
+
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+        let end = self.get_token_start();
+
+        let pattern = crate::parser::ObjectBindingPattern {
+            base: NodeBase::new_ext(syntax_kind_ext::OBJECT_BINDING_PATTERN, pos, end),
+            elements,
+        };
+        self.alloc_node(Node::ObjectBindingPattern(pattern))
+    }
+
+    /// Parse an array binding pattern: [a, b, ...rest]
+    fn parse_array_binding_pattern(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        self.parse_expected(SyntaxKind::OpenBracketToken);
+
+        let elements = self.parse_delimited_list(
+            SyntaxKind::CloseBracketToken,
+            |p| p.is_array_binding_element_start(),
+            |p| p.parse_array_binding_element(),
+        );
+
+        self.parse_expected(SyntaxKind::CloseBracketToken);
+        let end = self.get_token_start();
+
+        let pattern = crate::parser::ArrayBindingPattern {
+            base: NodeBase::new_ext(syntax_kind_ext::ARRAY_BINDING_PATTERN, pos, end),
+            elements,
+        };
+        self.alloc_node(Node::ArrayBindingPattern(pattern))
+    }
+
+    /// Check if at the start of a binding element in an object pattern.
+    fn is_binding_element_start(&self) -> bool {
+        self.is_token(SyntaxKind::DotDotDotToken) ||
+        self.is_token(SyntaxKind::OpenBracketToken) ||  // Computed property name
+        self.scanner.is_identifier() ||
+        self.is_token(SyntaxKind::StringLiteral) ||
+        self.is_token(SyntaxKind::NumericLiteral)
+    }
+
+    /// Check if at the start of an array binding element.
+    fn is_array_binding_element_start(&self) -> bool {
+        self.is_token(SyntaxKind::DotDotDotToken) ||
+        self.is_token(SyntaxKind::OpenBraceToken) ||
+        self.is_token(SyntaxKind::OpenBracketToken) ||
+        self.scanner.is_identifier()
+    }
+
+    /// Parse a binding element in an object binding pattern: a, a: b, a = default, ...rest
+    fn parse_binding_element(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+
+        // Check for rest element
+        let dot_dot_dot_token = self.parse_optional(SyntaxKind::DotDotDotToken);
+
+        // Parse property name (for renaming: propertyName: bindingName)
+        let property_name = self.parse_property_name();
+
+        // Check if this is a shorthand (just identifier) or has a colon (renaming)
+        let (final_property_name, name) = if self.parse_optional(SyntaxKind::ColonToken) {
+            // Property renaming: a: b or a: { nested }
+            (property_name, self.parse_binding_name())
+        } else {
+            // Shorthand: just `a` means both property name and binding name are `a`
+            (NodeIndex::NONE, property_name)
+        };
+
+        // Parse optional initializer
+        let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
+            self.parse_assignment_expression_or_higher()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end = self.get_token_start();
+
+        let element = crate::parser::BindingElement {
+            base: NodeBase::new_ext(syntax_kind_ext::BINDING_ELEMENT, pos, end),
+            dot_dot_dot_token,
+            property_name: final_property_name,
+            name,
+            initializer,
+        };
+        self.alloc_node(Node::BindingElement(element))
+    }
+
+    /// Parse an array binding element: a, [nested], { nested }, ...rest, or elided (empty)
+    fn parse_array_binding_element(&mut self) -> NodeIndex {
+        // Note: Elided elements (empty slots before comma) are handled by returning NONE
+        // In a full implementation, we'd create an OmittedExpression node
+        let pos = self.get_full_start();
+
+        // Check for rest element
+        let dot_dot_dot_token = self.parse_optional(SyntaxKind::DotDotDotToken);
+
+        // Parse binding name (identifier or nested pattern)
+        let name = self.parse_binding_name();
+
+        // Parse optional initializer
+        let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
+            self.parse_assignment_expression_or_higher()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end = self.get_token_start();
+
+        let element = crate::parser::BindingElement {
+            base: NodeBase::new_ext(syntax_kind_ext::BINDING_ELEMENT, pos, end),
+            dot_dot_dot_token,
+            property_name: NodeIndex::NONE,  // Array elements don't have property names
+            name,
+            initializer,
+        };
+        self.alloc_node(Node::BindingElement(element))
     }
 
     /// Parse a function declaration.
@@ -3170,10 +3308,15 @@ impl ParserState {
         loop {
             match self.token() {
                 SyntaxKind::DotToken => {
-                    // Property access: expr.name
+                    // Property access: expr.name or expr.#name (private identifier)
                     self.next_token();
                     let pos = self.arena.get(expr).map(|n| n.base().pos).unwrap_or(0);
-                    let name = self.parse_identifier();
+                    // After a dot, we can have an identifier or a private identifier
+                    let name = if self.is_token(SyntaxKind::PrivateIdentifier) {
+                        self.parse_private_identifier()
+                    } else {
+                        self.parse_identifier()
+                    };
                     let end = self.get_token_start();
 
                     let access = PropertyAccessExpression {
@@ -3686,6 +3829,8 @@ impl ParserState {
             SyntaxKind::StringLiteral => self.parse_string_literal(),
             SyntaxKind::NumericLiteral => self.parse_numeric_literal(),
             SyntaxKind::OpenBracketToken => self.parse_computed_property_name(),
+            // Private identifier (#name)
+            SyntaxKind::PrivateIdentifier => self.parse_private_identifier(),
             // Any identifier or keyword can be a property name
             _ if self.scanner.is_identifier() || self.is_keyword() => self.parse_property_name_identifier(),
             _ => {
@@ -3694,6 +3839,22 @@ impl ParserState {
                 self.create_missing_identifier()
             }
         }
+    }
+
+    /// Parse a private identifier (#name).
+    fn parse_private_identifier(&mut self) -> NodeIndex {
+        let pos = self.get_full_start();
+        let text = self.get_token_value(); // includes the #
+        self.next_token();
+        let end = self.get_token_start();
+
+        let id = Identifier {
+            base: NodeBase::new(SyntaxKind::PrivateIdentifier, pos, end),
+            escaped_text: text,
+            original_text: None,
+            type_arguments: None,
+        };
+        self.alloc_node(Node::PrivateIdentifier(id))
     }
 
     /// Parse a property name that is an identifier or keyword.
@@ -3849,10 +4010,11 @@ impl ParserState {
         let dot_dot_dot_token = self.parse_optional(SyntaxKind::DotDotDotToken);
 
         // Handle `this` parameter: function foo(this: SomeType, ...)
+        // Or binding pattern: function foo({ a, b }: Type)
         let name = if self.is_token(SyntaxKind::ThisKeyword) {
             self.parse_this_as_identifier()
         } else {
-            self.parse_binding_identifier()
+            self.parse_binding_name()
         };
 
         // Check for optional parameter (name?)

@@ -336,21 +336,39 @@ impl ScannerState {
                     }
                 }
 
-                // Whitespace
-                CharacterCodes::TAB 
-                | CharacterCodes::VERTICAL_TAB 
-                | CharacterCodes::FORM_FEED 
-                | CharacterCodes::SPACE 
+                // Whitespace (ASCII single-byte)
+                CharacterCodes::TAB
+                | CharacterCodes::VERTICAL_TAB
+                | CharacterCodes::FORM_FEED
+                | CharacterCodes::SPACE
                 | CharacterCodes::NON_BREAKING_SPACE => {
                     if self.skip_trivia {
                         self.pos += 1;
                         while self.pos < self.end && is_white_space_single_line(self.char_code_unchecked(self.pos)) {
-                            self.pos += 1;
+                            self.pos += self.char_len_at(self.pos);
                         }
                         continue;
                     } else {
                         while self.pos < self.end && is_white_space_single_line(self.char_code_unchecked(self.pos)) {
-                            self.pos += 1;
+                            self.pos += self.char_len_at(self.pos);
+                        }
+                        self.token = SyntaxKind::WhitespaceTrivia;
+                        return self.token;
+                    }
+                }
+
+                // BOM (Byte Order Mark) - 3 bytes in UTF-8
+                CharacterCodes::BYTE_ORDER_MARK => {
+                    if self.skip_trivia {
+                        self.pos += 3; // BOM is 3 bytes in UTF-8
+                        while self.pos < self.end && is_white_space_single_line(self.char_code_unchecked(self.pos)) {
+                            self.pos += self.char_len_at(self.pos);
+                        }
+                        continue;
+                    } else {
+                        self.pos += 3; // BOM is 3 bytes in UTF-8
+                        while self.pos < self.end && is_white_space_single_line(self.char_code_unchecked(self.pos)) {
+                            self.pos += self.char_len_at(self.pos);
                         }
                         self.token = SyntaxKind::WhitespaceTrivia;
                         return self.token;
@@ -663,7 +681,7 @@ impl ScannerState {
                             if c == CharacterCodes::LINE_FEED || c == CharacterCodes::CARRIAGE_RETURN {
                                 break;
                             }
-                            self.pos += 1;
+                            self.pos += self.char_len_at(self.pos); // Handle multi-byte UTF-8
                         }
                         if self.skip_trivia {
                             continue;
@@ -677,8 +695,8 @@ impl ScannerState {
                         let mut comment_closed = false;
                         while self.pos < self.end {
                             let c = self.char_code_unchecked(self.pos);
-                            if c == CharacterCodes::ASTERISK 
-                                && self.char_code_at(self.pos + 1) == Some(CharacterCodes::SLASH) 
+                            if c == CharacterCodes::ASTERISK
+                                && self.char_code_at(self.pos + 1) == Some(CharacterCodes::SLASH)
                             {
                                 self.pos += 2;
                                 comment_closed = true;
@@ -687,7 +705,7 @@ impl ScannerState {
                             if c == CharacterCodes::LINE_FEED || c == CharacterCodes::CARRIAGE_RETURN {
                                 self.token_flags |= TokenFlags::PrecedingLineBreak as u32;
                             }
-                            self.pos += 1;
+                            self.pos += self.char_len_at(self.pos); // Handle multi-byte UTF-8
                         }
                         if !comment_closed {
                             self.token_flags |= TokenFlags::Unterminated as u32;
@@ -727,9 +745,9 @@ impl ScannerState {
                     // Full implementation would check for private identifier
                     self.pos += 1;
                     if self.pos < self.end && is_identifier_start(self.char_code_unchecked(self.pos)) {
-                        self.pos += 1;
+                        self.pos += self.char_len_at(self.pos); // Handle multi-byte UTF-8
                         while self.pos < self.end && is_identifier_part(self.char_code_unchecked(self.pos)) {
-                            self.pos += 1;
+                            self.pos += self.char_len_at(self.pos); // Handle multi-byte UTF-8
                         }
                         self.token_value = self.substring(self.token_start, self.pos);
                         self.token = SyntaxKind::PrivateIdentifier;
@@ -803,10 +821,10 @@ impl ScannerState {
                 if let Some(c) = char::from_u32(ch) {
                     result.push(c);
                 }
-                self.pos += 1;
+                self.pos += self.char_len_at(self.pos); // Advance by character byte length
             }
         }
-        
+
         // Unterminated string
         self.token_flags |= TokenFlags::Unterminated as u32;
         self.token_value = result;
@@ -861,7 +879,7 @@ impl ScannerState {
                 if let Some(c) = char::from_u32(ch) {
                     result.push(c);
                 }
-                self.pos += 1;
+                self.pos += self.char_len_at(self.pos); // Advance by character byte length
             }
         }
         
@@ -962,20 +980,20 @@ impl ScannerState {
     /// Scan an identifier.
     fn scan_identifier(&mut self) {
         let start = self.pos;
-        // Advance past first character
-        self.pos += 1;
-        
+        // Advance past first character (may be multi-byte)
+        self.pos += self.char_len_at(self.pos);
+
         while self.pos < self.end {
             let ch = self.char_code_unchecked(self.pos);
             if !is_identifier_part(ch) {
                 break;
             }
-            self.pos += 1;
+            self.pos += self.char_len_at(self.pos); // Handle multi-byte UTF-8
         }
-        
+
         let text = self.substring(start, self.pos);
         self.token_value = text.clone();
-        
+
         // Check if it's a keyword
         self.token = crate::scanner::text_to_keyword(&text).unwrap_or(SyntaxKind::Identifier);
     }
@@ -1322,9 +1340,9 @@ impl ScannerState {
                     self.pos += 1;
                     // After hyphen, we need more identifier characters
                     if self.pos < self.end && is_identifier_start(self.char_code_unchecked(self.pos)) {
-                        self.pos += 1;
+                        self.pos += self.char_len_at(self.pos); // Handle multi-byte UTF-8
                         while self.pos < self.end && is_identifier_part(self.char_code_unchecked(self.pos)) {
-                            self.pos += 1;
+                            self.pos += self.char_len_at(self.pos); // Handle multi-byte UTF-8
                         }
                     }
                 } else {
@@ -1396,7 +1414,7 @@ impl ScannerState {
             if let Some(char) = char::from_u32(c) {
                 text.push(char);
             }
-            self.pos += 1;
+            self.pos += self.char_len_at(self.pos); // Handle multi-byte UTF-8
         }
 
         if !text.is_empty() {
