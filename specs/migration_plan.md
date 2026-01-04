@@ -289,13 +289,24 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 ### Completed (Session 18)
 - [x] Parallel function body type checking infrastructure
   - `check_functions_parallel()` - Check function bodies across files in parallel
+  - `check_functions_with_stats()` - Check with statistics collection
   - `collect_functions()` - Collect all function declarations from source file
-  - `collect_functions_from_node()` - Recursive function collection
+  - `collect_functions_from_node()` - Recursive function collection (handles nested functions, arrow functions in variable declarations, class methods)
+  - `create_binder_from_bound_file()` - Create binder state for checking from merged program
   - `FunctionCheckResult`, `FileCheckResult`, `CheckResult` structs
-  - `CheckStats` for statistics tracking
-  - Creates per-file ThinCheckerState for parallel checking
-- [x] Added `Clone` derive to `SymbolArena` for parallel checker creation
-- [x] 758 tests passing
+  - `CheckStats` for statistics tracking (file_count, function_count, diagnostic_count)
+- [x] Added `ThinBinderState::from_bound_state()` constructor for type checking context
+- [x] 9 new parallel type checking tests:
+  - Single function checking
+  - Multiple functions in parallel
+  - Arrow functions in variable declarations
+  - Class methods
+  - Checking with stats
+  - Large program (50 files)
+  - Consistency across runs
+  - Nested functions
+  - Exported functions
+- [x] 767 tests passing
 
 ### TODO
 - [ ] Benchmark parallel checking vs sequential
@@ -388,7 +399,10 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 This is the ultimate validation milestone. The TypeScript test suite contains thousands of real-world test cases covering all language features.
 
 ### Infrastructure
-- [ ] Create test runner that invokes Rust compiler on `tests/cases/**/*.ts`
+- [x] Created test runner script: `scripts/test-rust-compiler.mjs`
+  - Reads test file and displays source
+  - Checks for baseline files (.js, .types, .errors.txt)
+- [ ] Build WASM and integrate with test runner
 - [ ] Compare output against TypeScript baseline files
 - [ ] Measure and track compilation times vs TypeScript-Go
 - [ ] Track pass/fail rate and blockers
@@ -431,7 +445,7 @@ This is the ultimate validation milestone. The TypeScript test suite contains th
 | 0.1 | ThinNode Architecture | ~3,000 | 5+ | ✅ Done |
 | 0.2 | Zero-Alloc Scanner | ~200 | 5+ | ✅ Done |
 | 0.3 | Arena Type Checker | - | - | 🟢 Analyzed |
-| 0.4 | Parallelism (Rayon) | ~700 | 15+ | ✅ Done |
+| 0.4 | Parallelism (Rayon) | ~900 | 25+ | ✅ Done |
 | 0.5 | SIMD Scanning | - | - | ⬜ Future |
 | 1 | Utilities | ~300 | 21 | ✅ Done |
 | 2 | Scanner | ~2,500 | 22 | ✅ Done |

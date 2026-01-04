@@ -454,13 +454,22 @@ fn collect_functions_from_node(arena: &ThinNodeArena, node_idx: NodeIndex, funct
             }
         }
         k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
-            // Variable statement might contain arrow functions or function expressions
+            // Variable statement contains a declaration list which contains declarations
             if let Some(var_stmt) = arena.get_variable(node) {
-                for &decl_idx in &var_stmt.declarations.nodes {
-                    if let Some(decl_node) = arena.get(decl_idx) {
-                        if let Some(decl) = arena.get_variable_declaration(decl_node) {
-                            if !decl.initializer.is_none() {
-                                collect_functions_from_node(arena, decl.initializer, functions);
+                // var_stmt.declarations contains the VARIABLE_DECLARATION_LIST node(s)
+                for &decl_list_idx in &var_stmt.declarations.nodes {
+                    if let Some(decl_list_node) = arena.get(decl_list_idx) {
+                        // The declaration list also uses VariableData
+                        if let Some(decl_list) = arena.get_variable(decl_list_node) {
+                            // Now decl_list.declarations contains the actual VARIABLE_DECLARATION nodes
+                            for &decl_idx in &decl_list.declarations.nodes {
+                                if let Some(decl_node) = arena.get(decl_idx) {
+                                    if let Some(decl) = arena.get_variable_declaration(decl_node) {
+                                        if !decl.initializer.is_none() {
+                                            collect_functions_from_node(arena, decl.initializer, functions);
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
