@@ -405,8 +405,8 @@ diagnostics. This is ~50% of the compiler complexity.
 Strategy: Migrate in layers, starting with primitive type operations and
 building up to full inference.
 
-**Current Stats**: ~7,600 lines of checker code (excluding 9,200+ lines of tests)
-**Tests**: 419 checker tests passing, 9 skipped
+**Current Stats**: ~7,600 lines of checker code (excluding 9,500+ lines of tests)
+**Tests**: 428 checker tests passing, 9 skipped
 
 5.1 Type Representation (COMPLETE)
 ----------------------------------
@@ -525,9 +525,9 @@ building up to full inference.
       - `this is T` (this type predicates in methods)
 - [ ] Integrate with TypeScript's checker for full test suite
 
-Verification Gate: 419 Rust tests passing, 9 skipped. Full baseline matching pending.
+Verification Gate: 428 Rust tests passing, 9 skipped. Full baseline matching pending.
 
-Progress: **Phase 5 ~85% complete! Core type checking working. 419 tests passing (9 skipped).**
+Progress: **Phase 5 ~85% complete! Core type checking working. 428 tests passing (9 skipped).**
 
 ==============================================================================
 PHASE 6: EMITTER

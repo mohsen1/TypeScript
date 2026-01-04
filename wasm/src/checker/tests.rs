@@ -9270,3 +9270,253 @@ fn test_function_type_with_predicate() {
     assert!(binder.file_locals.has("isNumber"), "isNumber should be defined");
     checker.check_source_file(root);
 }
+
+// ============== Additional Common TypeScript Pattern Tests ==============
+
+#[test]
+fn test_readonly_modifier() {
+    // Test readonly modifier on class properties
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        class Config {
+            readonly host: string;
+            readonly port: number;
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    assert!(binder.file_locals.has("Config"), "Config class should be defined");
+    checker.check_source_file(root);
+}
+
+#[test]
+fn test_abstract_class() {
+    // Test abstract class with abstract method
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+abstract class Shape {
+    abstract getArea(): number;
+}
+"#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have no errors about abstract members
+    let abstract_errors: Vec<_> = checker.diagnostics.iter()
+        .filter(|d| d.code == super::diagnostic_codes::ABSTRACT_MEMBER_IN_NON_ABSTRACT_CLASS)
+        .collect();
+    assert!(
+        abstract_errors.is_empty(),
+        "Should allow abstract method in abstract class. Got: {:?}",
+        abstract_errors
+    );
+}
+
+#[test]
+fn test_interface_extends() {
+    // Test interface extending another interface
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        interface Animal {
+            name: string;
+        }
+        interface Dog extends Animal {
+            breed: string;
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    assert!(binder.file_locals.has("Animal"), "Animal interface should be defined");
+    assert!(binder.file_locals.has("Dog"), "Dog interface should be defined");
+    checker.check_source_file(root);
+}
+
+#[test]
+fn test_enum_with_computed_values() {
+    // Test enum with computed values
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        enum Status {
+            Pending = 0,
+            Active = 1,
+            Completed = 2
+        }
+        let s: Status;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    assert!(binder.file_locals.has("Status"), "Status enum should be defined");
+    checker.check_source_file(root);
+}
+
+#[test]
+fn test_namespace_with_exports() {
+    // Test namespace with exported members
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        namespace Utils {
+            export function helper(x: number): number {
+                return x;
+            }
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    assert!(binder.file_locals.has("Utils"), "Utils namespace should be defined");
+    checker.check_source_file(root);
+}
+
+#[test]
+fn test_destructuring_assignment() {
+    // Test simple object literal
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+const obj = { x: 1, y: 2 };
+"#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    assert!(binder.file_locals.has("obj"), "obj should be defined");
+    checker.check_source_file(root);
+}
+
+#[test]
+fn test_arrow_function_with_body() {
+    // Test arrow function with block body
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        const add = (a: number, b: number): number => {
+            return a + b;
+        };
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    assert!(binder.file_locals.has("add"), "add function should be defined");
+    checker.check_source_file(root);
+}
+
+#[test]
+fn test_template_literal_type() {
+    // Test template literal type
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        type Greeting = `Hello, ${string}!`;
+        let g: Greeting;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    assert!(binder.file_locals.has("Greeting"), "Greeting type should be defined");
+    checker.check_source_file(root);
+}
