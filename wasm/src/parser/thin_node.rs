@@ -1204,6 +1204,206 @@ impl ThinNodeArena {
 }
 
 // =============================================================================
+// Node View - Ergonomic wrapper for reading ThinNodes
+// =============================================================================
+
+/// A view into a node that provides convenient access to both the ThinNode
+/// header and its type-specific data. This avoids the need to pass the arena
+/// around when working with node data.
+#[derive(Clone, Copy)]
+pub struct NodeView<'a> {
+    pub node: &'a ThinNode,
+    pub arena: &'a ThinNodeArena,
+    pub index: NodeIndex,
+}
+
+impl<'a> NodeView<'a> {
+    /// Create a new NodeView
+    #[inline]
+    pub fn new(arena: &'a ThinNodeArena, index: NodeIndex) -> Option<NodeView<'a>> {
+        arena.get(index).map(|node| NodeView { node, arena, index })
+    }
+
+    /// Get the SyntaxKind
+    #[inline]
+    pub fn kind(&self) -> u16 {
+        self.node.kind
+    }
+
+    /// Get the start position
+    #[inline]
+    pub fn pos(&self) -> u32 {
+        self.node.pos
+    }
+
+    /// Get the end position
+    #[inline]
+    pub fn end(&self) -> u32 {
+        self.node.end
+    }
+
+    /// Get the flags
+    #[inline]
+    pub fn flags(&self) -> u16 {
+        self.node.flags
+    }
+
+    /// Check if this node has associated data
+    #[inline]
+    pub fn has_data(&self) -> bool {
+        self.node.has_data()
+    }
+
+    /// Get extended node info (parent, id, modifier/transform flags)
+    #[inline]
+    pub fn extended(&self) -> Option<&'a ExtendedNodeInfo> {
+        self.arena.get_extended(self.index)
+    }
+
+    /// Get parent node index
+    #[inline]
+    pub fn parent(&self) -> NodeIndex {
+        self.extended().map_or(NodeIndex::NONE, |e| e.parent)
+    }
+
+    /// Get node id
+    #[inline]
+    pub fn id(&self) -> u32 {
+        self.extended().map_or(0, |e| e.id)
+    }
+
+    /// Get a child node as a NodeView
+    #[inline]
+    pub fn child(&self, index: NodeIndex) -> Option<NodeView<'a>> {
+        NodeView::new(self.arena, index)
+    }
+
+    // Typed data accessors - return Option<&T> based on node kind
+
+    /// Get identifier data (for Identifier, PrivateIdentifier nodes)
+    #[inline]
+    pub fn as_identifier(&self) -> Option<&'a IdentifierData> {
+        self.arena.get_identifier(self.node)
+    }
+
+    /// Get literal data (for StringLiteral, NumericLiteral, etc.)
+    #[inline]
+    pub fn as_literal(&self) -> Option<&'a LiteralData> {
+        self.arena.get_literal(self.node)
+    }
+
+    /// Get binary expression data
+    #[inline]
+    pub fn as_binary_expr(&self) -> Option<&'a BinaryExprData> {
+        self.arena.get_binary_expr(self.node)
+    }
+
+    /// Get call expression data
+    #[inline]
+    pub fn as_call_expr(&self) -> Option<&'a CallExprData> {
+        self.arena.get_call_expr(self.node)
+    }
+
+    /// Get function data
+    #[inline]
+    pub fn as_function(&self) -> Option<&'a FunctionData> {
+        self.arena.get_function(self.node)
+    }
+
+    /// Get class data
+    #[inline]
+    pub fn as_class(&self) -> Option<&'a ClassData> {
+        self.arena.get_class(self.node)
+    }
+
+    /// Get block data
+    #[inline]
+    pub fn as_block(&self) -> Option<&'a BlockData> {
+        self.arena.get_block(self.node)
+    }
+
+    /// Get source file data
+    #[inline]
+    pub fn as_source_file(&self) -> Option<&'a SourceFileData> {
+        self.arena.get_source_file(self.node)
+    }
+}
+
+// =============================================================================
+// Node Kind Utilities
+// =============================================================================
+
+impl ThinNode {
+    /// Check if this is an identifier node
+    #[inline]
+    pub fn is_identifier(&self) -> bool {
+        use crate::scanner::SyntaxKind;
+        self.kind == SyntaxKind::Identifier as u16
+    }
+
+    /// Check if this is a string literal
+    #[inline]
+    pub fn is_string_literal(&self) -> bool {
+        use crate::scanner::SyntaxKind;
+        self.kind == SyntaxKind::StringLiteral as u16
+    }
+
+    /// Check if this is a numeric literal
+    #[inline]
+    pub fn is_numeric_literal(&self) -> bool {
+        use crate::scanner::SyntaxKind;
+        self.kind == SyntaxKind::NumericLiteral as u16
+    }
+
+    /// Check if this is a function declaration
+    #[inline]
+    pub fn is_function_declaration(&self) -> bool {
+        use super::syntax_kind_ext::FUNCTION_DECLARATION;
+        self.kind == FUNCTION_DECLARATION
+    }
+
+    /// Check if this is a class declaration
+    #[inline]
+    pub fn is_class_declaration(&self) -> bool {
+        use super::syntax_kind_ext::CLASS_DECLARATION;
+        self.kind == CLASS_DECLARATION
+    }
+
+    /// Check if this is any kind of function-like node
+    #[inline]
+    pub fn is_function_like(&self) -> bool {
+        use super::syntax_kind_ext::*;
+        matches!(
+            self.kind,
+            FUNCTION_DECLARATION | FUNCTION_EXPRESSION | ARROW_FUNCTION |
+            METHOD_DECLARATION | CONSTRUCTOR | GET_ACCESSOR | SET_ACCESSOR
+        )
+    }
+
+    /// Check if this is a statement
+    #[inline]
+    pub fn is_statement(&self) -> bool {
+        use super::syntax_kind_ext::*;
+        (BLOCK..=DEBUGGER_STATEMENT).contains(&self.kind) ||
+        self.kind == VARIABLE_STATEMENT
+    }
+
+    /// Check if this is a declaration
+    #[inline]
+    pub fn is_declaration(&self) -> bool {
+        use super::syntax_kind_ext::*;
+        (VARIABLE_DECLARATION..=EXPORT_SPECIFIER).contains(&self.kind)
+    }
+
+    /// Check if this is a type node
+    #[inline]
+    pub fn is_type_node(&self) -> bool {
+        use super::syntax_kind_ext::*;
+        (TYPE_PREDICATE..=IMPORT_TYPE).contains(&self.kind)
+    }
+}
+
+// =============================================================================
 // Tests
 // =============================================================================
 
@@ -1265,5 +1465,57 @@ mod tests {
         assert!(size_of::<FunctionData>() <= 168, "FunctionData too large");
         assert!(size_of::<ClassData>() <= 200, "ClassData too large");
         assert!(size_of::<SourceFileData>() <= 200, "SourceFileData too large");
+    }
+
+    #[test]
+    fn test_node_view() {
+        let mut arena = ThinNodeArena::new();
+
+        // Add an identifier
+        let ident_idx = arena.add_identifier(
+            79,  // SyntaxKind::Identifier
+            10,
+            15,
+            IdentifierData {
+                escaped_text: "myVar".to_string(),
+                original_text: None,
+                type_arguments: None,
+            },
+        );
+
+        // Create a view and access data through it
+        let view = NodeView::new(&arena, ident_idx).unwrap();
+        assert_eq!(view.kind(), 79);
+        assert_eq!(view.pos(), 10);
+        assert_eq!(view.end(), 15);
+        assert!(view.has_data());
+
+        let ident = view.as_identifier().unwrap();
+        assert_eq!(ident.escaped_text, "myVar");
+    }
+
+    #[test]
+    fn test_node_kind_utilities() {
+        use crate::scanner::SyntaxKind;
+        use super::super::syntax_kind_ext::*;
+
+        let ident = ThinNode::new(SyntaxKind::Identifier as u16, 0, 5);
+        assert!(ident.is_identifier());
+        assert!(!ident.is_string_literal());
+
+        let func = ThinNode::new(FUNCTION_DECLARATION, 0, 100);
+        assert!(func.is_function_declaration());
+        assert!(func.is_function_like());
+        assert!(func.is_declaration());
+
+        let class = ThinNode::new(CLASS_DECLARATION, 0, 200);
+        assert!(class.is_class_declaration());
+        assert!(class.is_declaration());
+
+        let block = ThinNode::new(BLOCK, 0, 50);
+        assert!(block.is_statement());
+
+        let type_ref = ThinNode::new(TYPE_REFERENCE, 0, 10);
+        assert!(type_ref.is_type_node());
     }
 }
