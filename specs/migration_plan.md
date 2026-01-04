@@ -226,7 +226,7 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 - [ ] Update main parser to use zero-copy accessors throughout
 - [ ] Remove remaining to_string() calls from scanner hot paths
 
-## Phase 0.3: Arena-Based Type Checker (O(1) Cleanup)
+## Phase 0.3: Arena-Based Type Checker (O(1) Cleanup) - 🟢 Analyzed (Low Priority)
 
 ### Analysis (2026-01-04)
 Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
@@ -289,7 +289,7 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 ### TODO
 - [ ] Check function bodies in parallel (local inference doesn't affect global scope)
 
-## Phase 0.5: SIMD Scanning (Advanced)
+## Phase 0.5: SIMD Scanning (Advanced) - ⬜ Future
 
 ### TODO
 - [ ] Use portable SIMD for whitespace/identifier scanning
@@ -369,7 +369,7 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 - [ ] Formatting engine
 - [ ] Code fixes and refactorings
 
-## Phase 8: Full Rust Mode
+## Phase 8: Full Rust Mode - ⬜ Future
 
 - [ ] Remove TypeScript fallbacks
 - [ ] Performance optimization pass
@@ -384,7 +384,9 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 |-------|-----------|-------|-------|--------|
 | 0.1 | ThinNode Architecture | ~3,000 | 5+ | ✅ Done |
 | 0.2 | Zero-Alloc Scanner | ~200 | 5+ | ✅ Done |
+| 0.3 | Arena Type Checker | - | - | 🟢 Analyzed |
 | 0.4 | Parallelism (Rayon) | ~700 | 15+ | ✅ Done |
+| 0.5 | SIMD Scanning | - | - | ⬜ Future |
 | 1 | Utilities | ~300 | 21 | ✅ Done |
 | 2 | Scanner | ~2,500 | 22 | ✅ Done |
 | 3 | Parser (legacy + Thin) | ~11,300 | 160+ | ✅ Done |
@@ -392,7 +394,7 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 | 5 | Type Checker | ~23,500 | 485 | ✅ 99% |
 | 6 | Emitter (legacy + Thin) | ~5,100 | 92+ | 🟡 75% |
 | 7 | Language Service | ~2,000 | 8+ | 🟡 60% |
-| 8 | Full Rust Mode | - | - | ⬜ Pending |
+| 8 | Full Rust Mode | - | - | ⬜ Future |
 
 **Total Rust Code**: ~57,600 lines
 **Total Tests**: 758 passing
