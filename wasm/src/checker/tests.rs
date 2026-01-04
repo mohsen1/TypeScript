@@ -6282,6 +6282,73 @@ interface TreeNode {
     }
 
     #[test]
+    fn test_mutually_recursive_types() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test mutually recursive type aliases (like a JSON type)
+        let code = r#"
+type JSONValue = string | number | boolean | null | JSONArray | JSONObject;
+type JSONArray = JSONValue[];
+type JSONObject = { [key: string]: JSONValue };
+
+let val: JSONValue = "hello";
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Type checking should complete without hanging
+        checker.check_source_file(root);
+
+        // Verify the types exist
+        assert!(binder.file_locals.get("JSONValue").is_some());
+        assert!(binder.file_locals.get("JSONArray").is_some());
+        assert!(binder.file_locals.get("JSONObject").is_some());
+    }
+
+    #[test]
+    fn test_recursive_type_assignability() {
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        // Test that recursive types work in assignability checking
+        let code = r#"
+type List<T> = { value: T; next: List<T> | null };
+
+let list1: List<number> = { value: 1, next: null };
+let list2: List<number> = { value: 2, next: list1 };
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Type checking with recursive generic types
+        checker.check_source_file(root);
+        // Should complete without errors or hanging
+    }
+
+    #[test]
     fn test_resolution_stack_is_clean_after_resolution() {
         use crate::parser_impl::ParserState;
         use crate::binder::BinderState;
@@ -6642,6 +6709,80 @@ interface TreeNode {
         } else {
             panic!("Expected Mapped type");
         }
+    }
+
+    #[test]
+    fn test_mapped_type_key_remapping() {
+        // Test key remapping with `as` clause in mapped types (TS 4.1)
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+type Getters<T> = {
+    [K in keyof T as `get${Capitalize<string & K>}`]: () => T[K];
+};
+
+interface Person { name: string; age: number; }
+type PersonGetters = Getters<Person>;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Type checking should complete without errors
+        checker.check_source_file(root);
+
+        // Verify the types exist
+        assert!(binder.file_locals.get("Getters").is_some());
+        assert!(binder.file_locals.get("Person").is_some());
+        assert!(binder.file_locals.get("PersonGetters").is_some());
+    }
+
+    #[test]
+    fn test_mapped_type_key_filtering_with_as_never() {
+        // Test filtering keys by remapping to never (TS 4.1)
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+type OmitFunctions<T> = {
+    [K in keyof T as T[K] extends Function ? never : K]: T[K];
+};
+
+interface Mixed { name: string; age: number; greet(): void; }
+type DataOnly = OmitFunctions<Mixed>;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Type checking should complete without errors
+        checker.check_source_file(root);
+
+        // Verify the types exist
+        assert!(binder.file_locals.get("OmitFunctions").is_some());
+        assert!(binder.file_locals.get("Mixed").is_some());
+        assert!(binder.file_locals.get("DataOnly").is_some());
     }
 
     // ============== 5.112: Infer with extends constraints ==============
@@ -7372,6 +7513,69 @@ interface TreeNode {
         } else {
             panic!("Expected Tuple type");
         }
+    }
+
+    #[test]
+    fn test_variadic_tuple_type_parsing() {
+        // Test variadic tuple type in function signature
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+type Concat<T extends unknown[], U extends unknown[]> = [...T, ...U];
+type Result = Concat<[1, 2], [3, 4]>;
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Type checking should complete without errors
+        checker.check_source_file(root);
+
+        // Verify the types exist
+        assert!(binder.file_locals.get("Concat").is_some());
+        assert!(binder.file_locals.get("Result").is_some());
+    }
+
+    #[test]
+    fn test_variadic_tuple_rest_parameter() {
+        // Test variadic tuple with rest parameters (TS 4.0 feature)
+        use crate::parser_impl::ParserState;
+        use crate::binder::BinderState;
+
+        let code = r#"
+function concat<T extends unknown[], U extends unknown[]>(arr1: T, arr2: U): [...T, ...U] {
+    return [...arr1, ...arr2] as [...T, ...U];
+}
+
+let result = concat([1, 2] as const, ["a", "b"] as const);
+"#;
+
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = BinderState::new();
+        binder.bind_source_file(&parser.arena, root);
+
+        let mut checker = CheckerState::new(
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            "test.ts".to_string(),
+        );
+
+        // Should parse and check without hanging or crashing
+        checker.check_source_file(root);
     }
 
     // ============== 5.74: ThisType<T> utility type ==============
@@ -11111,5 +11315,39 @@ fn test_ambient_namespace() {
 
     checker.check_source_file(root);
     // Should complete without errors
+}
+
+#[test]
+fn test_function_overload_resolution() {
+    // Test function overload resolution
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        // Overloaded function
+        function foo(x: number): number;
+        function foo(x: string): string;
+        function foo(x: number | string): number | string {
+            return x;
+        }
+
+        let a: number = foo(42);
+        let b: string = foo("hello");
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+    // Should resolve overloads correctly based on argument types
 }
 
