@@ -7971,7 +7971,6 @@ fn test_awaited_type_on_non_promise() {
 }
 
 #[test]
-#[ignore = "TODO: Fix memory usage in Array.every callback type inference - needs deeper investigation"]
 fn test_array_method_every() {
     // This replicates the exact pattern from 2dArrays.ts that was causing infinite loop
     use crate::parser_impl::ParserState;
