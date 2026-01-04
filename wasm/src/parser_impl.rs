@@ -344,6 +344,13 @@ impl ParserState {
         self.scanner.get_token_value()
     }
 
+    /// Get the current token's text value as a reference (zero-copy).
+    /// Use this when you only need to read the value, not store it.
+    #[inline]
+    pub fn get_token_value_ref(&self) -> &str {
+        self.scanner.get_token_value_ref()
+    }
+
     /// Check if we're at end of file.
     pub fn at_end(&self) -> bool {
         self.token() == SyntaxKind::EndOfFileToken

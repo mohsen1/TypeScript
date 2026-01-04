@@ -902,9 +902,11 @@ impl ThinParserState {
     }
 
     /// Parse identifier
+    /// Uses zero-copy accessor and only clones when storing
     fn parse_identifier(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
-        let text = self.scanner.get_token_value();
+        // Use zero-copy accessor and clone only when storing
+        let text = self.scanner.get_token_value_ref().to_string();
         self.identifiers.push(text.clone());
         self.parse_expected(SyntaxKind::Identifier);
         let end_pos = self.token_end();
@@ -922,10 +924,13 @@ impl ThinParserState {
     }
 
     /// Parse numeric literal
+    /// Uses zero-copy accessor for parsing, clones only when storing
     fn parse_numeric_literal(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
-        let text = self.scanner.get_token_value();
-        let value = text.parse::<f64>().ok();
+        // Use zero-copy accessor for parsing
+        let text_ref = self.scanner.get_token_value_ref();
+        let value = text_ref.parse::<f64>().ok();
+        let text = text_ref.to_string();
         self.next_token();
         let end_pos = self.token_end();
 
@@ -938,9 +943,11 @@ impl ThinParserState {
     }
 
     /// Parse string literal
+    /// Uses zero-copy accessor, clones only when storing
     fn parse_string_literal(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
-        let text = self.scanner.get_token_value();
+        // Use zero-copy accessor
+        let text = self.scanner.get_token_value_ref().to_string();
         self.next_token();
         let end_pos = self.token_end();
 
@@ -1113,7 +1120,8 @@ impl ThinParserState {
             _ => {
                 // Identifier or keyword used as property name
                 let start_pos = self.token_pos();
-                let text = self.scanner.get_token_value();
+                // Use zero-copy accessor
+                let text = self.scanner.get_token_value_ref().to_string();
                 self.identifiers.push(text.clone());
                 self.next_token(); // Accept any token as property name
                 let end_pos = self.token_end();

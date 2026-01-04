@@ -110,8 +110,10 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 - [x] 2 new tests for zero-copy accessors
 - [x] 609 tests passing
 
-### TODO
-- [ ] Update parser to use zero-copy accessors
+### In Progress
+- [x] ThinParser uses `get_token_value_ref()` zero-copy accessor
+- [x] ParserState exposes `get_token_value_ref()` for zero-copy access
+- [ ] Update main parser to use zero-copy accessors throughout
 - [ ] Remove remaining to_string() calls from scanner hot paths
 
 ## Phase 0.3: Arena-Based Type Checker (O(1) Cleanup)
