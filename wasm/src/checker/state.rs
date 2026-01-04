@@ -743,6 +743,73 @@ impl<'a> CheckerState<'a> {
         }
     }
 
+    /// Get all property symbols from a type.
+    /// Used for member completions in the language service.
+    /// Returns a list of (property_name, symbol_id) pairs.
+    pub fn get_properties_of_type(&self, type_id: TypeId) -> Vec<(String, SymbolId)> {
+        use super::types::Type;
+
+        let Some(ty) = self.types.get(type_id) else {
+            return Vec::new();
+        };
+
+        match ty {
+            Type::Object(obj) => {
+                // Return all members from the SymbolTable
+                obj.members.iter()
+                    .map(|(name, &symbol_id)| (name.clone(), symbol_id))
+                    .collect()
+            }
+            Type::TypeReference(tr) => {
+                // Resolve the type reference and get its properties
+                if let Some(&resolved) = self.symbol_types.get(&tr.symbol) {
+                    return self.get_properties_of_type(resolved);
+                }
+                Vec::new()
+            }
+            Type::Union(u) => {
+                // For unions, return intersection of properties from all constituents
+                // (only properties that exist in all union members)
+                if u.types.is_empty() {
+                    return Vec::new();
+                }
+
+                // Start with properties from first type
+                let mut common_props: std::collections::HashMap<String, SymbolId> =
+                    self.get_properties_of_type(u.types[0])
+                        .into_iter()
+                        .collect();
+
+                // Keep only properties that exist in all other types
+                for &constituent in &u.types[1..] {
+                    let constituent_props: std::collections::HashSet<String> =
+                        self.get_properties_of_type(constituent)
+                            .into_iter()
+                            .map(|(name, _)| name)
+                            .collect();
+
+                    common_props.retain(|name, _| constituent_props.contains(name));
+                }
+
+                common_props.into_iter().collect()
+            }
+            Type::Intersection(i) => {
+                // For intersections, merge properties from all constituents
+                let mut all_props: std::collections::HashMap<String, SymbolId> =
+                    std::collections::HashMap::new();
+
+                for &constituent in &i.types {
+                    for (name, symbol_id) in self.get_properties_of_type(constituent) {
+                        all_props.entry(name).or_insert(symbol_id);
+                    }
+                }
+
+                all_props.into_iter().collect()
+            }
+            _ => Vec::new(),
+        }
+    }
+
     /// Get the type of a symbol (if cached).
     /// Returns the declared type for the symbol from the cache.
     pub fn get_cached_type_of_symbol(&self, symbol_id: SymbolId) -> Option<TypeId> {
