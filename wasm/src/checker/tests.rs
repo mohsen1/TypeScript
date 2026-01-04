@@ -7835,7 +7835,7 @@ fn test_super_type_basic() {
 }
 
 #[test]
-#[ignore = "TODO: Fix memory usage in super.method() type inference - exceeds 1GB Docker limit"]
+#[ignore = "TODO: Fix memory usage in super.method() type inference - needs deeper investigation"]
 fn test_super_method_call() {
     // Test that 'super.method()' works correctly in derived classes
     use crate::parser_impl::ParserState;
@@ -7928,7 +7928,7 @@ fn test_awaited_type_on_non_promise() {
 }
 
 #[test]
-#[ignore = "TODO: Fix memory usage in Array.every callback type inference - exceeds 1GB Docker limit"]
+#[ignore = "TODO: Fix memory usage in Array.every callback type inference - needs deeper investigation"]
 fn test_array_method_every() {
     // This replicates the exact pattern from 2dArrays.ts that was causing infinite loop
     use crate::parser_impl::ParserState;

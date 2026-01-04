@@ -724,6 +724,37 @@ impl<'a> CheckerState<'a> {
         type_arguments: &Option<crate::parser::NodeList>,
         arguments: &crate::parser::NodeList
     ) -> TypeId {
+        use super::state::MAX_CALL_DEPTH;
+
+        // Check call depth to prevent memory explosion from deeply nested callbacks
+        {
+            let depth = *self.call_depth.borrow();
+            if depth >= MAX_CALL_DEPTH {
+                // Return any_type to break potential infinite recursion
+                return self.types.any_type;
+            }
+            *self.call_depth.borrow_mut() = depth + 1;
+        }
+
+        // Use a helper to ensure we decrement call_depth on all exit paths
+        let result = self.get_type_of_call_expression_inner(expression, type_arguments, arguments);
+
+        // Decrement call depth
+        {
+            let mut depth = self.call_depth.borrow_mut();
+            *depth = depth.saturating_sub(1);
+        }
+
+        result
+    }
+
+    /// Inner implementation of call expression type resolution.
+    fn get_type_of_call_expression_inner(
+        &mut self,
+        expression: NodeIndex,
+        type_arguments: &Option<crate::parser::NodeList>,
+        arguments: &crate::parser::NodeList
+    ) -> TypeId {
         // Get the type of the function being called
         let func_type = self.get_type_of_node(expression);
 

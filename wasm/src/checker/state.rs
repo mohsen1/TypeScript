@@ -213,11 +213,18 @@ pub struct CheckerState<'a> {
     /// For primitives, this is their wrapper object type (e.g., string → String).
     /// For type parameters, this is the constraint (or its apparent type).
     pub(crate) apparent_type_cache: RefCell<FxHashMap<TypeId, TypeId>>,
+
+    /// Current depth of call expression resolution (for depth limits).
+    pub(crate) call_depth: RefCell<u32>,
 }
 
 /// Maximum depth for recursive type instantiation (conditional types, etc.).
 /// TypeScript uses a depth limit of 50 by default.
 pub const MAX_INSTANTIATION_DEPTH: u32 = 50;
+
+/// Maximum depth for call expression resolution.
+/// Prevents memory explosion from deeply nested callback type inference.
+pub const MAX_CALL_DEPTH: u32 = 20;
 
 impl<'a> CheckerState<'a> {
     /// Create a new checker state.
@@ -250,6 +257,7 @@ impl<'a> CheckerState<'a> {
             awaited_type_cache: RefCell::new(FxHashMap::default()),
             widened_type_cache: RefCell::new(FxHashMap::default()),
             apparent_type_cache: RefCell::new(FxHashMap::default()),
+            call_depth: RefCell::new(0),
         }
     }
 
