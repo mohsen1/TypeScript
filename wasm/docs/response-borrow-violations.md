@@ -178,3 +178,31 @@ The `narrowing.rs` code:
 - ✅ Benefits from Rust's Non-Lexical Lifetimes
 
 No changes required. The architectural concern was a **false positive** based on a misreading of the code patterns.
+
+---
+
+## Gemini 3 Pro Verification (2026-01-04)
+
+We asked Gemini to re-evaluate its own previous review. Here is the response:
+
+> **1. Was the "BLOCKER - Cannot compile narrowing code" claim accurate?**
+> **No, the claim was inaccurate.** The code is correct, compiles successfully, and passes tests. The previous reviewer identified potential borrow checker issues based on lexical lifetimes (pre-2018 Rust behavior) or a misunderstanding of the ownership flow, but the actual implementation correctly navigates Rust's borrowing rules.
+
+> **2. Does the `.copied().collect()` pattern correctly avoid borrow violations?**
+> **Yes.** This is the key pattern that makes the code safe.
+> - `.copied().collect()` copies the lightweight `TypeId`s (which are `u32`s) into a new, owned `Vec<TypeId>`.
+> - Once the vector is created, the dependency on the original borrow of `self.types` is severed.
+> - The subsequent call to `self.types.create_union_type(...)` uses the *owned* vector and a *new* mutable borrow of `self.types`, which is valid because the previous immutable borrow has ended.
+
+> **3. Does NLL (Non-Lexical Lifetimes) make the borrow end before create_union_type is called?**
+> **Yes.** Under NLL (standard in Rust 2018+), the borrow of `typ` (and by extension `self.types`) ends at its last usage point.
+
+> **4. Is there still any architectural concern here, or was this a false positive?**
+> **This was a false positive.** The architecture is sound.
+
+> The architecture correctly leverages:
+> 1. **Arena Indices (`TypeId`, `NodeIndex`)**: Allows copying identifiers instead of holding references.
+> 2. **Non-Lexical Lifetimes**: Allows immutable borrows to expire before mutable operations.
+> 3. **Split Ownership**: Separates the immutable AST (`node_arena`) from the mutable type state (`types`).
+>
+> **Verdict:** The code is safe and idiomatic. No changes are required for these reported "blockers."

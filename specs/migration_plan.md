@@ -18,6 +18,12 @@ compiler remains fully functional at every step.
 
 # REMAINING WORK
 
+## Before going back to work
+
+
+1. Split test out of source files into a separate tests directory in was dir. 
+2. Without going to deep into a rabbithole find opportunities for splitting large files into smaller ones in was directory
+
 ## Phase 6: Emitter (60% Complete)
 
 | Metric | Value |
