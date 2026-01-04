@@ -5377,7 +5377,6 @@ const instance = new Foo();
     // - check_property_visibility() reports errors when accessing private/protected outside class
     // - enclosing_class tracking is implemented in CheckerState
     #[test]
-    #[ignore = "TODO: Implement private property visibility checking"]
     fn test_private_property_access_outside_class() {
         // Test: private properties should error when accessed outside class
         // class Foo { private x: number; }
@@ -5418,7 +5417,6 @@ let v = f.x;
     }
 
     #[test]
-    #[ignore = "TODO: Implement protected property visibility checking"]
     fn test_protected_property_access_outside_class() {
         // Test: protected properties should error when accessed outside class
         // class Foo { protected y: string; }
@@ -5698,7 +5696,6 @@ class Derived extends Base {
     }
 
     #[test]
-    #[ignore = "TODO: Fix base class member detection for override validation"]
     fn test_override_member_in_base_allowed() {
         // Override modifier for member that exists in base class should be allowed
         use crate::parser_impl::ParserState;

@@ -507,6 +507,7 @@ impl<'a> CheckerState<'a> {
                 if hc.token == SyntaxKind::ExtendsKeyword as u16 {
                     // Get the first type (the base class)
                     if let Some(&type_idx) = hc.types.nodes.first() {
+                        // Try ExpressionWithTypeArguments first
                         if let Some(Node::ExpressionWithTypeArguments(ewta)) = self.node_arena.get(type_idx) {
                             // Get the identifier from the expression
                             if let Some(Node::Identifier(id)) = self.node_arena.get(ewta.expression) {
@@ -514,6 +515,13 @@ impl<'a> CheckerState<'a> {
                                 if let Some(symbol_id) = self.file_locals.get(&id.escaped_text) {
                                     return Some(symbol_id);
                                 }
+                            }
+                        }
+                        // Fallback: handle direct Identifier node
+                        // (Parser may not always wrap in ExpressionWithTypeArguments)
+                        else if let Some(Node::Identifier(id)) = self.node_arena.get(type_idx) {
+                            if let Some(symbol_id) = self.file_locals.get(&id.escaped_text) {
+                                return Some(symbol_id);
                             }
                         }
                     }

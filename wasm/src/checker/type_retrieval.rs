@@ -1719,8 +1719,24 @@ impl<'a> CheckerState<'a> {
                             self.types.any_type
                         };
 
-                        // Create a symbol for this property
-                        let symbol_id = self.local_symbols_mut().alloc(symbol_flags::PROPERTY, name.clone());
+                        // Determine symbol flags from modifiers (for visibility checking)
+                        let mut flags = symbol_flags::PROPERTY;
+                        if let Some(ref modifiers) = pd.modifiers {
+                            for &mod_idx in &modifiers.nodes {
+                                if let Some(node) = self.node_arena.get(mod_idx) {
+                                    let kind = node.base().kind;
+                                    if kind == SyntaxKind::PrivateKeyword as u16 {
+                                        flags |= symbol_flags::PRIVATE;
+                                    } else if kind == SyntaxKind::ProtectedKeyword as u16 {
+                                        flags |= symbol_flags::PROTECTED;
+                                    }
+                                    // Note: READONLY and STATIC are in modifier flags, not symbol flags
+                                }
+                            }
+                        }
+
+                        // Create a symbol for this property with visibility flags
+                        let symbol_id = self.local_symbols_mut().alloc(flags, name.clone());
                         self.symbol_types.insert(symbol_id, prop_type);
                         properties.push(symbol_id);
                     }
