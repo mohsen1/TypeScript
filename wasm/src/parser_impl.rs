@@ -554,6 +554,7 @@ impl ParserState {
             | SyntaxKind::VarKeyword
             | SyntaxKind::LetKeyword
             | SyntaxKind::ConstKeyword
+            | SyntaxKind::UsingKeyword  // TypeScript 5.2+
             | SyntaxKind::FunctionKeyword
             | SyntaxKind::ClassKeyword
             | SyntaxKind::EnumKeyword
@@ -580,6 +581,19 @@ impl ParserState {
             | SyntaxKind::ImportKeyword => true,
             _ => self.is_expression_start(),
         }
+    }
+
+    /// Check if we're looking at an `await using` declaration.
+    /// This requires lookahead to distinguish from `await expr`.
+    fn is_await_using_declaration(&mut self) -> bool {
+        if !self.is_token(SyntaxKind::AwaitKeyword) {
+            return false;
+        }
+        let snapshot = self.scanner.save_state();
+        self.next_token(); // consume await
+        let result = self.is_token(SyntaxKind::UsingKeyword);
+        self.scanner.restore_state(snapshot);
+        result
     }
 
     /// Check if the current token can start an expression.
@@ -636,7 +650,11 @@ impl ParserState {
         match self.token() {
             SyntaxKind::SemicolonToken => self.parse_empty_statement(),
             SyntaxKind::OpenBraceToken => self.parse_block(),
-            SyntaxKind::VarKeyword | SyntaxKind::LetKeyword | SyntaxKind::ConstKeyword => {
+            SyntaxKind::VarKeyword | SyntaxKind::LetKeyword | SyntaxKind::ConstKeyword | SyntaxKind::UsingKeyword => {
+                self.parse_variable_statement()
+            }
+            // Handle `await using` declaration (TypeScript 5.2+)
+            SyntaxKind::AwaitKeyword if self.is_await_using_declaration() => {
                 self.parse_variable_statement()
             }
             SyntaxKind::FunctionKeyword => self.parse_function_declaration(),
@@ -777,14 +795,41 @@ impl ParserState {
         let pos = self.get_full_start();
 
         // Get the declaration kind and set flags
-        let flags = match self.token() {
-            SyntaxKind::VarKeyword => 0,
-            SyntaxKind::LetKeyword => node_flags::LET,
-            SyntaxKind::ConstKeyword => node_flags::CONST,
-            _ => 0,
+        // Check for `await using` first (two tokens)
+        let flags = if self.is_token(SyntaxKind::AwaitKeyword) {
+            // Check for `await using` by looking ahead
+            let snapshot = self.scanner.save_state();
+            self.next_token(); // consume await
+            let is_await_using = self.is_token(SyntaxKind::UsingKeyword);
+            if is_await_using {
+                self.next_token(); // consume using
+                node_flags::AWAIT_USING
+            } else {
+                // Not `await using`, restore and let the expression parser handle it
+                self.scanner.restore_state(snapshot);
+                0
+            }
+        } else {
+            match self.token() {
+                SyntaxKind::VarKeyword => {
+                    self.next_token();
+                    0
+                }
+                SyntaxKind::LetKeyword => {
+                    self.next_token();
+                    node_flags::LET
+                }
+                SyntaxKind::ConstKeyword => {
+                    self.next_token();
+                    node_flags::CONST
+                }
+                SyntaxKind::UsingKeyword => {
+                    self.next_token();
+                    node_flags::USING
+                }
+                _ => 0,
+            }
         };
-
-        self.next_token(); // consume var/let/const
 
         // Parse declarations
         let mut declarations = NodeList::new();

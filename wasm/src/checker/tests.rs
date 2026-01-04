@@ -10819,3 +10819,40 @@ fn test_falsy_narrowing_boolean_literal() {
         "Expected no errors for boolean literal falsy narrowing, got: {:?}", checker.diagnostics);
 }
 
+#[test]
+fn test_using_declaration_parsing() {
+    // Test that using declarations are parsed correctly (TypeScript 5.2+)
+    use crate::parser_impl::ParserState;
+
+    let code = r#"
+        using resource = getResource();
+        using resource2 = getResource2();
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    // Check that we have 2 using declarations
+    if let Some(crate::parser::Node::SourceFile(sf)) = parser.arena.get(root) {
+        assert_eq!(sf.statements.len(), 2, "Expected 2 using declarations");
+    }
+}
+
+#[test]
+fn test_await_using_declaration_parsing() {
+    // Test that await using declarations are parsed correctly (TypeScript 5.2+)
+    use crate::parser_impl::ParserState;
+
+    let code = r#"
+        async function test() {
+            await using resource = getAsyncResource();
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let _root = parser.parse_source_file();
+
+    // Should parse without panicking
+    // The async function contains an await using declaration
+}
+
