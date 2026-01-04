@@ -5,6 +5,7 @@
 //!
 //! The transforms follow TypeScript's transformer pipeline architecture.
 
+pub mod class;
 pub mod es2015;
 pub mod helpers;
 
@@ -97,8 +98,13 @@ pub fn transform_source_file(
 
     // Only transform if targeting ES5 or lower
     if ctx.needs_downlevel(ScriptTarget::ES2015) {
-        let mut transformer = es2015::ES2015Transformer::new();
-        transformer.visit_node(source_file_idx, &mut ctx);
+        // Run class transformer first (handles class declarations, super calls)
+        let mut class_transformer = class::ClassTransformer::new();
+        class_transformer.visit_node(source_file_idx, &mut ctx);
+
+        // Then run ES2015 transformer (handles arrow functions, templates, etc.)
+        let mut es2015_transformer = es2015::ES2015Transformer::new();
+        es2015_transformer.visit_node(source_file_idx, &mut ctx);
     }
 
     ctx.helpers_needed
