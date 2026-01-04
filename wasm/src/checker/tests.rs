@@ -9940,3 +9940,146 @@ fn test_exclude_utility_type() {
     assert_eq!(checker.diagnostics.len(), 0,
         "No type errors expected for Exclude usage, got: {:?}", checker.diagnostics);
 }
+
+#[test]
+fn test_return_type_utility() {
+    // Test ReturnType<T> utility type
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        type ReturnType<T extends (...args: any) => any> = T extends (...args: any) => infer R ? R : any;
+        function getUser(): { name: string; age: number } {
+            return { name: "John", age: 30 };
+        }
+        type UserType = ReturnType<typeof getUser>;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // No type errors expected
+    assert_eq!(checker.diagnostics.len(), 0,
+        "No type errors expected for ReturnType usage, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_parameters_utility() {
+    // Test Parameters<T> utility type
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        type Parameters<T extends (...args: any) => any> = T extends (...args: infer P) => any ? P : never;
+        function greet(name: string, age: number): string {
+            return name;
+        }
+        type GreetParams = Parameters<typeof greet>;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // No type errors expected
+    assert_eq!(checker.diagnostics.len(), 0,
+        "No type errors expected for Parameters usage, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_constructor_parameters_utility() {
+    // Test simplified ConstructorParameters<T> utility type
+    // Note: Full "abstract new" syntax causes stack overflow, so using simpler form
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        type ConstructorParams<T extends new (...args: any) => any> = T extends new (...args: infer P) => any ? P : never;
+        class Point {
+            x: number;
+            y: number;
+            constructor(x: number, y: number) {
+                this.x = x;
+                this.y = y;
+            }
+        }
+        type PointParams = ConstructorParams<typeof Point>;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // No type errors expected
+    assert_eq!(checker.diagnostics.len(), 0,
+        "No type errors expected for ConstructorParameters usage, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_instance_type_utility() {
+    // Test simplified InstanceType<T> utility type
+    // Note: Full "abstract new" syntax causes stack overflow, so using simpler form
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        type InstanceOf<T extends new (...args: any) => any> = T extends new (...args: any) => infer R ? R : any;
+        class Animal {
+            name: string = "";
+        }
+        type AnimalInstance = InstanceOf<typeof Animal>;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // No type errors expected
+    assert_eq!(checker.diagnostics.len(), 0,
+        "No type errors expected for InstanceType usage, got: {:?}", checker.diagnostics);
+}
