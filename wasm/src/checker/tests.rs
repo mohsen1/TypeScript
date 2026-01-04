@@ -10222,3 +10222,101 @@ fn test_type_error_too_few_arguments() {
     assert!(!arg_errors.is_empty(),
         "Expected error for too few arguments, got: {:?}", checker.diagnostics);
 }
+
+#[test]
+fn test_generic_function_argument_type_check() {
+    // Test that generic function calls still check argument types
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        function identity<T>(value: T): T {
+            return value;
+        }
+        const x: number = identity<number>("hello");
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have type error for explicit type argument mismatch
+    // identity<number>("hello") - string is not assignable to number
+    assert!(!checker.diagnostics.is_empty(),
+        "Expected type error for generic call with wrong argument type, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_callback_argument_type_check() {
+    // Test that callback arguments are checked
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        function forEach<T>(arr: T[], callback: (item: T) => void): void {}
+        forEach<number>([1, 2, 3], (item: string) => {});
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have type error for callback parameter type mismatch
+    assert!(!checker.diagnostics.is_empty(),
+        "Expected type error for callback with wrong parameter type, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_rest_parameter_type_check() {
+    // Test that rest parameters are checked
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        function sum(...numbers: number[]): number {
+            return 0;
+        }
+        sum(1, 2, "three");
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have type error for string in number rest parameter
+    assert!(!checker.diagnostics.is_empty(),
+        "Expected type error for string in number[] rest parameter, got: {:?}", checker.diagnostics);
+}

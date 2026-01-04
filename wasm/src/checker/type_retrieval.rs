@@ -800,6 +800,30 @@ impl<'a> CheckerState<'a> {
                     self.infer_type_arguments(&type_parameters, &parameter_types, arguments)
                 };
 
+                // Instantiate parameter types with the type arguments
+                let instantiated_param_types: Vec<TypeId> = parameter_types.iter()
+                    .map(|&pt| self.instantiate_type(pt, &inferred_type_args, &type_parameters))
+                    .collect();
+
+                // Check argument types against instantiated parameter types
+                for (i, &arg_node) in arguments.nodes.iter().enumerate() {
+                    if i >= instantiated_param_types.len() {
+                        break;
+                    }
+                    let param_type = instantiated_param_types[i];
+                    let arg_type = self.get_type_of_node(arg_node);
+
+                    if !self.is_type_assignable_to(arg_type, param_type) {
+                        let arg_str = self.type_to_string(arg_type);
+                        let param_str = self.type_to_string(param_type);
+                        self.error(
+                            arg_node,
+                            &format!("Argument of type '{}' is not assignable to parameter of type '{}'.", arg_str, param_str),
+                            super::diagnostic_codes::ARGUMENT_NOT_ASSIGNABLE_TO_PARAMETER
+                        );
+                    }
+                }
+
                 // Instantiate the return type with the inferred type arguments
                 return self.instantiate_type(return_type, &inferred_type_args, &type_parameters);
             }
