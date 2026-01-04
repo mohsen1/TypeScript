@@ -464,8 +464,8 @@ building up to full inference.
 - [x] Equality narrowing (===, !==)
 - [x] Negated type guards (!condition)
 - [x] Apply type narrowing to expressions
-- [ ] Assertion functions (partially implemented)
-- [ ] Exhaustiveness checking (not implemented)
+- [x] Assertion functions (type predicates parsing complete - runtime behavior pending)
+- [x] Exhaustiveness checking (check_switch_exhaustiveness in narrowing.rs)
 
 5.5 Diagnostics (MOSTLY COMPLETE)
 ---------------------------------
@@ -505,7 +505,7 @@ building up to full inference.
 - [x] Array literals with contextual typing
 - [x] `this` type (get_this_type() - uses enclosing_class)
 - [x] `super` type (get_super_type() - uses base class from heritage clauses)
-- [ ] Awaited types for async/await (partially implemented)
+- [x] Awaited types for async/await (get_awaited_type wired to await expressions)
 
 5.8 Remaining Work
 ------------------
