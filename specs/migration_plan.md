@@ -39,8 +39,8 @@ Current `Node` enum is sized to largest variant (~208 bytes). This destroys cach
   - Imports: ImportDeclData, ExportDeclData, SpecifierData
   - JSX: JsxElementData, JsxOpeningData, JsxAttributeData
   - Source: SourceFileData with full metadata
-- [x] ThinNodeArena with all typed storage pools (40+ pools)
-- [x] Arena methods for adding all node types (add_token, add_identifier, add_literal, etc.)
+- [x] ThinNodeArena with all typed storage pools (60+ pools)
+- [x] Complete add_* methods for all 60+ node types (statements, expressions, types, JSX, etc.)
 - [x] NodeView wrapper for ergonomic node access
 - [x] Kind utilities (is_identifier, is_function_like, is_statement, is_type_node, etc.)
 - [x] Kind validation in accessor methods (type safety)
