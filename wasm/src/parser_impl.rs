@@ -1516,25 +1516,62 @@ impl ParserState {
         members
     }
 
+    /// Parse class member modifiers (public, private, protected, static, readonly, abstract, override, etc.)
+    fn parse_class_element_modifiers(&mut self) -> Option<NodeList> {
+        let pos = self.get_full_start();
+        let mut modifiers = Vec::new();
+
+        loop {
+            let modifier_kind = match self.token() {
+                SyntaxKind::PublicKeyword
+                | SyntaxKind::PrivateKeyword
+                | SyntaxKind::ProtectedKeyword
+                | SyntaxKind::StaticKeyword
+                | SyntaxKind::ReadonlyKeyword
+                | SyntaxKind::AbstractKeyword
+                | SyntaxKind::OverrideKeyword
+                | SyntaxKind::AsyncKeyword
+                | SyntaxKind::DeclareKeyword
+                | SyntaxKind::AccessorKeyword => self.token(),
+                _ => break,
+            };
+
+            let mod_pos = self.get_full_start();
+            self.next_token();
+            let mod_end = self.get_token_start();
+
+            let base = NodeBase::new(modifier_kind, mod_pos, mod_end);
+            modifiers.push(self.alloc_node(Node::Token(base)));
+        }
+
+        if modifiers.is_empty() {
+            None
+        } else {
+            let end = self.get_token_start();
+            Some(NodeList { pos, end, nodes: modifiers, has_trailing_comma: false })
+        }
+    }
+
     /// Parse a single class element.
     fn parse_class_element(&mut self) -> NodeIndex {
         let pos = self.get_full_start();
 
-        // TODO: Parse modifiers (public, private, static, etc.)
+        // Parse modifiers (public, private, static, etc.)
+        let modifiers = self.parse_class_element_modifiers();
 
-        // Check for constructor
+        // Check for constructor (with or without modifiers)
         if self.is_token(SyntaxKind::ConstructorKeyword) {
-            return self.parse_constructor_declaration(pos);
+            return self.parse_constructor_declaration_with_modifiers(pos, modifiers);
         }
 
-        // Check for getter/setter
+        // Check for getter/setter (after modifiers)
         if self.is_token(SyntaxKind::GetKeyword) {
             self.next_token();
-            return self.parse_get_accessor(pos);
+            return self.parse_get_accessor_with_modifiers(pos, modifiers);
         }
         if self.is_token(SyntaxKind::SetKeyword) {
             self.next_token();
-            return self.parse_set_accessor(pos);
+            return self.parse_set_accessor_with_modifiers(pos, modifiers);
         }
 
         // Parse as method or property
@@ -1542,15 +1579,20 @@ impl ParserState {
 
         if self.is_token(SyntaxKind::OpenParenToken) || self.is_token(SyntaxKind::LessThanToken) {
             // Method
-            self.parse_method_declaration(pos, name)
+            self.parse_method_declaration_with_modifiers(pos, name, modifiers)
         } else {
             // Property
-            self.parse_property_declaration(pos, name)
+            self.parse_property_declaration_with_modifiers(pos, name, modifiers)
         }
     }
 
     /// Parse a constructor declaration.
     fn parse_constructor_declaration(&mut self, pos: u32) -> NodeIndex {
+        self.parse_constructor_declaration_with_modifiers(pos, None)
+    }
+
+    /// Parse a constructor declaration with modifiers.
+    fn parse_constructor_declaration_with_modifiers(&mut self, pos: u32, modifiers: Option<NodeList>) -> NodeIndex {
         self.parse_expected(SyntaxKind::ConstructorKeyword);
         self.parse_expected(SyntaxKind::OpenParenToken);
         let parameters = self.parse_parameter_list();
@@ -1566,7 +1608,7 @@ impl ParserState {
 
         let decl = ConstructorDeclaration {
             base: NodeBase::new_ext(syntax_kind_ext::CONSTRUCTOR, pos, end),
-            modifiers: None,
+            modifiers,
             type_parameters: None,
             parameters,
             body,
@@ -1576,6 +1618,11 @@ impl ParserState {
 
     /// Parse a method declaration.
     fn parse_method_declaration(&mut self, pos: u32, name: NodeIndex) -> NodeIndex {
+        self.parse_method_declaration_with_modifiers(pos, name, None)
+    }
+
+    /// Parse a method declaration with modifiers.
+    fn parse_method_declaration_with_modifiers(&mut self, pos: u32, name: NodeIndex, modifiers: Option<NodeList>) -> NodeIndex {
         let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
             Some(self.parse_type_parameters())
         } else {
@@ -1603,7 +1650,7 @@ impl ParserState {
 
         let decl = MethodDeclaration {
             base: NodeBase::new_ext(syntax_kind_ext::METHOD_DECLARATION, pos, end),
-            modifiers: None,
+            modifiers,
             asterisk_token: false,
             name,
             question_token: false,
@@ -1617,6 +1664,11 @@ impl ParserState {
 
     /// Parse a property declaration.
     fn parse_property_declaration(&mut self, pos: u32, name: NodeIndex) -> NodeIndex {
+        self.parse_property_declaration_with_modifiers(pos, name, None)
+    }
+
+    /// Parse a property declaration with modifiers.
+    fn parse_property_declaration_with_modifiers(&mut self, pos: u32, name: NodeIndex, modifiers: Option<NodeList>) -> NodeIndex {
         let question_token = self.parse_optional(SyntaxKind::QuestionToken);
         let exclamation_token = self.parse_optional(SyntaxKind::ExclamationToken);
 
@@ -1637,7 +1689,7 @@ impl ParserState {
 
         let decl = PropertyDeclaration {
             base: NodeBase::new_ext(syntax_kind_ext::PROPERTY_DECLARATION, pos, end),
-            modifiers: None,
+            modifiers,
             name,
             question_token,
             exclamation_token,
@@ -1649,6 +1701,11 @@ impl ParserState {
 
     /// Parse a get accessor.
     fn parse_get_accessor(&mut self, pos: u32) -> NodeIndex {
+        self.parse_get_accessor_with_modifiers(pos, None)
+    }
+
+    /// Parse a get accessor with modifiers.
+    fn parse_get_accessor_with_modifiers(&mut self, pos: u32, modifiers: Option<NodeList>) -> NodeIndex {
         let name = self.parse_property_name();
         self.parse_expected(SyntaxKind::OpenParenToken);
         self.parse_expected(SyntaxKind::CloseParenToken);
@@ -1669,7 +1726,7 @@ impl ParserState {
 
         let decl = GetAccessorDeclaration {
             base: NodeBase::new_ext(syntax_kind_ext::GET_ACCESSOR, pos, end),
-            modifiers: None,
+            modifiers,
             name,
             type_parameters: None,
             parameters: NodeList::new(),
@@ -1681,6 +1738,11 @@ impl ParserState {
 
     /// Parse a set accessor.
     fn parse_set_accessor(&mut self, pos: u32) -> NodeIndex {
+        self.parse_set_accessor_with_modifiers(pos, None)
+    }
+
+    /// Parse a set accessor with modifiers.
+    fn parse_set_accessor_with_modifiers(&mut self, pos: u32, modifiers: Option<NodeList>) -> NodeIndex {
         let name = self.parse_property_name();
         self.parse_expected(SyntaxKind::OpenParenToken);
         let parameters = self.parse_parameter_list();
@@ -1696,7 +1758,7 @@ impl ParserState {
 
         let decl = SetAccessorDeclaration {
             base: NodeBase::new_ext(syntax_kind_ext::SET_ACCESSOR, pos, end),
-            modifiers: None,
+            modifiers,
             name,
             type_parameters: None,
             parameters,
