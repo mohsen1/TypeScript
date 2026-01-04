@@ -8911,6 +8911,69 @@ fn test_instanceof_narrowing() {
 }
 
 #[test]
+fn test_array_literal_with_type_annotation() {
+    // Test: const arr: number[] = [1, 2, 3]; should NOT produce an error
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"const arr: number[] = [1, 2, 3];"#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have NO errors - number literals are assignable to number[]
+    assert!(
+        checker.diagnostics.is_empty(),
+        "Expected no errors for 'const arr: number[] = [1, 2, 3];' but got: {:?}",
+        checker.diagnostics
+    );
+}
+
+#[test]
+fn test_function_with_parameters_in_return() {
+    // Test: function add(a: number, b: number): number { return a + b; }
+    // Parameters a and b should be in scope when checking the return expression
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"function add(a: number, b: number): number { return a + b; }"#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have NO errors - function parameters should be in scope
+    assert!(
+        checker.diagnostics.is_empty(),
+        "Expected no errors for function with parameters, but got: {:?}",
+        checker.diagnostics
+    );
+}
+
+#[test]
 fn test_mapped_type_basic() {
     use crate::parser_impl::ParserState;
     use crate::binder::BinderState;
