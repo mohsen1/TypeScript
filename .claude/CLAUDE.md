@@ -3,6 +3,9 @@
 ## Mission
 Migrate TypeScript compiler to Rust/WASM. **Beat TypeScript-Go in performance.**
 
+### Eventual Goal
+Rust port can run every single test case in test/cases faster than go port. Then we will release the port to the world. It should match TypeScript Go in terms of TS language feature (TS version). Later we can add new language features.
+
 ## 🎯 Philosophy: Performance-First Architecture
 
 We have time. No deadlines. Do it right.

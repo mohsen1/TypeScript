@@ -1,20 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(*)",
-      "Read(*)",
-      "Write(*)",
-      "Edit(*)",
+      "Bash",
+      "Read",
+      "Write",
+      "Edit",
       "mcp__*",
       "WebSearch",
-      "WebFetch(*)"
+      "WebFetch"
     ],
     "deny": [
       "Bash(rm -rf /)",
       "Bash(rm -rf ~)",
-      "Bash(rm -rf *)",
+      "Bash(rm -rf :*)",
       "Bash(sudo rm -rf:*)",
-      "Bash(:(){ :|:& };:)",
       "Bash(mkfs:*)",
       "Bash(dd if=/dev/zero:*)"
     ],
@@ -23,14 +22,14 @@
   "hooks": {
     "Stop": [
       {
+        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "tmux send-keys -t claude 'Continue with migration_plan.md' && sleep 0.1 && tmux send-keys -t claude Enter"
+            "command": "echo 'Continue with migration_plan.md' >&2; exit 2"
           }
         ]
       }
     ]
   }
 }
-
