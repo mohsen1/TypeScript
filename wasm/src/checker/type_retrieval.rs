@@ -111,11 +111,11 @@ impl<'a> CheckerState<'a> {
                 } else if kind == SyntaxKind::SymbolKeyword as u16 {
                     self.types.es_symbol_type
                 } else if kind == SyntaxKind::ThisKeyword as u16 {
-                    // TODO: Get the actual 'this' type from the enclosing class/function
-                    self.types.any_type
+                    // Get the 'this' type from the enclosing class
+                    self.get_this_type()
                 } else if kind == SyntaxKind::SuperKeyword as u16 {
-                    // TODO: Get the superclass type from the enclosing class
-                    self.types.any_type
+                    // Get the superclass type from the enclosing class
+                    self.get_super_type()
                 } else {
                     self.types.any_type
                 }
@@ -3488,6 +3488,46 @@ impl<'a> CheckerState<'a> {
             }
             _ => self.types.object_type,
         }
+    }
+
+    /// Get the 'this' type for the current context.
+    /// Returns the type of the enclosing class if inside a class method,
+    /// or 'any' if not inside a class.
+    fn get_this_type(&mut self) -> TypeId {
+        // Check if we're inside a class
+        if let Some(class_idx) = self.enclosing_class {
+            // Get the type of the enclosing class declaration
+            // We need to get the declared type of the class itself
+            if let Some(crate::parser::Node::ClassDeclaration(cd)) = self.node_arena.get(class_idx) {
+                // Get the class name
+                if let Some(crate::parser::Node::Identifier(id)) = self.node_arena.get(cd.name) {
+                    // Look up the class symbol
+                    if let Some(symbol_id) = self.file_locals.get(&id.escaped_text) {
+                        return self.get_type_of_symbol(symbol_id);
+                    }
+                }
+            }
+        }
+        // Not inside a class, return any
+        self.types.any_type
+    }
+
+    /// Get the 'super' type for the current context.
+    /// Returns the type of the base class if inside a class that extends another,
+    /// or 'any' if not inside a class or the class has no base class.
+    fn get_super_type(&mut self) -> TypeId {
+        // Check if we're inside a class
+        if let Some(class_idx) = self.enclosing_class {
+            // Get the class declaration
+            if let Some(crate::parser::Node::ClassDeclaration(cd)) = self.node_arena.get(class_idx) {
+                // Look for base class in heritage clauses
+                if let Some(base_symbol) = self.get_base_class_symbol(&cd.heritage_clauses) {
+                    return self.get_type_of_symbol(base_symbol);
+                }
+            }
+        }
+        // Not inside a class or no base class, return any
+        self.types.any_type
     }
 
     /// Get the type of a symbol (with caching).
