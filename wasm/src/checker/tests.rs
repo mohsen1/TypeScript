@@ -10083,3 +10083,142 @@ fn test_instance_type_utility() {
     assert_eq!(checker.diagnostics.len(), 0,
         "No type errors expected for InstanceType usage, got: {:?}", checker.diagnostics);
 }
+
+#[test]
+fn test_type_error_number_to_string() {
+    // Test that assigning number to string produces a type error
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        const x: string = 42;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have exactly 1 type error
+    assert_eq!(checker.diagnostics.len(), 1,
+        "Expected 1 type error for assigning number to string, got: {:?}", checker.diagnostics);
+
+    // Check error message contains relevant info
+    let diag = &checker.diagnostics[0];
+    assert!(diag.message_text.contains("not assignable") || diag.message_text.contains("number") || diag.message_text.contains("string"),
+        "Error message should mention type mismatch, got: {}", diag.message_text);
+}
+
+#[test]
+fn test_type_error_wrong_argument_type() {
+    // Test that passing wrong argument type produces a type error
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        function greet(name: string): void {}
+        greet(123);
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have at least 1 type error for argument type mismatch
+    assert!(!checker.diagnostics.is_empty(),
+        "Expected type error for passing number to string parameter, got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_type_error_missing_property() {
+    // Test that accessing non-existent property produces a type error
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        interface User {
+            name: string;
+        }
+        const user: User = { name: "John" };
+        const x = user.age;
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have error for missing property 'age'
+    let property_errors: Vec<_> = checker.diagnostics.iter()
+        .filter(|d| d.message_text.contains("age") || d.message_text.contains("does not exist"))
+        .collect();
+    assert!(!property_errors.is_empty(),
+        "Expected error for accessing non-existent property 'age', got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_type_error_too_few_arguments() {
+    // Test that calling function with too few arguments produces error
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        function add(a: number, b: number): number {
+            return a + b;
+        }
+        const result = add(1);
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // Should have error for too few arguments
+    let arg_errors: Vec<_> = checker.diagnostics.iter()
+        .filter(|d| d.message_text.contains("argument") || d.message_text.contains("Expected"))
+        .collect();
+    assert!(!arg_errors.is_empty(),
+        "Expected error for too few arguments, got: {:?}", checker.diagnostics);
+}

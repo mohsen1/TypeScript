@@ -804,7 +804,7 @@ impl<'a> CheckerState<'a> {
                 return self.instantiate_type(return_type, &inferred_type_args, &type_parameters);
             }
 
-            // For non-generic functions, still evaluate arguments with contextual types
+            // For non-generic functions, evaluate arguments with contextual types and check type compatibility
             // This enables contextual typing for callbacks like arr.map(x => x + 1)
             for (i, &arg_node) in arguments.nodes.iter().enumerate() {
                 if i >= parameter_types.len() {
@@ -813,8 +813,19 @@ impl<'a> CheckerState<'a> {
                 let param_type = parameter_types[i];
                 let prev_contextual_type = self.contextual_type;
                 self.contextual_type = Some(param_type);
-                let _arg_type = self.get_type_of_node(arg_node);
+                let arg_type = self.get_type_of_node(arg_node);
                 self.contextual_type = prev_contextual_type;
+
+                // Check if argument type is assignable to parameter type
+                if !self.is_type_assignable_to(arg_type, param_type) {
+                    let arg_str = self.type_to_string(arg_type);
+                    let param_str = self.type_to_string(param_type);
+                    self.error(
+                        arg_node,
+                        &format!("Argument of type '{}' is not assignable to parameter of type '{}'.", arg_str, param_str),
+                        super::diagnostic_codes::ARGUMENT_NOT_ASSIGNABLE_TO_PARAMETER
+                    );
+                }
             }
 
             return return_type;
