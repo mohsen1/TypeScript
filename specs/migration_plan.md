@@ -265,6 +265,7 @@ scanner and shares data structures with the type checker.
       - `parseIdentifier`, `parseNumericLiteral`, `parseStringLiteral`
       - `parseArrayLiteral`, `parseObjectLiteral`, `parsePropertyAssignment`
       - `parseParenthesizedExpression`, `parseArgumentList`
+      - `parseThisExpression`, `parseSuperExpression`
 - [x] Handle automatic semicolon insertion (ASI)
 - [x] Implement class parsing:
       - `parseClassDeclaration`, `parseHeritageClause`
@@ -525,12 +526,9 @@ building up to full inference.
       - `this is T` (this type predicates in methods)
 - [ ] Integrate with TypeScript's checker for full test suite
 
-Verification Gate: 442 Rust tests passing, 1 skipped. Full baseline matching pending.
+Verification Gate: 443 Rust tests passing, 0 skipped. Full baseline matching pending.
 
-**Known limitations**:
-- super.method() calls cause infinite recursion in some cases
-
-Progress: **Phase 5 ~95% complete! Core type checking working. 442 tests passing (1 skipped).**
+Progress: **Phase 5 ~96% complete! Core type checking working. 443 tests passing.**
 
 ==============================================================================
 PHASE 6: EMITTER
