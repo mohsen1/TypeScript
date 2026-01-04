@@ -26,10 +26,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/stop_review.sh"
+            "command": "tmux send-keys -t claude 'Continue with migration_plan.md' && sleep 0.1 && tmux send-keys -t claude Enter"
           }
         ]
       }
     ]
   }
 }
+
