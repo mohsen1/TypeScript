@@ -44,18 +44,19 @@ Created `scripts/runCheckerTests.mjs` to run Rust checker against TypeScript's 6
 
 | Metric | Value |
 |--------|-------|
-| Tests Completed | 135 of 200 |
-| Pass Rate | 87.4% |
-| Skipped (WASM crash) | 65 |
+| Tests Completed | 126 of 200 |
+| Pass Rate | 88.1% |
+| Skipped (WASM crash) | 74 |
 
 **Recent Fixes:**
 - Fixed parser crash when reserved keywords used as class/function/interface names
 - Fixed parser crash on parameter modifiers (public, private, etc.)
+- Fixed parser crash on heritage clauses with type arguments (implements IList<T>)
 
 **Known Issues:**
 - TS2304 "Cannot find name" - missing symbol resolution for class members
 - TS2339 "Property does not exist" - class instance property access
-- Implements clause with type arguments causes WASM crash
+- Multi-file tests with @filename directive not supported
 
 ---
 
