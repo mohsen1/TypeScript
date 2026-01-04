@@ -146,16 +146,24 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 - [x] Async/await transforms: await→yield + __awaiter helper creation
 - [~] Generator transforms (helper detection done, state machine pending)
 
-## Phase 7: Language Service (50% Complete)
+## Phase 7: Language Service (55% Complete)
 
 | Metric | Value |
 |--------|-------|
-| Lines of Code | ~1,300 |
-| Tests | 3 |
+| Lines of Code | ~1,500 |
+| Tests | 5 |
+
+### Completed (2026-01-04)
+- [x] Signature help (basic implementation)
+- [x] Context-aware completions:
+  - `get_properties_of_type()` for type property enumeration
+  - Member completions when typing after `.`
+  - `find_property_access_at_position()` for context detection
+  - Global completions refactored to separate method
+- [x] 2 new tests: member completions, get_properties_of_type
 
 ### TODO
-- [x] Signature help (basic implementation)
-- [ ] Context-aware completions (member completions, type completions)
+- [ ] Type completions (after `:` or in type position)
 - [ ] Cross-file navigation support
 - [ ] Formatting engine
 - [ ] Code fixes and refactorings
@@ -180,16 +188,24 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 | 4 | Binder | ~1,900 | 20+ | ✅ Done |
 | 5 | Type Checker | ~23,500 | 485 | ✅ 99% |
 | 6 | Emitter | ~5,000 | 85+ | 🟡 75% |
-| 7 | Language Service | ~1,500 | 3 | 🟡 55% |
+| 7 | Language Service | ~1,500 | 5 | 🟡 55% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
 **Total Rust Code**: ~42,000 lines
-**Total Tests**: 605 passing
+**Total Tests**: 607 passing
 **Overall Progress**: ~88% of full compiler functionality
 
 ---
 
 # MILESTONES
+
+## 2026-01-04: Language Service Member Completions
+- Added `get_properties_of_type()` to checker for enumerating type properties
+- Context-aware completions: detects PropertyAccessExpression context
+- Member completions when typing after `.` (obj.property)
+- Refactored global completions into separate method
+- 2 new tests for member completions and property enumeration
+- 607 tests passing
 
 ## 2026-01-04: Scanner Interner Integration (Phase 0.2)
 - Integrated Interner directly into ScannerState
