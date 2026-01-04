@@ -18,6 +18,9 @@ mod narrowing;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+mod baseline_tests;
+
 // Re-export key types for backwards compatibility
 pub use types::{
     type_flags, object_flags, signature_flags, diagnostic_codes,
