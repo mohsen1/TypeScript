@@ -2,6 +2,7 @@
 
 use serde::Serialize;
 use super::ast::{Node, NodeIndex};
+use super::thin_node::{NodeAccess, NodeInfo};
 
 /// Arena-based storage for AST nodes.
 /// Nodes are stored contiguously and referenced by index.
@@ -64,5 +65,58 @@ impl NodeArena {
     /// Check if the arena is empty
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
+    }
+}
+
+/// Implementation of NodeAccess for NodeArena
+impl NodeAccess for NodeArena {
+    fn node_info(&self, index: NodeIndex) -> Option<NodeInfo> {
+        let node = self.get(index)?;
+        let base = node.base();
+        Some(NodeInfo {
+            kind: base.kind,
+            flags: base.flags,
+            modifier_flags: base.modifier_flags,
+            pos: base.pos,
+            end: base.end,
+            parent: base.parent,
+            id: base.id,
+        })
+    }
+
+    fn kind(&self, index: NodeIndex) -> Option<u16> {
+        self.get(index).map(|n| n.base().kind)
+    }
+
+    fn pos_end(&self, index: NodeIndex) -> Option<(u32, u32)> {
+        self.get(index).map(|n| (n.base().pos, n.base().end))
+    }
+
+    fn get_identifier_text(&self, index: NodeIndex) -> Option<&str> {
+        match self.get(index)? {
+            Node::Identifier(ident) | Node::PrivateIdentifier(ident) => {
+                Some(&ident.escaped_text)
+            }
+            _ => None,
+        }
+    }
+
+    fn get_literal_text(&self, index: NodeIndex) -> Option<&str> {
+        match self.get(index)? {
+            Node::StringLiteral(lit) | Node::NoSubstitutionTemplateLiteral(lit) |
+            Node::TemplateHead(lit) | Node::TemplateMiddle(lit) | Node::TemplateTail(lit) => {
+                Some(&lit.text)
+            }
+            Node::NumericLiteral(lit) => Some(&lit.text),
+            Node::BigIntLiteral(lit) => Some(&lit.text),
+            Node::RegularExpressionLiteral(lit) => Some(&lit.text),
+            _ => None,
+        }
+    }
+
+    fn get_children(&self, index: NodeIndex) -> Vec<NodeIndex> {
+        // TODO: Implement proper child enumeration based on node kind
+        // For now, return empty - this would need kind-specific logic
+        Vec::new()
     }
 }

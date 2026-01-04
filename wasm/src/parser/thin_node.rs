@@ -1112,80 +1112,108 @@ impl ThinNodeArena {
         }
     }
 
-    /// Get identifier data for a node
+    /// Get identifier data for a node.
+    /// Returns None if node is not an identifier or has no data.
     #[inline]
     pub fn get_identifier(&self, node: &ThinNode) -> Option<&IdentifierData> {
-        if node.has_data() {
+        use crate::scanner::SyntaxKind;
+        if node.has_data() && (node.kind == SyntaxKind::Identifier as u16 ||
+                               node.kind == SyntaxKind::PrivateIdentifier as u16) {
             self.identifiers.get(node.data_index as usize)
         } else {
             None
         }
     }
 
-    /// Get literal data for a node
+    /// Get literal data for a node.
+    /// Returns None if node is not a literal or has no data.
     #[inline]
     pub fn get_literal(&self, node: &ThinNode) -> Option<&LiteralData> {
-        if node.has_data() {
+        use crate::scanner::SyntaxKind;
+        if node.has_data() && matches!(node.kind,
+            k if k == SyntaxKind::StringLiteral as u16 ||
+                 k == SyntaxKind::NumericLiteral as u16 ||
+                 k == SyntaxKind::BigIntLiteral as u16 ||
+                 k == SyntaxKind::RegularExpressionLiteral as u16 ||
+                 k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 ||
+                 k == SyntaxKind::TemplateHead as u16 ||
+                 k == SyntaxKind::TemplateMiddle as u16 ||
+                 k == SyntaxKind::TemplateTail as u16
+        ) {
             self.literals.get(node.data_index as usize)
         } else {
             None
         }
     }
 
-    /// Get binary expression data
+    /// Get binary expression data.
+    /// Returns None if node is not a binary expression or has no data.
     #[inline]
     pub fn get_binary_expr(&self, node: &ThinNode) -> Option<&BinaryExprData> {
-        if node.has_data() {
+        use super::syntax_kind_ext::BINARY_EXPRESSION;
+        if node.has_data() && node.kind == BINARY_EXPRESSION {
             self.binary_exprs.get(node.data_index as usize)
         } else {
             None
         }
     }
 
-    /// Get call expression data
+    /// Get call expression data.
+    /// Returns None if node is not a call/new expression or has no data.
     #[inline]
     pub fn get_call_expr(&self, node: &ThinNode) -> Option<&CallExprData> {
-        if node.has_data() {
+        use super::syntax_kind_ext::{CALL_EXPRESSION, NEW_EXPRESSION};
+        if node.has_data() && (node.kind == CALL_EXPRESSION || node.kind == NEW_EXPRESSION) {
             self.call_exprs.get(node.data_index as usize)
         } else {
             None
         }
     }
 
-    /// Get function data
+    /// Get function data.
+    /// Returns None if node is not a function-like node or has no data.
     #[inline]
     pub fn get_function(&self, node: &ThinNode) -> Option<&FunctionData> {
-        if node.has_data() {
+        use super::syntax_kind_ext::*;
+        if node.has_data() && matches!(node.kind,
+            FUNCTION_DECLARATION | FUNCTION_EXPRESSION | ARROW_FUNCTION
+        ) {
             self.functions.get(node.data_index as usize)
         } else {
             None
         }
     }
 
-    /// Get class data
+    /// Get class data.
+    /// Returns None if node is not a class declaration/expression or has no data.
     #[inline]
     pub fn get_class(&self, node: &ThinNode) -> Option<&ClassData> {
-        if node.has_data() {
+        use super::syntax_kind_ext::{CLASS_DECLARATION, CLASS_EXPRESSION};
+        if node.has_data() && (node.kind == CLASS_DECLARATION || node.kind == CLASS_EXPRESSION) {
             self.classes.get(node.data_index as usize)
         } else {
             None
         }
     }
 
-    /// Get block data
+    /// Get block data.
+    /// Returns None if node is not a block or has no data.
     #[inline]
     pub fn get_block(&self, node: &ThinNode) -> Option<&BlockData> {
-        if node.has_data() {
+        use super::syntax_kind_ext::BLOCK;
+        if node.has_data() && node.kind == BLOCK {
             self.blocks.get(node.data_index as usize)
         } else {
             None
         }
     }
 
-    /// Get source file data
+    /// Get source file data.
+    /// Returns None if node is not a source file or has no data.
     #[inline]
     pub fn get_source_file(&self, node: &ThinNode) -> Option<&SourceFileData> {
-        if node.has_data() {
+        use super::syntax_kind_ext::SOURCE_FILE;
+        if node.has_data() && node.kind == SOURCE_FILE {
             self.source_files.get(node.data_index as usize)
         } else {
             None
@@ -1404,6 +1432,110 @@ impl ThinNode {
 }
 
 // =============================================================================
+// Node Access Trait - Unified Interface for Arena Types
+// =============================================================================
+
+/// Common node information that both arena types can provide.
+/// This struct contains the essential fields needed by most consumers.
+#[derive(Clone, Debug)]
+pub struct NodeInfo {
+    pub kind: u16,
+    pub flags: u32,
+    pub modifier_flags: u32,
+    pub pos: u32,
+    pub end: u32,
+    pub parent: NodeIndex,
+    pub id: u32,
+}
+
+impl NodeInfo {
+    /// Create from a ThinNode and its extended info
+    pub fn from_thin(node: &ThinNode, ext: &ExtendedNodeInfo) -> NodeInfo {
+        NodeInfo {
+            kind: node.kind,
+            flags: node.flags as u32,
+            modifier_flags: ext.modifier_flags,
+            pos: node.pos,
+            end: node.end,
+            parent: ext.parent,
+            id: ext.id,
+        }
+    }
+}
+
+/// Trait for unified access to AST nodes across different arena implementations.
+/// This allows consumers (binder, checker, emitter) to work with either
+/// NodeArena or ThinNodeArena without code changes.
+pub trait NodeAccess {
+    /// Get basic node information by index
+    fn node_info(&self, index: NodeIndex) -> Option<NodeInfo>;
+
+    /// Get the syntax kind of a node
+    fn kind(&self, index: NodeIndex) -> Option<u16>;
+
+    /// Get the source position range
+    fn pos_end(&self, index: NodeIndex) -> Option<(u32, u32)>;
+
+    /// Check if a node exists
+    fn exists(&self, index: NodeIndex) -> bool {
+        !index.is_none() && self.kind(index).is_some()
+    }
+
+    /// Get identifier text (if this is an identifier node)
+    fn get_identifier_text(&self, index: NodeIndex) -> Option<&str>;
+
+    /// Get literal value text (if this is a literal node)
+    fn get_literal_text(&self, index: NodeIndex) -> Option<&str>;
+
+    /// Get children of a node (for traversal)
+    fn get_children(&self, index: NodeIndex) -> Vec<NodeIndex>;
+}
+
+/// Implementation of NodeAccess for ThinNodeArena
+impl NodeAccess for ThinNodeArena {
+    fn node_info(&self, index: NodeIndex) -> Option<NodeInfo> {
+        if index.is_none() {
+            return None;
+        }
+        let node = self.nodes.get(index.0 as usize)?;
+        let ext = self.extended_info.get(index.0 as usize)?;
+        Some(NodeInfo::from_thin(node, ext))
+    }
+
+    fn kind(&self, index: NodeIndex) -> Option<u16> {
+        if index.is_none() {
+            return None;
+        }
+        self.nodes.get(index.0 as usize).map(|n| n.kind)
+    }
+
+    fn pos_end(&self, index: NodeIndex) -> Option<(u32, u32)> {
+        if index.is_none() {
+            return None;
+        }
+        self.nodes.get(index.0 as usize).map(|n| (n.pos, n.end))
+    }
+
+    fn get_identifier_text(&self, index: NodeIndex) -> Option<&str> {
+        let node = self.get(index)?;
+        let data = self.get_identifier(node)?;
+        Some(&data.escaped_text)
+    }
+
+    fn get_literal_text(&self, index: NodeIndex) -> Option<&str> {
+        let node = self.get(index)?;
+        let data = self.get_literal(node)?;
+        Some(&data.text)
+    }
+
+    fn get_children(&self, index: NodeIndex) -> Vec<NodeIndex> {
+        // TODO: Implement proper child enumeration based on node kind
+        // For now, return empty - this would need kind-specific logic
+        Vec::new()
+    }
+}
+
+// =============================================================================
 // Tests
 // =============================================================================
 
@@ -1424,15 +1556,17 @@ mod tests {
 
     #[test]
     fn test_thin_node_arena_basic() {
+        use crate::scanner::SyntaxKind;
+
         let mut arena = ThinNodeArena::new();
 
         // Add a token (no data)
-        let token = arena.add_token(42, 0, 5);
+        let token = arena.add_token(SyntaxKind::AsteriskToken as u16, 0, 5);
         assert_eq!(token.0, 0);
 
         // Add an identifier
         let ident = arena.add_identifier(
-            79,  // SyntaxKind::Identifier
+            SyntaxKind::Identifier as u16,
             10,
             15,
             IdentifierData {
@@ -1445,13 +1579,13 @@ mod tests {
 
         // Verify we can retrieve them
         let node = arena.get(token).unwrap();
-        assert_eq!(node.kind, 42);
+        assert_eq!(node.kind, SyntaxKind::AsteriskToken as u16);
         assert_eq!(node.pos, 0);
         assert_eq!(node.end, 5);
         assert!(!node.has_data());
 
         let node = arena.get(ident).unwrap();
-        assert_eq!(node.kind, 79);
+        assert_eq!(node.kind, SyntaxKind::Identifier as u16);
         assert!(node.has_data());
 
         let data = arena.get_identifier(node).unwrap();
@@ -1469,11 +1603,13 @@ mod tests {
 
     #[test]
     fn test_node_view() {
+        use crate::scanner::SyntaxKind;
+
         let mut arena = ThinNodeArena::new();
 
         // Add an identifier
         let ident_idx = arena.add_identifier(
-            79,  // SyntaxKind::Identifier
+            SyntaxKind::Identifier as u16,
             10,
             15,
             IdentifierData {
@@ -1485,7 +1621,7 @@ mod tests {
 
         // Create a view and access data through it
         let view = NodeView::new(&arena, ident_idx).unwrap();
-        assert_eq!(view.kind(), 79);
+        assert_eq!(view.kind(), SyntaxKind::Identifier as u16);
         assert_eq!(view.pos(), 10);
         assert_eq!(view.end(), 15);
         assert!(view.has_data());
@@ -1517,5 +1653,38 @@ mod tests {
 
         let type_ref = ThinNode::new(TYPE_REFERENCE, 0, 10);
         assert!(type_ref.is_type_node());
+    }
+
+    #[test]
+    fn test_node_access_trait() {
+        use crate::scanner::SyntaxKind;
+
+        let mut arena = ThinNodeArena::new();
+
+        // Add an identifier
+        let ident_idx = arena.add_identifier(
+            SyntaxKind::Identifier as u16,
+            10,
+            20,
+            IdentifierData {
+                escaped_text: "testVar".to_string(),
+                original_text: None,
+                type_arguments: None,
+            },
+        );
+
+        // Test NodeAccess trait methods
+        assert!(arena.exists(ident_idx));
+        assert!(!arena.exists(NodeIndex::NONE));
+
+        assert_eq!(arena.kind(ident_idx), Some(SyntaxKind::Identifier as u16));
+        assert_eq!(arena.pos_end(ident_idx), Some((10, 20)));
+        assert_eq!(arena.get_identifier_text(ident_idx), Some("testVar"));
+
+        // Test NodeInfo
+        let info = arena.node_info(ident_idx).unwrap();
+        assert_eq!(info.kind, SyntaxKind::Identifier as u16);
+        assert_eq!(info.pos, 10);
+        assert_eq!(info.end, 20);
     }
 }

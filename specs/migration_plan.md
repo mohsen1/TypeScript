@@ -26,15 +26,39 @@ Stop "porting" TypeScript line-by-line. Start **architecting for the hardware**.
 
 Current `Node` enum is sized to largest variant (~208 bytes). This destroys cache locality.
 
-### Progress
+### Completed Infrastructure (~1,500 lines)
 - [x] Size analysis complete: Node=208B, ClassDeclaration=200B, FunctionDeclaration=168B
 - [x] ThinNode struct implemented: exactly 16 bytes (4 nodes per cache line)
-- [x] 60+ typed data pool structs defined for all node categories
-- [x] ThinNodeArena with all typed storage pools
+- [x] 60+ typed data pool structs for all node categories:
+  - Names: IdentifierData, QualifiedNameData, ComputedPropertyData
+  - Literals: LiteralData (string, numeric, regex)
+  - Expressions: BinaryExprData, UnaryExprData, CallExprData, AccessExprData, ConditionalExprData
+  - Functions: FunctionData, ClassData, InterfaceData, TypeAliasData, EnumData
+  - Statements: IfStatementData, LoopData, BlockData, SwitchData, TryData
+  - Types: TypeRefData, CompositeTypeData, FunctionTypeData, MappedTypeData, ConditionalTypeData
+  - Imports: ImportDeclData, ExportDeclData, SpecifierData
+  - JSX: JsxElementData, JsxOpeningData, JsxAttributeData
+  - Source: SourceFileData with full metadata
+- [x] ThinNodeArena with all typed storage pools (40+ pools)
+- [x] Arena methods for adding all node types (add_token, add_identifier, add_literal, etc.)
 - [x] NodeView wrapper for ergonomic node access
-- [x] Kind utilities (is_identifier, is_function_like, is_statement, etc.)
-- [ ] Migrate parser to use ThinNodeArena
-- [ ] Update binder, checker, emitter to use new structure
+- [x] Kind utilities (is_identifier, is_function_like, is_statement, is_type_node, etc.)
+- [x] Kind validation in accessor methods (type safety)
+- [x] Tests passing (5 thin_node tests, 595 total)
+
+### NodeAccess Trait (Unified Interface)
+- [x] NodeAccess trait defined with common node access methods
+- [x] NodeInfo struct for common node information
+- [x] ThinNodeArena implements NodeAccess
+- [x] NodeArena implements NodeAccess
+- 596 tests passing
+
+### Next Steps
+- [ ] Migrate parser to output ThinNodeArena
+- [ ] Update binder to use NodeAccess trait
+- [ ] Update checker to use NodeAccess trait
+- [ ] Update emitter to use NodeAccess trait
+- [ ] Benchmark: compare ThinNodeArena vs NodeArena parsing performance
 
 ### Architecture (wasm/src/parser/thin_node.rs)
 ```rust
@@ -148,21 +172,23 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 | 7 | Language Service | ~1,500 | 3 | 🟡 55% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
-**Total Rust Code**: ~39,500 lines
-**Total Tests**: 595 passing
+**Total Rust Code**: ~41,000 lines
+**Total Tests**: 596 passing
 **Overall Progress**: ~85% of full compiler functionality
 
 ---
 
 # MILESTONES
 
-## 2026-01-04: Thin Nodes Architecture
+## 2026-01-04: Thin Nodes Architecture + NodeAccess Trait
 - Implemented ThinNode struct (16 bytes vs 208 bytes = 13x improvement)
 - Created 60+ typed data pool structures for all node categories
-- ThinNodeArena with all typed storage pools
+- ThinNodeArena with all typed storage pools (~1,700 lines)
 - NodeView wrapper for ergonomic node access
 - Kind utilities (is_identifier, is_function_like, is_statement, etc.)
-- 595 tests passing
+- NodeAccess trait for unified arena interface (both arenas implement it)
+- NodeInfo struct for common node information
+- 596 tests passing
 
 ## 2026-01-04: Architecture Fixes
 - Fixed 4 BLOCKER/CRITICAL issues from Gemini architecture review
