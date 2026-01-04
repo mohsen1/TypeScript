@@ -594,7 +594,7 @@ impl BinderState {
                                 for &decl_idx in &list.declarations.nodes {
                                     if let Some(Node::VariableDeclaration(decl)) = arena.get(decl_idx) {
                                         if let Some(name) = self.get_identifier_name(arena, decl.name) {
-                                            self.add_hoisted_var(name, decl_idx);
+                                            self.add_hoisted_var(name.to_string(), decl_idx);
                                         }
                                     }
                                 }
@@ -604,7 +604,7 @@ impl BinderState {
                     // function declarations are hoisted
                     Node::FunctionDeclaration(func) => {
                         if let Some(name) = self.get_identifier_name(arena, func.name) {
-                            self.add_hoisted_function(name, stmt_idx);
+                            self.add_hoisted_function(name.to_string(), stmt_idx);
                         }
                     }
                     // Recurse into blocks for var hoisting (but not let/const)
@@ -987,10 +987,11 @@ impl BinderState {
         false
     }
 
-    /// Get the name from an identifier node.
-    fn get_identifier_name(&self, arena: &NodeArena, idx: NodeIndex) -> Option<String> {
+    /// Get the name text from an identifier node.
+    /// Returns a reference to avoid cloning - callers should clone only when needed.
+    fn get_identifier_name<'a>(&self, arena: &'a NodeArena, idx: NodeIndex) -> Option<&'a str> {
         if let Some(Node::Identifier(id)) = arena.get(idx) {
-            Some(id.escaped_text.clone())
+            Some(&id.escaped_text)
         } else {
             None
         }
@@ -1050,17 +1051,17 @@ impl BinderState {
                 let flags = symbol_flags::FUNCTION_SCOPED_VARIABLE;
 
                 // For var, check if already declared (from hoisting)
-                if self.current_scope.has(&name) || self.lookup_symbol(&name).is_some() {
+                if self.current_scope.has(name) || self.lookup_symbol(name).is_some() {
                     // Already declared via hoisting, just bind the initializer
                     // The symbol was already created during hoisting
                 } else {
                     // Declare in function scope
-                    self.declare_symbol(name.clone(), flags, decl_idx);
+                    self.declare_symbol(name.to_string(), flags, decl_idx);
                 }
             } else {
                 // let/const: block-scoped, declares in current block
                 let flags = symbol_flags::BLOCK_SCOPED_VARIABLE;
-                self.declare_symbol(name, flags, decl_idx);
+                self.declare_symbol(name.to_string(), flags, decl_idx);
             }
         }
     }
@@ -1074,8 +1075,8 @@ impl BinderState {
         // Function declarations are hoisted, so the symbol may already exist
         if let Some(name) = self.get_identifier_name(arena, func.name) {
             // Check if already declared via hoisting
-            if !self.current_scope.has(&name) {
-                self.declare_symbol(name, symbol_flags::FUNCTION, func_idx);
+            if !self.current_scope.has(name) {
+                self.declare_symbol(name.to_string(), symbol_flags::FUNCTION, func_idx);
             }
         }
 
@@ -1093,7 +1094,7 @@ impl BinderState {
             for &param_idx in &func.parameters.nodes {
                 if let Some(Node::ParameterDeclaration(param)) = arena.get(param_idx) {
                     if let Some(name) = self.get_identifier_name(arena, param.name) {
-                        self.declare_symbol(name, symbol_flags::FUNCTION_SCOPED_VARIABLE, param_idx);
+                        self.declare_symbol(name.to_string(), symbol_flags::FUNCTION_SCOPED_VARIABLE, param_idx);
                     }
                 }
             }
@@ -1111,7 +1112,7 @@ impl BinderState {
         class_idx: NodeIndex,
     ) {
         if let Some(name) = self.get_identifier_name(arena, class.name) {
-            self.declare_symbol(name, symbol_flags::CLASS, class_idx);
+            self.declare_symbol(name.to_string(), symbol_flags::CLASS, class_idx);
         }
 
         // Bind class members in a new scope
@@ -1128,13 +1129,13 @@ impl BinderState {
                 Node::MethodDeclaration(method) => {
                     if let Some(name) = self.get_identifier_name(arena, method.name) {
                         let visibility = self.get_modifier_flags(arena, &method.modifiers);
-                        self.declare_symbol(name, symbol_flags::METHOD | visibility, idx);
+                        self.declare_symbol(name.to_string(), symbol_flags::METHOD | visibility, idx);
                     }
                 }
                 Node::PropertyDeclaration(prop) => {
                     if let Some(name) = self.get_identifier_name(arena, prop.name) {
                         let visibility = self.get_modifier_flags(arena, &prop.modifiers);
-                        self.declare_symbol(name, symbol_flags::PROPERTY | visibility, idx);
+                        self.declare_symbol(name.to_string(), symbol_flags::PROPERTY | visibility, idx);
                     }
                 }
                 Node::ConstructorDeclaration(_) => {
@@ -1250,7 +1251,7 @@ impl BinderState {
         iface_idx: NodeIndex,
     ) {
         if let Some(name) = self.get_identifier_name(arena, iface.name) {
-            self.declare_symbol(name, symbol_flags::INTERFACE, iface_idx);
+            self.declare_symbol(name.to_string(), symbol_flags::INTERFACE, iface_idx);
         }
     }
 
@@ -1261,7 +1262,7 @@ impl BinderState {
         alias_idx: NodeIndex,
     ) {
         if let Some(name) = self.get_identifier_name(arena, alias.name) {
-            self.declare_symbol(name, symbol_flags::TYPE_ALIAS, alias_idx);
+            self.declare_symbol(name.to_string(), symbol_flags::TYPE_ALIAS, alias_idx);
         }
     }
 
@@ -1272,14 +1273,14 @@ impl BinderState {
         enum_idx: NodeIndex,
     ) {
         if let Some(name) = self.get_identifier_name(arena, enum_decl.name) {
-            self.declare_symbol(name, symbol_flags::REGULAR_ENUM, enum_idx);
+            self.declare_symbol(name.to_string(), symbol_flags::REGULAR_ENUM, enum_idx);
         }
 
         // Bind enum members
         for &member_idx in &enum_decl.members.nodes {
             if let Some(Node::EnumMember(member)) = arena.get(member_idx) {
                 if let Some(name) = self.get_identifier_name(arena, member.name) {
-                    self.declare_symbol(name, symbol_flags::ENUM_MEMBER, member_idx);
+                    self.declare_symbol(name.to_string(), symbol_flags::ENUM_MEMBER, member_idx);
                 }
             }
         }
@@ -1295,7 +1296,7 @@ impl BinderState {
             // Default import
             if !clause.name.is_none() {
                 if let Some(name) = self.get_identifier_name(arena, clause.name) {
-                    self.declare_symbol(name, symbol_flags::ALIAS, clause.name);
+                    self.declare_symbol(name.to_string(), symbol_flags::ALIAS, clause.name);
                 }
             }
 
@@ -1304,7 +1305,7 @@ impl BinderState {
                 for &spec_idx in &named.elements.nodes {
                     if let Some(Node::ImportSpecifier(spec)) = arena.get(spec_idx) {
                         if let Some(name) = self.get_identifier_name(arena, spec.name) {
-                            self.declare_symbol(name, symbol_flags::ALIAS, spec_idx);
+                            self.declare_symbol(name.to_string(), symbol_flags::ALIAS, spec_idx);
                         }
                     }
                 }
@@ -1323,7 +1324,7 @@ impl BinderState {
             // Determine if this is a namespace (value) or module (ambient)
             // For simplicity, treat as namespace module (can contain values)
             let flags = symbol_flags::NAMESPACE_MODULE | symbol_flags::VALUE_MODULE;
-            self.declare_symbol(name, flags, module_idx);
+            self.declare_symbol(name.to_string(), flags, module_idx);
         }
 
         // Bind module body in new scope
@@ -1423,7 +1424,7 @@ impl BinderState {
                 if !catch.variable_declaration.is_none() {
                     if let Some(Node::VariableDeclaration(decl)) = arena.get(catch.variable_declaration) {
                         if let Some(name) = self.get_identifier_name(arena, decl.name) {
-                            self.declare_symbol(name, symbol_flags::BLOCK_SCOPED_VARIABLE, catch.variable_declaration);
+                            self.declare_symbol(name.to_string(), symbol_flags::BLOCK_SCOPED_VARIABLE, catch.variable_declaration);
                         }
                     }
                 }
