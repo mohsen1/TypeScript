@@ -9719,3 +9719,84 @@ fn test_method_parameter_scoping() {
         .collect();
     assert!(name_errors.is_empty(), "Should have no Cannot find name errors, got: {:?}", name_errors);
 }
+
+#[test]
+fn test_super_property_access() {
+    // Test accessing properties on super in derived classes
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        class Base {
+            value: number = 42;
+            getValue(): number { return this.value; }
+        }
+        class Derived extends Base {
+            value: number = 100;
+            getBaseValue(): number {
+                return super.getValue();
+            }
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // No type errors expected
+    assert_eq!(checker.diagnostics.len(), 0,
+        "No type errors expected for super.getValue(), got: {:?}", checker.diagnostics);
+}
+
+#[test]
+fn test_super_in_constructor() {
+    // Test super call in constructor
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    let code = r#"
+        class Animal {
+            name: string;
+            constructor(name: string) {
+                this.name = name;
+            }
+        }
+        class Dog extends Animal {
+            breed: string;
+            constructor(name: string, breed: string) {
+                super(name);
+                this.breed = breed;
+            }
+        }
+    "#;
+
+    let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.ts".to_string(),
+    );
+
+    checker.check_source_file(root);
+
+    // No type errors expected for super(name) constructor call
+    assert_eq!(checker.diagnostics.len(), 0,
+        "No type errors expected for super(name), got: {:?}", checker.diagnostics);
+}
