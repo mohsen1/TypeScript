@@ -674,9 +674,87 @@ impl<'a> CheckerState<'a> {
                 self.get_type_of_node(*expression)
             }
 
+            // JSX element (<Foo>...</Foo>)
+            Node::JsxElement(je) => {
+                self.get_type_of_jsx_element(je.opening_element)
+            }
+
+            // JSX self-closing element (<Foo />)
+            Node::JsxSelfClosingElement(jse) => {
+                self.get_type_of_jsx_opening_like(jse.tag_name)
+            }
+
+            // JSX fragment (<>...</>)
+            Node::JsxFragment(_) => {
+                // Fragments return JSX.Element or the configured fragment type
+                self.get_jsx_element_type()
+            }
+
             // Default: return any
             _ => self.types.any_type,
         }
+    }
+
+    /// Get the type of a JSX element based on its opening element.
+    fn get_type_of_jsx_element(&mut self, opening_element: NodeIndex) -> TypeId {
+        if let Some(crate::parser::Node::JsxOpeningElement(joe)) = self.node_arena.get(opening_element) {
+            self.get_type_of_jsx_opening_like(joe.tag_name)
+        } else {
+            self.get_jsx_element_type()
+        }
+    }
+
+    /// Get the type of a JSX opening-like element (opening or self-closing).
+    fn get_type_of_jsx_opening_like(&mut self, tag_name: NodeIndex) -> TypeId {
+        // Check if tag name is a lowercase identifier (intrinsic element like <div>)
+        // or a reference (component element like <MyComponent>)
+        if let Some(node) = self.node_arena.get(tag_name) {
+            match node {
+                crate::parser::Node::Identifier(id) => {
+                    let name = &id.escaped_text;
+                    // Intrinsic elements start with lowercase
+                    if name.chars().next().map(|c| c.is_lowercase()).unwrap_or(false) {
+                        // For intrinsic elements, return JSX.Element type
+                        // (In full implementation, would look up JSX.IntrinsicElements[name])
+                        self.get_jsx_element_type()
+                    } else {
+                        // Component reference - get the type of the component
+                        let component_type = self.get_type_of_node(tag_name);
+                        // If it's a function component, get its return type
+                        if let Some(crate::checker::types::Type::Function(f)) = self.types.get(component_type) {
+                            f.return_type
+                        } else {
+                            // For class components, return JSX.Element
+                            self.get_jsx_element_type()
+                        }
+                    }
+                }
+                // Property access for namespaced components (e.g., <Foo.Bar />)
+                crate::parser::Node::PropertyAccessExpression(_) => {
+                    let component_type = self.get_type_of_node(tag_name);
+                    if let Some(crate::checker::types::Type::Function(f)) = self.types.get(component_type) {
+                        f.return_type
+                    } else {
+                        self.get_jsx_element_type()
+                    }
+                }
+                _ => self.get_jsx_element_type()
+            }
+        } else {
+            self.get_jsx_element_type()
+        }
+    }
+
+    /// Get the JSX.Element type (or a placeholder if not configured).
+    fn get_jsx_element_type(&mut self) -> TypeId {
+        // For now, return a placeholder object type representing JSX.Element
+        // In a full implementation, this would look up the JSX namespace
+        // and return JSX.Element or the configured jsxFactory return type
+        use crate::checker::types::{ObjectType, object_flags};
+        use crate::binder::SymbolId;
+
+        let obj = ObjectType::new(object_flags::ANONYMOUS, SymbolId::NONE);
+        self.types.alloc(Type::Object(Box::new(obj)))
     }
 
     /// Get the type of an enum declaration.

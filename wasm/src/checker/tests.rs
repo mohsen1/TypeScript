@@ -10941,3 +10941,48 @@ fn test_array_filter_method() {
     // Should complete without errors
 }
 
+#[test]
+fn test_jsx_element_type() {
+    // Test that JSX elements have a type
+    use crate::parser_impl::ParserState;
+    use crate::binder::BinderState;
+
+    // Simple JSX test - just verify parsing and type checking doesn't crash
+    let code = r#"
+        const element = <div>Hello</div>;
+    "#;
+
+    let mut parser = ParserState::new("test.tsx".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+    let mut binder = BinderState::new();
+    binder.bind_source_file(&parser.arena, root);
+
+    let mut checker = CheckerState::new(
+        &parser.arena,
+        &binder.symbols,
+        &binder.file_locals,
+        "test.tsx".to_string(),
+    );
+
+    checker.check_source_file(root);
+    // Should complete without crashing
+}
+
+#[test]
+fn test_jsx_self_closing_element() {
+    // Test JSX self-closing elements - just parsing, no type checking
+    use crate::parser_impl::ParserState;
+
+    let code = r#"
+        const element = <input />;
+    "#;
+
+    let mut parser = ParserState::new("test.tsx".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    // Just verify it parses without crashing
+    if let Some(crate::parser::Node::SourceFile(sf)) = parser.arena.get(root) {
+        assert_eq!(sf.statements.len(), 1, "Expected 1 statement");
+    }
+}
+
