@@ -562,9 +562,8 @@ impl<'a> CheckerState<'a> {
                     // await x: unwrap Promise type
                     SyntaxKind::AwaitKeyword => {
                         let operand_type = self.get_type_of_node(pue.operand);
-                        // TODO: Properly unwrap Promise<T> to T
-                        // For now, return the operand type
-                        operand_type
+                        // Unwrap Promise<T> to T using get_awaited_type
+                        self.get_awaited_type(operand_type)
                     }
                     _ => self.types.any_type
                 }
@@ -636,8 +635,8 @@ impl<'a> CheckerState<'a> {
             // Await expressions (await x)
             Node::AwaitExpression(ae) => {
                 let operand_type = self.get_type_of_node(ae.expression);
-                // TODO: Properly unwrap Promise<T> to T
-                operand_type
+                // Unwrap Promise<T> to T using get_awaited_type
+                self.get_awaited_type(operand_type)
             }
 
             // Template literal type (TemplateLiteralType is a type node, not expression)

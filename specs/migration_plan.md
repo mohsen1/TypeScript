@@ -503,14 +503,18 @@ building up to full inference.
 - [x] `infer` types in conditional types
 - [x] Object literals with contextual typing
 - [x] Array literals with contextual typing
-- [ ] `this` type (returns any currently - needs class context)
-- [ ] `super` type (returns any currently - needs class context)
+- [x] `this` type (get_this_type() - uses enclosing_class)
+- [x] `super` type (get_super_type() - uses base class from heritage clauses)
 - [ ] Awaited types for async/await (partially implemented)
 
 5.8 Remaining Work
 ------------------
-- [ ] Fix memory issue with Array.every callback inference
-- [ ] Improve `this` type in class methods
+- [ ] Fix memory issue with method call type inference (Array.every, super.method)
+      Known issue: Some method call patterns cause memory explosion (>1GB)
+      Root cause: Complex type inference during callback/method resolution
+      Affected: Array prototype methods with callbacks, super.method() calls
+- [x] Improve `this` type in class methods (DONE - get_this_type())
+- [x] Improve `super` type in class methods (DONE - get_super_type())
 - [ ] Complete async/await type inference
 - [ ] Add assertion function support
 - [ ] Add exhaustiveness checking for switch
