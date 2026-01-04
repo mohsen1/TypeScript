@@ -516,8 +516,8 @@ building up to full inference.
 - [x] Improve `this` type in class methods (DONE - get_this_type())
 - [x] Improve `super` type in class methods (DONE - get_super_type())
 - [x] Complete async/await type inference (DONE - wired get_awaited_type to await expressions)
+- [x] Add exhaustiveness checking for switch (DONE - check_switch_exhaustiveness in narrowing.rs)
 - [ ] Add assertion function support
-- [ ] Add exhaustiveness checking for switch
 - [ ] Integrate with TypeScript's checker for full test suite
 
 Verification Gate: 389 Rust tests passing. Full baseline matching pending.
