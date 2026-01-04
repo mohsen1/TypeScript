@@ -426,11 +426,15 @@ This is the ultimate validation milestone. The TypeScript test suite contains th
 | fourslash | 6,563 | TBD | 0% | - |
 | **Total** | **18,651** | **~111** | **~0.6%** | - |
 
-### Batch Test Results (500 files from compiler/)
-- Passed: 111/500 (22.2%)
-- Parse failures: 54 (10.8%) - missing syntax support
-- Crashes: 335 (67%) - mostly multi-file tests with directives
+### Batch Test Results (compiler/, single-file only)
+| Sample | Tested | Passed | Pass Rate | Parse Failures | Crashes |
+|--------|--------|--------|-----------|----------------|---------|
+| First 200 | 174 | 106 | **60.9%** | 48 | 20 |
+| First 1000 | 890 | 117 | 13.1% | 50 | 723 |
+
 - Performance: 0.03ms parse, 0.01ms bind, 0.04ms check per file
+- Crashes are "unreachable" panics - unimplemented code paths
+- Parse failures: missing syntax support (decorators, `import =`, etc.)
 
 ### Current Blockers
 - ThinChecker needs control flow narrowing

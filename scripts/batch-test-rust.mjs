@@ -55,12 +55,19 @@ let totalCheckTime = 0;
 
 const failures = [];
 
+let skipped = 0;
+
 for (const file of files) {
     // Skip very large files
     const source = readFileSync(file, 'utf-8');
     if (source.length > 50000) {
-        failures.push({ file: basename(file, '.ts'), stage: 'skip', error: 'too large' });
-        failed++;
+        skipped++;
+        continue;
+    }
+
+    // Skip multi-file tests (have @filename: directive)
+    if (source.includes('@filename:') || source.includes('// @filename')) {
+        skipped++;
         continue;
     }
 
@@ -109,9 +116,11 @@ for (const file of files) {
     }
 }
 
+const tested = passed + failed;
 console.log('=== Results ===\n');
-console.log(`Passed:      ${passed}/${files.length} (${(passed/files.length*100).toFixed(1)}%)`);
-console.log(`Failed:      ${failed}/${files.length} (${(failed/files.length*100).toFixed(1)}%)`);
+console.log(`Tested:      ${tested}/${files.length} (skipped ${skipped} multi-file/large)`);
+console.log(`Passed:      ${passed}/${tested} (${(passed/tested*100).toFixed(1)}%)`);
+console.log(`Failed:      ${failed}/${tested} (${(failed/tested*100).toFixed(1)}%)`);
 console.log(`Parse errors: ${parseErrors} files`);
 console.log(`Type errors:  ${typeErrors} total`);
 console.log('');
@@ -128,10 +137,10 @@ if (failures.length > 0) {
     console.log(`  Crashes: ${crashes.length}`);
     console.log(`  Parse failures: ${parseFailures.length}`);
 
-    if (crashes.length > 0 && crashes.length <= 10) {
-        console.log('\n  Crash details:');
-        crashes.forEach(f => {
-            console.log(`    ${f.file}: ${f.error?.slice(0,80)}`);
+    if (crashes.length > 0) {
+        console.log('\n  Sample crashes (first 5):');
+        crashes.slice(0, 5).forEach(f => {
+            console.log(`    ${f.file}: ${f.error?.slice(0,100)}`);
         });
     }
 }

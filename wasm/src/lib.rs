@@ -100,7 +100,7 @@ pub fn create_binder() -> binder::BinderState {
 use crate::thin_parser::ThinParserState;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
-use crate::thin_emitter::ThinEmitter;
+use crate::thin_emitter::ThinPrinter;
 
 /// High-performance parser using ThinNode architecture (16 bytes/node).
 /// This is the optimized path for Phase 8 test suite evaluation.
@@ -144,7 +144,7 @@ impl ThinParser {
             serde_json::json!({
                 "message": d.message,
                 "start": d.start,
-                "end": d.end,
+                "length": d.length,
             })
         }).collect();
         serde_json::to_string(&diags).unwrap_or_else(|_| "[]".to_string())
