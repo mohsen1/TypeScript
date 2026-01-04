@@ -91,8 +91,16 @@ Since we're going ThinNode-only (no backwards compatibility with old Node enum n
   - Tracks hoisted variables and functions
   - Flow control for control flow analysis
   - 6 tests passing for core binding scenarios
-  - 712 tests total passing
-- [ ] Migrate checker to use ThinNodeArena directly
+- [x] ThinChecker basic structure (Session 16) - Created thin_checker.rs
+  - ~560 lines establishing type checker structure
+  - Uses ThinNodeArena for AST access, ThinBinderState for symbols
+  - Reuses TypeArena (types already well-optimized at 48 bytes)
+  - Core type inference: identifiers, literals, binary expressions
+  - Type node resolution for primitive types
+  - Scope management, circular reference detection, caching
+  - 2 tests passing for basic checker functionality
+  - 714 tests total passing
+- [ ] Add full type inference to ThinChecker (call, property access, functions, etc.)
 - [ ] Migrate emitter to use ThinNodeArena directly
 - [ ] Remove old Node enum and NodeArena
 

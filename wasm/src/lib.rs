@@ -33,6 +33,9 @@ pub mod thin_binder;
 // Checker types and implementation (Phase 5)
 pub mod checker;
 
+// ThinChecker - Type checker using ThinNodeArena (Phase 0.1)
+pub mod thin_checker;
+
 // Emitter types and implementation (Phase 6)
 pub mod emitter;
 
