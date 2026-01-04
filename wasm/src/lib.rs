@@ -30,6 +30,9 @@ pub mod checker;
 // Emitter types and implementation (Phase 6)
 pub mod emitter;
 
+// Comment preservation (Phase 6.3)
+pub mod comments;
+
 // Source Map generation (Phase 6.2)
 pub mod source_map;
 

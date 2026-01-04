@@ -320,6 +320,97 @@ impl Printer {
     }
 
     // =========================================================================
+    // Comment emission
+    // =========================================================================
+
+    /// Emit leading comments for a node.
+    ///
+    /// This emits comments that appear before the node's position.
+    pub fn emit_leading_comments(&mut self, source: &str, pos: u32, comments: &[crate::comments::CommentRange]) {
+        if self.options.remove_comments {
+            return;
+        }
+
+        for comment in comments.iter().filter(|c| c.end <= pos) {
+            let text = comment.get_text(source);
+            if comment.is_multi_line {
+                self.write(&crate::comments::format_multi_line_comment(text, &self.indent_str));
+            } else {
+                self.write(text);
+            }
+            if comment.has_trailing_new_line {
+                self.write_line();
+            } else {
+                self.write(" ");
+            }
+        }
+    }
+
+    /// Emit trailing comments for a node.
+    ///
+    /// This emits comments that appear after the node's end position on the same line.
+    pub fn emit_trailing_comments(&mut self, source: &str, pos: u32, comments: &[crate::comments::CommentRange]) {
+        if self.options.remove_comments {
+            return;
+        }
+
+        // Find comments on the same line after pos
+        let bytes = source.as_bytes();
+        let mut line_end = pos as usize;
+        while line_end < bytes.len() && bytes[line_end] != b'\n' && bytes[line_end] != b'\r' {
+            line_end += 1;
+        }
+
+        for comment in comments.iter().filter(|c| c.pos >= pos && c.pos < line_end as u32) {
+            self.write(" ");
+            self.write(comment.get_text(source));
+        }
+    }
+
+    /// Emit a single-line comment.
+    pub fn emit_single_line_comment(&mut self, text: &str) {
+        if self.options.remove_comments {
+            return;
+        }
+        if !text.starts_with("//") {
+            self.write("// ");
+        }
+        self.write(text);
+    }
+
+    /// Emit a multi-line comment.
+    pub fn emit_multi_line_comment(&mut self, text: &str) {
+        if self.options.remove_comments {
+            return;
+        }
+        if !text.starts_with("/*") {
+            self.write("/* ");
+            self.write(text);
+            self.write(" */");
+        } else {
+            self.write(&crate::comments::format_multi_line_comment(text, &self.indent_str));
+        }
+    }
+
+    /// Emit a JSDoc comment.
+    pub fn emit_jsdoc_comment(&mut self, content: &str) {
+        if self.options.remove_comments {
+            return;
+        }
+        self.write("/**");
+        self.write_line();
+
+        for line in content.lines() {
+            self.write(" * ");
+            self.write(line);
+            self.write_line();
+        }
+
+        self.write(" */");
+        self.write_line();
+    }
+
+    // =========================================================================
     // Node emission
     // =========================================================================
 

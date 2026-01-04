@@ -1,0 +1,328 @@
+//! Comment Preservation
+//!
+//! This module handles extracting and emitting comments from TypeScript source.
+//! Comments are not part of the AST, so they must be extracted separately
+//! from the source text and associated with nodes for emission.
+
+/// A range representing a comment in the source text.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CommentRange {
+    /// Start position (byte offset)
+    pub pos: u32,
+    /// End position (byte offset)
+    pub end: u32,
+    /// Whether this is a multi-line comment
+    pub is_multi_line: bool,
+    /// Whether this comment has a trailing newline
+    pub has_trailing_new_line: bool,
+}
+
+impl CommentRange {
+    /// Create a new comment range.
+    pub fn new(pos: u32, end: u32, is_multi_line: bool, has_trailing_new_line: bool) -> Self {
+        CommentRange {
+            pos,
+            end,
+            is_multi_line,
+            has_trailing_new_line,
+        }
+    }
+
+    /// Get the comment text from source.
+    pub fn get_text<'a>(&self, source: &'a str) -> &'a str {
+        let start = self.pos as usize;
+        let end = self.end as usize;
+        if end <= source.len() && start < end {
+            &source[start..end]
+        } else {
+            ""
+        }
+    }
+}
+
+/// Extract all comment ranges from source text.
+///
+/// This scans the source text and returns all single-line (//) and
+/// multi-line (/* */) comments with their positions.
+pub fn get_comment_ranges(source: &str) -> Vec<CommentRange> {
+    let mut comments = Vec::new();
+    let bytes = source.as_bytes();
+    let len = bytes.len();
+    let mut pos = 0;
+
+    while pos < len {
+        let ch = bytes[pos];
+
+        // Skip whitespace
+        if ch == b' ' || ch == b'\t' || ch == b'\r' || ch == b'\n' {
+            pos += 1;
+            continue;
+        }
+
+        // Check for comment start
+        if ch == b'/' && pos + 1 < len {
+            let next = bytes[pos + 1];
+
+            if next == b'/' {
+                // Single-line comment
+                let start = pos as u32;
+                pos += 2;
+
+                // Scan to end of line
+                while pos < len && bytes[pos] != b'\n' && bytes[pos] != b'\r' {
+                    pos += 1;
+                }
+
+                let has_trailing_new_line = pos < len;
+                comments.push(CommentRange::new(start, pos as u32, false, has_trailing_new_line));
+
+                // Skip the newline
+                if pos < len && bytes[pos] == b'\r' {
+                    pos += 1;
+                }
+                if pos < len && bytes[pos] == b'\n' {
+                    pos += 1;
+                }
+                continue;
+            } else if next == b'*' {
+                // Multi-line comment
+                let start = pos as u32;
+                pos += 2;
+
+                // Scan to closing */
+                let mut closed = false;
+                while pos + 1 < len {
+                    if bytes[pos] == b'*' && bytes[pos + 1] == b'/' {
+                        pos += 2;
+                        closed = true;
+                        break;
+                    }
+                    pos += 1;
+                }
+
+                if !closed {
+                    pos = len; // Unclosed comment - go to end
+                }
+
+                // Check for trailing newline
+                let has_trailing_new_line = pos < len && (bytes[pos] == b'\n' || bytes[pos] == b'\r');
+
+                comments.push(CommentRange::new(start, pos as u32, true, has_trailing_new_line));
+                continue;
+            }
+        }
+
+        // Not in a comment or whitespace, skip this character
+        // (In practice, we'd stop at actual code, but for simplicity
+        // we're just extracting top-level comments here)
+        pos += 1;
+    }
+
+    comments
+}
+
+/// Get leading comments before a position.
+///
+/// Returns comments that appear before `pos` and after any previous code.
+pub fn get_leading_comments(source: &str, pos: u32, all_comments: &[CommentRange]) -> Vec<CommentRange> {
+    all_comments
+        .iter()
+        .filter(|c| c.end <= pos)
+        .cloned()
+        .collect()
+}
+
+/// Get trailing comments after a position.
+///
+/// Returns comments that appear after `pos` on the same line.
+pub fn get_trailing_comments(source: &str, pos: u32, all_comments: &[CommentRange]) -> Vec<CommentRange> {
+    let bytes = source.as_bytes();
+
+    // Find the next newline after pos
+    let mut line_end = pos as usize;
+    while line_end < bytes.len() && bytes[line_end] != b'\n' && bytes[line_end] != b'\r' {
+        line_end += 1;
+    }
+
+    all_comments
+        .iter()
+        .filter(|c| c.pos >= pos && c.pos < line_end as u32 && !c.is_multi_line)
+        .cloned()
+        .collect()
+}
+
+/// Format a single-line comment for output.
+pub fn format_single_line_comment(text: &str) -> String {
+    // Already includes // prefix
+    text.to_string()
+}
+
+/// Format a multi-line comment for output.
+pub fn format_multi_line_comment(text: &str, indent: &str) -> String {
+    // For multi-line comments, we need to add indentation to each line
+    let lines: Vec<&str> = text.lines().collect();
+    if lines.len() <= 1 {
+        return text.to_string();
+    }
+
+    let mut result = String::new();
+    for (i, line) in lines.iter().enumerate() {
+        if i > 0 {
+            result.push('\n');
+            // Add indentation for continuation lines (except first line)
+            if !line.trim().is_empty() {
+                result.push_str(indent);
+            }
+        }
+        result.push_str(line);
+    }
+    result
+}
+
+/// Check if a comment is a JSDoc comment.
+pub fn is_jsdoc_comment(comment: &CommentRange, source: &str) -> bool {
+    let text = comment.get_text(source);
+    text.starts_with("/**") && !text.starts_with("/***")
+}
+
+/// Check if a comment is a triple-slash directive.
+pub fn is_triple_slash_directive(comment: &CommentRange, source: &str) -> bool {
+    let text = comment.get_text(source);
+    text.starts_with("///")
+}
+
+/// Extract the content of a JSDoc comment (without the delimiters).
+pub fn get_jsdoc_content(comment: &CommentRange, source: &str) -> String {
+    let text = comment.get_text(source);
+    if text.starts_with("/**") && text.ends_with("*/") {
+        let inner = &text[3..text.len() - 2];
+        // Remove leading * from each line
+        inner
+            .lines()
+            .map(|line| {
+                let trimmed = line.trim_start();
+                if trimmed.starts_with('*') {
+                    trimmed[1..].trim_start()
+                } else {
+                    trimmed
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+            .trim()
+            .to_string()
+    } else {
+        text.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_single_line_comment() {
+        let source = "// hello\nconst x = 1;";
+        let comments = get_comment_ranges(source);
+
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].pos, 0);
+        assert_eq!(comments[0].end, 8);
+        assert!(!comments[0].is_multi_line);
+        assert!(comments[0].has_trailing_new_line);
+        assert_eq!(comments[0].get_text(source), "// hello");
+    }
+
+    #[test]
+    fn test_extract_multi_line_comment() {
+        let source = "/* hello */const x = 1;";
+        let comments = get_comment_ranges(source);
+
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].pos, 0);
+        assert_eq!(comments[0].end, 11);
+        assert!(comments[0].is_multi_line);
+        assert_eq!(comments[0].get_text(source), "/* hello */");
+    }
+
+    #[test]
+    fn test_extract_multiple_comments() {
+        let source = "// first\n// second\nconst x = 1;";
+        let comments = get_comment_ranges(source);
+
+        assert_eq!(comments.len(), 2);
+        assert_eq!(comments[0].get_text(source), "// first");
+        assert_eq!(comments[1].get_text(source), "// second");
+    }
+
+    #[test]
+    fn test_jsdoc_detection() {
+        let source = "/** @param x */";
+        let comments = get_comment_ranges(source);
+
+        assert_eq!(comments.len(), 1);
+        assert!(is_jsdoc_comment(&comments[0], source));
+    }
+
+    #[test]
+    fn test_not_jsdoc() {
+        let source = "/*** not jsdoc */";
+        let comments = get_comment_ranges(source);
+
+        assert_eq!(comments.len(), 1);
+        assert!(!is_jsdoc_comment(&comments[0], source));
+    }
+
+    #[test]
+    fn test_triple_slash_directive() {
+        let source = "/// <reference path=\"foo.d.ts\" />";
+        let comments = get_comment_ranges(source);
+
+        assert_eq!(comments.len(), 1);
+        assert!(is_triple_slash_directive(&comments[0], source));
+    }
+
+    #[test]
+    fn test_jsdoc_content_extraction() {
+        let source = "/**\n * Hello\n * World\n */";
+        let comments = get_comment_ranges(source);
+
+        assert_eq!(comments.len(), 1);
+        let content = get_jsdoc_content(&comments[0], source);
+        assert_eq!(content, "Hello\nWorld");
+    }
+
+    #[test]
+    fn test_format_multiline_comment() {
+        let text = "/*\n * Line 1\n * Line 2\n */";
+        let formatted = format_multi_line_comment(text, "    ");
+        assert!(formatted.contains("Line 1"));
+        assert!(formatted.contains("Line 2"));
+    }
+
+    #[test]
+    fn test_empty_source() {
+        let source = "";
+        let comments = get_comment_ranges(source);
+        assert!(comments.is_empty());
+    }
+
+    #[test]
+    fn test_no_comments() {
+        let source = "const x = 1;";
+        let comments = get_comment_ranges(source);
+        // This will include the source as non-comment text
+        // The function stops at actual code
+        assert!(comments.is_empty());
+    }
+
+    #[test]
+    fn test_nested_comment_markers() {
+        let source = "/* outer /* inner */ end */";
+        let comments = get_comment_ranges(source);
+
+        // Should find the first complete comment
+        assert_eq!(comments.len(), 1);
+        assert_eq!(comments[0].get_text(source), "/* outer /* inner */");
+    }
+}

@@ -2,7 +2,7 @@
 
 use super::*;
 use crate::parser::{NodeArena, NodeIndex};
-use crate::binder::{SymbolArena, SymbolTable, SymbolId, symbol_flags};
+use crate::binder::{SymbolArena, SymbolTable, SymbolId, symbol_flags, NodeSymbolMap};
 
 #[test]
 fn test_type_flags() {
@@ -322,7 +322,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Should have intrinsic types pre-allocated
         assert!(!checker.types.any_type.is_none());
@@ -337,7 +338,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Same type is assignable to itself
         assert!(checker.is_type_assignable_to(checker.types.string_type, checker.types.string_type));
@@ -352,7 +354,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // any is assignable to anything
         assert!(checker.is_type_assignable_to(checker.types.any_type, checker.types.string_type));
@@ -370,7 +373,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // never is assignable to everything
         assert!(checker.is_type_assignable_to(checker.types.never_type, checker.types.string_type));
@@ -385,7 +389,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // String literal is assignable to string
         let str_lit = checker.types.create_string_literal("hello".to_string());
@@ -407,7 +412,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // string is assignable to string | number
         let union = checker.types.create_union(vec![
@@ -428,7 +434,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         assert_eq!(checker.type_to_string(checker.types.string_type), "string");
         assert_eq!(checker.type_to_string(checker.types.number_type), "number");
@@ -455,7 +462,8 @@ fn test_type_flags() {
 
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&parser.arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&parser.arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Get the source file
         if let Some(crate::parser::Node::SourceFile(sf)) = parser.arena.get(root) {
@@ -496,6 +504,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -529,6 +538,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -586,6 +596,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -623,6 +634,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -656,7 +668,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create a function type manually
         let fn_type = checker.types.create_function_type(
@@ -704,6 +717,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -744,6 +758,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -784,6 +799,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -822,6 +838,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -866,6 +883,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -910,6 +928,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -957,6 +976,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -983,7 +1003,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Manually create a type parameter
         let tp_id = checker.types.create_type_parameter(
@@ -1022,6 +1043,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1058,6 +1080,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1082,7 +1105,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create an empty object type
         let obj_type = checker.types.create_object_type(Vec::new());
@@ -1118,6 +1142,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1157,6 +1182,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1188,7 +1214,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create a union type of string | number
         let string_type = checker.types.string_type;
@@ -1298,6 +1325,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1336,6 +1364,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1372,6 +1401,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1415,6 +1445,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1461,6 +1492,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1504,6 +1536,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1542,6 +1575,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1566,7 +1600,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create a type parameter T
         let t_symbol = checker.local_symbols.alloc(symbol_flags::TYPE_PARAMETER, "T".to_string());
@@ -1623,6 +1658,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1652,6 +1688,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1686,6 +1723,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1724,6 +1762,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1748,7 +1787,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create a union type: string | number
         let union_type = checker.types.create_union(vec![
@@ -1770,7 +1810,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create a union type: string | number | boolean
         let union_type = checker.types.create_union(vec![
@@ -1793,7 +1834,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create a union type: string | number
         let union_type = checker.types.create_union(vec![
@@ -1815,7 +1857,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create a union type: string | null | undefined
         let union_type = checker.types.create_union(vec![
@@ -1838,7 +1881,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Narrow string by typeof === "number" should give never
         let narrowed = checker.narrow_type_by_typeof(checker.types.string_type, "number");
@@ -1868,6 +1912,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1933,6 +1978,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -1966,7 +2012,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create a simple class type
         let class_type = checker.types.create_class_type(vec![], vec![], vec![]);
@@ -1984,7 +2031,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create a simple class type
         let class_type = checker.types.create_class_type(vec![], vec![], vec![]);
@@ -2002,7 +2050,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create a class type
         let class_type = checker.types.create_class_type(vec![], vec![], vec![]);
@@ -2027,7 +2076,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create two class types
         let class_a = checker.types.create_class_type(vec![], vec![], vec![]);
@@ -2051,7 +2101,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create an instance type (what you get from new Foo())
         let instance_type = checker.types.create_class_type(vec![], vec![], vec![]);
@@ -2084,7 +2135,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create an instance type
         let instance_type = checker.types.create_class_type(vec![], vec![], vec![]);
@@ -2126,6 +2178,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2155,7 +2208,8 @@ fn test_type_flags() {
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create a union of string | number | boolean
         let union_type = checker.types.create_union(vec![
@@ -2196,6 +2250,7 @@ fn test_type_flags() {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2241,6 +2296,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2271,6 +2327,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2355,6 +2412,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2389,6 +2447,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2429,6 +2488,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2475,6 +2535,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2522,6 +2583,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2564,6 +2626,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2628,6 +2691,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2665,6 +2729,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2705,6 +2770,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2759,6 +2825,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2854,6 +2921,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2888,6 +2956,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2933,6 +3002,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -2966,6 +3036,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3001,6 +3072,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3036,6 +3108,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3071,6 +3144,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3107,6 +3181,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3144,6 +3219,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3182,6 +3258,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3215,6 +3292,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3248,6 +3326,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3283,6 +3362,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3322,7 +3402,8 @@ let x = d["key"];
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create a union of literal types: "a" | "b" | "c"
         let lit_a = checker.types.create_string_literal("a".to_string());
@@ -3367,7 +3448,8 @@ let x = d["key"];
         let node_arena = NodeArena::new();
         let symbol_arena = SymbolArena::new();
         let file_locals = SymbolTable::new();
-        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &symbol_arena, &file_locals, &node_symbols, "test.ts".to_string());
 
         // Create a union of literal types: 1 | 2 | 3
         let lit_1 = checker.types.create_number_literal(1.0);
@@ -3417,6 +3499,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3468,6 +3551,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3501,6 +3585,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3544,6 +3629,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3575,6 +3661,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3616,6 +3703,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3683,6 +3771,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3717,6 +3806,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3758,6 +3848,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3797,6 +3888,7 @@ let x = d["key"];
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3949,6 +4041,7 @@ interface Invariant<in out T> {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -3996,6 +4089,7 @@ interface Invariant<in out T> {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -4035,6 +4129,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -4073,6 +4168,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -4118,6 +4214,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -4160,6 +4257,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -4216,11 +4314,13 @@ const instance = new Foo();
         let node_arena = crate::parser::NodeArena::new();
         let binder_symbols = crate::binder::SymbolArena::new();
         let file_locals = SymbolTable::new();
+        let node_symbols = NodeSymbolMap::new();
 
         let mut checker = CheckerState::new(
             &node_arena,
             &binder_symbols,
             &file_locals,
+            &node_symbols,
             "test.ts".to_string(),
         );
 
@@ -4267,11 +4367,13 @@ const instance = new Foo();
         let node_arena = crate::parser::NodeArena::new();
         let binder_symbols = crate::binder::SymbolArena::new();
         let file_locals = SymbolTable::new();
+        let node_symbols = NodeSymbolMap::new();
 
         let mut checker = CheckerState::new(
             &node_arena,
             &binder_symbols,
             &file_locals,
+            &node_symbols,
             "test.ts".to_string(),
         );
         checker.types = arena;
@@ -4314,7 +4416,8 @@ const instance = new Foo();
         let binder_symbols = crate::binder::SymbolArena::new();
         let file_locals = SymbolTable::new();
 
-        let mut checker = CheckerState::new(&node_arena, &binder_symbols, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &binder_symbols, &file_locals, &node_symbols, "test.ts".to_string());
         checker.types = arena;
 
         // Non-exhaustive switch should leave remaining type
@@ -4349,6 +4452,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -4384,6 +4488,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -4409,7 +4514,8 @@ const instance = new Foo();
         let binder_symbols = crate::binder::SymbolArena::new();
         let file_locals = SymbolTable::new();
 
-        let mut checker = CheckerState::new(&node_arena, &binder_symbols, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &binder_symbols, &file_locals, &node_symbols, "test.ts".to_string());
         checker.types = arena;
 
         // String is not assignable to number
@@ -4500,6 +4606,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -4561,7 +4668,8 @@ const instance = new Foo();
         let binder_symbols = crate::binder::SymbolArena::new();
         let file_locals = SymbolTable::new();
 
-        let mut checker = CheckerState::new(&node_arena, &binder_symbols, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &binder_symbols, &file_locals, &node_symbols, "test.ts".to_string());
         checker.types = arena;
         checker.symbol_types = symbol_types;
 
@@ -4599,7 +4707,8 @@ const instance = new Foo();
         let binder_symbols = crate::binder::SymbolArena::new();
         let file_locals = SymbolTable::new();
 
-        let mut checker = CheckerState::new(&node_arena, &binder_symbols, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &binder_symbols, &file_locals, &node_symbols, "test.ts".to_string());
         checker.types = arena;
 
         // Different parameter types - not directly assignable
@@ -4622,7 +4731,8 @@ const instance = new Foo();
         let binder_symbols = crate::binder::SymbolArena::new();
         let file_locals = SymbolTable::new();
 
-        let mut checker = CheckerState::new(&node_arena, &binder_symbols, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &binder_symbols, &file_locals, &node_symbols, "test.ts".to_string());
         checker.types = arena;
 
         // After assignment of string, type should narrow
@@ -4653,6 +4763,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -4705,7 +4816,8 @@ const instance = new Foo();
         let binder_symbols = crate::binder::SymbolArena::new();
         let file_locals = SymbolTable::new();
 
-        let mut checker = CheckerState::new(&node_arena, &binder_symbols, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &binder_symbols, &file_locals, &node_symbols, "test.ts".to_string());
         checker.types = arena;
 
         // Verify callable has call signature
@@ -4747,7 +4859,8 @@ const instance = new Foo();
         let binder_symbols = crate::binder::SymbolArena::new();
         let file_locals = SymbolTable::new();
 
-        let mut checker = CheckerState::new(&node_arena, &binder_symbols, &file_locals, "test.ts".to_string());
+        let node_symbols = NodeSymbolMap::new();
+        let mut checker = CheckerState::new(&node_arena, &binder_symbols, &file_locals, &node_symbols, "test.ts".to_string());
         checker.types = arena;
         checker.symbol_types = symbol_types;
 
@@ -4814,6 +4927,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -4850,6 +4964,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -4884,6 +4999,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -4923,6 +5039,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5033,6 +5150,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5067,6 +5185,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5124,6 +5243,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5173,6 +5293,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5214,6 +5335,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5254,6 +5376,7 @@ const instance = new Foo();
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5417,6 +5540,7 @@ let v = f.x;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5457,6 +5581,7 @@ let v = f.y;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5495,6 +5620,7 @@ class Foo {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5533,6 +5659,7 @@ abstract class Foo {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5571,6 +5698,7 @@ class Foo {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5609,6 +5737,7 @@ class Foo {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5651,6 +5780,7 @@ class Foo {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5692,6 +5822,7 @@ class Derived extends Base {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5733,6 +5864,7 @@ class Derived extends Base {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5774,6 +5906,7 @@ type T = typeof x;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5815,6 +5948,7 @@ type Upper = Uppercase<"hello">;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5847,6 +5981,7 @@ type Lower = Lowercase<"HELLO">;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5879,6 +6014,7 @@ type Cap = Capitalize<"hello">;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5911,6 +6047,7 @@ type Uncap = Uncapitalize<"Hello">;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5947,6 +6084,7 @@ const x = 42 as const;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -5980,6 +6118,7 @@ const s = "hello" as const;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6030,6 +6169,7 @@ type AwaitedStr = Awaited<string>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6073,6 +6213,7 @@ type Result = NonNullable<string | null | undefined>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6110,6 +6251,7 @@ type NoInferStr = NoInfer<string>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6157,6 +6299,7 @@ type NoInferStr = NoInfer<string>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6188,6 +6331,7 @@ type Test = DoubleWrapped<number>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6226,6 +6370,7 @@ type Recursive = { next: Recursive };
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6267,6 +6412,7 @@ interface TreeNode {
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6305,6 +6451,7 @@ let val: JSONValue = "hello";
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6340,6 +6487,7 @@ let list2: List<number> = { value: 2, next: list1 };
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6364,6 +6512,7 @@ let list2: List<number> = { value: 2, next: list1 };
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6399,6 +6548,7 @@ let list2: List<number> = { value: 2, next: list1 };
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6447,6 +6597,7 @@ let list2: List<number> = { value: 2, next: list1 };
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6491,6 +6642,7 @@ let list2: List<number> = { value: 2, next: list1 };
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6559,6 +6711,7 @@ let list2: List<number> = { value: 2, next: list1 };
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6591,6 +6744,7 @@ let list2: List<number> = { value: 2, next: list1 };
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6623,6 +6777,7 @@ let list2: List<number> = { value: 2, next: list1 };
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6658,6 +6813,7 @@ let list2: List<number> = { value: 2, next: list1 };
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6736,6 +6892,7 @@ type PersonGetters = Getters<Person>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6773,6 +6930,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6803,6 +6961,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6842,6 +7001,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6886,6 +7046,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6926,6 +7087,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -6964,6 +7126,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7006,6 +7169,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7043,6 +7207,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7071,6 +7236,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7098,6 +7264,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7144,6 +7311,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7189,6 +7357,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7246,6 +7415,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7295,6 +7465,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7344,6 +7515,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7393,6 +7565,7 @@ type DataOnly = OmitFunctions<Mixed>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7536,6 +7709,7 @@ type Result = Concat<[1, 2], [3, 4]>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7571,6 +7745,7 @@ let result = concat([1, 2] as const, ["a", "b"] as const);
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7600,6 +7775,7 @@ type AnyThis = ThisType<any>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7647,6 +7823,7 @@ type ObjectWithThis = Methods & ThisType<{ name: string }>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7731,6 +7908,7 @@ type ObjectWithThis = Methods & ThisType<{ name: string }>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7775,6 +7953,7 @@ type ObjectWithThis = Methods & ThisType<{ name: string }>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7827,6 +8006,7 @@ type ObjectWithThis = Methods & ThisType<{ name: string }>;
             &parser.arena,
             &binder.symbols,
             &binder.file_locals,
+            &binder.node_symbols,
             "test.ts".to_string(),
         );
 
@@ -7879,11 +8059,12 @@ fn test_simple_property_access() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
     // Just verify no infinite loop
@@ -7909,11 +8090,12 @@ fn test_this_keyword_type() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
     // Just verify no infinite loop - 'this' returns any for now
@@ -7945,11 +8127,12 @@ fn test_this_type_in_class_method() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     // Check the source file
     checker.check_source_file(root);
@@ -7991,11 +8174,12 @@ fn test_this_property_access() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -8029,11 +8213,12 @@ fn test_super_type_basic() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     // Check base class symbol is resolvable
     let animal_symbol = checker.file_locals.get("Animal").expect("Animal class should exist");
@@ -8069,11 +8254,12 @@ fn test_class_inheritance_simple() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -8109,11 +8295,12 @@ fn test_super_method_call() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -8147,11 +8334,12 @@ fn test_awaited_type_unwraps_promise() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     // Check that Promise<string> can be resolved
     // Note: With our simple type alias, Promise<T> = T, so this should just work
@@ -8195,11 +8383,12 @@ fn test_array_method_every() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
     // Should complete without infinite loop
@@ -8226,11 +8415,12 @@ fn test_method_call_on_array() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8256,11 +8446,12 @@ fn test_array_every_simple_callback() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8286,11 +8477,12 @@ fn test_method_with_function_arg() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8316,11 +8508,12 @@ fn test_this_method_call_simple() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8343,11 +8536,12 @@ fn test_minimal_class_only() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8373,11 +8567,12 @@ fn test_class_with_two_methods() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8403,11 +8598,12 @@ fn test_this_method_call_no_args() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8433,11 +8629,12 @@ fn test_this_method_call_with_string_arg() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8463,11 +8660,12 @@ fn test_this_method_with_func_arg_no_param() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8492,11 +8690,12 @@ fn test_method_call_without_this() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8517,11 +8716,12 @@ fn test_just_function_expression() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8543,11 +8743,12 @@ fn test_function_call_with_callback_no_this() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8573,11 +8774,12 @@ fn test_array_property_access_without_call() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8599,11 +8801,12 @@ fn test_simple_function_call() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8625,11 +8828,12 @@ fn test_callback_function() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8651,11 +8855,12 @@ fn test_generic_function_identity() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8676,11 +8881,12 @@ fn test_union_type_variable() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8706,11 +8912,12 @@ fn test_interface_member_access() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8732,11 +8939,12 @@ fn test_tuple_type_indexing() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8757,11 +8965,12 @@ fn test_type_alias_with_generics() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8783,11 +8992,12 @@ fn test_literal_type_assignment() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8811,11 +9021,12 @@ fn test_optional_parameter() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8838,11 +9049,12 @@ fn test_rest_parameter() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8867,11 +9079,12 @@ fn test_typeof_narrowing() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8901,11 +9114,12 @@ fn test_instanceof_narrowing() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -8925,11 +9139,12 @@ fn test_array_literal_with_type_annotation() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -8957,11 +9172,12 @@ fn test_function_with_parameters_in_return() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -9017,11 +9233,12 @@ fn test_mapped_type_basic() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9043,11 +9260,12 @@ fn test_conditional_type_basic() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9072,11 +9290,12 @@ fn test_class_simple_method() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9099,11 +9318,12 @@ fn test_class_with_property_no_method_call() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9129,11 +9349,12 @@ fn test_class_with_method_using_this_property() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9154,11 +9375,12 @@ fn test_simple_type_annotation() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9179,11 +9401,12 @@ fn test_empty_class() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9206,11 +9429,12 @@ fn test_class_with_public_modifier_and_initializer() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9233,11 +9457,12 @@ fn test_class_with_public_no_initializer() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9260,11 +9485,12 @@ fn test_class_with_private_no_initializer() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9287,11 +9513,12 @@ fn test_class_with_private_initializer() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9313,11 +9540,12 @@ fn test_postfix_increment() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9343,11 +9571,12 @@ fn test_class_with_postfix_on_property() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9376,11 +9605,12 @@ fn test_class_with_private_field() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9408,11 +9638,12 @@ fn test_class_static_member() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9439,11 +9670,12 @@ fn test_type_predicate_simple() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     // Function should exist
     assert!(binder.file_locals.has("isString"), "isString function should be defined");
@@ -9471,11 +9703,12 @@ fn test_type_predicate_this() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     assert!(binder.file_locals.has("Cat"), "Cat class should be defined");
     checker.check_source_file(root);
@@ -9502,11 +9735,12 @@ fn test_type_predicate_asserts() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     assert!(binder.file_locals.has("assertIsString"), "assertIsString function should be defined");
     checker.check_source_file(root);
@@ -9530,11 +9764,12 @@ fn test_type_predicate_asserts_only() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     assert!(binder.file_locals.has("assertDefined"), "assertDefined function should be defined");
     checker.check_source_file(root);
@@ -9558,11 +9793,12 @@ fn test_function_type_with_predicate() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     assert!(binder.file_locals.has("Guard"), "Guard type should be defined");
     assert!(binder.file_locals.has("isNumber"), "isNumber should be defined");
@@ -9591,11 +9827,12 @@ fn test_readonly_modifier() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     assert!(binder.file_locals.has("Config"), "Config class should be defined");
     checker.check_source_file(root);
@@ -9620,11 +9857,12 @@ abstract class Shape {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -9661,11 +9899,12 @@ fn test_interface_extends() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     assert!(binder.file_locals.has("Animal"), "Animal interface should be defined");
     assert!(binder.file_locals.has("Dog"), "Dog interface should be defined");
@@ -9694,11 +9933,12 @@ fn test_enum_with_computed_values() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     assert!(binder.file_locals.has("Status"), "Status enum should be defined");
     checker.check_source_file(root);
@@ -9725,11 +9965,12 @@ fn test_namespace_with_exports() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     assert!(binder.file_locals.has("Utils"), "Utils namespace should be defined");
     checker.check_source_file(root);
@@ -9752,11 +9993,12 @@ const obj = { x: 1, y: 2 };
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     assert!(binder.file_locals.has("obj"), "obj should be defined");
     checker.check_source_file(root);
@@ -9781,11 +10023,12 @@ fn test_arrow_function_with_body() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     assert!(binder.file_locals.has("add"), "add function should be defined");
     checker.check_source_file(root);
@@ -9811,11 +10054,12 @@ let f = new Foo();
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     assert!(binder.file_locals.has("Foo"), "Foo class should be defined");
     assert!(binder.file_locals.has("f"), "f variable should be defined");
@@ -9843,11 +10087,12 @@ let v = f.x;
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9873,11 +10118,12 @@ let v = f.x;
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9903,11 +10149,12 @@ let v = f.x;
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 }
@@ -9930,11 +10177,12 @@ fn test_template_literal_type() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     assert!(binder.file_locals.has("Greeting"), "Greeting type should be defined");
     checker.check_source_file(root);
@@ -9961,11 +10209,12 @@ fn test_function_parameter_scoping() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -9999,11 +10248,12 @@ fn test_method_parameter_scoping() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10040,11 +10290,12 @@ fn test_super_property_access() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10082,11 +10333,12 @@ fn test_super_in_constructor() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10119,11 +10371,12 @@ fn test_pick_utility_type() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10156,11 +10409,12 @@ fn test_omit_utility_type() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10189,11 +10443,12 @@ fn test_extract_utility_type() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10222,11 +10477,12 @@ fn test_exclude_utility_type() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10256,11 +10512,12 @@ fn test_return_type_utility() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10290,11 +10547,12 @@ fn test_parameters_utility() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10330,11 +10588,12 @@ fn test_constructor_parameters_utility() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10365,11 +10624,12 @@ fn test_instance_type_utility() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10395,11 +10655,12 @@ fn test_type_error_number_to_string() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10431,11 +10692,12 @@ fn test_type_error_wrong_argument_type() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10465,11 +10727,12 @@ fn test_type_error_missing_property() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10501,11 +10764,12 @@ fn test_type_error_too_few_arguments() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10537,11 +10801,12 @@ fn test_generic_function_argument_type_check() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10569,11 +10834,12 @@ fn test_callback_argument_type_check() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10602,11 +10868,12 @@ fn test_rest_parameter_type_check() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10633,11 +10900,12 @@ fn test_satisfies_expression() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10663,11 +10931,12 @@ fn test_satisfies_expression_error() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10694,11 +10963,12 @@ fn test_as_expression_unknown_to_string() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10724,11 +10994,12 @@ fn test_as_expression() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10753,11 +11024,12 @@ fn test_as_const_expression() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10784,11 +11056,12 @@ fn test_non_null_assertion() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10814,11 +11087,12 @@ fn test_typeof_operator() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10844,11 +11118,12 @@ fn test_delete_operator() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10873,11 +11148,12 @@ fn test_void_operator() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10904,11 +11180,12 @@ fn test_prefix_increment_decrement() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10934,11 +11211,12 @@ fn test_bitwise_not() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10965,11 +11243,12 @@ fn test_postfix_increment_decrement() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -10994,11 +11273,12 @@ fn test_array_with_contextual_type() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -11029,11 +11309,12 @@ fn test_falsy_narrowing_null_undefined() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -11065,11 +11346,12 @@ fn test_falsy_narrowing_object_type() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -11100,11 +11382,12 @@ fn test_falsy_narrowing_boolean_literal() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
 
@@ -11198,11 +11481,12 @@ fn test_private_method_visibility() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
     // Should complete without errors
@@ -11225,11 +11509,12 @@ fn test_array_filter_method() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
     // Should complete without errors
@@ -11255,6 +11540,7 @@ fn test_jsx_element_type() {
         &parser.arena,
         &binder.symbols,
         &binder.file_locals,
+        &binder.node_symbols,
         "test.tsx".to_string(),
     );
 
@@ -11302,11 +11588,12 @@ fn test_class_namespace_merging_type_check() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
     // Should complete without errors - Foo.bar should resolve
@@ -11338,11 +11625,12 @@ fn test_enum_namespace_merging_type_check() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
     // Should complete without errors - Color.parse should resolve
@@ -11369,6 +11657,7 @@ fn test_declare_module_basic() {
         &parser.arena,
         &binder.symbols,
         &binder.file_locals,
+        &binder.node_symbols,
         "test.d.ts".to_string(),
     );
 
@@ -11400,6 +11689,7 @@ fn test_ambient_namespace() {
         &parser.arena,
         &binder.symbols,
         &binder.file_locals,
+        &binder.node_symbols,
         "test.d.ts".to_string(),
     );
 
@@ -11431,11 +11721,12 @@ fn test_function_overload_resolution() {
     binder.bind_source_file(&parser.arena, root);
 
     let mut checker = CheckerState::new(
-        &parser.arena,
-        &binder.symbols,
-        &binder.file_locals,
-        "test.ts".to_string(),
-    );
+            &parser.arena,
+            &binder.symbols,
+            &binder.file_locals,
+            &binder.node_symbols,
+            "test.ts".to_string(),
+        );
 
     checker.check_source_file(root);
     // Should resolve overloads correctly based on argument types
@@ -11497,6 +11788,29 @@ fn test_function_with_reserved_keyword_name() {
         "function any() {}",
         "function number() {}",
         "function string() {}",
+    ];
+
+    for code in test_cases {
+        let mut parser = ParserState::new("test.ts".to_string(), code.to_string());
+        let root = parser.parse_source_file();
+        assert!(!root.is_none(), "Should parse: {}", code);
+    }
+}
+
+#[test]
+fn test_abstract_class_inside_function_body() {
+    // Test: abstract class declarations inside function bodies
+    use crate::parser_impl::ParserState;
+
+    let test_cases = vec![
+        // Abstract class inside function body
+        "function f() { abstract class A {} }",
+        // Abstract class with members inside function
+        "function f() { abstract class A { abstract foo(): void; } }",
+        // Top-level abstract class (should also work)
+        "abstract class A {}",
+        // Abstract class with extends
+        "function f() { abstract class A extends B {} }",
     ];
 
     for code in test_cases {
