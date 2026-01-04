@@ -12,7 +12,7 @@ compiler remains fully functional at every step.
 1. **Never Break the Build** – Every commit must pass `hereby runtests-parallel`.
 2. **Iterate in Small Slices** – One function, one module at a time.
 3. **Test Before & After** – Existing test suite is the source of truth.
-4. **Performance Parity First** – Match TS speed before optimizing.
+4. **Performance First** – we are building for performance
 
 ---
 
@@ -121,19 +121,20 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 
 # REMAINING WORK
 
-## Phase 6: Emitter (60% Complete)
+## Phase 6: Emitter (75% Complete)
 
 | Metric | Value |
 |--------|-------|
-| Lines of Code | ~4,500 |
-| Tests | 65+ |
+| Lines of Code | ~5,000 |
+| Tests | 85+ |
 
 ### TODO
 - [x] Declaration file emission (node filtering, export visibility, type-only imports)
 - [x] ES2015+ transforms: arrow function → function expression
+- [x] Module transforms: CommonJS import rewriting (require, __importDefault, __importStar)
+- [x] Module transforms: CommonJS export rewriting (exports.x, __exportStar)
 - [~] Async/await transforms (helper detection done, AST rewriting pending)
 - [~] Generator transforms (helper detection done, state machine pending)
-- [~] Module transforms (helper detection done, import/export rewriting pending)
 
 ## Phase 7: Language Service (50% Complete)
 
@@ -168,13 +169,13 @@ Current scanner does `self.source[...].to_string()` = malloc per token.
 | 3 | Parser | ~5,000 | 100+ | ✅ Done |
 | 4 | Binder | ~1,900 | 20+ | ✅ Done |
 | 5 | Type Checker | ~23,500 | 485 | ✅ 99% |
-| 6 | Emitter | ~4,800 | 80+ | 🟡 70% |
+| 6 | Emitter | ~5,000 | 85+ | 🟡 75% |
 | 7 | Language Service | ~1,500 | 3 | 🟡 55% |
 | 8 | Full Rust Mode | - | - | ⬜ Pending |
 
-**Total Rust Code**: ~41,000 lines
-**Total Tests**: 596 passing
-**Overall Progress**: ~85% of full compiler functionality
+**Total Rust Code**: ~41,500 lines
+**Total Tests**: 600 passing
+**Overall Progress**: ~87% of full compiler functionality
 
 ---
 
