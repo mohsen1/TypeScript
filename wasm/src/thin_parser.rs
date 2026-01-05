@@ -58,6 +58,8 @@ pub struct ThinParserState {
     node_count: u32,
     /// Identifiers found during parsing
     identifiers: Vec<String>,
+    /// Recursion depth for stack overflow protection
+    recursion_depth: u32,
 }
 
 impl ThinParserState {
@@ -75,7 +77,27 @@ impl ThinParserState {
             source_text,
             node_count: 0,
             identifiers: Vec::new(),
+            recursion_depth: 0,
         }
+    }
+
+    /// Maximum recursion depth to prevent stack overflow on deeply nested code
+    const MAX_RECURSION_DEPTH: u32 = 1000;
+
+    /// Check recursion limit - returns true if we can continue, false if limit exceeded
+    fn enter_recursion(&mut self) -> bool {
+        self.recursion_depth += 1;
+        if self.recursion_depth > Self::MAX_RECURSION_DEPTH {
+            self.parse_error_at_current_token("Maximum recursion depth exceeded");
+            false
+        } else {
+            true
+        }
+    }
+
+    /// Exit recursion scope
+    fn exit_recursion(&mut self) {
+        self.recursion_depth = self.recursion_depth.saturating_sub(1);
     }
 
     // =========================================================================
@@ -582,6 +604,11 @@ impl ThinParserState {
 
     /// Parse a block statement
     fn parse_block(&mut self) -> NodeIndex {
+        // Check recursion limit to prevent stack overflow on deeply nested code
+        if !self.enter_recursion() {
+            return NodeIndex::NONE;
+        }
+
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::OpenBraceToken);
 
@@ -589,6 +616,8 @@ impl ThinParserState {
 
         self.parse_expected(SyntaxKind::CloseBraceToken);
         let end_pos = self.token_end();
+
+        self.exit_recursion();
 
         self.arena.add_block(
             syntax_kind_ext::BLOCK,
@@ -3917,6 +3946,11 @@ impl ThinParserState {
 
     /// Parse binary expression with precedence climbing
     fn parse_binary_expression(&mut self, min_precedence: u8) -> NodeIndex {
+        // Check recursion limit for deeply nested expressions
+        if !self.enter_recursion() {
+            return NodeIndex::NONE;
+        }
+
         let start_pos = self.token_pos();
         let mut left = self.parse_unary_expression();
 
@@ -3983,6 +4017,7 @@ impl ThinParserState {
             left = self.parse_as_or_satisfies_expression(left, start_pos);
         }
 
+        self.exit_recursion();
         left
     }
 
