@@ -1566,6 +1566,17 @@ impl ThinParserState {
             return self.parse_set_accessor_with_modifiers(modifiers, start_pos);
         }
 
+        // Handle index signatures: [key: Type]: ValueType
+        if self.is_token(SyntaxKind::OpenBracketToken) && self.look_ahead_is_index_signature() {
+            let readonly = modifiers.as_ref().map_or(false, |mods| {
+                mods.nodes.iter().any(|&idx| {
+                    self.arena.nodes.get(idx.0 as usize)
+                        .map_or(false, |node| node.kind == SyntaxKind::ReadonlyKeyword as u16)
+                })
+            });
+            return self.parse_index_signature_with_readonly(readonly, start_pos);
+        }
+
         // Handle methods and properties
         // For now, just parse name and check for ( for methods
         let name = if self.is_token(SyntaxKind::Identifier) ||
@@ -1705,6 +1716,28 @@ impl ThinParserState {
         self.scanner.restore_state(snapshot);
         self.current_token = current;
         has_name
+    }
+
+    /// Look ahead to see if this is an index signature: [key: Type]: ValueType
+    /// vs a computed property: [expr]: Type or [computed]()
+    fn look_ahead_is_index_signature(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        // Skip '['
+        self.next_token();
+
+        // Check for identifier followed by ':'
+        let is_index_sig = if self.is_identifier_or_keyword() {
+            self.next_token();
+            self.is_token(SyntaxKind::ColonToken)
+        } else {
+            false
+        };
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_index_sig
     }
 
     /// Parse get accessor: get foo() { return value; }
