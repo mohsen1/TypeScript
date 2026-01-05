@@ -83,6 +83,11 @@ impl ThinParserState {
     // Token Utilities (shared with regular parser)
     // =========================================================================
 
+    /// Check if we're in a JSX file (.tsx or .jsx)
+    fn is_jsx_file(&self) -> bool {
+        self.file_name.ends_with(".tsx") || self.file_name.ends_with(".jsx")
+    }
+
     /// Get current token
     #[inline]
     fn token(&self) -> SyntaxKind {
@@ -169,6 +174,15 @@ impl ThinParserState {
         self.scanner.has_preceding_line_break()
     }
 
+    /// Try to rescan `>` as a compound token (`>>`, `>>>`, `>=`, `>>=`, `>>>=`)
+    /// Returns the rescanned token (which may be unchanged if no compound token found)
+    fn try_rescan_greater_token(&mut self) -> SyntaxKind {
+        if self.current_token == SyntaxKind::GreaterThanToken {
+            self.current_token = self.scanner.re_scan_greater_token();
+        }
+        self.current_token
+    }
+
     /// Create a NodeList from a Vec of NodeIndex
     fn make_node_list(&self, nodes: Vec<NodeIndex>) -> NodeList {
         NodeList {
@@ -187,9 +201,21 @@ impl ThinParserState {
             SyntaxKind::PlusEqualsToken |
             SyntaxKind::MinusEqualsToken |
             SyntaxKind::AsteriskEqualsToken |
-            SyntaxKind::SlashEqualsToken => 2,
+            SyntaxKind::AsteriskAsteriskEqualsToken |
+            SyntaxKind::SlashEqualsToken |
+            SyntaxKind::PercentEqualsToken |
+            SyntaxKind::LessThanLessThanEqualsToken |
+            SyntaxKind::GreaterThanGreaterThanEqualsToken |
+            SyntaxKind::GreaterThanGreaterThanGreaterThanEqualsToken |
+            SyntaxKind::AmpersandEqualsToken |
+            SyntaxKind::BarEqualsToken |
+            SyntaxKind::BarBarEqualsToken |
+            SyntaxKind::AmpersandAmpersandEqualsToken |
+            SyntaxKind::QuestionQuestionEqualsToken |
+            SyntaxKind::CaretEqualsToken => 2,
             SyntaxKind::QuestionToken => 3,
-            SyntaxKind::BarBarToken => 4,
+            SyntaxKind::BarBarToken |
+            SyntaxKind::QuestionQuestionToken => 4,
             SyntaxKind::AmpersandAmpersandToken => 5,
             SyntaxKind::BarToken => 6,
             SyntaxKind::CaretToken => 7,
@@ -842,8 +868,12 @@ impl ThinParserState {
         // Parse rest parameter (...)
         let dot_dot_dot_token = self.parse_optional(SyntaxKind::DotDotDotToken);
 
-        // Parse parameter name - can be an identifier or keyword
-        let name = if self.is_identifier_or_keyword() {
+        // Parse parameter name - can be an identifier, keyword, or binding pattern
+        let name = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_object_binding_pattern()
+        } else if self.is_token(SyntaxKind::OpenBracketToken) {
+            self.parse_array_binding_pattern()
+        } else if self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
             self.parse_identifier()
@@ -2038,9 +2068,13 @@ impl ThinParserState {
         let param_type = self.parse_type();
 
         self.parse_expected(SyntaxKind::CloseBracketToken);
-        self.parse_expected(SyntaxKind::ColonToken);
 
-        let type_annotation = self.parse_type();
+        // Value type is optional - [index: any]; is valid (but semantically an error)
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
 
         // Build modifiers list if readonly was present
         let modifiers = if readonly {
@@ -3542,9 +3576,20 @@ impl ThinParserState {
         // Skip (
         self.next_token();
 
-        // Empty params: () =>
+        // Empty params: () => or (): type =>
         if self.is_token(SyntaxKind::CloseParenToken) {
             self.next_token();
+            // Check for optional return type: (): type =>
+            if self.is_token(SyntaxKind::ColonToken) {
+                self.next_token();
+                // Skip the type until =>
+                while !self.is_token(SyntaxKind::EqualsGreaterThanToken)
+                    && !self.is_token(SyntaxKind::EndOfFileToken)
+                    && !self.is_token(SyntaxKind::SemicolonToken)
+                    && !self.is_token(SyntaxKind::CloseBraceToken) {
+                    self.next_token();
+                }
+            }
             let is_arrow = self.is_token(SyntaxKind::EqualsGreaterThanToken);
             self.scanner.restore_state(snapshot);
             self.current_token = current;
@@ -3735,7 +3780,12 @@ impl ThinParserState {
         let mut left = self.parse_unary_expression();
 
         loop {
-            let op = self.token();
+            // Try to rescan > as >>, >>>, >=, >>=, >>>= for binary operators
+            let op = if self.is_token(SyntaxKind::GreaterThanToken) {
+                self.try_rescan_greater_token()
+            } else {
+                self.token()
+            };
             let precedence = self.get_operator_precedence(op);
 
             if precedence == 0 || precedence < min_precedence {
@@ -6226,6 +6276,12 @@ impl ThinParserState {
     fn parse_jsx_element_or_type_assertion(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
 
+        // In .tsx/.jsx files, all <...> syntax is JSX (use "as Type" for type assertions)
+        // In .ts files, we need to distinguish type assertions from JSX
+        if self.is_jsx_file() {
+            return self.parse_jsx_element_or_self_closing_or_fragment(true);
+        }
+
         // Look ahead to determine if this is a type assertion or JSX
         // Type assertion: <type>expression where type is a type keyword or identifier followed by >
         // JSX: <element ...> where element is an identifier (starts with lowercase = intrinsic, uppercase = component)
@@ -6260,10 +6316,10 @@ impl ThinParserState {
             | SyntaxKind::LessThanToken
             | SyntaxKind::GreaterThanToken => true,  // <> is a fragment, not type assertion
             SyntaxKind::Identifier => {
-                // Could be either JSX or type assertion
+                // Could be either JSX or type assertion in .ts files
                 // - Lowercase identifiers like <div> are always JSX
                 // - PascalCase followed by JSX-like syntax (attributes, /) is JSX
-                // - Single uppercase letter like <T> followed by > is likely type assertion
+                // - PascalCase followed by > is a type assertion like <Error>expr
 
                 let text = self.scanner.get_token_value_ref().to_string();
                 let first_char = text.chars().next().unwrap_or('a');
@@ -6272,14 +6328,20 @@ impl ThinParserState {
                     // Lowercase identifier = JSX intrinsic element
                     false
                 } else {
-                    // PascalCase - check if followed by JSX-like syntax
+                    // PascalCase - check if followed by type-related syntax
+                    // If followed by >, it's a simple type assertion like <Error>expr
+                    // If followed by type operators, it's a complex type assertion
+                    // Otherwise, assume JSX (has attributes, etc.)
                     self.next_token();
                     matches!(
                         self.token(),
-                        SyntaxKind::ExtendsKeyword
+                        SyntaxKind::GreaterThanToken   // <Error> - simple type assertion
+                            | SyntaxKind::ExtendsKeyword
                             | SyntaxKind::BarToken
                             | SyntaxKind::AmpersandToken
                             | SyntaxKind::CommaToken
+                            | SyntaxKind::OpenBracketToken  // <Error[]> - array type
+                            | SyntaxKind::DotToken  // <foo.Bar> - qualified type
                     )
                 }
             }
