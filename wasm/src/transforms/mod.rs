@@ -6,6 +6,7 @@
 //! The transforms follow TypeScript's transformer pipeline architecture.
 
 pub mod async_gen;
+pub mod async_emitter;
 pub mod class;
 pub mod class_es5;
 pub mod arrow_es5;
