@@ -502,8 +502,17 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Check all symbols by name (handles nested scopes like classes in IIFEs)
+        // But skip class members (PROPERTY/METHOD) - they need "this." prefix
         if let Some(sym_id) = self.binder.get_symbols().find_by_name(name) {
-            return self.get_type_of_symbol(sym_id);
+            if let Some(symbol) = self.binder.get_symbol(sym_id) {
+                use crate::binder::symbol_flags;
+                // Only use this fallback for classes, functions, variables - not class members
+                let is_class_member = (symbol.flags & symbol_flags::PROPERTY) != 0
+                    || (symbol.flags & symbol_flags::METHOD) != 0;
+                if !is_class_member {
+                    return self.get_type_of_symbol(sym_id);
+                }
+            }
         }
 
         // Intrinsic names - use constant TypeIds
