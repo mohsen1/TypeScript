@@ -133,7 +133,7 @@ pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
 ### Baseline Comparison (First 100 tests)
 | Baseline | Pass Rate | Blockers |
 |----------|-----------|----------|
-| .errors.txt | **59.7%** (46/77) | Parser error recovery, abstract class unions |
+| .errors.txt | **61.0%** (47/77) | Parser error recovery, abstract class unions |
 | .js emit | 0% | Emitter format mismatch |
 
 ### Completed
@@ -150,6 +150,7 @@ pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
 - ✅ Nested scope symbol lookup (classes/functions in IIFEs/arrow functions)
 - ✅ Type reference validation (2304 for undefined types)
 - ✅ Export declaration traversal (check exported classes/functions)
+- ✅ Interface name validation (2427 for reserved type names)
 
 ### Next Steps
 1. ✅ Type parameter scoping (generic type parameters in scope)
