@@ -942,6 +942,10 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
+        // Check for parameter properties (error 2369)
+        // Parameter properties are only allowed in constructors, not in regular functions
+        self.check_parameter_properties(&func.parameters.nodes);
+
         // Get return type from annotation or infer
         let return_type = if !func.type_annotation.is_none() {
             self.get_type_from_type_node(func.type_annotation)
@@ -1537,6 +1541,10 @@ impl<'a> ThinCheckerState<'a> {
             }
             syntax_kind_ext::FUNCTION_DECLARATION => {
                 if let Some(func) = self.arena.get_function(node) {
+                    // Check for parameter properties (error 2369)
+                    // Parameter properties are only allowed in constructors
+                    self.check_parameter_properties(&func.parameters.nodes);
+
                     // Check function body if present
                     if !func.body.is_none() {
                         self.push_local_scope();
@@ -2126,9 +2134,36 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Check that parameters don't have property modifiers (error 2369).
+    /// Parameter properties (public/private/protected/readonly on params) are only
+    /// allowed in constructor implementations.
+    fn check_parameter_properties(&mut self, parameters: &[NodeIndex]) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        for &param_idx in parameters {
+            let Some(param_node) = self.arena.get(param_idx) else {
+                continue;
+            };
+            let Some(param) = self.arena.get_parameter(param_node) else {
+                continue;
+            };
+
+            // If the parameter has modifiers, it's a parameter property
+            // which is only allowed in constructors
+            if param.modifiers.is_some() {
+                self.error_at_node(
+                    param_idx,
+                    "A parameter property is only allowed in a constructor implementation.",
+                    diagnostic_codes::PARAMETER_PROPERTY_NOT_ALLOWED,
+                );
+            }
+        }
+    }
+
     /// Report an error at a specific node.
     fn error_at_node(&mut self, node_idx: NodeIndex, message: &str, code: u32) {
-        if let Some((start, length)) = self.get_node_span(node_idx) {
+        if let Some((start, end)) = self.get_node_span(node_idx) {
+            let length = end.saturating_sub(start);
             self.diagnostics.push(crate::checker::Diagnostic {
                 file: self.file_name.clone(),
                 start,
@@ -2230,6 +2265,10 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
+        // Check for parameter properties (error 2369)
+        // Parameter properties are only allowed in constructors, not in methods
+        self.check_parameter_properties(&method.parameters.nodes);
+
         // Check method body
         if !method.body.is_none() {
             self.check_statement(method.body);
@@ -2248,6 +2287,12 @@ impl<'a> ThinCheckerState<'a> {
         let Some(ctor) = self.arena.get_constructor(node) else {
             return;
         };
+
+        // Check for parameter properties in constructor overload signatures (error 2369)
+        // Parameter properties are only allowed in constructor implementations (with body)
+        if ctor.body.is_none() {
+            self.check_parameter_properties(&ctor.parameters.nodes);
+        }
 
         // Enter a new local scope for the constructor body
         self.push_local_scope();
@@ -2323,6 +2368,10 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
         }
+
+        // Check for parameter properties (error 2369)
+        // Parameter properties are only allowed in constructors, not in accessors
+        self.check_parameter_properties(&accessor.parameters.nodes);
 
         // Check accessor body
         if !accessor.body.is_none() {

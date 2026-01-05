@@ -121,6 +121,7 @@ pub mod diagnostic_codes {
     pub const NOT_ALL_CODE_PATHS_RETURN_VALUE: u32 = 2366;
     pub const FUNCTION_LACKS_RETURN_TYPE: u32 = 2355;
     pub const FUNCTION_RETURN_TYPE_MISMATCH: u32 = 2322;
+    pub const PARAMETER_PROPERTY_NOT_ALLOWED: u32 = 2369;  // A parameter property is only allowed in a constructor implementation.
 
     // Null/undefined errors
     pub const OBJECT_IS_POSSIBLY_UNDEFINED: u32 = 2532;

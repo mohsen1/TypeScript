@@ -233,3 +233,94 @@ function bar() {}
     assert!(codes.contains(&2389) || codes.contains(&2391),
         "Expected error 2389 or 2391 for wrong implementation name, got: {:?}", codes);
 }
+
+#[test]
+fn test_parameter_property_in_function_2369() {
+    use crate::thin_parser::ThinParserState;
+    // Parameter properties (public/private/protected/readonly on params)
+    // are only allowed in constructor implementations
+    let source = r#"function F(public x: string) { }"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2369),
+        "Expected error 2369 for parameter property in function, got: {:?}", codes);
+}
+
+#[test]
+fn test_parameter_property_in_arrow_2369() {
+    use crate::thin_parser::ThinParserState;
+    let source = r#"var v = (public x: string) => { };"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2369),
+        "Expected error 2369 for parameter property in arrow function, got: {:?}", codes);
+}
+
+#[test]
+fn test_parameter_property_in_constructor_overload_2369() {
+    use crate::thin_parser::ThinParserState;
+    // Constructor overload signatures should error on parameter properties
+    let source = r#"
+class C {
+    constructor(public p1: string);
+    constructor(public p2: number) {}
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    // Should have exactly one 2369 error for the overload, not for the implementation
+    let count_2369 = codes.iter().filter(|&&c| c == 2369).count();
+    assert_eq!(count_2369, 1,
+        "Expected exactly 1 error 2369 for constructor overload, got {} from: {:?}", count_2369, codes);
+}
+
+#[test]
+fn test_parameter_property_in_constructor_implementation_ok() {
+    use crate::thin_parser::ThinParserState;
+    // Constructor implementations are allowed to have parameter properties
+    let source = r#"
+class C {
+    constructor(public x: string) {}
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(!codes.contains(&2369),
+        "Should not have error 2369 in constructor implementation, got: {:?}", codes);
+}
