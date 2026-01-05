@@ -7,113 +7,11 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 
 ---
 
-# ✅ COMPLETED WORK
+# ✅ COMPLETED
 
-## Phase 0: Performance Architecture ✅
-- **ThinNode**: 16 bytes/node (13x cache improvement from 208B)
-- **Zero-Alloc Scanner**: Atom interning, zero-copy accessors
-- **Parallelism**: Rayon-based parallel parsing/binding/checking
-- **Lazy Diagnostics**: Deferred string formatting, zero waste
-- **Solver Operations**: Pure type logic, structured results
-
-## Phases 1-5: Core Compiler ✅
-| Component | Lines | Status |
-|-----------|-------|--------|
-| Utilities | ~300 | ✅ |
-| Scanner | ~2,500 | ✅ |
-| Parser (ThinParser) | ~11,300 | ✅ 100% pass rate (4483/4483) |
-| Binder (ThinBinder) | ~2,900 | ✅ |
-| Type Checker + Solver | ~29,300 | ✅ 99% |
-
-**Total**: ~77,000 Rust LOC | 1018 tests passing
-
-## Solver (specs/SOLVER.md) ✅
-Complete implementation in `wasm/src/solver/`:
-- Type interning (O(1) equality via TypeId)
-- Semantic subtyping with coinductive recursion
-- Full type lowering (typeof, keyof, this, conditional, mapped, infer)
-- Generic instantiation and constraint-based inference
-- Contextual typing, discriminated union narrowing
-- Lazy diagnostics with structured args
-
-## Phase 7: Language Service (60%)
-- ✅ Go-to-definition, find references, completions, signature help, cross-file navigation
-- ⬜ Formatting engine, code fixes/refactorings
-
----
-
-# 🏛️ ARCHITECTURAL DECISIONS
-
-## Solver-Checker Separation: "Check Fast, Explain Slow"
-
-**Critical principle to avoid the "Fat Controller" anti-pattern.**
-
-### The Problem: Boolean Blindness
-If `thin_checker.rs` has to reverse-engineer *why* a type check failed, it becomes unmaintainable spaghetti:
-```rust
-// ❌ BAD: Checker guessing what went wrong
-if !self.is_assignable_to(init_type, declared_type) {
-    // Checker has to inspect types manually to find the missing property!
-    self.error(node, "Type X is not assignable to Y", ...);
-}
-```
-
-### The Solution: Re-entrant Error Elaboration
-Adopt TypeScript's own pattern: **check silently, explain on demand.**
-
-1. **Fast Path (The Judge)**: `is_subtype_of(A, B) -> bool`
-   - Fast, cached, silent
-   - Used 99% of the time
-
-2. **Slow Path (The Detective)**: `explain_subtype_failure(A, B) -> Diagnostic`
-   - Slow, uncached, verbose
-   - Called *only* when Fast Path returns `false` and we need to report
-
-### Implementation Pattern
-```rust
-// ✅ GOOD: thin_checker.rs stays dumb
-if !self.solver.is_assignable_to(source, target) {
-    // Ask the solver for the "Why"
-    let diagnostic = self.solver.explain_assignability_error(source, target);
-    self.report_diagnostic(node, diagnostic);
-}
-```
-
-```rust
-// solver/subtype.rs - Explain API
-pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
-    match (self.peek(sub), self.peek(sup)) {
-        (TypeKey::Object(s_props), TypeKey::Object(t_props)) => {
-            // Re-run object logic to find EXACT missing property
-            for t_prop in t_props {
-                if !s_props.contains(t_prop.name) {
-                    return PendingDiagnostic::new(
-                        code::PROPERTY_MISSING,
-                        vec![arg(t_prop.name), arg(sub), arg(sup)]
-                    );
-                }
-            }
-            // ... recurse into property types ...
-        }
-        // ... handle unions, functions, etc.
-    }
-    // Fallback generic error
-    PendingDiagnostic::new(code::TYPE_NOT_ASSIGNABLE, vec![arg(sub), arg(sup)])
-}
-```
-
-### Rules
-1. **`thin_checker.rs` only traverses AST and calls solver** - no type inspection logic
-2. **`solver/` owns all type reasoning** - including explaining failures
-3. **Use `PendingDiagnostic`** - solver creates structured data, checker renders strings
-
-### Key Files
-| Purpose | Location |
-|---------|----------|
-| Checker (AST traversal only) | `wasm/src/thin_checker.rs` |
-| Solver (type logic + explain) | `wasm/src/solver/` |
-| Explain API | `wasm/src/solver/subtype.rs` (`explain_failure()`, `SubtypeFailureReason`) |
-| Diagnostic structures | `wasm/src/solver/diagnostics.rs` |
+- **Phase 0-5**: Scanner, Parser, Binder, Solver (~77,000 LOC, 1041 tests)
+- **Phase 6**: Emitter (ES5 transforms, source maps, .d.ts) - 31% JS baseline
+- **Phase 7**: Language Service (60%) - go-to-def, find refs, completions
 
 ---
 
@@ -121,122 +19,46 @@ pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
 
 **Goal**: Match TypeScript's test baselines for `tests/cases/compiler`.
 
-### Test Pass Rates
-| Category | Pass Rate |
-|----------|-----------|
-| compiler | 99.9% (6389/6393) |
-| conformance | 99.98% (5654/5655) |
-| fourslash | 0% (not started) |
-
-### Baseline Comparison (First 100 tests)
-| Baseline | Pass Rate | Blockers |
-|----------|-----------|----------|
-| .errors.txt | **61.0%** (47/77) | Parser error recovery, abstract class unions |
-| .js emit | 0% | Baselines use ES5 (IIFEs), we emit ES6+ |
-
-**Note**: TypeScript baselines use ES5 target (classes→IIFEs, arrows→functions).
-Our emitter produces modern ES6+ output. ES5 transforms planned for Phase 6.3.
-
-### Completed
-- ✅ Class/function overload validation (2389, 2390, 2391)
-- ✅ Parser error code infrastructure
-- ✅ Parser semantic errors (1068, 1440) for class members
-- ✅ Parameter property validation (2369) in all contexts
-- ✅ Function type parameter property checks (2369)
-- ✅ Abstract method handling (skip 2391 for abstract)
-- ✅ Declare class parsing (skip impl checks for ambient)
-- ✅ Numeric method name support (0(), 1(), etc.)
-- ✅ Abstract class instantiation check (2511) - all contexts including local scopes
-- ✅ Expanded known globals (WeakRef, TypedArrays, Web APIs, etc.)
-- ✅ Nested scope symbol lookup (classes/functions in IIFEs/arrow functions)
-- ✅ Type reference validation (2304 for undefined types)
-- ✅ Export declaration traversal (check exported classes/functions)
-- ✅ Interface name validation (2427 for reserved type names)
+### Current Status
+| Baseline | Pass Rate | Notes |
+|----------|-----------|-------|
+| .errors.txt | **61.0%** (47/77) | Focus area |
+| .js emit | 0% | Baselines use ES5, we emit ES6+ |
 
 ### Next Steps
-1. ✅ Type parameter scoping (generic type parameters in scope)
-2. ⬜ Parser semantic errors (1128, additional coverage)
-2. ✅ Error elaboration ("...because property 'x' has type...")
-   - ✅ `explain_failure()` API in `solver/subtype.rs`
-   - ✅ `SubtypeFailureReason::to_diagnostic()` for structured error conversion
-   - ✅ `error_type_not_assignable_with_reason_at()` in thin_checker.rs
-   - ✅ Wired up: variable declarations, return statements, property declarations
-3. ⬜ RelatedInformation (point to definition sites)
-4. ✅ Scoped name resolution
-   - ✅ Local variables added to scope during type checking
-   - ✅ Parameters added to scope in functions/methods/constructors
-   - ✅ Block scope support (push/pop scope for BLOCK nodes)
-   - ✅ For-loop variable scope (FOR_STATEMENT, FOR_IN, FOR_OF)
-   - ✅ Abstract class checks in local scopes (binder + checker enhanced)
-   - ✅ Symbol lookup fallback for all symbols (handles nested classes)
-   - ⬜ Class member resolution (this.x vs x vs ClassName.x)
+1. ⬜ Export assignment validation (2309)
+2. ⬜ Return type validation (2355)
+3. ⬜ Parser semantic errors (1128, 1248)
+4. ⬜ Class member resolution (this.x vs x vs ClassName.x)
+5. ⬜ RelatedInformation (point to definition sites)
+
+### Blockers Analysis (30 failing tests)
+- **Parser errors** (1005, 1068, 1128, 1248): Error recovery gaps
+- **Module errors** (2304, 2309): Export assignment validation
+- **Type errors** (2339, 2355, 2511): Property access, return type, abstract unions
+- **Accessor errors** (1183, 6234, 18045): Accessor-specific validation
 
 ---
 
-# Phase 6 - Emitter Completion (75% → 100%)
+# 🏛️ ARCHITECTURE
 
-**Goal**: Complete emitter with performance-first approach.
-**Full Plan**: See `specs/PHASE_6_PLAN.md` for detailed breakdown.
+## Solver-Checker Separation: "Check Fast, Explain Slow"
 
-### Phase 6.1: Study & Exploration ✅
-- ✅ Benchmark infrastructure (`wasm/benches/emitter_bench.rs`)
-- ✅ Hot path analysis, TypeScript emitter study
-- ✅ Baseline test script (`scripts/baseline-test-rust.mjs`)
-
-### Phase 6.2: JavaScript Emit ✅
-- ✅ Strip TypeScript-only syntax (interfaces, type aliases, declarations)
-- ✅ Strip type annotations from functions, variables, parameters
-- ✅ Strip `private`/`protected`/`readonly` modifiers
-
-### Phase 6.3: ES5 Transforms ✅
-| Transform | Effort | Status |
-|-----------|--------|--------|
-| Class → IIFE | 4 days | ✅ `transforms/class_es5.rs` |
-| Arrow → function | 1 day | ✅ `transforms/arrow_es5.rs` |
-| Generators | 4 days | ✅ `transforms/generator_emitter.rs` |
-| Async/await | 2 days | ✅ `transforms/async_emitter.rs` |
-
-### Phase 6.4: Output Format ✅ (~5 days)
-| Feature | Effort | Status |
-|---------|--------|--------|
-| Source maps | 2 days | ✅ VLQ encoding, inline maps |
-| .d.ts emit | 2 days | ✅ `declaration_emitter.rs` |
-| Formatting | 1 day | ✅ basic indentation |
-
-### Phase 6.5: Baseline Validation 🔄 (~ongoing)
-| Baseline | Current | Target | Notes |
-|----------|---------|--------|-------|
-| .js emit | **31%** (27/87) | 80%+ | ES5 transforms, namespace→IIFE |
-| .d.ts emit | 0% | 80%+ | Framework ready |
-
-**Completed ES5 Improvements:**
-- Classes → IIFE with `/** @class */` comment
-- Methods → prototype assignments
-- Arrow functions → regular function expressions
-- Computed property names (numeric/string literals)
-- Empty body blocks on single line: `{ }`
-- Single-return function bodies on single line
-- **Namespace/module → IIFE transform** (`transforms/namespace_es5.rs`)
-- Export declarations handled via `EXPORT_DECLARATION` nodes
-
-**Remaining Blockers (for 80%+):**
-- Class inheritance (`__extends` helper for `extends`)
-- CommonJS exports (`module.exports`, `exports.X`)
-- `const` modifier on class properties (parse tolerance)
-- Parse errors (13 tests skipped) -- this will be done in rust branch later
+```rust
+// thin_checker.rs calls solver, doesn't inspect types
+if !self.solver.is_assignable_to(source, target) {
+    let diagnostic = self.solver.explain_assignability_error(source, target);
+    self.report_diagnostic(node, diagnostic);
+}
+```
 
 ### Key Files
 | Purpose | Location |
 |---------|----------|
-| ThinEmitter | `wasm/src/thin_emitter.rs` |
-| Declaration emitter | `wasm/src/declaration_emitter.rs` |
-| Source maps | `wasm/src/source_map.rs` |
-| Transforms | `wasm/src/transforms/` |
-| Class ES5 transform | `wasm/src/transforms/class_es5.rs` |
-| Arrow ES5 transform | `wasm/src/transforms/arrow_es5.rs` |
-| Namespace ES5 transform | `wasm/src/transforms/namespace_es5.rs` |
-| Generator emitter | `wasm/src/transforms/generator_emitter.rs` |
-| Async emitter | `wasm/src/transforms/async_emitter.rs` |
+| Checker | `wasm/src/thin_checker.rs` |
+| Solver | `wasm/src/solver/` |
+| Emitter | `wasm/src/thin_emitter.rs` |
+| Baseline tests | `scripts/baseline-test-rust.mjs` |
 
 ---
 
@@ -245,52 +67,18 @@ Our emitter produces modern ES6+ output. ES5 transforms planned for Phase 6.3.
 - ⬜ Remove TypeScript fallbacks
 - ⬜ Performance benchmarks vs tsc and tsc-go
 - ⬜ Memory usage optimization
-- ⬜ WASM interface optimization (binary protocol)
-
----
-
-# WASM Strategy
-
-## WasmGC (Garbage Collection) 🟢 **Ready Now**
-Use `externref` via `wasm-bindgen` for the Language Service API:
-```rust
-// Instead of JSON serialization:
-pub fn get_completions() -> js_sys::Array { ... }
-```
-- Removes serialization bottleneck at API boundary
-- Low risk, high payoff
-
-## Wasm64 (Memory64) 🔴 **Not Ready**
-- Experimental flag required in most runtimes
-- `wasm-bindgen` friction with 64-bit pointers/BigInt
-- **Not needed yet**: ThinNode (16 bytes) fits ~250M nodes in 4GB
-- **Decision**: Keep u32 indices, revisit in 12-18 months
 
 ---
 
 # Quick Reference
 
-## Commands
 ```bash
 # Tests (Docker)
 ./wasm/test.sh
 
-# TypeScript
-npx hereby runtests-parallel
-
 # Baseline comparison
 node scripts/baseline-test-rust.mjs
-```
 
-## Key Files
-| Purpose | Location |
-|---------|----------|
-| This plan | specs/migration_plan.md |
-| Session log | [specs/SESSION_LOG.md](SESSION_LOG.md) |
-| Solver spec | specs/SOLVER.md |
-| Unsoundness rules | specs/TS_UNSOUNDNESS_CATALOG.md |
-| Architecture | specs/WASM_ARCHITECTURE.md |
-| Solver code | wasm/src/solver/ |
-| ThinParser | wasm/src/parser/thin_parser.rs |
-| ThinChecker | wasm/src/checker/thin_checker.rs |
-| Baseline comparison | scripts/baseline-test-rust.mjs |
+# Build WASM
+./wasm/build-wasm.sh
+```
