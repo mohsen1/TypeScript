@@ -9,7 +9,7 @@
  */
 
 import { readFileSync, existsSync, readdirSync } from 'fs';
-import { basename, join } from 'path';
+import { basename, join, extname } from 'path';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
@@ -46,6 +46,61 @@ function readSourceFile(path) {
 
     // Default: UTF-8
     return buffer.toString('utf-8');
+}
+
+/**
+ * Parse a multi-file test case with @filename: directives.
+ * Returns an array of { filename, content } objects.
+ */
+function parseMultiFileTest(source) {
+    const files = [];
+    const lines = source.split('\n');
+
+    let currentFile = null;
+    let currentContent = [];
+    let headerLines = [];  // Lines before first @filename
+
+    for (const line of lines) {
+        // Match @filename: directive (case insensitive)
+        const filenameMatch = line.match(/^\/\/\s*@filename:\s*(.+)$/i);
+
+        if (filenameMatch) {
+            // Save previous file if exists
+            if (currentFile !== null) {
+                files.push({
+                    filename: currentFile,
+                    content: currentContent.join('\n')
+                });
+            }
+
+            currentFile = filenameMatch[1].trim();
+            currentContent = [];
+        } else if (currentFile !== null) {
+            // Add line to current file content
+            currentContent.push(line);
+        } else {
+            // Header line (compiler options, etc.) before first @filename
+            headerLines.push(line);
+        }
+    }
+
+    // Save last file
+    if (currentFile !== null) {
+        files.push({
+            filename: currentFile,
+            content: currentContent.join('\n')
+        });
+    }
+
+    return { files, headerLines };
+}
+
+/**
+ * Check if a filename is a TypeScript/JavaScript file we can parse.
+ */
+function isParseableFile(filename) {
+    const ext = extname(filename).toLowerCase();
+    return ['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs'].includes(ext);
 }
 
 // Load WASM module
@@ -90,6 +145,54 @@ let totalCheckTime = 0;
 const failures = [];
 
 let skipped = 0;
+let multiFilePassed = 0;
+let multiFileFailed = 0;
+let multiFileSkipped = 0;
+
+/**
+ * Process a single file (parse, bind, check).
+ * Returns { success, parseErrors, typeErrors, parseTime, bindTime, checkTime }
+ */
+function processFile(filename, source, useThinParser) {
+    const parser = useThinParser
+        ? wasm.createThinParser(filename, source)
+        : wasm.createParser(filename, source);
+
+    // Parse
+    const parseStart = performance.now();
+    const rootIdx = parser.parseSourceFile();
+    const parseTime = performance.now() - parseStart;
+
+    // Get parse diagnostics
+    const diagnosticsJson = parser.getDiagnosticsJson();
+    const diagnostics = JSON.parse(diagnosticsJson);
+
+    // Bind
+    const bindStart = performance.now();
+    if (useThinParser) {
+        parser.bindSourceFile();
+    } else {
+        parser.bindSourceFile(rootIdx);
+    }
+    const bindTime = performance.now() - bindStart;
+
+    // Type check
+    const checkStart = performance.now();
+    const checkJson = parser.checkSourceFile();
+    const checkTime = performance.now() - checkStart;
+    const checkResult = JSON.parse(checkJson);
+
+    parser.free();
+
+    return {
+        success: true,
+        parseErrors: diagnostics.length,
+        typeErrors: checkResult.diagnostics?.length || 0,
+        parseTime,
+        bindTime,
+        checkTime
+    };
+}
 
 for (const file of files) {
     // Skip very large files
@@ -99,67 +202,79 @@ for (const file of files) {
         continue;
     }
 
-    // Skip multi-file tests (have @filename: directive)
-    const sourceLower = source.toLowerCase();
-    if (sourceLower.includes('@filename:') || sourceLower.includes('// @filename')) {
-        skipped++;
-        continue;
-    }
-
     const testName = basename(file, '.ts');
+    const useThinParser = wasm.createThinParser !== undefined;
 
-    try {
-        // Use ThinParser if available, otherwise fall back to legacy parser
-        const useThinParser = wasm.createThinParser !== undefined;
-        const parser = useThinParser
-            ? wasm.createThinParser(file, source)
-            : wasm.createParser(file, source);
+    // Check if this is a multi-file test
+    const sourceLower = source.toLowerCase();
+    const isMultiFile = sourceLower.includes('@filename:') || sourceLower.includes('// @filename');
 
-        // Parse
-        const parseStart = performance.now();
-        const rootIdx = parser.parseSourceFile();
-        totalParseTime += performance.now() - parseStart;
+    if (isMultiFile) {
+        // Parse the multi-file test
+        const { files: testFiles, headerLines } = parseMultiFileTest(source);
 
-        // Get parse diagnostics (not necessarily failures - some tests expect errors)
-        const diagnosticsJson = parser.getDiagnosticsJson();
-        const diagnostics = JSON.parse(diagnosticsJson);
-        if (diagnostics.length > 0) {
-            parseErrors += diagnostics.length;
+        // Filter to parseable files only
+        const parseableFiles = testFiles.filter(f => isParseableFile(f.filename));
+
+        if (parseableFiles.length === 0) {
+            // No parseable files (e.g., only .json files)
+            multiFileSkipped++;
+            skipped++;
+            continue;
         }
 
-        // Bind
-        const bindStart = performance.now();
-        if (useThinParser) {
-            parser.bindSourceFile();  // ThinParser doesn't need rootIdx
-        } else {
-            parser.bindSourceFile(rootIdx);
+        try {
+            let allPassed = true;
+            let testParseErrors = 0;
+            let testTypeErrors = 0;
+
+            for (const testFile of parseableFiles) {
+                const result = processFile(testFile.filename, testFile.content, useThinParser);
+                testParseErrors += result.parseErrors;
+                testTypeErrors += result.typeErrors;
+                totalParseTime += result.parseTime;
+                totalBindTime += result.bindTime;
+                totalCheckTime += result.checkTime;
+            }
+
+            parseErrors += testParseErrors;
+            typeErrors += testTypeErrors;
+            multiFilePassed++;
+            passed++;
+        } catch (e) {
+            failures.push({ file: testName, stage: 'crash', error: e.message, multiFile: true });
+            multiFileFailed++;
+            failed++;
         }
-        totalBindTime += performance.now() - bindStart;
-
-        // Type check
-        const checkStart = performance.now();
-        const checkJson = parser.checkSourceFile();
-        totalCheckTime += performance.now() - checkStart;
-        const checkResult = JSON.parse(checkJson);
-
-        // Count type errors (some are expected)
-        if (checkResult.diagnostics && checkResult.diagnostics.length > 0) {
-            typeErrors += checkResult.diagnostics.length;
+    } else {
+        // Single file test
+        try {
+            const result = processFile(file, source, useThinParser);
+            parseErrors += result.parseErrors;
+            typeErrors += result.typeErrors;
+            totalParseTime += result.parseTime;
+            totalBindTime += result.bindTime;
+            totalCheckTime += result.checkTime;
+            passed++;
+        } catch (e) {
+            failures.push({ file: testName, stage: 'crash', error: e.message });
+            failed++;
         }
-
-        parser.free();
-        passed++;
-    } catch (e) {
-        failures.push({ file: testName, stage: 'crash', error: e.message });
-        failed++;
     }
 }
 
 const tested = passed + failed;
+const singleFilePassed = passed - multiFilePassed;
+const singleFileFailed = failed - multiFileFailed;
+
 console.log('=== Results ===\n');
-console.log(`Tested:      ${tested}/${files.length} (skipped ${skipped} multi-file/large)`);
+console.log(`Tested:      ${tested}/${files.length} (skipped ${skipped} large/non-parseable)`);
 console.log(`Passed:      ${passed}/${tested} (${(passed/tested*100).toFixed(1)}%)`);
 console.log(`Failed:      ${failed}/${tested} (${(failed/tested*100).toFixed(1)}%)`);
+console.log('');
+console.log('=== Breakdown ===\n');
+console.log(`Single-file: ${singleFilePassed} passed, ${singleFileFailed} failed`);
+console.log(`Multi-file:  ${multiFilePassed} passed, ${multiFileFailed} failed`);
 console.log(`Parse diagnostics: ${parseErrors} (expected for some tests)`);
 console.log(`Type diagnostics:  ${typeErrors}`);
 console.log('');

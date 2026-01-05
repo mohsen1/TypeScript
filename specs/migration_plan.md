@@ -43,7 +43,10 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 - Full type syntax: unions, intersections, generics, conditional, mapped, indexed access
 - JSX support, async/await, generators
 - Import/export (ES6, CommonJS, type-only)
-- 100% pass rate on batch tests (single-file, 3772/3772, 0 crashes)
+- **100% pass rate on batch tests (4483/4483, 0 crashes)**
+- Multi-file test support (312 tests with @filename directives)
+- Full UTF-8/Unicode support including non-BMP characters in regex and identifiers
+- Line continuation in strings (backslash + any line terminator including U+2028/U+2029)
 
 ### Parser Features Added (Sessions 22-30)
 - Generic function types, type assertions, template literals
@@ -281,10 +284,9 @@ These are TypeScript's "type-level functions" (see §4 of SOLVER.md).
 | fourslash | 6,563 | TBD | 0% |
 
 **Batch Test Results** (single-file compiler tests):
-- Pass Rate: **99.8%** (4924/4935 single-file tests)
-- 11 remaining crashes (parser edge cases)
+- Pass Rate: **100%** (3772/3772 single-file tests, 0 crashes)
 - UTF-16 BOM handling fixed in batch-test-rust.mjs
-- ~1462 multi-file tests skipped (need `@filename:` support)
+- ~1228 multi-file tests skipped (need `@filename:` support)
 
 ## Blockers for Higher Pass Rate
 

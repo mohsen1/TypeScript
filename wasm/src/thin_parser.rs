@@ -7147,33 +7147,23 @@ impl ThinParserState {
             | SyntaxKind::GreaterThanToken => true,  // <> is a fragment, not type assertion
             SyntaxKind::Identifier => {
                 // Could be either JSX or type assertion in .ts files
-                // - Lowercase identifiers like <div> are always JSX
-                // - PascalCase followed by JSX-like syntax (attributes, /) is JSX
-                // - PascalCase followed by > is a type assertion like <Error>expr
-
-                let text = self.scanner.get_token_value_ref().to_string();
-                let first_char = text.chars().next().unwrap_or('a');
-
-                if first_char.is_ascii_lowercase() {
-                    // Lowercase identifier = JSX intrinsic element
-                    false
-                } else {
-                    // PascalCase - check if followed by type-related syntax
-                    // If followed by >, it's a simple type assertion like <Error>expr
-                    // If followed by type operators, it's a complex type assertion
-                    // Otherwise, assume JSX (has attributes, etc.)
-                    self.next_token();
-                    matches!(
-                        self.token(),
-                        SyntaxKind::GreaterThanToken   // <Error> - simple type assertion
-                            | SyntaxKind::ExtendsKeyword
-                            | SyntaxKind::BarToken
-                            | SyntaxKind::AmpersandToken
-                            | SyntaxKind::CommaToken
-                            | SyntaxKind::OpenBracketToken  // <Error[]> - array type
-                            | SyntaxKind::DotToken  // <foo.Bar> - qualified type
-                    )
-                }
+                // Check if followed by type-related syntax
+                // If followed by >, it's a simple type assertion like <Error>expr
+                // If followed by type operators, it's a complex type assertion
+                // If followed by < it's a type assertion with type arguments like <Array<T>>
+                // Otherwise, assume JSX (has attributes, etc.)
+                self.next_token();
+                matches!(
+                    self.token(),
+                    SyntaxKind::GreaterThanToken   // <Error> - simple type assertion
+                        | SyntaxKind::LessThanToken   // <A<B>> or <Array<T>> - nested type arguments
+                        | SyntaxKind::ExtendsKeyword
+                        | SyntaxKind::BarToken
+                        | SyntaxKind::AmpersandToken
+                        | SyntaxKind::CommaToken
+                        | SyntaxKind::OpenBracketToken  // <Error[]> - array type
+                        | SyntaxKind::DotToken  // <foo.Bar> - qualified type
+                )
             }
             _ => false,
         };
@@ -7482,14 +7472,17 @@ impl ThinParserState {
     }
 
     /// Parse JSX attribute name (possibly namespaced).
+    /// JSX attribute names can be keywords like "extends", "class", etc.
     fn parse_jsx_attribute_name(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
-        let name = self.parse_identifier();
+        // Use parse_identifier_name to allow keywords as attribute names
+        let name = self.parse_identifier_name();
 
         // Check for namespaced name (a:b)
         if self.is_token(SyntaxKind::ColonToken) {
             self.next_token(); // consume :
-            let local_name = self.parse_identifier();
+            // Also allow keywords for the local part of namespaced names
+            let local_name = self.parse_identifier_name();
             let end_pos = self.token_end();
             return self.arena.add_jsx_namespaced_name(
                 syntax_kind_ext::JSX_NAMESPACED_NAME,
@@ -7558,35 +7551,35 @@ impl ThinParserState {
         let mut children = Vec::new();
 
         loop {
-            // Check for closing tag or closing fragment
-            if self.is_token(SyntaxKind::LessThanToken) {
-                // Look ahead for </
-                let saved = self.scanner.save_state();
-                let saved_token = self.current_token;
-                self.next_token();
+            // Rescan in JSX context to get proper JsxText tokens and LessThanSlashToken
+            // This is necessary because after parsing expressions or nested elements,
+            // the scanner may not be in JSX mode.
+            self.current_token = self.scanner.re_scan_jsx_token(true);
 
-                if self.is_token(SyntaxKind::SlashToken) {
-                    // Closing tag/fragment, restore and stop
-                    self.scanner.restore_state(saved);
-                    self.current_token = saved_token;
+            match self.current_token {
+                SyntaxKind::LessThanSlashToken => {
+                    // Closing tag/fragment - stop parsing children
                     break;
                 }
-
-                // Nested JSX element
-                self.scanner.restore_state(saved);
-                self.current_token = saved_token;
-                children.push(self.parse_jsx_element_or_self_closing_or_fragment(false));
-            } else if self.is_token(SyntaxKind::OpenBraceToken) {
-                // JSX expression: {expr}
-                children.push(self.parse_jsx_expression());
-            } else if self.is_token(SyntaxKind::JsxText) {
-                // Text node
-                children.push(self.parse_jsx_text());
-            } else if self.is_token(SyntaxKind::EndOfFileToken) {
-                break;
-            } else {
-                // Unknown token in JSX children - stop
-                break;
+                SyntaxKind::LessThanToken => {
+                    // Nested JSX element
+                    children.push(self.parse_jsx_element_or_self_closing_or_fragment(false));
+                }
+                SyntaxKind::OpenBraceToken => {
+                    // JSX expression: {expr}
+                    children.push(self.parse_jsx_expression());
+                }
+                SyntaxKind::JsxText => {
+                    // Text node
+                    children.push(self.parse_jsx_text());
+                }
+                SyntaxKind::EndOfFileToken => {
+                    break;
+                }
+                _ => {
+                    // Unknown token in JSX children - stop
+                    break;
+                }
             }
         }
 
@@ -7614,8 +7607,8 @@ impl ThinParserState {
     /// Parse a JSX closing element: </Foo>
     fn parse_jsx_closing_element(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
-        self.parse_expected(SyntaxKind::LessThanToken);
-        self.parse_expected(SyntaxKind::SlashToken);
+        // In JSX mode, </ is scanned as a single LessThanSlashToken
+        self.parse_expected(SyntaxKind::LessThanSlashToken);
         let tag_name = self.parse_jsx_element_name();
         self.parse_expected(SyntaxKind::GreaterThanToken);
 
@@ -7633,8 +7626,8 @@ impl ThinParserState {
     /// Parse a JSX closing fragment: </>
     fn parse_jsx_closing_fragment(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
-        self.parse_expected(SyntaxKind::LessThanToken);
-        self.parse_expected(SyntaxKind::SlashToken);
+        // In JSX mode, </ is scanned as a single LessThanSlashToken
+        self.parse_expected(SyntaxKind::LessThanSlashToken);
         self.parse_expected(SyntaxKind::GreaterThanToken);
 
         let end_pos = self.token_end();

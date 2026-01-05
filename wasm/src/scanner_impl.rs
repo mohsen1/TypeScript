@@ -814,13 +814,29 @@ impl ScannerState {
                 self.pos += 1;
                 if self.pos < self.end {
                     let escaped = self.char_code_unchecked(self.pos);
-                    self.pos += 1;
+                    // Get byte length of the escaped character BEFORE advancing
+                    let escaped_char_len = self.char_len_at(self.pos);
+                    self.pos += escaped_char_len;
                     match escaped {
                         CharacterCodes::LOWER_N => result.push('\n'),
                         CharacterCodes::LOWER_R => result.push('\r'),
                         CharacterCodes::LOWER_T => result.push('\t'),
                         CharacterCodes::BACKSLASH => result.push('\\'),
                         c if c == quote => result.push(char::from_u32(quote).unwrap_or('\0')),
+                        // Line continuation: backslash followed by line terminator
+                        CharacterCodes::LINE_FEED
+                        | CharacterCodes::CARRIAGE_RETURN
+                        | CharacterCodes::LINE_SEPARATOR
+                        | CharacterCodes::PARAGRAPH_SEPARATOR => {
+                            // Line continuation - don't add anything to result
+                            // Also handle CR+LF as a single line break
+                            if escaped == CharacterCodes::CARRIAGE_RETURN
+                                && self.pos < self.end
+                                && self.char_code_unchecked(self.pos) == CharacterCodes::LINE_FEED
+                            {
+                                self.pos += 1;
+                            }
+                        }
                         _ => {
                             result.push('\\');
                             if let Some(c) = char::from_u32(escaped) {
@@ -1083,7 +1099,7 @@ impl ScannerState {
             // Scan until we find the closing /
             while self.pos < self.end {
                 let ch = self.char_code_unchecked(self.pos);
-                
+
                 // Unterminated regex if we hit a newline
                 if is_line_break(ch) {
                     self.token_flags |= TokenFlags::Unterminated as u32;
@@ -1103,20 +1119,23 @@ impl ScannerState {
                 } else if ch == CharacterCodes::CLOSE_BRACKET {
                     in_character_class = false;
                 }
-                self.pos += 1;
+                // Use char_len_at to properly advance past multi-byte UTF-8 characters
+                self.pos += self.char_len_at(self.pos);
             }
 
             if (self.token_flags & TokenFlags::Unterminated as u32) == 0 {
                 // Consume the closing /
                 self.pos += 1;
-                
+
                 // Scan regex flags (g, i, m, s, u, v, y, d)
+                // Also handles non-ASCII characters that may appear as invalid flags
                 while self.pos < self.end {
                     let ch = self.char_code_unchecked(self.pos);
                     if !is_regex_flag(ch) && !is_identifier_part(ch) {
                         break;
                     }
-                    self.pos += 1;
+                    // Use char_len_at for proper UTF-8 handling (handles non-ASCII flags)
+                    self.pos += self.char_len_at(self.pos);
                 }
             }
 
