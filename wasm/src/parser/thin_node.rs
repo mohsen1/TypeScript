@@ -382,6 +382,12 @@ pub struct ModuleData {
     pub body: NodeIndex,
 }
 
+/// Data for module blocks: { statements }
+#[derive(Clone, Debug, Serialize)]
+pub struct ModuleBlockData {
+    pub statements: Option<NodeList>,
+}
+
 /// Data for property/method signatures
 #[derive(Clone, Debug, Serialize)]
 pub struct SignatureData {
@@ -887,6 +893,7 @@ pub struct ThinNodeArena {
     pub enums: Vec<EnumData>,
     pub enum_members: Vec<EnumMemberData>,
     pub modules: Vec<ModuleData>,
+    pub module_blocks: Vec<ModuleBlockData>,
 
     // Signatures and members
     pub signatures: Vec<SignatureData>,
@@ -1022,6 +1029,28 @@ impl ThinNodeArena {
         self.nodes.push(ThinNode::new(kind, pos, end));
         self.extended_info.push(ExtendedNodeInfo::default());
         NodeIndex(index)
+    }
+
+    /// Create a modifier token (static, public, private, etc.)
+    pub fn create_modifier(&mut self, kind: crate::scanner::SyntaxKind, pos: u32) -> NodeIndex {
+        // Modifiers are simple tokens, their kind IS the modifier type
+        // End position is pos + keyword length
+        let end = pos + match kind {
+            crate::scanner::SyntaxKind::StaticKeyword => 6,    // "static"
+            crate::scanner::SyntaxKind::PublicKeyword => 6,    // "public"
+            crate::scanner::SyntaxKind::PrivateKeyword => 7,   // "private"
+            crate::scanner::SyntaxKind::ProtectedKeyword => 9, // "protected"
+            crate::scanner::SyntaxKind::ReadonlyKeyword => 8,  // "readonly"
+            crate::scanner::SyntaxKind::AbstractKeyword => 8,  // "abstract"
+            crate::scanner::SyntaxKind::OverrideKeyword => 8,  // "override"
+            crate::scanner::SyntaxKind::AsyncKeyword => 5,     // "async"
+            crate::scanner::SyntaxKind::DeclareKeyword => 7,   // "declare"
+            crate::scanner::SyntaxKind::ExportKeyword => 6,    // "export"
+            crate::scanner::SyntaxKind::DefaultKeyword => 7,   // "default"
+            crate::scanner::SyntaxKind::ConstKeyword => 5,     // "const"
+            _ => 0,
+        };
+        self.add_token(kind as u16, pos, end)
     }
 
     /// Add an identifier node
@@ -1273,6 +1302,16 @@ impl ThinNodeArena {
     pub fn add_module(&mut self, kind: u16, pos: u32, end: u32, data: ModuleData) -> NodeIndex {
         let data_index = self.modules.len() as u32;
         self.modules.push(data);
+        let index = self.nodes.len() as u32;
+        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.extended_info.push(ExtendedNodeInfo::default());
+        NodeIndex(index)
+    }
+
+    /// Add a module block node: { statements }
+    pub fn add_module_block(&mut self, kind: u16, pos: u32, end: u32, data: ModuleBlockData) -> NodeIndex {
+        let data_index = self.module_blocks.len() as u32;
+        self.module_blocks.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
@@ -2391,6 +2430,28 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get accessor data (get/set accessor).
+    #[inline]
+    pub fn get_accessor(&self, node: &ThinNode) -> Option<&AccessorData> {
+        use super::syntax_kind_ext::{GET_ACCESSOR, SET_ACCESSOR};
+        if node.has_data() && (node.kind == GET_ACCESSOR || node.kind == SET_ACCESSOR) {
+            self.accessors.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get decorator data.
+    #[inline]
+    pub fn get_decorator(&self, node: &ThinNode) -> Option<&DecoratorData> {
+        use super::syntax_kind_ext::DECORATOR;
+        if node.has_data() && node.kind == DECORATOR {
+            self.decorators.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Get type reference data.
     #[inline]
     pub fn get_type_ref(&self, node: &ThinNode) -> Option<&TypeRefData> {
@@ -2521,6 +2582,139 @@ impl ThinNodeArena {
         use super::syntax_kind_ext::JSX_NAMESPACED_NAME;
         if node.has_data() && node.kind == JSX_NAMESPACED_NAME {
             self.jsx_namespaced_names.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get signature data (call, construct, method, property signatures).
+    #[inline]
+    pub fn get_signature(&self, node: &ThinNode) -> Option<&SignatureData> {
+        use super::syntax_kind_ext::{CALL_SIGNATURE, CONSTRUCT_SIGNATURE, METHOD_SIGNATURE, PROPERTY_SIGNATURE};
+        if node.has_data() && (node.kind == CALL_SIGNATURE || node.kind == CONSTRUCT_SIGNATURE ||
+                               node.kind == METHOD_SIGNATURE || node.kind == PROPERTY_SIGNATURE) {
+            self.signatures.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get index signature data.
+    #[inline]
+    pub fn get_index_signature(&self, node: &ThinNode) -> Option<&IndexSignatureData> {
+        use super::syntax_kind_ext::INDEX_SIGNATURE;
+        if node.has_data() && node.kind == INDEX_SIGNATURE {
+            self.index_signatures.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get composite type data (union or intersection).
+    #[inline]
+    pub fn get_composite_type(&self, node: &ThinNode) -> Option<&CompositeTypeData> {
+        use super::syntax_kind_ext::{UNION_TYPE, INTERSECTION_TYPE};
+        if node.has_data() && (node.kind == UNION_TYPE || node.kind == INTERSECTION_TYPE) {
+            self.composite_types.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get array type data.
+    #[inline]
+    pub fn get_array_type(&self, node: &ThinNode) -> Option<&ArrayTypeData> {
+        use super::syntax_kind_ext::ARRAY_TYPE;
+        if node.has_data() && node.kind == ARRAY_TYPE {
+            self.array_types.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get tuple type data.
+    #[inline]
+    pub fn get_tuple_type(&self, node: &ThinNode) -> Option<&TupleTypeData> {
+        use super::syntax_kind_ext::TUPLE_TYPE;
+        if node.has_data() && node.kind == TUPLE_TYPE {
+            self.tuple_types.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get function type data.
+    #[inline]
+    pub fn get_function_type(&self, node: &ThinNode) -> Option<&FunctionTypeData> {
+        use super::syntax_kind_ext::FUNCTION_TYPE;
+        if node.has_data() && node.kind == FUNCTION_TYPE {
+            self.function_types.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get type literal data.
+    #[inline]
+    pub fn get_type_literal(&self, node: &ThinNode) -> Option<&TypeLiteralData> {
+        use super::syntax_kind_ext::TYPE_LITERAL;
+        if node.has_data() && node.kind == TYPE_LITERAL {
+            self.type_literals.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get conditional type data.
+    #[inline]
+    pub fn get_conditional_type(&self, node: &ThinNode) -> Option<&ConditionalTypeData> {
+        use super::syntax_kind_ext::CONDITIONAL_TYPE;
+        if node.has_data() && node.kind == CONDITIONAL_TYPE {
+            self.conditional_types.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get mapped type data.
+    #[inline]
+    pub fn get_mapped_type(&self, node: &ThinNode) -> Option<&MappedTypeData> {
+        use super::syntax_kind_ext::MAPPED_TYPE;
+        if node.has_data() && node.kind == MAPPED_TYPE {
+            self.mapped_types.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get indexed access type data.
+    #[inline]
+    pub fn get_indexed_access_type(&self, node: &ThinNode) -> Option<&IndexedAccessTypeData> {
+        use super::syntax_kind_ext::INDEXED_ACCESS_TYPE;
+        if node.has_data() && node.kind == INDEXED_ACCESS_TYPE {
+            self.indexed_access_types.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get literal type data.
+    #[inline]
+    pub fn get_literal_type(&self, node: &ThinNode) -> Option<&LiteralTypeData> {
+        use super::syntax_kind_ext::LITERAL_TYPE;
+        if node.has_data() && node.kind == LITERAL_TYPE {
+            self.literal_types.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get wrapped type data (parenthesized, optional, rest types).
+    #[inline]
+    pub fn get_wrapped_type(&self, node: &ThinNode) -> Option<&WrappedTypeData> {
+        use super::syntax_kind_ext::{PARENTHESIZED_TYPE, OPTIONAL_TYPE, REST_TYPE};
+        if node.has_data() && (node.kind == PARENTHESIZED_TYPE || node.kind == OPTIONAL_TYPE || node.kind == REST_TYPE) {
+            self.wrapped_types.get(node.data_index as usize)
         } else {
             None
         }

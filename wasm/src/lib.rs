@@ -60,6 +60,9 @@ pub mod transforms;
 // Language Service types and implementation (Phase 7)
 pub mod services;
 
+// Query-based Structural Solver (Phase 7.5)
+pub mod solver;
+
 // =============================================================================
 // Scanner Factory Function
 // =============================================================================

@@ -14,7 +14,7 @@
 //! This is an initial implementation with core emit methods.
 //! More emit methods will be added as needed.
 
-use crate::parser::NodeIndex;
+use crate::parser::{NodeIndex, NodeList};
 use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
@@ -497,6 +497,32 @@ impl<'a> ThinPrinter<'a> {
             }
             k if k == syntax_kind_ext::CONSTRUCTOR => {
                 self.emit_constructor_declaration(node);
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR => {
+                self.emit_get_accessor(node);
+            }
+            k if k == syntax_kind_ext::SET_ACCESSOR => {
+                self.emit_set_accessor(node);
+            }
+            k if k == syntax_kind_ext::DECORATOR => {
+                self.emit_decorator(node);
+            }
+
+            // Interface/type members (signatures)
+            k if k == syntax_kind_ext::PROPERTY_SIGNATURE => {
+                self.emit_property_signature(node);
+            }
+            k if k == syntax_kind_ext::METHOD_SIGNATURE => {
+                self.emit_method_signature(node);
+            }
+            k if k == syntax_kind_ext::CALL_SIGNATURE => {
+                self.emit_call_signature(node);
+            }
+            k if k == syntax_kind_ext::CONSTRUCT_SIGNATURE => {
+                self.emit_construct_signature(node);
+            }
+            k if k == syntax_kind_ext::INDEX_SIGNATURE => {
+                self.emit_index_signature(node);
             }
 
             // Template literals
@@ -1019,6 +1045,21 @@ impl<'a> ThinPrinter<'a> {
         let Some(class) = self.arena.get_class(node) else {
             return;
         };
+
+        // Emit modifiers (including decorators)
+        if let Some(ref modifiers) = class.modifiers {
+            for &mod_idx in &modifiers.nodes {
+                self.emit(mod_idx);
+                // Add space or newline after decorator
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == syntax_kind_ext::DECORATOR {
+                        self.write_line();
+                    } else {
+                        self.write_space();
+                    }
+                }
+            }
+        }
 
         self.write("class");
 
@@ -1582,12 +1623,39 @@ impl<'a> ThinPrinter<'a> {
     // Class Members
     // =========================================================================
 
+    /// Emit class member modifiers (static, public, private, etc.)
+    fn emit_class_member_modifiers(&mut self, modifiers: &Option<NodeList>) {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    // Emit the modifier keyword based on its kind
+                    let keyword = match mod_node.kind as u32 {
+                        k if k == SyntaxKind::StaticKeyword as u32 => "static",
+                        k if k == SyntaxKind::PublicKeyword as u32 => "public",
+                        k if k == SyntaxKind::PrivateKeyword as u32 => "private",
+                        k if k == SyntaxKind::ProtectedKeyword as u32 => "protected",
+                        k if k == SyntaxKind::ReadonlyKeyword as u32 => "readonly",
+                        k if k == SyntaxKind::AbstractKeyword as u32 => "abstract",
+                        k if k == SyntaxKind::OverrideKeyword as u32 => "override",
+                        k if k == SyntaxKind::AsyncKeyword as u32 => "async",
+                        k if k == SyntaxKind::DeclareKeyword as u32 => "declare",
+                        _ => continue,
+                    };
+                    self.write(keyword);
+                    self.write_space();
+                }
+            }
+        }
+    }
+
     fn emit_method_declaration(&mut self, node: &ThinNode) {
         let Some(method) = self.arena.get_method_decl(node) else {
             return;
         };
 
-        // TODO: Handle modifiers (static, async, etc.)
+        // Emit modifiers (static, async, etc.)
+        self.emit_class_member_modifiers(&method.modifiers);
+
         self.emit(method.name);
         self.write("(");
         self.emit_comma_separated(&method.parameters.nodes);
@@ -1608,6 +1676,9 @@ impl<'a> ThinPrinter<'a> {
         let Some(prop) = self.arena.get_property_decl(node) else {
             return;
         };
+
+        // Emit modifiers (static, readonly, private, etc.)
+        self.emit_class_member_modifiers(&prop.modifiers);
 
         self.emit(prop.name);
 
@@ -1633,6 +1704,9 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
+        // Emit modifiers (public, protected, private)
+        self.emit_class_member_modifiers(&ctor.modifiers);
+
         self.write("constructor(");
         self.emit_comma_separated(&ctor.parameters.nodes);
         self.write(")");
@@ -1640,6 +1714,158 @@ impl<'a> ThinPrinter<'a> {
         if !ctor.body.is_none() {
             self.write(" ");
             self.emit(ctor.body);
+        }
+    }
+
+    fn emit_get_accessor(&mut self, node: &ThinNode) {
+        let Some(accessor) = self.arena.get_accessor(node) else {
+            return;
+        };
+
+        // Emit modifiers (static, private, etc.)
+        self.emit_class_member_modifiers(&accessor.modifiers);
+
+        self.write("get ");
+        self.emit(accessor.name);
+        self.write("()");
+
+        if !accessor.type_annotation.is_none() {
+            self.write(": ");
+            self.emit(accessor.type_annotation);
+        }
+
+        if !accessor.body.is_none() {
+            self.write(" ");
+            self.emit(accessor.body);
+        }
+    }
+
+    fn emit_set_accessor(&mut self, node: &ThinNode) {
+        let Some(accessor) = self.arena.get_accessor(node) else {
+            return;
+        };
+
+        // Emit modifiers (static, private, etc.)
+        self.emit_class_member_modifiers(&accessor.modifiers);
+
+        self.write("set ");
+        self.emit(accessor.name);
+        self.write("(");
+        self.emit_comma_separated(&accessor.parameters.nodes);
+        self.write(")");
+
+        if !accessor.body.is_none() {
+            self.write(" ");
+            self.emit(accessor.body);
+        }
+    }
+
+    // =========================================================================
+    // Interface/Type Members (Signatures)
+    // =========================================================================
+
+    fn emit_property_signature(&mut self, node: &ThinNode) {
+        let Some(sig) = self.arena.get_signature(node) else {
+            return;
+        };
+
+        // Emit modifiers (readonly)
+        self.emit_class_member_modifiers(&sig.modifiers);
+
+        if !sig.name.is_none() {
+            self.emit(sig.name);
+        }
+
+        if sig.question_token {
+            self.write("?");
+        }
+
+        if !sig.type_annotation.is_none() {
+            self.write(": ");
+            self.emit(sig.type_annotation);
+        }
+    }
+
+    fn emit_method_signature(&mut self, node: &ThinNode) {
+        let Some(sig) = self.arena.get_signature(node) else {
+            return;
+        };
+
+        if !sig.name.is_none() {
+            self.emit(sig.name);
+        }
+
+        if sig.question_token {
+            self.write("?");
+        }
+
+        self.write("(");
+        if let Some(ref params) = sig.parameters {
+            self.emit_comma_separated(&params.nodes);
+        }
+        self.write(")");
+
+        if !sig.type_annotation.is_none() {
+            self.write(": ");
+            self.emit(sig.type_annotation);
+        }
+    }
+
+    fn emit_call_signature(&mut self, node: &ThinNode) {
+        let Some(sig) = self.arena.get_signature(node) else {
+            return;
+        };
+
+        // TODO: type parameters
+
+        self.write("(");
+        if let Some(ref params) = sig.parameters {
+            self.emit_comma_separated(&params.nodes);
+        }
+        self.write(")");
+
+        if !sig.type_annotation.is_none() {
+            self.write(": ");
+            self.emit(sig.type_annotation);
+        }
+    }
+
+    fn emit_construct_signature(&mut self, node: &ThinNode) {
+        let Some(sig) = self.arena.get_signature(node) else {
+            return;
+        };
+
+        self.write("new ");
+
+        // TODO: type parameters
+
+        self.write("(");
+        if let Some(ref params) = sig.parameters {
+            self.emit_comma_separated(&params.nodes);
+        }
+        self.write(")");
+
+        if !sig.type_annotation.is_none() {
+            self.write(": ");
+            self.emit(sig.type_annotation);
+        }
+    }
+
+    fn emit_index_signature(&mut self, node: &ThinNode) {
+        let Some(sig) = self.arena.get_index_signature(node) else {
+            return;
+        };
+
+        // Emit modifiers (readonly)
+        self.emit_class_member_modifiers(&sig.modifiers);
+
+        self.write("[");
+        self.emit_comma_separated(&sig.parameters.nodes);
+        self.write("]");
+
+        if !sig.type_annotation.is_none() {
+            self.write(": ");
+            self.emit(sig.type_annotation);
         }
     }
 
@@ -1661,6 +1887,19 @@ impl<'a> ThinPrinter<'a> {
     fn emit_spread_element(&mut self, node: &ThinNode) {
         // TODO: Add get_spread_element accessor
         self.write("...");
+    }
+
+    // =========================================================================
+    // Decorators
+    // =========================================================================
+
+    fn emit_decorator(&mut self, node: &ThinNode) {
+        let Some(decorator) = self.arena.get_decorator(node) else {
+            return;
+        };
+
+        self.write("@");
+        self.emit(decorator.expression);
     }
 
     // =========================================================================
@@ -1919,5 +2158,180 @@ mod tests {
         assert!(output.contains("export"), "Output should contain 'export': {}", output);
         assert!(output.contains("function"), "Output should contain 'function': {}", output);
         assert!(output.contains("greet"), "Output should contain 'greet': {}", output);
+    }
+
+    #[test]
+    fn test_thin_emit_get_accessor() {
+        let source = "class Foo { get value() { return this._value; } }";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut printer = ThinPrinter::new(&parser.arena);
+        printer.emit(root);
+
+        let output = printer.get_output();
+        assert!(output.contains("get"), "Output should contain 'get': {}", output);
+        assert!(output.contains("value"), "Output should contain 'value': {}", output);
+    }
+
+    #[test]
+    fn test_thin_emit_set_accessor() {
+        let source = "class Foo { set value(v) { this._value = v; } }";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut printer = ThinPrinter::new(&parser.arena);
+        printer.emit(root);
+
+        let output = printer.get_output();
+        assert!(output.contains("set"), "Output should contain 'set': {}", output);
+        assert!(output.contains("value"), "Output should contain 'value': {}", output);
+    }
+
+    #[test]
+    fn test_thin_emit_decorator() {
+        let source = "@Component class MyComponent {}";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut printer = ThinPrinter::new(&parser.arena);
+        printer.emit(root);
+
+        let output = printer.get_output();
+        assert!(output.contains("@"), "Output should contain '@': {}", output);
+        assert!(output.contains("Component"), "Output should contain 'Component': {}", output);
+        assert!(output.contains("class"), "Output should contain 'class': {}", output);
+    }
+
+    #[test]
+    fn test_thin_emit_static_property() {
+        let source = "class Foo { static count = 0; }";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut printer = ThinPrinter::new(&parser.arena);
+        printer.emit(root);
+
+        let output = printer.get_output();
+        assert!(output.contains("static"), "Output should contain 'static': {}", output);
+        assert!(output.contains("count"), "Output should contain 'count': {}", output);
+    }
+
+    #[test]
+    fn test_thin_emit_private_method() {
+        let source = "class Foo { private doSomething(): void {} }";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut printer = ThinPrinter::new(&parser.arena);
+        printer.emit(root);
+
+        let output = printer.get_output();
+        assert!(output.contains("private"), "Output should contain 'private': {}", output);
+        assert!(output.contains("doSomething"), "Output should contain 'doSomething': {}", output);
+    }
+
+    #[test]
+    fn test_thin_emit_static_readonly() {
+        let source = "class Foo { static readonly MAX = 100; }";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut printer = ThinPrinter::new(&parser.arena);
+        printer.emit(root);
+
+        let output = printer.get_output();
+        assert!(output.contains("static"), "Output should contain 'static': {}", output);
+        assert!(output.contains("readonly"), "Output should contain 'readonly': {}", output);
+        assert!(output.contains("MAX"), "Output should contain 'MAX': {}", output);
+    }
+
+    #[test]
+    fn test_thin_emit_protected_constructor() {
+        let source = "class Singleton { protected constructor() {} }";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut printer = ThinPrinter::new(&parser.arena);
+        printer.emit(root);
+
+        let output = printer.get_output();
+        assert!(output.contains("protected"), "Output should contain 'protected': {}", output);
+        assert!(output.contains("constructor"), "Output should contain 'constructor': {}", output);
+    }
+
+    #[test]
+    fn test_thin_emit_static_get_accessor() {
+        let source = "class Foo { static get instance(): Foo { return null; } }";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut printer = ThinPrinter::new(&parser.arena);
+        printer.emit(root);
+
+        let output = printer.get_output();
+        assert!(output.contains("static"), "Output should contain 'static': {}", output);
+        assert!(output.contains("get"), "Output should contain 'get': {}", output);
+        assert!(output.contains("instance"), "Output should contain 'instance': {}", output);
+    }
+
+    #[test]
+    fn test_thin_emit_call_signature() {
+        let source = "interface Callable { (): string; }";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut printer = ThinPrinter::new(&parser.arena);
+        printer.emit(root);
+
+        let output = printer.get_output();
+        assert!(output.contains("interface"), "Output should contain 'interface': {}", output);
+        assert!(output.contains("Callable"), "Output should contain 'Callable': {}", output);
+        assert!(output.contains("():"), "Output should contain '():' for call signature: {}", output);
+        assert!(output.contains("string"), "Output should contain 'string': {}", output);
+    }
+
+    #[test]
+    fn test_thin_emit_construct_signature() {
+        let source = "interface Factory { new (): MyClass; }";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut printer = ThinPrinter::new(&parser.arena);
+        printer.emit(root);
+
+        let output = printer.get_output();
+        assert!(output.contains("new"), "Output should contain 'new': {}", output);
+        assert!(output.contains("MyClass"), "Output should contain 'MyClass': {}", output);
+    }
+
+    #[test]
+    fn test_thin_emit_readonly_property_signature() {
+        let source = "interface Config { readonly name: string; }";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut printer = ThinPrinter::new(&parser.arena);
+        printer.emit(root);
+
+        let output = printer.get_output();
+        assert!(output.contains("readonly"), "Output should contain 'readonly': {}", output);
+        assert!(output.contains("name"), "Output should contain 'name': {}", output);
+        assert!(output.contains("string"), "Output should contain 'string': {}", output);
+    }
+
+    #[test]
+    fn test_thin_emit_readonly_index_signature() {
+        let source = "interface ReadonlyMap { readonly [key: string]: number; }";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut printer = ThinPrinter::new(&parser.arena);
+        printer.emit(root);
+
+        let output = printer.get_output();
+        assert!(output.contains("readonly"), "Output should contain 'readonly': {}", output);
+        assert!(output.contains("["), "Output should contain '[': {}", output);
+        assert!(output.contains("]"), "Output should contain ']': {}", output);
     }
 }

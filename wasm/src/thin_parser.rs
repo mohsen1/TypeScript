@@ -2234,30 +2234,39 @@ impl ThinParserState {
     // Module/Namespace Declarations
     // =========================================================================
 
-    /// Parse ambient declaration: declare ...
+    /// Parse ambient declaration: declare function/class/namespace/var/etc.
     fn parse_ambient_declaration(&mut self) -> NodeIndex {
-        let start_pos = self.token_pos();
+        let _start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::DeclareKeyword);
 
-        // Parse the declaration after 'declare'
-        match self.current_token {
+        // Parse the inner declaration based on what follows 'declare'
+        match self.token() {
             SyntaxKind::FunctionKeyword => self.parse_function_declaration(),
             SyntaxKind::ClassKeyword => self.parse_class_declaration(),
+            SyntaxKind::AbstractKeyword => {
+                // declare abstract class
+                self.parse_class_declaration()
+            }
             SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
             SyntaxKind::TypeKeyword => self.parse_type_alias_declaration(),
             SyntaxKind::EnumKeyword => self.parse_enum_declaration(),
-            SyntaxKind::ConstKeyword | SyntaxKind::VarKeyword | SyntaxKind::LetKeyword => {
-                self.parse_variable_statement()
-            }
-            SyntaxKind::ModuleKeyword | SyntaxKind::NamespaceKeyword => {
-                self.parse_module_declaration()
-            }
-            SyntaxKind::GlobalKeyword => {
-                // declare global { }
-                self.parse_module_declaration()
+            SyntaxKind::NamespaceKeyword |
+            SyntaxKind::ModuleKeyword => self.parse_module_declaration(),
+            SyntaxKind::GlobalKeyword => self.parse_module_declaration(),
+            SyntaxKind::VarKeyword |
+            SyntaxKind::LetKeyword |
+            SyntaxKind::ConstKeyword => self.parse_variable_statement(),
+            SyntaxKind::AsyncKeyword => {
+                // declare async function
+                if self.look_ahead_is_async_function() {
+                    self.parse_async_function_declaration()
+                } else {
+                    self.parse_error_at_current_token("Declaration expected after 'declare'");
+                    self.parse_expression_statement()
+                }
             }
             _ => {
-                // Unknown ambient declaration, parse as expression
+                self.parse_error_at_current_token("Declaration expected after 'declare'");
                 self.parse_expression_statement()
             }
         }
@@ -2825,6 +2834,10 @@ impl ThinParserState {
                 // export abstract class ...
                 self.parse_class_declaration()
             }
+            SyntaxKind::DeclareKeyword => {
+                // export declare function/class/namespace/var/etc.
+                self.parse_ambient_declaration()
+            }
             SyntaxKind::VarKeyword |
             SyntaxKind::LetKeyword |
             SyntaxKind::ConstKeyword => self.parse_variable_statement(),
@@ -2957,20 +2970,34 @@ impl ThinParserState {
     fn parse_for_statement(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::ForKeyword);
+
+        // Check for for-await-of: for await (...)
+        let await_modifier = self.parse_optional(SyntaxKind::AwaitKeyword);
+
         self.parse_expected(SyntaxKind::OpenParenToken);
 
-        // Initializer
+        // Parse initializer (can be var/let/const declaration or expression)
         let initializer = if !self.is_token(SyntaxKind::SemicolonToken) {
             if self.is_token(SyntaxKind::VarKeyword) ||
                self.is_token(SyntaxKind::LetKeyword) ||
                self.is_token(SyntaxKind::ConstKeyword) {
-                self.parse_variable_declaration_list()
+                self.parse_for_variable_declaration()
             } else {
                 self.parse_expression()
             }
         } else {
             NodeIndex::NONE
         };
+
+        // Check for for-in or for-of
+        if self.is_token(SyntaxKind::InKeyword) {
+            return self.parse_for_in_statement_rest(start_pos, initializer);
+        }
+        if self.is_token(SyntaxKind::OfKeyword) {
+            return self.parse_for_of_statement_rest(start_pos, initializer, await_modifier);
+        }
+
+        // Regular for statement: for (init; cond; incr)
         self.parse_expected(SyntaxKind::SemicolonToken);
 
         // Condition
@@ -3000,6 +3027,107 @@ impl ThinParserState {
                 initializer,
                 condition,
                 incrementor,
+                statement,
+            },
+        )
+    }
+
+    /// Parse variable declaration for for-in/for-of (single declaration only)
+    fn parse_for_variable_declaration(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        let _decl_keyword = self.token();
+        self.next_token(); // consume var/let/const
+
+        // Parse single variable declaration (for-in/for-of only allows one)
+        // Use similar logic to parse_variable_declaration
+        let name = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_object_binding_pattern()
+        } else if self.is_token(SyntaxKind::OpenBracketToken) {
+            self.parse_array_binding_pattern()
+        } else if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
+        } else {
+            self.parse_identifier()
+        };
+
+        // Optional type annotation
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // For for-in/for-of, initializer is parsed separately as the expression
+        // But for regular for, there might be an initializer
+        let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
+            self.parse_assignment_expression()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let decl = self.arena.add_variable_declaration(
+            syntax_kind_ext::VARIABLE_DECLARATION,
+            start_pos,
+            self.token_end(),
+            VariableDeclarationData {
+                name,
+                type_annotation,
+                initializer,
+                exclamation_token: false,
+            },
+        );
+
+        let declarations = self.make_node_list(vec![decl]);
+        let end_pos = self.token_end();
+
+        self.arena.add_variable(
+            syntax_kind_ext::VARIABLE_DECLARATION_LIST,
+            start_pos,
+            end_pos,
+            VariableData {
+                modifiers: None,
+                declarations,
+            },
+        )
+    }
+
+    /// Parse for-in statement after initializer: for (x in obj)
+    fn parse_for_in_statement_rest(&mut self, start_pos: u32, initializer: NodeIndex) -> NodeIndex {
+        self.parse_expected(SyntaxKind::InKeyword);
+        let expression = self.parse_expression();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+        let statement = self.parse_statement();
+
+        let end_pos = self.token_end();
+        self.arena.add_for_in_of(
+            syntax_kind_ext::FOR_IN_STATEMENT,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::ForInOfData {
+                await_modifier: false,
+                initializer,
+                expression,
+                statement,
+            },
+        )
+    }
+
+    /// Parse for-of statement after initializer: for (x of arr)
+    fn parse_for_of_statement_rest(&mut self, start_pos: u32, initializer: NodeIndex, await_modifier: bool) -> NodeIndex {
+        self.parse_expected(SyntaxKind::OfKeyword);
+        let expression = self.parse_assignment_expression();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+        let statement = self.parse_statement();
+
+        let end_pos = self.token_end();
+        self.arena.add_for_in_of(
+            syntax_kind_ext::FOR_OF_STATEMENT,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::ForInOfData {
+                await_modifier,
+                initializer,
+                expression,
                 statement,
             },
         )
@@ -3898,6 +4026,7 @@ impl ThinParserState {
             SyntaxKind::TrueKeyword |
             SyntaxKind::FalseKeyword => self.parse_boolean_literal(),
             SyntaxKind::NullKeyword => self.parse_null_literal(),
+            SyntaxKind::UndefinedKeyword => self.parse_keyword_as_identifier(),
             SyntaxKind::ThisKeyword => self.parse_this_expression(),
             SyntaxKind::SuperKeyword => self.parse_super_expression(),
             SyntaxKind::OpenParenToken => self.parse_parenthesized_expression(),

@@ -980,9 +980,8 @@ These issues were identified by Gemini but NOT yet fixed:
 - Symbol table with scope chain and control flow graph
 - All TypeScript syntax supported
 
-## 2026-01-05: ThinParser Batch Test Improvements (Session 22-23)
-**Batch Test Progress: 78.4% (316/403 files on 500-file test) - 0 Crashes**
-**Large Scale Test: 76.0% (627/825 files on 1000-file test) - 0 Crashes**
+## 2026-01-05: ThinParser Batch Test Improvements (Session 22-24)
+**Batch Test Progress: 78.4% (784/1000 files) - 0 Crashes**
 
 ### Session 22 Fixes:
 - [x] Generic function types `<T>() => T` - FunctionType with type_parameters
@@ -1013,12 +1012,18 @@ These issues were identified by Gemini but NOT yet fixed:
 - [x] Object literal async/generator methods: `{ async foo() { }, *bar() { } }`
 - [x] Mapped types without explicit type: `{ [P in K] }` (implicit any)
 
+### Session 24 Fixes:
+- [x] For-in and for-of loop parsing `for (let x of arr) {}`
+- [x] `export declare` declarations (function, class, namespace, var)
+- [x] `undefined` keyword in expression context as identifier
+
 ### Test Results:
 - 857 unit tests passing (all Rust tests)
 - 0 crashes (was 7 at start of Session 23)
-- 87 remaining parse failures
+- 216 remaining parse failures (down from 237)
 
-### Remaining Parse Failures (87 files):
+### Remaining Parse Failures (216 files):
+- Multi-file tests with `@filename:` directives (~50 files)
 - Import equals with literal values: `import n = 5;` (intentional error cases)
 - Accessor without body: `get foo()` (intentional error test)
 - Anonymous modules: `module { }` (legacy syntax)

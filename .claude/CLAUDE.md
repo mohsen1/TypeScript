@@ -116,6 +116,6 @@ You can take a look at `specs/TYPESCRIPT_GO_ARCHITECTURE.md` for an overview
 3. **ALWAYS use Docker for Rust** - ./wasm/test.sh only, NEVER raw cargo commands
 4. **Measure impact** - add benchmarks for perf claims
 5. **Update the plan** - mark tasks complete, add new discoveries
-6. **Separate test files** - `foo.rs` and `foo_tests.rs` or `tests/foo.rs`
-7. **Gemini at milestones** - not every commit, but every major component
+6. IMPORTANT: **Separate test files** - `foo.rs` and `foo_tests.rs` or `tests/foo.rs` even in Rust files. if you see a file that has source and test in the same file move tests to separate file as a top priority
+7. **Gemini at milestones** - not every commit, but every major component. or when it is a big task and makes sense to get some help
 

@@ -1,18 +1,18 @@
-//! ThinChecker - Type checker using ThinNodeArena
+//! ThinChecker - Type checker using ThinNodeArena and Solver
 //!
-//! This checker uses the ThinNode architecture for cache-optimized AST access.
-//! It works directly with ThinNodeArena instead of the old Node enum.
+//! This checker uses the ThinNode architecture for cache-optimized AST access
+//! and the Solver's type system for structural type interning.
 //!
 //! # Architecture
 //!
-//! - Uses ThinNodeArena for AST access
+//! - Uses ThinNodeArena for AST access (16-byte cache-optimized nodes)
 //! - Uses ThinBinderState for symbol information
-//! - Reuses TypeArena from existing checker (types are already well-optimized)
+//! - Uses Solver's TypeInterner for structural type equality (O(1) comparison)
+//! - Uses solver::lower::TypeLower for AST-to-type conversion
 //!
 //! # Status
 //!
-//! This is a minimal implementation to establish the structure.
-//! Type inference methods will be added incrementally.
+//! Phase 7.5 integration - using solver type system for type checking.
 
 use std::collections::{HashMap, HashSet};
 use std::cell::RefCell;
@@ -24,18 +24,18 @@ use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::binder::{SymbolId, symbol_flags};
 use crate::thin_binder::ThinBinderState;
-use crate::checker::arena::TypeArena;
-use crate::checker::types::TypeId;
+use crate::solver::{TypeId, TypeInterner};
 use crate::checker::state::{Diagnostic, DiagnosticCategory};
 
 // =============================================================================
 // ThinCheckerState
 // =============================================================================
 
-/// Type checker state using ThinNodeArena.
+/// Type checker state using ThinNodeArena and Solver type system.
 ///
 /// This is a performance-optimized checker that works directly with the
-/// cache-friendly ThinNode architecture.
+/// cache-friendly ThinNode architecture and uses the solver's TypeInterner
+/// for structural type equality.
 pub struct ThinCheckerState<'a> {
     /// The ThinNodeArena containing the AST.
     pub arena: &'a ThinNodeArena,
@@ -43,8 +43,9 @@ pub struct ThinCheckerState<'a> {
     /// The binder state with symbols.
     pub binder: &'a ThinBinderState,
 
-    /// Type arena for allocating types.
-    pub types: TypeArena,
+    /// Type interner for structural type interning.
+    /// Uses solver's TypeInterner for O(1) type equality.
+    pub types: TypeInterner,
 
     /// Cached types for symbols.
     symbol_types: FxHashMap<SymbolId, TypeId>,
@@ -106,7 +107,7 @@ impl<'a> ThinCheckerState<'a> {
         ThinCheckerState {
             arena,
             binder,
-            types: TypeArena::new(),
+            types: TypeInterner::new(),
             symbol_types: FxHashMap::default(),
             node_types: FxHashMap::default(),
             type_parameter_names: FxHashMap::default(),
@@ -204,7 +205,7 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check for circular reference
         if self.node_resolution_set.contains(&idx) {
-            return self.types.any_type;
+            return TypeId::ANY;
         }
 
         // Push onto resolution stack
@@ -226,7 +227,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Compute the type of a node (internal, not cached).
     fn compute_type_of_node(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.arena.get(idx) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         match node.kind {
@@ -235,19 +236,12 @@ impl<'a> ThinCheckerState<'a> {
                 self.get_type_of_identifier(idx)
             }
 
-            // Literals
-            k if k == SyntaxKind::NumericLiteral as u16 => {
-                self.types.number_type
-            }
-            k if k == SyntaxKind::StringLiteral as u16 => {
-                self.types.string_type
-            }
-            k if k == SyntaxKind::TrueKeyword as u16 || k == SyntaxKind::FalseKeyword as u16 => {
-                self.types.boolean_type
-            }
-            k if k == SyntaxKind::NullKeyword as u16 => {
-                self.types.null_type
-            }
+            // Literals - use compile-time constant TypeIds
+            k if k == SyntaxKind::NumericLiteral as u16 => TypeId::NUMBER,
+            k if k == SyntaxKind::StringLiteral as u16 => TypeId::STRING,
+            k if k == SyntaxKind::TrueKeyword as u16 => self.types.literal_boolean(true),
+            k if k == SyntaxKind::FalseKeyword as u16 => self.types.literal_boolean(false),
+            k if k == SyntaxKind::NullKeyword as u16 => TypeId::NULL,
 
             // Binary expressions
             k if k == syntax_kind_ext::BINARY_EXPRESSION => {
@@ -314,24 +308,17 @@ impl<'a> ThinCheckerState<'a> {
                 self.get_type_of_prefix_unary(idx)
             }
 
-            // Postfix unary expression
-            k if k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION => {
-                // ++ and -- always return number
-                self.types.number_type
-            }
+            // Postfix unary expression - ++ and -- always return number
+            k if k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION => TypeId::NUMBER,
 
             // typeof expression
-            k if k == syntax_kind_ext::TYPE_OF_EXPRESSION => {
-                self.types.string_type
-            }
+            k if k == syntax_kind_ext::TYPE_OF_EXPRESSION => TypeId::STRING,
 
             // void expression
-            k if k == syntax_kind_ext::VOID_EXPRESSION => {
-                self.types.undefined_type
-            }
+            k if k == syntax_kind_ext::VOID_EXPRESSION => TypeId::UNDEFINED,
 
             // Default case
-            _ => self.types.any_type,
+            _ => TypeId::ANY,
         }
     }
 
@@ -342,11 +329,11 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type of identifier.
     fn get_type_of_identifier(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.arena.get(idx) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let Some(ident) = self.arena.get_identifier(node) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let name = &ident.escaped_text;
@@ -361,11 +348,11 @@ impl<'a> ThinCheckerState<'a> {
             return self.get_type_of_symbol(sym_id);
         }
 
-        // Intrinsic names
+        // Intrinsic names - use constant TypeIds
         match name.as_str() {
-            "undefined" => self.types.undefined_type,
-            "NaN" | "Infinity" => self.types.number_type,
-            _ => self.types.any_type,
+            "undefined" => TypeId::UNDEFINED,
+            "NaN" | "Infinity" => TypeId::NUMBER,
+            _ => TypeId::ANY,
         }
     }
 
@@ -378,7 +365,7 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check for circular reference
         if self.symbol_resolution_set.contains(&sym_id) {
-            return self.types.any_type;
+            return TypeId::ANY;
         }
 
         // Push onto resolution stack
@@ -398,54 +385,100 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     /// Compute type of a symbol (internal, not cached).
+    ///
+    /// Uses TypeLowering to bridge symbol declarations to solver types.
     fn compute_type_of_symbol(&mut self, sym_id: SymbolId) -> TypeId {
+        use crate::solver::TypeLowering;
+
         let Some(symbol) = self.binder.get_symbol(sym_id) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let flags = symbol.flags;
+        let value_decl = symbol.value_declaration;
 
-        // Function
+        // Function - build function type from declaration
         if flags & symbol_flags::FUNCTION != 0 {
-            // TODO: Build function type from declaration
-            return self.types.any_type;
+            if !value_decl.is_none() {
+                return self.get_type_of_function(value_decl);
+            }
+            return TypeId::ANY;
         }
 
-        // Class
+        // Class - return class constructor type
         if flags & symbol_flags::CLASS != 0 {
-            // TODO: Build class type from declaration
-            return self.types.any_type;
+            // TODO: Build class constructor type
+            return TypeId::ANY;
         }
 
-        // Interface
+        // Interface - return interface type from TypeLowering
         if flags & symbol_flags::INTERFACE != 0 {
-            // TODO: Build interface type from declaration
-            return self.types.any_type;
+            // For interfaces, we need to lower the interface body
+            // TODO: Implement interface type lowering
+            return TypeId::ANY;
         }
 
-        // Type alias
+        // Type alias - resolve using TypeLowering
         if flags & symbol_flags::TYPE_ALIAS != 0 {
-            // TODO: Resolve type alias
-            return self.types.any_type;
+            // Get the type node from the type alias declaration
+            if !value_decl.is_none() {
+                if let Some(node) = self.arena.get(value_decl) {
+                    if let Some(type_alias) = self.arena.get_type_alias(node) {
+                        // Lower the aliased type
+                        let lowering = TypeLowering::new(self.arena, &self.types);
+                        return lowering.lower_type(type_alias.type_node);
+                    }
+                }
+            }
+            return TypeId::ANY;
         }
 
-        // Variable
+        // Variable - get type from annotation or infer from initializer
         if flags & (symbol_flags::FUNCTION_SCOPED_VARIABLE | symbol_flags::BLOCK_SCOPED_VARIABLE) != 0 {
-            // TODO: Get type from declaration or infer from initializer
-            return self.types.any_type;
+            if !value_decl.is_none() {
+                if let Some(node) = self.arena.get(value_decl) {
+                    if let Some(var_decl) = self.arena.get_variable_declaration(node) {
+                        // First try type annotation
+                        if !var_decl.type_annotation.is_none() {
+                            let lowering = TypeLowering::new(self.arena, &self.types);
+                            return lowering.lower_type(var_decl.type_annotation);
+                        }
+                        // Fall back to inferring from initializer
+                        if !var_decl.initializer.is_none() {
+                            return self.get_type_of_node(var_decl.initializer);
+                        }
+                    }
+                }
+            }
+            return TypeId::ANY;
         }
 
-        self.types.any_type
+        // Parameter - get type from annotation
+        if flags & symbol_flags::FUNCTION_SCOPED_VARIABLE != 0 {
+            if !value_decl.is_none() {
+                if let Some(node) = self.arena.get(value_decl) {
+                    if let Some(param) = self.arena.get_parameter(node) {
+                        if !param.type_annotation.is_none() {
+                            let lowering = TypeLowering::new(self.arena, &self.types);
+                            return lowering.lower_type(param.type_annotation);
+                        }
+                    }
+                }
+            }
+            return TypeId::ANY;
+        }
+
+        TypeId::ANY
     }
 
     /// Get type of binary expression.
     fn get_type_of_binary_expression(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.arena.get(idx) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let Some(binary) = self.arena.get_binary_expr(node) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let op_kind = binary.operator_token;
@@ -455,15 +488,13 @@ impl<'a> ThinCheckerState<'a> {
             k if k == SyntaxKind::PlusToken as u16 => {
                 // + can be addition or concatenation
                 // Simplified: always return any for now
-                self.types.any_type
+                TypeId::ANY
             }
             k if k == SyntaxKind::MinusToken as u16
                 || k == SyntaxKind::AsteriskToken as u16
                 || k == SyntaxKind::SlashToken as u16
                 || k == SyntaxKind::PercentToken as u16
-                || k == SyntaxKind::AsteriskAsteriskToken as u16 => {
-                self.types.number_type
-            }
+                || k == SyntaxKind::AsteriskAsteriskToken as u16 => TypeId::NUMBER,
 
             // Comparison operators return boolean
             k if k == SyntaxKind::LessThanToken as u16
@@ -473,9 +504,7 @@ impl<'a> ThinCheckerState<'a> {
                 || k == SyntaxKind::EqualsEqualsToken as u16
                 || k == SyntaxKind::ExclamationEqualsToken as u16
                 || k == SyntaxKind::EqualsEqualsEqualsToken as u16
-                || k == SyntaxKind::ExclamationEqualsEqualsToken as u16 => {
-                self.types.boolean_type
-            }
+                || k == SyntaxKind::ExclamationEqualsEqualsToken as u16 => TypeId::BOOLEAN,
 
             // Assignment returns the assigned value's type
             k if k == SyntaxKind::EqualsToken as u16 => {
@@ -488,22 +517,20 @@ impl<'a> ThinCheckerState<'a> {
                 || k == SyntaxKind::CaretToken as u16
                 || k == SyntaxKind::LessThanLessThanToken as u16
                 || k == SyntaxKind::GreaterThanGreaterThanToken as u16
-                || k == SyntaxKind::GreaterThanGreaterThanGreaterThanToken as u16 => {
-                self.types.number_type
-            }
+                || k == SyntaxKind::GreaterThanGreaterThanGreaterThanToken as u16 => TypeId::NUMBER,
 
-            _ => self.types.any_type,
+            _ => TypeId::ANY,
         }
     }
 
     /// Get type of variable declaration.
     fn get_type_of_variable_declaration(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.arena.get(idx) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let Some(var_decl) = self.arena.get_variable_declaration(node) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         // Infer from initializer
@@ -512,53 +539,53 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // No initializer - implicit any
-        self.types.any_type
+        TypeId::ANY
     }
 
     /// Get type of call expression.
     fn get_type_of_call_expression(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.arena.get(idx) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let Some(call) = self.arena.get_call_expr(node) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         // Get the type of the callee
-        let callee_type = self.get_type_of_node(call.expression);
+        let _callee_type = self.get_type_of_node(call.expression);
 
         // For now, return any for function calls
-        // TODO: Extract return type from function type
-        self.types.any_type
+        // TODO: Extract return type from function type using TypeInterner lookup
+        TypeId::ANY
     }
 
     /// Get type of new expression.
     fn get_type_of_new_expression(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.arena.get(idx) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let Some(new_expr) = self.arena.get_call_expr(node) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         // Get the type of the constructor
-        let constructor_type = self.get_type_of_node(new_expr.expression);
+        let _constructor_type = self.get_type_of_node(new_expr.expression);
 
         // For now, return any for new expressions
         // TODO: Extract instance type from constructor
-        self.types.any_type
+        TypeId::ANY
     }
 
     /// Get type of property access expression.
     fn get_type_of_property_access(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.arena.get(idx) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let Some(access) = self.arena.get_access_expr(node) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         // Get the type of the object
@@ -566,7 +593,7 @@ impl<'a> ThinCheckerState<'a> {
 
         // Get the property name
         let Some(name_node) = self.arena.get(access.name_or_argument) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         // If it's an identifier, look up the property
@@ -579,17 +606,17 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        self.types.any_type
+        TypeId::ANY
     }
 
     /// Get type of element access expression (e.g., arr[0], obj["prop"]).
     fn get_type_of_element_access(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.arena.get(idx) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let Some(access) = self.arena.get_access_expr(node) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         // Get the type of the object
@@ -599,18 +626,18 @@ impl<'a> ThinCheckerState<'a> {
         let _index_type = self.get_type_of_node(access.name_or_argument);
 
         // For now, return any for element access
-        // TODO: Extract element type from array/tuple types
-        self.types.any_type
+        // TODO: Extract element type from array/tuple types using TypeInterner lookup
+        TypeId::ANY
     }
 
     /// Get type of conditional expression (ternary: a ? b : c).
     fn get_type_of_conditional_expression(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.arena.get(idx) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let Some(cond) = self.arena.get_conditional_expr(node) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let when_true = self.get_type_of_node(cond.when_true);
@@ -619,58 +646,58 @@ impl<'a> ThinCheckerState<'a> {
         if when_true == when_false {
             when_true
         } else {
-            self.types.create_union_type(vec![when_true, when_false])
+            // Use TypeInterner's union method for automatic normalization
+            self.types.union(vec![when_true, when_false])
         }
     }
 
     /// Get type of function declaration/expression/arrow.
     fn get_type_of_function(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::{FunctionShape, ParamInfo};
+        use std::sync::Arc;
+
         let Some(node) = self.arena.get(idx) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let Some(func) = self.arena.get_function(node) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
-        // Collect parameter types and names
-        let mut param_types = Vec::new();
-        let mut param_names = Vec::new();
-        let mut min_argument_count = 0u32;
-        let mut has_rest_parameter = false;
+        // Collect parameter info using solver's ParamInfo struct
+        let mut params = Vec::new();
 
         for &param_idx in &func.parameters.nodes {
             if let Some(param_node) = self.arena.get(param_idx) {
                 if let Some(param) = self.arena.get_parameter(param_node) {
                     // Get parameter name
-                    if let Some(name_node) = self.arena.get(param.name) {
+                    let name: Option<Arc<str>> = if let Some(name_node) = self.arena.get(param.name) {
                         if let Some(name_data) = self.arena.get_identifier(name_node) {
-                            param_names.push(name_data.escaped_text.clone());
+                            Some(Arc::from(name_data.escaped_text.as_str()))
                         } else {
-                            param_names.push(String::new());
+                            None
                         }
                     } else {
-                        param_names.push(String::new());
-                    }
+                        None
+                    };
 
                     // Use type annotation if present, otherwise any
-                    let param_type = if !param.type_annotation.is_none() {
+                    let type_id = if !param.type_annotation.is_none() {
                         self.get_type_from_type_node(param.type_annotation)
                     } else {
-                        self.types.any_type
+                        TypeId::ANY
                     };
-                    param_types.push(param_type);
 
                     // Check if optional or has initializer
-                    let is_optional = param.question_token || !param.initializer.is_none();
-                    if !is_optional && !has_rest_parameter {
-                        min_argument_count += 1;
-                    }
+                    let optional = param.question_token || !param.initializer.is_none();
+                    let rest = param.dot_dot_dot_token;
 
-                    // Check for rest parameter (dotDotDotToken)
-                    if param.dot_dot_dot_token {
-                        has_rest_parameter = true;
-                    }
+                    params.push(ParamInfo {
+                        name,
+                        type_id,
+                        optional,
+                        rest,
+                    });
                 }
             }
         }
@@ -680,27 +707,28 @@ impl<'a> ThinCheckerState<'a> {
             self.get_type_from_type_node(func.type_annotation)
         } else {
             // TODO: Infer return type from body
-            self.types.any_type
+            TypeId::ANY
         };
 
-        self.types.create_function_type(
-            idx,
-            param_types,
-            param_names,
+        // Create function type using TypeInterner
+        let shape = FunctionShape {
+            type_params: Vec::new(), // TODO: Handle type parameters
+            params,
             return_type,
-            min_argument_count,
-            has_rest_parameter,
-        )
+            is_constructor: false,
+        };
+
+        self.types.function(shape)
     }
 
     /// Get type of array literal.
     fn get_type_of_array_literal(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.arena.get(idx) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let Some(array) = self.arena.get_literal_expr(node) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         if array.elements.nodes.is_empty() {
@@ -708,7 +736,7 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(contextual) = self.contextual_type {
                 return contextual;
             }
-            return self.types.create_array_type(self.types.never_type, false);
+            return self.types.array(TypeId::NEVER);
         }
 
         // Get types of all elements
@@ -719,61 +747,53 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // Create union of element types
+        // Create union of element types using TypeInterner
         let element_type = if element_types.len() == 1 {
             element_types[0]
         } else if element_types.is_empty() {
-            self.types.never_type
+            TypeId::NEVER
         } else {
-            self.types.create_union_type(element_types)
+            self.types.union(element_types)
         };
 
-        self.types.create_array_type(element_type, false)
+        self.types.array(element_type)
     }
 
     /// Get type of object literal.
     fn get_type_of_object_literal(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.arena.get(idx) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let Some(_obj) = self.arena.get_literal_expr(node) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
-        // TODO: Create symbols for object literal properties and build proper object type
+        // TODO: Create PropertyInfo for object literal properties
         // For now, return an empty anonymous object type
-        self.types.create_object_type(Vec::new())
+        self.types.object(Vec::new())
     }
 
     /// Get type of prefix unary expression.
     fn get_type_of_prefix_unary(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.arena.get(idx) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         let Some(unary) = self.arena.get_unary_expr(node) else {
-            return self.types.any_type;
+            return TypeId::ANY;
         };
 
         match unary.operator {
-            k if k == SyntaxKind::ExclamationToken as u16 => {
-                // ! returns boolean
-                self.types.boolean_type
-            }
-            k if k == SyntaxKind::PlusToken as u16 || k == SyntaxKind::MinusToken as u16 => {
-                // Unary + and - return number
-                self.types.number_type
-            }
-            k if k == SyntaxKind::TildeToken as u16 => {
-                // ~ returns number
-                self.types.number_type
-            }
-            k if k == SyntaxKind::PlusPlusToken as u16 || k == SyntaxKind::MinusMinusToken as u16 => {
-                // ++ and -- return number
-                self.types.number_type
-            }
-            _ => self.types.any_type,
+            // ! returns boolean
+            k if k == SyntaxKind::ExclamationToken as u16 => TypeId::BOOLEAN,
+            // Unary + and - return number
+            k if k == SyntaxKind::PlusToken as u16 || k == SyntaxKind::MinusToken as u16 => TypeId::NUMBER,
+            // ~ returns number
+            k if k == SyntaxKind::TildeToken as u16 => TypeId::NUMBER,
+            // ++ and -- return number
+            k if k == SyntaxKind::PlusPlusToken as u16 || k == SyntaxKind::MinusMinusToken as u16 => TypeId::NUMBER,
+            _ => TypeId::ANY,
         }
     }
 
@@ -785,32 +805,74 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     // =========================================================================
+    // Type Relations (uses solver::SubtypeChecker)
+    // =========================================================================
+
+    /// Check if `source` type is assignable to `target` type.
+    ///
+    /// Uses the solver's SubtypeChecker with coinductive cycle detection.
+    pub fn is_assignable_to(&self, source: TypeId, target: TypeId) -> bool {
+        use crate::solver::SubtypeChecker;
+        let mut checker = SubtypeChecker::new(&self.types);
+        checker.is_assignable_to(source, target)
+    }
+
+    /// Check if `source` type is a subtype of `target` type.
+    ///
+    /// Stricter than assignability. Uses coinductive semantics for recursive types.
+    pub fn is_subtype_of(&self, source: TypeId, target: TypeId) -> bool {
+        use crate::solver::SubtypeChecker;
+        let mut checker = SubtypeChecker::new(&self.types);
+        checker.is_subtype_of(source, target)
+    }
+
+    /// Check if two types are identical.
+    ///
+    /// O(1) operation - just compare TypeId values (structural interning).
+    pub fn are_types_identical(&self, type1: TypeId, type2: TypeId) -> bool {
+        type1 == type2
+    }
+
+    /// Check if a type is assignable to a union of types.
+    pub fn is_assignable_to_union(&self, source: TypeId, targets: &[TypeId]) -> bool {
+        use crate::solver::SubtypeChecker;
+        let mut checker = SubtypeChecker::new(&self.types);
+        for &target in targets {
+            if checker.is_assignable_to(source, target) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Create a union type from multiple types.
+    ///
+    /// Automatically normalizes: flattens nested unions, deduplicates, sorts.
+    pub fn get_union_type(&self, types: Vec<TypeId>) -> TypeId {
+        self.types.union(types)
+    }
+
+    /// Create an intersection type from multiple types.
+    ///
+    /// Automatically normalizes: flattens nested intersections, deduplicates, sorts.
+    pub fn get_intersection_type(&self, types: Vec<TypeId>) -> TypeId {
+        self.types.intersection(types)
+    }
+
+    // =========================================================================
     // Type Node Resolution
     // =========================================================================
 
     /// Get type from a type node.
+    ///
+    /// Uses compile-time constant TypeIds for intrinsic types (O(1) lookup).
+    /// Delegates to TypeLowering for complex types (union, intersection, array, etc.).
     pub fn get_type_from_type_node(&mut self, idx: NodeIndex) -> TypeId {
-        let Some(node) = self.arena.get(idx) else {
-            return self.types.any_type;
-        };
+        use crate::solver::TypeLowering;
 
-        match node.kind {
-            k if k == SyntaxKind::NumberKeyword as u16 => self.types.number_type,
-            k if k == SyntaxKind::StringKeyword as u16 => self.types.string_type,
-            k if k == SyntaxKind::BooleanKeyword as u16 => self.types.boolean_type,
-            k if k == SyntaxKind::VoidKeyword as u16 => self.types.void_type,
-            k if k == SyntaxKind::NullKeyword as u16 => self.types.null_type,
-            k if k == SyntaxKind::UndefinedKeyword as u16 => self.types.undefined_type,
-            k if k == SyntaxKind::NeverKeyword as u16 => self.types.never_type,
-            k if k == SyntaxKind::AnyKeyword as u16 => self.types.any_type,
-            k if k == SyntaxKind::UnknownKeyword as u16 => self.types.unknown_type,
-            k if k == SyntaxKind::ObjectKeyword as u16 => self.types.object_type,
-            k if k == SyntaxKind::SymbolKeyword as u16 => self.types.es_symbol_type,
-            k if k == SyntaxKind::BigIntKeyword as u16 => self.types.big_int_type,
-
-            // TODO: Add more type node handling
-            _ => self.types.any_type,
-        }
+        // Use TypeLowering which handles all type nodes
+        let lowering = TypeLowering::new(self.arena, &self.types);
+        lowering.lower_type(idx)
     }
 }
 
@@ -837,11 +899,153 @@ mod tests {
     fn test_thin_checker_basic_types() {
         let arena = ThinNodeArena::new();
         let binder = ThinBinderState::new();
-        let mut checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+        let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
 
-        // Check that basic types exist
-        assert!(checker.types.number_type.0 > 0);
-        assert!(checker.types.string_type.0 > 0);
-        assert!(checker.types.boolean_type.0 > 0);
+        // Verify intrinsic TypeIds are constants (compile-time values)
+        assert_eq!(TypeId::NUMBER.0, 9);
+        assert_eq!(TypeId::STRING.0, 10);
+        assert_eq!(TypeId::BOOLEAN.0, 8);
+        assert_eq!(TypeId::ANY.0, 4);
+        assert_eq!(TypeId::NEVER.0, 2);
+    }
+
+    #[test]
+    fn test_thin_checker_type_interner() {
+        let arena = ThinNodeArena::new();
+        let binder = ThinBinderState::new();
+        let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+
+        // Test that TypeInterner is properly initialized
+        // Intrinsics should be pre-registered
+        assert!(checker.types.lookup(TypeId::STRING).is_some());
+        assert!(checker.types.lookup(TypeId::NUMBER).is_some());
+        assert!(checker.types.lookup(TypeId::ANY).is_some());
+    }
+
+    #[test]
+    fn test_thin_checker_structural_equality() {
+        let arena = ThinNodeArena::new();
+        let binder = ThinBinderState::new();
+        let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+
+        // Test structural equality via TypeInterner
+        // Same string literal should get same TypeId
+        let str1 = checker.types.literal_string("hello");
+        let str2 = checker.types.literal_string("hello");
+        let str3 = checker.types.literal_string("world");
+
+        assert_eq!(str1, str2); // Same structure = same TypeId
+        assert_ne!(str1, str3); // Different structure = different TypeId
+    }
+
+    #[test]
+    fn test_thin_checker_union_normalization() {
+        let arena = ThinNodeArena::new();
+        let binder = ThinBinderState::new();
+        let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+
+        // Test union normalization
+        // Union with `any` should be `any`
+        let with_any = checker.types.union(vec![TypeId::STRING, TypeId::ANY]);
+        assert_eq!(with_any, TypeId::ANY);
+
+        // Union with `never` should exclude `never`
+        let with_never = checker.types.union(vec![TypeId::STRING, TypeId::NEVER]);
+        assert_eq!(with_never, TypeId::STRING);
+
+        // Single-element union should return the element
+        let single = checker.types.union(vec![TypeId::STRING]);
+        assert_eq!(single, TypeId::STRING);
+    }
+
+    #[test]
+    fn test_thin_checker_subtype_intrinsics() {
+        let arena = ThinNodeArena::new();
+        let binder = ThinBinderState::new();
+        let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+
+        // Test intrinsic subtype relations
+        // Any is assignable to everything
+        assert!(checker.is_assignable_to(TypeId::ANY, TypeId::STRING));
+        assert!(checker.is_assignable_to(TypeId::ANY, TypeId::NUMBER));
+
+        // Everything is assignable to any
+        assert!(checker.is_assignable_to(TypeId::STRING, TypeId::ANY));
+        assert!(checker.is_assignable_to(TypeId::NUMBER, TypeId::ANY));
+
+        // Everything is assignable to unknown
+        assert!(checker.is_assignable_to(TypeId::STRING, TypeId::UNKNOWN));
+        assert!(checker.is_assignable_to(TypeId::NUMBER, TypeId::UNKNOWN));
+
+        // Never is assignable to everything
+        assert!(checker.is_assignable_to(TypeId::NEVER, TypeId::STRING));
+        assert!(checker.is_assignable_to(TypeId::NEVER, TypeId::NUMBER));
+
+        // Nothing is assignable to never (except never)
+        assert!(!checker.is_assignable_to(TypeId::STRING, TypeId::NEVER));
+        assert!(!checker.is_assignable_to(TypeId::NUMBER, TypeId::NEVER));
+        assert!(checker.is_assignable_to(TypeId::NEVER, TypeId::NEVER));
+    }
+
+    #[test]
+    fn test_thin_checker_subtype_literals() {
+        let arena = ThinNodeArena::new();
+        let binder = ThinBinderState::new();
+        let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+
+        // String literal is subtype of string
+        let hello = checker.types.literal_string("hello");
+        assert!(checker.is_assignable_to(hello, TypeId::STRING));
+
+        // Number literal is subtype of number
+        let forty_two = checker.types.literal_number(42.0);
+        assert!(checker.is_assignable_to(forty_two, TypeId::NUMBER));
+
+        // Boolean literal is subtype of boolean
+        let t = checker.types.literal_boolean(true);
+        assert!(checker.is_assignable_to(t, TypeId::BOOLEAN));
+
+        // String literal is NOT assignable to number
+        assert!(!checker.is_assignable_to(hello, TypeId::NUMBER));
+    }
+
+    #[test]
+    fn test_thin_checker_subtype_unions() {
+        let arena = ThinNodeArena::new();
+        let binder = ThinBinderState::new();
+        let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+
+        // Create string | number union
+        let string_or_number = checker.get_union_type(vec![TypeId::STRING, TypeId::NUMBER]);
+
+        // String is assignable to string | number
+        assert!(checker.is_assignable_to(TypeId::STRING, string_or_number));
+        assert!(checker.is_assignable_to(TypeId::NUMBER, string_or_number));
+
+        // Boolean is NOT assignable to string | number
+        assert!(!checker.is_assignable_to(TypeId::BOOLEAN, string_or_number));
+
+        // string | number is assignable to string | number | boolean
+        let three_types = checker.get_union_type(vec![TypeId::STRING, TypeId::NUMBER, TypeId::BOOLEAN]);
+        assert!(checker.is_assignable_to(string_or_number, three_types));
+    }
+
+    #[test]
+    fn test_thin_checker_type_identity() {
+        let arena = ThinNodeArena::new();
+        let binder = ThinBinderState::new();
+        let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+
+        // Same type is identical to itself
+        assert!(checker.are_types_identical(TypeId::STRING, TypeId::STRING));
+        assert!(checker.are_types_identical(TypeId::NUMBER, TypeId::NUMBER));
+
+        // Different types are not identical
+        assert!(!checker.are_types_identical(TypeId::STRING, TypeId::NUMBER));
+
+        // Same literal values produce identical types (via interning)
+        let lit1 = checker.types.literal_string("test");
+        let lit2 = checker.types.literal_string("test");
+        assert!(checker.are_types_identical(lit1, lit2));
     }
 }

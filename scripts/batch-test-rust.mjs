@@ -66,7 +66,8 @@ for (const file of files) {
     }
 
     // Skip multi-file tests (have @filename: directive)
-    if (source.includes('@filename:') || source.includes('// @filename')) {
+    const sourceLower = source.toLowerCase();
+    if (sourceLower.includes('@filename:') || sourceLower.includes('// @filename')) {
         skipped++;
         continue;
     }
@@ -74,7 +75,11 @@ for (const file of files) {
     const testName = basename(file, '.ts');
 
     try {
-        const parser = wasm.createParser(file, source);
+        // Use ThinParser if available, otherwise fall back to legacy parser
+        const useThinParser = wasm.createThinParser !== undefined;
+        const parser = useThinParser
+            ? wasm.createThinParser(file, source)
+            : wasm.createParser(file, source);
 
         // Parse
         const parseStart = performance.now();
@@ -94,7 +99,11 @@ for (const file of files) {
 
         // Bind
         const bindStart = performance.now();
-        parser.bindSourceFile(rootIdx);
+        if (useThinParser) {
+            parser.bindSourceFile();  // ThinParser doesn't need rootIdx
+        } else {
+            parser.bindSourceFile(rootIdx);
+        }
         totalBindTime += performance.now() - bindStart;
 
         // Type check
@@ -141,6 +150,13 @@ if (failures.length > 0) {
         console.log('\n  Sample crashes (first 5):');
         crashes.slice(0, 5).forEach(f => {
             console.log(`    ${f.file}: ${f.error?.slice(0,100)}`);
+        });
+    }
+
+    if (parseFailures.length > 0) {
+        console.log('\n  Parse failures (first 10):');
+        parseFailures.slice(0, 10).forEach(f => {
+            console.log(`    ${f.file}: ${f.errors} errors`);
         });
     }
 }
