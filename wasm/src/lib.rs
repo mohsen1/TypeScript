@@ -23,6 +23,8 @@ pub mod parser_impl;
 
 // ThinParser - Cache-optimized parser using ThinNodeArena (Phase 0.1)
 pub mod thin_parser;
+#[cfg(test)]
+mod thin_parser_tests;
 
 // Binder types and implementation (Phase 4)
 pub mod binder;

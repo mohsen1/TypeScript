@@ -946,12 +946,20 @@ impl<'a> CheckerState<'a> {
         })
     }
 
-    /// Get the kind of a node.
+    /// Get the kind of a node as a token SyntaxKind (0-166).
+    /// Returns None if the node is an AST node (extended kind >= 167).
+    /// For AST node kinds, use get_node_kind_raw() instead.
     pub fn get_node_kind(&self, node_idx: NodeIndex) -> Option<crate::scanner::SyntaxKind> {
-        self.node_arena.get(node_idx).map(|n| {
-            // Convert the u16 kind to SyntaxKind
-            unsafe { std::mem::transmute(n.base().kind) }
+        self.node_arena.get(node_idx).and_then(|n| {
+            // Use try_from_u16 to safely convert - returns None for extended AST kinds
+            crate::scanner::SyntaxKind::try_from_u16(n.base().kind)
         })
+    }
+
+    /// Get the raw kind of a node as u16.
+    /// This works for both tokens (0-166) and AST nodes (167+).
+    pub fn get_node_kind_raw(&self, node_idx: NodeIndex) -> Option<u16> {
+        self.node_arena.get(node_idx).map(|n| n.base().kind)
     }
 
     /// Find the innermost node at a given position.
