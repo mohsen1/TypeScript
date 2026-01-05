@@ -811,9 +811,24 @@ impl<'a> ThinCheckerState<'a> {
     /// Check if `source` type is assignable to `target` type.
     ///
     /// Uses the solver's SubtypeChecker with coinductive cycle detection.
+    /// Note: Does not resolve Ref types (use `is_assignable_to_with_resolution` for that).
     pub fn is_assignable_to(&self, source: TypeId, target: TypeId) -> bool {
         use crate::solver::SubtypeChecker;
         let mut checker = SubtypeChecker::new(&self.types);
+        checker.is_assignable_to(source, target)
+    }
+
+    /// Check if `source` type is assignable to `target` type, resolving Ref types.
+    ///
+    /// Uses the provided TypeEnvironment to resolve type references.
+    pub fn is_assignable_to_with_env(
+        &self,
+        source: TypeId,
+        target: TypeId,
+        env: &crate::solver::TypeEnvironment,
+    ) -> bool {
+        use crate::solver::SubtypeChecker;
+        let mut checker = SubtypeChecker::with_resolver(&self.types, env);
         checker.is_assignable_to(source, target)
     }
 
@@ -823,6 +838,20 @@ impl<'a> ThinCheckerState<'a> {
     pub fn is_subtype_of(&self, source: TypeId, target: TypeId) -> bool {
         use crate::solver::SubtypeChecker;
         let mut checker = SubtypeChecker::new(&self.types);
+        checker.is_subtype_of(source, target)
+    }
+
+    /// Check if `source` type is a subtype of `target` type, resolving Ref types.
+    ///
+    /// Uses the provided TypeEnvironment to resolve type references.
+    pub fn is_subtype_of_with_env(
+        &self,
+        source: TypeId,
+        target: TypeId,
+        env: &crate::solver::TypeEnvironment,
+    ) -> bool {
+        use crate::solver::SubtypeChecker;
+        let mut checker = SubtypeChecker::with_resolver(&self.types, env);
         checker.is_subtype_of(source, target)
     }
 
@@ -845,6 +874,36 @@ impl<'a> ThinCheckerState<'a> {
         false
     }
 
+    /// Create a TypeEnvironment populated with resolved symbol types.
+    ///
+    /// This can be passed to `is_assignable_to_with_env` for type checking
+    /// that needs to resolve type references.
+    pub fn build_type_environment(&mut self) -> crate::solver::TypeEnvironment {
+        use crate::solver::{TypeEnvironment, SymbolRef};
+
+        let mut env = TypeEnvironment::new();
+
+        // Collect all unique symbols from node_symbols map
+        let symbols: Vec<SymbolId> = self.binder.node_symbols
+            .values()
+            .copied()
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+
+        // Resolve each symbol and add to the environment
+        for sym_id in symbols {
+            // Get the type for this symbol
+            let type_id = self.get_type_of_symbol(sym_id);
+            if type_id != TypeId::ANY && type_id != TypeId::ERROR {
+                // Use symbol's raw ID as the SymbolRef
+                env.insert(SymbolRef(sym_id.0), type_id);
+            }
+        }
+
+        env
+    }
+
     /// Create a union type from multiple types.
     ///
     /// Automatically normalizes: flattens nested unions, deduplicates, sorts.
@@ -857,6 +916,83 @@ impl<'a> ThinCheckerState<'a> {
     /// Automatically normalizes: flattens nested intersections, deduplicates, sorts.
     pub fn get_intersection_type(&self, types: Vec<TypeId>) -> TypeId {
         self.types.intersection(types)
+    }
+
+    // =========================================================================
+    // Type Narrowing (uses solver::NarrowingContext)
+    // =========================================================================
+
+    /// Narrow a type by a typeof guard.
+    ///
+    /// Example: `typeof x === "string"` narrows `string | number` to `string`.
+    pub fn narrow_by_typeof(&self, source: TypeId, typeof_result: &str) -> TypeId {
+        use crate::solver::NarrowingContext;
+        let ctx = NarrowingContext::new(&self.types);
+        ctx.narrow_by_typeof(source, typeof_result)
+    }
+
+    /// Narrow a type by excluding a typeof guard.
+    ///
+    /// Example: `typeof x !== "string"` narrows `string | number` to `number`.
+    pub fn narrow_by_typeof_negation(&self, source: TypeId, typeof_result: &str) -> TypeId {
+        use crate::solver::NarrowingContext;
+        let ctx = NarrowingContext::new(&self.types);
+
+        // Get the target type for this typeof result
+        let target = match typeof_result {
+            "string" => TypeId::STRING,
+            "number" => TypeId::NUMBER,
+            "boolean" => TypeId::BOOLEAN,
+            "bigint" => TypeId::BIGINT,
+            "symbol" => TypeId::SYMBOL,
+            "undefined" => TypeId::UNDEFINED,
+            "object" => TypeId::OBJECT,
+            _ => return source,
+        };
+
+        ctx.narrow_excluding_type(source, target)
+    }
+
+    /// Narrow a discriminated union by a discriminant property check.
+    ///
+    /// Example: `action.type === "add"` narrows `{ type: "add" } | { type: "remove" }`
+    /// to `{ type: "add" }`.
+    pub fn narrow_by_discriminant(&self, union_type: TypeId, property_name: &str, literal_value: TypeId) -> TypeId {
+        use crate::solver::NarrowingContext;
+        let ctx = NarrowingContext::new(&self.types);
+        ctx.narrow_by_discriminant(union_type, property_name, literal_value)
+    }
+
+    /// Narrow a discriminated union by excluding a discriminant value.
+    ///
+    /// Example: `action.type !== "add"` narrows the union to exclude the "add" variant.
+    pub fn narrow_by_excluding_discriminant(&self, union_type: TypeId, property_name: &str, excluded_value: TypeId) -> TypeId {
+        use crate::solver::NarrowingContext;
+        let ctx = NarrowingContext::new(&self.types);
+        ctx.narrow_by_excluding_discriminant(union_type, property_name, excluded_value)
+    }
+
+    /// Find discriminant properties in a union type.
+    ///
+    /// Returns information about properties that uniquely identify each union variant.
+    pub fn find_discriminants(&self, union_type: TypeId) -> Vec<crate::solver::DiscriminantInfo> {
+        use crate::solver::NarrowingContext;
+        let ctx = NarrowingContext::new(&self.types);
+        ctx.find_discriminants(union_type)
+    }
+
+    /// Narrow a type to include only members assignable to target.
+    pub fn narrow_to_type(&self, source: TypeId, target: TypeId) -> TypeId {
+        use crate::solver::NarrowingContext;
+        let ctx = NarrowingContext::new(&self.types);
+        ctx.narrow_to_type(source, target)
+    }
+
+    /// Narrow a type to exclude members assignable to target.
+    pub fn narrow_excluding_type(&self, source: TypeId, excluded: TypeId) -> TypeId {
+        use crate::solver::NarrowingContext;
+        let ctx = NarrowingContext::new(&self.types);
+        ctx.narrow_excluding_type(source, excluded)
     }
 
     // =========================================================================
@@ -873,5 +1009,135 @@ impl<'a> ThinCheckerState<'a> {
         // Use TypeLowering which handles all type nodes
         let lowering = TypeLowering::new(self.arena, &self.types);
         lowering.lower_type(idx)
+    }
+
+    // =========================================================================
+    // Source Location Tracking & Solver Diagnostics
+    // =========================================================================
+
+    /// Get a source location for a node.
+    pub fn get_source_location(&self, idx: NodeIndex) -> Option<crate::solver::SourceLocation> {
+        let node = self.arena.get(idx)?;
+        Some(crate::solver::SourceLocation::new(
+            self.file_name.as_str(),
+            node.pos,
+            node.end,
+        ))
+    }
+
+    /// Report a type not assignable error using solver diagnostics with source tracking.
+    pub fn error_type_not_assignable_at(
+        &mut self,
+        source: TypeId,
+        target: TypeId,
+        idx: NodeIndex,
+    ) {
+        if let Some(loc) = self.get_source_location(idx) {
+            let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
+                &self.types,
+                self.file_name.as_str(),
+            );
+            let diag = builder.type_not_assignable(source, target, loc.start, loc.length());
+            self.diagnostics.push(diag.to_checker_diagnostic(&self.file_name));
+        }
+    }
+
+    /// Report a property missing error using solver diagnostics with source tracking.
+    pub fn error_property_missing_at(
+        &mut self,
+        prop_name: &str,
+        source: TypeId,
+        target: TypeId,
+        idx: NodeIndex,
+    ) {
+        if let Some(loc) = self.get_source_location(idx) {
+            let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
+                &self.types,
+                self.file_name.as_str(),
+            );
+            let diag = builder.property_missing(prop_name, source, target, loc.start, loc.length());
+            self.diagnostics.push(diag.to_checker_diagnostic(&self.file_name));
+        }
+    }
+
+    /// Report a property not exist error using solver diagnostics with source tracking.
+    pub fn error_property_not_exist_at(
+        &mut self,
+        prop_name: &str,
+        type_id: TypeId,
+        idx: NodeIndex,
+    ) {
+        if let Some(loc) = self.get_source_location(idx) {
+            let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
+                &self.types,
+                self.file_name.as_str(),
+            );
+            let diag = builder.property_not_exist(prop_name, type_id, loc.start, loc.length());
+            self.diagnostics.push(diag.to_checker_diagnostic(&self.file_name));
+        }
+    }
+
+    /// Report an argument not assignable error using solver diagnostics with source tracking.
+    pub fn error_argument_not_assignable_at(
+        &mut self,
+        arg_type: TypeId,
+        param_type: TypeId,
+        idx: NodeIndex,
+    ) {
+        if let Some(loc) = self.get_source_location(idx) {
+            let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
+                &self.types,
+                self.file_name.as_str(),
+            );
+            let diag = builder.argument_not_assignable(arg_type, param_type, loc.start, loc.length());
+            self.diagnostics.push(diag.to_checker_diagnostic(&self.file_name));
+        }
+    }
+
+    /// Report a cannot find name error using solver diagnostics with source tracking.
+    pub fn error_cannot_find_name_at(&mut self, name: &str, idx: NodeIndex) {
+        if let Some(loc) = self.get_source_location(idx) {
+            let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
+                &self.types,
+                self.file_name.as_str(),
+            );
+            let diag = builder.cannot_find_name(name, loc.start, loc.length());
+            self.diagnostics.push(diag.to_checker_diagnostic(&self.file_name));
+        }
+    }
+
+    /// Report an argument count mismatch error using solver diagnostics with source tracking.
+    pub fn error_argument_count_mismatch_at(
+        &mut self,
+        expected: usize,
+        got: usize,
+        idx: NodeIndex,
+    ) {
+        if let Some(loc) = self.get_source_location(idx) {
+            let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
+                &self.types,
+                self.file_name.as_str(),
+            );
+            let diag = builder.argument_count_mismatch(expected, got, loc.start, loc.length());
+            self.diagnostics.push(diag.to_checker_diagnostic(&self.file_name));
+        }
+    }
+
+    /// Create a diagnostic collector for batch error reporting.
+    pub fn create_diagnostic_collector(&self) -> crate::solver::DiagnosticCollector {
+        crate::solver::DiagnosticCollector::new(&self.types, self.file_name.as_str())
+    }
+
+    /// Merge diagnostics from a collector into the checker's diagnostics.
+    pub fn merge_diagnostics(&mut self, collector: &crate::solver::DiagnosticCollector) {
+        for diag in collector.to_checker_diagnostics() {
+            self.diagnostics.push(diag);
+        }
+    }
+
+    /// Format a type as a human-readable string using solver's TypeFormatter.
+    pub fn format_type(&self, type_id: TypeId) -> String {
+        let mut formatter = crate::solver::TypeFormatter::new(&self.types);
+        formatter.format(type_id)
     }
 }
