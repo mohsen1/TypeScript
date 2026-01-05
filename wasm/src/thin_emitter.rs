@@ -373,6 +373,41 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_type_reference(node);
             }
 
+            // Array type
+            k if k == syntax_kind_ext::ARRAY_TYPE => {
+                self.emit_array_type(node);
+            }
+
+            // Union type
+            k if k == syntax_kind_ext::UNION_TYPE => {
+                self.emit_union_type(node);
+            }
+
+            // Intersection type
+            k if k == syntax_kind_ext::INTERSECTION_TYPE => {
+                self.emit_intersection_type(node);
+            }
+
+            // Tuple type
+            k if k == syntax_kind_ext::TUPLE_TYPE => {
+                self.emit_tuple_type(node);
+            }
+
+            // Function type
+            k if k == syntax_kind_ext::FUNCTION_TYPE => {
+                self.emit_function_type(node);
+            }
+
+            // Type literal
+            k if k == syntax_kind_ext::TYPE_LITERAL => {
+                self.emit_type_literal(node);
+            }
+
+            // Parenthesized type
+            k if k == syntax_kind_ext::PARENTHESIZED_TYPE => {
+                self.emit_parenthesized_type(node);
+            }
+
             // Empty statement
             k if k == syntax_kind_ext::EMPTY_STATEMENT => {
                 self.write_semicolon();
@@ -482,10 +517,12 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_enum_member(node);
             }
             k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
-                self.emit_interface_declaration(node);
+                // Interface declarations are TypeScript-only - skip for JavaScript
+                // self.emit_interface_declaration(node);
             }
             k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
-                self.emit_type_alias_declaration(node);
+                // Type alias declarations are TypeScript-only - skip for JavaScript
+                // self.emit_type_alias_declaration(node);
             }
             k if k == syntax_kind_ext::MODULE_DECLARATION => {
                 self.emit_module_declaration(node);
@@ -799,24 +836,12 @@ impl<'a> ThinPrinter<'a> {
             self.write("async ");
         }
 
-        // Parameters
-        let params = &func.parameters.nodes;
-        if params.len() == 1 && !func.type_annotation.is_none() {
-            // Single untyped param doesn't need parens (but we keep them for safety)
-            self.write("(");
-            self.emit_comma_separated(params);
-            self.write(")");
-        } else {
-            self.write("(");
-            self.emit_comma_separated(params);
-            self.write(")");
-        }
+        // Parameters (without types for JavaScript)
+        self.write("(");
+        self.emit_function_parameters_js(&func.parameters.nodes);
+        self.write(")");
 
-        // Return type annotation
-        if !func.type_annotation.is_none() {
-            self.write(": ");
-            self.emit(func.type_annotation);
-        }
+        // Skip return type for JavaScript
 
         self.write(" => ");
 
@@ -845,16 +870,12 @@ impl<'a> ThinPrinter<'a> {
             self.emit(func.name);
         }
 
-        // Parameters
+        // Parameters (without types for JavaScript)
         self.write("(");
-        self.emit_comma_separated(&func.parameters.nodes);
+        self.emit_function_parameters_js(&func.parameters.nodes);
         self.write(")");
 
-        // Return type
-        if !func.type_annotation.is_none() {
-            self.write(": ");
-            self.emit(func.type_annotation);
-        }
+        // Skip return type for JavaScript
 
         self.write_space();
         self.emit(func.body);
@@ -864,6 +885,12 @@ impl<'a> ThinPrinter<'a> {
         let Some(func) = self.arena.get_function(node) else {
             return;
         };
+
+        // For JavaScript emit: skip declaration-only functions (no body)
+        // These are just type information in TypeScript
+        if func.body.is_none() {
+            return;
+        }
 
         if func.is_async {
             self.write("async ");
@@ -881,19 +908,40 @@ impl<'a> ThinPrinter<'a> {
             self.emit(func.name);
         }
 
-        // Parameters
+        // Parameters - only emit names, not types for JavaScript
         self.write("(");
-        self.emit_comma_separated(&func.parameters.nodes);
+        self.emit_function_parameters_js(&func.parameters.nodes);
         self.write(")");
 
-        // Return type
-        if !func.type_annotation.is_none() {
-            self.write(": ");
-            self.emit(func.type_annotation);
-        }
+        // No return type for JavaScript
 
         self.write_space();
         self.emit(func.body);
+    }
+
+    /// Emit function parameters for JavaScript (no types)
+    fn emit_function_parameters_js(&mut self, params: &[NodeIndex]) {
+        let mut first = true;
+        for &param_idx in params {
+            if !first {
+                self.write(", ");
+            }
+            first = false;
+
+            if let Some(param_node) = self.arena.get(param_idx) {
+                if let Some(param) = self.arena.get_parameter(param_node) {
+                    if param.dot_dot_dot_token {
+                        self.write("...");
+                    }
+                    self.emit(param.name);
+                    // Skip type annotations and defaults for JS emit
+                    if !param.initializer.is_none() {
+                        self.write(" = ");
+                        self.emit(param.initializer);
+                    }
+                }
+            }
+        }
     }
 
     fn emit_parameter(&mut self, node: &ThinNode) {
@@ -985,10 +1033,7 @@ impl<'a> ThinPrinter<'a> {
 
         self.emit(decl.name);
 
-        if !decl.type_annotation.is_none() {
-            self.write(": ");
-            self.emit(decl.type_annotation);
-        }
+        // Skip type annotation for JavaScript emit
 
         if !decl.initializer.is_none() {
             self.write(" = ");
@@ -1539,23 +1584,112 @@ impl<'a> ThinPrinter<'a> {
     // Type Emit Methods
     // =========================================================================
 
-    fn emit_union_type(&mut self, _node: &ThinNode) {
-        // TODO: Add union type accessor
-        // For now, emit nothing
+    fn emit_union_type(&mut self, node: &ThinNode) {
+        let Some(union) = self.arena.get_composite_type(node) else {
+            return;
+        };
+
+        let mut first = true;
+        for &type_idx in &union.types.nodes {
+            if !first {
+                self.write(" | ");
+            }
+            first = false;
+            self.emit(type_idx);
+        }
     }
 
-    fn emit_intersection_type(&mut self, _node: &ThinNode) {
-        // TODO: Add intersection type accessor
+    fn emit_intersection_type(&mut self, node: &ThinNode) {
+        let Some(intersection) = self.arena.get_composite_type(node) else {
+            return;
+        };
+
+        let mut first = true;
+        for &type_idx in &intersection.types.nodes {
+            if !first {
+                self.write(" & ");
+            }
+            first = false;
+            self.emit(type_idx);
+        }
     }
 
-    fn emit_array_type(&mut self, _node: &ThinNode) {
-        // TODO: Add array type accessor - emit element type then []
+    fn emit_array_type(&mut self, node: &ThinNode) {
+        let Some(array) = self.arena.get_array_type(node) else {
+            return;
+        };
+
+        self.emit(array.element_type);
+        self.write("[]");
     }
 
-    fn emit_tuple_type(&mut self, _node: &ThinNode) {
-        // TODO: Add tuple type accessor
+    fn emit_tuple_type(&mut self, node: &ThinNode) {
+        let Some(tuple) = self.arena.get_tuple_type(node) else {
+            self.write("[]");
+            return;
+        };
+
         self.write("[");
+        self.emit_comma_separated(&tuple.elements.nodes);
         self.write("]");
+    }
+
+    fn emit_function_type(&mut self, node: &ThinNode) {
+        let Some(func_type) = self.arena.get_function_type(node) else {
+            return;
+        };
+
+        // Type parameters
+        if let Some(ref type_params) = func_type.type_parameters {
+            if !type_params.nodes.is_empty() {
+                self.write("<");
+                self.emit_comma_separated(&type_params.nodes);
+                self.write(">");
+            }
+        }
+
+        // Parameters
+        self.write("(");
+        self.emit_comma_separated(&func_type.parameters.nodes);
+        self.write(") => ");
+
+        // Return type
+        self.emit(func_type.type_annotation);
+    }
+
+    fn emit_type_literal(&mut self, node: &ThinNode) {
+        let Some(type_lit) = self.arena.get_type_literal(node) else {
+            self.write("{}");
+            return;
+        };
+
+        if type_lit.members.nodes.is_empty() {
+            self.write("{}");
+            return;
+        }
+
+        self.write("{");
+        self.write_line();
+        self.increase_indent();
+
+        for &member_idx in &type_lit.members.nodes {
+            self.emit(member_idx);
+            self.write_semicolon();
+            self.write_line();
+        }
+
+        self.decrease_indent();
+        self.write("}");
+    }
+
+    fn emit_parenthesized_type(&mut self, node: &ThinNode) {
+        let Some(paren_type) = self.arena.get_wrapped_type(node) else {
+            return;
+        };
+
+        self.write("(");
+        self.emit(paren_type.type_node);
+        self.write(")");
     }
 
     // =========================================================================
@@ -1765,22 +1899,37 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Emit modifiers (static, async, etc.)
-        self.emit_class_member_modifiers(&method.modifiers);
+        // Skip method declarations without bodies (TypeScript-only overloads)
+        if method.body.is_none() {
+            return;
+        }
+
+        // Emit modifiers (static, async only for JavaScript)
+        self.emit_method_modifiers_js(&method.modifiers);
 
         self.emit(method.name);
         self.write("(");
-        self.emit_comma_separated(&method.parameters.nodes);
+        self.emit_function_parameters_js(&method.parameters.nodes);
         self.write(")");
 
-        if !method.type_annotation.is_none() {
-            self.write(": ");
-            self.emit(method.type_annotation);
-        }
+        // Skip return type for JavaScript emit
 
-        if !method.body.is_none() {
-            self.write(" ");
-            self.emit(method.body);
+        self.write(" ");
+        self.emit(method.body);
+    }
+
+    /// Emit method modifiers for JavaScript (static, async only)
+    fn emit_method_modifiers_js(&mut self, modifiers: &Option<NodeList>) {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    match mod_node.kind {
+                        k if k == SyntaxKind::StaticKeyword as u16 => self.write("static "),
+                        k if k == SyntaxKind::AsyncKeyword as u16 => self.write("async "),
+                        _ => {} // Skip private/protected/public/readonly/abstract
+                    }
+                }
+            }
         }
     }
 
@@ -1789,19 +1938,18 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Emit modifiers (static, readonly, private, etc.)
-        self.emit_class_member_modifiers(&prop.modifiers);
+        // For JavaScript: Skip property declarations that are TypeScript-only
+        // (declarations with type annotation but no initializer)
+        if prop.initializer.is_none() && !prop.type_annotation.is_none() {
+            return;
+        }
+
+        // Emit modifiers (static only for JavaScript)
+        self.emit_class_member_modifiers_js(&prop.modifiers);
 
         self.emit(prop.name);
 
-        if prop.question_token {
-            self.write("?");
-        }
-
-        if !prop.type_annotation.is_none() {
-            self.write(": ");
-            self.emit(prop.type_annotation);
-        }
+        // Skip type annotations for JavaScript emit
 
         if !prop.initializer.is_none() {
             self.write(" = ");
@@ -1809,6 +1957,20 @@ impl<'a> ThinPrinter<'a> {
         }
 
         self.write_semicolon();
+    }
+
+    /// Emit class member modifiers for JavaScript (only static is valid)
+    fn emit_class_member_modifiers_js(&mut self, modifiers: &Option<NodeList>) {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    // Only emit 'static' for JavaScript - skip private/readonly/public/protected
+                    if mod_node.kind == SyntaxKind::StaticKeyword as u16 {
+                        self.write("static ");
+                    }
+                }
+            }
+        }
     }
 
     fn emit_constructor_declaration(&mut self, node: &ThinNode) {

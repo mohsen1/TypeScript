@@ -18,7 +18,6 @@
 import { readFileSync, readdirSync, existsSync, writeFileSync } from 'fs';
 import { join, basename, extname } from 'path';
 import { createRequire } from 'module';
-import { diffLines } from 'diff';
 
 const require = createRequire(import.meta.url);
 
@@ -85,6 +84,29 @@ function stripTypeAnnotations(code) {
         .replace(/declare\s+[^;]+;/g, '');                     // Declare statements
 }
 
+// Extract JS output from baseline file
+// Baseline format: //// [file.ts]\n<source>\n//// [file.js]\n<js output>
+function extractJsFromBaseline(baselineContent, testName) {
+    // Look for the JS section
+    const jsMarker = `//// [${testName}.js]`;
+    const jsStartIdx = baselineContent.indexOf(jsMarker);
+    
+    if (jsStartIdx === -1) {
+        return '';
+    }
+    
+    // Get everything after the marker
+    let jsContent = baselineContent.slice(jsStartIdx + jsMarker.length);
+    
+    // Stop at the next marker (if any)
+    const nextMarker = jsContent.indexOf('//// [');
+    if (nextMarker !== -1) {
+        jsContent = jsContent.slice(0, nextMarker);
+    }
+    
+    return jsContent;
+}
+
 // Run emit and compare
 function testFile(testFile) {
     const testName = basename(testFile, '.ts');
@@ -97,7 +119,8 @@ function testFile(testFile) {
     }
     
     const source = readFileSync(sourcePath, 'utf-8');
-    const expectedJs = readFileSync(baselinePath, 'utf-8');
+    const baselineContent = readFileSync(baselinePath, 'utf-8');
+    const expectedJs = extractJsFromBaseline(baselineContent, testName);
     
     try {
         // Parse with ThinParser
@@ -125,10 +148,10 @@ function testFile(testFile) {
         
         // Emit
         let emittedJs = '';
-        if (parser.emitSourceFile) {
+        if (parser.emit) {
+            emittedJs = parser.emit();
+        } else if (parser.emitSourceFile) {
             emittedJs = parser.emitSourceFile();
-        } else if (wasm.emitThin) {
-            emittedJs = wasm.emitThin(parser, root);
         } else {
             parser.free?.();
             return { name: testName, status: 'skip', reason: 'emit not available' };

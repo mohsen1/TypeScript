@@ -6693,13 +6693,12 @@ impl ThinParserState {
                 self.next_token();
                 let end_pos = self.token_end();
 
-                current = self.arena.add_type_ref(
+                current = self.arena.add_array_type(
                     syntax_kind_ext::ARRAY_TYPE,
                     start_pos,
                     end_pos,
-                    crate::parser::thin_node::TypeRefData {
-                        type_name: current,
-                        type_arguments: None,
+                    crate::parser::thin_node::ArrayTypeData {
+                        element_type: current,
                     },
                 );
             } else {

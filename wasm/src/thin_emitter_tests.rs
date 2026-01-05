@@ -90,6 +90,7 @@ fn test_thin_emit_arrow_function() {
 
 #[test]
 fn test_thin_emit_interface_declaration() {
+    // Interface declarations are TypeScript-only, so JavaScript emit should be empty
     let source = "interface Point { x: number; y: number; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
@@ -98,8 +99,8 @@ fn test_thin_emit_interface_declaration() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("interface"), "Expected 'interface' in output: {}", output);
-    assert!(output.contains("Point"), "Expected 'Point' in output: {}", output);
+    // For JavaScript emit, interface should NOT be in output
+    assert!(!output.contains("interface"), "JavaScript output should NOT contain 'interface': {}", output);
 }
 
 #[test]
@@ -152,7 +153,8 @@ fn test_thin_pipeline_integration() {
     let output = printer.get_output();
     assert!(output.contains("function"), "Output should contain 'function': {}", output);
     assert!(output.contains("add"), "Output should contain 'add': {}", output);
-    assert!(output.contains("number"), "Output should contain 'number': {}", output);
+    // JavaScript emit strips types, so "number" should NOT be in output
+    assert!(!output.contains("number"), "JavaScript output should NOT contain 'number' (types are stripped): {}", output);
     assert!(output.contains("return"), "Output should contain 'return': {}", output);
     assert!(output.contains("let"), "Output should contain 'let': {}", output);
     assert!(output.contains("result"), "Output should contain 'result': {}", output);
@@ -247,6 +249,7 @@ fn test_thin_emit_static_property() {
 
 #[test]
 fn test_thin_emit_private_method() {
+    // For JavaScript emit, 'private' modifier is stripped
     let source = "class Foo { private doSomething(): void {} }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
@@ -255,12 +258,13 @@ fn test_thin_emit_private_method() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("private"), "Output should contain 'private': {}", output);
+    assert!(!output.contains("private"), "JavaScript output should NOT contain 'private': {}", output);
     assert!(output.contains("doSomething"), "Output should contain 'doSomething': {}", output);
 }
 
 #[test]
 fn test_thin_emit_static_readonly() {
+    // For JavaScript emit, 'readonly' modifier is stripped but 'static' is kept
     let source = "class Foo { static readonly MAX = 100; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
@@ -270,7 +274,7 @@ fn test_thin_emit_static_readonly() {
 
     let output = printer.get_output();
     assert!(output.contains("static"), "Output should contain 'static': {}", output);
-    assert!(output.contains("readonly"), "Output should contain 'readonly': {}", output);
+    assert!(!output.contains("readonly"), "JavaScript output should NOT contain 'readonly': {}", output);
     assert!(output.contains("MAX"), "Output should contain 'MAX': {}", output);
 }
 
@@ -305,6 +309,7 @@ fn test_thin_emit_static_get_accessor() {
 
 #[test]
 fn test_thin_emit_call_signature() {
+    // Interfaces are TypeScript-only, so JavaScript emit should be empty
     let source = "interface Callable { (): string; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
@@ -313,14 +318,13 @@ fn test_thin_emit_call_signature() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("interface"), "Output should contain 'interface': {}", output);
-    assert!(output.contains("Callable"), "Output should contain 'Callable': {}", output);
-    assert!(output.contains("():"), "Output should contain '():' for call signature: {}", output);
-    assert!(output.contains("string"), "Output should contain 'string': {}", output);
+    // For JavaScript emit, interface should NOT be in output
+    assert!(!output.contains("interface"), "JavaScript output should NOT contain 'interface': {}", output);
 }
 
 #[test]
 fn test_thin_emit_construct_signature() {
+    // Interfaces are TypeScript-only, so JavaScript emit should be empty
     let source = "interface Factory { new (): MyClass; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
@@ -329,12 +333,13 @@ fn test_thin_emit_construct_signature() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("new"), "Output should contain 'new': {}", output);
-    assert!(output.contains("MyClass"), "Output should contain 'MyClass': {}", output);
+    // For JavaScript emit, interface should NOT be in output
+    assert!(!output.contains("interface"), "JavaScript output should NOT contain 'interface': {}", output);
 }
 
 #[test]
 fn test_thin_emit_readonly_property_signature() {
+    // Interfaces are TypeScript-only, so JavaScript emit should be empty
     let source = "interface Config { readonly name: string; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
@@ -343,13 +348,14 @@ fn test_thin_emit_readonly_property_signature() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("readonly"), "Output should contain 'readonly': {}", output);
-    assert!(output.contains("name"), "Output should contain 'name': {}", output);
-    assert!(output.contains("string"), "Output should contain 'string': {}", output);
+    // For JavaScript emit, interface should NOT be in output
+    assert!(!output.contains("interface"), "JavaScript output should NOT contain 'interface': {}", output);
+    assert!(!output.contains("readonly"), "JavaScript output should NOT contain 'readonly': {}", output);
 }
 
 #[test]
 fn test_thin_emit_readonly_index_signature() {
+    // Interfaces are TypeScript-only, so JavaScript emit should be empty
     let source = "interface ReadonlyMap { readonly [key: string]: number; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
@@ -358,7 +364,7 @@ fn test_thin_emit_readonly_index_signature() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("readonly"), "Output should contain 'readonly': {}", output);
-    assert!(output.contains("["), "Output should contain '[': {}", output);
-    assert!(output.contains("]"), "Output should contain ']': {}", output);
+    // For JavaScript emit, interface should NOT be in output
+    assert!(!output.contains("interface"), "JavaScript output should NOT contain 'interface': {}", output);
+    assert!(!output.contains("readonly"), "JavaScript output should NOT contain 'readonly': {}", output);
 }

@@ -59,7 +59,10 @@ Complete implementation in `wasm/src/solver/`:
 | Baseline | Pass Rate | Blockers |
 |----------|-----------|----------|
 | .errors.txt | **32.5%** (25/77) | Missing function validation, parser errors |
-| .js emit | 0% | Emitter format mismatch |
+| .js emit | 0% | Baselines use ES5 (IIFEs), we emit ES6+ |
+
+**Note**: TypeScript baselines use ES5 target (classes→IIFEs, arrows→functions).
+Our emitter produces modern ES6+ output. ES5 transforms planned for Phase 6.3.
 
 ### Next Steps
 1. ⬜ Function validation errors (2389-2391) for top-level declarations
@@ -80,15 +83,26 @@ Performance analysis complete - see `specs/EMITTER_ANALYSIS.md`:
 - ✅ **TypeScript emitter study** - generator state machine architecture
 - ✅ **Baseline test script** - `scripts/baseline-test-rust.mjs`
 
-### Phase 6.2: Generator Transforms (In Progress)
-- ✅ `function*` syntax and `yield` expressions (emit support)
-- 🔄 State machine generation for ES5 target (`transforms/generators.rs`)
-- ⬜ Iterator protocol compliance (full state machine codegen)
+### Phase 6.2: JavaScript Emit ✅
+- ✅ Strip TypeScript-only syntax for JS output
+- ✅ Skip interface/type declarations
+- ✅ Skip function/method bodies without implementation
+- ✅ Strip type annotations from parameters and variables
+- ✅ Strip `private`/`protected`/`readonly` modifiers
+- ✅ Keep `static`/`async` modifiers for JavaScript
 
-### Phase 6.3: Output Format Matching
+### Phase 6.3: ES5 Transforms (Future)
+TypeScript baselines use ES5 target. Our emitter produces ES6+ output.
+ES5 transforms needed for baseline compatibility:
+- ⬜ Class → IIFE with prototype methods
+- ⬜ Arrow function → regular function
+- ⬜ Generator state machines (`transforms/generators.rs` started)
+- ⬜ Template literals → string concatenation
+
+### Phase 6.4: Output Format Matching
 - ⬜ Match TypeScript baseline whitespace/semicolons
-- ⬜ Source map accuracy
-- ⬜ Declaration file formatting
+- ⬜ Source map generation
+- ⬜ Declaration file formatting (.d.ts emit)
 
 ### Key Files
 | Purpose | Location |

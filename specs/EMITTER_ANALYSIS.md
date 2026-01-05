@@ -444,18 +444,28 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 - [x] TypeScript emitter studied
 - [x] This document created
 
-### Phase 6.2 (Generator Transforms)
-- [ ] Add missing accessors to ThinNodeArena
-- [ ] Implement `get_return_statement`, `get_yield_expr`, etc.
-- [ ] Create `generators.rs` transformer
-- [ ] State machine generation
-- [ ] Control flow handling (break/continue in generators)
+### Phase 6.2 (JavaScript Emit) ✅
+- [x] Add missing accessors to ThinNodeArena (parenthesized, template, yield, await, spread)
+- [x] Fix array type parsing and emission
+- [x] Implement JavaScript emit mode (strip types, interfaces, declarations)
+- [x] Skip TypeScript-only modifiers (private, protected, readonly)
+- [x] Create `generators.rs` transformer (started)
+- [ ] Full state machine generation for ES5 (future)
 
-### Phase 6.3 (Output Format Matching)
-- [ ] Fix object literal multi-line formatting
-- [ ] Fix return statement expression emission
-- [ ] Fix template literal emission
-- [ ] Run baseline-test-rust.mjs and iterate
+### Phase 6.3 (ES5 Transforms - Future)
+TypeScript baselines use ES5 target. Our emitter produces ES6+.
+- [ ] Class → IIFE with prototype methods
+- [ ] Arrow function → regular function
+- [ ] Generator state machines
+- [ ] Template literals → string concatenation
+
+### Phase 6.4 (Output Format Matching)
+- [x] Fix object literal multi-line formatting
+- [x] Fix return statement expression emission
+- [x] Fix template literal emission
+- [x] Fix parenthesized expression emission
+- [ ] Run baseline-test-rust.mjs for ES6+ comparison
+- [ ] Source map generation
 
 ---
 
