@@ -24,7 +24,7 @@ use crate::parser::{
         SwitchData, CaseClauseData, TryData, CatchClauseData,
         EnumData, EnumMemberData,
         ImportDeclData, ImportClauseData, NamedImportsData, SpecifierData,
-        ExportDeclData, QualifiedNameData,
+        ExportDeclData, ExportAssignmentData, QualifiedNameData,
     },
     syntax_kind_ext,
 };
@@ -109,6 +109,13 @@ impl ThinParserState {
     #[inline]
     fn is_token(&self, kind: SyntaxKind) -> bool {
         self.current_token == kind
+    }
+
+    /// Check if current token is an identifier or any keyword
+    /// Keywords can be used as identifiers in many contexts (e.g., class names, property names)
+    #[inline]
+    fn is_identifier_or_keyword(&self) -> bool {
+        self.current_token as u16 >= SyntaxKind::Identifier as u16
     }
 
     /// Parse optional token, returns true if found
@@ -286,10 +293,24 @@ impl ThinParserState {
                     self.parse_expression_statement()
                 }
             }
+            SyntaxKind::AtToken => {
+                // Decorator: @decorator class/function
+                self.parse_decorated_declaration()
+            }
             SyntaxKind::ClassKeyword => self.parse_class_declaration(),
+            SyntaxKind::AbstractKeyword => {
+                // abstract class declaration
+                if self.look_ahead_is_abstract_class() {
+                    self.parse_abstract_class_declaration()
+                } else {
+                    self.parse_expression_statement()
+                }
+            }
             SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
             SyntaxKind::TypeKeyword => self.parse_type_alias_declaration(),
             SyntaxKind::EnumKeyword => self.parse_enum_declaration(),
+            SyntaxKind::DeclareKeyword => self.parse_ambient_declaration(),
+            SyntaxKind::NamespaceKeyword | SyntaxKind::ModuleKeyword => self.parse_module_declaration(),
             SyntaxKind::IfKeyword => self.parse_if_statement(),
             SyntaxKind::ReturnKeyword => self.parse_return_statement(),
             SyntaxKind::WhileKeyword => self.parse_while_statement(),
@@ -320,6 +341,20 @@ impl ThinParserState {
         self.scanner.restore_state(snapshot);
         self.current_token = current;
         is_function
+    }
+
+    /// Look ahead to see if we have "abstract class"
+    fn look_ahead_is_abstract_class(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        // Skip 'abstract'
+        self.next_token();
+        let is_class = self.is_token(SyntaxKind::ClassKeyword);
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_class
     }
 
     /// Look ahead to see if we have "import identifier ="
@@ -561,8 +596,12 @@ impl ThinParserState {
         // Check for generator asterisk
         let asterisk_token = self.parse_optional(SyntaxKind::AsteriskToken);
 
-        // Parse name
-        let name = self.parse_identifier();
+        // Parse name - keywords like 'abstract' can be used as function names
+        let name = if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
+        } else {
+            self.parse_identifier()
+        };
 
         // Parse parameters
         self.parse_expected(SyntaxKind::OpenParenToken);
@@ -576,8 +615,14 @@ impl ThinParserState {
             NodeIndex::NONE
         };
 
-        // Parse body
-        let body = self.parse_block();
+        // Parse body - may be missing for overload signatures (just a semicolon)
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            // Consume the semicolon if present (overload signature)
+            self.parse_optional(SyntaxKind::SemicolonToken);
+            NodeIndex::NONE
+        };
 
         let end_pos = self.token_end();
         self.arena.add_function(
@@ -598,6 +643,117 @@ impl ThinParserState {
         )
     }
 
+    /// Parse function expression: function() {} or function name() {}
+    ///
+    /// Unlike function declarations, function expressions can be anonymous.
+    fn parse_function_expression(&mut self) -> NodeIndex {
+        self.parse_function_expression_with_async(false)
+    }
+
+    /// Parse async function expression: async function() {} or async function name() {}
+    fn parse_async_function_expression(&mut self) -> NodeIndex {
+        self.parse_function_expression_with_async(true)
+    }
+
+    /// Parse function expression with optional async modifier
+    fn parse_function_expression_with_async(&mut self, is_async: bool) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Consume async if present and not already parsed
+        let is_async = is_async || self.parse_optional(SyntaxKind::AsyncKeyword);
+
+        self.parse_expected(SyntaxKind::FunctionKeyword);
+
+        // Check for generator asterisk
+        let asterisk_token = self.parse_optional(SyntaxKind::AsteriskToken);
+
+        // Parse optional name (function expressions can be anonymous)
+        let name = if self.is_token(SyntaxKind::Identifier) {
+            self.parse_identifier()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse parameters
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Parse optional return type
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse body
+        let body = self.parse_block();
+
+        let end_pos = self.token_end();
+        self.arena.add_function(
+            syntax_kind_ext::FUNCTION_EXPRESSION,
+            start_pos,
+            end_pos,
+            FunctionData {
+                modifiers: None,
+                is_async,
+                asterisk_token,
+                name,
+                type_parameters: None,
+                parameters,
+                type_annotation,
+                body,
+                equals_greater_than_token: false,
+            },
+        )
+    }
+
+    /// Parse class expression: class {} or class Name {}
+    ///
+    /// Unlike class declarations, class expressions can be anonymous.
+    fn parse_class_expression(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        self.parse_expected(SyntaxKind::ClassKeyword);
+
+        // Parse optional name (class expressions can be anonymous)
+        let name = if self.is_token(SyntaxKind::Identifier) {
+            self.parse_identifier()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse optional type parameters
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameter_list())
+        } else {
+            None
+        };
+
+        // Parse heritage (extends/implements)
+        let heritage = self.parse_heritage_clauses();
+
+        // Parse body
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+        let members = self.parse_class_members();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end_pos = self.token_end();
+
+        self.arena.add_class(
+            syntax_kind_ext::CLASS_EXPRESSION,
+            start_pos,
+            end_pos,
+            ClassData {
+                modifiers: None,
+                name,
+                type_parameters,
+                heritage_clauses: heritage,
+                members,
+            },
+        )
+    }
+
     /// Parse parameter list
     fn parse_parameter_list(&mut self) -> NodeList {
         let mut params = Vec::new();
@@ -614,10 +770,55 @@ impl ThinParserState {
         self.make_node_list(params)
     }
 
+    /// Check if current token is a parameter modifier
+    fn is_parameter_modifier(&self) -> bool {
+        matches!(
+            self.current_token,
+            SyntaxKind::PublicKeyword
+                | SyntaxKind::PrivateKeyword
+                | SyntaxKind::ProtectedKeyword
+                | SyntaxKind::ReadonlyKeyword
+        )
+    }
+
+    /// Parse parameter modifiers (public, private, protected, readonly)
+    fn parse_parameter_modifiers(&mut self) -> Option<NodeList> {
+        let mut modifiers = Vec::new();
+
+        while self.is_parameter_modifier() {
+            let mod_start = self.token_pos();
+            let mod_kind = self.current_token;
+            self.next_token();
+            let mod_end = self.token_end();
+            modifiers.push(self.arena.add_token(mod_kind as u16, mod_start, mod_end));
+        }
+
+        if modifiers.is_empty() {
+            None
+        } else {
+            Some(self.make_node_list(modifiers))
+        }
+    }
+
     /// Parse a single parameter
     fn parse_parameter(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
-        let name = self.parse_identifier();
+
+        // Parse optional modifiers (public, private, protected, readonly)
+        let modifiers = self.parse_parameter_modifiers();
+
+        // Parse rest parameter (...)
+        let dot_dot_dot_token = self.parse_optional(SyntaxKind::DotDotDotToken);
+
+        // Parse parameter name - can be an identifier or keyword
+        let name = if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
+        } else {
+            self.parse_identifier()
+        };
+
+        // Parse optional question mark
+        let question_token = self.parse_optional(SyntaxKind::QuestionToken);
 
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
             self.parse_type()
@@ -637,10 +838,10 @@ impl ThinParserState {
             start_pos,
             end_pos,
             crate::parser::thin_node::ParameterData {
-                modifiers: None,
-                dot_dot_dot_token: false,
+                modifiers,
+                dot_dot_dot_token,
                 name,
-                question_token: false,
+                question_token,
                 type_annotation,
                 initializer,
             },
@@ -652,14 +853,19 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::ClassKeyword);
 
-        // Parse class name
-        let name = if self.is_token(SyntaxKind::Identifier) {
-            self.parse_identifier()
+        // Parse class name - keywords like 'any', 'string' can be used as class names
+        let name = if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
         } else {
             NodeIndex::NONE
         };
 
-        // TODO: Parse type parameters
+        // Parse type parameters: class Foo<T, U> {}
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
 
         // Parse heritage clauses (extends, implements)
         let heritage_clauses = self.parse_heritage_clauses();
@@ -677,6 +883,229 @@ impl ThinParserState {
             ClassData {
                 modifiers: None,
                 name,
+                type_parameters,
+                heritage_clauses,
+                members,
+            },
+        )
+    }
+
+    /// Parse abstract class declaration: abstract class Foo {}
+    fn parse_abstract_class_declaration(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Create abstract modifier node
+        let abstract_start = self.token_pos();
+        self.parse_expected(SyntaxKind::AbstractKeyword);
+        let abstract_end = self.token_end();
+        let abstract_modifier = self.arena.add_token(
+            SyntaxKind::AbstractKeyword as u16,
+            abstract_start,
+            abstract_end,
+        );
+
+        // Now parse the class
+        self.parse_expected(SyntaxKind::ClassKeyword);
+
+        // Parse class name - keywords like 'any', 'string' can be used as class names
+        let name = if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse type parameters: abstract class Foo<T, U> {}
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        // Parse heritage clauses (extends, implements)
+        let heritage_clauses = self.parse_heritage_clauses();
+
+        // Parse class body
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+        let members = self.parse_class_members();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end_pos = self.token_end();
+        self.arena.add_class(
+            syntax_kind_ext::CLASS_DECLARATION,
+            start_pos,
+            end_pos,
+            ClassData {
+                modifiers: Some(self.make_node_list(vec![abstract_modifier])),
+                name,
+                type_parameters,
+                heritage_clauses,
+                members,
+            },
+        )
+    }
+
+    /// Parse a decorated declaration: @decorator class/function
+    fn parse_decorated_declaration(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Parse decorators
+        let decorators = self.parse_decorators();
+
+        // After decorators, expect class, abstract class, or function
+        match self.token() {
+            SyntaxKind::ClassKeyword => {
+                self.parse_class_declaration_with_decorators(decorators, start_pos)
+            }
+            SyntaxKind::AbstractKeyword => {
+                // abstract class with decorators
+                self.parse_abstract_class_declaration_with_decorators(decorators, start_pos)
+            }
+            SyntaxKind::FunctionKeyword => {
+                // For now, just parse the function and ignore decorators
+                // Full decorator support would need function modifications
+                self.parse_function_declaration()
+            }
+            SyntaxKind::ExportKeyword => {
+                // Export with decorators: @decorator export class Foo {}
+                self.parse_export_declaration()
+            }
+            _ => {
+                // Unexpected - just continue
+                self.parse_expression_statement()
+            }
+        }
+    }
+
+    /// Parse decorators: @decorator1 @decorator2(arg) ...
+    fn parse_decorators(&mut self) -> Option<NodeList> {
+        if !self.is_token(SyntaxKind::AtToken) {
+            return None;
+        }
+
+        let mut decorators = Vec::new();
+
+        while self.is_token(SyntaxKind::AtToken) {
+            if let Some(decorator) = self.try_parse_decorator() {
+                decorators.push(decorator);
+            } else {
+                break;
+            }
+        }
+
+        if decorators.is_empty() {
+            None
+        } else {
+            Some(self.make_node_list(decorators))
+        }
+    }
+
+    /// Try to parse a single decorator
+    fn try_parse_decorator(&mut self) -> Option<NodeIndex> {
+        if !self.is_token(SyntaxKind::AtToken) {
+            return None;
+        }
+
+        let start_pos = self.token_pos();
+        self.next_token(); // consume @
+
+        // Parse the decorator expression (identifier, member access, or call)
+        let expression = self.parse_left_hand_side_expression();
+
+        let end_pos = self.token_end();
+        Some(self.arena.add_decorator(
+            syntax_kind_ext::DECORATOR,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::DecoratorData { expression },
+        ))
+    }
+
+    /// Parse class declaration with pre-parsed decorators
+    fn parse_class_declaration_with_decorators(&mut self, decorators: Option<NodeList>, start_pos: u32) -> NodeIndex {
+        self.parse_expected(SyntaxKind::ClassKeyword);
+
+        // Parse class name
+        let name = if self.is_token(SyntaxKind::Identifier) {
+            self.parse_identifier()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse heritage clauses (extends, implements)
+        let heritage_clauses = self.parse_heritage_clauses();
+
+        // Parse class body
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+        let members = self.parse_class_members();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end_pos = self.token_end();
+
+        // Create a modifiers list from decorators
+        // In TypeScript, decorators are part of the modifiers
+        self.arena.add_class(
+            syntax_kind_ext::CLASS_DECLARATION,
+            start_pos,
+            end_pos,
+            ClassData {
+                modifiers: decorators,
+                name,
+                type_parameters: None,
+                heritage_clauses,
+                members,
+            },
+        )
+    }
+
+    /// Parse abstract class declaration with pre-parsed decorators
+    fn parse_abstract_class_declaration_with_decorators(&mut self, decorators: Option<NodeList>, start_pos: u32) -> NodeIndex {
+        // Create abstract modifier node
+        let abstract_start = self.token_pos();
+        self.parse_expected(SyntaxKind::AbstractKeyword);
+        let abstract_end = self.token_end();
+        let abstract_modifier = self.arena.add_token(
+            SyntaxKind::AbstractKeyword as u16,
+            abstract_start,
+            abstract_end,
+        );
+
+        // Now parse the class
+        self.parse_expected(SyntaxKind::ClassKeyword);
+
+        // Parse class name
+        let name = if self.is_token(SyntaxKind::Identifier) {
+            self.parse_identifier()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse heritage clauses (extends, implements)
+        let heritage_clauses = self.parse_heritage_clauses();
+
+        // Parse class body
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+        let members = self.parse_class_members();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end_pos = self.token_end();
+
+        // Combine decorators with abstract modifier
+        let modifiers = if let Some(dec_list) = decorators {
+            // Add abstract modifier to decorator list
+            let mut nodes: Vec<NodeIndex> = dec_list.nodes.clone();
+            nodes.push(abstract_modifier);
+            Some(self.make_node_list(nodes))
+        } else {
+            Some(self.make_node_list(vec![abstract_modifier]))
+        };
+
+        self.arena.add_class(
+            syntax_kind_ext::CLASS_DECLARATION,
+            start_pos,
+            end_pos,
+            ClassData {
+                modifiers,
+                name,
                 type_parameters: None,
                 heritage_clauses,
                 members,
@@ -692,7 +1121,7 @@ impl ThinParserState {
         if self.is_token(SyntaxKind::ExtendsKeyword) {
             let start_pos = self.token_pos();
             self.next_token();
-            let type_ref = self.parse_expression(); // Simple: just parse as expression
+            let type_ref = self.parse_heritage_type_reference();
             let end_pos = self.token_end();
 
             // Create heritage clause node
@@ -715,7 +1144,7 @@ impl ThinParserState {
 
             let mut types = Vec::new();
             loop {
-                let type_ref = self.parse_expression();
+                let type_ref = self.parse_heritage_type_reference();
                 types.push(type_ref);
                 if !self.parse_optional(SyntaxKind::CommaToken) {
                     break;
@@ -742,6 +1171,274 @@ impl ThinParserState {
         }
     }
 
+    /// Parse a heritage type reference: Foo or Foo<T> or Foo.Bar<T>
+    /// This is used in extends/implements clauses
+    fn parse_heritage_type_reference(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Parse the base expression (could be Foo or Foo.Bar.Baz)
+        // We parse it as a left-hand-side expression to support property access
+        let expression = self.parse_heritage_left_hand_expression();
+
+        // Parse optional type arguments: <T, U>
+        if self.is_token(SyntaxKind::LessThanToken) {
+            self.next_token();
+            let mut type_args = Vec::new();
+
+            while !self.is_token(SyntaxKind::GreaterThanToken)
+                && !self.is_token(SyntaxKind::EndOfFileToken)
+            {
+                let type_arg = self.parse_type();
+                type_args.push(type_arg);
+
+                if !self.parse_optional(SyntaxKind::CommaToken) {
+                    break;
+                }
+            }
+
+            self.parse_expected(SyntaxKind::GreaterThanToken);
+
+            // Create expression with type arguments
+            let end_pos = self.token_end();
+            return self.arena.add_expr_with_type_args(
+                syntax_kind_ext::EXPRESSION_WITH_TYPE_ARGUMENTS,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::ExprWithTypeArgsData {
+                    expression,
+                    type_arguments: Some(self.make_node_list(type_args)),
+                },
+            );
+        }
+
+        expression
+    }
+
+    /// Parse left-hand expression for heritage clauses: Foo, Foo.Bar, or Mixin(Parent)
+    /// This is a subset of member expression that allows identifiers, dots, and call expressions
+    fn parse_heritage_left_hand_expression(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Start with identifier
+        let mut expr = if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
+        } else {
+            self.parse_identifier()
+        };
+
+        // Handle property access chain and call expressions: Foo.Bar.Baz or Mixin(Parent)
+        loop {
+            if self.is_token(SyntaxKind::DotToken) {
+                self.next_token();
+                let name = if self.is_identifier_or_keyword() {
+                    self.parse_identifier_name()
+                } else {
+                    self.parse_identifier()
+                };
+
+                let end_pos = self.token_end();
+                expr = self.arena.add_access_expr(
+                    syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION,
+                    start_pos,
+                    end_pos,
+                    crate::parser::thin_node::AccessExprData {
+                        expression: expr,
+                        name_or_argument: name,
+                        question_dot_token: false,
+                    },
+                );
+            } else if self.is_token(SyntaxKind::OpenParenToken) {
+                // Call expression: Mixin(Parent)
+                self.next_token();
+                let mut args = Vec::new();
+                while !self.is_token(SyntaxKind::CloseParenToken)
+                    && !self.is_token(SyntaxKind::EndOfFileToken)
+                {
+                    let arg = self.parse_assignment_expression();
+                    args.push(arg);
+                    if !self.parse_optional(SyntaxKind::CommaToken) {
+                        break;
+                    }
+                }
+                self.parse_expected(SyntaxKind::CloseParenToken);
+
+                let end_pos = self.token_end();
+                expr = self.arena.add_call_expr(
+                    syntax_kind_ext::CALL_EXPRESSION,
+                    start_pos,
+                    end_pos,
+                    crate::parser::thin_node::CallExprData {
+                        expression: expr,
+                        type_arguments: None,
+                        arguments: Some(self.make_node_list(args)),
+                    },
+                );
+            } else {
+                break;
+            }
+        }
+
+        expr
+    }
+
+    /// Parse class member modifiers (static, public, private, protected, readonly, abstract, override)
+    fn parse_class_member_modifiers(&mut self) -> Option<NodeList> {
+        let mut modifiers = Vec::new();
+
+        loop {
+            let start_pos = self.token_pos();
+            let modifier = match self.token() {
+                SyntaxKind::StaticKeyword => {
+                    self.next_token();
+                    self.arena.create_modifier(SyntaxKind::StaticKeyword, start_pos)
+                }
+                SyntaxKind::PublicKeyword => {
+                    self.next_token();
+                    self.arena.create_modifier(SyntaxKind::PublicKeyword, start_pos)
+                }
+                SyntaxKind::PrivateKeyword => {
+                    self.next_token();
+                    self.arena.create_modifier(SyntaxKind::PrivateKeyword, start_pos)
+                }
+                SyntaxKind::ProtectedKeyword => {
+                    self.next_token();
+                    self.arena.create_modifier(SyntaxKind::ProtectedKeyword, start_pos)
+                }
+                SyntaxKind::ReadonlyKeyword => {
+                    self.next_token();
+                    self.arena.create_modifier(SyntaxKind::ReadonlyKeyword, start_pos)
+                }
+                SyntaxKind::AbstractKeyword => {
+                    self.next_token();
+                    self.arena.create_modifier(SyntaxKind::AbstractKeyword, start_pos)
+                }
+                SyntaxKind::OverrideKeyword => {
+                    self.next_token();
+                    self.arena.create_modifier(SyntaxKind::OverrideKeyword, start_pos)
+                }
+                SyntaxKind::AsyncKeyword => {
+                    self.next_token();
+                    self.arena.create_modifier(SyntaxKind::AsyncKeyword, start_pos)
+                }
+                SyntaxKind::DeclareKeyword => {
+                    self.next_token();
+                    self.arena.create_modifier(SyntaxKind::DeclareKeyword, start_pos)
+                }
+                _ => break,
+            };
+            modifiers.push(modifier);
+        }
+
+        if modifiers.is_empty() {
+            None
+        } else {
+            Some(self.make_node_list(modifiers))
+        }
+    }
+
+    /// Parse constructor with modifiers
+    fn parse_constructor_with_modifiers(&mut self, modifiers: Option<NodeList>) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::ConstructorKeyword);
+
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_constructor(
+            syntax_kind_ext::CONSTRUCTOR,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::ConstructorData {
+                modifiers,
+                type_parameters: None,
+                parameters,
+                body,
+            },
+        )
+    }
+
+    /// Parse get accessor with modifiers: static get foo() { }
+    fn parse_get_accessor_with_modifiers(&mut self, modifiers: Option<NodeList>, start_pos: u32) -> NodeIndex {
+        self.parse_expected(SyntaxKind::GetKeyword);
+
+        let name = self.parse_property_name();
+
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Optional return type
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse body (may be empty for ambient declarations)
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            self.parse_semicolon();
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_accessor(
+            syntax_kind_ext::GET_ACCESSOR,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::AccessorData {
+                modifiers,
+                name,
+                type_parameters: None,
+                parameters: self.make_node_list(vec![]),
+                type_annotation,
+                body,
+            },
+        )
+    }
+
+    /// Parse set accessor with modifiers: static set foo(value) { }
+    fn parse_set_accessor_with_modifiers(&mut self, modifiers: Option<NodeList>, start_pos: u32) -> NodeIndex {
+        self.parse_expected(SyntaxKind::SetKeyword);
+
+        let name = self.parse_property_name();
+
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Parse body (may be empty for ambient declarations)
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            self.parse_semicolon();
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_accessor(
+            syntax_kind_ext::SET_ACCESSOR,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::AccessorData {
+                modifiers,
+                name,
+                type_parameters: None,
+                parameters,
+                type_annotation: NodeIndex::NONE,
+                body,
+            },
+        )
+    }
+
     /// Parse class members
     fn parse_class_members(&mut self) -> NodeList {
         let mut members = Vec::new();
@@ -764,16 +1461,32 @@ impl ThinParserState {
     fn parse_class_member(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
 
+        // Parse modifiers (static, public, private, protected, readonly, abstract, override)
+        let modifiers = self.parse_class_member_modifiers();
+
         // Handle constructor
         if self.is_token(SyntaxKind::ConstructorKeyword) {
-            return self.parse_constructor();
+            return self.parse_constructor_with_modifiers(modifiers);
+        }
+
+        // Handle get accessor: get foo() { }
+        if self.is_token(SyntaxKind::GetKeyword) && self.look_ahead_is_accessor() {
+            return self.parse_get_accessor_with_modifiers(modifiers, start_pos);
+        }
+
+        // Handle set accessor: set foo(value) { }
+        if self.is_token(SyntaxKind::SetKeyword) && self.look_ahead_is_accessor() {
+            return self.parse_set_accessor_with_modifiers(modifiers, start_pos);
         }
 
         // Handle methods and properties
         // For now, just parse name and check for ( for methods
         let name = if self.is_token(SyntaxKind::Identifier) ||
                      self.is_token(SyntaxKind::StringLiteral) ||
-                     self.is_token(SyntaxKind::NumericLiteral) {
+                     self.is_token(SyntaxKind::NumericLiteral) ||
+                     self.is_token(SyntaxKind::GetKeyword) ||
+                     self.is_token(SyntaxKind::SetKeyword) ||
+                     self.is_token(SyntaxKind::OpenBracketToken) {
             self.parse_property_name()
         } else {
             // Skip unknown token
@@ -808,7 +1521,7 @@ impl ThinParserState {
                 start_pos,
                 end_pos,
                 crate::parser::thin_node::MethodDeclData {
-                    modifiers: None,
+                    modifiers,
                     asterisk_token: false,
                     name,
                     question_token: false,
@@ -838,7 +1551,7 @@ impl ThinParserState {
                 start_pos,
                 end_pos,
                 crate::parser::thin_node::PropertyDeclData {
-                    modifiers: None,
+                    modifiers,
                     name,
                     question_token: false,
                     exclamation_token: false,
@@ -878,15 +1591,119 @@ impl ThinParserState {
         )
     }
 
+    /// Look ahead to see if we have an accessor (get/set followed by property name and ()
+    fn look_ahead_is_accessor(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        // Skip 'get' or 'set'
+        self.next_token();
+
+        // Check for property name (identifier, string, number, or computed)
+        let has_name = self.is_token(SyntaxKind::Identifier) ||
+                       self.is_token(SyntaxKind::StringLiteral) ||
+                       self.is_token(SyntaxKind::NumericLiteral) ||
+                       self.is_token(SyntaxKind::OpenBracketToken);
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        has_name
+    }
+
+    /// Parse get accessor: get foo() { return value; }
+    fn parse_get_accessor(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::GetKeyword);
+
+        let name = self.parse_property_name();
+
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Optional return type
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse body (may be empty for ambient declarations)
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            self.parse_semicolon();
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_accessor(
+            syntax_kind_ext::GET_ACCESSOR,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::AccessorData {
+                modifiers: None,
+                name,
+                type_parameters: None,
+                parameters: self.make_node_list(vec![]),
+                type_annotation,
+                body,
+            },
+        )
+    }
+
+    /// Parse set accessor: set foo(value) { this.value = value; }
+    fn parse_set_accessor(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::SetKeyword);
+
+        let name = self.parse_property_name();
+
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Parse body (may be empty for ambient declarations)
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            self.parse_semicolon();
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_accessor(
+            syntax_kind_ext::SET_ACCESSOR,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::AccessorData {
+                modifiers: None,
+                name,
+                type_parameters: None,
+                parameters,
+                type_annotation: NodeIndex::NONE,
+                body,
+            },
+        )
+    }
+
     /// Parse interface declaration
     fn parse_interface_declaration(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::InterfaceKeyword);
 
-        // Parse interface name
-        let name = self.parse_identifier();
+        // Parse interface name - keywords like 'string', 'abstract' can be used as interface names
+        let name = if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
+        } else {
+            self.parse_identifier()
+        };
 
-        // TODO: Parse type parameters
+        // Parse type parameters: interface IList<T> {}
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
 
         // Parse heritage clauses (extends only for interfaces)
         let heritage_clauses = if self.is_token(SyntaxKind::ExtendsKeyword) {
@@ -930,7 +1747,7 @@ impl ThinParserState {
             crate::parser::thin_node::InterfaceData {
                 modifiers: None,
                 name,
-                type_parameters: None,
+                type_parameters,
                 heritage_clauses,
                 members,
             },
@@ -962,9 +1779,32 @@ impl ThinParserState {
         self.make_node_list(members)
     }
 
-    /// Parse a single type member (property signature or method signature)
+    /// Parse a single type member (property signature, method signature, call signature, construct signature)
     fn parse_type_member(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+
+        // Handle call signature: (): returnType
+        if self.is_token(SyntaxKind::OpenParenToken) {
+            return self.parse_call_signature(start_pos);
+        }
+
+        // Handle construct signature: new (): returnType
+        if self.is_token(SyntaxKind::NewKeyword) {
+            return self.parse_construct_signature(start_pos);
+        }
+
+        // Handle get accessor: get foo(): type { } (error: body in type context)
+        if self.is_token(SyntaxKind::GetKeyword) {
+            return self.parse_get_accessor_signature(start_pos);
+        }
+
+        // Handle set accessor: set foo(v: type) { } (error: body in type context)
+        if self.is_token(SyntaxKind::SetKeyword) {
+            return self.parse_set_accessor_signature(start_pos);
+        }
+
+        // Parse optional readonly modifier
+        let readonly = self.parse_optional(SyntaxKind::ReadonlyKeyword);
 
         // Parse property/method name
         let name = if self.is_token(SyntaxKind::Identifier) ||
@@ -972,14 +1812,22 @@ impl ThinParserState {
                      self.is_token(SyntaxKind::NumericLiteral) {
             self.parse_property_name()
         } else if self.is_token(SyntaxKind::OpenBracketToken) {
-            // Index signature: [key: string]: value
-            return self.parse_index_signature();
+            // Index signature: [key: string]: value (possibly with readonly)
+            return self.parse_index_signature_with_readonly(readonly, start_pos);
         } else {
             return NodeIndex::NONE;
         };
 
         // Optional question mark
         let question_token = self.parse_optional(SyntaxKind::QuestionToken);
+
+        // Build modifiers list if readonly was present
+        let modifiers = if readonly {
+            let mod_idx = self.arena.create_modifier(SyntaxKind::ReadonlyKeyword, start_pos);
+            Some(self.make_node_list(vec![mod_idx]))
+        } else {
+            None
+        };
 
         // Check if it's a method signature or property signature
         if self.is_token(SyntaxKind::OpenParenToken) {
@@ -1000,7 +1848,7 @@ impl ThinParserState {
                 start_pos,
                 end_pos,
                 crate::parser::thin_node::SignatureData {
-                    modifiers: None,
+                    modifiers,
                     name,
                     question_token,
                     type_parameters: None,
@@ -1022,7 +1870,7 @@ impl ThinParserState {
                 start_pos,
                 end_pos,
                 crate::parser::thin_node::SignatureData {
-                    modifiers: None,
+                    modifiers,
                     name,
                     question_token,
                     type_parameters: None,
@@ -1033,9 +1881,75 @@ impl ThinParserState {
         }
     }
 
+    /// Parse call signature: (): returnType or <T>(): returnType
+    fn parse_call_signature(&mut self, start_pos: u32) -> NodeIndex {
+        // TODO: Parse type parameters if present
+
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_signature(
+            syntax_kind_ext::CALL_SIGNATURE,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::SignatureData {
+                modifiers: None,
+                name: NodeIndex::NONE,
+                question_token: false,
+                type_parameters: None,
+                parameters: Some(parameters),
+                type_annotation,
+            },
+        )
+    }
+
+    /// Parse construct signature: new (): returnType or new <T>(): returnType
+    fn parse_construct_signature(&mut self, start_pos: u32) -> NodeIndex {
+        self.parse_expected(SyntaxKind::NewKeyword);
+
+        // TODO: Parse type parameters if present
+
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_signature(
+            syntax_kind_ext::CONSTRUCT_SIGNATURE,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::SignatureData {
+                modifiers: None,
+                name: NodeIndex::NONE,
+                question_token: false,
+                type_parameters: None,
+                parameters: Some(parameters),
+                type_annotation,
+            },
+        )
+    }
+
     /// Parse index signature: [key: string]: value
     fn parse_index_signature(&mut self) -> NodeIndex {
-        let start_pos = self.token_pos();
+        self.parse_index_signature_with_readonly(false, self.token_pos())
+    }
+
+    /// Parse index signature with optional readonly modifier: readonly [key: string]: value
+    fn parse_index_signature_with_readonly(&mut self, readonly: bool, start_pos: u32) -> NodeIndex {
         self.parse_expected(SyntaxKind::OpenBracketToken);
 
         // Parse parameter
@@ -1048,15 +1962,96 @@ impl ThinParserState {
 
         let type_annotation = self.parse_type();
 
+        // Build modifiers list if readonly was present
+        let modifiers = if readonly {
+            let mod_idx = self.arena.create_modifier(SyntaxKind::ReadonlyKeyword, start_pos);
+            Some(self.make_node_list(vec![mod_idx]))
+        } else {
+            None
+        };
+
         let end_pos = self.token_end();
         self.arena.add_index_signature(
             syntax_kind_ext::INDEX_SIGNATURE,
             start_pos,
             end_pos,
             crate::parser::thin_node::IndexSignatureData {
-                modifiers: None,
+                modifiers,
                 parameters: self.make_node_list(vec![param_name]),
                 type_annotation,
+            },
+        )
+    }
+
+    /// Parse get accessor signature in type context: get foo(): type
+    /// Note: TypeScript allows bodies here (which is an error), so we parse them for error recovery
+    fn parse_get_accessor_signature(&mut self, start_pos: u32) -> NodeIndex {
+        self.parse_expected(SyntaxKind::GetKeyword);
+
+        let name = self.parse_property_name();
+
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse body if present (this is an error in type context, but we handle it)
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_accessor(
+            syntax_kind_ext::GET_ACCESSOR,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::AccessorData {
+                modifiers: None,
+                name,
+                type_parameters: None,
+                parameters: self.make_node_list(vec![]),
+                type_annotation,
+                body,
+            },
+        )
+    }
+
+    /// Parse set accessor signature in type context: set foo(v: type)
+    /// Note: TypeScript allows bodies here (which is an error), so we parse them for error recovery
+    fn parse_set_accessor_signature(&mut self, start_pos: u32) -> NodeIndex {
+        self.parse_expected(SyntaxKind::SetKeyword);
+
+        let name = self.parse_property_name();
+
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Parse body if present (this is an error in type context, but we handle it)
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_accessor(
+            syntax_kind_ext::SET_ACCESSOR,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::AccessorData {
+                modifiers: None,
+                name,
+                type_parameters: None,
+                parameters,
+                type_annotation: NodeIndex::NONE,
+                body,
             },
         )
     }
@@ -1150,6 +2145,118 @@ impl ThinParserState {
         }
 
         self.make_node_list(members)
+    }
+
+    // =========================================================================
+    // Module/Namespace Declarations
+    // =========================================================================
+
+    /// Parse ambient declaration: declare ...
+    fn parse_ambient_declaration(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::DeclareKeyword);
+
+        // Parse the declaration after 'declare'
+        match self.current_token {
+            SyntaxKind::FunctionKeyword => self.parse_function_declaration(),
+            SyntaxKind::ClassKeyword => self.parse_class_declaration(),
+            SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
+            SyntaxKind::TypeKeyword => self.parse_type_alias_declaration(),
+            SyntaxKind::EnumKeyword => self.parse_enum_declaration(),
+            SyntaxKind::ConstKeyword | SyntaxKind::VarKeyword | SyntaxKind::LetKeyword => {
+                self.parse_variable_statement()
+            }
+            SyntaxKind::ModuleKeyword | SyntaxKind::NamespaceKeyword => {
+                self.parse_module_declaration()
+            }
+            SyntaxKind::GlobalKeyword => {
+                // declare global { }
+                self.parse_module_declaration()
+            }
+            _ => {
+                // Unknown ambient declaration, parse as expression
+                self.parse_expression_statement()
+            }
+        }
+    }
+
+    /// Parse module or namespace declaration: module "name" { } or namespace X { }
+    fn parse_module_declaration(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Skip module/namespace/global keyword
+        let is_global = self.is_token(SyntaxKind::GlobalKeyword);
+        self.next_token();
+
+        // Parse name - can be identifier or string literal
+        let name = if self.is_token(SyntaxKind::StringLiteral) {
+            self.parse_string_literal()
+        } else {
+            self.parse_module_name()
+        };
+
+        // Parse body
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_module_block()
+        } else if self.is_token(SyntaxKind::DotToken) {
+            // Nested module: module A.B.C { }
+            self.next_token();
+            self.parse_module_declaration()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+
+        self.arena.add_module(
+            syntax_kind_ext::MODULE_DECLARATION,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::ModuleData {
+                modifiers: None,
+                name,
+                body,
+            },
+        )
+    }
+
+    /// Parse module name (can be dotted: A.B.C)
+    fn parse_module_name(&mut self) -> NodeIndex {
+        let mut left = self.parse_identifier();
+
+        while self.is_token(SyntaxKind::DotToken) {
+            self.next_token();
+            let right = self.parse_identifier();
+            let start = if let Some(n) = self.arena.get(left) { n.pos } else { 0 };
+            let end = self.token_end();
+
+            left = self.arena.add_qualified_name(
+                syntax_kind_ext::QUALIFIED_NAME,
+                start,
+                end,
+                QualifiedNameData { left, right },
+            );
+        }
+
+        left
+    }
+
+    /// Parse module block: { statements }
+    fn parse_module_block(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+
+        let statements = self.parse_statements();
+
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+        let end_pos = self.token_end();
+
+        self.arena.add_module_block(
+            syntax_kind_ext::MODULE_BLOCK,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::ModuleBlockData { statements: Some(statements) },
+        )
     }
 
     // =========================================================================
@@ -1366,6 +2473,11 @@ impl ThinParserState {
             return self.parse_export_default(start_pos);
         }
 
+        // export import X = Y (re-export of import equals)
+        if self.is_token(SyntaxKind::ImportKeyword) {
+            return self.parse_export_import_equals(start_pos);
+        }
+
         // export * from "mod"
         if self.is_token(SyntaxKind::AsteriskToken) {
             return self.parse_export_star(start_pos, is_type_only);
@@ -1376,8 +2488,55 @@ impl ThinParserState {
             return self.parse_export_named(start_pos, is_type_only);
         }
 
+        // export = expression (CommonJS-style export)
+        if self.is_token(SyntaxKind::EqualsToken) {
+            return self.parse_export_assignment(start_pos);
+        }
+
         // export function/class/const/let/var/interface/type/enum
         self.parse_export_declaration_or_statement(start_pos)
+    }
+
+    /// Parse export import X = Y (re-export of import equals declaration)
+    fn parse_export_import_equals(&mut self, start_pos: u32) -> NodeIndex {
+        // Parse the import equals declaration
+        let import_decl = self.parse_import_equals_declaration();
+
+        let end_pos = self.token_end();
+
+        // Wrap in an export declaration
+        self.arena.add_export_decl(
+            syntax_kind_ext::EXPORT_DECLARATION,
+            start_pos,
+            end_pos,
+            ExportDeclData {
+                modifiers: None,
+                is_type_only: false,
+                export_clause: import_decl,
+                module_specifier: NodeIndex::NONE,
+                attributes: NodeIndex::NONE,
+            },
+        )
+    }
+
+    /// Parse export = expression (CommonJS-style default export)
+    fn parse_export_assignment(&mut self, start_pos: u32) -> NodeIndex {
+        self.parse_expected(SyntaxKind::EqualsToken);
+        let expression = self.parse_assignment_expression();
+        self.parse_semicolon();
+
+        let end_pos = self.token_end();
+
+        self.arena.add_export_assignment(
+            syntax_kind_ext::EXPORT_ASSIGNMENT,
+            start_pos,
+            end_pos,
+            ExportAssignmentData {
+                modifiers: None,
+                is_export_equals: true,
+                expression,
+            },
+        )
     }
 
     /// Parse export default
@@ -2313,6 +3472,17 @@ impl ThinParserState {
             SyntaxKind::OpenBracketToken => self.parse_array_literal(),
             SyntaxKind::OpenBraceToken => self.parse_object_literal(),
             SyntaxKind::NewKeyword => self.parse_new_expression(),
+            SyntaxKind::FunctionKeyword => self.parse_function_expression(),
+            SyntaxKind::ClassKeyword => self.parse_class_expression(),
+            SyntaxKind::AsyncKeyword => {
+                // async function expression or async arrow function
+                if self.look_ahead_is_async_function() {
+                    self.parse_async_function_expression()
+                } else {
+                    // Could be an async arrow function, parse as identifier for now
+                    self.parse_identifier()
+                }
+            }
             SyntaxKind::LessThanToken => self.parse_jsx_element_or_self_closing_or_fragment(true),
             _ => {
                 // Unknown primary expression - create an error token
@@ -2333,6 +3503,33 @@ impl ThinParserState {
         let text = self.scanner.get_token_value_ref().to_string();
         self.identifiers.push(text.clone());
         self.parse_expected(SyntaxKind::Identifier);
+        let end_pos = self.token_end();
+
+        self.arena.add_identifier(
+            SyntaxKind::Identifier as u16,
+            start_pos,
+            end_pos,
+            IdentifierData {
+                escaped_text: text,
+                original_text: None,
+                type_arguments: None,
+            },
+        )
+    }
+
+    /// Parse identifier name - allows keywords to be used as identifiers
+    /// This is used in contexts where keywords are valid identifier names
+    /// (e.g., class names, property names, function names)
+    fn parse_identifier_name(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        let text = self.scanner.get_token_value_ref().to_string();
+        self.identifiers.push(text.clone());
+
+        if self.is_identifier_or_keyword() {
+            self.next_token();
+        } else {
+            self.parse_error_at_current_token("Expected identifier");
+        }
         let end_pos = self.token_end();
 
         self.arena.add_identifier(
@@ -4013,6 +5210,166 @@ mod tests {
     }
 
     #[test]
+    fn test_thin_parser_class_extends_call() {
+        // Class extends a mixin call
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Child extends Mixin(Parent) {}".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_class_extends_property_access() {
+        // Class extends a property access
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Child extends Base.Parent {}".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_decorator_class() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "@Component class Foo {}".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_decorator_with_call() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "@Component({ selector: 'app' }) class AppComponent {}".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_multiple_decorators() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "@Component @Injectable class Service {}".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_decorator_abstract_class() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "@Serializable abstract class Base {}".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_class_extends_and_implements() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo extends Base implements A, B, C {}".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_abstract_class() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "abstract class Base { abstract method(): void; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_abstract_class_in_iife() {
+        // This was causing crashes before - abstract class inside IIFE
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "(function() { abstract class Foo {} return Foo; })()".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        // Should parse without crashing
+    }
+
+    #[test]
+    fn test_thin_parser_get_accessor() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { get value(): number { return 42; } }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_set_accessor() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { set value(v: number) { this._v = v; } }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_empty_accessor_body() {
+        // Empty accessor body edge case (for ambient declarations)
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "declare class Foo { get value(): number; set value(v: number); }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        // Should parse without crashing
+    }
+
+    #[test]
+    fn test_thin_parser_get_set_pair() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { private _x: number = 0; get x() { return this._x; } set x(v) { this._x = v; } }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
     fn test_thin_parser_memory_efficiency() {
         // Verify that ThinParserState uses less memory per node
         let source = "let x = 1 + 2 + 3 + 4 + 5;".to_string();
@@ -4103,6 +5460,30 @@ mod tests {
         let mut parser = ThinParserState::new(
             "test.ts".to_string(),
             "interface StringMap { [key: string]: string; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_readonly_index_signature() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "interface ReadonlyMap { readonly [key: string]: string; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_readonly_property_signature() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "interface Config { readonly name: string; readonly value: number; }".to_string(),
         );
         let root = parser.parse_source_file();
 
@@ -5198,6 +6579,460 @@ mod tests {
         let mut parser = ThinParserState::new(
             "test.ts".to_string(),
             r#"export * from "foo";"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    // =========================================================================
+    // Additional tests for common TypeScript patterns
+    // =========================================================================
+
+    #[test]
+    fn test_thin_parser_static_members() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { static count: number = 0; static increment() { Foo.count++; } }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        // May have diagnostics for static but should parse
+    }
+
+    #[test]
+    fn test_thin_parser_private_protected() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { private x: number; protected y: string; public z: boolean; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_readonly() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { readonly name: string; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_constructor_parameter_properties() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Person { constructor(public name: string, private age: number) {} }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_optional_chaining() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "let x = obj?.prop?.method?.()".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_nullish_coalescing() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "let x = a ?? b ?? c".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_type_predicate() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "function isString(x: any): x is string { return typeof x === 'string'; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_mapped_type() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "type Readonly<T> = { readonly [K in keyof T]: T[K] }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_conditional_type() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "type IsString<T> = T extends string ? true : false".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_infer_type_complex() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_rest_spread() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "function foo(...args: number[]) { let [first, ...rest] = args; return [...rest, first]; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_destructuring_default() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "let { x = 1, y = 2 } = obj; let [a = 1, b = 2] = arr;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_computed_property() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "let obj = { [key]: value, ['computed']: 42 }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_symbol_property() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "let obj = { [Symbol.iterator]() { } }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_bigint_literal() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "let x: bigint = 123n; let y = 0xFFn;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_numeric_separator() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "let x = 1_000_000; let y = 0xFF_FF_FF;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_private_identifier() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { #privateField = 1; #privateMethod() {} }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_satisfies() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "const obj = { x: 1, y: 2 } satisfies Record<string, number>".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_using_declaration() {
+        // ECMAScript explicit resource management
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "using file = openFile(); await using conn = getConnection();".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+    }
+
+    #[test]
+    fn test_thin_parser_static_property() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { static count = 0; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_static_method() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { static create(): Foo { return new Foo(); } }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_private_property() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { private secret: string = 'hidden'; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_protected_method() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Base { protected init(): void {} }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_readonly_property() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { readonly id: number = 1; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_public_constructor() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { public constructor(x: number) {} }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_static_get_accessor() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { static get instance(): Foo { return _instance; } }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_private_set_accessor() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { private set value(v: number) { this._value = v; } }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_multiple_modifiers() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { static readonly MAX_SIZE: number = 100; private static instance: Foo; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_override_method() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Child extends Parent { override doSomething(): void {} }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_async_method() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "class Foo { async fetchData(): Promise<void> {} }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_abstract_method_in_class() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "abstract class Shape { abstract getArea(): number; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_call_signature() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "interface Callable { (): string; (x: number): number; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_construct_signature() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "interface Constructable { new (): MyClass; new (x: number): MyClass; }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_interface_with_call_and_construct() {
+        // This is a common pattern for class constructors
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            r#"interface FooConstructor {
+                new (): Foo;
+                prototype: Foo;
+            }
+            interface Foo {
+                (): string;
+                bar(key: string): string;
+            }"#.to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_type_literal_with_call_signature() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "type Fn = { (): void; message: string }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_accessor_signature_in_type() {
+        // Accessor signatures in type context (allowed syntactically)
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "type A = { get foo(): number; set foo(v: number); }".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_accessor_body_in_type_context() {
+        // Accessor bodies in type context (error recovery - bodies not allowed but should parse)
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "type A = { get foo() { return 0 } };".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        // Should parse (checker will report error about body)
+        assert!(!root.is_none());
+        // Parser may report an error about unexpected token, but should recover
+    }
+
+    #[test]
+    fn test_thin_parser_interface_accessor_signature() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "interface X { get foo(): number; set foo(v: number); }".to_string(),
         );
         let root = parser.parse_source_file();
 

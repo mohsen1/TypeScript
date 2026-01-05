@@ -392,6 +392,133 @@ Type enum is already well-optimized at **48 bytes** (vs Node's 208 bytes):
 - [ ] Formatting engine
 - [ ] Code fixes and refactorings
 
+## Phase 7.5: Query-Based Structural Solver (The "New Engine") - ✅ INTEGRATED (Session 21)
+
+See more details about this idea in `specs/NEW_ENGINE.md`
+
+`docs/TYPESCRIPT_LANGUAGE_SPECIFICATION.md` and `docs/TYPESCRIPT_ADVANCED_TYPES.md` can be helpful for learning TS type system
+
+**Goal:** Replace the legacy imperative checker with a declarative, query-based solver architecture.
+
+This represents a strategic pivot from "porting" `checker.ts` to "architecting" a proper structural logic engine. This solves the "Infinite Recursion" problem of structural typing via explicit coinductive cycle tracking and enables fine-grained parallelism.
+
+### ✅ Integration Complete (Session 21 - 2026-01-05)
+
+The solver module is now **fully integrated** into thin_checker!
+
+**What Was Done:**
+1. ✅ Replaced `checker::TypeArena` with `solver::TypeInterner` in ThinCheckerState
+2. ✅ Replaced `checker::types::TypeId` with `solver::types::TypeId`
+3. ✅ All type operations now use compile-time constant TypeIds (O(1) lookup)
+4. ✅ Type creation uses TypeInterner methods (array, union, function, object)
+5. ✅ Updated parallel.rs to use solver::TypeId
+6. ✅ Added new ThinNodeArena accessors for type lowering
+7. ✅ Full type lowering in solver/lower.rs
+8. ✅ 853 tests passing
+
+**Architecture (After Integration):**
+```
+ThinParser → ThinNodeArena → ThinBinder → ThinChecker → TypeInterner → TypeId
+                                              ↓
+                                         Uses solver::TypeInterner
+                                         O(1) type equality via interning
+```
+
+**Key Benefits Now Active:**
+- O(1) type equality (just compare u32 values)
+- Compile-time constant TypeIds for intrinsics (TypeId::NUMBER = 9)
+- Automatic union/intersection normalization via TypeInterner
+- Structural deduplication (same structure = same TypeId)
+- Ready for coinductive subtype checking
+
+### ✅ Remaining Work (Completed Session 21)
+
+1. ✅ **SubtypeChecker Wired Up**:
+   - Added `is_assignable_to()`, `is_subtype_of()`, `are_types_identical()` to ThinCheckerState
+   - Uses solver::SubtypeChecker with coinductive cycle detection
+   - Added `get_union_type()`, `get_intersection_type()` helper methods
+   - 4 new subtype tests (intrinsics, literals, unions, identity)
+
+2. ✅ **TypeLowering Connected**:
+   - `get_type_from_type_node()` now delegates to `solver::TypeLowering`
+   - All type nodes properly lowered (union, intersection, array, tuple, etc.)
+
+3. ✅ **Symbol → Type Resolution**:
+   - `compute_type_of_symbol()` uses TypeLowering for type alias resolution
+   - Variable types resolved from annotations or inferred from initializers
+   - Function types built from declarations
+   - **857 tests passing**
+
+### Architecture: The "Hybrid" Stack
+We will adopt a hybrid stack that leverages the Rust compiler ecosystem while maintaining our high-performance `ThinNode` foundation.
+
+1.  **Storage:** `ThinNodeArena` (Keep existing custom arena) - The immutable input.
+2.  **Query Engine:** `salsa` (Adopt) - Handles incremental queries, memoization, and cycle detection (The "Database").
+3.  **Inference:** `ena` (Adopt) - Handles unification (Union-Find) for generic type inference.
+4.  **Logic:** Custom `SolverEngine` - Implements the specific structural subtyping rules of TypeScript.
+
+### Key Data Structures
+- **`TypeId(u32)`**: Lightweight handle (interned).
+- **`TypeKey` Enum**: The "Shape" of the type (interned).
+  ```rust
+  pub enum TypeKey {
+      Intrinsic(IntrinsicKind),
+      Literal(LiteralValue),
+      Object(Vec<(Atom, TypeId)>), // Sorted for structural identity
+      Union(Vec<TypeId>),
+      Intersection(Vec<TypeId>),
+      Ref(SymbolId), // Recursive reference
+  }
+  ```
+
+### Implementation Plan
+- [x] **Infrastructure**: Add `ena` dependency (Session 19). Salsa requires nightly Rust, deferred.
+- [x] **Types Module**: TypeId, TypeKey enum with all structural type representations
+- [x] **Interning**: TypeInterner with O(1) type equality via deduplication
+  - Intrinsics pre-registered (any, unknown, never, void, null, undefined, boolean, number, string, bigint, symbol, object)
+  - Union/intersection normalization (flattening, deduplication, sorting)
+  - Array, tuple, object, function type construction
+- [x] **Lowering**: TypeLowering with FULL type node → TypeId conversion ✅ COMPLETE (Session 21)
+  - [x] Keyword types, literal types, identifiers
+  - [x] Union types, intersection types
+  - [x] Array types
+  - [x] Tuple types (with optional/rest elements)
+  - [x] Function types
+  - [x] Type literals (object types with properties)
+  - [x] Conditional types, mapped types
+  - [x] Indexed access types
+  - [x] ThinNodeArena accessors for all type nodes
+- [x] **Subtype Checker**: SubtypeChecker with coinductive cycle detection
+  - Intrinsic subtyping, literal to intrinsic, union/intersection
+  - Object structural subtyping, function subtyping
+  - Cycle detection via "in_progress" set (provisional true)
+- [x] **Inference**: InferenceContext using ena's Union-Find
+  - Inference variables, type parameter binding
+  - Unification with constraint propagation
+- [x] **Integration**: Replace thin_checker's type system ✅ COMPLETE (Session 21)
+  - [x] Wire TypeInterner into ThinCheckerState (replaces TypeArena)
+  - [x] Replace checker::types::TypeId with solver::types::TypeId
+  - [x] Update parallel.rs to use solver::TypeId
+  - [x] All 853 tests passing
+  - [ ] Connect TypeLowering to actual AST
+  - [ ] Connect SubtypeChecker to type relations
+
+### Why This Wins
+- **Immutability**: The DB is append-only (interning), avoiding the mutable state hell of `checker.ts`.
+- **Parallelism**: Salsa queries are implicitly parallel-ready.
+- **Correctness**: Solves recursive type equality (`interface A { x: A }`) mathematically via Greatest Fixed Point semantics.
+
+
+
+### IMPORTANT: Always consult Gemini about high level approach. include our design docs
+
+use scripts/ask-gemini.mjs for a second option. this is a mssive and ambitious job. we need to get it right 
+
+
+## Phase 7.6 Clean up Rust stuff from legacy  ❌ NOT DONE
+
+Throughout the migration we changed directions a little that might have left us with some "legacy" code. none of this work is released and should aim for a clean and elegant codebase
+
 ## Phase 8: Running `tests/cases` - 🎯 Primary Goal
 
 **Goal: Every test case in `tests/cases` compiles faster than TypeScript-Go.**
@@ -441,17 +568,23 @@ This is the ultimate validation milestone. The TypeScript test suite contains th
 **Parser (causing parse failures):**
 - [x] `import X = require("...")` - Added in Session 18
 - [x] `import X = Y.Z` - Entity name imports added
-- `export import X = Y` - re-export import equals
-- `declare module "name" { }` - ambient module declarations
-- Empty accessor bodies: `get foo() { }` edge cases
+- [x] `declare module "name" { }` - Ambient module declarations (Session 19)
+- [x] `declare namespace X { }` - Namespace declarations (Session 19)
+- [x] `namespace A.B.C { }` - Dotted namespace names (Session 19)
+- [x] `export import X = Y` - re-export import equals (Session 19)
+- [x] `export = expression` - CommonJS-style default export (Session 19)
+- [x] Empty accessor bodies: `get foo() { }` edge cases - Fixed in Session 19
 
 **Checker (causing crashes):**
-- `abstract class` inside expressions (IIFE, arrow functions)
-- Some class heritage expressions
-- Certain decorator patterns
+- [x] `abstract class` inside expressions (IIFE, arrow functions) - Fixed in Session 19
+- [x] Some class heritage expressions - Verified working (Session 19)
+- [x] Decorator patterns (`@decorator class`) - Fixed in Session 19
 
 **Emitter:**
-- Declaration emit needs to match TypeScript exactly
+- [x] Accessor emit support (get/set) - Added in Session 19
+- [x] Decorator emit support - Added in Session 19
+- [x] Class modifiers emit support - Added in Session 19
+- Declaration emit needs to match TypeScript exactly (baseline comparison)
 - Class transforms for ES5 output
 
 ## Phase 9: Full Rust Mode - ⬜ Future
@@ -479,16 +612,122 @@ This is the ultimate validation milestone. The TypeScript test suite contains th
 | 5 | Type Checker | ~23,500 | 485 | ✅ 99% |
 | 6 | Emitter (legacy + Thin) | ~5,100 | 92+ | 🟡 75% |
 | 7 | Language Service | ~2,000 | 8+ | 🟡 60% |
+| 7.5 | Structural Solver | ~1,200 | 18+ | ✅ Core Done |
 | 8 | tests/cases | - | 0 | 🎯 Goal |
 | 9 | Full Rust Mode | - | - | ⬜ Future |
 
-**Total Rust Code**: ~58,000 lines
-**Total Tests**: 767 passing
+**Total Rust Code**: ~59,200 lines
+**Total Tests**: 847 passing
 **Overall Progress**: ~90% of full compiler functionality
 
 ---
 
 # MILESTONES
+
+## 2026-01-04: Readonly Type Members (Session 21)
+- Added `parse_index_signature_with_readonly()` for readonly index signatures
+- Updated `parse_type_member()` to parse optional readonly modifier before property names
+- Added readonly modifier support in property signatures and index signatures
+- Updated emitter to emit readonly modifiers in signatures (`emit_property_signature`, `emit_index_signature`)
+- Added 2 new parser tests (readonly_index_signature, readonly_property_signature)
+- Added 2 new emitter tests (readonly_property_signature, readonly_index_signature)
+- 847 tests passing
+
+## 2026-01-04: Class Member Modifiers & Signatures (Session 20)
+- Added `parse_class_member_modifiers()` for static, public, private, protected, readonly, abstract, override, async
+- Added `parse_constructor_with_modifiers()` for constructor visibility
+- Added `parse_get_accessor_with_modifiers()` and `parse_set_accessor_with_modifiers()` for accessor modifiers
+- Added `create_modifier()` to ThinNodeArena
+- Updated method and property declarations to include parsed modifiers
+- Added `emit_class_member_modifiers()` helper to ThinEmitter
+- Updated all class member emitters (method, property, constructor, get/set accessor) to emit modifiers
+- Added call signature and construct signature parsing in interfaces
+- Added `get_signature()` and `get_index_signature()` accessors to ThinNodeArena
+- Added signature emit functions (call, construct, method, property, index)
+- 17 new parser tests, 7 new emitter tests
+- 843 tests passing
+
+## 2026-01-05: ThinParser Improvements (Session 22 - continued)
+
+**Batch test pass rate improved: 52.7% → 85.0%**
+
+Parser improvements:
+- Keywords as identifiers: class/interface/function names can use keywords (e.g., `class any {}`)
+- Function overload signatures: `function foo();` without body
+- Parameter modifiers: `public`, `private`, `protected`, `readonly` on parameters
+- Type parameters for classes/interfaces: `class Foo<T>`, `interface Bar<T>`
+- Heritage clause type arguments: `implements IList<U>`, `extends Base<T>`
+- Heritage call expressions: `extends Mixin(Parent)`
+- Rest parameters: `...args` in function signatures
+- Optional parameters: `arg?` syntax
+
+Test progression:
+- Session start: 21/40 passing (52.7%)
+- + Function expressions: 40/74 (54.1%)
+- + Keywords as identifiers: 33/40 (82.5%)
+- + Type parameters: 34/40 (85.0%)
+
+## 2026-01-05: Phase 7.5 Solver Integration Complete (Session 21)
+
+**MAJOR MILESTONE: Solver fully integrated into ThinChecker!**
+
+### Part 1: Core Integration
+- Deep review of Phase 7.5 solver module
+- Identified critical gap: solver was designed but NOT integrated
+- Complete integration of solver into thin_checker:
+  - Replaced `checker::TypeArena` with `solver::TypeInterner`
+  - Replaced `checker::types::TypeId` with `solver::types::TypeId`
+  - All type operations now use compile-time constant TypeIds (O(1))
+  - Type creation uses TypeInterner: array(), union(), function(), object()
+- Added ThinNodeArena accessors for type lowering:
+  - get_composite_type(), get_array_type(), get_tuple_type()
+  - get_function_type(), get_type_literal(), get_conditional_type()
+  - get_mapped_type(), get_indexed_access_type(), get_literal_type()
+  - get_wrapped_type()
+- Complete solver/lower.rs rewrite with full type lowering
+- Updated parallel.rs to use solver::TypeId
+
+### Part 2: SubtypeChecker & TypeLowering Wiring
+- Added type relation methods to ThinCheckerState:
+  - `is_assignable_to()` - uses solver::SubtypeChecker
+  - `is_subtype_of()` - stricter subtype check
+  - `are_types_identical()` - O(1) TypeId comparison
+  - `is_assignable_to_union()` - check against multiple targets
+  - `get_union_type()` / `get_intersection_type()` - normalized type construction
+- Connected TypeLowering to `get_type_from_type_node()`
+- Symbol → Type bridging in `compute_type_of_symbol()`:
+  - Functions build types from declarations
+  - Type aliases resolve via TypeLowering
+  - Variables use type annotations or infer from initializers
+- 8 new thin_checker tests for solver integration
+- **857 tests passing**
+
+Key Benefits Now Active:
+- O(1) type equality (compare u32 values)
+- Compile-time constant TypeIds for intrinsics
+- Automatic union/intersection normalization
+- Structural deduplication (same structure = same TypeId)
+- Coinductive subtype checking with cycle detection
+
+## 2026-01-04: Phase 7.5 Structural Solver (Session 19)
+- Created `wasm/src/solver/` module with 4 submodules (~1,200 lines):
+  - `types.rs`: TypeId, TypeKey enum with full structural type representation
+  - `intern.rs`: TypeInterner with O(1) equality via deduplication
+  - `subtype.rs`: SubtypeChecker with coinductive cycle detection
+  - `infer.rs`: InferenceContext using ena's Union-Find
+- Added `ena` crate for type unification (Union-Find)
+- 18 new tests for solver module
+- 843 tests passing total
+
+## 2026-01-04: Ambient Module/Namespace Parsing (Session 19)
+- Added `declare module "name" { }` parsing
+- Added `declare namespace X { }` parsing
+- Added `namespace A.B.C { }` dotted namespace names
+- Added `parse_ambient_declaration()` for declare keyword handling
+- Added `parse_module_declaration()` for module/namespace/global
+- Added `parse_module_block()` for { statements } body
+- Added ModuleBlockData struct and add_module_block() method
+- 767 tests passing
 
 ## 2026-01-04: ThinChecker and ThinEmitter Complete (Session 16)
 - Expanded ThinChecker with full type inference methods
