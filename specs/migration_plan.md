@@ -25,6 +25,8 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 | **Zero-Alloc Scanner (0.2)** | ✅ Done | Atom interning (u32), zero-copy accessors |
 | **Arena Type Analysis (0.3)** | ✅ Analyzed | Type enum = 48 bytes (already optimized) |
 | **Parallelism (0.4)** | ✅ Done | Rayon-based parallel parsing/binding/checking |
+| **Lazy Diagnostics (0.5)** | ✅ Done | Deferred string formatting, zero waste in tentative checks |
+| **Solver Operations (0.6)** | ✅ Done | Pure type logic, structured results, separation of concerns |
 
 ## Phase 1-5: Core Compiler ✅
 
@@ -36,7 +38,7 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 | 4 | Binder (ThinBinder) | ~2,900 | 26+ | ✅ Done |
 | 5 | Type Checker | ~23,500 | 485 | ✅ 99% |
 
-**Total Rust Code**: ~59,800 lines | **Total Tests**: 999 passing
+**Total Rust Code**: ~60,700 lines | **Total Tests**: 1006 passing
 
 ### ThinParser Capabilities (Complete)
 - All expressions, statements, declarations
@@ -92,6 +94,12 @@ ThinParser → ThinNodeArena → ThinBinder → ThinChecker → TypeInterner →
 | `lower.rs` | ~830 | 13+ | ✅ Complete (type params added) |
 | `subtype.rs` | ~420 | 5+ | ✅ Core done |
 | `infer.rs` | ~185 | 5+ | ✅ Basic done |
+| `instantiate.rs` | ~260 | 12+ | ✅ Complete |
+| `evaluate.rs` | ~540 | 15+ | ✅ Complete |
+| `contextual.rs` | ~320 | 16+ | ✅ Complete |
+| `narrowing.rs` | ~280 | 15+ | ✅ Complete |
+| `diagnostics.rs` | ~860 | 24+ | ✅ Complete (lazy rendering) |
+| `operations.rs` | ~430 | 7+ | ✅ Complete (call/property/binary) |
 
 ### ✅ What's Working
 
