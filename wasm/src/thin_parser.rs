@@ -3240,52 +3240,66 @@ impl ThinParserState {
         )
     }
 
-    /// Parse variable declaration for for-in/for-of (single declaration only)
+    /// Parse variable declaration list for for statement
+    /// Supports multiple declarations for regular for: for (let x = 0, y = 1; ...)
+    /// Single declaration for for-in/for-of: for (let x in/of ...)
     fn parse_for_variable_declaration(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
         let _decl_keyword = self.token();
         self.next_token(); // consume var/let/const
 
-        // Parse single variable declaration (for-in/for-of only allows one)
-        // Use similar logic to parse_variable_declaration
-        let name = if self.is_token(SyntaxKind::OpenBraceToken) {
-            self.parse_object_binding_pattern()
-        } else if self.is_token(SyntaxKind::OpenBracketToken) {
-            self.parse_array_binding_pattern()
-        } else if self.is_identifier_or_keyword() {
-            self.parse_identifier_name()
-        } else {
-            self.parse_identifier()
-        };
+        let mut declarations = Vec::new();
 
-        // Optional type annotation
-        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-            self.parse_type()
-        } else {
-            NodeIndex::NONE
-        };
+        loop {
+            let decl_start = self.token_pos();
 
-        // For for-in/for-of, initializer is parsed separately as the expression
-        // But for regular for, there might be an initializer
-        let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
-            self.parse_assignment_expression()
-        } else {
-            NodeIndex::NONE
-        };
+            // Parse variable name (identifier or binding pattern)
+            let name = if self.is_token(SyntaxKind::OpenBraceToken) {
+                self.parse_object_binding_pattern()
+            } else if self.is_token(SyntaxKind::OpenBracketToken) {
+                self.parse_array_binding_pattern()
+            } else if self.is_identifier_or_keyword() {
+                self.parse_identifier_name()
+            } else {
+                self.parse_identifier()
+            };
 
-        let decl = self.arena.add_variable_declaration(
-            syntax_kind_ext::VARIABLE_DECLARATION,
-            start_pos,
-            self.token_end(),
-            VariableDeclarationData {
-                name,
-                type_annotation,
-                initializer,
-                exclamation_token: false,
-            },
-        );
+            // Optional type annotation
+            let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+                self.parse_type()
+            } else {
+                NodeIndex::NONE
+            };
 
-        let declarations = self.make_node_list(vec![decl]);
+            // Optional initializer
+            let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
+                self.parse_assignment_expression()
+            } else {
+                NodeIndex::NONE
+            };
+
+            let decl = self.arena.add_variable_declaration(
+                syntax_kind_ext::VARIABLE_DECLARATION,
+                decl_start,
+                self.token_end(),
+                VariableDeclarationData {
+                    name,
+                    type_annotation,
+                    initializer,
+                    exclamation_token: false,
+                },
+            );
+            declarations.push(decl);
+
+            // Check for comma (more declarations) or end of list
+            // For for-in/for-of, stop at 'in' or 'of' keyword
+            // For regular for, stop at ';' or ')'
+            if !self.parse_optional(SyntaxKind::CommaToken) {
+                break;
+            }
+        }
+
+        let declarations_list = self.make_node_list(declarations);
         let end_pos = self.token_end();
 
         self.arena.add_variable(
@@ -3294,7 +3308,7 @@ impl ThinParserState {
             end_pos,
             VariableData {
                 modifiers: None,
-                declarations,
+                declarations: declarations_list,
             },
         )
     }
@@ -4022,11 +4036,21 @@ impl ThinParserState {
     }
 
     /// Parse as/satisfies expression: expr as Type, expr satisfies Type
+    /// Also handles const assertion: expr as const
     fn parse_as_or_satisfies_expression(&mut self, expression: NodeIndex, start_pos: u32) -> NodeIndex {
         let is_satisfies = self.is_token(SyntaxKind::SatisfiesKeyword);
         self.next_token(); // consume 'as' or 'satisfies'
 
-        let type_node = self.parse_type();
+        // Handle 'as const' - const assertion
+        let type_node = if !is_satisfies && self.is_token(SyntaxKind::ConstKeyword) {
+            // Create a token node for 'const' keyword
+            let const_start = self.token_pos();
+            let const_end = self.token_end();
+            self.next_token(); // consume 'const'
+            self.arena.add_token(SyntaxKind::ConstKeyword as u16, const_start, const_end)
+        } else {
+            self.parse_type()
+        };
         let end_pos = self.token_end();
 
         let result = self.arena.add_type_assertion(

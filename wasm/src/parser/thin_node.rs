@@ -2720,6 +2720,83 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get type query data (typeof in type position).
+    #[inline]
+    pub fn get_type_query(&self, node: &ThinNode) -> Option<&TypeQueryData> {
+        use super::syntax_kind_ext::TYPE_QUERY;
+        if node.has_data() && node.kind == TYPE_QUERY {
+            self.type_queries.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get type operator data (keyof, unique, readonly).
+    #[inline]
+    pub fn get_type_operator(&self, node: &ThinNode) -> Option<&TypeOperatorData> {
+        use super::syntax_kind_ext::TYPE_OPERATOR;
+        if node.has_data() && node.kind == TYPE_OPERATOR {
+            self.type_operators.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get infer type data.
+    #[inline]
+    pub fn get_infer_type(&self, node: &ThinNode) -> Option<&InferTypeData> {
+        use super::syntax_kind_ext::INFER_TYPE;
+        if node.has_data() && node.kind == INFER_TYPE {
+            self.infer_types.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get template literal type data.
+    #[inline]
+    pub fn get_template_literal_type(&self, node: &ThinNode) -> Option<&TemplateLiteralTypeData> {
+        use super::syntax_kind_ext::TEMPLATE_LITERAL_TYPE;
+        if node.has_data() && node.kind == TEMPLATE_LITERAL_TYPE {
+            self.template_literal_types.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get named tuple member data.
+    #[inline]
+    pub fn get_named_tuple_member(&self, node: &ThinNode) -> Option<&NamedTupleMemberData> {
+        use super::syntax_kind_ext::NAMED_TUPLE_MEMBER;
+        if node.has_data() && node.kind == NAMED_TUPLE_MEMBER {
+            self.named_tuple_members.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get type predicate data.
+    #[inline]
+    pub fn get_type_predicate(&self, node: &ThinNode) -> Option<&TypePredicateData> {
+        use super::syntax_kind_ext::TYPE_PREDICATE;
+        if node.has_data() && node.kind == TYPE_PREDICATE {
+            self.type_predicates.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get type parameter data.
+    #[inline]
+    pub fn get_type_parameter(&self, node: &ThinNode) -> Option<&TypeParameterData> {
+        use super::syntax_kind_ext::TYPE_PARAMETER;
+        if node.has_data() && node.kind == TYPE_PARAMETER {
+            self.type_parameters.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Number of nodes in the arena
     pub fn len(&self) -> usize {
         self.nodes.len()
