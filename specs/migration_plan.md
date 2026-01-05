@@ -36,52 +36,67 @@ Complete implementation in `wasm/src/solver/`:
 - Contextual typing, discriminated union narrowing
 - Lazy diagnostics with structured args
 
-## Phase 6: Emitter (75%)
-- ✅ Declaration emit, ES2015+ transforms, CommonJS, async/await
-- 🟡 Partial: Generator transforms
-
 ## Phase 7: Language Service (60%)
 - ✅ Go-to-definition, find references, completions, signature help, cross-file navigation
 - ⬜ Formatting engine, code fixes/refactorings
 
 ---
 
-# 🎯 CURRENT FOCUS: Phase 8 - Baseline Compatibility
+# 🎯 CURRENT FOCUS: Parallel Tracks
+
+## Track A: Phase 8 - Baseline Compatibility
 
 **Goal**: Match TypeScript's test baselines for `tests/cases/compiler`.
 
-## Test Pass Rates
+### Test Pass Rates
 | Category | Pass Rate |
 |----------|-----------|
 | compiler | 99.9% (6389/6393) |
 | conformance | 99.98% (5654/5655) |
 | fourslash | 0% (not started) |
 
-## Baseline Comparison (First 100 tests)
+### Baseline Comparison (First 100 tests)
 | Baseline | Pass Rate | Blockers |
 |----------|-----------|----------|
 | .errors.txt | **32.5%** (25/77) | Missing function validation, parser errors |
 | .js emit | 0% | Emitter format mismatch |
 
-## Completed
-- ✅ Class member validation (2389-2391) for method/constructor overloads
-- ✅ Parser error code infrastructure
-
-## Missing Error Codes
-**High Priority**:
-- 2389, 2391 - Top-level function overload validation (not just class methods)
-- 2369 - Parameter type errors
-- 2414 - Class member modifiers
-
-**Parser Validation**:
-- 1005, 1068, 1128, 1440 - Parser semantic errors
-
-## Next Steps
-1. ⬜ Function validation errors (2389-2391) for top-level function declarations
-2. ⬜ Add parser semantic errors (1068, 1128, 1440) in ThinParser
-3. ⬜ Error elaboration ("...because property 'x' has type 'string' not 'number'")
+### Next Steps
+1. ⬜ Function validation errors (2389-2391) for top-level declarations
+2. ⬜ Parser semantic errors (1068, 1128, 1440)
+3. ⬜ Error elaboration ("...because property 'x' has type...")
 4. ⬜ RelatedInformation (point to definition sites)
-5. ⬜ Match emitter output format
+
+---
+
+## Track B: Phase 6 - Emitter Completion (75% → 100%)
+
+**Goal**: Complete emitter with performance-first approach.
+
+### Phase 6.1: Study & Exploration (Use Gemini)
+Before implementation, analyze for performance opportunities:
+- ⬜ **Benchmark current emit** - measure throughput (bytes/sec)
+- ⬜ **Profile hot paths** - string building, whitespace, source maps
+- ⬜ **Study TypeScript emitter** - identify simplification opportunities
+- ⬜ **Gemini review** - ask for emit architecture recommendations
+- ⬜ **Explore alternatives**: rope data structures, streaming output, SIMD text processing
+
+### Phase 6.2: Generator Transforms
+- ⬜ `function*` syntax and `yield` expressions
+- ⬜ State machine generation for ES5 target
+- ⬜ Iterator protocol compliance
+
+### Phase 6.3: Output Format Matching
+- ⬜ Match TypeScript baseline whitespace/semicolons
+- ⬜ Source map accuracy
+- ⬜ Declaration file formatting
+
+### Key Files
+| Purpose | Location |
+|---------|----------|
+| ThinEmitter | `wasm/src/thin_emitter.rs` |
+| Transforms | `wasm/src/transforms/` |
+| Generator transforms | `wasm/src/transforms/async_gen.rs` |
 
 ---
 
