@@ -75,12 +75,20 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 ## Architecture Overview
 
 ```
-ThinParser → ThinNodeArena → ThinBinder → ThinChecker → TypeInterner → TypeId
+ThinParser → ThinNodeArena → ThinBinder → ThinChecker
                                               ↓
-                                     solver::TypeInterner
-                                     solver::SubtypeChecker
-                                     solver::TypeLowering
-                                     solver::InferenceContext
+                                         Solver (Pure Type Logic)
+                                              ├─ TypeInterner (interning)
+                                              ├─ TypeLowering (AST → TypeId)
+                                              ├─ SubtypeChecker (relations)
+                                              ├─ TypeEvaluator (meta-types)
+                                              ├─ InferenceContext (constraints)
+                                              ├─ CallEvaluator (calls)
+                                              ├─ PropertyAccessEvaluator (access)
+                                              ├─ BinaryOpEvaluator (ops)
+                                              └─ DiagnosticBuilder (lazy rendering)
+
+Result: TypeId (O(1) equality via interning)
 ```
 
 ## Current State
