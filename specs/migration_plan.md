@@ -146,6 +146,7 @@ pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
 - ✅ Declare class parsing (skip impl checks for ambient)
 - ✅ Numeric method name support (0(), 1(), etc.)
 - ✅ Abstract class instantiation check (2511) - file-level direct `new` calls
+- ✅ Expanded known globals (WeakRef, TypedArrays, Web APIs, etc.)
 
 ### Next Steps
 1. ⬜ Parser semantic errors (1128, additional coverage)
