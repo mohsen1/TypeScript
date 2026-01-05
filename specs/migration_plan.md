@@ -525,6 +525,48 @@ also even though it's more common for Rust code to cohost test and source in the
 
 After cleaning up we must recreate `specs/WASM_ARCHITECTURE.md` with the new solver engine and cleaned up code.
 
+in this phase we can also clean up some of the easy to fix Rust compiler warnings, keep the Rust dependencies up to date and overall improve Rust project hygiene. maybe add some code quality and cleanness tooling so for future work we are continuing to keep the project clean.
+
+### TODO
+* [ ] remove duplicate files
+* [ ] remove legacy stuff
+* [ ] separate test and source files across all wasm Rust files
+* [ ] fix some Rust warnings
+* [ ] improve code quality tooling
+* [ ] write specs based on new code
+* [ ] make sure we're still in good shape (similar to before starting the phase) in terms of test coverage
+* [ ] In multiple rounds try to very specifically ask Gemini for code review of overall system and address its comments. make sure you don't take Gemini advice verbatim and make a judgement on each comment before addressing. we don't want hyper optimization. you can modify the script and prompt to get better results. ALWAYS USE GEMINI 3 PRO.
+* [ ] shift focus to the Phase 8 and continue
+
+#### Gemini Review
+Some early Gemini findings
+```
+
+  Summary of Findings
+
+  | Severity | File                      | Issue                                                            |
+  |----------|---------------------------|------------------------------------------------------------------|
+  | BLOCKER  | checker/state.rs:727      | UB via transmute - AST node kinds (167+) exceed SyntaxKind range |
+  | CRITICAL | transforms/mod.rs         | Transforms use legacy NodeArena, ThinParser can't transpile      |
+  | CRITICAL | checker/types/type_def.rs | Type enum boxes every variant, defeats arena benefits            |
+  | MAJOR    | binder.rs, thin_binder.rs | Scanner produces Atom, but binder uses String                    |
+  | MAJOR    | scanner.rs:170            | SyntaxKind::try_from_u16 uses fragile transmute                  |
+  | MINOR    | scanner_impl.rs:885       | Template escape sequences allocate per-sequence                  |
+
+  Alignment with Migration Plan
+
+  These findings align with Phase 7.6 (Cleanup) which is the current focus:
+  - Remove legacy code (transforms architecture mismatch)
+  - Fix Rust warnings and improve code quality
+  - The Type enum issue is noted as "analyzed, low priority" in Phase 0.3
+
+  Recommended Priority
+
+  1. BLOCKER first: Fix the UB in checker/state.rs - this is undefined behavior
+  2. CRITICAL next: The transforms architecture needs design work - may require a plan
+  3. MAJOR items: String→Atom propagation will improve performance significantly
+```
+
 ## Phase 8: Running `tests/cases` - Primary Goal
 
 **Goal: Every test case in `tests/cases` compiles faster than TypeScript-Go.**
@@ -1040,15 +1082,23 @@ These issues were identified by Gemini but NOT yet fixed:
 - [x] Generic call expressions in heritage clauses: `class Gen extends base<T>() {}`
 - [x] Index signatures in class bodies: `class C { [key: string]: number; }`
 
+### Session 26 Fixes (85.2% → 85.3% pass rate):
+- [x] Type keywords as identifiers in expression context: `new any[1]`, `new string()`, etc.
+- [x] Fixed can_parse_semicolon to include SemicolonToken for proper `return;` parsing
+- [x] Labeled statement support: `target: break target;`, `loop: while(true) { }`
+- [x] Nested generic `>>` token handling: proper splitting of `>>` into two `>` tokens
+  - Added `parse_expected_greater_than()` to handle compound tokens
+  - Added `is_greater_than_or_compound()` helper
+  - Added `set_pos()` to scanner for position adjustment
+
 ### Test Results:
 - 863 unit tests passing (all Rust tests)
 - 0 crashes
-- 122 remaining parse failures (down from 200)
+- 107 remaining parse failures (down from 122)
 
-### Remaining Parse Failures (~122 files):
+### Remaining Parse Failures (~107 files):
 - Multi-file tests with `@filename:` directives (~50 files)
-- Import equals with literal values: `import n = 5;` (intentional error cases)
-- Anonymous modules: `module { }` (legacy syntax)
+- Intentional syntax error test cases (malformed generic brackets, missing tokens)
 - ASI edge cases with class modifiers: `abstract\n}` as property name
-- Intentionally malformed code (error recovery tests)
+- Anonymous modules: `module { }` (legacy syntax)
 - Multiple extends clauses: `class C extends A, B {}` (intentional error)

@@ -26,7 +26,7 @@ use crate::parser::{
         ImportDeclData, ImportClauseData, NamedImportsData, SpecifierData,
         ExportDeclData, ExportAssignmentData, QualifiedNameData,
         TemplateExprData, TemplateSpanData,
-        TypeOperatorData, NamedTupleMemberData,
+        TypeOperatorData, NamedTupleMemberData, LabeledData,
     },
     syntax_kind_ext,
 };
@@ -168,7 +168,9 @@ impl ThinParserState {
     }
 
     /// Check if we can parse a semicolon (ASI rules)
+    /// Returns true if current token is semicolon or ASI applies
     fn can_parse_semicolon(&self) -> bool {
+        self.is_token(SyntaxKind::SemicolonToken) ||
         self.is_token(SyntaxKind::CloseBraceToken) ||
         self.is_token(SyntaxKind::EndOfFileToken) ||
         self.scanner.has_preceding_line_break()
@@ -181,6 +183,47 @@ impl ThinParserState {
             self.current_token = self.scanner.re_scan_greater_token();
         }
         self.current_token
+    }
+
+    /// Parse expected `>` token, handling compound tokens like `>>` and `>>>`
+    /// When we have `>>`, we need to consume just one `>` and leave `>` for the next parse
+    fn parse_expected_greater_than(&mut self) {
+        match self.current_token {
+            SyntaxKind::GreaterThanToken => {
+                // Simple case - just consume the single `>`
+                self.next_token();
+            }
+            SyntaxKind::GreaterThanGreaterThanToken => {
+                // `>>` - back up scanner and treat as single `>`
+                // After consuming, the remaining `>` becomes the current token
+                self.scanner.set_pos(self.scanner.get_pos() - 1);
+                self.current_token = SyntaxKind::GreaterThanToken;
+            }
+            SyntaxKind::GreaterThanGreaterThanGreaterThanToken => {
+                // `>>>` - back up scanner and treat as single `>`
+                // After consuming, the remaining `>>` becomes the current token
+                self.scanner.set_pos(self.scanner.get_pos() - 2);
+                self.current_token = SyntaxKind::GreaterThanGreaterThanToken;
+            }
+            SyntaxKind::GreaterThanEqualsToken => {
+                // `>=` - back up scanner and treat as single `>`
+                self.scanner.set_pos(self.scanner.get_pos() - 1);
+                self.current_token = SyntaxKind::EqualsToken;
+            }
+            SyntaxKind::GreaterThanGreaterThanEqualsToken => {
+                // `>>=` - back up scanner and treat as single `>`
+                self.scanner.set_pos(self.scanner.get_pos() - 2);
+                self.current_token = SyntaxKind::GreaterThanEqualsToken;
+            }
+            SyntaxKind::GreaterThanGreaterThanGreaterThanEqualsToken => {
+                // `>>>=` - back up scanner and treat as single `>`
+                self.scanner.set_pos(self.scanner.get_pos() - 3);
+                self.current_token = SyntaxKind::GreaterThanGreaterThanEqualsToken;
+            }
+            _ => {
+                self.parse_error_at_current_token("Expected GreaterThanToken");
+            }
+        }
     }
 
     /// Create a NodeList from a Vec of NodeIndex
@@ -361,6 +404,14 @@ impl ThinParserState {
             SyntaxKind::TryKeyword => self.parse_try_statement(),
             SyntaxKind::WithKeyword => self.parse_with_statement(),
             SyntaxKind::DebuggerKeyword => self.parse_debugger_statement(),
+            SyntaxKind::Identifier => {
+                // Check for labeled statement: label: statement
+                if self.look_ahead_is_labeled_statement() {
+                    self.parse_labeled_statement()
+                } else {
+                    self.parse_expression_statement()
+                }
+            }
             _ => self.parse_expression_statement(),
         }
     }
@@ -414,6 +465,44 @@ impl ThinParserState {
         self.scanner.restore_state(snapshot);
         self.current_token = current;
         is_equals
+    }
+
+    /// Look ahead to see if we have "identifier :" (labeled statement)
+    fn look_ahead_is_labeled_statement(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        // Skip identifier
+        self.next_token();
+        // Check for ':'
+        let is_colon = self.is_token(SyntaxKind::ColonToken);
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_colon
+    }
+
+    /// Parse labeled statement: label: statement
+    fn parse_labeled_statement(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Parse the label (identifier)
+        let label = self.parse_identifier_name();
+
+        // Consume the colon
+        self.parse_expected(SyntaxKind::ColonToken);
+
+        // Parse the statement
+        let statement = self.parse_statement();
+
+        let end_pos = self.token_end();
+
+        self.arena.add_labeled(
+            syntax_kind_ext::LABELED_STATEMENT,
+            start_pos,
+            end_pos,
+            LabeledData { label, statement },
+        )
     }
 
     /// Parse import equals declaration: import X = require("...") or import X = Y.Z
@@ -3780,7 +3869,7 @@ impl ThinParserState {
 
         self.parse_expected(SyntaxKind::LessThanToken);
 
-        while !self.is_token(SyntaxKind::GreaterThanToken)
+        while !self.is_greater_than_or_compound()
             && !self.is_token(SyntaxKind::EndOfFileToken)
         {
             let param = self.parse_type_parameter();
@@ -3791,7 +3880,7 @@ impl ThinParserState {
             }
         }
 
-        self.parse_expected(SyntaxKind::GreaterThanToken);
+        self.parse_expected_greater_than();
 
         self.make_node_list(params)
     }
@@ -4159,6 +4248,17 @@ impl ThinParserState {
             SyntaxKind::LessThanToken => self.parse_jsx_element_or_type_assertion(),
             SyntaxKind::NoSubstitutionTemplateLiteral => self.parse_no_substitution_template_literal(),
             SyntaxKind::TemplateHead => self.parse_template_expression(),
+            // Type keywords can be used as identifiers in expression context
+            // e.g., new any[1], new string(), etc.
+            SyntaxKind::AnyKeyword
+            | SyntaxKind::StringKeyword
+            | SyntaxKind::NumberKeyword
+            | SyntaxKind::BooleanKeyword
+            | SyntaxKind::SymbolKeyword
+            | SyntaxKind::BigIntKeyword
+            | SyntaxKind::ObjectKeyword
+            | SyntaxKind::NeverKeyword
+            | SyntaxKind::UnknownKeyword => self.parse_keyword_as_identifier(),
             _ => {
                 // Unknown primary expression - create an error token
                 let start_pos = self.token_pos();
@@ -5905,13 +6005,26 @@ impl ThinParserState {
         )
     }
 
+    /// Check if the current token starts with `>` (includes compound tokens like `>>`, `>>>`, `>=`, etc.)
+    fn is_greater_than_or_compound(&self) -> bool {
+        matches!(
+            self.current_token,
+            SyntaxKind::GreaterThanToken
+                | SyntaxKind::GreaterThanGreaterThanToken
+                | SyntaxKind::GreaterThanGreaterThanGreaterThanToken
+                | SyntaxKind::GreaterThanEqualsToken
+                | SyntaxKind::GreaterThanGreaterThanEqualsToken
+                | SyntaxKind::GreaterThanGreaterThanGreaterThanEqualsToken
+        )
+    }
+
     /// Parse type arguments: <T, U, V>
     fn parse_type_arguments(&mut self) -> NodeList {
         self.parse_expected(SyntaxKind::LessThanToken);
 
         let mut args = Vec::new();
 
-        while !self.is_token(SyntaxKind::GreaterThanToken)
+        while !self.is_greater_than_or_compound()
             && !self.is_token(SyntaxKind::EndOfFileToken)
         {
             args.push(self.parse_type());
@@ -5921,7 +6034,7 @@ impl ThinParserState {
             }
         }
 
-        self.parse_expected(SyntaxKind::GreaterThanToken);
+        self.parse_expected_greater_than();
         self.make_node_list(args)
     }
 

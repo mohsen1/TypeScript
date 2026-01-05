@@ -117,6 +117,12 @@ impl ScannerState {
         self.pos
     }
 
+    /// Set the current position (used for rescanning compound tokens).
+    /// This allows consuming partial tokens like splitting `>>` into `>` + `>`.
+    pub fn set_pos(&mut self, pos: usize) {
+        self.pos = pos;
+    }
+
     /// Get the full start position (including leading trivia).
     #[wasm_bindgen(js_name = getTokenFullStart)]
     pub fn get_token_full_start(&self) -> usize {
