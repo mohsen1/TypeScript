@@ -313,7 +313,9 @@ These are TypeScript's "type-level functions" (see §4 of SOLVER.md).
    - Variable declaration type checking ✅
 3. 🟡 Generate diagnostics matching TypeScript baselines
    - Basic type mismatch diagnostics working ✅ (error 2322)
-   - **NEXT**: Expand to more expression types, function calls, etc.
+   - Function call argument checking working ✅ (errors 2345, 2554)
+   - Return type checking working ✅ (error 2322)
+   - **NEXT**: Class member type checking, more expression types
 4. ⬜ Compare output: `.errors.txt`, `.types`, `.js` files
 
 ### ThinChecker Type Checking Status
@@ -327,10 +329,16 @@ Working:
 - Union types ✅
 - Array types ✅
 - Basic type mismatch diagnostics ✅
+- Function call argument type checking ✅
+  - Wrong argument type → error 2345
+  - Wrong argument count → error 2554
+- Function return type checking ✅
+  - Return type mismatch → error 2322
+  - `return;` in non-void function → error 2322
 
 Next:
-- Function parameter and return type checking
 - Class member type checking
+- Method call type checking
 - More comprehensive diagnostic messages
 
 ---
@@ -540,6 +548,22 @@ node scripts/ask-gemini.mjs --review
 - Implemented lowering for all new type forms in solver/lower.rs
 - Added subtype checking rules for new TypeKey variants
 - 861 tests passing
+
+## 2026-01-05: Session 32
+- **Function Call Type Checking Complete**
+- Added return type checking with `return_type_stack`
+- Added function call argument type checking in `get_type_of_call_expression()`
+- Check argument count (too few → 2554, too many → 2554)
+- Check argument types (mismatch → 2345)
+- Fixed critical bug: `get_expression_statement()` was using `data_index` as NodeIndex instead of index into `expr_statements` vector
+- Fixed binder: `value_declaration` wasn't being set for function symbols (both hoisted and non-hoisted)
+- All function call tests passing:
+  - Correct calls produce no errors
+  - Wrong argument types → error 2345
+  - Wrong argument count → error 2554
+  - Optional parameters work correctly
+  - Return type mismatches → error 2322
+- 999 tests passing
 
 ## 2026-01-05: Session 27
 - Fixed 52 Rust warnings (67 → 15)
