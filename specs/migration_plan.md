@@ -254,26 +254,35 @@ These are TypeScript's "type-level functions" (see §4 of SOLVER.md).
 ## Implementation Order
 
 ```
-1. Type Lowering Gaps
+✅ 1. Type Lowering Gaps (COMPLETE - Session 28)
    └─ typeof, keyof, this, template literals
 
-2. Ref Resolution
+✅ 2. Ref Resolution (COMPLETE - Session 29)
    └─ TypeKey::Ref → structural expansion (lazy)
 
-3. Conditional Type Evaluation
+✅ 3. Conditional Type Evaluation (COMPLETE - Session 29)
    └─ check_type <: extends_type ? true_branch : false_branch
    └─ Distributivity: (A | B) extends U ? ... distributes
 
-4. Mapped Type Instantiation
+✅ 4. Mapped Type Instantiation (COMPLETE - Session 29)
    └─ { [K in keyof T]: Transform<T[K]> }
 
-5. Full Inference Pipeline
+✅ 5. Full Inference Pipeline (COMPLETE - Session 29)
    └─ Constraint collection → Bounds checking → Resolution
    └─ Contextual typing for arrow functions
 
-6. Integration with ThinChecker
-   └─ Wire solver into expression checking
-   └─ Connect to diagnostics
+✅ 6. Lazy Diagnostics (COMPLETE - Session 33)
+   └─ Deferred string formatting via PendingDiagnostic
+   └─ Template-based message generation
+
+✅ 7. Solver Operations (COMPLETE - Session 33)
+   └─ Pure type logic: CallEvaluator, PropertyAccessEvaluator, BinaryOpEvaluator
+   └─ Structured results with no side effects
+
+🎯 8. Integration with ThinChecker (NEXT)
+   └─ Refactor expression checking to use solver operations
+   └─ Replace inline logic with CallEvaluator/PropertyAccessEvaluator
+   └─ Use PendingDiagnostic throughout
 ```
 
 ---
