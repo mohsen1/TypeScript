@@ -104,13 +104,17 @@ pub struct ThinCheckerState<'a> {
     enclosing_class: Option<EnclosingClassInfo>,
 }
 
-/// Info about the enclosing class for static member suggestions.
+/// Info about the enclosing class for static member suggestions and abstract property checks.
 #[derive(Clone)]
 struct EnclosingClassInfo {
     /// Name of the class.
     name: String,
     /// Names of static members.
     static_members: Vec<String>,
+    /// Names of abstract properties (for error 2715).
+    abstract_properties: Vec<String>,
+    /// Whether we're in a constructor (for error 2715 checking).
+    in_constructor: bool,
 }
 
 /// Maximum depth for recursive type instantiation.
@@ -928,6 +932,29 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
+        // Get the property name first (needed for abstract property check regardless of object type)
+        let Some(name_node) = self.arena.get(access.name_or_argument) else {
+            return TypeId::ANY;
+        };
+
+        // Check for abstract property access in constructor BEFORE evaluating types (error 2715)
+        // This must happen even when `this` has type ANY
+        if let Some(ident) = self.arena.get_identifier(name_node) {
+            let property_name = &ident.escaped_text;
+
+            if self.is_this_expression(access.expression) {
+                if let Some(ref class_info) = self.enclosing_class.clone() {
+                    if class_info.in_constructor && class_info.abstract_properties.contains(property_name) {
+                        self.error_abstract_property_in_constructor(
+                            property_name,
+                            &class_info.name,
+                            access.name_or_argument,
+                        );
+                    }
+                }
+            }
+        }
+
         // Get the type of the object
         let object_type = self.get_type_of_node(access.expression);
 
@@ -935,11 +962,6 @@ impl<'a> ThinCheckerState<'a> {
         if object_type == TypeId::ANY || object_type == TypeId::ERROR {
             return TypeId::ANY;
         }
-
-        // Get the property name
-        let Some(name_node) = self.arena.get(access.name_or_argument) else {
-            return TypeId::ANY;
-        };
 
         // If it's an identifier, look up the property
         if let Some(ident) = self.arena.get_identifier(name_node) {
@@ -1651,6 +1673,42 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Report error 2715: Abstract property 'X' in class 'C' cannot be accessed in the constructor.
+    pub fn error_abstract_property_in_constructor(
+        &mut self,
+        prop_name: &str,
+        class_name: &str,
+        idx: NodeIndex,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        if let Some(loc) = self.get_source_location(idx) {
+            let message = format!(
+                "Abstract property '{}' in class '{}' cannot be accessed in the constructor.",
+                prop_name, class_name
+            );
+            self.diagnostics.push(Diagnostic {
+                code: diagnostic_codes::ABSTRACT_PROPERTY_IN_CONSTRUCTOR,
+                category: crate::checker::state::DiagnosticCategory::Error,
+                message_text: message,
+                file: self.file_name.clone(),
+                start: loc.start,
+                length: loc.length(),
+                related_information: Vec::new(),
+            });
+        }
+    }
+
+    /// Check if a node is a `this` expression.
+    fn is_this_expression(&self, idx: NodeIndex) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(node) = self.arena.get(idx) {
+            node.kind == SyntaxKind::ThisKeyword as u16
+        } else {
+            false
+        }
+    }
+
     /// Report an argument count mismatch error using solver diagnostics with source tracking.
     pub fn error_argument_count_mismatch_at(
         &mut self,
@@ -2270,6 +2328,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         let static_members = self.collect_static_member_names(&class.members.nodes);
+        let abstract_properties = self.collect_abstract_property_names(&class.members.nodes);
 
         // Save previous enclosing class and set current
         let prev_enclosing_class = self.enclosing_class.take();
@@ -2277,6 +2336,8 @@ impl<'a> ThinCheckerState<'a> {
             self.enclosing_class = Some(EnclosingClassInfo {
                 name,
                 static_members,
+                abstract_properties,
+                in_constructor: false,
             });
         }
 
@@ -2458,6 +2519,38 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         static_names
+    }
+
+    /// Collect names of abstract properties/methods in a class.
+    /// (Public for testing)
+    pub fn test_collect_abstract_properties(&self, members: &[NodeIndex]) -> Vec<String> {
+        self.collect_abstract_property_names(members)
+    }
+
+    /// Collect names of abstract properties/methods in a class.
+    fn collect_abstract_property_names(&self, members: &[NodeIndex]) -> Vec<String> {
+        let mut abstract_names = Vec::new();
+
+        for &member_idx in members {
+            if let Some(member_node) = self.arena.get(member_idx) {
+                // Check property declarations
+                if member_node.kind == syntax_kind_ext::PROPERTY_DECLARATION {
+                    if let Some(prop) = self.arena.get_property_decl(member_node) {
+                        if self.has_abstract_modifier(&prop.modifiers) {
+                            if let Some(name_node) = self.arena.get(prop.name) {
+                                if let Some(ident) = self.arena.get_identifier(name_node) {
+                                    abstract_names.push(ident.escaped_text.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+                // Note: Abstract methods are NOT included here because accessing
+                // this.abstractMethod() in constructor is allowed.
+            }
+        }
+
+        abstract_names
     }
 
     /// Recursively check a type node for parameter properties in function types.
@@ -3092,9 +3185,19 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
+        // Set in_constructor flag for abstract property checks (error 2715)
+        if let Some(ref mut class_info) = self.enclosing_class {
+            class_info.in_constructor = true;
+        }
+
         // Check constructor body
         if !ctor.body.is_none() {
             self.check_statement(ctor.body);
+        }
+
+        // Reset in_constructor flag
+        if let Some(ref mut class_info) = self.enclosing_class {
+            class_info.in_constructor = false;
         }
 
         self.pop_local_scope();

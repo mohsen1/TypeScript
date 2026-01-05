@@ -38,12 +38,12 @@ see SESSION_LOG.md -- always amended with each session's work
 
 ### Next Steps
 
-**Type Checking (26 failing tests)**
+**Type Checking (25 failing tests)**
 1. ✅ Export assignment validation (2309, 2304)
 2. ✅ Setter parameter validation (1052, 1053)
 3. ✅ Return type validation (2355) - function must return a value (basic types)
-4. ⬜ Abstract class instantiation (2511) - cannot create instance of abstract
-5. ⬜ Static member access from instance (2662) - `this.staticProp` in static method
+4. ✅ Abstract class instantiation (2511) - basic case (union types need more work)
+5. ✅ Static member access from instance (2662) - `foo` → "Did you mean 'C.foo'?"
 6. ⬜ Abstract property validation (2715, 2729) - abstract in constructor
 7. ⬜ Accessor return type inference (7023) - implicit any in getter
 

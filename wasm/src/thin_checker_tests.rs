@@ -526,6 +526,36 @@ class C {
 }
 
 #[test]
+fn test_abstract_property_in_constructor_2715() {
+    // Error 2715: Abstract property 'prop' in class 'AbstractClass' cannot be accessed in the constructor.
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+abstract class AbstractClass {
+    constructor(str: string) {
+        let val = this.prop.toLowerCase();
+    }
+
+    abstract prop: string;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2715),
+        "Expected error 2715 (Abstract property cannot be accessed in constructor), got: {:?}", codes);
+}
+
+#[test]
 fn test_interface_name_cannot_be_reserved_2427() {
     // Error 2427: Interface name cannot be 'string' (or other primitive types)
     use crate::thin_parser::ThinParserState;
