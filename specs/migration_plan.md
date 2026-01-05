@@ -1087,8 +1087,20 @@ These issues were identified by Gemini but NOT yet fixed:
   - Added `is_greater_than_or_compound()` helper
   - Added `set_pos()` to scanner for position adjustment
 
+### Session 27 Fixes (Phase 7.6 Cleanup):
+- [x] Fixed 52 Rust compiler warnings (67 → 15 remaining)
+  - Removed unused imports and variables
+  - Prefixed intentionally unused parameters with `_`
+- [x] Investigated UB transmute concern - CONFIRMED SAFE
+  - `try_from_u16` validates `value <= 166` before transmute
+  - Extended AST kinds (167+) return None, no UB possible
+- [x] Added recursion depth limit to ThinParser
+  - Added `recursion_depth` field and `enter_recursion`/`exit_recursion` helpers
+  - Checks added to `parse_block` and `parse_binary_expression`
+  - MAX_RECURSION_DEPTH = 1000 prevents stack overflow
+
 ### Test Results:
-- 863 unit tests passing (all Rust tests)
+- 861 unit tests passing (all Rust tests)
 - 0 crashes
 - 107 remaining parse failures (down from 122)
 
