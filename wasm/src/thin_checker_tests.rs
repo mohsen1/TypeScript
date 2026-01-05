@@ -371,3 +371,30 @@ fn test_local_variable_scope_resolution() {
     assert!(!codes.contains(&2304),
         "Should not have 'Cannot find name' error for local variable, got: {:?}", codes);
 }
+
+#[test]
+fn test_for_loop_variable_scope() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that for loop variables are properly scoped
+    let code = r#"
+        function test() {
+            for (let i = 0; i < 10; i++) {
+                let x = i * 2;
+            }
+        }
+    "#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have no "Cannot find name" errors (2304) for loop variable 'i'
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(!codes.contains(&2304),
+        "Should not have 'Cannot find name' error for loop variable, got: {:?}", codes);
+}

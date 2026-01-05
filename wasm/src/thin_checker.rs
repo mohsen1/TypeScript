@@ -1635,11 +1635,14 @@ impl<'a> ThinCheckerState<'a> {
             }
             syntax_kind_ext::BLOCK => {
                 if let Some(block) = self.arena.get_block(node) {
+                    // Push a new scope for block-scoped variables (let/const)
+                    self.push_local_scope();
                     for &inner_stmt in &block.statements.nodes {
                         self.check_statement(inner_stmt);
                     }
                     // Check for function overload implementations in blocks
                     self.check_function_implementations(&block.statements.nodes);
+                    self.pop_local_scope();
                 }
             }
             syntax_kind_ext::FUNCTION_DECLARATION => {
@@ -1709,8 +1712,17 @@ impl<'a> ThinCheckerState<'a> {
             }
             syntax_kind_ext::FOR_STATEMENT => {
                 if let Some(loop_data) = self.arena.get_loop(node) {
+                    // Push scope for loop variables (e.g., for (let i = 0; ...))
+                    self.push_local_scope();
                     if !loop_data.initializer.is_none() {
-                        self.get_type_of_node(loop_data.initializer);
+                        // Check if initializer is a variable declaration list
+                        if let Some(init_node) = self.arena.get(loop_data.initializer) {
+                            if init_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+                                self.check_variable_declaration_list(loop_data.initializer);
+                            } else {
+                                self.get_type_of_node(loop_data.initializer);
+                            }
+                        }
                     }
                     if !loop_data.condition.is_none() {
                         self.get_type_of_node(loop_data.condition);
@@ -1719,13 +1731,24 @@ impl<'a> ThinCheckerState<'a> {
                         self.get_type_of_node(loop_data.incrementor);
                     }
                     self.check_statement(loop_data.statement);
+                    self.pop_local_scope();
                 }
             }
             syntax_kind_ext::FOR_IN_STATEMENT | syntax_kind_ext::FOR_OF_STATEMENT => {
                 if let Some(for_data) = self.arena.get_for_in_of(node) {
-                    self.get_type_of_node(for_data.initializer);
+                    // Push scope for loop variable
+                    self.push_local_scope();
+                    // Check if initializer is a variable declaration
+                    if let Some(init_node) = self.arena.get(for_data.initializer) {
+                        if init_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+                            self.check_variable_declaration_list(for_data.initializer);
+                        } else {
+                            self.get_type_of_node(for_data.initializer);
+                        }
+                    }
                     self.get_type_of_node(for_data.expression);
                     self.check_statement(for_data.statement);
+                    self.pop_local_scope();
                 }
             }
             syntax_kind_ext::TRY_STATEMENT => {
