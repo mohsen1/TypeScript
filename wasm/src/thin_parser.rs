@@ -372,8 +372,15 @@ impl ThinParserState {
         match self.token() {
             SyntaxKind::OpenBraceToken => self.parse_block(),
             SyntaxKind::VarKeyword |
-            SyntaxKind::LetKeyword |
-            SyntaxKind::ConstKeyword => self.parse_variable_statement(),
+            SyntaxKind::LetKeyword => self.parse_variable_statement(),
+            SyntaxKind::ConstKeyword => {
+                // const enum or const variable
+                if self.look_ahead_is_const_enum() {
+                    self.parse_const_enum_declaration()
+                } else {
+                    self.parse_variable_statement()
+                }
+            }
             SyntaxKind::FunctionKeyword => self.parse_function_declaration(),
             SyntaxKind::AsyncKeyword => {
                 // async function declaration or async arrow expression statement
@@ -521,6 +528,37 @@ impl ThinParserState {
         is_colon
     }
 
+    /// Look ahead to see if we have "const enum"
+    fn look_ahead_is_const_enum(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        // Skip 'const'
+        self.next_token();
+        // Check for 'enum'
+        let is_enum = self.is_token(SyntaxKind::EnumKeyword);
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_enum
+    }
+
+    /// Parse const enum declaration
+    fn parse_const_enum_declaration(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Consume 'const'
+        self.parse_expected(SyntaxKind::ConstKeyword);
+
+        // Parse the enum declaration normally
+        let enum_decl = self.parse_enum_declaration();
+
+        // The enum is already created - we just need to mark it as const
+        // For now, return as-is since the enum node doesn't have a const flag
+        // TODO: Add const flag to enum node if needed for semantics
+        enum_decl
+    }
+
     /// Parse labeled statement: label: statement
     fn parse_labeled_statement(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
@@ -590,13 +628,21 @@ impl ThinParserState {
         expression
     }
 
-    /// Parse entity name: A or A.B.C
+    /// Parse entity name: A or A.B.C or this or this.x
     fn parse_entity_name(&mut self) -> NodeIndex {
-        let mut left = self.parse_identifier();
+        // Handle 'this' keyword as a valid start for typeof expressions
+        let mut left = if self.is_token(SyntaxKind::ThisKeyword) {
+            let start_pos = self.token_pos();
+            let end_pos = self.token_end();
+            self.next_token();
+            self.arena.add_token(SyntaxKind::ThisKeyword as u16, start_pos, end_pos)
+        } else {
+            self.parse_identifier()
+        };
 
         while self.is_token(SyntaxKind::DotToken) {
             self.next_token();
-            let right = self.parse_identifier();
+            let right = self.parse_identifier_name(); // Use identifier_name to allow keywords as property names
             let start_pos = if let Some(node) = self.arena.get(left) { node.pos } else { 0 };
             let end_pos = self.token_end();
 
@@ -2482,8 +2528,15 @@ impl ThinParserState {
             SyntaxKind::ModuleKeyword => self.parse_module_declaration(),
             SyntaxKind::GlobalKeyword => self.parse_module_declaration(),
             SyntaxKind::VarKeyword |
-            SyntaxKind::LetKeyword |
-            SyntaxKind::ConstKeyword => self.parse_variable_statement(),
+            SyntaxKind::LetKeyword => self.parse_variable_statement(),
+            SyntaxKind::ConstKeyword => {
+                // declare const enum or declare const variable
+                if self.look_ahead_is_const_enum() {
+                    self.parse_const_enum_declaration()
+                } else {
+                    self.parse_variable_statement()
+                }
+            }
             SyntaxKind::AsyncKeyword => {
                 // declare async function
                 if self.look_ahead_is_async_function() {
@@ -3058,15 +3111,22 @@ impl ThinParserState {
             SyntaxKind::ModuleKeyword => self.parse_module_declaration(),
             SyntaxKind::AbstractKeyword => {
                 // export abstract class ...
-                self.parse_class_declaration()
+                self.parse_abstract_class_declaration()
             }
             SyntaxKind::DeclareKeyword => {
                 // export declare function/class/namespace/var/etc.
                 self.parse_ambient_declaration()
             }
             SyntaxKind::VarKeyword |
-            SyntaxKind::LetKeyword |
-            SyntaxKind::ConstKeyword => self.parse_variable_statement(),
+            SyntaxKind::LetKeyword => self.parse_variable_statement(),
+            SyntaxKind::ConstKeyword => {
+                // export const enum or export const variable
+                if self.look_ahead_is_const_enum() {
+                    self.parse_const_enum_declaration()
+                } else {
+                    self.parse_variable_statement()
+                }
+            }
             _ => {
                 // Unsupported export
                 self.parse_error_at_current_token("Declaration or statement expected");
