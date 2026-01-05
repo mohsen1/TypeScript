@@ -37,7 +37,7 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 | Baseline | Pass Rate | Notes |
 |----------|-----------|-------|
 | .errors.txt | **63.6%** (49/77) | Focus area |
-| .js emit | **39.5%** (30/76) | ES5 IIFE emit, class transforms |
+| .js emit | **39.5%** (30/76) | ES5 IIFE, instance props, heritage |
 
 ### Next Steps
 1. ✅ Export assignment validation (2309, 2304)
