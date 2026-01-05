@@ -1784,6 +1784,22 @@ impl<'a> ThinCheckerState<'a> {
                         }
 
                         self.check_statement(func.body);
+
+                        // Check for error 2355: function with return type must return a value
+                        // Only check if there's an explicit return type annotation
+                        let has_type_annotation = !func.type_annotation.is_none();
+                        let requires_return = self.requires_return_value(return_type);
+                        let has_return = self.body_has_return_with_value(func.body);
+
+                        if has_type_annotation && requires_return && !has_return {
+                            use crate::checker::types::diagnostics::diagnostic_codes;
+                            self.error_at_node(
+                                func.type_annotation,
+                                "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
+                                diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
+                            );
+                        }
+
                         self.pop_return_type();
                         self.pop_local_scope();
                     }
@@ -3013,6 +3029,144 @@ impl<'a> ThinCheckerState<'a> {
                     diagnostic_codes::SETTER_CANNOT_HAVE_REST_PARAMETER,
                 );
             }
+        }
+    }
+
+    /// Check if a return type requires a return value.
+    /// Returns false for void, undefined, any, and never.
+    fn requires_return_value(&self, return_type: TypeId) -> bool {
+        use crate::solver::TypeKey;
+
+        // void, undefined, any, never don't require a return value
+        if return_type == TypeId::VOID
+            || return_type == TypeId::UNDEFINED
+            || return_type == TypeId::ANY
+            || return_type == TypeId::NEVER
+        {
+            return false;
+        }
+
+        // Check for union types that include void/undefined
+        if let Some(TypeKey::Union(members)) = self.types.lookup(return_type) {
+            for &member in &members {
+                if member == TypeId::VOID || member == TypeId::UNDEFINED {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
+    /// Check if a function body has at least one return statement with a value.
+    /// This is a simplified check - doesn't do full control flow analysis.
+    fn body_has_return_with_value(&self, body_idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(body_idx) else {
+            return false;
+        };
+
+        // For block bodies, check all statements
+        if node.kind == syntax_kind_ext::BLOCK {
+            if let Some(block) = self.arena.get_block(node) {
+                return self.statements_have_return_with_value(&block.statements.nodes);
+            }
+        }
+
+        false
+    }
+
+    /// Check if any statement in the list contains a return with a value.
+    fn statements_have_return_with_value(&self, statements: &[NodeIndex]) -> bool {
+        for &stmt_idx in statements {
+            if self.statement_has_return_with_value(stmt_idx) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Check if a statement contains a return with a value.
+    fn statement_has_return_with_value(&self, stmt_idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(stmt_idx) else {
+            return false;
+        };
+
+        match node.kind {
+            syntax_kind_ext::RETURN_STATEMENT => {
+                if let Some(return_data) = self.arena.get_return_statement(node) {
+                    // Return with expression
+                    return !return_data.expression.is_none();
+                }
+                false
+            }
+            syntax_kind_ext::BLOCK => {
+                if let Some(block) = self.arena.get_block(node) {
+                    return self.statements_have_return_with_value(&block.statements.nodes);
+                }
+                false
+            }
+            syntax_kind_ext::IF_STATEMENT => {
+                if let Some(if_data) = self.arena.get_if_statement(node) {
+                    // Check both then and else branches
+                    let then_has = self.statement_has_return_with_value(if_data.then_statement);
+                    let else_has = if !if_data.else_statement.is_none() {
+                        self.statement_has_return_with_value(if_data.else_statement)
+                    } else {
+                        false
+                    };
+                    return then_has || else_has;
+                }
+                false
+            }
+            syntax_kind_ext::SWITCH_STATEMENT => {
+                if let Some(switch_data) = self.arena.get_switch(node) {
+                    if let Some(case_block_node) = self.arena.get(switch_data.case_block) {
+                        // Case block is stored as a Block containing case clauses
+                        if let Some(case_block) = self.arena.get_block(case_block_node) {
+                            for &clause_idx in &case_block.statements.nodes {
+                                if let Some(clause_node) = self.arena.get(clause_idx) {
+                                    if let Some(clause) = self.arena.get_case_clause(clause_node) {
+                                        if self.statements_have_return_with_value(&clause.statements.nodes) {
+                                            return true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                false
+            }
+            syntax_kind_ext::TRY_STATEMENT => {
+                if let Some(try_data) = self.arena.get_try(node) {
+                    let try_has = self.statement_has_return_with_value(try_data.try_block);
+                    let catch_has = if !try_data.catch_clause.is_none() {
+                        self.statement_has_return_with_value(try_data.catch_clause)
+                    } else {
+                        false
+                    };
+                    let finally_has = if !try_data.finally_block.is_none() {
+                        self.statement_has_return_with_value(try_data.finally_block)
+                    } else {
+                        false
+                    };
+                    return try_has || catch_has || finally_has;
+                }
+                false
+            }
+            syntax_kind_ext::CATCH_CLAUSE => {
+                if let Some(catch_data) = self.arena.get_catch_clause(node) {
+                    return self.statement_has_return_with_value(catch_data.block);
+                }
+                false
+            }
+            syntax_kind_ext::WHILE_STATEMENT | syntax_kind_ext::DO_STATEMENT | syntax_kind_ext::FOR_STATEMENT | syntax_kind_ext::FOR_IN_STATEMENT | syntax_kind_ext::FOR_OF_STATEMENT => {
+                if let Some(loop_data) = self.arena.get_loop(node) {
+                    return self.statement_has_return_with_value(loop_data.statement);
+                }
+                false
+            }
+            _ => false,
         }
     }
 }
