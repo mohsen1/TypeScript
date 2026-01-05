@@ -5592,13 +5592,23 @@ impl ThinParserState {
     /// Parse object type literal or mapped type
     /// Object type: { prop: T; method(): U }
     /// Mapped type: { [K in keyof T]: U } or { readonly [K in T]?: U }
+    /// Index signature: { [key: string]: T }
     fn parse_object_or_mapped_type(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::OpenBraceToken);
 
-        // Check if this is a mapped type: starts with [ or readonly [
-        if self.is_token(SyntaxKind::OpenBracketToken)
-            || (self.is_token(SyntaxKind::ReadonlyKeyword) && self.look_ahead_is_mapped_type())
+        // Check if this is a mapped type: [ followed by identifier and 'in'
+        // vs index signature: [ followed by identifier and ':'
+        if self.is_token(SyntaxKind::OpenBracketToken) {
+            if self.look_ahead_is_mapped_type_start() {
+                return self.parse_mapped_type_rest(start_pos);
+            }
+            // Not a mapped type - let type literal parsing handle index signature
+            return self.parse_type_literal_rest(start_pos);
+        }
+
+        // Check for readonly/+/- prefixed mapped type
+        if (self.is_token(SyntaxKind::ReadonlyKeyword) && self.look_ahead_is_mapped_type())
             || (self.is_token(SyntaxKind::PlusToken) || self.is_token(SyntaxKind::MinusToken))
         {
             return self.parse_mapped_type_rest(start_pos);
@@ -5606,6 +5616,26 @@ impl ThinParserState {
 
         // Otherwise it's an object type literal - parse as type literal
         self.parse_type_literal_rest(start_pos)
+    }
+
+    /// Look ahead to see if [ starts a mapped type (has 'in' keyword) vs index signature (has ':')
+    fn look_ahead_is_mapped_type_start(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        self.next_token(); // skip [
+
+        // Skip identifier
+        if self.is_token(SyntaxKind::Identifier) {
+            self.next_token();
+        }
+
+        // Check if followed by 'in' (mapped type) or ':' (index signature)
+        let is_mapped = self.is_token(SyntaxKind::InKeyword);
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_mapped
     }
 
     /// Look ahead to check if readonly is followed by [ (mapped type) vs property
