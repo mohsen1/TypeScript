@@ -344,3 +344,30 @@ fn test_class_name_any_error_2414() {
     assert!(codes.contains(&2414),
         "Expected error 2414 (Class name cannot be 'any'), got: {:?}", codes);
 }
+
+#[test]
+fn test_local_variable_scope_resolution() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that local variables inside functions are properly resolved
+    // This should NOT produce "Cannot find name 'x'" error
+    let code = r#"
+        function test() {
+            let x: number = 1;
+            let y = x + 1;
+        }
+    "#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have no "Cannot find name" errors (2304)
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(!codes.contains(&2304),
+        "Should not have 'Cannot find name' error for local variable, got: {:?}", codes);
+}
