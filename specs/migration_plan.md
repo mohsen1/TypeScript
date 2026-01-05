@@ -37,27 +37,53 @@ see SESSION_LOG.md -- always amended with each session's work
 | .js emit | **36.8%** (28/76) | Fixed baseline comparison bug |
 
 ### Next Steps
-1. ✅ Export assignment validation (2309, 2304)
-2. ⬜ Return type validation (2355)
-3. ⬜ Parser semantic errors (1128, 1248)
-4. ⬜ Class member resolution (this.x vs x vs ClassName.x)
-5. ⬜ RelatedInformation (point to definition sites)
 
-### Blockers Analysis (28 failing tests)
-- **Parser errors** (1005, 1068, 1128, 1248): Error recovery gaps
-- **Type errors** (2339, 2355, 2511): Property access, return type, abstract unions
-- **Accessor errors** (1183, 6234, 18045): Accessor-specific validation
+**Type Checking (26 failing tests)**
+1. ✅ Export assignment validation (2309, 2304)
+2. ✅ Setter parameter validation (1052, 1053)
+3. ⬜ Return type validation (2355) - function must return a value
+4. ⬜ Abstract class instantiation (2511) - cannot create instance of abstract
+5. ⬜ Static member access from instance (2662) - `this.staticProp` in static method
+6. ⬜ Abstract property validation (2715, 2729) - abstract in constructor
+7. ⬜ Accessor return type inference (7023) - implicit any in getter
+
+**Parser Semantic Errors**
+
+8. ⬜ Declaration expected (1128) - after certain tokens
+9. ⬜ Const modifier on class members (1248) - `const` invalid on properties
+10. ⬜ Accessor body in ambient context (1183) - no body in declare class
+11. ⬜ Accessor in ambient context ES5 (18045) - accessors need ES5+
+
+**Advanced Diagnostics**
+
+12. ⬜ RelatedInformation - point to definition sites for context
+13. ⬜ Accessor diagnostic hints (6234) - "did you mean to call it?"
+
+### Blockers Analysis (26 failing tests)
+| Category | Codes | Tests | Notes |
+|----------|-------|-------|-------|
+| Parser errors | 1005, 1068, 1128, 1248 | 6 | Error recovery gaps |
+| Type errors | 2339, 2355, 2511, 2662 | 12 | Property access, returns, abstract |
+| Accessor errors | 1183, 6234, 18045 | 4 | Ambient context, hints |
+| Abstract members | 2715, 2729, 2416, 2540 | 4 | Abstract property handling |
 
 ---
 
-# Phase 9: Full Rust Mode ⬜
+# Phase 9: Finishing up all TODOs ⬜
+
+- ⬜ 100% baseline in all aspects
+- ⬜ all todos left from previous phases
+- ⬜ todos in code
+- ⬜ missing unit tests
+
+# Phase 10: Full Rust Mode ⬜
 
 - ⬜ Remove TypeScript fallbacks
 - ⬜ Performance benchmarks vs tsc and tsc-go
 - ⬜ Memory usage optimization
 
 
-# Phase 10: Prepare for Release ⬜
+# Phase 11: Prepare for Release ⬜
 
 ## Strategy
 - **Track upstream**: Mirror TypeScript releases (5.x → 6.x)
