@@ -36,6 +36,15 @@ see SESSION_LOG.md -- always amended with each session's work
 | .errors.txt | 38.6% (2,070/5,360) | 33.8% (1,741/5,157) | 0.05% |
 | .js emit | 3.3% (194/5,837) | ~3% | 0.05% |
 
+### Work Process
+
+⚠️ **CRITICAL: For each task, ALWAYS:**
+1. **BEFORE**: `node scripts/ask-gemini.mjs "How should I implement [task]?"` - get guidance
+2. **IMPLEMENT**: Write code, run tests
+3. **AFTER**: `node scripts/ask-gemini.mjs --review wasm/src/[file].rs` - get review
+
+This catches design issues early and ensures consistent code quality.
+
 ### Next Steps
 
 **Type Checking (25 failing tests)**
@@ -44,8 +53,9 @@ see SESSION_LOG.md -- always amended with each session's work
 3. ✅ Return type validation (2355) - function must return a value (basic types)
 4. ✅ Abstract class instantiation (2511) - basic case (union types need more work)
 5. ✅ Static member access from instance (2662) - `foo` → "Did you mean 'C.foo'?"
-6. ⬜ Abstract property validation (2715, 2729) - abstract in constructor
-7. ⬜ Accessor return type inference (7023) - implicit any in getter
+6. ✅ Abstract property in constructor (2715) - `this.abstractProp` in ctor
+7. ⬜ Property used before initialization (2729) - needs dataflow analysis
+8. ⬜ Accessor return type inference (7023) - implicit any in getter
 
 **Parser Semantic Errors**
 
