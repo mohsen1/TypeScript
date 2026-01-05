@@ -12,7 +12,6 @@
 
 use ena::unify::{InPlaceUnificationTable, UnifyKey, UnifyValue, NoError};
 use std::sync::Arc;
-use std::collections::HashSet;
 use crate::solver::types::*;
 use crate::solver::intern::TypeInterner;
 
@@ -263,7 +262,7 @@ impl<'a> InferenceContext<'a> {
     /// Collect a constraint from an assignment: source flows into target
     /// If target is an inference variable, source becomes a lower bound.
     /// If source is an inference variable, target becomes an upper bound.
-    pub fn collect_constraint(&mut self, source: TypeId, target: TypeId) {
+    pub fn collect_constraint(&mut self, _source: TypeId, _target: TypeId) {
         // Check if target is an inference variable (via TypeKey lookup)
         // For now, we rely on the caller to call add_lower_bound/add_upper_bound directly
         // This is a placeholder for more sophisticated constraint collection

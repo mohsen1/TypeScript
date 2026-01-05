@@ -8,6 +8,9 @@
 //!
 //! - Uses ThinNodeArena instead of NodeArena
 //! - Each node is 16 bytes (vs 208 bytes for fat Node enum)
+
+// Allow dead code for parser infrastructure methods that will be used in future phases
+#![allow(dead_code)]
 //! - Node data is stored in separate typed pools
 //! - 4 nodes fit per 64-byte cache line (vs 0.31 for fat nodes)
 
@@ -545,8 +548,6 @@ impl ThinParserState {
 
     /// Parse const enum declaration
     fn parse_const_enum_declaration(&mut self) -> NodeIndex {
-        let start_pos = self.token_pos();
-
         // Consume 'const'
         self.parse_expected(SyntaxKind::ConstKeyword);
 
@@ -6807,7 +6808,6 @@ impl ThinParserState {
                 | SyntaxKind::NullKeyword
                 | SyntaxKind::UndefinedKeyword
                 | SyntaxKind::OutKeyword
-                | SyntaxKind::OverrideKeyword
                 | SyntaxKind::SatisfiesKeyword
                 | SyntaxKind::AssertKeyword
                 | SyntaxKind::AssertsKeyword

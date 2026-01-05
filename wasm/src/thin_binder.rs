@@ -3,6 +3,9 @@
 //! This is a clean implementation of the binder that works directly with
 //! ThinNode and ThinNodeArena, avoiding the old Node enum pattern matching.
 
+// Allow dead code for binder infrastructure methods that will be used in future phases
+#![allow(dead_code)]
+
 use crate::parser::thin_node::{ThinNodeArena, ThinNode};
 use crate::parser::{NodeIndex, NodeList, syntax_kind_ext};
 use crate::binder::{

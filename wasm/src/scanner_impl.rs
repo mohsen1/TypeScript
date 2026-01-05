@@ -6,6 +6,9 @@
 //! IMPORTANT: All positions are character-based (like JavaScript's string indexing),
 //! NOT byte-based. This ensures compatibility with TypeScript's scanner positions.
 
+// Allow dead code for scanner infrastructure methods that will be used in future phases
+#![allow(dead_code)]
+
 use wasm_bindgen::prelude::*;
 use crate::scanner::SyntaxKind;
 use crate::char_codes::CharacterCodes;

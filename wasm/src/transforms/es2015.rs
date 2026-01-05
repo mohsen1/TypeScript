@@ -9,6 +9,9 @@
 //! - Spread in arrays → concat/apply
 //! - let/const → var
 
+// Allow dead code for transform infrastructure methods that will be used in future phases
+#![allow(dead_code)]
+
 use super::{TransformContext, Transformer};
 use crate::parser::{Node, NodeIndex, NodeBase, NodeList};
 use crate::parser::expressions::FunctionExpression;

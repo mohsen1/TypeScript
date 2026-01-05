@@ -8,6 +8,9 @@
 //! - async generator → combined transform
 //! - for-await-of → async iteration protocol
 
+// Allow dead code for transform infrastructure methods that will be used in future phases
+#![allow(dead_code)]
+
 use super::{TransformContext, Transformer};
 use crate::parser::{Node, NodeIndex, NodeBase, NodeList, syntax_kind_ext};
 use crate::parser::ast::{

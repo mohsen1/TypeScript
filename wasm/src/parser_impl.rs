@@ -3,6 +3,9 @@
 //! This module implements the core Parser struct that produces an AST from tokens.
 //! It's designed to produce the same AST as TypeScript's parser.ts.
 
+// Allow dead code for parser infrastructure methods that will be used in future phases
+#![allow(dead_code)]
+
 use wasm_bindgen::prelude::*;
 use crate::scanner::SyntaxKind;
 use crate::scanner_impl::ScannerState;

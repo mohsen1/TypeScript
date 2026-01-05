@@ -8,6 +8,9 @@
 //! - Uses ThinNodeArena for AST access (16-byte nodes, 13x cache improvement)
 //! - Dispatches based on ThinNode.kind (u16)
 //! - Uses accessor methods to get typed node data
+
+// Allow dead code for emitter infrastructure methods that will be used in future phases
+#![allow(dead_code)]
 //!
 //! # Status
 //!

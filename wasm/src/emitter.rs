@@ -3,6 +3,9 @@
 //! The emitter converts an AST back to source code (JavaScript or TypeScript).
 //! This is Phase 6 of the Rust migration.
 
+// Allow dead code for emitter infrastructure methods that will be used in future phases
+#![allow(dead_code)]
+
 use crate::parser::{Node, NodeList, NodeIndex, TemplateSpan};
 use crate::parser::base::NodeBase;
 use crate::scanner::SyntaxKind;

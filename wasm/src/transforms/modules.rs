@@ -11,7 +11,10 @@
 //! - __esModule marker
 //! - Interop helpers (__importDefault, __importStar)
 
-use super::{TransformContext, Transformer, HelpersNeeded};
+use super::{TransformContext, Transformer};
+
+// Re-export HelpersNeeded for tests
+pub use super::HelpersNeeded;
 use crate::emitter::ModuleKind;
 use crate::parser::{Node, NodeIndex, NodeBase, NodeList, syntax_kind_ext};
 use crate::parser::ast::{

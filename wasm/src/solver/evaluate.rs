@@ -410,8 +410,6 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
     /// Extract string literals from a type (for mapped type iteration)
     fn extract_string_literals(&self, type_id: TypeId) -> Option<Vec<std::sync::Arc<str>>> {
-        use std::sync::Arc;
-
         let key = self.interner.lookup(type_id)?;
 
         match key {

@@ -107,7 +107,8 @@ pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
     resolver: &'a R,
     /// Active subtype pairs being checked (for cycle detection)
     in_progress: HashSet<(TypeId, TypeId)>,
-    /// Cache of resolved Ref types
+    /// Cache of resolved Ref types (for future use in Ref resolution optimization)
+    #[allow(dead_code)]
     ref_cache: HashSet<(SymbolRef, TypeId)>,
 }
 

@@ -96,6 +96,7 @@ impl<'a> TypeLowering<'a> {
             // Type literal (object type)
             // =========================================================================
             k if k == syntax_kind_ext::TYPE_LITERAL => {
+                eprintln!("[DEBUG lower_type] Matched TYPE_LITERAL for kind={}", k);
                 self.lower_type_literal(node_idx)
             }
 
@@ -211,6 +212,8 @@ impl<'a> TypeLowering<'a> {
             // Unknown/unsupported - return ANY for now
             // =========================================================================
             _ => {
+                // Debug: print unhandled kind
+                eprintln!("[DEBUG lower_type] Unhandled kind: {} (TYPE_LITERAL={})", node.kind, syntax_kind_ext::TYPE_LITERAL);
                 TypeId::ANY
             }
         }
@@ -391,7 +394,10 @@ impl<'a> TypeLowering<'a> {
             None => return TypeId::ERROR,
         };
 
+        eprintln!("[DEBUG lower_type_literal] node.kind={} has_data={}", node.kind, node.has_data());
+
         if let Some(data) = self.arena.get_type_literal(node) {
+            eprintln!("[DEBUG lower_type_literal] Got type literal data, members={}", data.members.nodes.len());
             let properties: Vec<PropertyInfo> = data.members.nodes.iter()
                 .filter_map(|&idx| self.lower_type_element(idx))
                 .collect();
@@ -405,8 +411,12 @@ impl<'a> TypeLowering<'a> {
     fn lower_type_element(&self, node_idx: NodeIndex) -> Option<PropertyInfo> {
         let node = self.arena.get(node_idx)?;
 
+        eprintln!("[DEBUG lower_type_element] node.kind={} PROPERTY_SIGNATURE={}",
+                  node.kind, syntax_kind_ext::PROPERTY_SIGNATURE);
+
         // Check if it's a property or method signature
         if let Some(sig) = self.arena.get_signature(node) {
+            eprintln!("[DEBUG lower_type_element] Got signature, name_idx={:?}", sig.name);
             // Get property name as Arc<str>
             let name: Arc<str> = if sig.name != NodeIndex::NONE {
                 if let Some(name_node) = self.arena.get(sig.name) {
@@ -730,7 +740,7 @@ impl<'a> TypeLowering<'a> {
 
             // Add template spans (type + text pairs)
             for &span_idx in &data.template_spans.nodes {
-                if let Some(span_node) = self.arena.get(span_idx) {
+                if self.arena.get(span_idx).is_some() {
                     // Template span has a type and literal parts
                     // For simplicity, we'll just add the type reference
                     // TODO: Parse template span structure properly

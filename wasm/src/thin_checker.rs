@@ -53,10 +53,12 @@ pub struct ThinCheckerState<'a> {
     /// Cached types for nodes.
     node_types: FxHashMap<u32, TypeId>,
 
-    /// Type parameter names for type_to_string.
+    /// Type parameter names for type_to_string (for future use in error messages).
+    #[allow(dead_code)]
     type_parameter_names: FxHashMap<TypeId, String>,
 
-    /// Current type parameter scope (name -> TypeId).
+    /// Current type parameter scope (name -> TypeId) (for future generic instantiation).
+    #[allow(dead_code)]
     type_parameter_scope: HashMap<String, TypeId>,
 
     /// Diagnostics produced during type checking.
@@ -78,13 +80,16 @@ pub struct ThinCheckerState<'a> {
     /// Contextual type for expression being checked.
     contextual_type: Option<TypeId>,
 
-    /// Cache for type relation results.
+    /// Cache for type relation results (for future caching optimization).
+    #[allow(dead_code)]
     relation_cache: RefCell<FxHashMap<(TypeId, TypeId, u8), bool>>,
 
-    /// Current depth of recursive type instantiation.
+    /// Current depth of recursive type instantiation (for future cycle detection).
+    #[allow(dead_code)]
     instantiation_depth: RefCell<u32>,
 
-    /// Current depth of call expression resolution.
+    /// Current depth of call expression resolution (for future cycle detection).
+    #[allow(dead_code)]
     call_depth: RefCell<u32>,
 
     /// Stack of local scopes for function parameters and block-scoped variables.
@@ -961,17 +966,79 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of object literal.
     fn get_type_of_object_literal(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::PropertyInfo;
+        use std::sync::Arc;
+
         let Some(node) = self.arena.get(idx) else {
             return TypeId::ANY;
         };
 
-        let Some(_obj) = self.arena.get_literal_expr(node) else {
+        let Some(obj) = self.arena.get_literal_expr(node) else {
             return TypeId::ANY;
         };
 
-        // TODO: Create PropertyInfo for object literal properties
-        // For now, return an empty anonymous object type
-        self.types.object(Vec::new())
+        // Collect properties from the object literal
+        let mut properties: Vec<PropertyInfo> = Vec::new();
+
+        for &elem_idx in &obj.elements.nodes {
+            let Some(elem_node) = self.arena.get(elem_idx) else {
+                continue;
+            };
+
+            // Property assignment: { x: value }
+            if let Some(prop) = self.arena.get_property_assignment(elem_node) {
+                if let Some(name) = self.get_property_name(prop.name) {
+                    let value_type = self.get_type_of_node(prop.initializer);
+                    properties.push(PropertyInfo {
+                        name: Arc::from(name.as_str()),
+                        type_id: value_type,
+                        optional: false,
+                        readonly: false,
+                    });
+                }
+            }
+            // Shorthand property: { x } - identifier is both name and value
+            else if elem_node.kind == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT {
+                if let Some(ident) = self.arena.get_identifier(elem_node) {
+                    let value_type = self.get_type_of_node(elem_idx);
+                    properties.push(PropertyInfo {
+                        name: Arc::from(ident.escaped_text.as_str()),
+                        type_id: value_type,
+                        optional: false,
+                        readonly: false,
+                    });
+                }
+            }
+            // Method shorthand: { foo() {} }
+            else if let Some(method) = self.arena.get_method_decl(elem_node) {
+                if let Some(name) = self.get_property_name(method.name) {
+                    let method_type = self.get_type_of_function(elem_idx);
+                    properties.push(PropertyInfo {
+                        name: Arc::from(name.as_str()),
+                        type_id: method_type,
+                        optional: false,
+                        readonly: false,
+                    });
+                }
+            }
+            // Skip spread elements and computed properties for now
+        }
+
+        self.types.object(properties)
+    }
+
+    /// Get property name as string from a property name node (identifier, string literal, etc.)
+    fn get_property_name(&self, name_idx: NodeIndex) -> Option<String> {
+        let name_node = self.arena.get(name_idx)?;
+
+        // Identifier
+        if let Some(ident) = self.arena.get_identifier(name_node) {
+            return Some(ident.escaped_text.clone());
+        }
+
+        // For string/numeric literals, we'd need access to the token text
+        // For now, just handle identifiers which are the common case
+        None
     }
 
     /// Get type of prefix unary expression.
@@ -1428,8 +1495,20 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Report an excess property error using solver diagnostics with source tracking.
+    pub fn error_excess_property_at(&mut self, prop_name: &str, target: TypeId, idx: NodeIndex) {
+        if let Some(loc) = self.get_source_location(idx) {
+            let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
+                &self.types,
+                self.file_name.as_str(),
+            );
+            let diag = builder.excess_property(prop_name, target, loc.start, loc.length());
+            self.diagnostics.push(diag.to_checker_diagnostic(&self.file_name));
+        }
+    }
+
     /// Create a diagnostic collector for batch error reporting.
-    pub fn create_diagnostic_collector(&self) -> crate::solver::DiagnosticCollector {
+    pub fn create_diagnostic_collector(&self) -> crate::solver::DiagnosticCollector<'_> {
         crate::solver::DiagnosticCollector::new(&self.types, self.file_name.as_str())
     }
 
@@ -1648,7 +1727,7 @@ impl<'a> ThinCheckerState<'a> {
 
         // Get declared type from type annotation
         let declared_type = if !var_decl.type_annotation.is_none() {
-            self.get_type_of_node(var_decl.type_annotation)
+            self.get_type_from_type_node(var_decl.type_annotation)
         } else {
             TypeId::ANY
         };
@@ -1663,6 +1742,48 @@ impl<'a> ThinCheckerState<'a> {
                     // Report type error
                     self.error_type_not_assignable_at(init_type, declared_type, var_decl.initializer);
                 }
+
+                // For object literals, also check for excess properties and missing required properties
+                if let Some(init_node) = self.arena.get(var_decl.initializer) {
+                    if init_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                        self.check_object_literal_assignment(init_type, declared_type, var_decl.initializer);
+                    }
+                }
+            }
+        }
+    }
+
+    /// Check object literal assignment for excess properties and missing required properties.
+    fn check_object_literal_assignment(&mut self, source: TypeId, target: TypeId, idx: NodeIndex) {
+        use crate::solver::TypeKey;
+
+        // Get the properties of both types
+        let source_props = match self.types.lookup(source) {
+            Some(TypeKey::Object(props)) => props,
+            _ => return,
+        };
+
+        let target_props = match self.types.lookup(target) {
+            Some(TypeKey::Object(props)) => props,
+            _ => return,
+        };
+
+        // Check for excess properties in source that don't exist in target
+        for source_prop in &source_props {
+            let exists_in_target = target_props.iter().any(|p| p.name == source_prop.name);
+            if !exists_in_target {
+                self.error_excess_property_at(&source_prop.name, target, idx);
+            }
+        }
+
+        // Check for missing required properties in source
+        for target_prop in &target_props {
+            if target_prop.optional {
+                continue;
+            }
+            let exists_in_source = source_props.iter().any(|p| p.name == target_prop.name);
+            if !exists_in_source {
+                self.error_property_missing_at(&target_prop.name, source, target, idx);
             }
         }
     }

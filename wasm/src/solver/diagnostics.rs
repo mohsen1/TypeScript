@@ -142,6 +142,9 @@ pub mod codes {
 
     /// Object is of type 'unknown'.
     pub const OBJECT_IS_UNKNOWN: u32 = 2571;
+
+    /// Object literal may only specify known properties, and '{0}' does not exist in type '{1}'.
+    pub const EXCESS_PROPERTY: u32 = 2353;
 }
 
 // =============================================================================
@@ -409,6 +412,7 @@ impl<'a> TypeFormatter<'a> {
 
 /// Builder for creating type error diagnostics.
 pub struct DiagnosticBuilder<'a> {
+    #[allow(dead_code)]
     interner: &'a TypeInterner,
     formatter: TypeFormatter<'a>,
 }
@@ -496,6 +500,18 @@ impl<'a> DiagnosticBuilder<'a> {
         TypeDiagnostic::error(
             format!("Cannot assign to '{}' because it is a read-only property.", prop_name),
             codes::READONLY_PROPERTY,
+        )
+    }
+
+    /// Create an "Excess property" diagnostic.
+    pub fn excess_property(&mut self, prop_name: &str, target: TypeId) -> TypeDiagnostic {
+        let target_str = self.formatter.format(target);
+        TypeDiagnostic::error(
+            format!(
+                "Object literal may only specify known properties, and '{}' does not exist in type '{}'.",
+                prop_name, target_str
+            ),
+            codes::EXCESS_PROPERTY,
         )
     }
 }
@@ -606,6 +622,18 @@ impl<'a> SpannedDiagnosticBuilder<'a> {
         length: u32,
     ) -> TypeDiagnostic {
         self.builder.not_callable(type_id)
+            .with_span(self.span(start, length))
+    }
+
+    /// Create an "Excess property" diagnostic with span.
+    pub fn excess_property(
+        &mut self,
+        prop_name: &str,
+        target: TypeId,
+        start: u32,
+        length: u32,
+    ) -> TypeDiagnostic {
+        self.builder.excess_property(prop_name, target)
             .with_span(self.span(start, length))
     }
 

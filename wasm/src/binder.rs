@@ -3,6 +3,9 @@
 //! The binder walks the AST and creates symbols, establishing
 //! scope and name resolution.
 
+// Allow dead code for binder infrastructure methods that will be used in future phases
+#![allow(dead_code)]
+
 use serde::Serialize;
 use rustc_hash::FxHashMap;
 use crate::parser::NodeIndex;

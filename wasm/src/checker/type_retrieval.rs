@@ -3,6 +3,9 @@
 //! This module contains the core get_type_of_node implementation and
 //! type inference logic for all AST node types.
 
+// Allow dead code for type retrieval infrastructure methods that will be used in future phases
+#![allow(dead_code)]
+
 use crate::parser::NodeIndex;
 use crate::scanner::SyntaxKind;
 use crate::binder::{SymbolId, SymbolArena, SymbolTable, symbol_flags};
