@@ -201,6 +201,11 @@ impl ThinBinderState {
                 if let Some(func) = arena.get_function(node) {
                     if let Some(name) = self.get_identifier_name(arena, func.name) {
                         let sym_id = self.symbols.alloc(symbol_flags::FUNCTION, name.to_string());
+                        // Set the value_declaration to this function declaration node
+                        if let Some(sym) = self.symbols.get_mut(sym_id) {
+                            sym.value_declaration = func_idx;
+                            sym.declarations.push(func_idx);
+                        }
                         self.current_scope.set(name.to_string(), sym_id);
                         self.node_symbols.insert(func_idx.0, sym_id);
                     }
@@ -420,6 +425,11 @@ impl ThinBinderState {
                 // Check if already bound (hoisted)
                 if !self.current_scope.has(name) {
                     let sym_id = self.symbols.alloc(symbol_flags::FUNCTION, name.to_string());
+                    // Set the value_declaration to this function declaration node
+                    if let Some(sym) = self.symbols.get_mut(sym_id) {
+                        sym.value_declaration = idx;
+                        sym.declarations.push(idx);
+                    }
                     self.current_scope.set(name.to_string(), sym_id);
                     self.node_symbols.insert(idx.0, sym_id);
                 }

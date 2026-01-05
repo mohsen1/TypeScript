@@ -2465,13 +2465,21 @@ impl ThinNodeArena {
 
     /// Get expression statement data (returns the expression node index).
     #[inline]
-    pub fn get_expression_statement(&self, node: &ThinNode) -> Option<ExpressionStatementData> {
+    pub fn get_expression_statement(&self, node: &ThinNode) -> Option<&ExprStatementData> {
         use super::syntax_kind_ext::EXPRESSION_STATEMENT;
-        if node.kind == EXPRESSION_STATEMENT {
-            // Expression statement stores expression index in data_index
-            Some(ExpressionStatementData {
-                expression: NodeIndex(node.data_index),
-            })
+        if node.has_data() && node.kind == EXPRESSION_STATEMENT {
+            self.expr_statements.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get return statement data (returns the expression node index).
+    #[inline]
+    pub fn get_return_statement(&self, node: &ThinNode) -> Option<&ReturnData> {
+        use super::syntax_kind_ext::{RETURN_STATEMENT, THROW_STATEMENT};
+        if node.has_data() && (node.kind == RETURN_STATEMENT || node.kind == THROW_STATEMENT) {
+            self.return_data.get(node.data_index as usize)
         } else {
             None
         }

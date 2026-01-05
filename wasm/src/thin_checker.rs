@@ -89,6 +89,9 @@ pub struct ThinCheckerState<'a> {
 
     /// Stack of local scopes for function parameters and block-scoped variables.
     local_scope_stack: Vec<FxHashMap<String, TypeId>>,
+
+    /// Stack of expected return types for functions (for return statement checking).
+    return_type_stack: Vec<TypeId>,
 }
 
 /// Maximum depth for recursive type instantiation.
@@ -123,6 +126,7 @@ impl<'a> ThinCheckerState<'a> {
             instantiation_depth: RefCell::new(0),
             call_depth: RefCell::new(0),
             local_scope_stack: Vec::new(),
+            return_type_stack: Vec::new(),
         }
     }
 
@@ -155,6 +159,21 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         None
+    }
+
+    /// Push an expected return type onto the stack (when entering a function).
+    pub fn push_return_type(&mut self, return_type: TypeId) {
+        self.return_type_stack.push(return_type);
+    }
+
+    /// Pop an expected return type from the stack (when exiting a function).
+    pub fn pop_return_type(&mut self) {
+        self.return_type_stack.pop();
+    }
+
+    /// Get the current expected return type (if in a function).
+    pub fn current_return_type(&self) -> Option<TypeId> {
+        self.return_type_stack.last().copied()
     }
 
     // =========================================================================
@@ -664,6 +683,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of call expression.
     fn get_type_of_call_expression(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::TypeKey;
+
         let Some(node) = self.arena.get(idx) else {
             return TypeId::ANY;
         };
@@ -673,10 +694,45 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         // Get the type of the callee
-        let _callee_type = self.get_type_of_node(call.expression);
+        let callee_type = self.get_type_of_node(call.expression);
 
-        // For now, return any for function calls
-        // TODO: Extract return type from function type using TypeInterner lookup
+        // Look up the function type to get return type and check arguments
+        if let Some(TypeKey::Function(shape)) = self.types.lookup(callee_type) {
+            // Get arguments list (may be None for calls without arguments)
+            let args = call.arguments.as_ref().map(|a| &a.nodes).map(|n| n.as_slice()).unwrap_or(&[]);
+
+            // Check argument count
+            let required_params = shape.params.iter().filter(|p| !p.optional && !p.rest).count();
+            let total_params = shape.params.len();
+            let arg_count = args.len();
+
+            // Check if we have too few arguments
+            if arg_count < required_params {
+                self.error_argument_count_mismatch_at(required_params, arg_count, idx);
+            }
+
+            // Check if we have too many arguments (unless there's a rest param)
+            let has_rest = shape.params.iter().any(|p| p.rest);
+            if !has_rest && arg_count > total_params {
+                self.error_argument_count_mismatch_at(total_params, arg_count, idx);
+            }
+
+            // Check each argument against its corresponding parameter
+            for (i, &arg_idx) in args.iter().enumerate() {
+                if i < shape.params.len() {
+                    let arg_type = self.get_type_of_node(arg_idx);
+                    let param_type = shape.params[i].type_id;
+
+                    if param_type != TypeId::ANY && !self.is_assignable_to(arg_type, param_type) {
+                        self.error_argument_not_assignable_at(arg_type, param_type, arg_idx);
+                    }
+                }
+            }
+
+            return shape.return_type;
+        }
+
+        // Callee is not a known function type - return any
         TypeId::ANY
     }
 
@@ -1291,9 +1347,10 @@ impl<'a> ThinCheckerState<'a> {
                 self.check_variable_statement(stmt_idx);
             }
             syntax_kind_ext::EXPRESSION_STATEMENT => {
-                // Type-check the expression - get it from the expression pool
-                // ExpressionStatement stores single expression at data_index
-                self.get_type_of_node(stmt_idx);
+                // ExpressionStatement stores expression index in data_index
+                if let Some(expr_stmt) = self.arena.get_expression_statement(node) {
+                    self.get_type_of_node(expr_stmt.expression);
+                }
             }
             syntax_kind_ext::IF_STATEMENT => {
                 if let Some(if_data) = self.arena.get_if_statement(node) {
@@ -1308,8 +1365,7 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
             syntax_kind_ext::RETURN_STATEMENT => {
-                // Return statement expression - just type check the node
-                self.get_type_of_node(stmt_idx);
+                self.check_return_statement(stmt_idx);
             }
             syntax_kind_ext::BLOCK => {
                 if let Some(block) = self.arena.get_block(node) {
@@ -1323,6 +1379,14 @@ impl<'a> ThinCheckerState<'a> {
                     // Check function body if present
                     if !func.body.is_none() {
                         self.push_local_scope();
+
+                        // Get declared return type
+                        let return_type = if !func.type_annotation.is_none() {
+                            self.get_type_of_node(func.type_annotation)
+                        } else {
+                            TypeId::ANY
+                        };
+                        self.push_return_type(return_type);
 
                         // Add parameters to local scope
                         for &param_idx in &func.parameters.nodes {
@@ -1344,6 +1408,7 @@ impl<'a> ThinCheckerState<'a> {
                         }
 
                         self.check_statement(func.body);
+                        self.pop_return_type();
                         self.pop_local_scope();
                     }
                 }
@@ -1471,6 +1536,39 @@ impl<'a> ThinCheckerState<'a> {
                     self.error_type_not_assignable_at(init_type, declared_type, var_decl.initializer);
                 }
             }
+        }
+    }
+
+    /// Check a return statement.
+    fn check_return_statement(&mut self, stmt_idx: NodeIndex) {
+        let Some(node) = self.arena.get(stmt_idx) else {
+            return;
+        };
+
+        let Some(return_data) = self.arena.get_return_statement(node) else {
+            return;
+        };
+
+        // Get the expected return type from the function context
+        let expected_type = self.current_return_type().unwrap_or(TypeId::ANY);
+
+        // Get the type of the return expression (if any)
+        let return_type = if !return_data.expression.is_none() {
+            self.get_type_of_node(return_data.expression)
+        } else {
+            // `return;` without expression returns undefined
+            TypeId::UNDEFINED
+        };
+
+        // Check if the return type is assignable to the expected type
+        if expected_type != TypeId::ANY && !self.is_assignable_to(return_type, expected_type) {
+            // Report error at the return expression (or at return keyword if no expression)
+            let error_node = if !return_data.expression.is_none() {
+                return_data.expression
+            } else {
+                stmt_idx
+            };
+            self.error_type_not_assignable_at(return_type, expected_type, error_node);
         }
     }
 }
