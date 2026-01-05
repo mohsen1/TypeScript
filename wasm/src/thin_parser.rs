@@ -91,7 +91,8 @@ impl ThinParserState {
     fn enter_recursion(&mut self) -> bool {
         self.recursion_depth += 1;
         if self.recursion_depth > Self::MAX_RECURSION_DEPTH {
-            self.parse_error_at_current_token("Maximum recursion depth exceeded");
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token("Maximum recursion depth exceeded", diagnostic_codes::UNEXPECTED_TOKEN);
             false
         } else {
             true
@@ -165,21 +166,99 @@ impl ThinParserState {
             self.next_token();
             true
         } else {
-            self.parse_error_at_current_token(&format!("Expected {:?}", kind));
+            self.error_token_expected(Self::token_to_string(kind));
             false
         }
     }
 
-    /// Report parse error at current token
-    pub fn parse_error_at_current_token(&mut self, message: &str) {
+    /// Convert SyntaxKind to human-readable token string
+    fn token_to_string(kind: SyntaxKind) -> &'static str {
+        match kind {
+            SyntaxKind::OpenBraceToken => "{",
+            SyntaxKind::CloseBraceToken => "}",
+            SyntaxKind::OpenParenToken => "(",
+            SyntaxKind::CloseParenToken => ")",
+            SyntaxKind::OpenBracketToken => "[",
+            SyntaxKind::CloseBracketToken => "]",
+            SyntaxKind::SemicolonToken => ";",
+            SyntaxKind::CommaToken => ",",
+            SyntaxKind::ColonToken => ":",
+            SyntaxKind::DotToken => ".",
+            SyntaxKind::EqualsToken => "=",
+            SyntaxKind::GreaterThanToken => ">",
+            SyntaxKind::LessThanToken => "<",
+            SyntaxKind::QuestionToken => "?",
+            SyntaxKind::ExclamationToken => "!",
+            SyntaxKind::AtToken => "@",
+            SyntaxKind::AmpersandToken => "&",
+            SyntaxKind::BarToken => "|",
+            SyntaxKind::PlusToken => "+",
+            SyntaxKind::MinusToken => "-",
+            SyntaxKind::AsteriskToken => "*",
+            SyntaxKind::SlashToken => "/",
+            SyntaxKind::EqualsGreaterThanToken => "=>",
+            SyntaxKind::DotDotDotToken => "...",
+            SyntaxKind::Identifier => "identifier",
+            _ => "token",
+        }
+    }
+
+    /// Report parse error at current token with specific error code
+    pub fn parse_error_at_current_token(&mut self, message: &str, code: u32) {
         let start = self.scanner.get_token_start() as u32;
         let end = self.scanner.get_token_end() as u32;
         self.parse_diagnostics.push(ParseDiagnostic {
             start,
             length: end - start,
             message: message.to_string(),
-            code: 1000,
+            code,
         });
+    }
+
+    // =========================================================================
+    // Typed error helper methods (use these instead of parse_error_at_current_token)
+    // =========================================================================
+
+    /// Error: Expression expected (TS1109)
+    fn error_expression_expected(&mut self) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        self.parse_error_at_current_token("Expression expected", diagnostic_codes::EXPRESSION_EXPECTED);
+    }
+
+    /// Error: Type expected (TS1110)
+    fn error_type_expected(&mut self) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        self.parse_error_at_current_token("Type expected", diagnostic_codes::TYPE_EXPECTED);
+    }
+
+    /// Error: Identifier expected (TS1003)
+    fn error_identifier_expected(&mut self) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        self.parse_error_at_current_token("Identifier expected", diagnostic_codes::IDENTIFIER_EXPECTED);
+    }
+
+    /// Error: '{token}' expected (TS1005)
+    fn error_token_expected(&mut self, token: &str) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        self.parse_error_at_current_token(&format!("'{}' expected", token), diagnostic_codes::TOKEN_EXPECTED);
+    }
+
+    /// Error: Declaration expected (TS1146)
+    fn error_declaration_expected(&mut self) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        self.parse_error_at_current_token("Declaration expected", diagnostic_codes::DECLARATION_EXPECTED);
+    }
+
+    /// Error: Statement expected (TS1129)
+    fn error_statement_expected(&mut self) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        self.parse_error_at_current_token("Statement expected", diagnostic_codes::STATEMENT_EXPECTED);
+    }
+
+    /// Error: Unexpected token (TS1012)
+    fn error_unexpected_token(&mut self) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        self.parse_error_at_current_token("Unexpected token", diagnostic_codes::UNEXPECTED_TOKEN);
     }
 
     /// Parse semicolon (or recover from missing)
@@ -187,7 +266,7 @@ impl ThinParserState {
         if self.is_token(SyntaxKind::SemicolonToken) {
             self.next_token();
         } else if !self.can_parse_semicolon() {
-            self.parse_error_at_current_token("';' expected");
+            self.error_token_expected(";");
         }
     }
 
@@ -245,7 +324,7 @@ impl ThinParserState {
                 self.current_token = SyntaxKind::GreaterThanGreaterThanEqualsToken;
             }
             _ => {
-                self.parse_error_at_current_token("Expected GreaterThanToken");
+                self.error_token_expected(">");
             }
         }
     }
@@ -2623,12 +2702,12 @@ impl ThinParserState {
                 if self.look_ahead_is_async_function() {
                     self.parse_async_function_declaration()
                 } else {
-                    self.parse_error_at_current_token("Declaration expected after 'declare'");
+                    self.error_declaration_expected();
                     self.parse_expression_statement()
                 }
             }
             _ => {
-                self.parse_error_at_current_token("Declaration expected after 'declare'");
+                self.error_declaration_expected();
                 self.parse_expression_statement()
             }
         }
@@ -3210,7 +3289,7 @@ impl ThinParserState {
             }
             _ => {
                 // Unsupported export
-                self.parse_error_at_current_token("Declaration or statement expected");
+                self.error_statement_expected();
                 self.parse_expression_statement()
             }
         };
@@ -3233,7 +3312,8 @@ impl ThinParserState {
     /// Parse a string literal (used for module specifiers)
     fn parse_string_literal(&mut self) -> NodeIndex {
         if !self.is_token(SyntaxKind::StringLiteral) {
-            self.parse_error_at_current_token("String literal expected");
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token("String literal expected", diagnostic_codes::TOKEN_EXPECTED);
             return NodeIndex::NONE;
         }
 
@@ -4689,7 +4769,7 @@ impl ThinParserState {
                 // Unknown primary expression - create an error token
                 let start_pos = self.token_pos();
                 let end_pos = self.token_end();
-                self.parse_error_at_current_token("Expression expected");
+                self.error_expression_expected();
                 self.next_token();
                 self.arena.add_token(SyntaxKind::Unknown as u16, start_pos, end_pos)
             }
@@ -4729,7 +4809,7 @@ impl ThinParserState {
         if self.is_identifier_or_keyword() {
             self.next_token();
         } else {
-            self.parse_error_at_current_token("Expected identifier");
+            self.error_identifier_expected();
         }
         let end_pos = self.token_end();
 
@@ -6549,7 +6629,7 @@ impl ThinParserState {
             // If parse_type_member returned NONE (couldn't parse) and we haven't advanced,
             // skip the current token to prevent infinite loops
             if member.is_none() && self.token_pos() == saved_pos {
-                self.parse_error_at_current_token("Unexpected token in type literal");
+                self.error_unexpected_token();
                 self.next_token(); // Skip the problematic token
                 continue;
             }
@@ -7349,7 +7429,7 @@ impl ThinParserState {
             && !self.is_token(SyntaxKind::ThisKeyword)
             && !self.is_identifier_or_keyword()
         {
-            self.parse_error_at_current_token("Expected JSX element name");
+            self.error_identifier_expected();
             // Create a missing identifier node
             let end_pos = self.token_end();
             return self.arena.add_identifier(
@@ -7448,7 +7528,7 @@ impl ThinParserState {
         // Error recovery: if the current token can't start an attribute name,
         // report error and skip to next attribute or end of attributes
         if !self.is_token(SyntaxKind::Identifier) && !self.is_identifier_or_keyword() {
-            self.parse_error_at_current_token("Expected JSX attribute name");
+            self.error_identifier_expected();
             // Skip the invalid token to prevent infinite loops
             self.next_token();
             // Return a dummy attribute with missing name
@@ -7475,7 +7555,7 @@ impl ThinParserState {
             } else if self.is_token(SyntaxKind::LessThanToken) {
                 self.parse_jsx_element_or_self_closing_or_fragment(true)
             } else {
-                self.parse_error_at_current_token("JSX attribute value expected");
+                self.error_expression_expected();
                 NodeIndex::NONE
             }
         } else {
