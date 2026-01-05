@@ -39,10 +39,10 @@ fn test_source_map_simple() {
     generator.add_simple_mapping(1, 0, source_idx, 1, 0);
 
     let json = generator.to_json();
-    assert!(json.contains("\"version\": 3"));
-    assert!(json.contains("\"file\": \"output.js\""));
-    assert!(json.contains("\"sources\": [\"input.ts\"]"));
-    assert!(json.contains("\"mappings\""));
+    assert!(json.contains("\"version\":3") || json.contains("\"version\": 3"), "Should be v3 source map: {}", json);
+    assert!(json.contains("\"file\":\"output.js\"") || json.contains("\"file\": \"output.js\""), "Should have file: {}", json);
+    assert!(json.contains("\"sources\":[\"input.ts\"]") || json.contains("\"sources\": [\"input.ts\"]"), "Should have sources: {}", json);
+    assert!(json.contains("\"mappings\""), "Should have mappings: {}", json);
 }
 
 #[test]
@@ -66,7 +66,7 @@ fn test_source_map_with_names() {
     generator.add_named_mapping(0, 0, source_idx, 0, 0, name_idx);
 
     let json = generator.to_json();
-    assert!(json.contains("\"names\": [\"myVariable\"]"));
+    assert!(json.contains("\"names\":[\"myVariable\"]") || json.contains("\"names\": [\"myVariable\"]"), "Should have names: {}", json);
 }
 
 #[test]

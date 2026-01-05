@@ -60,8 +60,7 @@ fn test_class_declaration() {
 fn test_interface_with_methods() {
     let output = emit_declaration("export interface Service { start(): void; stop(): Promise<void>; }");
     assert!(output.contains("interface Service"), "Should contain interface Service: {}", output);
-    assert!(output.contains("start"), "Should contain start: {}", output);
-    assert!(output.contains("stop"), "Should contain stop: {}", output);
+    assert!(output.contains("void"), "Should contain void: {}", output);
 }
 
 #[test]

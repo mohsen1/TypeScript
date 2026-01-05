@@ -572,9 +572,9 @@ fn test_source_map_basic() {
     let source_map = printer.get_source_map();
     assert!(source_map.is_some(), "Should generate source map");
     let json = source_map.unwrap();
-    assert!(json.contains("\"version\": 3"), "Should be v3 source map");
-    assert!(json.contains("\"file\": \"output.js\""), "Should have output file name");
-    assert!(json.contains("\"sources\": [\"input.ts\"]"), "Should have input file name");
+    assert!(json.contains("\"version\":3") || json.contains("\"version\": 3"), "Should be v3 source map: {}", json);
+    assert!(json.contains("\"file\":\"output.js\"") || json.contains("\"file\": \"output.js\""), "Should have output file name: {}", json);
+    assert!(json.contains("\"sources\":[\"input.ts\"]") || json.contains("\"sources\": [\"input.ts\"]"), "Should have input file name: {}", json);
 }
 
 #[test]

@@ -11,6 +11,7 @@ pub mod class_es5;
 pub mod arrow_es5;
 pub mod es2015;
 pub mod generators;
+pub mod generator_emitter;
 pub mod helpers;
 pub mod modules;
 
