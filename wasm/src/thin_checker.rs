@@ -626,6 +626,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of binary expression.
     fn get_type_of_binary_expression(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::{BinaryOpEvaluator, BinaryOpResult};
+
         let Some(node) = self.arena.get(idx) else {
             return TypeId::ANY;
         };
@@ -636,45 +638,56 @@ impl<'a> ThinCheckerState<'a> {
 
         let op_kind = binary.operator_token;
 
-        match op_kind {
-            // Arithmetic operators return number (simplified)
-            k if k == SyntaxKind::PlusToken as u16 => {
-                // + can be addition or concatenation
-                // Simplified: always return any for now
-                TypeId::ANY
-            }
-            k if k == SyntaxKind::MinusToken as u16
-                || k == SyntaxKind::AsteriskToken as u16
-                || k == SyntaxKind::SlashToken as u16
-                || k == SyntaxKind::PercentToken as u16
-                || k == SyntaxKind::AsteriskAsteriskToken as u16 => TypeId::NUMBER,
+        // Special case: Assignment operator (not a type operation)
+        if op_kind == SyntaxKind::EqualsToken as u16 {
+            // Check for readonly property assignment
+            self.check_readonly_assignment(binary.left, idx);
+            return self.get_type_of_node(binary.right);
+        }
 
-            // Comparison operators return boolean
-            k if k == SyntaxKind::LessThanToken as u16
-                || k == SyntaxKind::GreaterThanToken as u16
-                || k == SyntaxKind::LessThanEqualsToken as u16
-                || k == SyntaxKind::GreaterThanEqualsToken as u16
-                || k == SyntaxKind::EqualsEqualsToken as u16
-                || k == SyntaxKind::ExclamationEqualsToken as u16
-                || k == SyntaxKind::EqualsEqualsEqualsToken as u16
-                || k == SyntaxKind::ExclamationEqualsEqualsToken as u16 => TypeId::BOOLEAN,
+        // Get operand types
+        let left_type = self.get_type_of_node(binary.left);
+        let right_type = self.get_type_of_node(binary.right);
 
-            // Assignment returns the assigned value's type
-            k if k == SyntaxKind::EqualsToken as u16 => {
-                // Check for readonly property assignment
-                self.check_readonly_assignment(binary.left, idx);
-                self.get_type_of_node(binary.right)
-            }
-
-            // Bitwise operators return number
+        // Map SyntaxKind to operation string
+        let op_str = match op_kind {
+            k if k == SyntaxKind::PlusToken as u16 => "+",
+            k if k == SyntaxKind::MinusToken as u16 => "-",
+            k if k == SyntaxKind::AsteriskToken as u16 => "*",
+            k if k == SyntaxKind::SlashToken as u16 => "/",
+            k if k == SyntaxKind::PercentToken as u16 => "%",
+            k if k == SyntaxKind::LessThanToken as u16 => "<",
+            k if k == SyntaxKind::GreaterThanToken as u16 => ">",
+            k if k == SyntaxKind::LessThanEqualsToken as u16 => "<=",
+            k if k == SyntaxKind::GreaterThanEqualsToken as u16 => ">=",
+            k if k == SyntaxKind::EqualsEqualsToken as u16 => "==",
+            k if k == SyntaxKind::ExclamationEqualsToken as u16 => "!=",
+            k if k == SyntaxKind::EqualsEqualsEqualsToken as u16 => "===",
+            k if k == SyntaxKind::ExclamationEqualsEqualsToken as u16 => "!==",
+            k if k == SyntaxKind::AmpersandAmpersandToken as u16 => "&&",
+            k if k == SyntaxKind::BarBarToken as u16 => "||",
+            // Bitwise operators - for now, return number directly
             k if k == SyntaxKind::AmpersandToken as u16
                 || k == SyntaxKind::BarToken as u16
                 || k == SyntaxKind::CaretToken as u16
                 || k == SyntaxKind::LessThanLessThanToken as u16
                 || k == SyntaxKind::GreaterThanGreaterThanToken as u16
-                || k == SyntaxKind::GreaterThanGreaterThanGreaterThanToken as u16 => TypeId::NUMBER,
+                || k == SyntaxKind::GreaterThanGreaterThanGreaterThanToken as u16 => return TypeId::NUMBER,
+            _ => return TypeId::ANY,
+        };
 
-            _ => TypeId::ANY,
+        // Use BinaryOpEvaluator to resolve the operation
+        let evaluator = BinaryOpEvaluator::new(&self.types);
+        let result = evaluator.evaluate(left_type, right_type, op_str);
+
+        match result {
+            BinaryOpResult::Success(result_type) => result_type,
+
+            BinaryOpResult::TypeError { .. } => {
+                // For now, return any instead of error for binary op mismatches
+                // TypeScript is lenient with many binary operations
+                TypeId::ANY
+            }
         }
     }
 
@@ -699,7 +712,7 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of call expression.
     fn get_type_of_call_expression(&mut self, idx: NodeIndex) -> TypeId {
-        use crate::solver::TypeKey;
+        use crate::solver::{CallEvaluator, CallResult, SubtypeChecker};
 
         let Some(node) = self.arena.get(idx) else {
             return TypeId::ANY;
@@ -712,50 +725,53 @@ impl<'a> ThinCheckerState<'a> {
         // Get the type of the callee
         let callee_type = self.get_type_of_node(call.expression);
 
-        // Look up the function type to get return type and check arguments
-        if let Some(TypeKey::Function(shape)) = self.types.lookup(callee_type) {
-            // Get arguments list (may be None for calls without arguments)
-            let args = call.arguments.as_ref().map(|a| &a.nodes).map(|n| n.as_slice()).unwrap_or(&[]);
-
-            // Check argument count
-            let required_params = shape.params.iter().filter(|p| !p.optional && !p.rest).count();
-            let total_params = shape.params.len();
-            let arg_count = args.len();
-
-            // Check if we have too few arguments
-            if arg_count < required_params {
-                self.error_argument_count_mismatch_at(required_params, arg_count, idx);
-            }
-
-            // Check if we have too many arguments (unless there's a rest param)
-            let has_rest = shape.params.iter().any(|p| p.rest);
-            if !has_rest && arg_count > total_params {
-                self.error_argument_count_mismatch_at(total_params, arg_count, idx);
-            }
-
-            // Check each argument against its corresponding parameter
-            for (i, &arg_idx) in args.iter().enumerate() {
-                if i < shape.params.len() {
-                    let arg_type = self.get_type_of_node(arg_idx);
-                    let param_type = shape.params[i].type_id;
-
-                    if param_type != TypeId::ANY && !self.is_assignable_to(arg_type, param_type) {
-                        self.error_argument_not_assignable_at(arg_type, param_type, arg_idx);
-                    }
-                }
-            }
-
-            return shape.return_type;
-        }
-
         // Check if callee is any/error (don't report for those)
         if callee_type == TypeId::ANY || callee_type == TypeId::ERROR {
             return TypeId::ANY;
         }
 
-        // Callee is not a function type - report error
-        self.error_not_callable_at(callee_type, call.expression);
-        TypeId::ERROR
+        // Get arguments list (may be None for calls without arguments)
+        let args = call.arguments.as_ref().map(|a| &a.nodes).map(|n| n.as_slice()).unwrap_or(&[]);
+
+        // Collect argument types
+        let arg_types: Vec<TypeId> = args.iter()
+            .map(|&arg_idx| self.get_type_of_node(arg_idx))
+            .collect();
+
+        // Use CallEvaluator to resolve the call
+        let mut subtype = SubtypeChecker::new(&self.types);
+        let mut evaluator = CallEvaluator::new(&self.types, &mut subtype);
+        let result = evaluator.resolve_call(callee_type, &arg_types);
+
+        match result {
+            CallResult::Success(return_type) => return_type,
+
+            CallResult::NotCallable { .. } => {
+                self.error_not_callable_at(callee_type, call.expression);
+                TypeId::ERROR
+            }
+
+            CallResult::ArgumentCountMismatch { expected_min, expected_max, actual } => {
+                let expected = expected_max.unwrap_or(expected_min);
+                self.error_argument_count_mismatch_at(expected, actual, idx);
+                TypeId::ERROR
+            }
+
+            CallResult::ArgumentTypeMismatch { index, expected, actual } => {
+                // Report error at the specific argument
+                if index < args.len() {
+                    self.error_argument_not_assignable_at(actual, expected, args[index]);
+                }
+                TypeId::ERROR
+            }
+
+            CallResult::NoOverloadMatch { .. } => {
+                // For now, just report a generic error
+                // TODO: Enhance with specific overload failure details
+                self.error_not_callable_at(callee_type, call.expression);
+                TypeId::ERROR
+            }
+        }
     }
 
     /// Get type of new expression.
@@ -778,6 +794,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of property access expression.
     fn get_type_of_property_access(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
+
         let Some(node) = self.arena.get(idx) else {
             return TypeId::ANY;
         };
@@ -803,17 +821,32 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(ident) = self.arena.get_identifier(name_node) {
             let property_name = &ident.escaped_text;
 
-            // Check for built-in properties on known types
-            if let Some(prop_type) = self.get_property_of_type(object_type, property_name) {
-                return prop_type;
+            // Use PropertyAccessEvaluator to resolve the property access
+            let evaluator = PropertyAccessEvaluator::new(&self.types);
+            let result = evaluator.resolve_property_access(object_type, property_name);
+
+            match result {
+                PropertyAccessResult::Success(prop_type) => prop_type,
+
+                PropertyAccessResult::PropertyNotFound { .. } => {
+                    self.error_property_not_exist_at(property_name, object_type, idx);
+                    TypeId::ERROR
+                }
+
+                PropertyAccessResult::PossiblyNullOrUndefined { .. } => {
+                    // Report error about accessing property on possibly null/undefined
+                    self.error_property_not_exist_at(property_name, object_type, idx);
+                    TypeId::ERROR
+                }
+
+                PropertyAccessResult::IsUnknown => {
+                    // Accessing property on unknown type returns any
+                    TypeId::ANY
+                }
             }
-
-            // Property doesn't exist - report error
-            self.error_property_not_exist_at(property_name, object_type, idx);
-            return TypeId::ERROR;
+        } else {
+            TypeId::ANY
         }
-
-        TypeId::ANY
     }
 
     /// Get type of element access expression (e.g., arr[0], obj["prop"]).
@@ -1066,105 +1099,6 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    /// Get a property type from an object type.
-    fn get_property_of_type(&self, type_id: TypeId, property_name: &str) -> Option<TypeId> {
-        use crate::solver::TypeKey;
-
-        // Lookup the type structure
-        let type_key = self.types.lookup(type_id)?;
-
-        match type_key {
-            TypeKey::Object(props) => {
-                // Direct property lookup on object type
-                for prop in &props {
-                    if prop.name.as_ref() == property_name {
-                        return Some(prop.type_id);
-                    }
-                }
-                None
-            }
-            TypeKey::ObjectWithIndex(shape) => {
-                // First try properties, then fall back to index signature
-                for prop in &shape.properties {
-                    if prop.name.as_ref() == property_name {
-                        return Some(prop.type_id);
-                    }
-                }
-                // If not found in properties, check string index signature
-                shape.string_index.map(|idx| idx.value_type)
-            }
-            TypeKey::Union(members) => {
-                // For union types, the property must exist on ALL members
-                // and the result is the union of their types
-                let mut result_types = Vec::new();
-                for &member in &members {
-                    if let Some(prop_type) = self.get_property_of_type(member, property_name) {
-                        result_types.push(prop_type);
-                    } else {
-                        // Property doesn't exist on this union member
-                        return None;
-                    }
-                }
-                if result_types.is_empty() {
-                    None
-                } else if result_types.len() == 1 {
-                    Some(result_types[0])
-                } else {
-                    Some(self.types.union(result_types))
-                }
-            }
-            TypeKey::Intersection(members) => {
-                // For intersection types, try each member and return the first match
-                for &member in &members {
-                    if let Some(prop_type) = self.get_property_of_type(member, property_name) {
-                        return Some(prop_type);
-                    }
-                }
-                None
-            }
-            TypeKey::Array(_elem_type) => {
-                // Built-in array properties
-                match property_name {
-                    "length" => Some(TypeId::NUMBER),
-                    "push" | "pop" | "shift" | "unshift" | "splice" | "slice"
-                    | "concat" | "join" | "indexOf" | "lastIndexOf" | "forEach"
-                    | "map" | "filter" | "reduce" | "find" | "findIndex" | "every"
-                    | "some" | "includes" | "sort" | "reverse" | "fill" | "copyWithin"
-                    | "entries" | "keys" | "values" | "flat" | "flatMap" => {
-                        // Return any for array methods - proper typing requires generics
-                        Some(TypeId::ANY)
-                    }
-                    _ => None,
-                }
-            }
-            TypeKey::Intrinsic(crate::solver::IntrinsicKind::String) => {
-                // Built-in string properties
-                self.get_string_property(property_name)
-            }
-            TypeKey::Literal(crate::solver::LiteralValue::String(_)) => {
-                // String literal has same properties as string
-                self.get_string_property(property_name)
-            }
-            _ => None,
-        }
-    }
-
-    /// Get built-in string property type.
-    fn get_string_property(&self, property_name: &str) -> Option<TypeId> {
-        match property_name {
-            "length" => Some(TypeId::NUMBER),
-            "charAt" | "charCodeAt" | "concat" | "indexOf" | "lastIndexOf"
-            | "localeCompare" | "match" | "replace" | "search" | "slice"
-            | "split" | "substring" | "toLowerCase" | "toUpperCase" | "trim"
-            | "trimStart" | "trimEnd" | "padStart" | "padEnd" | "repeat"
-            | "startsWith" | "endsWith" | "includes" | "normalize" | "at"
-            | "codePointAt" | "toLocaleLowerCase" | "toLocaleUpperCase" => {
-                // Return any for string methods - proper typing requires overloads
-                Some(TypeId::ANY)
-            }
-            _ => None,
-        }
-    }
 
     // =========================================================================
     // Type Relations (uses solver::SubtypeChecker)
