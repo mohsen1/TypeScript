@@ -1368,6 +1368,9 @@ impl<'a> CheckerState<'a> {
                     }
                 }
 
+                // Check for missing method/constructor implementations (2389, 2390, 2391)
+                self.check_class_member_implementations(&cd.members.nodes);
+
                 // Restore enclosing class (handles nested classes)
                 self.enclosing_class = prev_enclosing_class;
             }
@@ -1581,5 +1584,121 @@ impl<'a> CheckerState<'a> {
             }
             _ => {}
         }
+    }
+
+    /// Check that all method/constructor overload signatures have implementations.
+    /// Reports errors 2389, 2390, 2391.
+    fn check_class_member_implementations(&mut self, members: &[crate::parser::NodeIndex]) {
+        use crate::parser::Node;
+
+        let mut i = 0;
+        while i < members.len() {
+            let member_idx = members[i];
+            let Some(node) = self.node_arena.get(member_idx) else {
+                i += 1;
+                continue;
+            };
+
+            match node {
+                Node::ConstructorDeclaration(cd) => {
+                    if cd.body.is_none() {
+                        // Constructor overload signature - check for implementation
+                        let has_impl = self.find_constructor_implementation(members, i + 1);
+                        if !has_impl {
+                            self.error(
+                                member_idx,
+                                "Constructor implementation is missing.",
+                                super::diagnostic_codes::CONSTRUCTOR_IMPLEMENTATION_MISSING
+                            );
+                        }
+                    }
+                }
+                Node::MethodDeclaration(md) => {
+                    if md.body.is_none() {
+                        // Method overload signature - check for implementation
+                        let method_name = self.get_method_name(member_idx);
+                        if let Some(name) = method_name {
+                            let (has_impl, impl_name) = self.find_method_implementation(members, i + 1, &name);
+                            if !has_impl {
+                                self.error(
+                                    member_idx,
+                                    "Function implementation is missing or not immediately following the declaration.",
+                                    super::diagnostic_codes::FUNCTION_IMPLEMENTATION_MISSING
+                                );
+                            } else if let Some(actual_name) = impl_name {
+                                if actual_name != name {
+                                    // Implementation has wrong name
+                                    self.error(
+                                        members[i + 1],
+                                        &format!("Function implementation name must be '{}'.", name),
+                                        super::diagnostic_codes::FUNCTION_IMPLEMENTATION_NAME_MUST_BE
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+    }
+
+    /// Check if there's a constructor implementation after position `start`.
+    fn find_constructor_implementation(&self, members: &[crate::parser::NodeIndex], start: usize) -> bool {
+        use crate::parser::Node;
+
+        for i in start..members.len() {
+            let member_idx = members[i];
+            if let Some(Node::ConstructorDeclaration(cd)) = self.node_arena.get(member_idx) {
+                if !cd.body.is_none() {
+                    return true;
+                }
+                // Another constructor overload - keep looking
+            } else {
+                // Non-constructor member - no implementation found
+                return false;
+            }
+        }
+        false
+    }
+
+    /// Check if there's a method implementation with the given name after position `start`.
+    /// Returns (has_impl, impl_name) - impl_name is the actual name if next member is an impl.
+    fn find_method_implementation(&self, members: &[crate::parser::NodeIndex], start: usize, name: &str) -> (bool, Option<String>) {
+        use crate::parser::Node;
+
+        if start >= members.len() {
+            return (false, None);
+        }
+
+        let member_idx = members[start];
+        if let Some(Node::MethodDeclaration(md)) = self.node_arena.get(member_idx) {
+            if !md.body.is_none() {
+                // This is an implementation - check if name matches
+                let impl_name = self.get_method_name(member_idx);
+                if let Some(ref impl_name_str) = impl_name {
+                    if impl_name_str == name {
+                        return (true, impl_name);
+                    } else {
+                        // Wrong name - report 2389
+                        return (true, impl_name);
+                    }
+                }
+            }
+        }
+        (false, None)
+    }
+
+    /// Get the name of a method declaration.
+    fn get_method_name(&self, member_idx: crate::parser::NodeIndex) -> Option<String> {
+        use crate::parser::Node;
+
+        if let Some(Node::MethodDeclaration(md)) = self.node_arena.get(member_idx) {
+            if let Some(Node::Identifier(id)) = self.node_arena.get(md.name) {
+                return Some(id.escaped_text.clone());
+            }
+        }
+        None
     }
 }
