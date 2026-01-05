@@ -25,7 +25,7 @@ use crate::parser::{
         EnumData, EnumMemberData,
         ImportDeclData, ImportClauseData, NamedImportsData, SpecifierData,
         ExportDeclData, ExportAssignmentData, QualifiedNameData,
-        TemplateExprData, TemplateSpanData, LabeledData,
+        TemplateExprData, TemplateSpanData, LabeledData, TaggedTemplateData,
     },
     syntax_kind_ext,
 };
@@ -4224,6 +4224,22 @@ impl ThinParserState {
                         },
                     );
                 }
+                // Tagged template literals: tag`template` or tag`head${expr}tail`
+                SyntaxKind::NoSubstitutionTemplateLiteral | SyntaxKind::TemplateHead => {
+                    let template = self.parse_template_literal();
+                    let end_pos = self.token_end();
+
+                    expr = self.arena.add_tagged_template(
+                        syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION,
+                        start_pos,
+                        end_pos,
+                        TaggedTemplateData {
+                            tag: expr,
+                            type_arguments: None,
+                            template,
+                        },
+                    );
+                }
                 _ => break,
             }
         }
@@ -4671,6 +4687,16 @@ impl ThinParserState {
                 template_spans: self.make_node_list(spans),
             },
         )
+    }
+
+    /// Parse template literal (either no-substitution or full template expression)
+    /// Used for both standalone template literals and as the template part of tagged templates
+    fn parse_template_literal(&mut self) -> NodeIndex {
+        if self.is_token(SyntaxKind::NoSubstitutionTemplateLiteral) {
+            self.parse_no_substitution_template_literal()
+        } else {
+            self.parse_template_expression()
+        }
     }
 
     /// Parse parenthesized expression
