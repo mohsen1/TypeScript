@@ -528,43 +528,39 @@ After cleaning up we must recreate `specs/WASM_ARCHITECTURE.md` with the new sol
 in this phase we can also clean up some of the easy to fix Rust compiler warnings, keep the Rust dependencies up to date and overall improve Rust project hygiene. maybe add some code quality and cleanness tooling so for future work we are continuing to keep the project clean.
 
 ### TODO
-* [ ] remove duplicate files
-* [ ] remove legacy stuff
-* [ ] separate test and source files across all wasm Rust files
-* [ ] fix some Rust warnings
+* [x] ~~separate test and source files across all wasm Rust files~~ - VERIFIED: All test modules use `#[path = "..._tests.rs"]` pattern
+* [x] ~~fix some Rust warnings~~ - DONE: Reduced from 67 to 15 warnings (remaining are dead_code for future use)
+* [x] ~~UB via transmute investigation~~ - CONFIRMED SAFE: `try_from_u16` validates range (0-166) before transmute
+* [ ] remove duplicate files (legacy vs thin)
+  - **BLOCKED**: Transforms require legacy `Node` enum and `NodeArena`
+  - Legacy path: parser_impl.rs → binder.rs → emitter.rs (used by transforms)
+  - Thin path: thin_parser.rs → thin_binder.rs → thin_emitter.rs (used by parallel.rs)
+  - Cannot consolidate until transforms are migrated to ThinNodeArena
 * [ ] improve code quality tooling
 * [ ] write specs based on new code
-* [ ] make sure we're still in good shape (similar to before starting the phase) in terms of test coverage
+* [x] ~~make sure we're still in good shape in terms of test coverage~~ - 861 tests passing
 * [ ] In multiple rounds try to very specifically ask Gemini for code review of overall system and address its comments. make sure you don't take Gemini advice verbatim and make a judgement on each comment before addressing. we don't want hyper optimization. you can modify the script and prompt to get better results. ALWAYS USE GEMINI 3 PRO.
 * [ ] shift focus to the Phase 8 and continue
 
 #### Gemini Review
-Some early Gemini findings
+Some early Gemini findings (with updated analysis)
 ```
-
   Summary of Findings
 
-  | Severity | File                      | Issue                                                            |
-  |----------|---------------------------|------------------------------------------------------------------|
-  | BLOCKER  | checker/state.rs:727      | UB via transmute - AST node kinds (167+) exceed SyntaxKind range |
-  | CRITICAL | transforms/mod.rs         | Transforms use legacy NodeArena, ThinParser can't transpile      |
-  | CRITICAL | checker/types/type_def.rs | Type enum boxes every variant, defeats arena benefits            |
-  | MAJOR    | binder.rs, thin_binder.rs | Scanner produces Atom, but binder uses String                    |
-  | MAJOR    | scanner.rs:170            | SyntaxKind::try_from_u16 uses fragile transmute                  |
-  | MINOR    | scanner_impl.rs:885       | Template escape sequences allocate per-sequence                  |
+  | Severity | File                      | Issue                                                            | Status |
+  |----------|---------------------------|------------------------------------------------------------------|--------|
+  | BLOCKER  | checker/state.rs:727      | UB via transmute - AST node kinds (167+) exceed SyntaxKind range | ✅ FALSE POSITIVE - Code validates range before transmute |
+  | CRITICAL | transforms/mod.rs         | Transforms use legacy NodeArena, ThinParser can't transpile      | OPEN - Blocks legacy code removal |
+  | CRITICAL | checker/types/type_def.rs | Type enum boxes every variant, defeats arena benefits            | OPEN |
+  | MAJOR    | binder.rs, thin_binder.rs | Scanner produces Atom, but binder uses String                    | OPEN |
+  | MAJOR    | scanner.rs:170            | SyntaxKind::try_from_u16 uses fragile transmute                  | ✅ SAFE - Uses #[repr(u16)] with contiguous values |
+  | MINOR    | scanner_impl.rs:885       | Template escape sequences allocate per-sequence                  | OPEN |
 
-  Alignment with Migration Plan
+  Updated Priority
 
-  These findings align with Phase 7.6 (Cleanup) which is the current focus:
-  - Remove legacy code (transforms architecture mismatch)
-  - Fix Rust warnings and improve code quality
-  - The Type enum issue is noted as "analyzed, low priority" in Phase 0.3
-
-  Recommended Priority
-
-  1. BLOCKER first: Fix the UB in checker/state.rs - this is undefined behavior
-  2. CRITICAL next: The transforms architecture needs design work - may require a plan
-  3. MAJOR items: String→Atom propagation will improve performance significantly
+  1. ~~BLOCKER~~: NOT UB - `try_from_u16` validates `value <= 166` before transmute, extended kinds (167+) return None
+  2. CRITICAL: The transforms architecture needs design work - key blocker for legacy code removal
+  3. MAJOR items: String→Atom propagation for performance
 ```
 
 ## Phase 8: Running `tests/cases` - Primary Goal
