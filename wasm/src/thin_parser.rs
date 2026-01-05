@@ -2263,6 +2263,12 @@ impl ThinParserState {
                 NodeIndex::NONE
             };
 
+            // Skip initializer if present (invalid in type context but should produce error, not crash)
+            // Example: { bar: number = 5 } - the "= 5" is invalid but we parse it for recovery
+            if self.parse_optional(SyntaxKind::EqualsToken) {
+                self.parse_assignment_expression();
+            }
+
             let end_pos = self.token_end();
             self.arena.add_signature(
                 syntax_kind_ext::PROPERTY_SIGNATURE,
@@ -2367,6 +2373,9 @@ impl ThinParserState {
         let param_name = self.parse_identifier();
         self.parse_expected(SyntaxKind::ColonToken);
         let _param_type = self.parse_type(); // Type of the index parameter (e.g., string, number)
+
+        // Allow trailing comma (invalid syntax but should produce error, not crash)
+        self.parse_optional(SyntaxKind::CommaToken);
 
         self.parse_expected(SyntaxKind::CloseBracketToken);
 
@@ -6756,6 +6765,25 @@ impl ThinParserState {
                 | SyntaxKind::FalseKeyword
                 | SyntaxKind::NullKeyword
                 | SyntaxKind::UndefinedKeyword
+                | SyntaxKind::OutKeyword
+                | SyntaxKind::OverrideKeyword
+                | SyntaxKind::SatisfiesKeyword
+                | SyntaxKind::AssertKeyword
+                | SyntaxKind::AssertsKeyword
+                | SyntaxKind::KeyOfKeyword
+                | SyntaxKind::UniqueKeyword
+                | SyntaxKind::InferKeyword
+                | SyntaxKind::IsKeyword
+                | SyntaxKind::NeverKeyword
+                | SyntaxKind::UnknownKeyword
+                | SyntaxKind::BigIntKeyword
+                | SyntaxKind::ObjectKeyword
+                | SyntaxKind::StringKeyword
+                | SyntaxKind::NumberKeyword
+                | SyntaxKind::SymbolKeyword
+                | SyntaxKind::UsingKeyword
+                | SyntaxKind::AccessorKeyword
+                | SyntaxKind::DeferKeyword
         )
     }
 
