@@ -38,7 +38,7 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 | 4 | Binder (ThinBinder) | ~2,900 | 26+ | ✅ Done |
 | 5 | Type Checker | ~23,500 | 485 | ✅ 99% |
 
-**Total Rust Code**: ~60,700 lines | **Total Tests**: 1006 passing
+**Total Rust Code**: ~74,350 lines | **Total Tests**: 1006 passing (1017 total)
 
 ### ThinParser Capabilities (Complete)
 - All expressions, statements, declarations
@@ -108,17 +108,18 @@ Result: TypeId (O(1) equality via interning)
 
 | Module | Lines | Tests | Status |
 |--------|-------|-------|--------|
-| `types.rs` | ~250 | 5+ | ✅ Complete |
-| `intern.rs` | ~260 | 5+ | ✅ Complete |
-| `lower.rs` | ~830 | 13+ | ✅ Complete (type params added) |
-| `subtype.rs` | ~420 | 5+ | ✅ Core done |
-| `infer.rs` | ~185 | 5+ | ✅ Basic done |
-| `instantiate.rs` | ~260 | 12+ | ✅ Complete |
-| `evaluate.rs` | ~540 | 15+ | ✅ Complete |
-| `contextual.rs` | ~320 | 16+ | ✅ Complete |
-| `narrowing.rs` | ~280 | 15+ | ✅ Complete |
-| `diagnostics.rs` | ~860 | 24+ | ✅ Complete (lazy rendering) |
-| `operations.rs` | ~430 | 7+ | ✅ Complete (call/property/binary) |
+| `types.rs` | 331 | 5 | ✅ Complete |
+| `intern.rs` | 274 | 5 | ✅ Complete |
+| `lower.rs` | 851 | 13 | ✅ Complete (type params added) |
+| `subtype.rs` | 859 | 18 | ✅ Complete |
+| `infer.rs` | 416 | 18 | ✅ Complete |
+| `instantiate.rs` | 379 | 25 | ✅ Complete |
+| `evaluate.rs` | 476 | 38 | ✅ Complete |
+| `contextual.rs` | 296 | 16 | ✅ Complete |
+| `narrowing.rs` | 379 | 15 | ✅ Complete |
+| `diagnostics.rs` | 1154 | 27 | ✅ Complete (lazy rendering) |
+| `operations.rs` | 430 | 7 | ✅ Complete (call/property/binary) |
+| **Total** | **5,845** | **187** | **100%** |
 
 ### ✅ What's Working
 
