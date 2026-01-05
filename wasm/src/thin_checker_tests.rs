@@ -459,4 +459,9 @@ fn test_abstract_class_in_local_scope_2511() {
     let count_2511 = codes.iter().filter(|&&c| c == 2511).count();
     assert_eq!(count_2511, 1,
         "Expected exactly 1 error 2511 (for abstract class A only), got {} from: {:?}", count_2511, codes);
+
+    // Should NOT have error 2304 (Cannot find name) - both A and B should be found
+    let count_2304 = codes.iter().filter(|&&c| c == 2304).count();
+    assert_eq!(count_2304, 0,
+        "Should NOT have 'Cannot find name' error (2304) for classes in local scope, got {} from: {:?}", count_2304, codes);
 }

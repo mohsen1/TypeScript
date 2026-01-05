@@ -501,6 +501,11 @@ impl<'a> ThinCheckerState<'a> {
             return self.get_type_of_symbol(sym_id);
         }
 
+        // Check all symbols by name (handles nested scopes like classes in IIFEs)
+        if let Some(sym_id) = self.binder.get_symbols().find_by_name(name) {
+            return self.get_type_of_symbol(sym_id);
+        }
+
         // Intrinsic names - use constant TypeIds
         match name.as_str() {
             "undefined" => TypeId::UNDEFINED,
