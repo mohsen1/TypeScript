@@ -334,6 +334,20 @@ impl SymbolArena {
     pub fn is_empty(&self) -> bool {
         self.symbols.is_empty()
     }
+
+    /// Find a symbol by name (linear search through all symbols).
+    ///
+    /// This is a fallback for when scope chain lookup is not available.
+    /// Note: This doesn't handle shadowing correctly - it returns the first match.
+    /// For proper scoping, use the SymbolTable scope chain instead.
+    pub fn find_by_name(&self, name: &str) -> Option<SymbolId> {
+        for symbol in &self.symbols {
+            if symbol.escaped_name == name {
+                return Some(symbol.id);
+            }
+        }
+        None
+    }
 }
 
 // =============================================================================

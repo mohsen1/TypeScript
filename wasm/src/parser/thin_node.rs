@@ -2816,6 +2816,18 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get parenthesized expression data.
+    /// Returns None if node is not a parenthesized expression or has no data.
+    #[inline]
+    pub fn get_parenthesized(&self, node: &ThinNode) -> Option<&ParenthesizedData> {
+        use super::syntax_kind_ext::PARENTHESIZED_EXPRESSION;
+        if node.has_data() && node.kind == PARENTHESIZED_EXPRESSION {
+            self.parenthesized.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Number of nodes in the arena
     pub fn len(&self) -> usize {
         self.nodes.len()

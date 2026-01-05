@@ -398,3 +398,65 @@ fn test_for_loop_variable_scope() {
     assert!(!codes.contains(&2304),
         "Should not have 'Cannot find name' error for loop variable, got: {:?}", codes);
 }
+
+#[test]
+fn test_abstract_class_in_local_scope_2511() {
+    use crate::thin_parser::ThinParserState;
+    use crate::binder::symbol_flags;
+
+    // Test case from tests/cases/compiler/abstractClassInLocalScopeIsAbstract.ts
+    // Abstract class declared inside an IIFE should still error on instantiation
+    let code = r#"
+        (() => {
+            abstract class A {}
+            class B extends A {}
+            new A();
+            new B();
+        })()
+    "#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), code.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    // Debug: Check symbols
+    let symbols = binder.get_symbols();
+    eprintln!("=== Symbols ===");
+    for i in 0..symbols.len() {
+        if let Some(sym) = symbols.get(crate::binder::SymbolId(i as u32)) {
+            eprintln!("  {:?}: {} flags={:#x} abstract={}", sym.id, sym.escaped_name, sym.flags, sym.flags & symbol_flags::ABSTRACT != 0);
+        }
+    }
+
+    // Also try manually checking new expression
+    eprintln!("=== Class name lookup test ===");
+    if let Some(sym_id) = binder.get_symbols().find_by_name("A") {
+        eprintln!("Found symbol A: {:?}", sym_id);
+        if let Some(symbol) = binder.get_symbol(sym_id) {
+            eprintln!("  flags={:#x} abstract={}", symbol.flags, symbol.flags & symbol_flags::ABSTRACT != 0);
+        }
+    } else {
+        eprintln!("Symbol A not found!");
+    }
+
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Debug: Check diagnostics
+    eprintln!("=== Diagnostics ===");
+    for d in &checker.diagnostics {
+        eprintln!("  code={}, msg={}", d.code, d.message_text);
+    }
+
+    // Should have error 2511 for `new A()` but not for `new B()`
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2511),
+        "Expected error 2511 for abstract class instantiation in local scope, got: {:?}", codes);
+
+    // Should only have one 2511 error (for A, not B)
+    let count_2511 = codes.iter().filter(|&&c| c == 2511).count();
+    assert_eq!(count_2511, 1,
+        "Expected exactly 1 error 2511 (for abstract class A only), got {} from: {:?}", count_2511, codes);
+}

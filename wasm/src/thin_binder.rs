@@ -356,6 +356,54 @@ impl ThinBinderState {
                 }
             }
 
+            // Expression statements - traverse into the expression
+            k if k == syntax_kind_ext::EXPRESSION_STATEMENT => {
+                if let Some(expr_stmt) = arena.get_expression_statement(node) {
+                    self.bind_node(arena, expr_stmt.expression);
+                }
+            }
+
+            // Call expressions - traverse into callee and arguments
+            k if k == syntax_kind_ext::CALL_EXPRESSION => {
+                if let Some(call) = arena.get_call_expr(node) {
+                    self.bind_node(arena, call.expression);
+                    if let Some(args) = &call.arguments {
+                        for &arg in &args.nodes {
+                            self.bind_node(arena, arg);
+                        }
+                    }
+                }
+            }
+
+            // New expressions - traverse into expression and arguments
+            k if k == syntax_kind_ext::NEW_EXPRESSION => {
+                if let Some(new_expr) = arena.get_call_expr(node) {
+                    self.bind_node(arena, new_expr.expression);
+                    if let Some(args) = &new_expr.arguments {
+                        for &arg in &args.nodes {
+                            self.bind_node(arena, arg);
+                        }
+                    }
+                }
+            }
+
+            // Parenthesized expressions - traverse into inner expression
+            k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
+                if let Some(paren) = arena.get_parenthesized(node) {
+                    self.bind_node(arena, paren.expression);
+                }
+            }
+
+            // Arrow function expressions - bind body
+            k if k == syntax_kind_ext::ARROW_FUNCTION => {
+                self.bind_arrow_function(arena, node, idx);
+            }
+
+            // Function expressions - bind body
+            k if k == syntax_kind_ext::FUNCTION_EXPRESSION => {
+                self.bind_function_expression(arena, node, idx);
+            }
+
             _ => {
                 // For other node types, no symbols to create
             }
@@ -370,6 +418,22 @@ impl ThinBinderState {
             }
         }
         None
+    }
+
+    /// Check if modifiers list contains the 'abstract' keyword.
+    fn has_abstract_modifier(&self, arena: &ThinNodeArena, modifiers: &Option<NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::AbstractKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 
     // Scope management
@@ -470,10 +534,54 @@ impl ThinBinderState {
         }
     }
 
+    /// Bind an arrow function expression - creates a scope and binds the body.
+    fn bind_arrow_function(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
+        if let Some(func) = arena.get_function(node) {
+            // Enter function scope
+            self.enter_scope(ContainerKind::Function, idx);
+
+            // Bind parameters
+            for &param_idx in &func.parameters.nodes {
+                self.bind_parameter(arena, param_idx);
+            }
+
+            // Bind body (could be a block or an expression)
+            self.bind_node(arena, func.body);
+
+            self.exit_scope();
+        }
+    }
+
+    /// Bind a function expression - creates a scope and binds the body.
+    fn bind_function_expression(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
+        if let Some(func) = arena.get_function(node) {
+            // Enter function scope
+            self.enter_scope(ContainerKind::Function, idx);
+
+            // Bind parameters
+            for &param_idx in &func.parameters.nodes {
+                self.bind_parameter(arena, param_idx);
+            }
+
+            // Bind body
+            self.bind_node(arena, func.body);
+
+            self.exit_scope();
+        }
+    }
+
     fn bind_class_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
         if let Some(class) = arena.get_class(node) {
             if let Some(name) = self.get_identifier_name(arena, class.name) {
-                let sym_id = self.symbols.alloc(symbol_flags::CLASS, name.to_string());
+                // Start with CLASS flag
+                let mut flags = symbol_flags::CLASS;
+
+                // Add ABSTRACT flag if class has 'abstract' modifier
+                if self.has_abstract_modifier(arena, &class.modifiers) {
+                    flags |= symbol_flags::ABSTRACT;
+                }
+
+                let sym_id = self.symbols.alloc(flags, name.to_string());
                 self.current_scope.set(name.to_string(), sym_id);
                 self.node_symbols.insert(idx.0, sym_id);
             }

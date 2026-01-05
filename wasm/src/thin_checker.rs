@@ -341,6 +341,15 @@ impl<'a> ThinCheckerState<'a> {
             // void expression
             k if k == syntax_kind_ext::VOID_EXPRESSION => TypeId::UNDEFINED,
 
+            // Parenthesized expression - just pass through to inner expression
+            k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
+                if let Some(paren) = self.arena.get_parenthesized(node) {
+                    self.get_type_of_node(paren.expression)
+                } else {
+                    TypeId::ANY
+                }
+            }
+
             // =========================================================================
             // Type Nodes
             // =========================================================================
@@ -808,10 +817,11 @@ impl<'a> ThinCheckerState<'a> {
                 // Try multiple ways to find the symbol:
                 // 1. Check if the identifier node has a direct symbol binding
                 // 2. Look up in file_locals
-                // 3. Check scoped locals (future: implement proper scope chain)
+                // 3. Search all symbols by name (handles local scopes like classes inside functions)
 
                 let symbol_opt = self.binder.get_node_symbol(new_expr.expression)
-                    .or_else(|| self.binder.file_locals.get(class_name));
+                    .or_else(|| self.binder.file_locals.get(class_name))
+                    .or_else(|| self.binder.get_symbols().find_by_name(class_name));
 
                 if let Some(sym_id) = symbol_opt {
                     if let Some(symbol) = self.binder.get_symbol(sym_id) {
@@ -1002,6 +1012,34 @@ impl<'a> ThinCheckerState<'a> {
             // TODO: Infer return type from body
             TypeId::ANY
         };
+
+        // Check the function body (for type errors within the body)
+        if !func.body.is_none() {
+            self.push_local_scope();
+
+            // Add parameters to local scope
+            for &param_idx in &func.parameters.nodes {
+                if let Some(param_node) = self.arena.get(param_idx) {
+                    if let Some(param) = self.arena.get_parameter(param_node) {
+                        if let Some(name_node) = self.arena.get(param.name) {
+                            if let Some(name_data) = self.arena.get_identifier(name_node) {
+                                let param_type = if !param.type_annotation.is_none() {
+                                    self.get_type_from_type_node(param.type_annotation)
+                                } else {
+                                    TypeId::ANY
+                                };
+                                self.add_local(name_data.escaped_text.clone(), param_type);
+                            }
+                        }
+                    }
+                }
+            }
+
+            self.push_return_type(return_type);
+            self.check_statement(func.body);
+            self.pop_return_type();
+            self.pop_local_scope();
+        }
 
         // Create function type using TypeInterner
         let shape = FunctionShape {
@@ -1867,10 +1905,11 @@ impl<'a> ThinCheckerState<'a> {
                     self.error_type_not_assignable_with_reason_at(init_type, declared_type, var_decl.initializer);
                 }
 
-                // For object literals, also check for excess properties and missing required properties
+                // For object literals, also check for excess properties
+                // (missing properties are already handled by error_type_not_assignable_with_reason_at)
                 if let Some(init_node) = self.arena.get(var_decl.initializer) {
                     if init_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
-                        self.check_object_literal_assignment(init_type, declared_type, var_decl.initializer);
+                        self.check_object_literal_excess_properties(init_type, declared_type, var_decl.initializer);
                     }
                 }
                 declared_type
@@ -1888,8 +1927,16 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    /// Check object literal assignment for excess properties and missing required properties.
-    fn check_object_literal_assignment(&mut self, source: TypeId, target: TypeId, idx: NodeIndex) {
+    /// Check object literal assignment for excess properties.
+    ///
+    /// **Note**: This check is specific to object literals and is NOT part of general
+    /// structural subtyping. Excess properties in object literals are errors, but
+    /// when assigning from a variable with extra properties, it's allowed.
+    ///
+    /// Missing property errors are handled by the solver's `explain_failure` API
+    /// via `error_type_not_assignable_with_reason_at`, so we only check excess
+    /// properties here to avoid duplication.
+    fn check_object_literal_excess_properties(&mut self, source: TypeId, target: TypeId, idx: NodeIndex) {
         use crate::solver::TypeKey;
 
         // Get the properties of both types
@@ -1904,23 +1951,14 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         // Check for excess properties in source that don't exist in target
+        // This is the "freshness" or "strict object literal" check
         for source_prop in &source_props {
             let exists_in_target = target_props.iter().any(|p| p.name == source_prop.name);
             if !exists_in_target {
                 self.error_excess_property_at(&source_prop.name, target, idx);
             }
         }
-
-        // Check for missing required properties in source
-        for target_prop in &target_props {
-            if target_prop.optional {
-                continue;
-            }
-            let exists_in_source = source_props.iter().any(|p| p.name == target_prop.name);
-            if !exists_in_source {
-                self.error_property_missing_at(&target_prop.name, source, target, idx);
-            }
-        }
+        // Note: Missing property checks are handled by solver's explain_failure
     }
 
     /// Check if an assignment target is a readonly property.
