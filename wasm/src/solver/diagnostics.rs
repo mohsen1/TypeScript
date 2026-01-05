@@ -2,10 +2,22 @@
 //!
 //! This module provides error message generation for type checking failures.
 //! It produces human-readable diagnostics with source locations and context.
+//!
+//! ## Architecture: Lazy Diagnostics
+//!
+//! To avoid expensive string formatting during type checking (especially in tentative
+//! contexts like overload resolution), this module uses a two-phase approach:
+//!
+//! 1. **Collection**: Store structured data in `PendingDiagnostic` with `DiagnosticArg` values
+//! 2. **Rendering**: Format strings lazily only when displaying to the user
+//!
+//! This prevents calling `type_to_string()` thousands of times for errors that are
+//! discarded during overload resolution.
 
 use std::sync::Arc;
 use crate::solver::types::*;
 use crate::solver::intern::TypeInterner;
+use crate::binder::SymbolId;
 
 /// Diagnostic severity level.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -14,6 +26,99 @@ pub enum DiagnosticSeverity {
     Warning,
     Suggestion,
     Message,
+}
+
+// =============================================================================
+// Lazy Diagnostic Arguments
+// =============================================================================
+
+/// Argument for a diagnostic message template.
+///
+/// Instead of eagerly formatting types to strings, we store the raw data
+/// (TypeId, SymbolId, etc.) and only format when rendering.
+#[derive(Clone, Debug)]
+pub enum DiagnosticArg {
+    /// A type reference (will be formatted via TypeFormatter)
+    Type(TypeId),
+    /// A symbol reference (will be looked up by name)
+    Symbol(SymbolId),
+    /// A plain string
+    String(Arc<str>),
+    /// A number
+    Number(usize),
+}
+
+impl From<TypeId> for DiagnosticArg {
+    fn from(t: TypeId) -> Self {
+        DiagnosticArg::Type(t)
+    }
+}
+
+impl From<SymbolId> for DiagnosticArg {
+    fn from(s: SymbolId) -> Self {
+        DiagnosticArg::Symbol(s)
+    }
+}
+
+impl From<&str> for DiagnosticArg {
+    fn from(s: &str) -> Self {
+        DiagnosticArg::String(s.into())
+    }
+}
+
+impl From<String> for DiagnosticArg {
+    fn from(s: String) -> Self {
+        DiagnosticArg::String(s.into())
+    }
+}
+
+impl From<usize> for DiagnosticArg {
+    fn from(n: usize) -> Self {
+        DiagnosticArg::Number(n)
+    }
+}
+
+/// A pending diagnostic that hasn't been rendered yet.
+///
+/// This stores the structured data needed to generate an error message,
+/// but defers the expensive string formatting until rendering time.
+#[derive(Clone, Debug)]
+pub struct PendingDiagnostic {
+    /// Diagnostic code (e.g., 2322 for type not assignable)
+    pub code: u32,
+    /// Arguments for the message template
+    pub args: Vec<DiagnosticArg>,
+    /// Primary source location
+    pub span: Option<SourceSpan>,
+    /// Severity level
+    pub severity: DiagnosticSeverity,
+    /// Related information (additional locations)
+    pub related: Vec<PendingDiagnostic>,
+}
+
+impl PendingDiagnostic {
+    /// Create a new pending error diagnostic.
+    pub fn error(code: u32, args: Vec<DiagnosticArg>) -> Self {
+        Self {
+            code,
+            args,
+            span: None,
+            severity: DiagnosticSeverity::Error,
+            related: Vec::new(),
+        }
+    }
+
+    /// Attach a source span to this diagnostic.
+    pub fn with_span(mut self, span: SourceSpan) -> Self {
+        self.span = Some(span);
+        self
+    }
+
+    /// Add related information.
+    pub fn with_related(mut self, related: PendingDiagnostic) -> Self {
+        self.related.push(related);
+        self
+    }
 }
 
 /// A source location span.
@@ -148,12 +253,43 @@ pub mod codes {
 }
 
 // =============================================================================
+// Message Templates
+// =============================================================================
+
+/// Get the message template for a diagnostic code.
+///
+/// Templates use {0}, {1}, etc. as placeholders for arguments.
+pub fn get_message_template(code: u32) -> &'static str {
+    match code {
+        codes::TYPE_NOT_ASSIGNABLE => "Type '{0}' is not assignable to type '{1}'.",
+        codes::ARG_NOT_ASSIGNABLE => "Argument of type '{0}' is not assignable to parameter of type '{1}'.",
+        codes::PROPERTY_MISSING => "Property '{0}' is missing in type '{1}' but required in type '{2}'.",
+        codes::PROPERTY_NOT_EXIST => "Property '{0}' does not exist on type '{1}'.",
+        codes::NO_COMMON_PROPERTIES => "Type '{0}' has no properties in common with type '{1}'.",
+        codes::READONLY_PROPERTY => "Cannot assign to '{0}' because it is a read-only property.",
+        codes::CONSTRAINT_NOT_SATISFIED => "Type '{0}' is not assignable to type '{1}'. '{2}' is assignable to the constraint of type '{3}', but '{3}' could be instantiated with a different subtype.",
+        codes::THIS_CONTEXT_MISMATCH => "The 'this' context of type '{0}' is not assignable to method's 'this' of type '{1}'.",
+        codes::NEVER_ASYNC_RETURN => "Type 'never' is not a valid return type for an async function.",
+        codes::CANNOT_FIND_NAME => "Cannot find name '{0}'.",
+        codes::NOT_CALLABLE => "This expression is not callable. Type '{0}' has no call signatures.",
+        codes::ARG_COUNT_MISMATCH => "Expected {0} arguments, but got {1}.",
+        codes::OBJECT_POSSIBLY_UNDEFINED => "Object is possibly 'undefined'.",
+        codes::OBJECT_POSSIBLY_NULL => "Object is possibly 'null'.",
+        codes::OBJECT_IS_UNKNOWN => "Object is of type 'unknown'.",
+        codes::EXCESS_PROPERTY => "Object literal may only specify known properties, and '{0}' does not exist in type '{1}'.",
+        _ => "Unknown diagnostic",
+    }
+}
+
+// =============================================================================
 // Type Formatting
 // =============================================================================
 
 /// Context for generating type strings.
 pub struct TypeFormatter<'a> {
     interner: &'a TypeInterner,
+    /// Symbol arena for looking up symbol names (optional)
+    symbol_arena: Option<&'a crate::binder::SymbolArena>,
     /// Maximum depth for nested type printing
     max_depth: u32,
     /// Current depth
@@ -164,9 +300,81 @@ impl<'a> TypeFormatter<'a> {
     pub fn new(interner: &'a TypeInterner) -> Self {
         TypeFormatter {
             interner,
+            symbol_arena: None,
             max_depth: 5,
             current_depth: 0,
         }
+    }
+
+    /// Create a formatter with access to symbol names.
+    pub fn with_symbols(interner: &'a TypeInterner, symbol_arena: &'a crate::binder::SymbolArena) -> Self {
+        TypeFormatter {
+            interner,
+            symbol_arena: Some(symbol_arena),
+            max_depth: 5,
+            current_depth: 0,
+        }
+    }
+
+    /// Render a pending diagnostic to a complete diagnostic with formatted message.
+    ///
+    /// This is where the lazy evaluation happens - we format types to strings
+    /// only when the diagnostic is actually going to be displayed.
+    pub fn render(&mut self, pending: &PendingDiagnostic) -> TypeDiagnostic {
+        let template = get_message_template(pending.code);
+        let message = self.render_template(template, &pending.args);
+
+        let mut diag = TypeDiagnostic {
+            message,
+            code: pending.code,
+            severity: pending.severity,
+            span: pending.span.clone(),
+            related: Vec::new(),
+        };
+
+        // Render related diagnostics
+        for related in &pending.related {
+            if let Some(span) = &related.span {
+                let related_msg = self.render_template(
+                    get_message_template(related.code),
+                    &related.args
+                );
+                diag.related.push(RelatedInformation {
+                    span: span.clone(),
+                    message: related_msg,
+                });
+            }
+        }
+
+        diag
+    }
+
+    /// Render a message template with arguments.
+    fn render_template(&mut self, template: &str, args: &[DiagnosticArg]) -> String {
+        let mut result = template.to_string();
+
+        for (i, arg) in args.iter().enumerate() {
+            let placeholder = format!("{{{}}}", i);
+            let replacement = match arg {
+                DiagnosticArg::Type(type_id) => self.format(*type_id),
+                DiagnosticArg::Symbol(sym_id) => {
+                    if let Some(arena) = self.symbol_arena {
+                        if let Some(sym) = arena.get(*sym_id) {
+                            sym.escaped_name.to_string()
+                        } else {
+                            format!("Symbol({})", sym_id.0)
+                        }
+                    } else {
+                        format!("Symbol({})", sym_id.0)
+                    }
+                }
+                DiagnosticArg::String(s) => s.to_string(),
+                DiagnosticArg::Number(n) => n.to_string(),
+            };
+            result = result.replace(&placeholder, &replacement);
+        }
+
+        result
     }
 
     /// Format a type as a human-readable string.
@@ -512,6 +720,90 @@ impl<'a> DiagnosticBuilder<'a> {
                 prop_name, target_str
             ),
             codes::EXCESS_PROPERTY,
+        )
+    }
+}
+
+// =============================================================================
+// Pending Diagnostic Builder (LAZY)
+// =============================================================================
+
+/// Builder for creating lazy pending diagnostics.
+///
+/// This builder creates PendingDiagnostic instances that defer expensive
+/// string formatting until rendering time.
+pub struct PendingDiagnosticBuilder;
+
+impl PendingDiagnosticBuilder {
+    /// Create a "Type X is not assignable to type Y" pending diagnostic.
+    pub fn type_not_assignable(source: TypeId, target: TypeId) -> PendingDiagnostic {
+        PendingDiagnostic::error(
+            codes::TYPE_NOT_ASSIGNABLE,
+            vec![source.into(), target.into()],
+        )
+    }
+
+    /// Create a "Property X is missing" pending diagnostic.
+    pub fn property_missing(prop_name: &str, source: TypeId, target: TypeId) -> PendingDiagnostic {
+        PendingDiagnostic::error(
+            codes::PROPERTY_MISSING,
+            vec![prop_name.into(), source.into(), target.into()],
+        )
+    }
+
+    /// Create a "Property X does not exist" pending diagnostic.
+    pub fn property_not_exist(prop_name: &str, type_id: TypeId) -> PendingDiagnostic {
+        PendingDiagnostic::error(
+            codes::PROPERTY_NOT_EXIST,
+            vec![prop_name.into(), type_id.into()],
+        )
+    }
+
+    /// Create an "Argument not assignable" pending diagnostic.
+    pub fn argument_not_assignable(arg_type: TypeId, param_type: TypeId) -> PendingDiagnostic {
+        PendingDiagnostic::error(
+            codes::ARG_NOT_ASSIGNABLE,
+            vec![arg_type.into(), param_type.into()],
+        )
+    }
+
+    /// Create a "Cannot find name" pending diagnostic.
+    pub fn cannot_find_name(name: &str) -> PendingDiagnostic {
+        PendingDiagnostic::error(
+            codes::CANNOT_FIND_NAME,
+            vec![name.into()],
+        )
+    }
+
+    /// Create a "Type is not callable" pending diagnostic.
+    pub fn not_callable(type_id: TypeId) -> PendingDiagnostic {
+        PendingDiagnostic::error(
+            codes::NOT_CALLABLE,
+            vec![type_id.into()],
+        )
+    }
+
+    /// Create an "Expected N arguments but got M" pending diagnostic.
+    pub fn argument_count_mismatch(expected: usize, got: usize) -> PendingDiagnostic {
+        PendingDiagnostic::error(
+            codes::ARG_COUNT_MISMATCH,
+            vec![expected.into(), got.into()],
+        )
+    }
+
+    /// Create a "Cannot assign to readonly property" pending diagnostic.
+    pub fn readonly_property(prop_name: &str) -> PendingDiagnostic {
+        PendingDiagnostic::error(
+            codes::READONLY_PROPERTY,
+            vec![prop_name.into()],
+        )
+    }
+
+    /// Create an "Excess property" pending diagnostic.
+    pub fn excess_property(prop_name: &str, target: TypeId) -> PendingDiagnostic {
+        PendingDiagnostic::error(
+            codes::EXCESS_PROPERTY,
+            vec![prop_name.into(), target.into()],
         )
     }
 }

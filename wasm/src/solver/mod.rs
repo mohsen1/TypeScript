@@ -25,6 +25,7 @@ mod evaluate;
 mod contextual;
 mod narrowing;
 mod diagnostics;
+mod operations;
 
 pub use types::*;
 pub use intern::*;
@@ -36,3 +37,4 @@ pub use evaluate::*;
 pub use contextual::*;
 pub use narrowing::*;
 pub use diagnostics::*;
+pub use operations::*;
