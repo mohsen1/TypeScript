@@ -468,6 +468,35 @@ node scripts/ask-gemini.mjs --review
 
 # Session Log (Recent)
 
+## 2026-01-05: Session 33
+- **Lazy Diagnostics Infrastructure Complete** (Phase 0 Performance)
+- Problem: Eager string formatting during type checking wasted allocations
+- Added `DiagnosticArg` enum for storing raw data (TypeId, SymbolId, String, Number)
+- Added `PendingDiagnostic` struct for deferred rendering
+- Added `get_message_template()` for template-based message generation
+- Extended `TypeFormatter::render()` to lazily format pending diagnostics
+- Added `PendingDiagnosticBuilder` for ergonomic creation
+- Impact: Zero wasted allocations during tentative type checking (overload resolution)
+
+- **Solver Operations Architecture Complete** (Phase 0 Performance)
+- Problem: ThinChecker doing type logic instead of type orchestration
+- Created new `solver/operations.rs` module
+- Separation of concerns:
+  - **ThinChecker**: WHERE (AST traversal, scoping, control flow)
+  - **Solver**: WHAT (expressions, relations, operations)
+- Added structured result types:
+  - `CallResult` - function call resolution (success, arg mismatch, not callable, no overload)
+  - `PropertyAccessResult` - property access resolution
+  - `BinaryOpResult` - binary operation evaluation
+- Added pure evaluators:
+  - `CallEvaluator` - resolves calls with overload resolution
+  - `PropertyAccessEvaluator` - resolves property access on all type shapes
+  - `BinaryOpEvaluator` - evaluates binary ops (+, -, &&, ||, etc.)
+- All functions: TypeId in → Structured results out (no AST, no formatting, no side effects)
+- Added 7 new operation tests (all passing)
+- 1006 total tests passing
+- **Next**: Refactor ThinChecker to use solver operations instead of inline logic
+
 ## 2026-01-05: Session 29
 - **Ref Resolution Complete**
 - Added TypeResolver trait for lazy symbol-to-type resolution
