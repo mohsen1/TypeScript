@@ -412,6 +412,11 @@ impl ThinBinderState {
                 };
 
                 let sym_id = self.symbols.alloc(flags, name.to_string());
+                // Set the value_declaration to this variable declaration node
+                if let Some(sym) = self.symbols.get_mut(sym_id) {
+                    sym.value_declaration = idx;
+                    sym.declarations.push(idx);
+                }
                 self.current_scope.set(name.to_string(), sym_id);
                 self.node_symbols.insert(idx.0, sym_id);
             }

@@ -343,8 +343,13 @@ Working:
   - Constructor body checking
   - Getter/setter type checking
 
+- Method call type checking ✅
+  - Property access on object types
+  - Built-in properties (string.length, array.length)
+  - Union/intersection property access
+  - Function call argument checking on method calls
+
 Next:
-- Method call type checking
 - More comprehensive diagnostic messages
 
 ---

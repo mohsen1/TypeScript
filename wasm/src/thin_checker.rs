@@ -974,10 +974,103 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     /// Get a property type from an object type.
-    fn get_property_of_type(&self, _type_id: TypeId, _property_name: &str) -> Option<TypeId> {
-        // TODO: Implement property lookup on types
-        // For now, return None to indicate property not found
-        None
+    fn get_property_of_type(&self, type_id: TypeId, property_name: &str) -> Option<TypeId> {
+        use crate::solver::TypeKey;
+
+        // Lookup the type structure
+        let type_key = self.types.lookup(type_id)?;
+
+        match type_key {
+            TypeKey::Object(props) => {
+                // Direct property lookup on object type
+                for prop in &props {
+                    if prop.name.as_ref() == property_name {
+                        return Some(prop.type_id);
+                    }
+                }
+                None
+            }
+            TypeKey::ObjectWithIndex(shape) => {
+                // First try properties, then fall back to index signature
+                for prop in &shape.properties {
+                    if prop.name.as_ref() == property_name {
+                        return Some(prop.type_id);
+                    }
+                }
+                // If not found in properties, check string index signature
+                shape.string_index.map(|idx| idx.value_type)
+            }
+            TypeKey::Union(members) => {
+                // For union types, the property must exist on ALL members
+                // and the result is the union of their types
+                let mut result_types = Vec::new();
+                for &member in &members {
+                    if let Some(prop_type) = self.get_property_of_type(member, property_name) {
+                        result_types.push(prop_type);
+                    } else {
+                        // Property doesn't exist on this union member
+                        return None;
+                    }
+                }
+                if result_types.is_empty() {
+                    None
+                } else if result_types.len() == 1 {
+                    Some(result_types[0])
+                } else {
+                    Some(self.types.union(result_types))
+                }
+            }
+            TypeKey::Intersection(members) => {
+                // For intersection types, try each member and return the first match
+                for &member in &members {
+                    if let Some(prop_type) = self.get_property_of_type(member, property_name) {
+                        return Some(prop_type);
+                    }
+                }
+                None
+            }
+            TypeKey::Array(_elem_type) => {
+                // Built-in array properties
+                match property_name {
+                    "length" => Some(TypeId::NUMBER),
+                    "push" | "pop" | "shift" | "unshift" | "splice" | "slice"
+                    | "concat" | "join" | "indexOf" | "lastIndexOf" | "forEach"
+                    | "map" | "filter" | "reduce" | "find" | "findIndex" | "every"
+                    | "some" | "includes" | "sort" | "reverse" | "fill" | "copyWithin"
+                    | "entries" | "keys" | "values" | "flat" | "flatMap" => {
+                        // Return any for array methods - proper typing requires generics
+                        Some(TypeId::ANY)
+                    }
+                    _ => None,
+                }
+            }
+            TypeKey::Intrinsic(crate::solver::IntrinsicKind::String) => {
+                // Built-in string properties
+                self.get_string_property(property_name)
+            }
+            TypeKey::Literal(crate::solver::LiteralValue::String(_)) => {
+                // String literal has same properties as string
+                self.get_string_property(property_name)
+            }
+            _ => None,
+        }
+    }
+
+    /// Get built-in string property type.
+    fn get_string_property(&self, property_name: &str) -> Option<TypeId> {
+        match property_name {
+            "length" => Some(TypeId::NUMBER),
+            "charAt" | "charCodeAt" | "concat" | "indexOf" | "lastIndexOf"
+            | "localeCompare" | "match" | "replace" | "search" | "slice"
+            | "split" | "substring" | "toLowerCase" | "toUpperCase" | "trim"
+            | "trimStart" | "trimEnd" | "padStart" | "padEnd" | "repeat"
+            | "startsWith" | "endsWith" | "includes" | "normalize" | "at"
+            | "codePointAt" | "toLocaleLowerCase" | "toLocaleUpperCase" => {
+                // Return any for string methods - proper typing requires overloads
+                Some(TypeId::ANY)
+            }
+            _ => None,
+        }
     }
 
     // =========================================================================
