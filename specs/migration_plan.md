@@ -43,14 +43,18 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 - Full type syntax: unions, intersections, generics, conditional, mapped, indexed access
 - JSX support, async/await, generators
 - Import/export (ES6, CommonJS, type-only)
-- 97.5% pass rate on batch tests (single-file)
+- 96.9% pass rate on batch tests (single-file, 800/825)
 
-### Parser Features Added (Sessions 22-27)
+### Parser Features Added (Sessions 22-30)
 - Generic function types, type assertions, template literals
 - Tuple rest/optional/named elements, constructor types
 - All compound assignment operators, nullish coalescing
 - Binding patterns, index signatures, labeled statements
 - Recursion depth limits, tagged template literals
+- 'as const' assertions, multi-declaration for loops
+- Comma expressions, generic function calls with type arguments
+- 'this' type, 'declare abstract class', regex literals
+- Dynamic import expressions (import(...) and import.meta)
 
 ---
 
