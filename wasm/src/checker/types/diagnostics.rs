@@ -89,6 +89,7 @@ pub mod diagnostic_codes {
     pub const STATEMENT_EXPECTED: u32 = 1129;
     pub const CATCH_OR_FINALLY_EXPECTED: u32 = 1472;
     pub const DECORATORS_NOT_VALID_HERE: u32 = 1206;
+    pub const IMPLEMENTATION_CANNOT_BE_IN_AMBIENT_CONTEXT: u32 = 1183;  // An implementation cannot be declared in ambient contexts.
     pub const MODIFIERS_NOT_ALLOWED_HERE: u32 = 1184;
     pub const UNEXPECTED_TOKEN_CLASS_MEMBER: u32 = 1068;  // Unexpected token. A constructor, method, accessor, or property was expected.
     pub const DECLARATION_OR_STATEMENT_EXPECTED: u32 = 1128;  // Declaration or statement expected.

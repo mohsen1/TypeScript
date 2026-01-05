@@ -114,6 +114,8 @@ struct EnclosingClassInfo {
     member_nodes: Vec<NodeIndex>,
     /// Whether we're in a constructor (for error 2715 checking).
     in_constructor: bool,
+    /// Whether this is a `declare class` (ambient context for error 1183).
+    is_declared: bool,
 }
 
 /// Maximum depth for recursive type instantiation.
@@ -2333,6 +2335,7 @@ impl<'a> ThinCheckerState<'a> {
                 name,
                 member_nodes: class.members.nodes.clone(),
                 in_constructor: false,
+                is_declared,
             });
         }
 
@@ -2998,6 +3001,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check a method declaration.
     fn check_method_declaration(&mut self, member_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
         let Some(node) = self.arena.get(member_idx) else {
             return;
         };
@@ -3005,6 +3010,20 @@ impl<'a> ThinCheckerState<'a> {
         let Some(method) = self.arena.get_method_decl(node) else {
             return;
         };
+
+        // Error 1183: An implementation cannot be declared in ambient contexts
+        // Check if we're in a declared class and the method has a body
+        if !method.body.is_none() {
+            if let Some(ref class_info) = self.enclosing_class {
+                if class_info.is_declared {
+                    self.error_at_node(
+                        member_idx,
+                        "An implementation cannot be declared in ambient contexts.",
+                        diagnostic_codes::IMPLEMENTATION_CANNOT_BE_IN_AMBIENT_CONTEXT,
+                    );
+                }
+            }
+        }
 
         // Enter a new local scope for the method body
         self.push_local_scope();
@@ -3066,6 +3085,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check a constructor declaration.
     fn check_constructor_declaration(&mut self, member_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
         let Some(node) = self.arena.get(member_idx) else {
             return;
         };
@@ -3073,6 +3094,20 @@ impl<'a> ThinCheckerState<'a> {
         let Some(ctor) = self.arena.get_constructor(node) else {
             return;
         };
+
+        // Error 1183: An implementation cannot be declared in ambient contexts
+        // Check if we're in a declared class and the constructor has a body
+        if !ctor.body.is_none() {
+            if let Some(ref class_info) = self.enclosing_class {
+                if class_info.is_declared {
+                    self.error_at_node(
+                        member_idx,
+                        "An implementation cannot be declared in ambient contexts.",
+                        diagnostic_codes::IMPLEMENTATION_CANNOT_BE_IN_AMBIENT_CONTEXT,
+                    );
+                }
+            }
+        }
 
         // Check for parameter properties in constructor overload signatures (error 2369)
         // Parameter properties are only allowed in constructor implementations (with body)
@@ -3134,6 +3169,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check an accessor declaration (getter/setter).
     fn check_accessor_declaration(&mut self, member_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
         let Some(node) = self.arena.get(member_idx) else {
             return;
         };
@@ -3141,6 +3178,20 @@ impl<'a> ThinCheckerState<'a> {
         let Some(accessor) = self.arena.get_accessor(node) else {
             return;
         };
+
+        // Error 1183: An implementation cannot be declared in ambient contexts
+        // Check if we're in a declared class and the accessor has a body
+        if !accessor.body.is_none() {
+            if let Some(ref class_info) = self.enclosing_class {
+                if class_info.is_declared {
+                    self.error_at_node(
+                        member_idx,
+                        "An implementation cannot be declared in ambient contexts.",
+                        diagnostic_codes::IMPLEMENTATION_CANNOT_BE_IN_AMBIENT_CONTEXT,
+                    );
+                }
+            }
+        }
 
         // Enter a new local scope for the accessor body
         self.push_local_scope();
