@@ -22,6 +22,7 @@ use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::emitter::{PrinterOptions, NewLineKind};
+use crate::transforms::class_es5::ClassES5Emitter;
 
 // =============================================================================
 // ThinPrinter
@@ -55,6 +56,9 @@ pub struct ThinPrinter<'a> {
 
     /// Current output column (0-indexed)
     output_column: u32,
+
+    /// Whether to emit ES5 (classes→IIFEs, arrows→functions)
+    target_es5: bool,
 }
 
 impl<'a> ThinPrinter<'a> {
@@ -79,7 +83,22 @@ impl<'a> ThinPrinter<'a> {
             at_line_start: true,
             output_line: 0,
             output_column: 0,
+            target_es5: true, // Default to ES5 for baseline compatibility
         }
+    }
+
+    /// Create a new ThinPrinter targeting ES5.
+    pub fn new_es5(arena: &'a ThinNodeArena) -> Self {
+        let mut printer = Self::new(arena);
+        printer.target_es5 = true;
+        printer
+    }
+
+    /// Create a new ThinPrinter targeting ES6+.
+    pub fn new_es6(arena: &'a ThinNodeArena) -> Self {
+        let mut printer = Self::new(arena);
+        printer.target_es5 = false;
+        printer
     }
 
     /// Get the output.
@@ -832,6 +851,45 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
+        // Transform arrow function to regular function for ES5
+        if self.target_es5 {
+            if func.is_async {
+                self.write("async ");
+            }
+            
+            self.write("function (");
+            self.emit_function_parameters_js(&func.parameters.nodes);
+            self.write(") ");
+            
+            // If body is not a block (concise arrow), wrap with return
+            let body_node = self.arena.get(func.body);
+            let is_block = body_node.map(|n| n.kind == syntax_kind_ext::BLOCK).unwrap_or(false);
+            
+            if is_block {
+                // Check if it's a simple single-return block
+                if let Some(block_node) = self.arena.get(func.body) {
+                    if let Some(block) = self.arena.get_block(block_node) {
+                        if block.statements.nodes.len() == 1 
+                            && self.is_simple_return_statement(block.statements.nodes[0]) {
+                            self.emit_single_line_block(func.body);
+                        } else {
+                            self.emit(func.body);
+                        }
+                    } else {
+                        self.emit(func.body);
+                    }
+                } else {
+                    self.emit(func.body);
+                }
+            } else {
+                // Concise body: (x) => x + 1  →  function (x) { return x + 1; }
+                self.write("{ return ");
+                self.emit(func.body);
+                self.write("; }");
+            }
+            return;
+        }
+
         if func.is_async {
             self.write("async ");
         }
@@ -864,21 +922,67 @@ impl<'a> ThinPrinter<'a> {
             self.write("*");
         }
 
-        // Name (if any)
+        // Name (if any) - add space before open paren whether or not there's a name
         if !func.name.is_none() {
             self.write_space();
             self.emit(func.name);
         }
 
+        // Space before ( for TypeScript compatibility: function (x) vs function(x)
+        self.write(" ");
+
         // Parameters (without types for JavaScript)
         self.write("(");
         self.emit_function_parameters_js(&func.parameters.nodes);
-        self.write(")");
+        self.write(") ");
 
-        // Skip return type for JavaScript
-
-        self.write_space();
-        self.emit(func.body);
+        // Emit body - check if it's a simple single-statement body
+        let body_node = self.arena.get(func.body);
+        let is_simple_body = if let Some(body) = body_node {
+            if let Some(block) = self.arena.get_block(body) {
+                // Single return statement = simple body
+                block.statements.nodes.len() == 1
+                    && self.is_simple_return_statement(block.statements.nodes[0])
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        
+        if is_simple_body {
+            self.emit_single_line_block(func.body);
+        } else {
+            self.emit(func.body);
+        }
+    }
+    
+    /// Check if a statement is a simple return statement (for single-line emission)
+    fn is_simple_return_statement(&self, stmt_idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(stmt_idx) else { return false };
+        if node.kind != syntax_kind_ext::RETURN_STATEMENT {
+            return false;
+        }
+        // Consider it simple if it has an expression (not just "return;")
+        if let Some(ret) = self.arena.get_return_statement(node) {
+            return !ret.expression.is_none();
+        }
+        false
+    }
+    
+    /// Emit a block on a single line: { return expr; }
+    fn emit_single_line_block(&mut self, block_idx: NodeIndex) {
+        let Some(block_node) = self.arena.get(block_idx) else { return };
+        let Some(block) = self.arena.get_block(block_node) else { return };
+        
+        self.write("{ ");
+        for (i, &stmt_idx) in block.statements.nodes.iter().enumerate() {
+            if i > 0 {
+                self.write(" ");
+            }
+            self.emit(stmt_idx);
+        }
+        self.write(" }");
     }
 
     fn emit_function_declaration(&mut self, node: &ThinNode, _idx: NodeIndex) {
@@ -978,6 +1082,12 @@ impl<'a> ThinPrinter<'a> {
         let Some(block) = self.arena.get_block(node) else {
             return;
         };
+
+        // Empty blocks: emit as "{ }" on same line for ES5 compatibility
+        if block.statements.nodes.is_empty() {
+            self.write("{ }");
+            return;
+        }
 
         self.write("{");
         self.write_line();
@@ -1141,7 +1251,15 @@ impl<'a> ThinPrinter<'a> {
     // Classes
     // =========================================================================
 
-    fn emit_class_declaration(&mut self, node: &ThinNode, _idx: NodeIndex) {
+    fn emit_class_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
+        // Use ES5 IIFE transform when targeting ES5
+        if self.target_es5 {
+            let mut es5_emitter = ClassES5Emitter::new(self.arena);
+            let es5_output = es5_emitter.emit_class(idx);
+            self.write(&es5_output);
+            return;
+        }
+        
         let Some(class) = self.arena.get_class(node) else {
             return;
         };

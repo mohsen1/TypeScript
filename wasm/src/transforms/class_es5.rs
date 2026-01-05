@@ -185,15 +185,33 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write(&method_name);
                 self.write(" = function (");
                 self.emit_parameters(&method_data.parameters);
-                self.write(") {");
-                self.write_line();
-                self.increase_indent();
+                self.write(") ");
                 
-                self.emit_block_contents(method_data.body);
+                // Check if body is empty - only empty bodies go on single line
+                let body_node = self.arena.get(method_data.body);
+                let is_empty_body = if let Some(block_node) = body_node {
+                    if let Some(block) = self.arena.get_block(block_node) {
+                        block.statements.nodes.is_empty()
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                };
                 
-                self.decrease_indent();
-                self.write_indent();
-                self.write("};");
+                if is_empty_body {
+                    self.write("{ }");
+                } else {
+                    self.write("{");
+                    self.write_line();
+                    self.increase_indent();
+                    self.emit_block_contents(method_data.body);
+                    self.decrease_indent();
+                    self.write_indent();
+                    self.write("}");
+                }
+                
+                self.write(";");
                 self.write_line();
             } else if member_node.kind == syntax_kind_ext::GET_ACCESSOR {
                 self.emit_accessor(class_name, member_idx, true);
@@ -705,10 +723,36 @@ impl<'a> ClassES5Emitter<'a> {
                         self.write(" ");
                         self.emit_expression(func.name);
                     }
-                    self.write("(");
+                    // Space before ( for TypeScript compatibility
+                    self.write(" (");
                     self.emit_parameters(&func.parameters);
                     self.write(") ");
-                    self.emit_statement(func.body);
+                    
+                    // Check if body is a single return statement - emit on one line
+                    let body_node = self.arena.get(func.body);
+                    let is_simple_body = if let Some(block) = body_node.and_then(|n| self.arena.get_block(n)) {
+                        block.statements.nodes.len() == 1 && {
+                            let stmt_node = self.arena.get(block.statements.nodes[0]);
+                            stmt_node.map(|s| s.kind == syntax_kind_ext::RETURN_STATEMENT).unwrap_or(false)
+                        }
+                    } else {
+                        false
+                    };
+                    
+                    if is_simple_body {
+                        // Single-line: { return expr; }
+                        if let Some(block_node) = body_node {
+                            if let Some(block) = self.arena.get_block(block_node) {
+                                self.write("{ ");
+                                for &stmt_idx in &block.statements.nodes {
+                                    self.emit_statement(stmt_idx);
+                                }
+                                self.write(" }");
+                            }
+                        }
+                    } else {
+                        self.emit_statement(func.body);
+                    }
                 }
             }
             _ => {

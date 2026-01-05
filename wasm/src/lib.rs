@@ -55,6 +55,7 @@ pub mod thin_emitter;
 #[cfg(test)]
 mod thin_emitter_tests;
 
+
 // Parallel processing with Rayon (Phase 0.4)
 pub mod parallel;
 
