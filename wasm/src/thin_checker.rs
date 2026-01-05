@@ -923,6 +923,8 @@ impl<'a> ThinCheckerState<'a> {
 
                     // Use type annotation if present, otherwise any
                     let type_id = if !param.type_annotation.is_none() {
+                        // Check parameter type for parameter properties in function types
+                        self.check_type_for_parameter_properties(param.type_annotation);
                         self.get_type_from_type_node(param.type_annotation)
                     } else {
                         TypeId::ANY
@@ -948,6 +950,8 @@ impl<'a> ThinCheckerState<'a> {
 
         // Get return type from annotation or infer
         let return_type = if !func.type_annotation.is_none() {
+            // Check return type for parameter properties in function types
+            self.check_type_for_parameter_properties(func.type_annotation);
             self.get_type_from_type_node(func.type_annotation)
         } else {
             // TODO: Infer return type from body
@@ -1545,6 +1549,22 @@ impl<'a> ThinCheckerState<'a> {
                     // Parameter properties are only allowed in constructors
                     self.check_parameter_properties(&func.parameters.nodes);
 
+                    // Check return type annotation for parameter properties in function types
+                    if !func.type_annotation.is_none() {
+                        self.check_type_for_parameter_properties(func.type_annotation);
+                    }
+
+                    // Check parameter type annotations for parameter properties
+                    for &param_idx in &func.parameters.nodes {
+                        if let Some(param_node) = self.arena.get(param_idx) {
+                            if let Some(param) = self.arena.get_parameter(param_node) {
+                                if !param.type_annotation.is_none() {
+                                    self.check_type_for_parameter_properties(param.type_annotation);
+                                }
+                            }
+                        }
+                    }
+
                     // Check function body if present
                     if !func.body.is_none() {
                         self.push_local_scope();
@@ -1624,8 +1644,11 @@ impl<'a> ThinCheckerState<'a> {
                     }
                 }
             }
+            // Interface declarations need parameter property checks
+            syntax_kind_ext::INTERFACE_DECLARATION => {
+                self.check_interface_declaration(stmt_idx);
+            }
             // Type declarations - just register them, no expression checking needed
-            syntax_kind_ext::INTERFACE_DECLARATION |
             syntax_kind_ext::TYPE_ALIAS_DECLARATION |
             syntax_kind_ext::ENUM_DECLARATION |
             syntax_kind_ext::IMPORT_DECLARATION |
@@ -1894,6 +1917,22 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Check an interface declaration.
+    fn check_interface_declaration(&mut self, stmt_idx: NodeIndex) {
+        let Some(node) = self.arena.get(stmt_idx) else {
+            return;
+        };
+
+        let Some(iface) = self.arena.get_interface(node) else {
+            return;
+        };
+
+        // Check each interface member for parameter properties
+        for &member_idx in &iface.members.nodes {
+            self.check_type_member_for_parameter_properties(member_idx);
+        }
+    }
+
     /// Check if a node has the `declare` modifier.
     fn has_declare_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
         use crate::scanner::SyntaxKind;
@@ -1907,6 +1946,95 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         false
+    }
+
+    /// Check if a node has the `abstract` modifier.
+    fn has_abstract_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::AbstractKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Recursively check a type node for parameter properties in function types.
+    /// Function types (like `(x: T) => R` or `new (x: T) => R`) cannot have parameter properties.
+    fn check_type_for_parameter_properties(&mut self, type_idx: NodeIndex) {
+        let Some(node) = self.arena.get(type_idx) else {
+            return;
+        };
+
+        // Check if this is a function type or constructor type
+        if node.kind == syntax_kind_ext::FUNCTION_TYPE ||
+           node.kind == syntax_kind_ext::CONSTRUCTOR_TYPE {
+            if let Some(func_type) = self.arena.get_function_type(node) {
+                // Check each parameter for parameter property modifiers
+                self.check_parameter_properties(&func_type.parameters.nodes);
+                // Recursively check the return type
+                self.check_type_for_parameter_properties(func_type.type_annotation);
+            }
+        }
+        // Check type literals (object types) for call/construct signatures
+        else if node.kind == syntax_kind_ext::TYPE_LITERAL {
+            if let Some(type_lit) = self.arena.get_type_literal(node) {
+                for &member_idx in &type_lit.members.nodes {
+                    self.check_type_member_for_parameter_properties(member_idx);
+                }
+            }
+        }
+        // Recursively check array types, union types, intersection types, etc.
+        else if node.kind == syntax_kind_ext::ARRAY_TYPE {
+            if let Some(arr) = self.arena.get_array_type(node) {
+                self.check_type_for_parameter_properties(arr.element_type);
+            }
+        }
+        else if node.kind == syntax_kind_ext::UNION_TYPE ||
+                node.kind == syntax_kind_ext::INTERSECTION_TYPE {
+            if let Some(composite) = self.arena.get_composite_type(node) {
+                for &type_idx in &composite.types.nodes {
+                    self.check_type_for_parameter_properties(type_idx);
+                }
+            }
+        }
+        else if node.kind == syntax_kind_ext::PARENTHESIZED_TYPE {
+            if let Some(paren) = self.arena.get_wrapped_type(node) {
+                self.check_type_for_parameter_properties(paren.type_node);
+            }
+        }
+    }
+
+    /// Check a type literal member for parameter properties (call/construct signatures).
+    fn check_type_member_for_parameter_properties(&mut self, member_idx: NodeIndex) {
+        let Some(node) = self.arena.get(member_idx) else {
+            return;
+        };
+
+        // Check call signatures and construct signatures for parameter properties
+        if node.kind == syntax_kind_ext::CALL_SIGNATURE ||
+           node.kind == syntax_kind_ext::CONSTRUCT_SIGNATURE {
+            if let Some(sig) = self.arena.get_signature(node) {
+                if let Some(params) = &sig.parameters {
+                    self.check_parameter_properties(&params.nodes);
+                }
+                // Recursively check the return type
+                self.check_type_for_parameter_properties(sig.type_annotation);
+            }
+        }
+        // Check method signatures in type literals
+        else if node.kind == syntax_kind_ext::METHOD_SIGNATURE {
+            if let Some(sig) = self.arena.get_signature(node) {
+                if let Some(params) = &sig.parameters {
+                    self.check_parameter_properties(&params.nodes);
+                }
+                self.check_type_for_parameter_properties(sig.type_annotation);
+            }
+        }
     }
 
     /// Check that all method/constructor overload signatures have implementations.
@@ -1940,7 +2068,9 @@ impl<'a> ThinCheckerState<'a> {
                 }
                 syntax_kind_ext::METHOD_DECLARATION => {
                     if let Some(method) = self.arena.get_method_decl(node) {
-                        if method.body.is_none() {
+                        // Abstract methods don't need implementations (they're meant for derived classes)
+                        let is_abstract = self.has_abstract_modifier(&method.modifiers);
+                        if method.body.is_none() && !is_abstract {
                             // Method overload signature - check for implementation
                             let method_name = self.get_method_name_from_node(member_idx);
                             if let Some(name) = method_name {
@@ -2296,6 +2426,22 @@ impl<'a> ThinCheckerState<'a> {
         // Parameter properties are only allowed in constructors, not in methods
         self.check_parameter_properties(&method.parameters.nodes);
 
+        // Check parameter type annotations for parameter properties in function types
+        for &param_idx in &method.parameters.nodes {
+            if let Some(param_node) = self.arena.get(param_idx) {
+                if let Some(param) = self.arena.get_parameter(param_node) {
+                    if !param.type_annotation.is_none() {
+                        self.check_type_for_parameter_properties(param.type_annotation);
+                    }
+                }
+            }
+        }
+
+        // Check return type annotation for parameter properties in function types
+        if !method.type_annotation.is_none() {
+            self.check_type_for_parameter_properties(method.type_annotation);
+        }
+
         // Check method body
         if !method.body.is_none() {
             self.check_statement(method.body);
@@ -2319,6 +2465,17 @@ impl<'a> ThinCheckerState<'a> {
         // Parameter properties are only allowed in constructor implementations (with body)
         if ctor.body.is_none() {
             self.check_parameter_properties(&ctor.parameters.nodes);
+        }
+
+        // Check parameter type annotations for parameter properties in function types
+        for &param_idx in &ctor.parameters.nodes {
+            if let Some(param_node) = self.arena.get(param_idx) {
+                if let Some(param) = self.arena.get_parameter(param_node) {
+                    if !param.type_annotation.is_none() {
+                        self.check_type_for_parameter_properties(param.type_annotation);
+                    }
+                }
+            }
         }
 
         // Enter a new local scope for the constructor body
