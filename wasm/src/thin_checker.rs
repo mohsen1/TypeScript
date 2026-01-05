@@ -423,9 +423,26 @@ impl<'a> ThinCheckerState<'a> {
                         // TODO: Handle generic Array type
                         return self.types.array(TypeId::ANY);
                     }
-                    _ => {
-                        // TODO: Look up user-defined types from symbol table
-                        return TypeId::ANY;
+                    name => {
+                        // Look up user-defined types from symbol table
+                        // Check file locals first
+                        if let Some(sym_id) = self.binder.file_locals.get(name) {
+                            return self.get_type_of_symbol(sym_id);
+                        }
+                        // Check all symbols (excluding class members)
+                        if let Some(sym_id) = self.binder.get_symbols().find_by_name(name) {
+                            if let Some(symbol) = self.binder.get_symbol(sym_id) {
+                                use crate::binder::symbol_flags;
+                                let is_class_member = (symbol.flags & symbol_flags::PROPERTY) != 0
+                                    || (symbol.flags & symbol_flags::METHOD) != 0;
+                                if !is_class_member {
+                                    return self.get_type_of_symbol(sym_id);
+                                }
+                            }
+                        }
+                        // Not found - report error
+                        self.error_cannot_find_name_at(name, type_name_idx);
+                        return TypeId::ERROR;
                     }
                 }
             }
@@ -1404,8 +1421,17 @@ impl<'a> ThinCheckerState<'a> {
     ///
     /// Uses compile-time constant TypeIds for intrinsic types (O(1) lookup).
     /// Delegates to TypeLowering for complex types (union, intersection, array, etc.).
+    /// Also validates that type references exist and reports errors.
     pub fn get_type_from_type_node(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::TypeLowering;
+
+        // First check if this is a type reference that needs validation
+        if let Some(node) = self.arena.get(idx) {
+            if node.kind == syntax_kind_ext::TYPE_REFERENCE {
+                // Validate the type reference exists before lowering
+                return self.get_type_from_type_reference(idx);
+            }
+        }
 
         // Use TypeLowering which handles all type nodes
         let lowering = TypeLowering::new(self.arena, &self.types);
@@ -1822,11 +1848,19 @@ impl<'a> ThinCheckerState<'a> {
             syntax_kind_ext::INTERFACE_DECLARATION => {
                 self.check_interface_declaration(stmt_idx);
             }
+            // Export declarations - descend into the wrapped declaration
+            syntax_kind_ext::EXPORT_DECLARATION => {
+                if let Some(export_decl) = self.arena.get_export_decl(node) {
+                    // Check the wrapped declaration (function, class, variable, etc.)
+                    if !export_decl.export_clause.is_none() {
+                        self.check_statement(export_decl.export_clause);
+                    }
+                }
+            }
             // Type declarations - just register them, no expression checking needed
             syntax_kind_ext::TYPE_ALIAS_DECLARATION |
             syntax_kind_ext::ENUM_DECLARATION |
             syntax_kind_ext::IMPORT_DECLARATION |
-            syntax_kind_ext::EXPORT_DECLARATION |
             syntax_kind_ext::EMPTY_STATEMENT |
             syntax_kind_ext::DEBUGGER_STATEMENT |
             syntax_kind_ext::BREAK_STATEMENT |
