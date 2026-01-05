@@ -515,11 +515,17 @@ We will adopt a hybrid stack that leverages the Rust compiler ecosystem while ma
 use scripts/ask-gemini.mjs for a second option. this is a mssive and ambitious job. we need to get it right 
 
 
-## Phase 7.6 Clean up Rust stuff from legacy  ❌ NOT DONE
+## Phase 7.6 Clean up Rust stuff from legacy  🎯 CURRENT FOCUS
 
 Throughout the migration we changed directions a little that might have left us with some "legacy" code. none of this work is released and should aim for a clean and elegant codebase
 
-## Phase 8: Running `tests/cases` - 🎯 Primary Goal
+having duplicate thin_emitter.rs and emitter.rs etc is not ideal. we should look at the code and clean up.
+
+also even though it's more common for Rust code to cohost test and source in the same file, in this project we **must** have separate files for test and source. it helps us with LLM based development and context management.
+
+After cleaning up we must recreate `specs/WASM_ARCHITECTURE.md` with the new solver engine and cleaned up code.
+
+## Phase 8: Running `tests/cases` - Primary Goal
 
 **Goal: Every test case in `tests/cases` compiles faster than TypeScript-Go.**
 
