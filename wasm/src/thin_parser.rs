@@ -6519,8 +6519,20 @@ impl ThinParserState {
         while !self.is_token(SyntaxKind::CloseBraceToken)
             && !self.is_token(SyntaxKind::EndOfFileToken)
         {
+            let saved_pos = self.token_pos();
             let member = self.parse_type_member();
-            members.push(member);
+
+            // If parse_type_member returned NONE (couldn't parse) and we haven't advanced,
+            // skip the current token to prevent infinite loops
+            if member.is_none() && self.token_pos() == saved_pos {
+                self.parse_error_at_current_token("Unexpected token in type literal");
+                self.next_token(); // Skip the problematic token
+                continue;
+            }
+
+            if !member.is_none() {
+                members.push(member);
+            }
 
             // Allow comma or semicolon as separator
             if !self.parse_optional(SyntaxKind::SemicolonToken) {
@@ -7318,6 +7330,27 @@ impl ThinParserState {
     fn parse_jsx_element_name(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
 
+        // Error recovery: if the current token can't start a JSX element name,
+        // return a missing identifier to avoid crashes
+        if !self.is_token(SyntaxKind::Identifier)
+            && !self.is_token(SyntaxKind::ThisKeyword)
+            && !self.is_identifier_or_keyword()
+        {
+            self.parse_error_at_current_token("Expected JSX element name");
+            // Create a missing identifier node
+            let end_pos = self.token_end();
+            return self.arena.add_identifier(
+                SyntaxKind::Identifier as u16,
+                start_pos,
+                end_pos,
+                IdentifierData {
+                    escaped_text: String::new(),
+                    original_text: None,
+                    type_arguments: None,
+                },
+            );
+        }
+
         // Parse the initial name (identifier or this)
         let mut expr = if self.is_token(SyntaxKind::ThisKeyword) {
             let pos = self.token_pos();
@@ -7398,6 +7431,26 @@ impl ThinParserState {
     /// Parse a single JSX attribute.
     fn parse_jsx_attribute(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+
+        // Error recovery: if the current token can't start an attribute name,
+        // report error and skip to next attribute or end of attributes
+        if !self.is_token(SyntaxKind::Identifier) && !self.is_identifier_or_keyword() {
+            self.parse_error_at_current_token("Expected JSX attribute name");
+            // Skip the invalid token to prevent infinite loops
+            self.next_token();
+            // Return a dummy attribute with missing name
+            let end_pos = self.token_end();
+            return self.arena.add_jsx_attribute(
+                syntax_kind_ext::JSX_ATTRIBUTE,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::JsxAttributeData {
+                    name: NodeIndex::NONE,
+                    initializer: NodeIndex::NONE,
+                },
+            );
+        }
+
         let name = self.parse_jsx_attribute_name();
 
         // Check for value: = followed by string, expression, or nested JSX

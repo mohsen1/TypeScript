@@ -53,6 +53,7 @@ pub struct ScannerSnapshot {
     pub token: SyntaxKind,
     pub token_value: String,
     pub token_flags: u32,
+    pub token_atom: Atom,
 }
 
 /// The scanner state that holds the current position and token information.
@@ -1851,6 +1852,7 @@ impl ScannerState {
             token: self.token,
             token_value: self.token_value.clone(),
             token_flags: self.token_flags,
+            token_atom: self.token_atom,
         }
     }
 
@@ -1862,6 +1864,7 @@ impl ScannerState {
         self.token = snapshot.token;
         self.token_value = snapshot.token_value;
         self.token_flags = snapshot.token_flags;
+        self.token_atom = snapshot.token_atom;
     }
 
     /// Get the interned atom for the current identifier token.

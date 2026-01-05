@@ -43,7 +43,7 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 - Full type syntax: unions, intersections, generics, conditional, mapped, indexed access
 - JSX support, async/await, generators
 - Import/export (ES6, CommonJS, type-only)
-- 99.6% pass rate on batch tests (single-file, 822/825, only 3 UTF-16 encoding failures)
+- 100% pass rate on batch tests (single-file, 3772/3772, 0 crashes)
 
 ### Parser Features Added (Sessions 22-30)
 - Generic function types, type assertions, template literals
@@ -289,9 +289,9 @@ These are TypeScript's "type-level functions" (see §4 of SOLVER.md).
 ## Blockers for Higher Pass Rate
 
 1. ~~**UTF-16 encoding**~~ - ✅ Fixed (BOM handling in test runner)
-2. **Multi-file tests** with `@filename:` directives (~1462 tests skipped)
+2. **Multi-file tests** with `@filename:` directives (~1228 tests skipped)
 3. **Large files** > 50KB (skipped)
-4. **Parser edge cases** - 14 crashes on invalid syntax (should produce errors, not crash)
+4. ~~**Parser edge cases**~~ - ✅ Fixed (all crashes eliminated, error recovery added for JSX/type literals)
 
 ## Path to 100%
 

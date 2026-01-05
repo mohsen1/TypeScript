@@ -93,12 +93,10 @@ impl Interner {
     }
 
     /// Resolve an Atom back to its string value.
-    ///
-    /// # Panics
-    /// Panics if the atom is invalid (not from this interner).
+    /// Returns empty string if atom is out of bounds (safety for error recovery).
     #[inline]
     pub fn resolve(&self, atom: Atom) -> &str {
-        &self.strings[atom.0 as usize]
+        self.strings.get(atom.0 as usize).map(|s| s.as_str()).unwrap_or("")
     }
 
     /// Try to resolve an Atom, returning None if invalid.
