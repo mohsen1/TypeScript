@@ -60,7 +60,7 @@ This catches design issues early and ensures consistent code quality.
 **Parser Semantic Errors**
 
 8. ⬜ Declaration expected (1128) - after certain tokens
-9. ⬜ Const modifier on class members (1248) - `const` invalid on properties
+9. ✅ Const modifier on class members (1248) - `const` invalid on properties
 10. ✅ Accessor body in ambient context (1183) - no body in declare class
 11. ⬜ Accessor in ambient context ES5 (18045) - accessors need ES5+
 
