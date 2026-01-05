@@ -89,6 +89,7 @@ node scripts/verifyChecker.mjs
 - `wasm/src/` - All Rust code
 - `specs/migration_plan.md` - THE PLAN
 - `specs/gemini_review_*.md` - Review findings to address
+- `specs/SOLVER.md` - very important guide for solver
 
 
 
@@ -108,6 +109,8 @@ You can take a look at `specs/TYPESCRIPT_GO_ARCHITECTURE.md` for an overview
 ```
 [wasm] <component>: <description>
 ```
+
+Commit frequently and atomically
 
 ## 🚨 Rules
 
