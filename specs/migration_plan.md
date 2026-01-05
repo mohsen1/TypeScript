@@ -156,9 +156,11 @@ pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
    - ✅ `error_type_not_assignable_with_reason_at()` in thin_checker.rs
    - ✅ Wired up: variable declarations, return statements, property declarations
 3. ⬜ RelatedInformation (point to definition sites)
-4. ⬜ Scoped name resolution (needed for abstract class checks in local scopes)
-   - Binder currently only persists file_locals, not local scopes
-   - Needed for: abstract class checks, proper identifier resolution in nested scopes
+4. 🔄 Scoped name resolution (partial)
+   - ✅ Local variables added to scope during type checking
+   - ✅ Parameters added to scope in functions/methods/constructors
+   - ⬜ Class member resolution (this.x vs x vs ClassName.x)
+   - ⬜ Abstract class checks in local scopes (needs binder enhancement)
 
 ---
 
