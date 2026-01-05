@@ -1637,6 +1637,7 @@ impl ThinParserState {
 
     /// Parse class member modifiers (static, public, private, protected, readonly, abstract, override)
     fn parse_class_member_modifiers(&mut self) -> Option<NodeList> {
+        use crate::checker::types::diagnostics::diagnostic_codes;
         let mut modifiers = Vec::new();
 
         loop {
@@ -1681,6 +1682,25 @@ impl ThinParserState {
                 SyntaxKind::AccessorKeyword => {
                     self.next_token();
                     self.arena.create_modifier(SyntaxKind::AccessorKeyword, start_pos)
+                }
+                // Handle const as a modifier (e.g., for const enums context, but error in class members)
+                SyntaxKind::ConstKeyword => {
+                    self.next_token();
+                    self.arena.create_modifier(SyntaxKind::ConstKeyword, start_pos)
+                }
+                // Handle 'var' - error: Variable declaration not allowed at this location
+                SyntaxKind::VarKeyword => {
+                    self.parse_error_at_current_token(
+                        "Variable declaration not allowed at this location.",
+                        diagnostic_codes::VAR_DECLARATION_NOT_ALLOWED
+                    );
+                    self.next_token();
+                    continue;
+                }
+                // Handle 'export' - not valid as class member modifier
+                SyntaxKind::ExportKeyword => {
+                    self.next_token();
+                    self.arena.create_modifier(SyntaxKind::ExportKeyword, start_pos)
                 }
                 _ => break,
             };
@@ -1817,11 +1837,22 @@ impl ThinParserState {
 
     /// Parse a single class member
     fn parse_class_member(&mut self) -> NodeIndex {
+        use crate::checker::types::diagnostics::diagnostic_codes;
         let start_pos = self.token_pos();
 
         // Handle static block: static { ... }
         if self.is_token(SyntaxKind::StaticKeyword) && self.look_ahead_is_static_block() {
             return self.parse_static_block();
+        }
+
+        // Check for 'var' at start of class member - error 1068
+        if self.is_token(SyntaxKind::VarKeyword) {
+            self.parse_error_at_current_token(
+                "Unexpected token. A constructor, method, accessor, or property was expected.",
+                diagnostic_codes::UNEXPECTED_TOKEN_CLASS_MEMBER
+            );
+            // Continue parsing to recover - skip var and try to parse rest
+            self.next_token();
         }
 
         // Parse modifiers (static, public, private, protected, readonly, abstract, override)

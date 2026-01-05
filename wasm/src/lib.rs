@@ -174,6 +174,7 @@ impl ThinParser {
                 "message": d.message,
                 "start": d.start,
                 "length": d.length,
+                "code": d.code,
             })
         }).collect();
         serde_json::to_string(&diags).unwrap_or_else(|_| "[]".to_string())
