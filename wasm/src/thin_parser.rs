@@ -3842,8 +3842,17 @@ impl ThinParserState {
     fn parse_assignment_expression(&mut self) -> NodeIndex {
         // Check for arrow function first (including async arrow)
         if self.is_start_of_arrow_function() {
-            // Check if it's an async arrow
+            // Check if it's an async arrow function
+            // Note: `async => x` is a NON-async arrow where 'async' is the parameter name
+            // `async x => x` or `async (x) => x` are async arrow functions
             if self.is_token(SyntaxKind::AsyncKeyword) {
+                // Need to distinguish:
+                // - `async => expr` (non-async, 'async' is param)
+                // - `async x => expr` or `async (x) => expr` (async arrow)
+                if self.look_ahead_is_simple_arrow_function() {
+                    // async => expr - treat 'async' as identifier parameter
+                    return self.parse_arrow_function_expression_with_async(false);
+                }
                 return self.parse_async_arrow_function_expression();
             }
             return self.parse_arrow_function_expression_with_async(false);
@@ -3867,8 +3876,20 @@ impl ThinParserState {
             SyntaxKind::OpenParenToken => self.look_ahead_is_arrow_function(),
             // identifier => ...
             SyntaxKind::Identifier => self.look_ahead_is_simple_arrow_function(),
-            // async (x) => ... or async x => ... or async <T>(x) => ...
-            SyntaxKind::AsyncKeyword => self.look_ahead_is_arrow_function_after_async(),
+            // async could be:
+            // 1. async (x) => ... or async x => ... (async arrow function)
+            // 2. async => ... (non-async arrow where 'async' is parameter name)
+            SyntaxKind::AsyncKeyword => {
+                // Check if 'async' is immediately followed by '=>'
+                // If so, it's 'async' used as parameter name, not async modifier
+                if self.look_ahead_is_simple_arrow_function() {
+                    // async => expr - treat as simple arrow with 'async' as param
+                    true
+                } else {
+                    // Check for async (x) => ... or async x => ...
+                    self.look_ahead_is_arrow_function_after_async()
+                }
+            }
             // <T>(x) => ... (generic arrow function)
             SyntaxKind::LessThanToken => self.look_ahead_is_generic_arrow_function(),
             _ => false,
@@ -4022,9 +4043,10 @@ impl ThinParserState {
             self.parse_expected(SyntaxKind::CloseParenToken);
             params
         } else {
-            // Single identifier parameter: x =>
+            // Single identifier parameter: x => or async => (where async is used as identifier)
             let param_start = self.token_pos();
-            let name = self.parse_identifier();
+            // Use parse_identifier_name to allow keywords like 'async' as parameter names
+            let name = self.parse_identifier_name();
             let param_end = self.token_end();
 
             let param = self.arena.add_parameter(
@@ -4637,8 +4659,9 @@ impl ThinParserState {
                 if self.look_ahead_is_async_function() {
                     self.parse_async_function_expression()
                 } else {
-                    // Could be an async arrow function, parse as identifier for now
-                    self.parse_identifier()
+                    // 'async' used as identifier (e.g., variable named async)
+                    // Use parse_identifier_name since 'async' is a keyword
+                    self.parse_identifier_name()
                 }
             }
             SyntaxKind::LessThanToken => self.parse_jsx_element_or_type_assertion(),
