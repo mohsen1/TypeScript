@@ -123,10 +123,25 @@ ThinParser → ThinNodeArena → ThinBinder → ThinChecker → TypeInterner →
    - Function subtyping (covariant return, bivariant params)
    - **Coinductive cycle detection** (recursive types)
 
-4. **Inference** (Basic)
+4. **Inference** (Complete)
    - Inference variables via `ena` Union-Find
-   - Type parameter binding
-   - Basic unification
+   - Type parameter binding, constraint collection
+   - Bounds checking (L <: α <: U)
+   - Contextual typing (reverse inference)
+   - Best common type calculation
+
+5. **Lazy Diagnostics** (Performance)
+   - Structured diagnostic args (TypeId, SymbolId, etc.)
+   - Deferred string formatting via `PendingDiagnostic`
+   - Template-based message generation
+   - Zero allocations during tentative type checking
+
+6. **Solver Operations** (Architecture)
+   - Pure type logic separated from AST traversal
+   - `CallEvaluator` - function call resolution with overloads
+   - `PropertyAccessEvaluator` - property access on all type shapes
+   - `BinaryOpEvaluator` - binary operations (+, -, &&, ||, etc.)
+   - Structured results (no side effects, unit testable)
 
 ---
 
@@ -190,6 +205,17 @@ These are TypeScript's "type-level functions" (see §4 of SOLVER.md).
 | Error type propagation ("poison pill") | §6.4 | ✅ Basic |
 | Diagnostic generation | - | ✅ Done (Session 29) |
 | Source location tracking | - | ✅ Done (Session 29) |
+| **Lazy diagnostic rendering** | - | ✅ Done (Session 33) |
+| **Structured diagnostic args** | - | ✅ Done (Session 33) |
+
+### Priority 6: Solver Operations ✅ COMPLETE
+
+| Task | Description | Status |
+|------|-------------|--------|
+| **Call resolution** | Function call evaluation with overloads | ✅ Done (Session 33) |
+| **Property access** | Property resolution on all type shapes | ✅ Done (Session 33) |
+| **Binary operations** | Arithmetic, logical, comparison operators | ✅ Done (Session 33) |
+| **Structured results** | Pure functions, no side effects | ✅ Done (Session 33) |
 
 ---
 
