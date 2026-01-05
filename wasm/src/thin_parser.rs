@@ -5167,14 +5167,24 @@ impl ThinParserState {
             return obj_type;
         }
 
-        // Handle typeof type: typeof x
+        // Handle typeof type: typeof x, typeof x[]
         if self.is_token(SyntaxKind::TypeOfKeyword) {
-            return self.parse_typeof_type();
+            let typeof_type = self.parse_typeof_type();
+            // Handle array type on typeof: typeof x[]
+            if self.is_token(SyntaxKind::OpenBracketToken) {
+                return self.parse_array_type(start_pos, typeof_type);
+            }
+            return typeof_type;
         }
 
-        // Handle keyof type: keyof T
+        // Handle keyof type: keyof T, keyof T[]
         if self.is_token(SyntaxKind::KeyOfKeyword) {
-            return self.parse_keyof_type();
+            let keyof_type = self.parse_keyof_type();
+            // Handle array type on keyof: keyof T[]
+            if self.is_token(SyntaxKind::OpenBracketToken) {
+                return self.parse_array_type(start_pos, keyof_type);
+            }
+            return keyof_type;
         }
 
         // Handle readonly type: readonly T[]
