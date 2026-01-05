@@ -981,7 +981,7 @@ These issues were identified by Gemini but NOT yet fixed:
 - All TypeScript syntax supported
 
 ## 2026-01-05: ThinParser Batch Test Improvements (Session 22-24)
-**Batch Test Progress: 78.4% (784/1000 files) - 0 Crashes**
+**Batch Test Progress: 79.3% (793/1000 files) - 0 Crashes**
 
 ### Session 22 Fixes:
 - [x] Generic function types `<T>() => T` - FunctionType with type_parameters
@@ -1016,13 +1016,15 @@ These issues were identified by Gemini but NOT yet fixed:
 - [x] For-in and for-of loop parsing `for (let x of arr) {}`
 - [x] `export declare` declarations (function, class, namespace, var)
 - [x] `undefined` keyword in expression context as identifier
+- [x] Type arguments on new expressions: `new Array<string>()`
+- [x] Type predicate return types: `x is T`, `asserts x is T`
 
 ### Test Results:
 - 857 unit tests passing (all Rust tests)
 - 0 crashes (was 7 at start of Session 23)
-- 216 remaining parse failures (down from 237)
+- 207 remaining parse failures (down from 237)
 
-### Remaining Parse Failures (216 files):
+### Remaining Parse Failures (207 files):
 - Multi-file tests with `@filename:` directives (~50 files)
 - Import equals with literal values: `import n = 5;` (intentional error cases)
 - Accessor without body: `get foo()` (intentional error test)
