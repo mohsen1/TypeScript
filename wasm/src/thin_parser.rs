@@ -889,8 +889,14 @@ impl ThinParserState {
     fn parse_function_expression_with_async(&mut self, is_async: bool) -> NodeIndex {
         let start_pos = self.token_pos();
 
-        // Consume async if present and not already parsed
-        let is_async = is_async || self.parse_optional(SyntaxKind::AsyncKeyword);
+        // Consume async if present - only if we haven't already determined it's async
+        // (When called from parse_async_function_expression, async hasn't been consumed yet)
+        let is_async = if is_async {
+            self.parse_expected(SyntaxKind::AsyncKeyword);
+            true
+        } else {
+            self.parse_optional(SyntaxKind::AsyncKeyword)
+        };
 
         self.parse_expected(SyntaxKind::FunctionKeyword);
 
