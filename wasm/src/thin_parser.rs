@@ -1271,6 +1271,90 @@ impl ThinParserState {
         )
     }
 
+    /// Parse declare class: declare class Foo {}
+    fn parse_declare_class(&mut self, start_pos: u32, declare_modifier: NodeIndex) -> NodeIndex {
+        self.parse_expected(SyntaxKind::ClassKeyword);
+
+        let name = if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        let heritage_clauses = self.parse_heritage_clauses();
+
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+        let members = self.parse_class_members();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end_pos = self.token_end();
+        self.arena.add_class(
+            syntax_kind_ext::CLASS_DECLARATION,
+            start_pos,
+            end_pos,
+            ClassData {
+                modifiers: Some(self.make_node_list(vec![declare_modifier])),
+                name,
+                type_parameters,
+                heritage_clauses,
+                members,
+            },
+        )
+    }
+
+    /// Parse declare abstract class: declare abstract class Foo {}
+    fn parse_declare_abstract_class(&mut self, start_pos: u32, declare_modifier: NodeIndex) -> NodeIndex {
+        // Create abstract modifier node
+        let abstract_start = self.token_pos();
+        self.parse_expected(SyntaxKind::AbstractKeyword);
+        let abstract_end = self.token_end();
+        let abstract_modifier = self.arena.add_token(
+            SyntaxKind::AbstractKeyword as u16,
+            abstract_start,
+            abstract_end,
+        );
+
+        self.parse_expected(SyntaxKind::ClassKeyword);
+
+        let name = if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        let heritage_clauses = self.parse_heritage_clauses();
+
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+        let members = self.parse_class_members();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+
+        let end_pos = self.token_end();
+        self.arena.add_class(
+            syntax_kind_ext::CLASS_DECLARATION,
+            start_pos,
+            end_pos,
+            ClassData {
+                modifiers: Some(self.make_node_list(vec![declare_modifier, abstract_modifier])),
+                name,
+                type_parameters,
+                heritage_clauses,
+                members,
+            },
+        )
+    }
+
     /// Parse a decorated declaration: @decorator class/function
     fn parse_decorated_declaration(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
@@ -2701,16 +2785,25 @@ impl ThinParserState {
 
     /// Parse ambient declaration: declare function/class/namespace/var/etc.
     fn parse_ambient_declaration(&mut self) -> NodeIndex {
-        let _start_pos = self.token_pos();
+        let start_pos = self.token_pos();
+
+        // Create declare modifier node
+        let declare_start = self.token_pos();
         self.parse_expected(SyntaxKind::DeclareKeyword);
+        let declare_end = self.token_end();
+        let declare_modifier = self.arena.add_token(
+            SyntaxKind::DeclareKeyword as u16,
+            declare_start,
+            declare_end,
+        );
 
         // Parse the inner declaration based on what follows 'declare'
         match self.token() {
             SyntaxKind::FunctionKeyword => self.parse_function_declaration(),
-            SyntaxKind::ClassKeyword => self.parse_class_declaration(),
+            SyntaxKind::ClassKeyword => self.parse_declare_class(start_pos, declare_modifier),
             SyntaxKind::AbstractKeyword => {
                 // declare abstract class
-                self.parse_abstract_class_declaration()
+                self.parse_declare_abstract_class(start_pos, declare_modifier)
             }
             SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
             SyntaxKind::TypeKeyword => self.parse_type_alias_declaration(),

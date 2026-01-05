@@ -1879,13 +1879,34 @@ impl<'a> ThinCheckerState<'a> {
             return;
         };
 
+        // Check if this is a declared class (ambient declaration)
+        let is_declared = self.has_declare_modifier(&class.modifiers);
+
         // Check each class member
         for &member_idx in &class.members.nodes {
             self.check_class_member(member_idx);
         }
 
         // Check for missing method/constructor implementations (2389, 2390, 2391)
-        self.check_class_member_implementations(&class.members.nodes);
+        // Skip for declared classes (ambient declarations don't need implementations)
+        if !is_declared {
+            self.check_class_member_implementations(&class.members.nodes);
+        }
+    }
+
+    /// Check if a node has the `declare` modifier.
+    fn has_declare_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::DeclareKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 
     /// Check that all method/constructor overload signatures have implementations.
