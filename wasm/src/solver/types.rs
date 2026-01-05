@@ -66,6 +66,10 @@ pub enum TypeKey {
     /// Vec is sorted by property name for consistent hashing
     Object(Vec<PropertyInfo>),
 
+    /// Object type with index signatures
+    /// For objects like { [key: string]: number, foo: string }
+    ObjectWithIndex(ObjectShape),
+
     /// Union type (A | B | C)
     /// Vec is sorted by TypeId for consistent hashing
     Union(Vec<TypeId>),
@@ -82,6 +86,10 @@ pub enum TypeKey {
 
     /// Function type
     Function(FunctionShape),
+
+    /// Callable type with overloaded signatures
+    /// For interfaces with call/construct signatures
+    Callable(CallableShape),
 
     /// Type parameter (generic)
     TypeParameter(TypeParamInfo),
@@ -101,6 +109,24 @@ pub enum TypeKey {
 
     /// Template literal type (`hello${string}world`)
     TemplateLiteral(Vec<TemplateSpan>),
+
+    /// Type query (typeof expression in type position)
+    TypeQuery(SymbolRef),
+
+    /// KeyOf type operator (keyof T)
+    KeyOf(TypeId),
+
+    /// Readonly type modifier (readonly T[])
+    ReadonlyType(TypeId),
+
+    /// Unique symbol type
+    UniqueSymbol(SymbolRef),
+
+    /// Infer type (infer R in conditional types)
+    Infer(TypeParamInfo),
+
+    /// This type (polymorphic this)
+    ThisType,
 
     /// Error type for recovery
     Error,
@@ -178,6 +204,29 @@ pub struct PropertyInfo {
     pub readonly: bool,
 }
 
+/// Index signature information for object types
+/// Represents `{ [key: string]: ValueType }` or `{ [key: number]: ValueType }`
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct IndexSignature {
+    /// The key type (usually string or number)
+    pub key_type: TypeId,
+    /// The value type for all indexed properties
+    pub value_type: TypeId,
+    /// Whether the index signature is readonly
+    pub readonly: bool,
+}
+
+/// Object type with properties and optional index signatures
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ObjectShape {
+    /// Named properties (sorted by name for consistent hashing)
+    pub properties: Vec<PropertyInfo>,
+    /// String index signature: { [key: string]: T }
+    pub string_index: Option<IndexSignature>,
+    /// Number index signature: { [key: number]: T }
+    pub number_index: Option<IndexSignature>,
+}
+
 /// Tuple element information
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TupleElement {
@@ -194,6 +243,33 @@ pub struct FunctionShape {
     pub params: Vec<ParamInfo>,
     pub return_type: TypeId,
     pub is_constructor: bool,
+}
+
+/// Call signature for overloaded functions
+/// Represents a single call signature in an overloaded type
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CallSignature {
+    pub type_params: Vec<TypeParamInfo>,
+    pub params: Vec<ParamInfo>,
+    pub return_type: TypeId,
+}
+
+/// Callable type with multiple overloaded call signatures
+/// Represents types like:
+/// ```typescript
+/// interface Overloaded {
+///   (x: string): number;
+///   (x: number): string;
+/// }
+/// ```
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CallableShape {
+    /// Call signatures (order matters for overload resolution)
+    pub call_signatures: Vec<CallSignature>,
+    /// Constructor signatures
+    pub construct_signatures: Vec<CallSignature>,
+    /// Optional properties on the callable (e.g., Function.prototype)
+    pub properties: Vec<PropertyInfo>,
 }
 
 /// Parameter information

@@ -240,9 +240,21 @@ impl TypeInterner {
         self.intern(TypeKey::Object(properties))
     }
 
+    /// Intern an object type with index signatures
+    pub fn object_with_index(&self, mut shape: ObjectShape) -> TypeId {
+        // Sort properties by name for consistent hashing
+        shape.properties.sort_by(|a, b| a.name.cmp(&b.name));
+        self.intern(TypeKey::ObjectWithIndex(shape))
+    }
+
     /// Intern a function type
     pub fn function(&self, shape: FunctionShape) -> TypeId {
         self.intern(TypeKey::Function(shape))
+    }
+
+    /// Intern a callable type with overloaded signatures
+    pub fn callable(&self, shape: CallableShape) -> TypeId {
+        self.intern(TypeKey::Callable(shape))
     }
 
     /// Intern a type reference
