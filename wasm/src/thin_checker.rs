@@ -25,7 +25,7 @@ use crate::scanner::SyntaxKind;
 use crate::binder::{SymbolId, symbol_flags};
 use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeId, TypeInterner};
-use crate::checker::state::{Diagnostic, DiagnosticCategory};
+use crate::checker::state::Diagnostic;
 
 // =============================================================================
 // ThinCheckerState

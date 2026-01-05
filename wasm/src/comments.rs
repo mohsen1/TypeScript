@@ -124,7 +124,7 @@ pub fn get_comment_ranges(source: &str) -> Vec<CommentRange> {
 /// Get leading comments before a position.
 ///
 /// Returns comments that appear before `pos` and after any previous code.
-pub fn get_leading_comments(source: &str, pos: u32, all_comments: &[CommentRange]) -> Vec<CommentRange> {
+pub fn get_leading_comments(_source: &str, pos: u32, all_comments: &[CommentRange]) -> Vec<CommentRange> {
     all_comments
         .iter()
         .filter(|c| c.end <= pos)

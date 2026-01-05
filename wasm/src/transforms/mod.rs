@@ -12,7 +12,7 @@ pub mod helpers;
 pub mod modules;
 
 use crate::emitter::ScriptTarget;
-use crate::parser::{Node, NodeArena, NodeIndex};
+use crate::parser::{NodeArena, NodeIndex};
 
 /// Transform context passed through the transform chain.
 pub struct TransformContext<'a> {

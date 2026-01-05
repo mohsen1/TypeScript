@@ -18,7 +18,7 @@ use crate::parser::{NodeIndex, NodeList};
 use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
-use crate::emitter::{PrinterOptions, ScriptTarget, ModuleKind, NewLineKind};
+use crate::emitter::{PrinterOptions, NewLineKind};
 
 // =============================================================================
 // ThinPrinter
@@ -681,7 +681,7 @@ impl<'a> ThinPrinter<'a> {
         self.write("]");
     }
 
-    fn emit_parenthesized(&mut self, node: &ThinNode) {
+    fn emit_parenthesized(&mut self, _node: &ThinNode) {
         // Parenthesized expression - get the inner expression
         // For now, just emit parens around something
         // TODO: Add get_parenthesized_expr accessor
@@ -1030,7 +1030,7 @@ impl<'a> ThinPrinter<'a> {
         self.emit(for_in_of.statement);
     }
 
-    fn emit_return_statement(&mut self, node: &ThinNode) {
+    fn emit_return_statement(&mut self, _node: &ThinNode) {
         // TODO: Add return statement accessor
         self.write("return");
         // Check if there's an expression to return
@@ -1327,7 +1327,7 @@ impl<'a> ThinPrinter<'a> {
         self.write_semicolon();
     }
 
-    fn emit_named_exports(&mut self, node: &ThinNode) {
+    fn emit_named_exports(&mut self, _node: &ThinNode) {
         // Similar to named imports but for exports
         // TODO: Add get_named_exports accessor
         self.write("{ }");
@@ -1349,7 +1349,7 @@ impl<'a> ThinPrinter<'a> {
     // Additional Statements
     // =========================================================================
 
-    fn emit_throw_statement(&mut self, node: &ThinNode) {
+    fn emit_throw_statement(&mut self, _node: &ThinNode) {
         self.write("throw ");
         // TODO: Add throw statement accessor to get expression
         self.write_semicolon();
@@ -1604,7 +1604,7 @@ impl<'a> ThinPrinter<'a> {
     // Template Literals
     // =========================================================================
 
-    fn emit_template_expression(&mut self, node: &ThinNode) {
+    fn emit_template_expression(&mut self, _node: &ThinNode) {
         // Template expressions have a head and spans
         // TODO: Add get_template_expr accessor
         self.write("`");
@@ -1873,18 +1873,18 @@ impl<'a> ThinPrinter<'a> {
     // Yield and Await
     // =========================================================================
 
-    fn emit_yield_expression(&mut self, node: &ThinNode) {
+    fn emit_yield_expression(&mut self, _node: &ThinNode) {
         // TODO: Add get_yield_expr accessor
         self.write("yield");
     }
 
-    fn emit_await_expression(&mut self, node: &ThinNode) {
+    fn emit_await_expression(&mut self, _node: &ThinNode) {
         // TODO: Add get_await_expr accessor
         self.write("await ");
         // Emit operand
     }
 
-    fn emit_spread_element(&mut self, node: &ThinNode) {
+    fn emit_spread_element(&mut self, _node: &ThinNode) {
         // TODO: Add get_spread_element accessor
         self.write("...");
     }

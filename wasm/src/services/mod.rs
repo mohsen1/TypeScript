@@ -867,16 +867,15 @@ impl<'a> LanguageService<'a> {
         let type_id = symbol_id.and_then(|sid| self.checker.get_cached_type_of_symbol(sid));
 
         let mut display_parts = Vec::new();
-        let mut kind = ScriptElementKind::Unknown;
         let kind_modifiers = String::new();
 
-        if let Some(sid) = symbol_id {
+        let kind = if let Some(sid) = symbol_id {
             let symbol_name = self.checker.get_symbol_name(sid).unwrap_or_default();
             let flags = self.checker.get_symbol_flags(sid);
-            kind = self.symbol_flags_to_script_element_kind(flags);
+            let k = self.symbol_flags_to_script_element_kind(flags);
 
             // Build display parts
-            display_parts.push(SymbolDisplayPart::keyword(self.get_kind_keyword(&kind)));
+            display_parts.push(SymbolDisplayPart::keyword(self.get_kind_keyword(&k)));
             display_parts.push(SymbolDisplayPart::space());
             display_parts.push(SymbolDisplayPart::text(symbol_name));
 
@@ -888,6 +887,7 @@ impl<'a> LanguageService<'a> {
                     display_parts.push(SymbolDisplayPart::text(self.type_to_string(tid)));
                 }
             }
+            k
         } else {
             // Check if this is a keyword
             if let Some(node_kind) = self.checker.get_node_kind(node_idx) {
@@ -903,7 +903,7 @@ impl<'a> LanguageService<'a> {
                 }
             }
             return None;
-        }
+        };
 
         Some(QuickInfo {
             kind,
@@ -1245,7 +1245,7 @@ impl<'a> LanguageService<'a> {
         // If this is a PropertyAccessExpression, check if we're after the dot
         if let Some(Node::PropertyAccessExpression(pa)) = self.checker.node_arena.get(node_idx) {
             // Check if we're in the name part (after the dot)
-            if let Some((expr_start, expr_end)) = self.checker.get_node_span(pa.expression) {
+            if let Some((_expr_start, expr_end)) = self.checker.get_node_span(pa.expression) {
                 // Position is after the expression (in the .name part)
                 if position > expr_end {
                     return Some(node_idx);
@@ -1329,7 +1329,7 @@ impl<'a> LanguageService<'a> {
 
         // Build the signature help item
         let mut parameters = Vec::new();
-        let mut prefix_display_parts = vec![
+        let prefix_display_parts = vec![
             SymbolDisplayPart::text(symbol_name.clone()),
             SymbolDisplayPart::punctuation("("),
         ];
@@ -1482,7 +1482,7 @@ impl<'a> LanguageService<'a> {
 
         // Find all references in this file
         let references = self.find_all_references_in_file(target_symbol);
-        let declarations = self.checker.get_symbol_declarations(target_symbol);
+        let _declarations = self.checker.get_symbol_declarations(target_symbol);
 
         let highlight_spans: Vec<HighlightSpan> = references
             .into_iter()

@@ -291,9 +291,6 @@ pub fn merge_bind_results(results: Vec<BindResult>) -> MergedProgram {
     let mut file_locals_list = Vec::with_capacity(results.len());
 
     for result in results {
-        // Track the base offset for this file's symbols
-        let base_offset = global_symbols.len() as u32;
-
         // Copy symbols from this file to global arena, getting new IDs
         let mut id_remap: FxHashMap<SymbolId, SymbolId> = FxHashMap::default();
         for i in 0..result.symbols.len() {

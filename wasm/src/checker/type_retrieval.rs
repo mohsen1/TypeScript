@@ -3,16 +3,14 @@
 //! This module contains the core get_type_of_node implementation and
 //! type inference logic for all AST node types.
 
-use crate::parser::{Node, NodeIndex};
+use crate::parser::NodeIndex;
 use crate::scanner::SyntaxKind;
-use crate::binder::{SymbolId, SymbolArena, SymbolTable, Symbol, symbol_flags};
+use crate::binder::{SymbolId, SymbolArena, SymbolTable, symbol_flags};
 use super::types::{
     type_flags, object_flags, signature_flags, diagnostic_codes,
-    Type, TypeId, LiteralValue, LiteralType, ObjectType, UnionType, TypeParameter,
-    FunctionType, Signature, IndexInfo,
+    Type, TypeId, LiteralValue, LiteralType, ObjectType, TypeParameter, Signature, IndexInfo,
 };
-use super::arena::TypeArena;
-use super::state::{CheckerState, Diagnostic, DiagnosticCategory};
+use super::state::CheckerState;
 
 /// Information about the contextual array/tuple element types.
 enum ContextualArrayInfo {
@@ -1784,7 +1782,7 @@ impl<'a> CheckerState<'a> {
         &mut self,
         ta: &crate::parser::TypeAliasDeclaration,
     ) -> TypeId {
-        use crate::parser::Node;
+        
 
         // Save current type parameter scope
         let saved_scope = std::mem::take(&mut self.type_parameter_scope);
@@ -1873,7 +1871,7 @@ impl<'a> CheckerState<'a> {
                     return self.types.never_type;
                 }
                 // Get keyof for each member and intersect
-                let mut key_types: Vec<TypeId> = types.iter()
+                let key_types: Vec<TypeId> = types.iter()
                     .map(|&t| self.get_keyof_type(t))
                     .collect();
                 if key_types.len() == 1 {
@@ -2158,8 +2156,8 @@ impl<'a> CheckerState<'a> {
 
         let mut properties = Vec::new();
         let mut members_table = SymbolTable::new();
-        let mut call_signatures = Vec::new();
-        let mut construct_signatures = Vec::new();
+        let call_signatures = Vec::new();
+        let construct_signatures = Vec::new();
         let mut index_infos = Vec::new();
 
         // Process interface members
@@ -2989,7 +2987,7 @@ impl<'a> CheckerState<'a> {
                 }
                 Some(members)
             }
-            Type::Function(f) => {
+            Type::Function(_) => {
                 // Function types can also provide contextual typing via their parameter types
                 // e.g., for a callback like (x: number) => void passed to object literal property
                 None // Function itself doesn't have object members

@@ -3028,7 +3028,7 @@ impl NodeAccess for ThinNodeArena {
         Some(&data.text)
     }
 
-    fn get_children(&self, index: NodeIndex) -> Vec<NodeIndex> {
+    fn get_children(&self, _index: NodeIndex) -> Vec<NodeIndex> {
         // TODO: Implement proper child enumeration based on node kind
         // For now, return empty - this would need kind-specific logic
         Vec::new()

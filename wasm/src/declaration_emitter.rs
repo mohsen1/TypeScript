@@ -3,9 +3,9 @@
 //! Generates .d.ts declaration files from TypeScript source.
 //! This emitter strips implementation details and preserves only type information.
 
-use crate::parser::{Node, NodeList, NodeIndex};
+use crate::parser::{Node, NodeList};
 use crate::scanner::SyntaxKind;
-use crate::emitter::{Printer, PrinterOptions};
+use crate::emitter::Printer;
 
 /// Options for declaration emission.
 #[derive(Clone, Debug, Default)]

@@ -438,7 +438,7 @@ impl ModuleTransformer {
     /// Transform named re-exports: export { x } from './foo'
     fn transform_named_reexport(
         &mut self,
-        export_clause_idx: NodeIndex,
+        _export_clause_idx: NodeIndex,
         module_specifier: &str,
         ctx: &mut TransformContext,
     ) -> Option<NodeIndex> {

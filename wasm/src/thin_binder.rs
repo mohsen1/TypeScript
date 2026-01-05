@@ -597,7 +597,7 @@ impl ThinBinderState {
         }
     }
 
-    fn bind_import_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
+    fn bind_import_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, _idx: NodeIndex) {
         if let Some(import) = arena.get_import_decl(node) {
             if let Some(clause_node) = arena.get(import.import_clause) {
                 if let Some(clause) = arena.get_import_clause(clause_node) {

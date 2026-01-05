@@ -20,17 +20,16 @@ use crate::parser::{
         AccessExprData, ConditionalExprData, LiteralExprData, ParenthesizedData,
         UnaryExprData, UnaryExprDataEx, TypeAssertionData, BlockData, ReturnData,
         ExprStatementData, IfStatementData, LoopData, FunctionData, ClassData,
-        SourceFileData, VariableData, VariableDeclarationData, ForInOfData,
+        SourceFileData, VariableData, VariableDeclarationData,
         SwitchData, CaseClauseData, TryData, CatchClauseData,
         EnumData, EnumMemberData,
         ImportDeclData, ImportClauseData, NamedImportsData, SpecifierData,
         ExportDeclData, ExportAssignmentData, QualifiedNameData,
-        TemplateExprData, TemplateSpanData,
-        TypeOperatorData, NamedTupleMemberData, LabeledData,
+        TemplateExprData, TemplateSpanData, LabeledData,
     },
     syntax_kind_ext,
 };
-use crate::parser_impl::{ParseDiagnostic, context_flags};
+use crate::parser_impl::ParseDiagnostic;
 
 // =============================================================================
 // ThinParserState
@@ -542,12 +541,10 @@ impl ThinParserState {
 
     /// Parse external module reference: require("...")
     fn parse_external_module_reference(&mut self) -> NodeIndex {
-        let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::RequireKeyword);
         self.parse_expected(SyntaxKind::OpenParenToken);
         let expression = self.parse_string_literal();
         self.parse_expected(SyntaxKind::CloseParenToken);
-        let end_pos = self.token_end();
 
         // Return the string literal as the module reference
         expression
@@ -1369,7 +1366,6 @@ impl ThinParserState {
             } else if self.is_token(SyntaxKind::LessThanToken) {
                 // Generic call expression: base<T>() or base<T, U>()
                 // Parse type arguments then check for call
-                let type_args_start = self.token_pos();
                 self.next_token();
                 let mut type_args = Vec::new();
                 while !self.is_token(SyntaxKind::GreaterThanToken)
@@ -2212,7 +2208,7 @@ impl ThinParserState {
         // Parse parameter
         let param_name = self.parse_identifier();
         self.parse_expected(SyntaxKind::ColonToken);
-        let param_type = self.parse_type();
+        let _param_type = self.parse_type(); // Type of the index parameter (e.g., string, number)
 
         self.parse_expected(SyntaxKind::CloseBracketToken);
 
@@ -2462,7 +2458,7 @@ impl ThinParserState {
         let start_pos = self.token_pos();
 
         // Skip module/namespace/global keyword
-        let is_global = self.is_token(SyntaxKind::GlobalKeyword);
+        let _is_global = self.is_token(SyntaxKind::GlobalKeyword);
         self.next_token();
 
         // Parse name - can be identifier or string literal
@@ -2649,11 +2645,9 @@ impl ThinParserState {
 
     /// Parse namespace import: * as name
     fn parse_namespace_import(&mut self) -> NodeIndex {
-        let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::AsteriskToken);
         self.parse_expected(SyntaxKind::AsKeyword);
         let name = self.parse_identifier();
-        let end_pos = self.token_end();
 
         // Store the namespace import with the name
         // For namespace import, we return the name identifier directly
@@ -3323,8 +3317,8 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::BreakKeyword);
 
-        // Optional label
-        let label = if !self.can_parse_semicolon() && self.is_identifier_or_keyword() {
+        // Optional label (TODO: store in break statement node)
+        let _label = if !self.can_parse_semicolon() && self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
             NodeIndex::NONE
@@ -5402,8 +5396,6 @@ impl ThinParserState {
         // Handle qualified names (foo.Bar, A.B.C)
         let type_name = self.parse_qualified_name_rest(first_name);
 
-        let end_pos = self.token_end();
-
         // Check for type arguments: Foo<T, U>
         let type_arguments = if self.is_token(SyntaxKind::LessThanToken) {
             Some(self.parse_type_arguments())
@@ -6455,8 +6447,6 @@ impl ThinParserState {
     /// Determine if we should parse a type assertion or JSX element.
     /// Type assertions use <Type>expr syntax, JSX uses <Element>.
     fn parse_jsx_element_or_type_assertion(&mut self) -> NodeIndex {
-        let start_pos = self.token_pos();
-
         // In .tsx/.jsx files, all <...> syntax is JSX (use "as Type" for type assertions)
         // In .ts files, we need to distinguish type assertions from JSX
         if self.is_jsx_file() {

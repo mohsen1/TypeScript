@@ -10,7 +10,7 @@
 //! - property initializers → constructor assignments
 //! - accessors → Object.defineProperty
 
-use super::{TransformContext, Transformer, HelpersNeeded};
+use super::{TransformContext, Transformer};
 use crate::parser::{Node, NodeIndex};
 
 /// Class transformation state

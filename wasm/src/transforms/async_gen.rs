@@ -8,10 +8,10 @@
 //! - async generator → combined transform
 //! - for-await-of → async iteration protocol
 
-use super::{TransformContext, Transformer, HelpersNeeded};
+use super::{TransformContext, Transformer};
 use crate::parser::{Node, NodeIndex, NodeBase, NodeList, syntax_kind_ext};
 use crate::parser::ast::{
-    Identifier, CallExpression, FunctionExpression, Block, ReturnStatement,
+    Identifier, CallExpression, FunctionExpression, ReturnStatement,
     YieldExpression,
 };
 use crate::scanner::SyntaxKind;

@@ -16,8 +16,7 @@ use crate::parser::{
     // Expressions
     BinaryExpression, CallExpression, PropertyAccessExpression,
     ArrayLiteralExpression, ObjectLiteralExpression, PropertyAssignment,
-    NewExpression, ElementAccessExpression, SpreadElement,
-    AwaitExpression, YieldExpression, FunctionExpression, PostfixUnaryExpression,
+    NewExpression, ElementAccessExpression, SpreadElement, FunctionExpression, PostfixUnaryExpression,
     // Statements
     Block, ExpressionStatement, VariableStatement,
     VariableDeclarationList, VariableDeclaration,
@@ -25,13 +24,12 @@ use crate::parser::{
     ForStatement, ForInStatement, ForOfStatement,
     SwitchStatement, CaseClause, DefaultClause,
     ThrowStatement, TryStatement, CatchClause,
-    BreakStatement, ContinueStatement, LabeledStatement,
+    BreakStatement, ContinueStatement,
     // Declarations
     FunctionDeclaration, ClassDeclaration,
     MethodDeclaration, PropertyDeclaration, ConstructorDeclaration,
     GetAccessorDeclaration, SetAccessorDeclaration,
-    InterfaceDeclaration, TypeAliasDeclaration, EnumDeclaration, EnumMember,
-    CallSignature, ConstructSignature, SpreadAssignment,
+    InterfaceDeclaration, TypeAliasDeclaration, EnumDeclaration, EnumMember, SpreadAssignment,
     // Import/Export/Module
     ImportDeclaration, ImportClause, NamespaceImport, NamedImports, ImportSpecifier,
     ExportDeclaration, NamedExports, ExportSpecifier, ExportAssignment,
@@ -46,7 +44,7 @@ use crate::parser::{
     JsxFragment, JsxOpeningFragment, JsxClosingFragment,
     JsxAttributes, JsxAttribute, JsxSpreadAttribute, JsxExpression, JsxText, JsxNamespacedName,
     // Misc
-    SourceFile, HeritageClause, ParameterDeclaration, Decorator,
+    SourceFile, HeritageClause, Decorator,
 };
 
 // =============================================================================
@@ -4473,7 +4471,7 @@ impl ParserState {
 
         // Parse modifiers for constructor type (abstract)
         let modifiers = if self.is_token(SyntaxKind::AbstractKeyword) {
-            let mod_pos = self.get_full_start();
+            let _mod_pos = self.get_full_start();
             let mut mods = NodeList::new();
             let abstract_node = self.parse_identifier();
             mods.push(abstract_node);
@@ -5317,7 +5315,7 @@ impl ParserState {
     }
 
     /// Parse JSX opening element, self-closing element, or opening fragment.
-    fn parse_jsx_opening_or_self_closing_or_fragment(&mut self, in_expression_context: bool) -> NodeIndex {
+    fn parse_jsx_opening_or_self_closing_or_fragment(&mut self, _in_expression_context: bool) -> NodeIndex {
         let pos = self.get_full_start();
         self.parse_expected(SyntaxKind::LessThanToken);
 
