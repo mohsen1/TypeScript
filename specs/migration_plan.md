@@ -25,7 +25,7 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 | Binder (ThinBinder) | ~2,900 | ✅ |
 | Type Checker + Solver | ~29,300 | ✅ 99% |
 
-**Total**: ~74,350 Rust LOC | 1014 tests passing
+**Total**: ~74,350 Rust LOC | 1015 tests passing
 
 ## Solver (specs/SOLVER.md) ✅
 Complete implementation in `wasm/src/solver/`:
