@@ -661,6 +661,8 @@ impl<'a> ThinCheckerState<'a> {
 
             // Assignment returns the assigned value's type
             k if k == SyntaxKind::EqualsToken as u16 => {
+                // Check for readonly property assignment
+                self.check_readonly_assignment(binary.left, idx);
                 self.get_type_of_node(binary.right)
             }
 
@@ -1507,6 +1509,18 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Report a "Cannot assign to readonly property" error using solver diagnostics with source tracking.
+    pub fn error_readonly_property_at(&mut self, prop_name: &str, idx: NodeIndex) {
+        if let Some(loc) = self.get_source_location(idx) {
+            let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
+                &self.types,
+                self.file_name.as_str(),
+            );
+            let diag = builder.readonly_property(prop_name, loc.start, loc.length());
+            self.diagnostics.push(diag.to_checker_diagnostic(&self.file_name));
+        }
+    }
+
     /// Create a diagnostic collector for batch error reporting.
     pub fn create_diagnostic_collector(&self) -> crate::solver::DiagnosticCollector<'_> {
         crate::solver::DiagnosticCollector::new(&self.types, self.file_name.as_str())
@@ -1785,6 +1799,86 @@ impl<'a> ThinCheckerState<'a> {
             if !exists_in_source {
                 self.error_property_missing_at(&target_prop.name, source, target, idx);
             }
+        }
+    }
+
+    /// Check if an assignment target is a readonly property.
+    /// Reports error TS2540 if trying to assign to a readonly property.
+    fn check_readonly_assignment(&mut self, target_idx: NodeIndex, expr_idx: NodeIndex) {
+        let Some(target_node) = self.arena.get(target_idx) else {
+            return;
+        };
+
+        // Only check property access expressions
+        if target_node.kind != syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+            return;
+        }
+
+        let Some(access) = self.arena.get_access_expr(target_node) else {
+            return;
+        };
+
+        // Get the property name
+        let Some(name_node) = self.arena.get(access.name_or_argument) else {
+            return;
+        };
+
+        let Some(ident) = self.arena.get_identifier(name_node) else {
+            return;
+        };
+
+        let prop_name = ident.escaped_text.clone();
+
+        // Get the type of the object being accessed
+        let obj_type = self.get_type_of_node(access.expression);
+
+        // Check if the property is readonly in the object type
+        if self.is_property_readonly(obj_type, &prop_name) {
+            self.error_readonly_property_at(&prop_name, expr_idx);
+        }
+    }
+
+    /// Check if a property is marked readonly in a type.
+    fn is_property_readonly(&self, type_id: TypeId, prop_name: &str) -> bool {
+        use crate::solver::TypeKey;
+
+        match self.types.lookup(type_id) {
+            Some(TypeKey::Object(props)) => {
+                for prop in props.iter() {
+                    if prop.name.as_ref() == prop_name {
+                        return prop.readonly;
+                    }
+                }
+                false
+            }
+            Some(TypeKey::ObjectWithIndex(shape)) => {
+                for prop in shape.properties.iter() {
+                    if prop.name.as_ref() == prop_name {
+                        return prop.readonly;
+                    }
+                }
+                // Check index signatures for readonly
+                if let Some(ref idx) = shape.string_index {
+                    if idx.readonly {
+                        return true;
+                    }
+                }
+                if let Some(ref idx) = shape.number_index {
+                    if idx.readonly {
+                        return true;
+                    }
+                }
+                false
+            }
+            Some(TypeKey::Union(types)) => {
+                // Property is readonly if readonly in all union members
+                types.iter().all(|t| self.is_property_readonly(*t, prop_name))
+            }
+            Some(TypeKey::Intersection(types)) => {
+                // Property is readonly if readonly in any intersection member
+                types.iter().any(|t| self.is_property_readonly(*t, prop_name))
+            }
+            _ => false,
         }
     }
 

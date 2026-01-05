@@ -637,6 +637,17 @@ impl<'a> SpannedDiagnosticBuilder<'a> {
             .with_span(self.span(start, length))
     }
 
+    /// Create a "Cannot assign to readonly property" diagnostic with span.
+    pub fn readonly_property(
+        &mut self,
+        prop_name: &str,
+        start: u32,
+        length: u32,
+    ) -> TypeDiagnostic {
+        self.builder.readonly_property(prop_name)
+            .with_span(self.span(start, length))
+    }
+
     /// Add a related location to an existing diagnostic.
     pub fn add_related(
         &self,

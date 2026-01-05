@@ -394,10 +394,7 @@ impl<'a> TypeLowering<'a> {
             None => return TypeId::ERROR,
         };
 
-        eprintln!("[DEBUG lower_type_literal] node.kind={} has_data={}", node.kind, node.has_data());
-
         if let Some(data) = self.arena.get_type_literal(node) {
-            eprintln!("[DEBUG lower_type_literal] Got type literal data, members={}", data.members.nodes.len());
             let properties: Vec<PropertyInfo> = data.members.nodes.iter()
                 .filter_map(|&idx| self.lower_type_element(idx))
                 .collect();
@@ -411,12 +408,8 @@ impl<'a> TypeLowering<'a> {
     fn lower_type_element(&self, node_idx: NodeIndex) -> Option<PropertyInfo> {
         let node = self.arena.get(node_idx)?;
 
-        eprintln!("[DEBUG lower_type_element] node.kind={} PROPERTY_SIGNATURE={}",
-                  node.kind, syntax_kind_ext::PROPERTY_SIGNATURE);
-
         // Check if it's a property or method signature
         if let Some(sig) = self.arena.get_signature(node) {
-            eprintln!("[DEBUG lower_type_element] Got signature, name_idx={:?}", sig.name);
             // Get property name as Arc<str>
             let name: Arc<str> = if sig.name != NodeIndex::NONE {
                 if let Some(name_node) = self.arena.get(sig.name) {
@@ -432,15 +425,34 @@ impl<'a> TypeLowering<'a> {
                 return None;
             };
 
+            // Check for readonly modifier
+            let readonly = self.has_readonly_modifier(&sig.modifiers);
+
             Some(PropertyInfo {
                 name,
                 type_id: self.lower_type(sig.type_annotation),
                 optional: sig.question_token,
-                readonly: false, // TODO: Check modifiers for readonly
+                readonly,
             })
         } else {
             None
         }
+    }
+
+    /// Check if a modifiers list contains a readonly keyword
+    fn has_readonly_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::ReadonlyKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 
     /// Lower a conditional type (T extends U ? X : Y)

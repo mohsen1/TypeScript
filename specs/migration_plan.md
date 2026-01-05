@@ -408,10 +408,21 @@ Working:
   - TS2304: Cannot find name
   - TS2339: Property does not exist
   - TS2349: Type is not callable
+  - TS2353: Excess property in object literal
+  - TS2540: Cannot assign to readonly property
+  - TS2741: Property missing in type
+
+- Object literal checking ✅
+  - Excess property detection (TS2353)
+  - Missing required property detection (TS2741)
+
+- Readonly property assignment checking ✅
+  - Detects assignment to readonly properties (TS2540)
+  - Works with property access expressions
 
 Next:
-- Object literal checking (excess properties, missing required properties)
-- Readonly property assignment checking
+- Compound assignment operators (+=, -=, etc.) readonly checking
+- Element access readonly checking (obj["prop"] = value)
 
 ---
 
