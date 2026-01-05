@@ -105,6 +105,9 @@ pub struct ThinCheckerState<'a> {
 }
 
 /// Info about the enclosing class for static member suggestions and abstract property checks.
+/// TODO: Refactor to use symbol flags instead of caching string lists. The binder already
+/// tracks abstract members via symbol_flags::ABSTRACT. This would avoid O(n) string lookups
+/// and reduce allocations. See Gemini review feedback.
 #[derive(Clone)]
 struct EnclosingClassInfo {
     /// Name of the class.
