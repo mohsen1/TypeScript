@@ -279,36 +279,5 @@ pub fn emit_helpers(helpers: &HelpersNeeded) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_emit_extends_helper() {
-        let mut helpers = HelpersNeeded::default();
-        helpers.extends = true;
-        let output = emit_helpers(&helpers);
-        assert!(output.contains("__extends"));
-        assert!(output.contains("extendStatics"));
-    }
-
-    #[test]
-    fn test_emit_awaiter_helper() {
-        let mut helpers = HelpersNeeded::default();
-        helpers.awaiter = true;
-        let output = emit_helpers(&helpers);
-        assert!(output.contains("__awaiter"));
-        assert!(output.contains("adopt"));
-    }
-
-    #[test]
-    fn test_emit_multiple_helpers() {
-        let mut helpers = HelpersNeeded::default();
-        helpers.extends = true;
-        helpers.assign = true;
-        helpers.rest = true;
-        let output = emit_helpers(&helpers);
-        assert!(output.contains("__extends"));
-        assert!(output.contains("__assign"));
-        assert!(output.contains("__rest"));
-    }
-}
+#[path = "helpers_tests.rs"]
+mod helpers_tests;

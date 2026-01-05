@@ -365,7 +365,7 @@ impl SourceMapGenerator {
 }
 
 /// Escape a string for JSON encoding.
-fn escape_json(s: &str) -> String {
+pub fn escape_json(s: &str) -> String {
     let mut result = String::with_capacity(s.len());
     for c in s.chars() {
         match c {
@@ -384,7 +384,7 @@ fn escape_json(s: &str) -> String {
 }
 
 /// Simple base64 encoding for inline source maps.
-fn base64_encode(data: &[u8]) -> String {
+pub fn base64_encode(data: &[u8]) -> String {
     const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     let mut result = String::with_capacity((data.len() + 2) / 3 * 4);
@@ -415,101 +415,3 @@ fn base64_encode(data: &[u8]) -> String {
     result
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_vlq_encode_positive() {
-        // Simple positive numbers
-        assert_eq!(vlq::encode(0), "A");
-        assert_eq!(vlq::encode(1), "C");
-        assert_eq!(vlq::encode(15), "e");
-        assert_eq!(vlq::encode(16), "gB");
-    }
-
-    #[test]
-    fn test_vlq_encode_negative() {
-        // Negative numbers (sign in LSB)
-        assert_eq!(vlq::encode(-1), "D");
-        assert_eq!(vlq::encode(-15), "f");
-    }
-
-    #[test]
-    fn test_vlq_decode() {
-        // Decode what we encode
-        for value in [-100, -1, 0, 1, 100, 1000] {
-            let encoded = vlq::encode(value);
-            let (decoded, consumed) = vlq::decode(&encoded).unwrap();
-            assert_eq!(decoded, value, "Failed for value {}", value);
-            assert_eq!(consumed, encoded.len());
-        }
-    }
-
-    #[test]
-    fn test_source_map_simple() {
-        let mut generator = SourceMapGenerator::new("output.js".to_string());
-        let source_idx = generator.add_source("input.ts".to_string());
-
-        generator.add_simple_mapping(0, 0, source_idx, 0, 0);
-        generator.add_simple_mapping(0, 10, source_idx, 0, 5);
-        generator.add_simple_mapping(1, 0, source_idx, 1, 0);
-
-        let json = generator.to_json();
-        assert!(json.contains("\"version\": 3"));
-        assert!(json.contains("\"file\": \"output.js\""));
-        assert!(json.contains("\"sources\": [\"input.ts\"]"));
-        assert!(json.contains("\"mappings\""));
-    }
-
-    #[test]
-    fn test_source_map_with_content() {
-        let mut generator = SourceMapGenerator::new("output.js".to_string());
-        generator.add_source_with_content("input.ts".to_string(), "const x = 1;".to_string());
-
-        generator.add_simple_mapping(0, 0, 0, 0, 0);
-
-        let json = generator.to_json();
-        assert!(json.contains("\"sourcesContent\""));
-        assert!(json.contains("const x = 1;"));
-    }
-
-    #[test]
-    fn test_source_map_with_names() {
-        let mut generator = SourceMapGenerator::new("output.js".to_string());
-        let source_idx = generator.add_source("input.ts".to_string());
-        let name_idx = generator.add_name("myVariable".to_string());
-
-        generator.add_named_mapping(0, 0, source_idx, 0, 0, name_idx);
-
-        let json = generator.to_json();
-        assert!(json.contains("\"names\": [\"myVariable\"]"));
-    }
-
-    #[test]
-    fn test_inline_source_map() {
-        let mut generator = SourceMapGenerator::new("output.js".to_string());
-        generator.add_source("input.ts".to_string());
-        generator.add_simple_mapping(0, 0, 0, 0, 0);
-
-        let inline = generator.to_inline_comment();
-        assert!(inline.starts_with("//# sourceMappingURL=data:application/json;base64,"));
-    }
-
-    #[test]
-    fn test_base64_encode() {
-        assert_eq!(base64_encode(b""), "");
-        assert_eq!(base64_encode(b"f"), "Zg==");
-        assert_eq!(base64_encode(b"fo"), "Zm8=");
-        assert_eq!(base64_encode(b"foo"), "Zm9v");
-        assert_eq!(base64_encode(b"foobar"), "Zm9vYmFy");
-    }
-
-    #[test]
-    fn test_escape_json() {
-        assert_eq!(escape_json("hello"), "hello");
-        assert_eq!(escape_json("hello\"world"), "hello\\\"world");
-        assert_eq!(escape_json("path\\to\\file"), "path\\\\to\\\\file");
-        assert_eq!(escape_json("line1\nline2"), "line1\\nline2");
-    }
-}
