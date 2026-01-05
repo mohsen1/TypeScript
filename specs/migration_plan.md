@@ -133,7 +133,7 @@ pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
 ### Baseline Comparison (First 100 tests)
 | Baseline | Pass Rate | Blockers |
 |----------|-----------|----------|
-| .errors.txt | **58.4%** (45/77) | Type parameter scoping, parser error recovery |
+| .errors.txt | **59.7%** (46/77) | Parser error recovery, abstract class unions |
 | .js emit | 0% | Emitter format mismatch |
 
 ### Completed
@@ -152,7 +152,7 @@ pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
 - ✅ Export declaration traversal (check exported classes/functions)
 
 ### Next Steps
-1. ⬜ Type parameter scoping (generic type parameters in scope)
+1. ✅ Type parameter scoping (generic type parameters in scope)
 2. ⬜ Parser semantic errors (1128, additional coverage)
 2. ✅ Error elaboration ("...because property 'x' has type...")
    - ✅ `explain_failure()` API in `solver/subtype.rs`
