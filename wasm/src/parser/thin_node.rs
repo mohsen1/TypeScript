@@ -2270,6 +2270,17 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get module block data.
+    #[inline]
+    pub fn get_module_block(&self, node: &ThinNode) -> Option<&ModuleBlockData> {
+        use super::syntax_kind_ext::MODULE_BLOCK;
+        if node.has_data() && node.kind == MODULE_BLOCK {
+            self.module_blocks.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Get if statement data.
     #[inline]
     pub fn get_if_statement(&self, node: &ThinNode) -> Option<&IfStatementData> {

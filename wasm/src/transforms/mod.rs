@@ -15,6 +15,7 @@ pub mod generators;
 pub mod generator_emitter;
 pub mod helpers;
 pub mod modules;
+pub mod namespace_es5;
 
 use crate::emitter::ScriptTarget;
 use crate::parser::{NodeArena, NodeIndex};

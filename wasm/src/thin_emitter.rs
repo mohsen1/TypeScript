@@ -100,6 +100,11 @@ impl<'a> ThinPrinter<'a> {
         printer.target_es5 = false;
         printer
     }
+    
+    /// Set whether to target ES5 (classes→IIFEs, arrows→functions).
+    pub fn set_target_es5(&mut self, es5: bool) {
+        self.target_es5 = es5;
+    }
 
     /// Get the output.
     pub fn get_output(&self) -> &str {
@@ -544,7 +549,7 @@ impl<'a> ThinPrinter<'a> {
                 // self.emit_type_alias_declaration(node);
             }
             k if k == syntax_kind_ext::MODULE_DECLARATION => {
-                self.emit_module_declaration(node);
+                self.emit_module_declaration(node, idx);
             }
 
             // Class members
@@ -1909,7 +1914,15 @@ impl<'a> ThinPrinter<'a> {
         self.write_semicolon();
     }
 
-    fn emit_module_declaration(&mut self, node: &ThinNode) {
+    fn emit_module_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
+        if self.target_es5 {
+            // Use ES5 namespace transform: namespace → IIFE pattern
+            let mut ns_emitter = crate::transforms::namespace_es5::NamespaceES5Emitter::new(self.arena);
+            let output = ns_emitter.emit_namespace(idx);
+            self.write(&output);
+            return;
+        }
+
         let Some(module) = self.arena.get_module(node) else {
             return;
         };
