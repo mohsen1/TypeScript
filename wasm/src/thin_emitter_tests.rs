@@ -4,6 +4,7 @@ use crate::thin_parser::ThinParserState;
 use crate::thin_emitter::ThinPrinter;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
+use crate::solver::TypeInterner;
 
 #[test]
 fn test_thin_printer_creation() {
@@ -144,7 +145,8 @@ fn test_thin_pipeline_integration() {
     assert!(symbol_count >= 2, "Expected at least 2 symbols (add, result), got {}", symbol_count);
 
     // Step 3: Check (type inference)
-    let checker = ThinCheckerState::new(&parser.arena, &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let checker = ThinCheckerState::new(&parser.arena, &binder, &types, "test.ts".to_string());
     // Basic check - the checker exists and can be created
     let _ = &checker.types; // Access types arena to verify it exists
 

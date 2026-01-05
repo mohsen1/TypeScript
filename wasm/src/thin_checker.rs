@@ -45,7 +45,8 @@ pub struct ThinCheckerState<'a> {
 
     /// Type interner for structural type interning.
     /// Uses solver's TypeInterner for O(1) type equality.
-    pub types: TypeInterner,
+    /// Shared across threads for global type deduplication.
+    pub types: &'a TypeInterner,
 
     /// Cached types for symbols.
     symbol_types: FxHashMap<SymbolId, TypeId>,
@@ -107,15 +108,22 @@ pub const MAX_CALL_DEPTH: u32 = 20;
 
 impl<'a> ThinCheckerState<'a> {
     /// Create a new ThinCheckerState.
+    ///
+    /// # Arguments
+    /// * `arena` - The AST node arena
+    /// * `binder` - The binder state with symbols
+    /// * `types` - The shared type interner (for thread-safe type deduplication)
+    /// * `file_name` - The source file name
     pub fn new(
         arena: &'a ThinNodeArena,
         binder: &'a ThinBinderState,
+        types: &'a TypeInterner,
         file_name: String,
     ) -> Self {
         ThinCheckerState {
             arena,
             binder,
-            types: TypeInterner::new(),
+            types,
             symbol_types: FxHashMap::default(),
             node_types: FxHashMap::default(),
             type_parameter_names: FxHashMap::default(),
