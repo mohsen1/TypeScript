@@ -425,7 +425,11 @@ impl<'a> ThinCheckerState<'a> {
                     }
                     name => {
                         // Look up user-defined types from symbol table
-                        // Check file locals first
+                        // Check local scopes first (includes type parameters)
+                        if let Some(type_id) = self.lookup_local(name) {
+                            return type_id;
+                        }
+                        // Check file locals
                         if let Some(sym_id) = self.binder.file_locals.get(name) {
                             return self.get_type_of_symbol(sym_id);
                         }
@@ -2152,6 +2156,25 @@ impl<'a> ThinCheckerState<'a> {
         // Check if this is a declared class (ambient declaration)
         let is_declared = self.has_declare_modifier(&class.modifiers);
 
+        // Push a scope for type parameters
+        self.push_local_scope();
+
+        // Add type parameters to scope
+        if let Some(ref type_params) = class.type_parameters {
+            for &tp_idx in &type_params.nodes {
+                if let Some(tp_node) = self.arena.get(tp_idx) {
+                    if let Some(tp) = self.arena.get_type_parameter(tp_node) {
+                        if let Some(name_node) = self.arena.get(tp.name) {
+                            if let Some(ident) = self.arena.get_identifier(name_node) {
+                                // Add type parameter as a type (use ANY as placeholder)
+                                self.add_local(ident.escaped_text.clone(), TypeId::ANY);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Check each class member
         for &member_idx in &class.members.nodes {
             self.check_class_member(member_idx);
@@ -2162,6 +2185,8 @@ impl<'a> ThinCheckerState<'a> {
         if !is_declared {
             self.check_class_member_implementations(&class.members.nodes);
         }
+
+        self.pop_local_scope();
     }
 
     /// Check an interface declaration.
@@ -2174,10 +2199,31 @@ impl<'a> ThinCheckerState<'a> {
             return;
         };
 
+        // Push a scope for type parameters
+        self.push_local_scope();
+
+        // Add type parameters to scope
+        if let Some(ref type_params) = iface.type_parameters {
+            for &tp_idx in &type_params.nodes {
+                if let Some(tp_node) = self.arena.get(tp_idx) {
+                    if let Some(tp) = self.arena.get_type_parameter(tp_node) {
+                        if let Some(name_node) = self.arena.get(tp.name) {
+                            if let Some(ident) = self.arena.get_identifier(name_node) {
+                                // Add type parameter as a type (use ANY as placeholder)
+                                self.add_local(ident.escaped_text.clone(), TypeId::ANY);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Check each interface member for parameter properties
         for &member_idx in &iface.members.nodes {
             self.check_type_member_for_parameter_properties(member_idx);
         }
+
+        self.pop_local_scope();
     }
 
     /// Check if a node has the `declare` modifier.
