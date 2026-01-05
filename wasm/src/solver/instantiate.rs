@@ -1,0 +1,379 @@
+//! Generic type instantiation and substitution.
+//!
+//! This module implements type parameter substitution for generic types.
+//! When a generic function/type is instantiated, we replace type parameters
+//! with concrete types throughout the type structure.
+//!
+//! Key features:
+//! - Type substitution map (type parameter name -> TypeId)
+//! - Deep recursive substitution through nested types
+//! - Handling of constraints and defaults
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use crate::solver::types::*;
+use crate::solver::intern::TypeInterner;
+
+/// A substitution map from type parameter names to concrete types.
+#[derive(Clone, Debug, Default)]
+pub struct TypeSubstitution {
+    /// Maps type parameter names to their substituted types
+    map: HashMap<Arc<str>, TypeId>,
+}
+
+impl TypeSubstitution {
+    /// Create an empty substitution.
+    pub fn new() -> Self {
+        TypeSubstitution {
+            map: HashMap::new(),
+        }
+    }
+
+    /// Create a substitution from type parameters and arguments.
+    ///
+    /// `type_params` - The declared type parameters (e.g., `<T, U>`)
+    /// `type_args` - The provided type arguments (e.g., `<string, number>`)
+    pub fn from_args(type_params: &[TypeParamInfo], type_args: &[TypeId]) -> Self {
+        let mut map = HashMap::new();
+        for (param, &arg) in type_params.iter().zip(type_args.iter()) {
+            map.insert(param.name.clone(), arg);
+        }
+        TypeSubstitution { map }
+    }
+
+    /// Add a single substitution.
+    pub fn insert(&mut self, name: Arc<str>, type_id: TypeId) {
+        self.map.insert(name, type_id);
+    }
+
+    /// Look up a substitution.
+    pub fn get(&self, name: &str) -> Option<TypeId> {
+        self.map.get(name).copied()
+    }
+
+    /// Check if substitution is empty.
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
+    /// Number of substitutions.
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
+}
+
+/// Instantiator for applying type substitutions.
+pub struct TypeInstantiator<'a> {
+    interner: &'a TypeInterner,
+    substitution: &'a TypeSubstitution,
+    /// Track visited types to handle cycles
+    visiting: HashMap<TypeId, TypeId>,
+}
+
+impl<'a> TypeInstantiator<'a> {
+    /// Create a new instantiator.
+    pub fn new(interner: &'a TypeInterner, substitution: &'a TypeSubstitution) -> Self {
+        TypeInstantiator {
+            interner,
+            substitution,
+            visiting: HashMap::new(),
+        }
+    }
+
+    /// Apply the substitution to a type, returning the instantiated type.
+    pub fn instantiate(&mut self, type_id: TypeId) -> TypeId {
+        // Fast path: intrinsic types don't need instantiation
+        if type_id.is_intrinsic() {
+            return type_id;
+        }
+
+        // Check if we're already processing this type (cycle detection)
+        if let Some(&cached) = self.visiting.get(&type_id) {
+            return cached;
+        }
+
+        // Look up the type structure
+        let key = match self.interner.lookup(type_id) {
+            Some(k) => k,
+            None => return type_id,
+        };
+
+        // Mark as visiting (with original ID as placeholder for cycles)
+        self.visiting.insert(type_id, type_id);
+
+        let result = self.instantiate_key(&key);
+
+        // Update the cache with the actual result
+        self.visiting.insert(type_id, result);
+
+        result
+    }
+
+    /// Instantiate a call signature.
+    fn instantiate_call_signature(&mut self, sig: &CallSignature) -> CallSignature {
+        CallSignature {
+            type_params: sig.type_params.iter()
+                .map(|tp| TypeParamInfo {
+                    name: tp.name.clone(),
+                    constraint: tp.constraint.map(|c| self.instantiate(c)),
+                    default: tp.default.map(|d| self.instantiate(d)),
+                })
+                .collect(),
+            params: sig.params.iter()
+                .map(|p| ParamInfo {
+                    name: p.name.clone(),
+                    type_id: self.instantiate(p.type_id),
+                    optional: p.optional,
+                    rest: p.rest,
+                })
+                .collect(),
+            return_type: self.instantiate(sig.return_type),
+        }
+    }
+
+    /// Instantiate a TypeKey.
+    fn instantiate_key(&mut self, key: &TypeKey) -> TypeId {
+        match key {
+            // Type parameters get substituted
+            TypeKey::TypeParameter(info) => {
+                if let Some(substituted) = self.substitution.get(&info.name) {
+                    substituted
+                } else {
+                    // No substitution found, return original type parameter
+                    self.interner.intern(key.clone())
+                }
+            }
+
+            // Intrinsics don't change
+            TypeKey::Intrinsic(_) | TypeKey::Literal(_) | TypeKey::Error => {
+                self.interner.intern(key.clone())
+            }
+
+            // Ref types might resolve to something that needs substitution
+            TypeKey::Ref(_) | TypeKey::TypeQuery(_) | TypeKey::UniqueSymbol(_) => {
+                self.interner.intern(key.clone())
+            }
+
+            // This type doesn't substitute
+            TypeKey::ThisType => self.interner.intern(key.clone()),
+
+            // Union: instantiate all members
+            TypeKey::Union(members) => {
+                let instantiated: Vec<TypeId> = members.iter()
+                    .map(|&m| self.instantiate(m))
+                    .collect();
+                self.interner.union(instantiated)
+            }
+
+            // Intersection: instantiate all members
+            TypeKey::Intersection(members) => {
+                let instantiated: Vec<TypeId> = members.iter()
+                    .map(|&m| self.instantiate(m))
+                    .collect();
+                self.interner.intersection(instantiated)
+            }
+
+            // Array: instantiate element type
+            TypeKey::Array(elem) => {
+                let instantiated_elem = self.instantiate(*elem);
+                self.interner.array(instantiated_elem)
+            }
+
+            // Tuple: instantiate all elements
+            TypeKey::Tuple(elements) => {
+                let instantiated: Vec<TupleElement> = elements.iter()
+                    .map(|e| TupleElement {
+                        type_id: self.instantiate(e.type_id),
+                        name: e.name.clone(),
+                        optional: e.optional,
+                        rest: e.rest,
+                    })
+                    .collect();
+                self.interner.tuple(instantiated)
+            }
+
+            // Object: instantiate all property types
+            TypeKey::Object(props) => {
+                let instantiated: Vec<PropertyInfo> = props.iter()
+                    .map(|p| PropertyInfo {
+                        name: p.name.clone(),
+                        type_id: self.instantiate(p.type_id),
+                        optional: p.optional,
+                        readonly: p.readonly,
+                    })
+                    .collect();
+                self.interner.object(instantiated)
+            }
+
+            // Object with index signatures: instantiate all types
+            TypeKey::ObjectWithIndex(shape) => {
+                let instantiated_props: Vec<PropertyInfo> = shape.properties.iter()
+                    .map(|p| PropertyInfo {
+                        name: p.name.clone(),
+                        type_id: self.instantiate(p.type_id),
+                        optional: p.optional,
+                        readonly: p.readonly,
+                    })
+                    .collect();
+                let instantiated_string_idx = shape.string_index.as_ref().map(|idx| IndexSignature {
+                    key_type: self.instantiate(idx.key_type),
+                    value_type: self.instantiate(idx.value_type),
+                    readonly: idx.readonly,
+                });
+                let instantiated_number_idx = shape.number_index.as_ref().map(|idx| IndexSignature {
+                    key_type: self.instantiate(idx.key_type),
+                    value_type: self.instantiate(idx.value_type),
+                    readonly: idx.readonly,
+                });
+                self.interner.object_with_index(ObjectShape {
+                    properties: instantiated_props,
+                    string_index: instantiated_string_idx,
+                    number_index: instantiated_number_idx,
+                })
+            }
+
+            // Function: instantiate params and return type
+            // Note: Type params in the function create a new scope - don't substitute those
+            TypeKey::Function(shape) => {
+                let instantiated_params: Vec<ParamInfo> = shape.params.iter()
+                    .map(|p| ParamInfo {
+                        name: p.name.clone(),
+                        type_id: self.instantiate(p.type_id),
+                        optional: p.optional,
+                        rest: p.rest,
+                    })
+                    .collect();
+                let instantiated_return = self.instantiate(shape.return_type);
+
+                // Type params that belong to this function should NOT be substituted
+                // They create a new scope - we keep them as-is
+                let instantiated_shape = FunctionShape {
+                    type_params: shape.type_params.iter()
+                        .map(|tp| TypeParamInfo {
+                            name: tp.name.clone(),
+                            constraint: tp.constraint.map(|c| self.instantiate(c)),
+                            default: tp.default.map(|d| self.instantiate(d)),
+                        })
+                        .collect(),
+                    params: instantiated_params,
+                    return_type: instantiated_return,
+                    is_constructor: shape.is_constructor,
+                };
+                self.interner.function(instantiated_shape)
+            }
+
+            // Callable: instantiate all signatures and properties
+            TypeKey::Callable(shape) => {
+                let instantiated_call: Vec<CallSignature> = shape.call_signatures.iter()
+                    .map(|sig| self.instantiate_call_signature(sig))
+                    .collect();
+                let instantiated_construct: Vec<CallSignature> = shape.construct_signatures.iter()
+                    .map(|sig| self.instantiate_call_signature(sig))
+                    .collect();
+                let instantiated_props = shape.properties.iter()
+                    .map(|p| PropertyInfo {
+                        name: p.name.clone(),
+                        type_id: self.instantiate(p.type_id),
+                        optional: p.optional,
+                        readonly: p.readonly,
+                    })
+                    .collect();
+
+                self.interner.callable(CallableShape {
+                    call_signatures: instantiated_call,
+                    construct_signatures: instantiated_construct,
+                    properties: instantiated_props,
+                })
+            }
+
+            // Conditional: instantiate all parts
+            TypeKey::Conditional(cond) => {
+                let instantiated = ConditionalType {
+                    check_type: self.instantiate(cond.check_type),
+                    extends_type: self.instantiate(cond.extends_type),
+                    true_type: self.instantiate(cond.true_type),
+                    false_type: self.instantiate(cond.false_type),
+                };
+                self.interner.intern(TypeKey::Conditional(Box::new(instantiated)))
+            }
+
+            // Mapped: instantiate constraint and template
+            TypeKey::Mapped(mapped) => {
+                let instantiated = MappedType {
+                    type_param: mapped.type_param.clone(), // The iteration variable stays
+                    constraint: self.instantiate(mapped.constraint),
+                    template: self.instantiate(mapped.template),
+                    readonly_modifier: mapped.readonly_modifier,
+                    optional_modifier: mapped.optional_modifier,
+                };
+                self.interner.intern(TypeKey::Mapped(Box::new(instantiated)))
+            }
+
+            // Index access: instantiate both parts
+            TypeKey::IndexAccess(obj, idx) => {
+                let inst_obj = self.instantiate(*obj);
+                let inst_idx = self.instantiate(*idx);
+                self.interner.intern(TypeKey::IndexAccess(inst_obj, inst_idx))
+            }
+
+            // KeyOf: instantiate the operand
+            TypeKey::KeyOf(operand) => {
+                let inst_operand = self.instantiate(*operand);
+                self.interner.intern(TypeKey::KeyOf(inst_operand))
+            }
+
+            // ReadonlyType: instantiate the operand
+            TypeKey::ReadonlyType(operand) => {
+                let inst_operand = self.instantiate(*operand);
+                self.interner.intern(TypeKey::ReadonlyType(inst_operand))
+            }
+
+            // Template literal: instantiate embedded types
+            TypeKey::TemplateLiteral(spans) => {
+                let instantiated: Vec<TemplateSpan> = spans.iter()
+                    .map(|span| match span {
+                        TemplateSpan::Text(t) => TemplateSpan::Text(t.clone()),
+                        TemplateSpan::Type(t) => TemplateSpan::Type(self.instantiate(*t)),
+                    })
+                    .collect();
+                self.interner.intern(TypeKey::TemplateLiteral(instantiated))
+            }
+
+            // Infer: keep as-is (these are only resolved in conditional type checking)
+            TypeKey::Infer(info) => {
+                self.interner.intern(TypeKey::Infer(info.clone()))
+            }
+        }
+    }
+}
+
+/// Convenience function for instantiating a type with a substitution.
+pub fn instantiate_type(
+    interner: &TypeInterner,
+    type_id: TypeId,
+    substitution: &TypeSubstitution,
+) -> TypeId {
+    if substitution.is_empty() {
+        return type_id;
+    }
+    let mut instantiator = TypeInstantiator::new(interner, substitution);
+    instantiator.instantiate(type_id)
+}
+
+/// Convenience function for instantiating a generic type with type arguments.
+pub fn instantiate_generic(
+    interner: &TypeInterner,
+    type_id: TypeId,
+    type_params: &[TypeParamInfo],
+    type_args: &[TypeId],
+) -> TypeId {
+    if type_params.is_empty() || type_args.is_empty() {
+        return type_id;
+    }
+    let substitution = TypeSubstitution::from_args(type_params, type_args);
+    instantiate_type(interner, type_id, &substitution)
+}
+
+#[cfg(test)]
+#[path = "instantiate_tests.rs"]
+mod tests;
