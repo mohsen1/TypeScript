@@ -8,6 +8,7 @@
 use std::sync::Arc;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::base::NodeIndex;
+use crate::parser::NodeList;
 use crate::scanner::SyntaxKind;
 use crate::parser::syntax_kind_ext;
 use crate::solver::types::*;
@@ -288,6 +289,57 @@ impl<'a> TypeLowering<'a> {
         }
     }
 
+    /// Lower type parameters from a NodeList.
+    /// Returns a Vec<TypeParamInfo> for use in FunctionShape.
+    fn lower_type_parameters(&self, type_params: &Option<NodeList>) -> Vec<TypeParamInfo> {
+        match type_params {
+            None => vec![],
+            Some(list) => {
+                list.nodes.iter()
+                    .filter_map(|&idx| {
+                        let node = self.arena.get(idx)?;
+                        let data = self.arena.get_type_parameter(node)?;
+
+                        // Get the name from the identifier node
+                        let name = if data.name != NodeIndex::NONE {
+                            if let Some(name_node) = self.arena.get(data.name) {
+                                if let Some(id_data) = self.arena.get_identifier(name_node) {
+                                    Arc::from(id_data.escaped_text.as_str())
+                                } else {
+                                    return None;
+                                }
+                            } else {
+                                return None;
+                            }
+                        } else {
+                            return None;
+                        };
+
+                        // Lower constraint if present (e.g., T extends SomeType)
+                        let constraint = if data.constraint != NodeIndex::NONE {
+                            Some(self.lower_type(data.constraint))
+                        } else {
+                            None
+                        };
+
+                        // Lower default if present (e.g., T = DefaultType)
+                        let default = if data.default != NodeIndex::NONE {
+                            Some(self.lower_type(data.default))
+                        } else {
+                            None
+                        };
+
+                        Some(TypeParamInfo {
+                            name,
+                            constraint,
+                            default,
+                        })
+                    })
+                    .collect()
+            }
+        }
+    }
+
     /// Lower a function type ((a: T, b: U) => R)
     fn lower_function_type(&self, node_idx: NodeIndex) -> TypeId {
         let node = match self.arena.get(node_idx) {
@@ -316,9 +368,11 @@ impl<'a> TypeLowering<'a> {
             // Lower return type
             let return_type = self.lower_type(data.type_annotation);
 
-            // TODO: Lower type parameters
+            // Lower type parameters
+            let type_params = self.lower_type_parameters(&data.type_parameters);
+
             let shape = FunctionShape {
-                type_params: vec![],
+                type_params,
                 params,
                 return_type,
                 is_constructor: false,
@@ -737,8 +791,11 @@ impl<'a> TypeLowering<'a> {
             // Lower return type
             let return_type = self.lower_type(data.type_annotation);
 
+            // Lower type parameters
+            let type_params = self.lower_type_parameters(&data.type_parameters);
+
             let shape = FunctionShape {
-                type_params: vec![], // TODO: Lower type parameters
+                type_params,
                 params,
                 return_type,
                 is_constructor: true, // Mark as constructor
