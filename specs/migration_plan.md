@@ -10,13 +10,18 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 # ✅ COMPLETED
 
 - **Phase 0-5**: Scanner, Parser, Binder, Solver (~77,000 LOC, 1041 tests)
-- **Phase 6**: Emitter (ES5 transforms, source maps, .d.ts) - 31% JS baseline
+- **Phase 6**: Emitter (ES5 transforms, source maps, .d.ts) - **39.5% JS baseline**
 - **Phase 7**: Language Service (60%) - go-to-def, find refs, completions
 
+## Recent Emitter Improvements
+- ✅ Fixed baseline comparison script to extract JS portion correctly
+- ✅ Instance property initializers → `this.x = value;` in constructor
+- ✅ Distinguish `implements` vs `extends` in heritage clauses
+
 ## Emitter TODOs (for JS baseline 80%+)
-- ⬜ Class inheritance (`__extends` helper for `extends`)
-- ⬜ CommonJS exports (`module.exports`, `exports.X`)
-- ⬜ Parse error tolerance (13 tests skipped)
+- ⬜ Class inheritance - emit base class name (not just `_super`)
+- ⬜ CommonJS exports (`"use strict"`, `module.exports`, `exports.X`)
+- ⬜ Parse error tolerance (some tests skipped)
 
 ## Language Service TODOs (40% remaining)
 - ⬜ Formatting engine
@@ -32,7 +37,7 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 | Baseline | Pass Rate | Notes |
 |----------|-----------|-------|
 | .errors.txt | **63.6%** (49/77) | Focus area |
-| .js emit | 0% | Baselines use ES5, we emit ES6+ |
+| .js emit | **39.5%** (30/76) | ES5 IIFE emit, class transforms |
 
 ### Next Steps
 1. ✅ Export assignment validation (2309, 2304)

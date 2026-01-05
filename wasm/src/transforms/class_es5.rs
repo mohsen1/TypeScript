@@ -58,10 +58,8 @@ impl<'a> ClassES5Emitter<'a> {
         // Get class name
         let class_name = self.get_identifier_text(class_data.name);
         
-        // Check for extends clause
-        let has_extends = class_data.heritage_clauses.as_ref()
-            .map(|h| !h.nodes.is_empty())
-            .unwrap_or(false);
+        // Check for extends clause (not implements)
+        let has_extends = self.has_extends_clause(&class_data.heritage_clauses);
         
         // var ClassName = /** @class */ (function (_super) {
         self.write("var ");
@@ -114,16 +112,37 @@ impl<'a> ClassES5Emitter<'a> {
     }
     
     fn emit_constructor(&mut self, class_name: &str, class_data: &ClassData) {
+        // Collect instance property initializers
+        let instance_props: Vec<NodeIndex> = class_data.members.nodes.iter()
+            .filter_map(|&member_idx| {
+                let member_node = self.arena.get(member_idx)?;
+                if member_node.kind != syntax_kind_ext::PROPERTY_DECLARATION {
+                    return None;
+                }
+                let prop_data = self.arena.get_property_decl(member_node)?;
+                // Skip static properties
+                if self.is_static(&prop_data.modifiers) {
+                    return None;
+                }
+                // Include if has initializer
+                if !prop_data.initializer.is_none() {
+                    Some(member_idx)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         // Find constructor in members
         let mut found_constructor = false;
-        
+
         for &member_idx in &class_data.members.nodes {
             let Some(member_node) = self.arena.get(member_idx) else { continue };
-            
+
             if member_node.kind == syntax_kind_ext::CONSTRUCTOR {
                 found_constructor = true;
                 let Some(ctor_data) = self.arena.get_constructor(member_node) else { continue };
-                
+
                 self.write_indent();
                 self.write("function ");
                 self.write(class_name);
@@ -132,12 +151,15 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write(") {");
                 self.write_line();
                 self.increase_indent();
-                
+
+                // Emit instance property initializers at the start of constructor
+                self.emit_instance_property_initializers(&instance_props);
+
                 // Emit constructor body
                 if !ctor_data.body.is_none() {
                     self.emit_block_contents(ctor_data.body);
                 }
-                
+
                 self.decrease_indent();
                 self.write_indent();
                 self.write("}");
@@ -145,7 +167,7 @@ impl<'a> ClassES5Emitter<'a> {
                 break;
             }
         }
-        
+
         // Default constructor if none found
         if !found_constructor {
             self.write_indent();
@@ -153,8 +175,34 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(class_name);
             self.write("() {");
             self.write_line();
+
+            // Emit instance property initializers in default constructor
+            if !instance_props.is_empty() {
+                self.increase_indent();
+                self.emit_instance_property_initializers(&instance_props);
+                self.decrease_indent();
+            }
+
             self.write_indent();
             self.write("}");
+            self.write_line();
+        }
+    }
+
+    /// Emit instance property initializers as this.prop = value;
+    fn emit_instance_property_initializers(&mut self, props: &[NodeIndex]) {
+        for &prop_idx in props {
+            let Some(prop_node) = self.arena.get(prop_idx) else { continue };
+            let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
+
+            let prop_name = self.get_identifier_text(prop_data.name);
+
+            self.write_indent();
+            self.write("this.");
+            self.write(&prop_name);
+            self.write(" = ");
+            self.emit_expression(prop_data.initializer);
+            self.write(";");
             self.write_line();
         }
     }
@@ -913,6 +961,24 @@ impl<'a> ClassES5Emitter<'a> {
                         return true;
                     }
                 }
+            }
+        }
+        false
+    }
+
+    /// Check if heritage clauses contain an `extends` clause (not just `implements`)
+    fn has_extends_clause(&self, heritage_clauses: &Option<NodeList>) -> bool {
+        let Some(clauses) = heritage_clauses else {
+            return false;
+        };
+
+        for &clause_idx in &clauses.nodes {
+            let Some(clause_node) = self.arena.get(clause_idx) else { continue };
+            let Some(heritage_data) = self.arena.get_heritage(clause_node) else { continue };
+
+            // Check if this is an extends clause (not implements)
+            if heritage_data.token == SyntaxKind::ExtendsKeyword as u16 {
+                return true;
             }
         }
         false

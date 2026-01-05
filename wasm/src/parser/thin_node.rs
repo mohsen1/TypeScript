@@ -2767,6 +2767,17 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get heritage clause data.
+    #[inline]
+    pub fn get_heritage(&self, node: &ThinNode) -> Option<&HeritageData> {
+        use super::syntax_kind_ext::HERITAGE_CLAUSE;
+        if node.has_data() && node.kind == HERITAGE_CLAUSE {
+            self.heritage_clauses.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Get type query data (typeof in type position).
     #[inline]
     pub fn get_type_query(&self, node: &ThinNode) -> Option<&TypeQueryData> {
