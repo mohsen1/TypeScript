@@ -25,6 +25,8 @@ use crate::parser::{
         EnumData, EnumMemberData,
         ImportDeclData, ImportClauseData, NamedImportsData, SpecifierData,
         ExportDeclData, ExportAssignmentData, QualifiedNameData,
+        TemplateExprData, TemplateSpanData,
+        TypeOperatorData, NamedTupleMemberData,
     },
     syntax_kind_ext,
 };
@@ -325,6 +327,14 @@ impl ThinParserState {
                     self.parse_import_declaration()
                 }
             }
+            SyntaxKind::BreakKeyword => self.parse_break_statement(),
+            SyntaxKind::ContinueKeyword => self.parse_continue_statement(),
+            SyntaxKind::ThrowKeyword => self.parse_throw_statement(),
+            SyntaxKind::DoKeyword => self.parse_do_statement(),
+            SyntaxKind::SwitchKeyword => self.parse_switch_statement(),
+            SyntaxKind::TryKeyword => self.parse_try_statement(),
+            SyntaxKind::WithKeyword => self.parse_with_statement(),
+            SyntaxKind::DebuggerKeyword => self.parse_debugger_statement(),
             _ => self.parse_expression_statement(),
         }
     }
@@ -548,8 +558,16 @@ impl ThinParserState {
     fn parse_variable_declaration(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
 
-        // Parse name
-        let name = self.parse_identifier();
+        // Parse name - can be identifier, keyword as identifier, or binding pattern
+        let name = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_object_binding_pattern()
+        } else if self.is_token(SyntaxKind::OpenBracketToken) {
+            self.parse_array_binding_pattern()
+        } else if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
+        } else {
+            self.parse_identifier()
+        };
 
         // Parse optional type annotation
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
@@ -603,6 +621,13 @@ impl ThinParserState {
             self.parse_identifier()
         };
 
+        // Parse optional type parameters: <T, U extends V>
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
         // Parse parameters
         self.parse_expected(SyntaxKind::OpenParenToken);
         let parameters = self.parse_parameter_list();
@@ -634,7 +659,7 @@ impl ThinParserState {
                 is_async,
                 asterisk_token,
                 name,
-                type_parameters: None,
+                type_parameters,
                 parameters,
                 type_annotation,
                 body,
@@ -674,6 +699,13 @@ impl ThinParserState {
             NodeIndex::NONE
         };
 
+        // Parse optional type parameters: <T, U extends V>
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
         // Parse parameters
         self.parse_expected(SyntaxKind::OpenParenToken);
         let parameters = self.parse_parameter_list();
@@ -699,7 +731,7 @@ impl ThinParserState {
                 is_async,
                 asterisk_token,
                 name,
-                type_parameters: None,
+                type_parameters,
                 parameters,
                 type_annotation,
                 body,
@@ -1495,7 +1527,17 @@ impl ThinParserState {
         };
 
         // Check if it's a method or property
-        if self.is_token(SyntaxKind::OpenParenToken) {
+        // Method: foo() or foo<T>()
+        if self.is_token(SyntaxKind::OpenParenToken)
+            || self.is_token(SyntaxKind::LessThanToken)
+        {
+            // Parse optional type parameters: foo<T, U>()
+            let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+                Some(self.parse_type_parameters())
+            } else {
+                None
+            };
+
             // Method
             self.parse_expected(SyntaxKind::OpenParenToken);
             let parameters = self.parse_parameter_list();
@@ -1525,7 +1567,7 @@ impl ThinParserState {
                     asterisk_token: false,
                     name,
                     question_token: false,
-                    type_parameters: None,
+                    type_parameters,
                     parameters,
                     type_annotation,
                     body,
@@ -1783,6 +1825,11 @@ impl ThinParserState {
     fn parse_type_member(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
 
+        // Handle generic call signature: <T>(): returnType
+        if self.is_token(SyntaxKind::LessThanToken) {
+            return self.parse_call_signature(start_pos);
+        }
+
         // Handle call signature: (): returnType
         if self.is_token(SyntaxKind::OpenParenToken) {
             return self.parse_call_signature(start_pos);
@@ -1793,23 +1840,33 @@ impl ThinParserState {
             return self.parse_construct_signature(start_pos);
         }
 
-        // Handle get accessor: get foo(): type { } (error: body in type context)
-        if self.is_token(SyntaxKind::GetKeyword) {
+        // Handle get accessor: get foo(): type
+        // But not if 'get' is used as property name (get: T or get?: T or get() or get<T>())
+        if self.is_token(SyntaxKind::GetKeyword) && !self.look_ahead_is_property_name_after_keyword() {
             return self.parse_get_accessor_signature(start_pos);
         }
 
-        // Handle set accessor: set foo(v: type) { } (error: body in type context)
-        if self.is_token(SyntaxKind::SetKeyword) {
+        // Handle set accessor: set foo(v: type)
+        // But not if 'set' is used as property name
+        if self.is_token(SyntaxKind::SetKeyword) && !self.look_ahead_is_property_name_after_keyword() {
             return self.parse_set_accessor_signature(start_pos);
         }
 
         // Parse optional readonly modifier
-        let readonly = self.parse_optional(SyntaxKind::ReadonlyKeyword);
+        // But not if 'readonly' is used as property name
+        let readonly = if self.is_token(SyntaxKind::ReadonlyKeyword) && !self.look_ahead_is_property_name_after_keyword() {
+            self.next_token();
+            true
+        } else {
+            false
+        };
 
         // Parse property/method name
+        // Include keywords that can be property names
         let name = if self.is_token(SyntaxKind::Identifier) ||
                      self.is_token(SyntaxKind::StringLiteral) ||
-                     self.is_token(SyntaxKind::NumericLiteral) {
+                     self.is_token(SyntaxKind::NumericLiteral) ||
+                     self.is_property_name_keyword() {
             self.parse_property_name()
         } else if self.is_token(SyntaxKind::OpenBracketToken) {
             // Index signature: [key: string]: value (possibly with readonly)
@@ -1830,7 +1887,17 @@ impl ThinParserState {
         };
 
         // Check if it's a method signature or property signature
-        if self.is_token(SyntaxKind::OpenParenToken) {
+        // Method signature: foo(): T or foo<T>(): U
+        if self.is_token(SyntaxKind::OpenParenToken)
+            || self.is_token(SyntaxKind::LessThanToken)
+        {
+            // Parse optional type parameters: foo<T, U>()
+            let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+                Some(self.parse_type_parameters())
+            } else {
+                None
+            };
+
             // Method signature
             self.parse_expected(SyntaxKind::OpenParenToken);
             let parameters = self.parse_parameter_list();
@@ -1851,7 +1918,7 @@ impl ThinParserState {
                     modifiers,
                     name,
                     question_token,
-                    type_parameters: None,
+                    type_parameters,
                     parameters: Some(parameters),
                     type_annotation,
                 },
@@ -1883,7 +1950,12 @@ impl ThinParserState {
 
     /// Parse call signature: (): returnType or <T>(): returnType
     fn parse_call_signature(&mut self, start_pos: u32) -> NodeIndex {
-        // TODO: Parse type parameters if present
+        // Parse optional type parameters: <T, U>
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
 
         self.parse_expected(SyntaxKind::OpenParenToken);
         let parameters = self.parse_parameter_list();
@@ -1904,7 +1976,7 @@ impl ThinParserState {
                 modifiers: None,
                 name: NodeIndex::NONE,
                 question_token: false,
-                type_parameters: None,
+                type_parameters,
                 parameters: Some(parameters),
                 type_annotation,
             },
@@ -1915,7 +1987,12 @@ impl ThinParserState {
     fn parse_construct_signature(&mut self, start_pos: u32) -> NodeIndex {
         self.parse_expected(SyntaxKind::NewKeyword);
 
-        // TODO: Parse type parameters if present
+        // Parse optional type parameters: new <T>()
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
 
         self.parse_expected(SyntaxKind::OpenParenToken);
         let parameters = self.parse_parameter_list();
@@ -1936,7 +2013,7 @@ impl ThinParserState {
                 modifiers: None,
                 name: NodeIndex::NONE,
                 question_token: false,
-                type_parameters: None,
+                type_parameters,
                 parameters: Some(parameters),
                 type_annotation,
             },
@@ -2122,7 +2199,13 @@ impl ThinParserState {
 
         while !self.is_token(SyntaxKind::CloseBraceToken) && !self.is_token(SyntaxKind::EndOfFileToken) {
             let start_pos = self.token_pos();
-            let name = self.parse_identifier();
+
+            // Enum member names can be identifiers or string literals
+            let name = if self.is_token(SyntaxKind::StringLiteral) {
+                self.parse_string_literal()
+            } else {
+                self.parse_identifier()
+            };
 
             let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
                 self.parse_assignment_expression()
@@ -2465,8 +2548,31 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::ExportKeyword);
 
-        // Check for type-only export
-        let is_type_only = self.parse_optional(SyntaxKind::TypeKeyword);
+        // Check for type-only export vs export type alias
+        // "export type { X }" or "export type * from" = type-only export
+        // "export type X = Y" = exported type alias declaration
+        let is_type_only = if self.is_token(SyntaxKind::TypeKeyword) {
+            // Look ahead to see if this is a type-only export
+            let snapshot = self.scanner.save_state();
+            let current = self.current_token;
+            self.next_token(); // skip 'type'
+
+            let is_type_only_export = self.is_token(SyntaxKind::OpenBraceToken)
+                || self.is_token(SyntaxKind::AsteriskToken);
+
+            self.scanner.restore_state(snapshot);
+            self.current_token = current;
+
+            if is_type_only_export {
+                self.next_token(); // consume 'type' for type-only exports
+                true
+            } else {
+                // Not a type-only export - leave 'type' for parse_export_declaration_or_statement
+                false
+            }
+        } else {
+            false
+        };
 
         // export default ...
         if self.is_token(SyntaxKind::DefaultKeyword) {
@@ -2713,6 +2819,12 @@ impl ThinParserState {
             SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
             SyntaxKind::TypeKeyword => self.parse_type_alias_declaration(),
             SyntaxKind::EnumKeyword => self.parse_enum_declaration(),
+            SyntaxKind::NamespaceKeyword |
+            SyntaxKind::ModuleKeyword => self.parse_module_declaration(),
+            SyntaxKind::AbstractKeyword => {
+                // export abstract class ...
+                self.parse_class_declaration()
+            }
             SyntaxKind::VarKeyword |
             SyntaxKind::LetKeyword |
             SyntaxKind::ConstKeyword => self.parse_variable_statement(),
@@ -2891,6 +3003,285 @@ impl ThinParserState {
                 statement,
             },
         )
+    }
+
+    /// Parse break statement
+    fn parse_break_statement(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::BreakKeyword);
+
+        // Optional label
+        let label = if !self.can_parse_semicolon() && self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
+        } else {
+            NodeIndex::NONE
+        };
+
+        self.parse_semicolon();
+        let end_pos = self.token_end();
+
+        self.arena.add_token(syntax_kind_ext::BREAK_STATEMENT as u16, start_pos, end_pos)
+    }
+
+    /// Parse continue statement
+    fn parse_continue_statement(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::ContinueKeyword);
+
+        // Optional label
+        let _label = if !self.can_parse_semicolon() && self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
+        } else {
+            NodeIndex::NONE
+        };
+
+        self.parse_semicolon();
+        let end_pos = self.token_end();
+
+        self.arena.add_token(syntax_kind_ext::CONTINUE_STATEMENT as u16, start_pos, end_pos)
+    }
+
+    /// Parse throw statement
+    fn parse_throw_statement(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::ThrowKeyword);
+
+        let expression = self.parse_expression();
+
+        self.parse_semicolon();
+        let end_pos = self.token_end();
+
+        // Use return statement node type for throw (same structure)
+        self.arena.add_return(
+            syntax_kind_ext::THROW_STATEMENT,
+            start_pos,
+            end_pos,
+            ReturnData { expression },
+        )
+    }
+
+    /// Parse do-while statement
+    fn parse_do_statement(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::DoKeyword);
+
+        let statement = self.parse_statement();
+
+        self.parse_expected(SyntaxKind::WhileKeyword);
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let condition = self.parse_expression();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        self.parse_semicolon();
+        let end_pos = self.token_end();
+
+        self.arena.add_loop(
+            syntax_kind_ext::DO_STATEMENT,
+            start_pos,
+            end_pos,
+            LoopData {
+                initializer: NodeIndex::NONE,
+                condition,
+                incrementor: NodeIndex::NONE,
+                statement,
+            },
+        )
+    }
+
+    /// Parse switch statement
+    fn parse_switch_statement(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::SwitchKeyword);
+        self.parse_expected(SyntaxKind::OpenParenToken);
+
+        let expression = self.parse_expression();
+
+        self.parse_expected(SyntaxKind::CloseParenToken);
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+
+        // Parse case clauses
+        let mut clauses = Vec::new();
+        while !self.is_token(SyntaxKind::CloseBraceToken)
+            && !self.is_token(SyntaxKind::EndOfFileToken)
+        {
+            if self.is_token(SyntaxKind::CaseKeyword) {
+                let clause_start = self.token_pos();
+                self.next_token();
+                let clause_expr = self.parse_expression();
+                self.parse_expected(SyntaxKind::ColonToken);
+
+                let mut statements = Vec::new();
+                while !self.is_token(SyntaxKind::CaseKeyword)
+                    && !self.is_token(SyntaxKind::DefaultKeyword)
+                    && !self.is_token(SyntaxKind::CloseBraceToken)
+                    && !self.is_token(SyntaxKind::EndOfFileToken)
+                {
+                    statements.push(self.parse_statement());
+                }
+
+                let clause_end = self.token_end();
+                clauses.push(self.arena.add_case_clause(
+                    syntax_kind_ext::CASE_CLAUSE,
+                    clause_start,
+                    clause_end,
+                    CaseClauseData {
+                        expression: clause_expr,
+                        statements: self.make_node_list(statements),
+                    },
+                ));
+            } else if self.is_token(SyntaxKind::DefaultKeyword) {
+                let clause_start = self.token_pos();
+                self.next_token();
+                self.parse_expected(SyntaxKind::ColonToken);
+
+                let mut statements = Vec::new();
+                while !self.is_token(SyntaxKind::CaseKeyword)
+                    && !self.is_token(SyntaxKind::DefaultKeyword)
+                    && !self.is_token(SyntaxKind::CloseBraceToken)
+                    && !self.is_token(SyntaxKind::EndOfFileToken)
+                {
+                    statements.push(self.parse_statement());
+                }
+
+                let clause_end = self.token_end();
+                clauses.push(self.arena.add_case_clause(
+                    syntax_kind_ext::DEFAULT_CLAUSE,
+                    clause_start,
+                    clause_end,
+                    CaseClauseData {
+                        expression: NodeIndex::NONE,
+                        statements: self.make_node_list(statements),
+                    },
+                ));
+            } else {
+                self.next_token(); // Skip unexpected token
+            }
+        }
+
+        let case_block_end = self.token_end();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+        let end_pos = self.token_end();
+
+        // Create the case block node
+        let case_block = self.arena.add_block(
+            syntax_kind_ext::CASE_BLOCK,
+            start_pos, // Case block starts with the opening brace
+            case_block_end,
+            BlockData {
+                statements: self.make_node_list(clauses),
+                multi_line: true,
+            },
+        );
+
+        self.arena.add_switch(
+            syntax_kind_ext::SWITCH_STATEMENT,
+            start_pos,
+            end_pos,
+            SwitchData {
+                expression,
+                case_block,
+            },
+        )
+    }
+
+    /// Parse try statement
+    fn parse_try_statement(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::TryKeyword);
+
+        let try_block = self.parse_block();
+
+        // Parse catch clause
+        let catch_clause = if self.is_token(SyntaxKind::CatchKeyword) {
+            let catch_start = self.token_pos();
+            self.next_token();
+
+            // Parse optional catch binding
+            let variable_declaration = if self.is_token(SyntaxKind::OpenParenToken) {
+                self.next_token();
+                let param = if self.is_identifier_or_keyword() {
+                    self.parse_identifier_name()
+                } else {
+                    NodeIndex::NONE
+                };
+                self.parse_expected(SyntaxKind::CloseParenToken);
+                param
+            } else {
+                NodeIndex::NONE
+            };
+
+            let catch_block = self.parse_block();
+            let catch_end = self.token_end();
+
+            self.arena.add_catch_clause(
+                syntax_kind_ext::CATCH_CLAUSE,
+                catch_start,
+                catch_end,
+                CatchClauseData {
+                    variable_declaration,
+                    block: catch_block,
+                },
+            )
+        } else {
+            NodeIndex::NONE
+        };
+
+        // Parse finally clause
+        let finally_block = if self.is_token(SyntaxKind::FinallyKeyword) {
+            self.next_token();
+            self.parse_block()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_try(
+            syntax_kind_ext::TRY_STATEMENT,
+            start_pos,
+            end_pos,
+            TryData {
+                try_block,
+                catch_clause,
+                finally_block,
+            },
+        )
+    }
+
+    /// Parse with statement
+    fn parse_with_statement(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::WithKeyword);
+        self.parse_expected(SyntaxKind::OpenParenToken);
+
+        let expression = self.parse_expression();
+
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        let statement = self.parse_statement();
+
+        let end_pos = self.token_end();
+
+        // Use if statement structure for with (expression + statement)
+        self.arena.add_if_statement(
+            syntax_kind_ext::WITH_STATEMENT,
+            start_pos,
+            end_pos,
+            IfStatementData {
+                expression,
+                then_statement: statement,
+                else_statement: NodeIndex::NONE,
+            },
+        )
+    }
+
+    /// Parse debugger statement
+    fn parse_debugger_statement(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::DebuggerKeyword);
+        self.parse_semicolon();
+        let end_pos = self.token_end();
+
+        self.arena.add_token(syntax_kind_ext::DEBUGGER_STATEMENT as u16, start_pos, end_pos)
     }
 
     /// Parse expression statement
@@ -3264,7 +3655,42 @@ impl ThinParserState {
             }
         }
 
+        // Handle as/satisfies type assertions: expr as Type, expr satisfies Type
+        if self.is_token(SyntaxKind::AsKeyword) || self.is_token(SyntaxKind::SatisfiesKeyword) {
+            left = self.parse_as_or_satisfies_expression(left, start_pos);
+        }
+
         left
+    }
+
+    /// Parse as/satisfies expression: expr as Type, expr satisfies Type
+    fn parse_as_or_satisfies_expression(&mut self, expression: NodeIndex, start_pos: u32) -> NodeIndex {
+        let is_satisfies = self.is_token(SyntaxKind::SatisfiesKeyword);
+        self.next_token(); // consume 'as' or 'satisfies'
+
+        let type_node = self.parse_type();
+        let end_pos = self.token_end();
+
+        let result = self.arena.add_type_assertion(
+            if is_satisfies {
+                syntax_kind_ext::SATISFIES_EXPRESSION
+            } else {
+                syntax_kind_ext::AS_EXPRESSION
+            },
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::TypeAssertionData {
+                expression,
+                type_node,
+            },
+        );
+
+        // Allow chaining: x as T as U
+        if self.is_token(SyntaxKind::AsKeyword) || self.is_token(SyntaxKind::SatisfiesKeyword) {
+            return self.parse_as_or_satisfies_expression(result, start_pos);
+        }
+
+        result
     }
 
     /// Parse unary expression
@@ -3387,7 +3813,12 @@ impl ThinParserState {
             match self.token() {
                 SyntaxKind::DotToken => {
                     self.next_token();
-                    let name = self.parse_identifier();
+                    // Handle both regular identifiers and private identifiers (#name)
+                    let name = if self.is_token(SyntaxKind::PrivateIdentifier) {
+                        self.parse_private_identifier()
+                    } else {
+                        self.parse_identifier_name()
+                    };
                     let end_pos = self.token_end();
 
                     expr = self.arena.add_access_expr(
@@ -3468,6 +3899,7 @@ impl ThinParserState {
             SyntaxKind::FalseKeyword => self.parse_boolean_literal(),
             SyntaxKind::NullKeyword => self.parse_null_literal(),
             SyntaxKind::ThisKeyword => self.parse_this_expression(),
+            SyntaxKind::SuperKeyword => self.parse_super_expression(),
             SyntaxKind::OpenParenToken => self.parse_parenthesized_expression(),
             SyntaxKind::OpenBracketToken => self.parse_array_literal(),
             SyntaxKind::OpenBraceToken => self.parse_object_literal(),
@@ -3483,7 +3915,9 @@ impl ThinParserState {
                     self.parse_identifier()
                 }
             }
-            SyntaxKind::LessThanToken => self.parse_jsx_element_or_self_closing_or_fragment(true),
+            SyntaxKind::LessThanToken => self.parse_jsx_element_or_type_assertion(),
+            SyntaxKind::NoSubstitutionTemplateLiteral => self.parse_no_substitution_template_literal(),
+            SyntaxKind::TemplateHead => self.parse_template_expression(),
             _ => {
                 // Unknown primary expression - create an error token
                 let start_pos = self.token_pos();
@@ -3544,6 +3978,185 @@ impl ThinParserState {
         )
     }
 
+    /// Parse private identifier (#name)
+    fn parse_private_identifier(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        let text = self.scanner.get_token_value_ref().to_string();
+        self.identifiers.push(text.clone());
+        self.parse_expected(SyntaxKind::PrivateIdentifier);
+        let end_pos = self.token_end();
+
+        self.arena.add_identifier(
+            SyntaxKind::PrivateIdentifier as u16,
+            start_pos,
+            end_pos,
+            IdentifierData {
+                escaped_text: text,
+                original_text: None,
+                type_arguments: None,
+            },
+        )
+    }
+
+    /// Parse object binding pattern: { x, y: z, ...rest }
+    fn parse_object_binding_pattern(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::OpenBraceToken);
+
+        let mut elements = Vec::new();
+
+        while !self.is_token(SyntaxKind::CloseBraceToken)
+            && !self.is_token(SyntaxKind::EndOfFileToken)
+        {
+            let elem_start = self.token_pos();
+
+            // Handle rest element: ...x
+            let dot_dot_dot = self.parse_optional(SyntaxKind::DotDotDotToken);
+
+            if dot_dot_dot {
+                // Rest element: just name
+                let name = self.parse_binding_element_name();
+                let elem_end = self.token_end();
+                elements.push(self.arena.add_binding_element(
+                    syntax_kind_ext::BINDING_ELEMENT,
+                    elem_start,
+                    elem_end,
+                    crate::parser::thin_node::BindingElementData {
+                        dot_dot_dot_token: true,
+                        property_name: NodeIndex::NONE,
+                        name,
+                        initializer: NodeIndex::NONE,
+                    },
+                ));
+            } else {
+                // Regular binding element: name or propertyName: name
+                let first_name = self.parse_property_name();
+
+                let (property_name, name) = if self.parse_optional(SyntaxKind::ColonToken) {
+                    // propertyName: name
+                    let name = self.parse_binding_element_name();
+                    (first_name, name)
+                } else {
+                    // Just name (shorthand)
+                    (NodeIndex::NONE, first_name)
+                };
+
+                // Optional initializer: = value
+                let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
+                    self.parse_assignment_expression()
+                } else {
+                    NodeIndex::NONE
+                };
+
+                let elem_end = self.token_end();
+                elements.push(self.arena.add_binding_element(
+                    syntax_kind_ext::BINDING_ELEMENT,
+                    elem_start,
+                    elem_end,
+                    crate::parser::thin_node::BindingElementData {
+                        dot_dot_dot_token: false,
+                        property_name,
+                        name,
+                        initializer,
+                    },
+                ));
+            }
+
+            if !self.parse_optional(SyntaxKind::CommaToken) {
+                break;
+            }
+        }
+
+        self.parse_expected(SyntaxKind::CloseBraceToken);
+        let end_pos = self.token_end();
+
+        self.arena.add_binding_pattern(
+            syntax_kind_ext::OBJECT_BINDING_PATTERN,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::BindingPatternData {
+                elements: self.make_node_list(elements),
+            },
+        )
+    }
+
+    /// Parse array binding pattern: [x, y, ...rest]
+    fn parse_array_binding_pattern(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::OpenBracketToken);
+
+        let mut elements = Vec::new();
+
+        while !self.is_token(SyntaxKind::CloseBracketToken)
+            && !self.is_token(SyntaxKind::EndOfFileToken)
+        {
+            let elem_start = self.token_pos();
+
+            // Handle omitted element: [, , x]
+            if self.is_token(SyntaxKind::CommaToken) {
+                // Omitted element - push NONE as placeholder
+                elements.push(NodeIndex::NONE);
+                self.next_token();
+                continue;
+            }
+
+            // Handle rest element: ...x
+            let dot_dot_dot = self.parse_optional(SyntaxKind::DotDotDotToken);
+
+            // Parse name (can be identifier or nested binding pattern)
+            let name = self.parse_binding_element_name();
+
+            // Optional initializer: = value
+            let initializer = if !dot_dot_dot && self.parse_optional(SyntaxKind::EqualsToken) {
+                self.parse_assignment_expression()
+            } else {
+                NodeIndex::NONE
+            };
+
+            let elem_end = self.token_end();
+            elements.push(self.arena.add_binding_element(
+                syntax_kind_ext::BINDING_ELEMENT,
+                elem_start,
+                elem_end,
+                crate::parser::thin_node::BindingElementData {
+                    dot_dot_dot_token: dot_dot_dot,
+                    property_name: NodeIndex::NONE,
+                    name,
+                    initializer,
+                },
+            ));
+
+            if !self.parse_optional(SyntaxKind::CommaToken) {
+                break;
+            }
+        }
+
+        self.parse_expected(SyntaxKind::CloseBracketToken);
+        let end_pos = self.token_end();
+
+        self.arena.add_binding_pattern(
+            syntax_kind_ext::ARRAY_BINDING_PATTERN,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::BindingPatternData {
+                elements: self.make_node_list(elements),
+            },
+        )
+    }
+
+    /// Parse binding element name (can be identifier or nested binding pattern)
+    fn parse_binding_element_name(&mut self) -> NodeIndex {
+        if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_object_binding_pattern()
+        } else if self.is_token(SyntaxKind::OpenBracketToken) {
+            self.parse_array_binding_pattern()
+        } else if self.is_identifier_or_keyword() {
+            self.parse_identifier_name()
+        } else {
+            self.parse_identifier()
+        }
+    }
+
     /// Parse numeric literal
     /// Uses zero-copy accessor for parsing, clones only when storing
     fn parse_numeric_literal(&mut self) -> NodeIndex {
@@ -3589,6 +4202,105 @@ impl ThinParserState {
         let end_pos = self.token_end();
 
         self.arena.add_token(SyntaxKind::ThisKeyword as u16, start_pos, end_pos)
+    }
+
+    /// Parse super expression
+    fn parse_super_expression(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.next_token();
+        let end_pos = self.token_end();
+
+        self.arena.add_token(SyntaxKind::SuperKeyword as u16, start_pos, end_pos)
+    }
+
+    /// Parse no-substitution template literal: `hello`
+    fn parse_no_substitution_template_literal(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        let text = self.scanner.get_token_value_ref().to_string();
+        self.parse_expected(SyntaxKind::NoSubstitutionTemplateLiteral);
+        let end_pos = self.token_end();
+
+        self.arena.add_literal(
+            SyntaxKind::NoSubstitutionTemplateLiteral as u16,
+            start_pos,
+            end_pos,
+            LiteralData { text, raw_text: None, value: None },
+        )
+    }
+
+    /// Parse template expression: `hello ${name}!`
+    fn parse_template_expression(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Parse template head: `hello ${
+        let head_text = self.scanner.get_token_value_ref().to_string();
+        let head_start = self.token_pos();
+        self.parse_expected(SyntaxKind::TemplateHead);
+        let head_end = self.token_end();
+
+        let head = self.arena.add_literal(
+            SyntaxKind::TemplateHead as u16,
+            head_start,
+            head_end,
+            LiteralData { text: head_text, raw_text: None, value: None },
+        );
+
+        // Parse template spans
+        let mut spans = Vec::new();
+        loop {
+            // Parse expression in ${ }
+            let expression = self.parse_expression();
+
+            // Now we need to rescan the } as a template continuation
+            // The scanner needs to be told to rescan as template
+            self.scanner.re_scan_template_token(false);
+            self.current_token = self.scanner.get_token();
+
+            // Parse template middle or tail
+            let literal_start = self.token_pos();
+            let literal_text = self.scanner.get_token_value_ref().to_string();
+            let is_tail = self.is_token(SyntaxKind::TemplateTail);
+            let literal_kind = if is_tail {
+                SyntaxKind::TemplateTail
+            } else {
+                SyntaxKind::TemplateMiddle
+            };
+
+            self.next_token();
+            let literal_end = self.token_end();
+
+            let literal = self.arena.add_literal(
+                literal_kind as u16,
+                literal_start,
+                literal_end,
+                LiteralData { text: literal_text, raw_text: None, value: None },
+            );
+
+            let span_start = if let Some(node) = self.arena.get(expression) { node.pos } else { literal_start };
+            let span = self.arena.add_template_span(
+                syntax_kind_ext::TEMPLATE_SPAN,
+                span_start,
+                literal_end,
+                TemplateSpanData { expression, literal },
+            );
+            spans.push(span);
+
+            if is_tail {
+                break;
+            }
+        }
+
+        let end_pos = self.token_end();
+
+        self.arena.add_template_expr(
+            syntax_kind_ext::TEMPLATE_EXPRESSION,
+            start_pos,
+            end_pos,
+            TemplateExprData {
+                head,
+                template_spans: self.make_node_list(spans),
+            },
+        )
     }
 
     /// Parse parenthesized expression
@@ -3890,6 +4602,11 @@ impl ThinParserState {
     fn parse_primary_type(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
 
+        // Handle generic function types: <T>() => T or <T, U>(x: T) => U
+        if self.is_token(SyntaxKind::LessThanToken) {
+            return self.parse_generic_function_type();
+        }
+
         // Handle parenthesized types or function types
         if self.is_token(SyntaxKind::OpenParenToken) {
             // Check if this is a function type: () => T or (x: T) => U
@@ -3916,7 +4633,12 @@ impl ThinParserState {
 
         // Handle object type literal or mapped type: { ... } or { [K in T]: U }
         if self.is_token(SyntaxKind::OpenBraceToken) {
-            return self.parse_object_or_mapped_type();
+            let obj_type = self.parse_object_or_mapped_type();
+            // Handle array/indexed access on object literal: {...}[] or {...}["key"]
+            if self.is_token(SyntaxKind::OpenBracketToken) {
+                return self.parse_array_type(start_pos, obj_type);
+            }
+            return obj_type;
         }
 
         // Handle typeof type: typeof x
@@ -3948,6 +4670,11 @@ impl ThinParserState {
             return self.parse_literal_type();
         }
 
+        // Handle negative numeric literal types: -1, -42
+        if self.is_token(SyntaxKind::MinusToken) {
+            return self.parse_prefix_unary_literal_type();
+        }
+
         // Handle template literal types: `hello` or `prefix${T}suffix`
         if self.is_token(SyntaxKind::NoSubstitutionTemplateLiteral)
             || self.is_token(SyntaxKind::TemplateHead)
@@ -3956,7 +4683,7 @@ impl ThinParserState {
         }
 
         // Check for type keywords (string, number, boolean, etc.)
-        let type_name = match self.token() {
+        let first_name = match self.token() {
             SyntaxKind::StringKeyword
             | SyntaxKind::NumberKeyword
             | SyntaxKind::BooleanKeyword
@@ -3977,6 +4704,9 @@ impl ThinParserState {
                 self.parse_identifier()
             }
         };
+
+        // Handle qualified names (foo.Bar, A.B.C)
+        let type_name = self.parse_qualified_name_rest(first_name);
 
         let end_pos = self.token_end();
 
@@ -4005,7 +4735,107 @@ impl ThinParserState {
         base_type
     }
 
-    /// Parse tuple type: [T, U, V]
+    /// Parse a single element in a tuple type, handling:
+    /// - Rest elements: ...T[]
+    /// - Optional elements: T?
+    /// - Named elements: name: T or name?: T
+    fn parse_tuple_element_type(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Handle rest element: ...T[]
+        if self.parse_optional(SyntaxKind::DotDotDotToken) {
+            let element_type = self.parse_type();
+            let end_pos = self.token_end();
+            return self.arena.add_type_operator(
+                syntax_kind_ext::REST_TYPE,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::TypeOperatorData {
+                    operator: SyntaxKind::DotDotDotToken as u16,
+                    type_node: element_type,
+                },
+            );
+        }
+
+        // Check if this is a named tuple element: name: T or name?: T
+        // Need to look ahead to see if there's a colon after the identifier
+        if self.is_token(SyntaxKind::Identifier) {
+            let snapshot = self.scanner.save_state();
+            let current = self.current_token;
+
+            let _name = self.scanner.get_token_value_ref().to_string();
+            self.next_token();
+
+            // Check for optional marker and colon
+            let has_question = self.parse_optional(SyntaxKind::QuestionToken);
+            let has_colon = self.is_token(SyntaxKind::ColonToken);
+
+            if has_colon || has_question {
+                // This is a named tuple element - parse it
+                self.scanner.restore_state(snapshot);
+                self.current_token = current;
+                return self.parse_named_tuple_member();
+            }
+
+            // Not a named element, restore and parse as regular type
+            self.scanner.restore_state(snapshot);
+            self.current_token = current;
+        }
+
+        // Parse the type
+        let type_node = self.parse_type();
+
+        // Check for optional marker: T?
+        if self.parse_optional(SyntaxKind::QuestionToken) {
+            let end_pos = self.token_end();
+            return self.arena.add_type_operator(
+                syntax_kind_ext::OPTIONAL_TYPE,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::TypeOperatorData {
+                    operator: SyntaxKind::QuestionToken as u16,
+                    type_node,
+                },
+            );
+        }
+
+        type_node
+    }
+
+    /// Parse a named tuple member: name: T or name?: T
+    fn parse_named_tuple_member(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Check for ... prefix (rest parameter)
+        let dot_dot_dot_token = self.parse_optional(SyntaxKind::DotDotDotToken);
+
+        // Parse name
+        let name = self.parse_identifier();
+
+        // Check for optional marker
+        let question_token = self.parse_optional(SyntaxKind::QuestionToken);
+
+        // Parse : and type
+        self.parse_expected(SyntaxKind::ColonToken);
+        let type_node = self.parse_type();
+
+        let end_pos = self.token_end();
+
+        // Create a named tuple member node
+        self.arena.add_named_tuple_member(
+            syntax_kind_ext::NAMED_TUPLE_MEMBER,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::NamedTupleMemberData {
+                dot_dot_dot_token,
+                name,
+                question_token,
+                type_node,
+            },
+        )
+    }
+
+    /// Parse tuple type: [T, U, V], [name: T], [...T[]], [T?]
     fn parse_tuple_type(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::OpenBracketToken);
@@ -4015,7 +4845,8 @@ impl ThinParserState {
         while !self.is_token(SyntaxKind::CloseBracketToken)
             && !self.is_token(SyntaxKind::EndOfFileToken)
         {
-            elements.push(self.parse_type());
+            let element = self.parse_tuple_element_type();
+            elements.push(element);
 
             if !self.parse_optional(SyntaxKind::CommaToken) {
                 break;
@@ -4067,6 +4898,41 @@ impl ThinParserState {
         )
     }
 
+    /// Parse prefix unary literal type: -1, -42
+    /// In TypeScript, negative number literals in type position are
+    /// represented as a PrefixUnaryExpression wrapped in a LiteralType
+    fn parse_prefix_unary_literal_type(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Parse the minus token
+        let operator_kind = self.token() as u16;
+        self.next_token();
+
+        // Parse the numeric literal operand
+        let operand = self.parse_numeric_literal();
+
+        let prefix_end = self.token_end();
+
+        // Create prefix unary expression node
+        let prefix_expr = self.arena.add_unary_expr(
+            syntax_kind_ext::PREFIX_UNARY_EXPRESSION,
+            start_pos,
+            prefix_end,
+            crate::parser::thin_node::UnaryExprData {
+                operator: operator_kind,
+                operand,
+            },
+        );
+
+        // Wrap in a literal type
+        self.arena.add_literal_type(
+            syntax_kind_ext::LITERAL_TYPE,
+            start_pos,
+            prefix_end,
+            crate::parser::thin_node::LiteralTypeData { literal: prefix_expr },
+        )
+    }
+
     /// Parse typeof type: typeof x, typeof x.y
     fn parse_typeof_type(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
@@ -4074,6 +4940,13 @@ impl ThinParserState {
 
         // Parse the expression name (can be qualified: x.y.z)
         let expr_name = self.parse_entity_name();
+
+        // Parse optional type arguments for instantiation expressions: typeof Err<U>
+        let type_arguments = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_arguments())
+        } else {
+            None
+        };
 
         let end_pos = self.token_end();
 
@@ -4083,7 +4956,7 @@ impl ThinParserState {
             end_pos,
             crate::parser::thin_node::TypeQueryData {
                 expr_name,
-                type_arguments: None,
+                type_arguments,
             },
         )
     }
@@ -4468,6 +5341,92 @@ impl ThinParserState {
         current
     }
 
+    /// Check if current keyword can be used as a property name
+    /// (when followed by :, ?, (, <, or at end of type member)
+    fn look_ahead_is_property_name_after_keyword(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        // Skip the keyword
+        self.next_token();
+
+        // If followed by these, the keyword is being used as a property name
+        let is_property_name = self.is_token(SyntaxKind::ColonToken)
+            || self.is_token(SyntaxKind::QuestionToken)
+            || self.is_token(SyntaxKind::OpenParenToken)
+            || self.is_token(SyntaxKind::LessThanToken)
+            || self.is_token(SyntaxKind::SemicolonToken)
+            || self.is_token(SyntaxKind::CommaToken)
+            || self.is_token(SyntaxKind::CloseBraceToken);
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_property_name
+    }
+
+    /// Check if current token is a keyword that can be used as a property name
+    fn is_property_name_keyword(&self) -> bool {
+        matches!(
+            self.token(),
+            SyntaxKind::TypeKeyword
+                | SyntaxKind::GetKeyword
+                | SyntaxKind::SetKeyword
+                | SyntaxKind::ReadonlyKeyword
+                | SyntaxKind::AsyncKeyword
+                | SyntaxKind::AwaitKeyword
+                | SyntaxKind::NewKeyword
+                | SyntaxKind::PublicKeyword
+                | SyntaxKind::PrivateKeyword
+                | SyntaxKind::ProtectedKeyword
+                | SyntaxKind::StaticKeyword
+                | SyntaxKind::AbstractKeyword
+                | SyntaxKind::OverrideKeyword
+                | SyntaxKind::DeclareKeyword
+                | SyntaxKind::ExportKeyword
+                | SyntaxKind::DefaultKeyword
+                | SyntaxKind::LetKeyword
+                | SyntaxKind::ConstKeyword
+                | SyntaxKind::VarKeyword
+                | SyntaxKind::IfKeyword
+                | SyntaxKind::ElseKeyword
+                | SyntaxKind::ForKeyword
+                | SyntaxKind::WhileKeyword
+                | SyntaxKind::DoKeyword
+                | SyntaxKind::SwitchKeyword
+                | SyntaxKind::CaseKeyword
+                | SyntaxKind::BreakKeyword
+                | SyntaxKind::ContinueKeyword
+                | SyntaxKind::ReturnKeyword
+                | SyntaxKind::ThrowKeyword
+                | SyntaxKind::TryKeyword
+                | SyntaxKind::CatchKeyword
+                | SyntaxKind::FinallyKeyword
+                | SyntaxKind::ClassKeyword
+                | SyntaxKind::FunctionKeyword
+                | SyntaxKind::ImportKeyword
+                | SyntaxKind::FromKeyword
+                | SyntaxKind::AsKeyword
+                | SyntaxKind::InKeyword
+                | SyntaxKind::OfKeyword
+                | SyntaxKind::InstanceOfKeyword
+                | SyntaxKind::ThisKeyword
+                | SyntaxKind::SuperKeyword
+                | SyntaxKind::DeleteKeyword
+                | SyntaxKind::VoidKeyword
+                | SyntaxKind::TypeOfKeyword
+                | SyntaxKind::YieldKeyword
+                | SyntaxKind::ConstructorKeyword
+                | SyntaxKind::InterfaceKeyword
+                | SyntaxKind::EnumKeyword
+                | SyntaxKind::ImplementsKeyword
+                | SyntaxKind::ExtendsKeyword
+                | SyntaxKind::ModuleKeyword
+                | SyntaxKind::NamespaceKeyword
+                | SyntaxKind::RequireKeyword
+                | SyntaxKind::GlobalKeyword
+        )
+    }
+
     /// Look ahead to see if ( starts a function type: () => T or (x: T) => U
     fn look_ahead_is_function_type(&mut self) -> bool {
         let snapshot = self.scanner.save_state();
@@ -4485,13 +5444,19 @@ impl ThinParserState {
             return is_arrow;
         }
 
-        // Check for parameter-like syntax: identifier followed by :
+        // Check for parameter-like syntax: identifier or keyword followed by : or )
         // If we see just a type (like `string`), it could be parenthesized type
-        // Function type params have: `name:`
-        if self.is_token(SyntaxKind::Identifier) {
+        // Function type params have: `name:` or `modifier name` where name can be a keyword
+        if self.is_identifier_or_keyword() {
             self.next_token();
             // If followed by : it's definitely a function type parameter
             if self.is_token(SyntaxKind::ColonToken) {
+                self.scanner.restore_state(snapshot);
+                self.current_token = current;
+                return true;
+            }
+            // If followed by another identifier (like `public B`), it's a parameter with modifier
+            if self.is_identifier_or_keyword() {
                 self.scanner.restore_state(snapshot);
                 self.current_token = current;
                 return true;
@@ -4551,7 +5516,40 @@ impl ThinParserState {
         )
     }
 
+    /// Parse generic function type: <T>() => T or <T, U extends V>(x: T) => U
+    fn parse_generic_function_type(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Parse type parameters: <T, U extends V>
+        let type_parameters = self.parse_type_parameters();
+
+        // Parse parameters: (x: T, y: U)
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_type_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Parse =>
+        self.parse_expected(SyntaxKind::EqualsGreaterThanToken);
+
+        // Parse return type
+        let type_annotation = self.parse_type();
+
+        let end_pos = self.token_end();
+
+        self.arena.add_function_type(
+            syntax_kind_ext::FUNCTION_TYPE,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::FunctionTypeData {
+                type_parameters: Some(type_parameters),
+                parameters,
+                type_annotation,
+            },
+        )
+    }
+
     /// Parse type parameter list for function types: (x: T, y: U)
+    /// Also handles invalid modifiers like (public x) which TypeScript parses but errors on semantically
     fn parse_type_parameter_list(&mut self) -> NodeList {
         let mut params = Vec::new();
 
@@ -4560,11 +5558,15 @@ impl ThinParserState {
         {
             let param_start = self.token_pos();
 
+            // Parse optional modifiers (public/private/protected/readonly)
+            // These are syntactically valid but semantically invalid in function types
+            let modifiers = self.parse_parameter_modifiers();
+
             // Parse optional ...rest
             let dot_dot_dot = self.parse_optional(SyntaxKind::DotDotDotToken);
 
-            // Parse parameter name
-            let name = self.parse_identifier();
+            // Parse parameter name (keywords are allowed as parameter names)
+            let name = self.parse_identifier_name();
 
             // Parse optional ?
             let question = self.parse_optional(SyntaxKind::QuestionToken);
@@ -4583,7 +5585,7 @@ impl ThinParserState {
                 param_start,
                 param_end,
                 crate::parser::thin_node::ParameterData {
-                    modifiers: None,
+                    modifiers,
                     dot_dot_dot_token: dot_dot_dot,
                     name,
                     question_token: question,
@@ -4621,6 +5623,36 @@ impl ThinParserState {
         )
     }
 
+    /// Parse qualified name rest: given a left name, parse `.Right.Rest` parts
+    /// Handles: foo.Bar, A.B.C, etc.
+    fn parse_qualified_name_rest(&mut self, left: NodeIndex) -> NodeIndex {
+        let mut current = left;
+
+        while self.is_token(SyntaxKind::DotToken) {
+            let start_pos = if let Some(node) = self.arena.get(current) {
+                node.pos
+            } else {
+                self.token_pos()
+            };
+
+            self.next_token(); // consume .
+            let right = self.parse_identifier_name();
+            let end_pos = self.token_end();
+
+            current = self.arena.add_qualified_name(
+                syntax_kind_ext::QUALIFIED_NAME,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::QualifiedNameData {
+                    left: current,
+                    right,
+                },
+            );
+        }
+
+        current
+    }
+
     // =========================================================================
     // Accessors
     // =========================================================================
@@ -4643,6 +5675,115 @@ impl ThinParserState {
     // =========================================================================
     // JSX Parsing
     // =========================================================================
+
+    /// Determine if we should parse a type assertion or JSX element.
+    /// Type assertions use <Type>expr syntax, JSX uses <Element>.
+    fn parse_jsx_element_or_type_assertion(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Look ahead to determine if this is a type assertion or JSX
+        // Type assertion: <type>expression where type is a type keyword or identifier followed by >
+        // JSX: <element ...> where element is an identifier (starts with lowercase = intrinsic, uppercase = component)
+
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        self.next_token(); // consume <
+
+        // Check if we have a type keyword (number, string, boolean, etc.) - definitely a type assertion
+        let is_type_assertion = match self.token() {
+            SyntaxKind::StringKeyword
+            | SyntaxKind::NumberKeyword
+            | SyntaxKind::BooleanKeyword
+            | SyntaxKind::SymbolKeyword
+            | SyntaxKind::BigIntKeyword
+            | SyntaxKind::VoidKeyword
+            | SyntaxKind::NullKeyword
+            | SyntaxKind::UndefinedKeyword
+            | SyntaxKind::NeverKeyword
+            | SyntaxKind::AnyKeyword
+            | SyntaxKind::UnknownKeyword
+            | SyntaxKind::ObjectKeyword
+            | SyntaxKind::KeyOfKeyword
+            | SyntaxKind::TypeOfKeyword
+            | SyntaxKind::ReadonlyKeyword
+            | SyntaxKind::UniqueKeyword
+            | SyntaxKind::InferKeyword
+            | SyntaxKind::OpenBraceToken
+            | SyntaxKind::OpenBracketToken
+            | SyntaxKind::OpenParenToken
+            | SyntaxKind::LessThanToken
+            | SyntaxKind::GreaterThanToken => true,  // <> is a fragment, not type assertion
+            SyntaxKind::Identifier => {
+                // Could be either JSX or type assertion
+                // - Lowercase identifiers like <div> are always JSX
+                // - PascalCase followed by JSX-like syntax (attributes, /) is JSX
+                // - Single uppercase letter like <T> followed by > is likely type assertion
+
+                let text = self.scanner.get_token_value_ref().to_string();
+                let first_char = text.chars().next().unwrap_or('a');
+
+                if first_char.is_ascii_lowercase() {
+                    // Lowercase identifier = JSX intrinsic element
+                    false
+                } else {
+                    // PascalCase - check if followed by JSX-like syntax
+                    self.next_token();
+                    matches!(
+                        self.token(),
+                        SyntaxKind::ExtendsKeyword
+                            | SyntaxKind::BarToken
+                            | SyntaxKind::AmpersandToken
+                            | SyntaxKind::CommaToken
+                    )
+                }
+            }
+            _ => false,
+        };
+
+        // Restore state
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+
+        if is_type_assertion && !self.look_ahead_is_jsx_fragment() {
+            self.parse_type_assertion()
+        } else {
+            self.parse_jsx_element_or_self_closing_or_fragment(true)
+        }
+    }
+
+    /// Check if this is a JSX fragment: <>
+    fn look_ahead_is_jsx_fragment(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        self.next_token(); // consume <
+        let is_fragment = self.is_token(SyntaxKind::GreaterThanToken);
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_fragment
+    }
+
+    /// Parse a type assertion: <Type>expression
+    fn parse_type_assertion(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::LessThanToken);
+        let type_node = self.parse_type();
+        self.parse_expected(SyntaxKind::GreaterThanToken);
+        let expression = self.parse_unary_expression();
+        let end_pos = self.token_end();
+
+        self.arena.add_type_assertion(
+            syntax_kind_ext::TYPE_ASSERTION,
+            start_pos,
+            end_pos,
+            TypeAssertionData {
+                type_node,
+                expression,
+            },
+        )
+    }
 
     /// Parse a JSX element, self-closing element, or fragment.
     /// Called when we see `<` in an expression context.

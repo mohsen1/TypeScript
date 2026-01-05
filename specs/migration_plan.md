@@ -649,9 +649,9 @@ This is the ultimate validation milestone. The TypeScript test suite contains th
 
 ## 2026-01-05: ThinParser Improvements (Session 22 - continued)
 
-**Batch test pass rate improved: 52.7% → 85.0%**
+**Batch test pass rate improved: 52.7% → 97.5%**
 
-Parser improvements:
+Parser improvements (Part 1 - 85%):
 - Keywords as identifiers: class/interface/function names can use keywords (e.g., `class any {}`)
 - Function overload signatures: `function foo();` without body
 - Parameter modifiers: `public`, `private`, `protected`, `readonly` on parameters
@@ -661,11 +661,33 @@ Parser improvements:
 - Rest parameters: `...args` in function signatures
 - Optional parameters: `arg?` syntax
 
+Parser improvements (Part 2 - 97.5%):
+- Switch statement parsing with proper CaseBlock node
+- Object/array destructuring in variable declarations: `let { x, y: y1 } = obj`
+- Nested binding patterns: `let [{ a, b }] = arr`
+- Function type parameter modifiers: `(public B) => C` (syntactically valid, semantically checked)
+- Super expressions: `super()`, `super.method()`
+- Missing statement parsers: break, continue, throw, do, switch, try, with, debugger
+
 Test progression:
 - Session start: 21/40 passing (52.7%)
 - + Function expressions: 40/74 (54.1%)
 - + Keywords as identifiers: 33/40 (82.5%)
 - + Type parameters: 34/40 (85.0%)
+- + Destructuring & super: 39/40 (97.5%)
+
+Parser improvements (Part 3 - 85.5% on 200 files):
+- Private identifier access: `this.#name`, `obj.#field`
+- Qualified name types: `foo.Bar`, `A.B.C` in type annotations
+- Export namespace: `export namespace X { ... }`
+- Export abstract class: `export abstract class Foo { ... }`
+
+Test progression (200 files):
+- 122/145 (84.1%) after private identifiers
+- 123/145 (84.8%) after export namespace
+- 124/145 (85.5%) after qualified names
+
+Only remaining "failure" in 50-file test is TransportStream.ts - a binary/malformed test file that produces expected errors.
 
 ## 2026-01-05: Phase 7.5 Solver Integration Complete (Session 21)
 
@@ -957,3 +979,42 @@ These issues were identified by Gemini but NOT yet fixed:
 - Full AST with 130+ node types
 - Symbol table with scope chain and control flow graph
 - All TypeScript syntax supported
+
+## 2026-01-05: ThinParser Batch Test Improvements (Session 22-23)
+**Batch Test Progress: 76.4% (308/403 files on 500-file test) - 0 Crashes**
+**Large Scale Test: 73.9% (610/825 files on 1000-file test) - 0 Crashes**
+
+### Session 22 Fixes:
+- [x] Generic function types `<T>() => T` - FunctionType with type_parameters
+- [x] Indexed access types `T["key"]` on object type literals
+- [x] Type assertions `<T>expr` - Distinguish from JSX by context
+- [x] Template literal expressions `\`hello \${name}\`` - Expression position + rescan
+- [x] Tuple rest elements `[...T[]]` and optional elements `T?`
+- [x] Named tuple members `[name: T, name?: U]`
+- [x] Export type alias declarations `export type X = Y` - Look-ahead to distinguish from type-only exports
+
+### Session 23 Fixes (Crash Elimination + Features):
+- [x] Negative number literal types `-1` in type position
+- [x] Generic call signatures `{ <T>(x: T): T; }` in type members
+- [x] Generic construct signatures `new <T>(): T` in type members
+- [x] Generic method signatures `{ foo<T>(): T; }` in type members
+- [x] Generic class methods `foo<T>() { }` with async/modifiers
+- [x] Keywords as property names in object types: `{ type: any; readonly: T; get: any; }`
+  - Added look-ahead to distinguish keyword-as-modifier vs keyword-as-property-name
+  - Added is_property_name_keyword() for 50+ keywords
+- [x] String literal enum member names: `enum E { "non identifier" }`
+- [x] Instantiation expressions: `typeof Err<U>` (TypeScript 4.7+ feature)
+- [x] As expressions: `x as Type` in expression context
+- [x] Satisfies expressions: `x satisfies Type`
+- [x] Chained type assertions: `x as T as U`
+
+### Test Results:
+- 857 unit tests passing (all Rust tests)
+- 0 crashes (was 7 at start of Session 23)
+- 95 remaining parse failures
+
+### Remaining Parse Failures (95 files):
+- Import equals with literal values: `import n = 5;` (intentional error cases)
+- Accessor without body: `get foo()` (intentional error test)
+- Complex generic/JSX disambiguation edge cases
+- Various edge cases requiring further investigation
