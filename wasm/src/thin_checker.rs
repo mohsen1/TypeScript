@@ -1681,6 +1681,9 @@ impl<'a> ThinCheckerState<'a> {
 
             // Check for function overload implementations (2389, 2391)
             self.check_function_implementations(&sf.statements.nodes);
+
+            // Check for export assignment with other exports (2309)
+            self.check_export_assignment(&sf.statements.nodes);
         }
     }
 
@@ -2603,6 +2606,100 @@ impl<'a> ThinCheckerState<'a> {
             // Nested namespace - recurse
             self.check_statement(body_idx);
         }
+    }
+
+    /// Check for export assignment with other exported elements (error 2309).
+    /// `export = X` cannot be used when there are also `export class/function/etc.`
+    /// Also checks that the exported expression exists (error 2304).
+    fn check_export_assignment(&mut self, statements: &[NodeIndex]) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        let mut export_assignment_idx: Option<NodeIndex> = None;
+        let mut has_other_exports = false;
+
+        for &stmt_idx in statements {
+            let Some(node) = self.arena.get(stmt_idx) else {
+                continue;
+            };
+
+            match node.kind {
+                syntax_kind_ext::EXPORT_ASSIGNMENT => {
+                    export_assignment_idx = Some(stmt_idx);
+
+                    // Check that the exported expression exists
+                    if let Some(export_data) = self.arena.get_export_assignment(node) {
+                        // Get the type of the expression (this will report 2304 if not found)
+                        self.get_type_of_node(export_data.expression);
+                    }
+                }
+                syntax_kind_ext::EXPORT_DECLARATION => {
+                    // export { ... } or export * from '...'
+                    has_other_exports = true;
+                }
+                _ => {
+                    // Check for export modifiers on declarations
+                    // (export class X, export function f, export const x, etc.)
+                    if self.has_export_modifier(stmt_idx) {
+                        has_other_exports = true;
+                    }
+                }
+            }
+        }
+
+        // Report error 2309 if there's an export assignment AND other exports
+        if let Some(export_idx) = export_assignment_idx {
+            if has_other_exports {
+                self.error_at_node(
+                    export_idx,
+                    "An export assignment cannot be used in a module with other exported elements.",
+                    diagnostic_codes::EXPORT_ASSIGNMENT_WITH_OTHER_EXPORTS,
+                );
+            }
+        }
+    }
+
+    /// Check if a statement has an export modifier.
+    fn has_export_modifier(&self, stmt_idx: NodeIndex) -> bool {
+        use crate::scanner::SyntaxKind;
+
+        let Some(node) = self.arena.get(stmt_idx) else {
+            return false;
+        };
+
+        // Check different declaration types for export modifier
+        let modifiers = match node.kind {
+            syntax_kind_ext::FUNCTION_DECLARATION => {
+                self.arena.get_function(node).and_then(|f| f.modifiers.as_ref())
+            }
+            syntax_kind_ext::CLASS_DECLARATION => {
+                self.arena.get_class(node).and_then(|c| c.modifiers.as_ref())
+            }
+            syntax_kind_ext::VARIABLE_STATEMENT => {
+                self.arena.get_variable(node).and_then(|v| v.modifiers.as_ref())
+            }
+            syntax_kind_ext::INTERFACE_DECLARATION => {
+                self.arena.get_interface(node).and_then(|i| i.modifiers.as_ref())
+            }
+            syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                self.arena.get_type_alias(node).and_then(|t| t.modifiers.as_ref())
+            }
+            syntax_kind_ext::ENUM_DECLARATION => {
+                self.arena.get_enum(node).and_then(|e| e.modifiers.as_ref())
+            }
+            _ => None,
+        };
+
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::ExportKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        false
     }
 
     /// Check that parameters don't have property modifiers (error 2369).

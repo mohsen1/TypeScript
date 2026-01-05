@@ -2414,6 +2414,17 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get export assignment data (export = expr).
+    #[inline]
+    pub fn get_export_assignment(&self, node: &ThinNode) -> Option<&ExportAssignmentData> {
+        use super::syntax_kind_ext::EXPORT_ASSIGNMENT;
+        if node.has_data() && node.kind == EXPORT_ASSIGNMENT {
+            self.export_assignments.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Get parameter data.
     #[inline]
     pub fn get_parameter(&self, node: &ThinNode) -> Option<&ParameterData> {

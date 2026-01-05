@@ -31,19 +31,18 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 ### Current Status
 | Baseline | Pass Rate | Notes |
 |----------|-----------|-------|
-| .errors.txt | **61.0%** (47/77) | Focus area |
+| .errors.txt | **63.6%** (49/77) | Focus area |
 | .js emit | 0% | Baselines use ES5, we emit ES6+ |
 
 ### Next Steps
-1. ⬜ Export assignment validation (2309)
+1. ✅ Export assignment validation (2309, 2304)
 2. ⬜ Return type validation (2355)
 3. ⬜ Parser semantic errors (1128, 1248)
 4. ⬜ Class member resolution (this.x vs x vs ClassName.x)
 5. ⬜ RelatedInformation (point to definition sites)
 
-### Blockers Analysis (30 failing tests)
+### Blockers Analysis (28 failing tests)
 - **Parser errors** (1005, 1068, 1128, 1248): Error recovery gaps
-- **Module errors** (2304, 2309): Export assignment validation
 - **Type errors** (2339, 2355, 2511): Property access, return type, abstract unions
 - **Accessor errors** (1183, 6234, 18045): Accessor-specific validation
 

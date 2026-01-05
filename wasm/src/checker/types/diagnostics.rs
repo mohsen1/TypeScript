@@ -175,6 +175,7 @@ pub mod diagnostic_codes {
     // Module/import errors
     pub const CANNOT_FIND_MODULE: u32 = 2307;
     pub const MODULE_NOT_FOUND: u32 = 2307;
+    pub const EXPORT_ASSIGNMENT_WITH_OTHER_EXPORTS: u32 = 2309;  // An export assignment cannot be used in a module with other exported elements.
     pub const HAS_NO_DEFAULT_EXPORT: u32 = 2613;
     pub const EXPORT_ASSIGNMENT_CANNOT_BE_USED: u32 = 2714;
 
