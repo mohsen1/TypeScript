@@ -1020,19 +1020,26 @@ These issues were identified by Gemini but NOT yet fixed:
 - [x] Type predicate return types: `x is T`, `asserts x is T`
 - [x] Index signature vs mapped type disambiguation: `{ [key: string]: T }` vs `{ [K in T]: U }`
 
-### Session 25 Fixes (82.3% pass rate):
+### Session 25 Fixes (82.3% → 84.2% pass rate):
 - [x] Type predicates in arrow function return types: `(x: unknown): x is string => ...`
 - [x] Type predicates in all function contexts (methods, call signatures, function types)
 - [x] Constructor types: `new () => T`, `new <T>() => T`, `new (x: T) => U`
+- [x] All compound assignment operators: `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=`, `>>>=`, `??=`, `||=`, `&&=`, `**=`
+- [x] Nullish coalescing operator: `??`
+- [x] Greater token rescanning for `>>`, `>>>`, `>=`, `>>=`, `>>>=` in binary expressions
+- [x] Binding patterns in function parameters: `function foo({a, b})`, `function bar([x, y])`
+- [x] Optional value type in index signatures: `[index: any];` (semantically invalid but parseable)
+- [x] Type assertion vs JSX disambiguation: `.tsx` files always parse as JSX; `.ts` files use type context
 
 ### Test Results:
 - 863 unit tests passing (all Rust tests)
 - 0 crashes
-- 146 remaining parse failures (down from 200)
+- 130 remaining parse failures (down from 200)
 
-### Remaining Parse Failures (~146 files):
+### Remaining Parse Failures (~130 files):
 - Multi-file tests with `@filename:` directives (~50 files)
 - Import equals with literal values: `import n = 5;` (intentional error cases)
 - Accessor without body: `get foo()` (intentional error test)
 - Anonymous modules: `module { }` (legacy syntax)
-- Complex generic/JSX disambiguation edge cases
+- ASI edge cases with class modifiers: `abstract\n}` as property name
+- Intentionally malformed arrow functions (error recovery tests)
