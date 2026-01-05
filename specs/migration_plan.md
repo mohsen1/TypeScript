@@ -981,7 +981,7 @@ These issues were identified by Gemini but NOT yet fixed:
 - All TypeScript syntax supported
 
 ## 2026-01-05: ThinParser Batch Test Improvements (Session 22-24)
-**Batch Test Progress: 80.0% (800/1000 files) - 0 Crashes**
+**Batch Test Progress: 82.3% (679/825 single-file tests) - 0 Crashes**
 
 ### Session 22 Fixes:
 - [x] Generic function types `<T>() => T` - FunctionType with type_parameters
@@ -1020,12 +1020,17 @@ These issues were identified by Gemini but NOT yet fixed:
 - [x] Type predicate return types: `x is T`, `asserts x is T`
 - [x] Index signature vs mapped type disambiguation: `{ [key: string]: T }` vs `{ [K in T]: U }`
 
-### Test Results:
-- 857 unit tests passing (all Rust tests)
-- 0 crashes (was 7 at start of Session 23)
-- 200 remaining parse failures (down from 237)
+### Session 25 Fixes (82.3% pass rate):
+- [x] Type predicates in arrow function return types: `(x: unknown): x is string => ...`
+- [x] Type predicates in all function contexts (methods, call signatures, function types)
+- [x] Constructor types: `new () => T`, `new <T>() => T`, `new (x: T) => U`
 
-### Remaining Parse Failures (200 files):
+### Test Results:
+- 863 unit tests passing (all Rust tests)
+- 0 crashes
+- 146 remaining parse failures (down from 200)
+
+### Remaining Parse Failures (~146 files):
 - Multi-file tests with `@filename:` directives (~50 files)
 - Import equals with literal values: `import n = 5;` (intentional error cases)
 - Accessor without body: `get foo()` (intentional error test)

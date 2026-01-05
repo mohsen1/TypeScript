@@ -1406,9 +1406,9 @@ impl ThinParserState {
         self.parse_expected(SyntaxKind::OpenParenToken);
         self.parse_expected(SyntaxKind::CloseParenToken);
 
-        // Optional return type
+        // Optional return type (supports type predicates)
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-            self.parse_type()
+            self.parse_return_type()
         } else {
             NodeIndex::NONE
         };
@@ -1543,9 +1543,9 @@ impl ThinParserState {
             let parameters = self.parse_parameter_list();
             self.parse_expected(SyntaxKind::CloseParenToken);
 
-            // Optional return type
+            // Optional return type (supports type predicates: param is T)
             let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-                self.parse_type()
+                self.parse_return_type()
             } else {
                 NodeIndex::NONE
             };
@@ -1662,9 +1662,9 @@ impl ThinParserState {
         self.parse_expected(SyntaxKind::OpenParenToken);
         self.parse_expected(SyntaxKind::CloseParenToken);
 
-        // Optional return type
+        // Optional return type (supports type predicates)
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-            self.parse_type()
+            self.parse_return_type()
         } else {
             NodeIndex::NONE
         };
@@ -1903,8 +1903,9 @@ impl ThinParserState {
             let parameters = self.parse_parameter_list();
             self.parse_expected(SyntaxKind::CloseParenToken);
 
+            // Return type (supports type predicates: param is T)
             let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-                self.parse_type()
+                self.parse_return_type()
             } else {
                 NodeIndex::NONE
             };
@@ -1961,8 +1962,9 @@ impl ThinParserState {
         let parameters = self.parse_parameter_list();
         self.parse_expected(SyntaxKind::CloseParenToken);
 
+        // Return type (supports type predicates: param is T)
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-            self.parse_type()
+            self.parse_return_type()
         } else {
             NodeIndex::NONE
         };
@@ -1998,8 +2000,9 @@ impl ThinParserState {
         let parameters = self.parse_parameter_list();
         self.parse_expected(SyntaxKind::CloseParenToken);
 
+        // Return type (supports type predicates)
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-            self.parse_type()
+            self.parse_return_type()
         } else {
             NodeIndex::NONE
         };
@@ -2070,8 +2073,9 @@ impl ThinParserState {
         self.parse_expected(SyntaxKind::OpenParenToken);
         self.parse_expected(SyntaxKind::CloseParenToken);
 
+        // Return type (supports type predicates)
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-            self.parse_type()
+            self.parse_return_type()
         } else {
             NodeIndex::NONE
         };
@@ -3630,9 +3634,9 @@ impl ThinParserState {
             self.make_node_list(vec![param])
         };
 
-        // Parse optional return type annotation
+        // Parse optional return type annotation (supports type predicates: x is T)
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-            self.parse_type()
+            self.parse_return_type()
         } else {
             NodeIndex::NONE
         };
@@ -5069,6 +5073,11 @@ impl ThinParserState {
     fn parse_primary_type(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
 
+        // Handle constructor types: new () => T or new <T>() => T
+        if self.is_token(SyntaxKind::NewKeyword) {
+            return self.parse_constructor_type();
+        }
+
         // Handle generic function types: <T>() => T or <T, U>(x: T) => U
         if self.is_token(SyntaxKind::LessThanToken) {
             return self.parse_generic_function_type();
@@ -5999,8 +6008,8 @@ impl ThinParserState {
         // Parse =>
         self.parse_expected(SyntaxKind::EqualsGreaterThanToken);
 
-        // Parse return type
-        let type_annotation = self.parse_type();
+        // Parse return type (supports type predicates: param is T)
+        let type_annotation = self.parse_return_type();
 
         let end_pos = self.token_end();
 
@@ -6031,8 +6040,8 @@ impl ThinParserState {
         // Parse =>
         self.parse_expected(SyntaxKind::EqualsGreaterThanToken);
 
-        // Parse return type
-        let type_annotation = self.parse_type();
+        // Parse return type (supports type predicates: param is T)
+        let type_annotation = self.parse_return_type();
 
         let end_pos = self.token_end();
 
@@ -6042,6 +6051,42 @@ impl ThinParserState {
             end_pos,
             crate::parser::thin_node::FunctionTypeData {
                 type_parameters: Some(type_parameters),
+                parameters,
+                type_annotation,
+            },
+        )
+    }
+
+    /// Parse constructor type: new () => T or new <T>() => T
+    fn parse_constructor_type(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::NewKeyword);
+
+        // Parse optional type parameters: new <T>() => T
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        // Parse parameters: new (x: T, y: U) => ...
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_type_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        // Parse => and return type
+        self.parse_expected(SyntaxKind::EqualsGreaterThanToken);
+        let type_annotation = self.parse_return_type();
+
+        let end_pos = self.token_end();
+
+        // Use ConstructorType kind - reuse FunctionTypeData since structure is the same
+        self.arena.add_function_type(
+            syntax_kind_ext::CONSTRUCTOR_TYPE,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::FunctionTypeData {
+                type_parameters,
                 parameters,
                 type_annotation,
             },
@@ -7642,6 +7687,71 @@ mod tests {
         let mut parser = ThinParserState::new(
             "test.ts".to_string(),
             "const first = <T>(arr: T[]) => arr[0];".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_arrow_function_with_return_type() {
+        // Arrow function with return type annotation
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "const add = (a: number, b: number): number => a + b;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_arrow_type_predicate() {
+        // Arrow function with type predicate return type
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "const isString = (x: unknown): x is string => typeof x === \"string\";".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_constructor_type() {
+        // Constructor type: new () => T
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "type Ctor = new () => object;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_constructor_type_with_params() {
+        // Constructor type with parameters: new (x: T) => U
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "type Factory<T> = new (value: T) => Wrapper<T>;".to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        assert!(!root.is_none());
+        assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+    }
+
+    #[test]
+    fn test_thin_parser_generic_constructor_type() {
+        // Generic constructor type: new <T>() => T
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "type GenericCtor = new <T>() => T;".to_string(),
         );
         let root = parser.parse_source_file();
 
