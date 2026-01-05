@@ -55,6 +55,26 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 - ⬜ Performance benchmarks vs tsc and tsc-go
 - ⬜ Memory usage optimization
 
+
+# Phase 10: Prepare for Release ⬜
+
+## Strategy
+- **Track upstream**: Mirror TypeScript releases (5.x → 6.x)
+- **Language features**: 100% compatible—no less, no more
+- **API/CLI**: Match tsc behavior; extra flags allowed (e.g., `--wasm-threads`)
+
+## TODOs
+- ⬜ Upstream sync workflow (track `microsoft/TypeScript` releases)
+- ⬜ Compatibility test suite (run against TS test baselines on each release)
+- ⬜ Version alignment (match TS version numbers, e.g., `5.7.0-rust`)
+- ⬜ CLI parity audit (`tsc --help` flags, exit codes, output format)
+- ⬜ API compatibility layer (programmatic API matches `typescript` npm)
+- ⬜ Packaging for npm (`@aspect/tsc-rust` or similar)
+- ⬜ Packaging for cargo (`tsc-rust` crate)
+- ⬜ Pre-built WASM binaries for major platforms
+- ⬜ CI/CD release pipeline (GitHub Actions)
+- ⬜ Documentation (migration guide, API docs, README)
+- ⬜ Branding & naming
 ---
 
 # Quick Reference
