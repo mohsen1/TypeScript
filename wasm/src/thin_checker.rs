@@ -499,8 +499,20 @@ impl<'a> ThinCheckerState<'a> {
             // Global objects that are always available
             "console" | "Math" | "JSON" | "Object" | "Array" | "String"
             | "Number" | "Boolean" | "Date" | "RegExp" | "Error" | "Promise"
-            | "Map" | "Set" | "WeakMap" | "WeakSet" | "Symbol" | "Proxy"
-            | "Reflect" | "globalThis" | "window" | "document" => TypeId::ANY,
+            | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Symbol" | "Proxy"
+            | "Reflect" | "globalThis" | "window" | "document"
+            | "FinalizationRegistry" | "BigInt" | "ArrayBuffer" | "SharedArrayBuffer"
+            | "DataView" | "Int8Array" | "Uint8Array" | "Uint8ClampedArray"
+            | "Int16Array" | "Uint16Array" | "Int32Array" | "Uint32Array"
+            | "Float32Array" | "Float64Array" | "BigInt64Array" | "BigUint64Array"
+            | "Intl" | "Atomics" | "WebAssembly" | "Iterator" | "AsyncIterator"
+            | "Generator" | "AsyncGenerator" | "URL" | "URLSearchParams"
+            | "Headers" | "Request" | "Response" | "FormData" | "Blob" | "File"
+            | "ReadableStream" | "WritableStream" | "TransformStream"
+            | "TextEncoder" | "TextDecoder" | "AbortController" | "AbortSignal"
+            | "fetch" | "setTimeout" | "setInterval" | "clearTimeout" | "clearInterval"
+            | "queueMicrotask" | "structuredClone" | "atob" | "btoa"
+            | "performance" | "crypto" | "navigator" | "location" | "history" => TypeId::ANY,
             _ => {
                 // Report "cannot find name" error
                 self.error_cannot_find_name_at(name, idx);
