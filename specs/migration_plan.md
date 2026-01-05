@@ -25,7 +25,7 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 | Binder (ThinBinder) | ~2,900 | ✅ |
 | Type Checker + Solver | ~29,300 | ✅ 99% |
 
-**Total**: ~76,500 Rust LOC | 1012 tests passing
+**Total**: ~77,000 Rust LOC | 1027 tests passing
 
 ## Solver (specs/SOLVER.md) ✅
 Complete implementation in `wasm/src/solver/`:
@@ -87,13 +87,13 @@ Our emitter produces modern ES6+ output. ES5 transforms planned for Phase 6.3.
 - ✅ Strip type annotations from functions, variables, parameters
 - ✅ Strip `private`/`protected`/`readonly` modifiers
 
-### Phase 6.3: ES5 Transforms 🔄 (~10 days)
+### Phase 6.3: ES5 Transforms ✅
 | Transform | Effort | Status |
 |-----------|--------|--------|
 | Class → IIFE | 4 days | ✅ `transforms/class_es5.rs` |
 | Arrow → function | 1 day | ✅ `transforms/arrow_es5.rs` |
-| Generators | 4 days | ⬜ state machines |
-| Async/await | 2 days | ⬜ |
+| Generators | 4 days | ✅ `transforms/generator_emitter.rs` |
+| Async/await | 2 days | ✅ `transforms/async_emitter.rs` |
 
 ### Phase 6.4: Output Format ✅ (~5 days)
 | Feature | Effort | Status |
@@ -117,7 +117,8 @@ Our emitter produces modern ES6+ output. ES5 transforms planned for Phase 6.3.
 | Transforms | `wasm/src/transforms/` |
 | Class ES5 transform | `wasm/src/transforms/class_es5.rs` |
 | Arrow ES5 transform | `wasm/src/transforms/arrow_es5.rs` |
-| Generator transforms | `wasm/src/transforms/async_gen.rs` |
+| Generator emitter | `wasm/src/transforms/generator_emitter.rs` |
+| Async emitter | `wasm/src/transforms/async_emitter.rs` |
 
 ---
 
