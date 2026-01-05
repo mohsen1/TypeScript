@@ -3653,9 +3653,31 @@ impl ThinParserState {
     // Parse Methods - Expressions
     // =========================================================================
 
-    /// Parse an expression
+    /// Parse an expression (including comma operator)
     pub fn parse_expression(&mut self) -> NodeIndex {
-        self.parse_assignment_expression()
+        let start_pos = self.token_pos();
+        let mut left = self.parse_assignment_expression();
+
+        // Handle comma operator: expr, expr, expr
+        // Comma expressions create a sequence, returning the last value
+        while self.is_token(SyntaxKind::CommaToken) {
+            self.next_token(); // consume comma
+            let right = self.parse_assignment_expression();
+            let end_pos = self.token_end();
+
+            left = self.arena.add_binary_expr(
+                syntax_kind_ext::BINARY_EXPRESSION,
+                start_pos,
+                end_pos,
+                BinaryExprData {
+                    left,
+                    operator_token: SyntaxKind::CommaToken as u16,
+                    right,
+                },
+            );
+        }
+
+        left
     }
 
     /// Parse assignment expression
@@ -4263,6 +4285,53 @@ impl ThinParserState {
                             template,
                         },
                     );
+                }
+                // Type arguments followed by call: expr<T>() or expr<T, U>()
+                SyntaxKind::LessThanToken => {
+                    // Try to parse as type arguments for a call expression
+                    // This is tricky because < could be comparison operator
+                    if let Some(type_args) = self.try_parse_type_arguments_for_call() {
+                        // After type arguments, we expect ( for a call or ` for tagged template
+                        if self.is_token(SyntaxKind::OpenParenToken) {
+                            self.next_token();
+                            let arguments = self.parse_argument_list();
+                            self.parse_expected(SyntaxKind::CloseParenToken);
+                            let end_pos = self.token_end();
+
+                            expr = self.arena.add_call_expr(
+                                syntax_kind_ext::CALL_EXPRESSION,
+                                start_pos,
+                                end_pos,
+                                CallExprData {
+                                    expression: expr,
+                                    type_arguments: Some(type_args),
+                                    arguments: Some(arguments),
+                                },
+                            );
+                        } else if self.is_token(SyntaxKind::NoSubstitutionTemplateLiteral)
+                            || self.is_token(SyntaxKind::TemplateHead)
+                        {
+                            // Tagged template with type arguments: tag<T>`template`
+                            let template = self.parse_template_literal();
+                            let end_pos = self.token_end();
+
+                            expr = self.arena.add_tagged_template(
+                                syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION,
+                                start_pos,
+                                end_pos,
+                                TaggedTemplateData {
+                                    tag: expr,
+                                    type_arguments: Some(type_args),
+                                    template,
+                                },
+                            );
+                        } else {
+                            // Not a call - leave type args attached (expression with type args)
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
                 }
                 _ => break,
             }
@@ -6113,6 +6182,72 @@ impl ThinParserState {
 
         self.parse_expected_greater_than();
         self.make_node_list(args)
+    }
+
+    /// Try to parse type arguments for a call expression: foo<T>()
+    /// Returns Some(NodeList) if successful, None if this is not type arguments.
+    /// Uses look-ahead to distinguish from comparison operators.
+    fn try_parse_type_arguments_for_call(&mut self) -> Option<NodeList> {
+        // Save state for potential rollback
+        let snapshot = self.scanner.save_state();
+        let saved_token = self.current_token;
+        let saved_arena_len = self.arena.nodes.len();
+
+        // Consume <
+        self.next_token();
+
+        let mut args = Vec::new();
+        let mut depth = 1;
+
+        // Parse type arguments
+        while depth > 0 && !self.is_token(SyntaxKind::EndOfFileToken) {
+            // Try to parse a type
+            if args.is_empty() || self.is_token(SyntaxKind::CommaToken) {
+                if !args.is_empty() {
+                    self.next_token(); // consume comma
+                }
+
+                // Check for nested < (generic types within type arguments)
+                let type_node = self.parse_type();
+                args.push(type_node);
+            }
+
+            if self.is_greater_than_or_compound() {
+                depth -= 1;
+            } else if self.is_token(SyntaxKind::CommaToken) {
+                // Continue to next type argument
+                continue;
+            } else if self.is_token(SyntaxKind::SemicolonToken)
+                || self.is_token(SyntaxKind::CloseBraceToken)
+                || self.is_token(SyntaxKind::EndOfFileToken)
+            {
+                // Invalid - not type arguments
+                break;
+            } else {
+                // Something unexpected - might not be type arguments
+                break;
+            }
+        }
+
+        if depth == 0 {
+            // Successfully parsed type arguments, now consume >
+            self.parse_expected_greater_than();
+
+            // Check if followed by ( or ` (which indicates a call/tagged template)
+            if self.is_token(SyntaxKind::OpenParenToken)
+                || self.is_token(SyntaxKind::NoSubstitutionTemplateLiteral)
+                || self.is_token(SyntaxKind::TemplateHead)
+            {
+                return Some(self.make_node_list(args));
+            }
+        }
+
+        // Not type arguments - restore state
+        self.scanner.restore_state(snapshot);
+        self.current_token = saved_token;
+        // Truncate arena to remove any nodes we added
+        self.arena.nodes.truncate(saved_arena_len);
+        None
     }
 
     /// Parse array type suffix (T[]) or indexed access type (T[K])
