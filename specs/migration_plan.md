@@ -58,7 +58,7 @@ Complete implementation in `wasm/src/solver/`:
 ### Baseline Comparison (First 100 tests)
 | Baseline | Pass Rate | Blockers |
 |----------|-----------|----------|
-| .errors.txt | **45.5%** (35/77) | Missing parser errors, error elaboration |
+| .errors.txt | **48.1%** (37/77) | Missing parser errors, error elaboration |
 | .js emit | 0% | Emitter format mismatch |
 
 ### Completed
@@ -67,6 +67,7 @@ Complete implementation in `wasm/src/solver/`:
 - ✅ Parser semantic errors (1068, 1440) for class members
 - ✅ Parameter property validation (2369)
 - ✅ Declare class parsing (skip impl checks for ambient)
+- ✅ Numeric method name support (0(), 1(), etc.)
 
 ### Next Steps
 1. ⬜ Parser semantic errors (1128, additional coverage)
