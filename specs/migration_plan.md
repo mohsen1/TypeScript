@@ -435,13 +435,16 @@ The work in `solver/diagnostics.rs` and its integration into `thin_checker.rs` i
    - ThinChecker uses solver's SubtypeChecker ✅
    - `check_source_file()` traversal ✅
    - Variable declaration type checking ✅
-3. 🟡 Generate diagnostics matching TypeScript baselines
+3. ✅ Generate diagnostics matching TypeScript baselines
    - Basic type mismatch diagnostics working ✅ (error 2322)
    - Function call argument checking working ✅ (errors 2345, 2554)
    - Return type checking working ✅ (error 2322)
    - Class member type checking ✅ (property, method, constructor, accessor)
-   - **NEXT**: Method call type checking, more expression types
-4. ⬜ Compare output: `.errors.txt`, `.types`, `.js` files
+   - Method call type checking ✅ (via CallEvaluator, Session 33)
+   - Property access type checking ✅ (via PropertyAccessEvaluator, Session 33)
+   - Binary operations type checking ✅ (via BinaryOpEvaluator, Session 33)
+   - Solver operations fully integrated ✅
+4. 🎯 Compare output: `.errors.txt`, `.types`, `.js` files (NEXT STEP)
 
 ### ThinChecker Type Checking Status
 
