@@ -465,3 +465,29 @@ fn test_abstract_class_in_local_scope_2511() {
     assert_eq!(count_2304, 0,
         "Should NOT have 'Cannot find name' error (2304) for classes in local scope, got {} from: {:?}", count_2304, codes);
 }
+
+#[test]
+fn test_interface_name_cannot_be_reserved_2427() {
+    // Error 2427: Interface name cannot be 'string' (or other primitive types)
+    use crate::thin_parser::ThinParserState;
+    let source = r#"interface string {}"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Debug: show all diagnostics
+    eprintln!("=== Diagnostics for 'interface string {{}}' ===");
+    for d in &checker.diagnostics {
+        eprintln!("  code={}, msg={}", d.code, d.message_text);
+    }
+
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2427),
+        "Expected error 2427 (Interface name cannot be 'string'), got: {:?}", codes);
+}

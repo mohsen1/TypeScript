@@ -151,6 +151,7 @@ pub mod diagnostic_codes {
     pub const OVERRIDE_MEMBER_REQUIRED: u32 = 4113;  // This member must have an 'override' modifier because it overrides a member in the base class
 
     // Interface/type errors
+    pub const INTERFACE_NAME_CANNOT_BE: u32 = 2427;  // Interface name cannot be '{0}'.
     pub const INTERFACE_CAN_ONLY_EXTEND_INTERFACE: u32 = 2422;
     pub const TYPE_ALIAS_CIRCULARLY_REFERENCES_ITSELF: u32 = 2456;
     pub const INTERFACE_DECLARES_CONFLICTING_MEMBER: u32 = 2320;

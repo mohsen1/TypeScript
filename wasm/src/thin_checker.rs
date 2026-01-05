@@ -2191,6 +2191,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check an interface declaration.
     fn check_interface_declaration(&mut self, stmt_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
         let Some(node) = self.arena.get(stmt_idx) else {
             return;
         };
@@ -2198,6 +2200,25 @@ impl<'a> ThinCheckerState<'a> {
         let Some(iface) = self.arena.get_interface(node) else {
             return;
         };
+
+        // Check for reserved interface names (error 2427)
+        if !iface.name.is_none() {
+            if let Some(name_node) = self.arena.get(iface.name) {
+                if let Some(ident) = self.arena.get_identifier(name_node) {
+                    // Reserved type names that can't be used as interface names
+                    match ident.escaped_text.as_str() {
+                        "string" | "number" | "boolean" | "symbol" | "void" | "object" => {
+                            self.error_at_node(
+                                iface.name,
+                                &format!("Interface name cannot be '{}'.", ident.escaped_text),
+                                diagnostic_codes::INTERFACE_NAME_CANNOT_BE,
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
 
         // Push a scope for type parameters
         self.push_local_scope();
