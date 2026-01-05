@@ -102,11 +102,25 @@ Our emitter produces modern ES6+ output. ES5 transforms planned for Phase 6.3.
 | .d.ts emit | 2 days | ✅ `declaration_emitter.rs` |
 | Formatting | 1 day | ✅ basic indentation |
 
-### Phase 6.5: Baseline Validation ⬜ (~3 days)
-| Baseline | Current | Target |
-|----------|---------|--------|
-| .js emit | 0% | 80%+ |
-| .d.ts emit | 0% | 80%+ |
+### Phase 6.5: Baseline Validation 🔄 (~ongoing)
+| Baseline | Current | Target | Notes |
+|----------|---------|--------|-------|
+| .js emit | **9.8%** (86/875) | 80%+ | ES5 class/arrow transforms working |
+| .d.ts emit | 0% | 80%+ | Framework ready |
+
+**Recent ES5 Improvements:**
+- Classes → IIFE with `/** @class */` comment
+- Methods → prototype assignments
+- Arrow functions → regular function expressions
+- Computed property names (numeric/string literals)
+- Empty body blocks on single line: `{ }`
+- Single-return function bodies on single line
+
+**Remaining Blockers (for 100%):**
+- Namespace/module → IIFE transforms
+- CommonJS exports (module.exports, exports.X)
+- `const` modifier on class properties (parse tolerance)
+- Parse errors (124+ tests skipped)
 
 ### Key Files
 | Purpose | Location |
