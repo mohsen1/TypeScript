@@ -68,19 +68,20 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 
 ---
 
-# 🎯 CURRENT FOCUS: Solver Integration & Phase 8
+# 🎯 CURRENT FOCUS: Phase 8 Complete - Production Ready
 
-**Phase 7.5 Status**: ✅ COMPLETE - Solver fully implemented (all 6 priorities done)
+**Phase 7.5 Status**: ✅ COMPLETE - Solver fully implemented and integrated
 
-**Current Goal**: Integrate solver operations into ThinChecker to achieve performance wins.
+**Integration Status**: ✅ COMPLETE - ThinChecker now uses solver operations
 
 **What's Built**:
 - Mathematically correct, high-performance type system based on **Semantic Subtyping**
-- Lazy diagnostics infrastructure (zero waste)
-- Pure solver operations (clean separation of concerns)
+- Lazy diagnostics infrastructure (zero waste in tentative checks)
+- Pure solver operations with clean separation of concerns
+- Full ThinChecker integration (CallEvaluator, PropertyAccessEvaluator, BinaryOpEvaluator)
 - See `specs/SOLVER.md` for theoretical foundations
 
-**Next Task**: Refactor ThinChecker expression checking to use solver operations (CallEvaluator, PropertyAccessEvaluator, etc.) instead of inline logic.
+**Next Phase**: Phase 6 (Emitter) and Phase 7 (Language Service) enhancements.
 
 ## Architecture Overview
 
@@ -160,6 +161,12 @@ Result: TypeId (O(1) equality via interning)
    - `PropertyAccessEvaluator` - property access on all type shapes
    - `BinaryOpEvaluator` - binary operations (+, -, &&, ||, etc.)
    - Structured results (no side effects, unit testable)
+
+7. **ThinChecker Integration** (Complete)
+   - Expression checking fully delegated to solver operations
+   - Clean separation: ThinChecker = WHERE (orchestration), Solver = WHAT (type logic)
+   - Reduced code size: -66 lines (removed redundant helpers)
+   - All 1006 tests passing
 
 ---
 
@@ -289,10 +296,11 @@ These are TypeScript's "type-level functions" (see §4 of SOLVER.md).
    └─ Pure type logic: CallEvaluator, PropertyAccessEvaluator, BinaryOpEvaluator
    └─ Structured results with no side effects
 
-🎯 8. Integration with ThinChecker (NEXT)
-   └─ Refactor expression checking to use solver operations
-   └─ Replace inline logic with CallEvaluator/PropertyAccessEvaluator
-   └─ Use PendingDiagnostic throughout
+✅ 8. Integration with ThinChecker (COMPLETE - Session 33)
+   └─ Refactored call expressions to use CallEvaluator
+   └─ Refactored property access to use PropertyAccessEvaluator
+   └─ Refactored binary operations to use BinaryOpEvaluator
+   └─ Removed redundant helper methods (get_property_of_type, get_string_property)
 ```
 
 ---
@@ -556,7 +564,29 @@ node scripts/ask-gemini.mjs --review
 - All functions: TypeId in → Structured results out (no AST, no formatting, no side effects)
 - Added 7 new operation tests (all passing)
 - 1006 total tests passing
-- **Next**: Refactor ThinChecker to use solver operations instead of inline logic
+
+- **ThinChecker Integration Complete** (Solver Operations)
+- Problem: ThinChecker had inline type logic that should be in Solver
+- Refactored `get_type_of_call_expression()`:
+  - Now uses `CallEvaluator::resolve_call()` instead of inline checks
+  - Pattern match on `CallResult` enum for structured error handling
+  - Improved error reporting at specific argument positions
+- Refactored `get_type_of_property_access()`:
+  - Now uses `PropertyAccessEvaluator::resolve_property_access()`
+  - Pattern match on `PropertyAccessResult` enum
+  - Cleaner handling of null/undefined and unknown types
+- Refactored `get_type_of_binary_expression()`:
+  - Now uses `BinaryOpEvaluator::evaluate()`
+  - Proper operator string mapping (&&, ||, +, -, etc.)
+  - Pattern match on `BinaryOpResult` enum
+- Removed redundant helper methods:
+  - `get_property_of_type()` (80 lines) - logic now in PropertyAccessEvaluator
+  - `get_string_property()` (13 lines) - logic now in PropertyAccessEvaluator
+- Impact:
+  - Reduced ThinChecker by 66 lines (cleanup)
+  - Complete separation: Checker = WHERE, Solver = WHAT
+  - All 1006 tests passing
+- **Phase 7.5 COMPLETE! Solver fully implemented and integrated.**
 
 ## 2026-01-05: Session 29
 - **Ref Resolution Complete**
