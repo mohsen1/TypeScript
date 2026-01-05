@@ -2019,6 +2019,7 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     /// Get the name of a method declaration.
+    /// Handles both identifier names and numeric literal names.
     fn get_method_name_from_node(&self, member_idx: NodeIndex) -> Option<String> {
         let Some(node) = self.arena.get(member_idx) else {
             return None;
@@ -2028,8 +2029,13 @@ impl<'a> ThinCheckerState<'a> {
             let Some(name_node) = self.arena.get(method.name) else {
                 return None;
             };
+            // Try identifier first
             if let Some(id) = self.arena.get_identifier(name_node) {
                 return Some(id.escaped_text.clone());
+            }
+            // Try numeric literal (for methods like 0(), 1(), etc.)
+            if let Some(lit) = self.arena.get_literal(name_node) {
+                return Some(lit.text.clone());
             }
         }
         None
