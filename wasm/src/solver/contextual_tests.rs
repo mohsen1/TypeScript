@@ -1,0 +1,276 @@
+use super::*;
+use std::sync::Arc;
+
+#[test]
+fn test_contextual_no_context() {
+    let interner = TypeInterner::new();
+    let ctx = ContextualTypeContext::new(&interner);
+
+    assert!(!ctx.has_context());
+    assert!(ctx.expected().is_none());
+}
+
+#[test]
+fn test_contextual_with_expected() {
+    let interner = TypeInterner::new();
+    let ctx = ContextualTypeContext::with_expected(&interner, TypeId::STRING);
+
+    assert!(ctx.has_context());
+    assert_eq!(ctx.expected(), Some(TypeId::STRING));
+}
+
+// =============================================================================
+// Function Parameter Contextual Typing
+// =============================================================================
+
+#[test]
+fn test_contextual_function_parameter() {
+    let interner = TypeInterner::new();
+
+    // type Handler = (e: string, i: number) => void
+    let handler = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(Arc::from("e")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(Arc::from("i")), type_id: TypeId::NUMBER, optional: false, rest: false },
+        ],
+        return_type: TypeId::VOID,
+        is_constructor: false,
+    });
+
+    let ctx = ContextualTypeContext::with_expected(&interner, handler);
+
+    // First parameter should be string
+    assert_eq!(ctx.get_parameter_type(0), Some(TypeId::STRING));
+    // Second parameter should be number
+    assert_eq!(ctx.get_parameter_type(1), Some(TypeId::NUMBER));
+    // Third parameter doesn't exist
+    assert_eq!(ctx.get_parameter_type(2), None);
+}
+
+#[test]
+fn test_contextual_function_return() {
+    let interner = TypeInterner::new();
+
+    // type Fn = () => string
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        return_type: TypeId::STRING,
+        is_constructor: false,
+    });
+
+    let ctx = ContextualTypeContext::with_expected(&interner, fn_type);
+
+    assert_eq!(ctx.get_return_type(), Some(TypeId::STRING));
+}
+
+#[test]
+fn test_contextual_function_rest_parameter() {
+    let interner = TypeInterner::new();
+
+    // type Fn = (...args: number[]) => void
+    let number_array = interner.array(TypeId::NUMBER);
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(Arc::from("args")), type_id: number_array, optional: false, rest: true },
+        ],
+        return_type: TypeId::VOID,
+        is_constructor: false,
+    });
+
+    let ctx = ContextualTypeContext::with_expected(&interner, fn_type);
+
+    // Any index should get number (from rest parameter)
+    assert_eq!(ctx.get_parameter_type(0), Some(TypeId::NUMBER));
+    assert_eq!(ctx.get_parameter_type(5), Some(TypeId::NUMBER));
+}
+
+// =============================================================================
+// Array Contextual Typing
+// =============================================================================
+
+#[test]
+fn test_contextual_array_element() {
+    let interner = TypeInterner::new();
+
+    // number[]
+    let number_array = interner.array(TypeId::NUMBER);
+    let ctx = ContextualTypeContext::with_expected(&interner, number_array);
+
+    assert_eq!(ctx.get_array_element_type(), Some(TypeId::NUMBER));
+}
+
+#[test]
+fn test_contextual_tuple_element() {
+    let interner = TypeInterner::new();
+
+    // [string, number, boolean]
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    let ctx = ContextualTypeContext::with_expected(&interner, tuple);
+
+    assert_eq!(ctx.get_tuple_element_type(0), Some(TypeId::STRING));
+    assert_eq!(ctx.get_tuple_element_type(1), Some(TypeId::NUMBER));
+    assert_eq!(ctx.get_tuple_element_type(2), Some(TypeId::BOOLEAN));
+    assert_eq!(ctx.get_tuple_element_type(3), None);
+}
+
+// =============================================================================
+// Object Contextual Typing
+// =============================================================================
+
+#[test]
+fn test_contextual_property() {
+    let interner = TypeInterner::new();
+
+    // { x: number, y: string }
+    let obj = interner.object(vec![
+        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: Arc::from("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+    ]);
+
+    let ctx = ContextualTypeContext::with_expected(&interner, obj);
+
+    assert_eq!(ctx.get_property_type("x"), Some(TypeId::NUMBER));
+    assert_eq!(ctx.get_property_type("y"), Some(TypeId::STRING));
+    assert_eq!(ctx.get_property_type("z"), None);
+}
+
+// =============================================================================
+// Nested Context
+// =============================================================================
+
+#[test]
+fn test_contextual_nested_property() {
+    let interner = TypeInterner::new();
+
+    // { nested: { value: number } }
+    let inner = interner.object(vec![
+        PropertyInfo { name: Arc::from("value"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+    ]);
+    let outer = interner.object(vec![
+        PropertyInfo { name: Arc::from("nested"), type_id: inner, optional: false, readonly: false },
+    ]);
+
+    let ctx = ContextualTypeContext::with_expected(&interner, outer);
+
+    // Get child context for "nested"
+    let nested_ctx = ctx.for_property("nested");
+    assert!(nested_ctx.has_context());
+    assert_eq!(nested_ctx.get_property_type("value"), Some(TypeId::NUMBER));
+}
+
+#[test]
+fn test_contextual_for_array_element() {
+    let interner = TypeInterner::new();
+
+    // number[]
+    let number_array = interner.array(TypeId::NUMBER);
+    let ctx = ContextualTypeContext::with_expected(&interner, number_array);
+
+    let elem_ctx = ctx.for_array_element();
+    assert!(elem_ctx.has_context());
+    assert_eq!(elem_ctx.expected(), Some(TypeId::NUMBER));
+}
+
+#[test]
+fn test_contextual_for_parameter() {
+    let interner = TypeInterner::new();
+
+    // (x: string) => void
+    let fn_type = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(Arc::from("x")), type_id: TypeId::STRING, optional: false, rest: false },
+        ],
+        return_type: TypeId::VOID,
+        is_constructor: false,
+    });
+
+    let ctx = ContextualTypeContext::with_expected(&interner, fn_type);
+
+    let param_ctx = ctx.for_parameter(0);
+    assert!(param_ctx.has_context());
+    assert_eq!(param_ctx.expected(), Some(TypeId::STRING));
+}
+
+// =============================================================================
+// Apply Contextual Type
+// =============================================================================
+
+#[test]
+fn test_apply_contextual_no_context() {
+    let interner = TypeInterner::new();
+
+    // No context - returns expression type
+    let result = apply_contextual_type(&interner, TypeId::STRING, None);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_apply_contextual_any_uses_context() {
+    let interner = TypeInterner::new();
+
+    // Expression type is any - use contextual type
+    let result = apply_contextual_type(&interner, TypeId::ANY, Some(TypeId::STRING));
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_apply_contextual_unknown_uses_context() {
+    let interner = TypeInterner::new();
+
+    // Expression type is unknown - use contextual type
+    let result = apply_contextual_type(&interner, TypeId::UNKNOWN, Some(TypeId::NUMBER));
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_apply_contextual_same_type() {
+    let interner = TypeInterner::new();
+
+    // Same type - returns it
+    let result = apply_contextual_type(&interner, TypeId::STRING, Some(TypeId::STRING));
+    assert_eq!(result, TypeId::STRING);
+}
+
+// =============================================================================
+// Union Contextual Types
+// =============================================================================
+
+#[test]
+fn test_contextual_union_function() {
+    let interner = TypeInterner::new();
+
+    // ((x: string) => void) | ((x: number) => void)
+    let fn1 = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(Arc::from("x")), type_id: TypeId::STRING, optional: false, rest: false },
+        ],
+        return_type: TypeId::VOID,
+        is_constructor: false,
+    });
+    let fn2 = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(Arc::from("x")), type_id: TypeId::NUMBER, optional: false, rest: false },
+        ],
+        return_type: TypeId::VOID,
+        is_constructor: false,
+    });
+    let union = interner.union(vec![fn1, fn2]);
+
+    let ctx = ContextualTypeContext::with_expected(&interner, union);
+
+    // Parameter type should be string | number
+    let param_type = ctx.get_parameter_type(0).unwrap();
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(param_type, expected);
+}
