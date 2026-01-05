@@ -1815,6 +1815,17 @@ impl<'a> ThinCheckerState<'a> {
             return;
         };
 
+        // Get the variable name for adding to local scope
+        let var_name = if let Some(name_node) = self.arena.get(var_decl.name) {
+            if let Some(ident) = self.arena.get_identifier(name_node) {
+                Some(ident.escaped_text.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         // Get declared type from type annotation
         let declared_type = if !var_decl.type_annotation.is_none() {
             self.get_type_from_type_node(var_decl.type_annotation)
@@ -1822,8 +1833,8 @@ impl<'a> ThinCheckerState<'a> {
             TypeId::ANY
         };
 
-        // Get inferred type from initializer
-        if !var_decl.initializer.is_none() {
+        // Determine final type (declared or inferred from initializer)
+        let final_type = if !var_decl.initializer.is_none() {
             let init_type = self.get_type_of_node(var_decl.initializer);
 
             // If there's a type annotation, check that initializer is assignable
@@ -1839,7 +1850,18 @@ impl<'a> ThinCheckerState<'a> {
                         self.check_object_literal_assignment(init_type, declared_type, var_decl.initializer);
                     }
                 }
+                declared_type
+            } else {
+                // No type annotation - use inferred type from initializer
+                init_type
             }
+        } else {
+            declared_type
+        };
+
+        // Add variable to local scope (if we're inside a function/method)
+        if let Some(name) = var_name {
+            self.add_local(name, final_type);
         }
     }
 
