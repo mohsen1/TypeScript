@@ -25,7 +25,7 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 | Binder (ThinBinder) | ~2,900 | ✅ |
 | Type Checker + Solver | ~29,300 | ✅ 99% |
 
-**Total**: ~74,350 Rust LOC | 1006 tests passing
+**Total**: ~74,350 Rust LOC | 1009 tests passing
 
 ## Solver (specs/SOLVER.md) ✅
 Complete implementation in `wasm/src/solver/`:
@@ -58,14 +58,18 @@ Complete implementation in `wasm/src/solver/`:
 ### Baseline Comparison (First 100 tests)
 | Baseline | Pass Rate | Blockers |
 |----------|-----------|----------|
-| .errors.txt | **32.5%** (25/77) | Missing function validation, parser errors |
+| .errors.txt | **37.7%** (29/77) | Missing parser errors, parameter validation |
 | .js emit | 0% | Emitter format mismatch |
 
+### Completed
+- ✅ Class/function overload validation (2389, 2390, 2391)
+- ✅ Parser error code infrastructure
+
 ### Next Steps
-1. ⬜ Function validation errors (2389-2391) for top-level declarations
-2. ⬜ Parser semantic errors (1068, 1128, 1440)
-3. ⬜ Error elaboration ("...because property 'x' has type...")
-4. ⬜ RelatedInformation (point to definition sites)
+1. ⬜ Parser semantic errors (1068, 1128, 1440)
+2. ⬜ Error elaboration ("...because property 'x' has type...")
+3. ⬜ RelatedInformation (point to definition sites)
+4. ⬜ Parameter type validation (2369)
 
 ---
 
