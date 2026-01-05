@@ -51,6 +51,7 @@ pub mod symbol_flags {
     pub const PRIVATE: u32 = 1 << 28;                   // Private member
     pub const PROTECTED: u32 = 1 << 29;                 // Protected member
     pub const ABSTRACT: u32 = 1 << 30;                  // Abstract member
+    pub const STATIC: u32 = 1 << 31;                    // Static member
 
     // Composite flags
     pub const ENUM: u32 = REGULAR_ENUM | CONST_ENUM;
@@ -1022,7 +1023,7 @@ impl BinderState {
         }
     }
 
-    /// Get modifier flags (PRIVATE, PROTECTED, ABSTRACT) from modifier list.
+    /// Get modifier flags (PRIVATE, PROTECTED, ABSTRACT, STATIC) from modifier list.
     fn get_modifier_flags(&self, arena: &NodeArena, modifiers: &Option<crate::parser::NodeList>) -> u32 {
         let mut flags = 0u32;
         if let Some(mods) = modifiers {
@@ -1034,6 +1035,8 @@ impl BinderState {
                         flags |= symbol_flags::PROTECTED;
                     } else if base.kind == SyntaxKind::AbstractKeyword as u16 {
                         flags |= symbol_flags::ABSTRACT;
+                    } else if base.kind == SyntaxKind::StaticKeyword as u16 {
+                        flags |= symbol_flags::STATIC;
                     }
                 }
             }

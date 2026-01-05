@@ -436,6 +436,22 @@ impl ThinBinderState {
         false
     }
 
+    /// Check if modifiers list contains the 'static' keyword.
+    fn has_static_modifier(&self, arena: &ThinNodeArena, modifiers: &Option<NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::StaticKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
     // Scope management
 
     fn enter_scope(&mut self, kind: ContainerKind, node: NodeIndex) {
@@ -603,7 +619,14 @@ impl ThinBinderState {
                 k if k == syntax_kind_ext::METHOD_DECLARATION => {
                     if let Some(method) = arena.get_method_decl(node) {
                         if let Some(name) = self.get_identifier_name(arena, method.name) {
-                            let sym_id = self.symbols.alloc(symbol_flags::METHOD, name.to_string());
+                            let mut flags = symbol_flags::METHOD;
+                            if self.has_abstract_modifier(arena, &method.modifiers) {
+                                flags |= symbol_flags::ABSTRACT;
+                            }
+                            if self.has_static_modifier(arena, &method.modifiers) {
+                                flags |= symbol_flags::STATIC;
+                            }
+                            let sym_id = self.symbols.alloc(flags, name.to_string());
                             self.current_scope.set(name.to_string(), sym_id);
                             self.node_symbols.insert(idx.0, sym_id);
                         }
@@ -612,7 +635,14 @@ impl ThinBinderState {
                 k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
                     if let Some(prop) = arena.get_property_decl(node) {
                         if let Some(name) = self.get_identifier_name(arena, prop.name) {
-                            let sym_id = self.symbols.alloc(symbol_flags::PROPERTY, name.to_string());
+                            let mut flags = symbol_flags::PROPERTY;
+                            if self.has_abstract_modifier(arena, &prop.modifiers) {
+                                flags |= symbol_flags::ABSTRACT;
+                            }
+                            if self.has_static_modifier(arena, &prop.modifiers) {
+                                flags |= symbol_flags::STATIC;
+                            }
+                            let sym_id = self.symbols.alloc(flags, name.to_string());
                             self.current_scope.set(name.to_string(), sym_id);
                             self.node_symbols.insert(idx.0, sym_id);
                         }

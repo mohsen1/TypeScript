@@ -105,17 +105,13 @@ pub struct ThinCheckerState<'a> {
 }
 
 /// Info about the enclosing class for static member suggestions and abstract property checks.
-/// TODO: Refactor to use symbol flags instead of caching string lists. The binder already
-/// tracks abstract members via symbol_flags::ABSTRACT. This would avoid O(n) string lookups
-/// and reduce allocations. See Gemini review feedback.
+/// Uses symbol flags for efficient lookups (O(1) vs O(n) string comparison).
 #[derive(Clone)]
 struct EnclosingClassInfo {
     /// Name of the class.
     name: String,
-    /// Names of static members.
-    static_members: Vec<String>,
-    /// Names of abstract properties (for error 2715).
-    abstract_properties: Vec<String>,
+    /// Member node indices for symbol lookup.
+    member_nodes: Vec<NodeIndex>,
     /// Whether we're in a constructor (for error 2715 checking).
     in_constructor: bool,
 }
@@ -590,7 +586,7 @@ impl<'a> ThinCheckerState<'a> {
                 // Check if we're inside a class and the name matches a static member (error 2662)
                 // Clone values to avoid borrow issues
                 if let Some(ref class_info) = self.enclosing_class.clone() {
-                    if class_info.static_members.contains(&name.to_string()) {
+                    if self.is_static_member(&class_info.member_nodes, name) {
                         self.error_cannot_find_name_static_member_at(
                             name,
                             &class_info.name,
@@ -947,7 +943,7 @@ impl<'a> ThinCheckerState<'a> {
 
             if self.is_this_expression(access.expression) {
                 if let Some(ref class_info) = self.enclosing_class.clone() {
-                    if class_info.in_constructor && class_info.abstract_properties.contains(property_name) {
+                    if class_info.in_constructor && self.is_abstract_member(&class_info.member_nodes, property_name) {
                         self.error_abstract_property_in_constructor(
                             property_name,
                             &class_info.name,
@@ -2330,16 +2326,12 @@ impl<'a> ThinCheckerState<'a> {
             None
         };
 
-        let static_members = self.collect_static_member_names(&class.members.nodes);
-        let abstract_properties = self.collect_abstract_property_names(&class.members.nodes);
-
         // Save previous enclosing class and set current
         let prev_enclosing_class = self.enclosing_class.take();
         if let Some(name) = class_name {
             self.enclosing_class = Some(EnclosingClassInfo {
                 name,
-                static_members,
-                abstract_properties,
+                member_nodes: class.members.nodes.clone(),
                 in_constructor: false,
             });
         }
@@ -2449,13 +2441,17 @@ impl<'a> ThinCheckerState<'a> {
         false
     }
 
-    /// Check if a node has the `static` modifier.
-    fn has_static_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
-        use crate::scanner::SyntaxKind;
-        if let Some(mods) = modifiers {
-            for &mod_idx in &mods.nodes {
-                if let Some(mod_node) = self.arena.get(mod_idx) {
-                    if mod_node.kind == SyntaxKind::StaticKeyword as u16 {
+    /// Check if a member with the given name is static by looking up its symbol flags.
+    /// Uses the binder's symbol information for efficient O(1) flag checks.
+    fn is_static_member(&self, member_nodes: &[NodeIndex], name: &str) -> bool {
+        use crate::binder::symbol_flags;
+
+        for &member_idx in member_nodes {
+            // Get symbol for this member
+            if let Some(sym_id) = self.binder.get_node_symbol(member_idx) {
+                if let Some(symbol) = self.binder.get_symbol(sym_id) {
+                    // Check if name matches and symbol has STATIC flag
+                    if symbol.escaped_name == name && (symbol.flags & symbol_flags::STATIC != 0) {
                         return true;
                     }
                 }
@@ -2464,96 +2460,26 @@ impl<'a> ThinCheckerState<'a> {
         false
     }
 
-    /// Collect names of static members in a class.
-    fn collect_static_member_names(&self, members: &[NodeIndex]) -> Vec<String> {
-        let mut static_names = Vec::new();
+    /// Check if a member with the given name is an abstract property by looking up its symbol flags.
+    /// Only checks properties (not methods) because accessing this.abstractMethod() in constructor is allowed.
+    fn is_abstract_member(&self, member_nodes: &[NodeIndex], name: &str) -> bool {
+        use crate::binder::symbol_flags;
 
-        for &member_idx in members {
-            if let Some(member_node) = self.arena.get(member_idx) {
-                // Check property declarations
-                if member_node.kind == syntax_kind_ext::PROPERTY_DECLARATION {
-                    if let Some(prop) = self.arena.get_property_decl(member_node) {
-                        if self.has_static_modifier(&prop.modifiers) {
-                            if let Some(name_node) = self.arena.get(prop.name) {
-                                if let Some(ident) = self.arena.get_identifier(name_node) {
-                                    static_names.push(ident.escaped_text.clone());
-                                }
-                            }
-                        }
-                    }
-                }
-                // Check method declarations
-                else if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
-                    if let Some(method) = self.arena.get_method_decl(member_node) {
-                        if self.has_static_modifier(&method.modifiers) {
-                            if let Some(name_node) = self.arena.get(method.name) {
-                                if let Some(ident) = self.arena.get_identifier(name_node) {
-                                    static_names.push(ident.escaped_text.clone());
-                                }
-                            }
-                        }
-                    }
-                }
-                // Check getter declarations
-                else if member_node.kind == syntax_kind_ext::GET_ACCESSOR {
-                    if let Some(getter) = self.arena.get_accessor(member_node) {
-                        if self.has_static_modifier(&getter.modifiers) {
-                            if let Some(name_node) = self.arena.get(getter.name) {
-                                if let Some(ident) = self.arena.get_identifier(name_node) {
-                                    static_names.push(ident.escaped_text.clone());
-                                }
-                            }
-                        }
-                    }
-                }
-                // Check setter declarations
-                else if member_node.kind == syntax_kind_ext::SET_ACCESSOR {
-                    if let Some(setter) = self.arena.get_accessor(member_node) {
-                        if self.has_static_modifier(&setter.modifiers) {
-                            if let Some(name_node) = self.arena.get(setter.name) {
-                                if let Some(ident) = self.arena.get_identifier(name_node) {
-                                    static_names.push(ident.escaped_text.clone());
-                                }
-                            }
-                        }
+        for &member_idx in member_nodes {
+            // Get symbol for this member
+            if let Some(sym_id) = self.binder.get_node_symbol(member_idx) {
+                if let Some(symbol) = self.binder.get_symbol(sym_id) {
+                    // Check if name matches and symbol has ABSTRACT flag (property only)
+                    if symbol.escaped_name == name
+                        && (symbol.flags & symbol_flags::ABSTRACT != 0)
+                        && (symbol.flags & symbol_flags::PROPERTY != 0)
+                    {
+                        return true;
                     }
                 }
             }
         }
-
-        static_names
-    }
-
-    /// Collect names of abstract properties/methods in a class.
-    /// (Public for testing)
-    pub fn test_collect_abstract_properties(&self, members: &[NodeIndex]) -> Vec<String> {
-        self.collect_abstract_property_names(members)
-    }
-
-    /// Collect names of abstract properties/methods in a class.
-    fn collect_abstract_property_names(&self, members: &[NodeIndex]) -> Vec<String> {
-        let mut abstract_names = Vec::new();
-
-        for &member_idx in members {
-            if let Some(member_node) = self.arena.get(member_idx) {
-                // Check property declarations
-                if member_node.kind == syntax_kind_ext::PROPERTY_DECLARATION {
-                    if let Some(prop) = self.arena.get_property_decl(member_node) {
-                        if self.has_abstract_modifier(&prop.modifiers) {
-                            if let Some(name_node) = self.arena.get(prop.name) {
-                                if let Some(ident) = self.arena.get_identifier(name_node) {
-                                    abstract_names.push(ident.escaped_text.clone());
-                                }
-                            }
-                        }
-                    }
-                }
-                // Note: Abstract methods are NOT included here because accessing
-                // this.abstractMethod() in constructor is allowed.
-            }
-        }
-
-        abstract_names
+        false
     }
 
     /// Recursively check a type node for parameter properties in function types.
