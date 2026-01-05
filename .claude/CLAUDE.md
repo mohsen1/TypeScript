@@ -91,6 +91,10 @@ node scripts/verifyChecker.mjs
 - `specs/gemini_review_*.md` - Review findings to address
 - `specs/SOLVER.md` - very important guide for solver
 
+## 🏗️ Checker-Solver Architecture
+
+**"Check Fast, Explain Slow"**: The checker (`thin_checker.rs`) traverses AST and calls solver. The solver (`wasm/src/solver/`) owns all type logic. When errors occur, use `solver.explain_failure()` to get detailed diagnostics instead of re-inspecting types in the checker.
+
 
 
 ## Reference: typescript-go Submodule

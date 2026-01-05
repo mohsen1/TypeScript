@@ -49,28 +49,6 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 
 ---
 
-# 🏛️ ARCHITECTURE
-
-## Solver-Checker Separation: "Check Fast, Explain Slow"
-
-```rust
-// thin_checker.rs calls solver, doesn't inspect types
-if !self.solver.is_assignable_to(source, target) {
-    let diagnostic = self.solver.explain_assignability_error(source, target);
-    self.report_diagnostic(node, diagnostic);
-}
-```
-
-### Key Files
-| Purpose | Location |
-|---------|----------|
-| Checker | `wasm/src/thin_checker.rs` |
-| Solver | `wasm/src/solver/` |
-| Emitter | `wasm/src/thin_emitter.rs` |
-| Baseline tests | `scripts/baseline-test-rust.mjs` |
-
----
-
 # Phase 9: Full Rust Mode ⬜
 
 - ⬜ Remove TypeScript fallbacks
