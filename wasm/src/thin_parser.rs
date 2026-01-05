@@ -410,8 +410,11 @@ impl ThinParserState {
             SyntaxKind::SemicolonToken => self.parse_empty_statement(),
             SyntaxKind::ExportKeyword => self.parse_export_declaration(),
             SyntaxKind::ImportKeyword => {
+                // Check for dynamic import: import(...)
+                if self.look_ahead_is_import_call() {
+                    self.parse_expression_statement()
                 // Check for import = (import equals declaration)
-                if self.look_ahead_is_import_equals() {
+                } else if self.look_ahead_is_import_equals() {
                     self.parse_import_equals_declaration()
                 } else {
                     self.parse_import_declaration()
@@ -486,6 +489,21 @@ impl ThinParserState {
         self.scanner.restore_state(snapshot);
         self.current_token = current;
         is_equals
+    }
+
+    /// Look ahead to see if we have "import (" (dynamic import call)
+    fn look_ahead_is_import_call(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        // Skip 'import'
+        self.next_token();
+        // Check for '(' or '.' (import.meta)
+        let is_call = self.is_token(SyntaxKind::OpenParenToken) || self.is_token(SyntaxKind::DotToken);
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_call
     }
 
     /// Look ahead to see if we have "identifier :" (labeled statement)
@@ -898,7 +916,7 @@ impl ThinParserState {
 
         // Parse optional type parameters
         let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
-            Some(self.parse_type_parameter_list())
+            Some(self.parse_type_parameters())
         } else {
             None
         };
@@ -2455,7 +2473,7 @@ impl ThinParserState {
             SyntaxKind::ClassKeyword => self.parse_class_declaration(),
             SyntaxKind::AbstractKeyword => {
                 // declare abstract class
-                self.parse_class_declaration()
+                self.parse_abstract_class_declaration()
             }
             SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
             SyntaxKind::TypeKeyword => self.parse_type_alias_declaration(),
@@ -4386,6 +4404,10 @@ impl ThinParserState {
             SyntaxKind::LessThanToken => self.parse_jsx_element_or_type_assertion(),
             SyntaxKind::NoSubstitutionTemplateLiteral => self.parse_no_substitution_template_literal(),
             SyntaxKind::TemplateHead => self.parse_template_expression(),
+            // Regex literal - rescan / or /= as regex
+            SyntaxKind::SlashToken | SyntaxKind::SlashEqualsToken => self.parse_regex_literal(),
+            // Dynamic import or import.meta
+            SyntaxKind::ImportKeyword => self.parse_import_expression(),
             // Type keywords can be used as identifiers in expression context
             // e.g., new any[1], new string(), etc.
             SyntaxKind::AnyKeyword
@@ -4690,6 +4712,91 @@ impl ThinParserState {
         let end_pos = self.token_end();
 
         self.arena.add_token(SyntaxKind::SuperKeyword as u16, start_pos, end_pos)
+    }
+
+    /// Parse regex literal: /pattern/flags
+    fn parse_regex_literal(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+
+        // Rescan the / or /= as a regex literal
+        self.scanner.re_scan_slash_token();
+        self.current_token = self.scanner.get_token();
+
+        // Get the regex text (including slashes and flags)
+        let text = self.scanner.get_token_value_ref().to_string();
+        self.parse_expected(SyntaxKind::RegularExpressionLiteral);
+        let end_pos = self.token_end();
+
+        self.arena.add_literal(
+            SyntaxKind::RegularExpressionLiteral as u16,
+            start_pos,
+            end_pos,
+            LiteralData { text, raw_text: None, value: None },
+        )
+    }
+
+    /// Parse import expression: import(...) or import.meta
+    fn parse_import_expression(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::ImportKeyword);
+
+        // Check for import.meta
+        if self.is_token(SyntaxKind::DotToken) {
+            self.next_token(); // consume '.'
+            // Create import keyword node first (before borrowing arena again)
+            let import_node = self.arena.add_token(SyntaxKind::ImportKeyword as u16, start_pos, start_pos + 6);
+            // Parse 'meta'
+            let name = self.parse_identifier_name();
+            let end_pos = self.token_end();
+
+            return self.arena.add_access_expr(
+                syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::AccessExprData {
+                    expression: import_node,
+                    question_dot_token: false,
+                    name_or_argument: name,
+                },
+            );
+        }
+
+        // Dynamic import: import(...)
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let argument = self.parse_assignment_expression();
+
+        // Optional second argument (import attributes in some proposals)
+        let options = if self.parse_optional(SyntaxKind::CommaToken) {
+            if !self.is_token(SyntaxKind::CloseParenToken) {
+                Some(self.parse_assignment_expression())
+            } else {
+                None // Trailing comma
+            }
+        } else {
+            None
+        };
+
+        self.parse_expected(SyntaxKind::CloseParenToken);
+        let end_pos = self.token_end();
+
+        // Create a call expression with import as the callee
+        let import_keyword = self.arena.add_token(SyntaxKind::ImportKeyword as u16, start_pos, start_pos + 6);
+        let mut args = vec![argument];
+        if let Some(opt) = options {
+            args.push(opt);
+        }
+        let arguments = self.make_node_list(args);
+
+        self.arena.add_call_expr(
+            syntax_kind_ext::CALL_EXPRESSION,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::CallExprData {
+                expression: import_keyword,
+                type_arguments: None,
+                arguments: Some(arguments),
+            },
+        )
     }
 
     /// Parse no-substitution template literal: `hello`
@@ -5501,6 +5608,18 @@ impl ThinParserState {
         // Handle infer type: infer T (used in conditional types)
         if self.is_token(SyntaxKind::InferKeyword) {
             return self.parse_infer_type();
+        }
+
+        // Handle 'this' type (polymorphic this)
+        if self.is_token(SyntaxKind::ThisKeyword) {
+            let this_start = self.token_pos();
+            let this_end = self.token_end();
+            self.next_token();
+            return self.arena.add_token(
+                syntax_kind_ext::THIS_TYPE,
+                this_start,
+                this_end,
+            );
         }
 
         // Handle literal types: "foo", 42, true, false
