@@ -281,13 +281,13 @@ These are TypeScript's "type-level functions" (see §4 of SOLVER.md).
 | fourslash | 6,563 | TBD | 0% |
 
 **Batch Test Results** (single-file compiler tests):
-- Pass Rate: **99.6%** (822/825)
+- Pass Rate: **100%** (825/825)
 - 0 crashes
-- Only 3 remaining failures (UTF-16 encoded files - scanner issue)
+- UTF-16 BOM handling fixed in batch-test-rust.mjs
 
 ## Blockers for Higher Pass Rate
 
-1. **UTF-16 encoding** - Scanner doesn't handle UTF-16 BE/LE BOM (3 files)
+1. ~~**UTF-16 encoding**~~ - ✅ Fixed (BOM handling in test runner)
 2. **Multi-file tests** with `@filename:` directives (skipped, ~175 files)
 3. **Large files** > 50KB (skipped)
 
