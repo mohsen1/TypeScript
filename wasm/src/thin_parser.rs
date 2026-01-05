@@ -5428,9 +5428,12 @@ impl ThinParserState {
             NodeIndex::NONE
         };
 
-        // Parse : and type
-        self.parse_expected(SyntaxKind::ColonToken);
-        let type_node = self.parse_type();
+        // Parse optional : and type (type can be omitted for implicit any)
+        let type_node = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
 
         // Parse optional semicolon
         self.parse_optional(SyntaxKind::SemicolonToken);
