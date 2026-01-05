@@ -1233,47 +1233,15 @@ impl ThinParserState {
         }
     }
 
-    /// Parse a heritage type reference: Foo or Foo<T> or Foo.Bar<T>
+    /// Parse a heritage type reference: Foo or Foo<T> or Foo.Bar<T> or base<T>()
     /// This is used in extends/implements clauses
     fn parse_heritage_type_reference(&mut self) -> NodeIndex {
-        let start_pos = self.token_pos();
-
-        // Parse the base expression (could be Foo or Foo.Bar.Baz)
-        // We parse it as a left-hand-side expression to support property access
-        let expression = self.parse_heritage_left_hand_expression();
-
-        // Parse optional type arguments: <T, U>
-        if self.is_token(SyntaxKind::LessThanToken) {
-            self.next_token();
-            let mut type_args = Vec::new();
-
-            while !self.is_token(SyntaxKind::GreaterThanToken)
-                && !self.is_token(SyntaxKind::EndOfFileToken)
-            {
-                let type_arg = self.parse_type();
-                type_args.push(type_arg);
-
-                if !self.parse_optional(SyntaxKind::CommaToken) {
-                    break;
-                }
-            }
-
-            self.parse_expected(SyntaxKind::GreaterThanToken);
-
-            // Create expression with type arguments
-            let end_pos = self.token_end();
-            return self.arena.add_expr_with_type_args(
-                syntax_kind_ext::EXPRESSION_WITH_TYPE_ARGUMENTS,
-                start_pos,
-                end_pos,
-                crate::parser::thin_node::ExprWithTypeArgsData {
-                    expression,
-                    type_arguments: Some(self.make_node_list(type_args)),
-                },
-            );
-        }
-
-        expression
+        // parse_heritage_left_hand_expression now handles:
+        // - Simple identifiers: Foo
+        // - Property access: Foo.Bar.Baz
+        // - Type arguments: Foo<T>
+        // - Call expressions: Mixin(Parent) or base<T>()
+        self.parse_heritage_left_hand_expression()
     }
 
     /// Parse left-hand expression for heritage clauses: Foo, Foo.Bar, or Mixin(Parent)
@@ -1309,8 +1277,65 @@ impl ThinParserState {
                         question_dot_token: false,
                     },
                 );
+            } else if self.is_token(SyntaxKind::LessThanToken) {
+                // Generic call expression: base<T>() or base<T, U>()
+                // Parse type arguments then check for call
+                let type_args_start = self.token_pos();
+                self.next_token();
+                let mut type_args = Vec::new();
+                while !self.is_token(SyntaxKind::GreaterThanToken)
+                    && !self.is_token(SyntaxKind::EndOfFileToken)
+                {
+                    let type_arg = self.parse_type();
+                    type_args.push(type_arg);
+                    if !self.parse_optional(SyntaxKind::CommaToken) {
+                        break;
+                    }
+                }
+                self.parse_expected(SyntaxKind::GreaterThanToken);
+
+                // Now check for call expression after type arguments
+                if self.is_token(SyntaxKind::OpenParenToken) {
+                    self.next_token();
+                    let mut args = Vec::new();
+                    while !self.is_token(SyntaxKind::CloseParenToken)
+                        && !self.is_token(SyntaxKind::EndOfFileToken)
+                    {
+                        let arg = self.parse_assignment_expression();
+                        args.push(arg);
+                        if !self.parse_optional(SyntaxKind::CommaToken) {
+                            break;
+                        }
+                    }
+                    self.parse_expected(SyntaxKind::CloseParenToken);
+
+                    let end_pos = self.token_end();
+                    expr = self.arena.add_call_expr(
+                        syntax_kind_ext::CALL_EXPRESSION,
+                        start_pos,
+                        end_pos,
+                        crate::parser::thin_node::CallExprData {
+                            expression: expr,
+                            type_arguments: Some(self.make_node_list(type_args)),
+                            arguments: Some(self.make_node_list(args)),
+                        },
+                    );
+                } else {
+                    // Just type arguments, no call - create expression with type arguments
+                    let end_pos = self.token_end();
+                    expr = self.arena.add_expr_with_type_args(
+                        syntax_kind_ext::EXPRESSION_WITH_TYPE_ARGUMENTS,
+                        start_pos,
+                        end_pos,
+                        crate::parser::thin_node::ExprWithTypeArgsData {
+                            expression: expr,
+                            type_arguments: Some(self.make_node_list(type_args)),
+                        },
+                    );
+                    // Don't break here - continue the loop for potential chaining
+                }
             } else if self.is_token(SyntaxKind::OpenParenToken) {
-                // Call expression: Mixin(Parent)
+                // Call expression without type args: Mixin(Parent)
                 self.next_token();
                 let mut args = Vec::new();
                 while !self.is_token(SyntaxKind::CloseParenToken)
