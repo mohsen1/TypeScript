@@ -281,8 +281,8 @@ These are TypeScript's "type-level functions" (see §4 of SOLVER.md).
 | fourslash | 6,563 | TBD | 0% |
 
 **Batch Test Results** (single-file compiler tests):
-- Pass Rate: **99.7%** (4921/4935 single-file tests)
-- 14 remaining crashes (parser edge cases with invalid syntax)
+- Pass Rate: **99.8%** (4924/4935 single-file tests)
+- 11 remaining crashes (parser edge cases)
 - UTF-16 BOM handling fixed in batch-test-rust.mjs
 - ~1462 multi-file tests skipped (need `@filename:` support)
 
