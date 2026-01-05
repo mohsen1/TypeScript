@@ -13,6 +13,15 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 - **Phase 6**: Emitter (ES5 transforms, source maps, .d.ts) - 31% JS baseline
 - **Phase 7**: Language Service (60%) - go-to-def, find refs, completions
 
+## Emitter TODOs (for JS baseline 80%+)
+- ⬜ Class inheritance (`__extends` helper for `extends`)
+- ⬜ CommonJS exports (`module.exports`, `exports.X`)
+- ⬜ Parse error tolerance (13 tests skipped)
+
+## Language Service TODOs (40% remaining)
+- ⬜ Formatting engine
+- ⬜ Code fixes/refactorings
+
 ---
 
 # 🎯 CURRENT FOCUS: Phase 8 - Baseline Compatibility
