@@ -117,9 +117,7 @@ pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
 
 ---
 
-# 🎯 CURRENT FOCUS: Parallel Tracks
-
-## Track A: Phase 8 - Baseline Compatibility
+# 🎯 CURRENT FOCUS: Phase 8 - Baseline Compatibility
 
 **Goal**: Match TypeScript's test baselines for `tests/cases/compiler`.
 
@@ -175,7 +173,7 @@ Our emitter produces modern ES6+ output. ES5 transforms planned for Phase 6.3.
 
 ---
 
-## Track B: Phase 6 - Emitter Completion (75% → 100%)
+# Phase 6 - Emitter Completion (75% → 100%)
 
 **Goal**: Complete emitter with performance-first approach.
 **Full Plan**: See `specs/PHASE_6_PLAN.md` for detailed breakdown.
