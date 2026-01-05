@@ -633,9 +633,9 @@ impl ThinParserState {
         let parameters = self.parse_parameter_list();
         self.parse_expected(SyntaxKind::CloseParenToken);
 
-        // Parse optional return type
+        // Parse optional return type (may be a type predicate: param is T)
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-            self.parse_type()
+            self.parse_return_type()
         } else {
             NodeIndex::NONE
         };
@@ -711,9 +711,9 @@ impl ThinParserState {
         let parameters = self.parse_parameter_list();
         self.parse_expected(SyntaxKind::CloseParenToken);
 
-        // Parse optional return type
+        // Parse optional return type (may be a type predicate: param is T)
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
-            self.parse_type()
+            self.parse_return_type()
         } else {
             NodeIndex::NONE
         };
@@ -4796,9 +4796,16 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::NewKeyword);
 
-        let expression = self.parse_left_hand_side_expression();
+        // Parse the callee expression - member access without call (we handle call ourselves)
+        let expression = self.parse_member_expression_base();
 
-        // TODO: Type arguments
+        // Parse type arguments: new Array<string>()
+        let type_arguments = if self.is_token(SyntaxKind::LessThanToken) {
+            // Try to parse as type arguments
+            Some(self.parse_type_arguments())
+        } else {
+            None
+        };
 
         let arguments = if self.is_token(SyntaxKind::OpenParenToken) {
             self.next_token();
@@ -4816,10 +4823,61 @@ impl ThinParserState {
             end_pos,
             CallExprData {
                 expression,
-                type_arguments: None,
+                type_arguments,
                 arguments,
             },
         )
+    }
+
+    /// Parse member expression base (identifier with property/element access, but no calls)
+    fn parse_member_expression_base(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        let mut expr = self.parse_primary_expression();
+
+        loop {
+            match self.token() {
+                SyntaxKind::DotToken => {
+                    self.next_token();
+                    let name = if self.is_token(SyntaxKind::PrivateIdentifier) {
+                        self.parse_private_identifier()
+                    } else {
+                        self.parse_identifier_name()
+                    };
+                    let end_pos = self.token_end();
+
+                    expr = self.arena.add_access_expr(
+                        syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION,
+                        start_pos,
+                        end_pos,
+                        AccessExprData {
+                            expression: expr,
+                            name_or_argument: name,
+                            question_dot_token: false,
+                        },
+                    );
+                }
+                SyntaxKind::OpenBracketToken => {
+                    self.next_token();
+                    let argument = self.parse_expression();
+                    self.parse_expected(SyntaxKind::CloseBracketToken);
+                    let end_pos = self.token_end();
+
+                    expr = self.arena.add_access_expr(
+                        syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION,
+                        start_pos,
+                        end_pos,
+                        AccessExprData {
+                            expression: expr,
+                            name_or_argument: argument,
+                            question_dot_token: false,
+                        },
+                    );
+                }
+                _ => break,
+            }
+        }
+
+        expr
     }
 
     // =========================================================================
@@ -4829,6 +4887,80 @@ impl ThinParserState {
     /// Parse a type (handles keywords, type references, unions, intersections, conditionals)
     fn parse_type(&mut self) -> NodeIndex {
         self.parse_conditional_type()
+    }
+
+    /// Parse return type, which may be a type predicate (x is T) or a regular type
+    fn parse_return_type(&mut self) -> NodeIndex {
+        // Check if this is a type predicate: identifier 'is' Type
+        // We need to look ahead to see if there's an identifier followed by 'is'
+        if self.is_token(SyntaxKind::Identifier) {
+            let snapshot = self.scanner.save_state();
+            let current = self.current_token;
+
+            let name = self.parse_identifier();
+            if self.is_token(SyntaxKind::IsKeyword) {
+                // This is a type predicate: x is T
+                let start_pos = if let Some(node) = self.arena.get(name) {
+                    node.pos
+                } else {
+                    self.token_pos()
+                };
+
+                self.next_token(); // consume 'is'
+                let type_node = self.parse_type();
+                let end_pos = self.token_end();
+
+                return self.arena.add_type_predicate(
+                    syntax_kind_ext::TYPE_PREDICATE,
+                    start_pos,
+                    end_pos,
+                    crate::parser::thin_node::TypePredicateData {
+                        asserts_modifier: false,
+                        parameter_name: name,
+                        type_node,
+                    },
+                );
+            }
+
+            // Not a type predicate, restore state and parse as regular type
+            self.scanner.restore_state(snapshot);
+            self.current_token = current;
+        }
+
+        // Check for 'asserts' type predicate: asserts x is T
+        if self.is_token(SyntaxKind::AssertsKeyword) {
+            return self.parse_asserts_type_predicate();
+        }
+
+        self.parse_type()
+    }
+
+    /// Parse 'asserts' type predicate: asserts x or asserts x is T
+    fn parse_asserts_type_predicate(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        self.parse_expected(SyntaxKind::AssertsKeyword);
+
+        let parameter_name = self.parse_identifier();
+
+        let type_node = if self.is_token(SyntaxKind::IsKeyword) {
+            self.next_token();
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+
+        self.arena.add_type_predicate(
+            syntax_kind_ext::TYPE_PREDICATE,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::TypePredicateData {
+                asserts_modifier: true,
+                parameter_name,
+                type_node,
+            },
+        )
     }
 
     /// Parse conditional type: T extends U ? X : Y
