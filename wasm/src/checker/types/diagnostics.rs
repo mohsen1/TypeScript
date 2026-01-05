@@ -74,9 +74,11 @@ pub mod diagnostic_codes {
     pub const UNEXPECTED_TOKEN: u32 = 1012;
     pub const REST_PARAMETER_MUST_BE_LAST: u32 = 1014;
     pub const PARAMETER_CANNOT_HAVE_INITIALIZER: u32 = 1015;
-    pub const SETTER_CANNOT_HAVE_RETURN_TYPE: u32 = 1095;
-    pub const GETTER_MUST_NOT_HAVE_PARAMETERS: u32 = 1054;
     pub const SETTER_MUST_HAVE_EXACTLY_ONE_PARAMETER: u32 = 1049;
+    pub const SETTER_PARAMETER_CANNOT_HAVE_INITIALIZER: u32 = 1052;  // A 'set' accessor parameter cannot have an initializer.
+    pub const SETTER_CANNOT_HAVE_REST_PARAMETER: u32 = 1053;  // A 'set' accessor cannot have rest parameter.
+    pub const GETTER_MUST_NOT_HAVE_PARAMETERS: u32 = 1054;
+    pub const SETTER_CANNOT_HAVE_RETURN_TYPE: u32 = 1095;
     pub const TYPE_PARAMETER_LIST_CANNOT_BE_EMPTY: u32 = 1098;
     pub const EXPRESSION_EXPECTED: u32 = 1109;
     pub const TYPE_EXPECTED: u32 = 1110;

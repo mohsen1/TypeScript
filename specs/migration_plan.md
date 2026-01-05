@@ -5,7 +5,9 @@
 Incrementally rewrite the TypeScript compiler in Rust, compiled to WebAssembly
 for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 
----
+## Session log
+
+see SESSION_LOG.md -- always amended with each session's work
 
 # ✅ COMPLETED
 
@@ -31,8 +33,8 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 ### Current Status
 | Baseline | Pass Rate | Notes |
 |----------|-----------|-------|
-| .errors.txt | **63.6%** (49/77) | Focus area |
-| .js emit | 0% | Baselines use ES5, we emit ES6+ |
+| .errors.txt | **66.2%** (51/77) | Focus area |
+| .js emit | **36.8%** (28/76) | Fixed baseline comparison bug |
 
 ### Next Steps
 1. ✅ Export assignment validation (2309, 2304)
@@ -65,7 +67,7 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 ## TODOs
 - ⬜ Upstream sync workflow (track `microsoft/TypeScript` releases)
 - ⬜ Compatibility test suite (run against TS test baselines on each release)
-- ⬜ Version alignment (match TS version numbers, e.g., `5.7.0-rust`)
+- ⬜ Version alignment (match TS version numbers, e.g., `@mohsen1/typescript@5.7.0`)
 - ⬜ CLI parity audit (`tsc --help` flags, exit codes, output format)
 - ⬜ API compatibility layer (programmatic API matches `typescript` npm)
 - ⬜ Packaging for npm (`@aspect/tsc-rust` or similar)

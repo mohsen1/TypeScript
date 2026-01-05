@@ -334,11 +334,16 @@ for (const file of files) {
     const jsBaseline = join(baselineDir, `${testName}.js`);
     if (existsSync(jsBaseline)) {
         stats.jsBaseline.total++;
-        const baselineJs = readFileSync(jsBaseline, 'utf-8');
+        const baselineContent = readFileSync(jsBaseline, 'utf-8');
+
+        // Extract just the JS output section from the baseline file
+        // Baseline format: //// [source.ts] ... source ... //// [output.js] ... js output
+        const jsOutputMatch = baselineContent.split(/\/\/\/\/ \[[^\]]+\.js\]/);
+        const expectedJs = jsOutputMatch.length > 1 ? jsOutputMatch[jsOutputMatch.length - 1] : '';
 
         if (result.emittedJs) {
             const normalizeJs = (s) => s.replace(/\r\n/g, '\n').trim();
-            const expectedNorm = normalizeJs(baselineJs);
+            const expectedNorm = normalizeJs(expectedJs);
             const actualNorm = normalizeJs(result.emittedJs);
 
             if (expectedNorm === actualNorm) {
