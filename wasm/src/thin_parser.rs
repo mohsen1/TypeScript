@@ -5298,12 +5298,14 @@ impl ThinParserState {
 
         self.next_token(); // skip get/set/async
 
-        // Check if followed by property name (identifier, string, number, [)
+        // Check if followed by property name (identifier, keyword, string, number, [)
+        // Keywords like 'return', 'throw', 'delete' can be method names
         let is_method = self.is_token(SyntaxKind::Identifier)
             || self.is_token(SyntaxKind::StringLiteral)
             || self.is_token(SyntaxKind::NumericLiteral)
             || self.is_token(SyntaxKind::OpenBracketToken)
-            || self.is_token(SyntaxKind::AsteriskToken); // async *foo()
+            || self.is_token(SyntaxKind::AsteriskToken) // async *foo()
+            || self.is_identifier_or_keyword(); // keywords as method names
 
         self.scanner.restore_state(snapshot);
         self.current_token = current;
@@ -6750,6 +6752,10 @@ impl ThinParserState {
                 | SyntaxKind::NamespaceKeyword
                 | SyntaxKind::RequireKeyword
                 | SyntaxKind::GlobalKeyword
+                | SyntaxKind::TrueKeyword
+                | SyntaxKind::FalseKeyword
+                | SyntaxKind::NullKeyword
+                | SyntaxKind::UndefinedKeyword
         )
     }
 
@@ -6932,8 +6938,16 @@ impl ThinParserState {
             // Parse optional ...rest
             let dot_dot_dot = self.parse_optional(SyntaxKind::DotDotDotToken);
 
-            // Parse parameter name (keywords are allowed as parameter names)
-            let name = self.parse_identifier_name();
+            // Parse parameter name - can be identifier, keyword, or binding pattern
+            let name = if self.is_token(SyntaxKind::OpenBraceToken) {
+                self.parse_object_binding_pattern()
+            } else if self.is_token(SyntaxKind::OpenBracketToken) {
+                self.parse_array_binding_pattern()
+            } else if self.is_identifier_or_keyword() {
+                self.parse_identifier_name()
+            } else {
+                self.parse_identifier()
+            };
 
             // Parse optional ?
             let question = self.parse_optional(SyntaxKind::QuestionToken);
