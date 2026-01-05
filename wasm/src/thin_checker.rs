@@ -491,7 +491,16 @@ impl<'a> ThinCheckerState<'a> {
         match name.as_str() {
             "undefined" => TypeId::UNDEFINED,
             "NaN" | "Infinity" => TypeId::NUMBER,
-            _ => TypeId::ANY,
+            // Global objects that are always available
+            "console" | "Math" | "JSON" | "Object" | "Array" | "String"
+            | "Number" | "Boolean" | "Date" | "RegExp" | "Error" | "Promise"
+            | "Map" | "Set" | "WeakMap" | "WeakSet" | "Symbol" | "Proxy"
+            | "Reflect" | "globalThis" | "window" | "document" => TypeId::ANY,
+            _ => {
+                // Report "cannot find name" error
+                self.error_cannot_find_name_at(name, idx);
+                TypeId::ERROR
+            }
         }
     }
 
@@ -732,8 +741,14 @@ impl<'a> ThinCheckerState<'a> {
             return shape.return_type;
         }
 
-        // Callee is not a known function type - return any
-        TypeId::ANY
+        // Check if callee is any/error (don't report for those)
+        if callee_type == TypeId::ANY || callee_type == TypeId::ERROR {
+            return TypeId::ANY;
+        }
+
+        // Callee is not a function type - report error
+        self.error_not_callable_at(callee_type, call.expression);
+        TypeId::ERROR
     }
 
     /// Get type of new expression.
@@ -767,6 +782,11 @@ impl<'a> ThinCheckerState<'a> {
         // Get the type of the object
         let object_type = self.get_type_of_node(access.expression);
 
+        // Don't report errors for any/error types
+        if object_type == TypeId::ANY || object_type == TypeId::ERROR {
+            return TypeId::ANY;
+        }
+
         // Get the property name
         let Some(name_node) = self.arena.get(access.name_or_argument) else {
             return TypeId::ANY;
@@ -780,6 +800,10 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(prop_type) = self.get_property_of_type(object_type, property_name) {
                 return prop_type;
             }
+
+            // Property doesn't exist - report error
+            self.error_property_not_exist_at(property_name, object_type, idx);
+            return TypeId::ERROR;
         }
 
         TypeId::ANY
@@ -1388,6 +1412,18 @@ impl<'a> ThinCheckerState<'a> {
                 self.file_name.as_str(),
             );
             let diag = builder.argument_count_mismatch(expected, got, loc.start, loc.length());
+            self.diagnostics.push(diag.to_checker_diagnostic(&self.file_name));
+        }
+    }
+
+    /// Report a "type is not callable" error using solver diagnostics with source tracking.
+    pub fn error_not_callable_at(&mut self, type_id: TypeId, idx: NodeIndex) {
+        if let Some(loc) = self.get_source_location(idx) {
+            let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
+                &self.types,
+                self.file_name.as_str(),
+            );
+            let diag = builder.not_callable(type_id, loc.start, loc.length());
             self.diagnostics.push(diag.to_checker_diagnostic(&self.file_name));
         }
     }

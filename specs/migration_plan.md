@@ -349,8 +349,14 @@ Working:
   - Union/intersection property access
   - Function call argument checking on method calls
 
+- Additional diagnostic messages ✅
+  - TS2304: Cannot find name
+  - TS2339: Property does not exist
+  - TS2349: Type is not callable
+
 Next:
-- More comprehensive diagnostic messages
+- Object literal checking (excess properties, missing required properties)
+- Readonly property assignment checking
 
 ---
 

@@ -598,6 +598,17 @@ impl<'a> SpannedDiagnosticBuilder<'a> {
             .with_span(self.span(start, length))
     }
 
+    /// Create a "Type is not callable" diagnostic with span.
+    pub fn not_callable(
+        &mut self,
+        type_id: TypeId,
+        start: u32,
+        length: u32,
+    ) -> TypeDiagnostic {
+        self.builder.not_callable(type_id)
+            .with_span(self.span(start, length))
+    }
+
     /// Add a related location to an existing diagnostic.
     pub fn add_related(
         &self,
