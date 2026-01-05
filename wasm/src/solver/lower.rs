@@ -144,7 +144,10 @@ impl<'a> TypeLowering<'a> {
             // This type
             // =========================================================================
             k if k == SyntaxKind::ThisKeyword as u16 => {
-                TypeId::ANY // TODO: Resolve to class's this type
+                self.interner.intern(TypeKey::ThisType)
+            }
+            k if k == syntax_kind_ext::THIS_TYPE => {
+                self.interner.intern(TypeKey::ThisType)
             }
 
             // =========================================================================
@@ -152,6 +155,55 @@ impl<'a> TypeLowering<'a> {
             // =========================================================================
             k if k == syntax_kind_ext::PARENTHESIZED_TYPE => {
                 self.lower_parenthesized_type(node_idx)
+            }
+
+            // =========================================================================
+            // Type query (typeof in type position)
+            // =========================================================================
+            k if k == syntax_kind_ext::TYPE_QUERY => {
+                self.lower_type_query(node_idx)
+            }
+
+            // =========================================================================
+            // Type operator (keyof, readonly, unique)
+            // =========================================================================
+            k if k == syntax_kind_ext::TYPE_OPERATOR => {
+                self.lower_type_operator(node_idx)
+            }
+
+            // =========================================================================
+            // Infer type (infer R)
+            // =========================================================================
+            k if k == syntax_kind_ext::INFER_TYPE => {
+                self.lower_infer_type(node_idx)
+            }
+
+            // =========================================================================
+            // Template literal type
+            // =========================================================================
+            k if k == syntax_kind_ext::TEMPLATE_LITERAL_TYPE => {
+                self.lower_template_literal_type(node_idx)
+            }
+
+            // =========================================================================
+            // Named tuple member
+            // =========================================================================
+            k if k == syntax_kind_ext::NAMED_TUPLE_MEMBER => {
+                self.lower_named_tuple_member(node_idx)
+            }
+
+            // =========================================================================
+            // Constructor type (new () => T)
+            // =========================================================================
+            k if k == syntax_kind_ext::CONSTRUCTOR_TYPE => {
+                self.lower_constructor_type(node_idx)
+            }
+
+            // =========================================================================
+            // Optional/Rest types (unwrap)
+            // =========================================================================
+            k if k == syntax_kind_ext::OPTIONAL_TYPE || k == syntax_kind_ext::REST_TYPE => {
+                self.lower_wrapped_type(node_idx)
             }
 
             // =========================================================================
@@ -502,6 +554,212 @@ impl<'a> TypeLowering<'a> {
 
         // Parenthesized types just wrap another type
         if let Some(data) = self.arena.get_wrapped_type(node) {
+            self.lower_type(data.type_node)
+        } else {
+            TypeId::ERROR
+        }
+    }
+
+    /// Lower a type query (typeof expr in type position)
+    fn lower_type_query(&self, node_idx: NodeIndex) -> TypeId {
+        let node = match self.arena.get(node_idx) {
+            Some(n) => n,
+            None => return TypeId::ERROR,
+        };
+
+        if let Some(data) = self.arena.get_type_query(node) {
+            // Create a symbol reference from the expression name
+            // For now, use a hash of the identifier name
+            if let Some(expr_node) = self.arena.get(data.expr_name) {
+                if let Some(id_data) = self.arena.get_identifier(expr_node) {
+                    use std::hash::{Hash, Hasher};
+                    use std::collections::hash_map::DefaultHasher;
+                    let mut hasher = DefaultHasher::new();
+                    id_data.escaped_text.hash(&mut hasher);
+                    let symbol_id = hasher.finish() as u32;
+                    return self.interner.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)));
+                }
+            }
+            TypeId::ANY
+        } else {
+            TypeId::ERROR
+        }
+    }
+
+    /// Lower a type operator (keyof, readonly, unique)
+    fn lower_type_operator(&self, node_idx: NodeIndex) -> TypeId {
+        let node = match self.arena.get(node_idx) {
+            Some(n) => n,
+            None => return TypeId::ERROR,
+        };
+
+        if let Some(data) = self.arena.get_type_operator(node) {
+            let inner_type = self.lower_type(data.type_node);
+
+            // Check which operator it is
+            match data.operator {
+                // KeyOfKeyword = 143
+                143 => self.interner.intern(TypeKey::KeyOf(inner_type)),
+                // ReadonlyKeyword = 148
+                148 => self.interner.intern(TypeKey::ReadonlyType(inner_type)),
+                // UniqueKeyword = 158 - unique symbol
+                158 => {
+                    // unique symbol creates a unique symbol type
+                    // Use node index as unique identifier
+                    self.interner.intern(TypeKey::UniqueSymbol(SymbolRef(node_idx.0)))
+                }
+                _ => inner_type,
+            }
+        } else {
+            TypeId::ERROR
+        }
+    }
+
+    /// Lower an infer type (infer R)
+    fn lower_infer_type(&self, node_idx: NodeIndex) -> TypeId {
+        let node = match self.arena.get(node_idx) {
+            Some(n) => n,
+            None => return TypeId::ERROR,
+        };
+
+        if let Some(data) = self.arena.get_infer_type(node) {
+            // Get the type parameter name
+            let name: Arc<str> = if let Some(tp_node) = self.arena.get(data.type_parameter) {
+                // Type parameter node should have an identifier
+                if let Some(tp_data) = self.arena.get_type_parameter(tp_node) {
+                    if let Some(name_node) = self.arena.get(tp_data.name) {
+                        if let Some(id_data) = self.arena.get_identifier(name_node) {
+                            Arc::from(id_data.escaped_text.as_str())
+                        } else {
+                            Arc::from("infer")
+                        }
+                    } else {
+                        Arc::from("infer")
+                    }
+                } else if let Some(id_data) = self.arena.get_identifier(tp_node) {
+                    Arc::from(id_data.escaped_text.as_str())
+                } else {
+                    Arc::from("infer")
+                }
+            } else {
+                Arc::from("infer")
+            };
+
+            self.interner.intern(TypeKey::Infer(TypeParamInfo {
+                name,
+                constraint: None,
+                default: None,
+            }))
+        } else {
+            TypeId::ERROR
+        }
+    }
+
+    /// Lower a template literal type (`hello${T}world`)
+    fn lower_template_literal_type(&self, node_idx: NodeIndex) -> TypeId {
+        let node = match self.arena.get(node_idx) {
+            Some(n) => n,
+            None => return TypeId::ERROR,
+        };
+
+        if let Some(data) = self.arena.get_template_literal_type(node) {
+            let mut spans: Vec<TemplateSpan> = Vec::new();
+
+            // Add the head text if present
+            if let Some(head_node) = self.arena.get(data.head) {
+                if let Some(head_lit) = self.arena.get_literal(head_node) {
+                    if !head_lit.text.is_empty() {
+                        spans.push(TemplateSpan::Text(Arc::from(head_lit.text.as_str())));
+                    }
+                }
+            }
+
+            // Add template spans (type + text pairs)
+            for &span_idx in &data.template_spans.nodes {
+                if let Some(span_node) = self.arena.get(span_idx) {
+                    // Template span has a type and literal parts
+                    // For simplicity, we'll just add the type reference
+                    // TODO: Parse template span structure properly
+                    let type_id = self.lower_type(span_idx);
+                    if type_id != TypeId::ANY && type_id != TypeId::ERROR {
+                        spans.push(TemplateSpan::Type(type_id));
+                    }
+                }
+            }
+
+            self.interner.intern(TypeKey::TemplateLiteral(spans))
+        } else {
+            TypeId::STRING // Fallback to string
+        }
+    }
+
+    /// Lower a named tuple member ([name: T])
+    fn lower_named_tuple_member(&self, node_idx: NodeIndex) -> TypeId {
+        let node = match self.arena.get(node_idx) {
+            Some(n) => n,
+            None => return TypeId::ERROR,
+        };
+
+        if let Some(data) = self.arena.get_named_tuple_member(node) {
+            // Lower the type part
+            self.lower_type(data.type_node)
+        } else {
+            TypeId::ERROR
+        }
+    }
+
+    /// Lower a constructor type (new () => T)
+    fn lower_constructor_type(&self, node_idx: NodeIndex) -> TypeId {
+        let node = match self.arena.get(node_idx) {
+            Some(n) => n,
+            None => return TypeId::ERROR,
+        };
+
+        // Constructor types use the same data structure as function types
+        if let Some(data) = self.arena.get_function_type(node) {
+            // Lower parameters
+            let params: Vec<ParamInfo> = data.parameters.nodes.iter()
+                .filter_map(|&idx| {
+                    if let Some(param_node) = self.arena.get(idx) {
+                        if let Some(param_data) = self.arena.get_parameter(param_node) {
+                            return Some(ParamInfo {
+                                name: None,
+                                type_id: self.lower_type(param_data.type_annotation),
+                                optional: param_data.question_token,
+                                rest: param_data.dot_dot_dot_token,
+                            });
+                        }
+                    }
+                    None
+                })
+                .collect();
+
+            // Lower return type
+            let return_type = self.lower_type(data.type_annotation);
+
+            let shape = FunctionShape {
+                type_params: vec![], // TODO: Lower type parameters
+                params,
+                return_type,
+                is_constructor: true, // Mark as constructor
+            };
+
+            self.interner.function(shape)
+        } else {
+            TypeId::ERROR
+        }
+    }
+
+    /// Lower a wrapped type (optional or rest type)
+    fn lower_wrapped_type(&self, node_idx: NodeIndex) -> TypeId {
+        let node = match self.arena.get(node_idx) {
+            Some(n) => n,
+            None => return TypeId::ERROR,
+        };
+
+        if let Some(data) = self.arena.get_wrapped_type(node) {
+            // Just unwrap and lower the inner type
+            // The optional/rest nature is handled at the tuple level
             self.lower_type(data.type_node)
         } else {
             TypeId::ERROR
