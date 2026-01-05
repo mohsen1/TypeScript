@@ -315,7 +315,8 @@ These are TypeScript's "type-level functions" (see §4 of SOLVER.md).
    - Basic type mismatch diagnostics working ✅ (error 2322)
    - Function call argument checking working ✅ (errors 2345, 2554)
    - Return type checking working ✅ (error 2322)
-   - **NEXT**: Class member type checking, more expression types
+   - Class member type checking ✅ (property, method, constructor, accessor)
+   - **NEXT**: Method call type checking, more expression types
 4. ⬜ Compare output: `.errors.txt`, `.types`, `.js` files
 
 ### ThinChecker Type Checking Status
@@ -336,8 +337,13 @@ Working:
   - Return type mismatch → error 2322
   - `return;` in non-void function → error 2322
 
+- Class member type checking ✅
+  - Property initializer type checking
+  - Method return type checking
+  - Constructor body checking
+  - Getter/setter type checking
+
 Next:
-- Class member type checking
 - Method call type checking
 - More comprehensive diagnostic messages
 

@@ -1469,8 +1469,7 @@ impl<'a> ThinCheckerState<'a> {
                 // No action needed
             }
             syntax_kind_ext::CLASS_DECLARATION => {
-                // TODO: Check class members
-                self.get_type_of_node(stmt_idx);
+                self.check_class_declaration(stmt_idx);
             }
             _ => {
                 // Catch-all for other statement types
@@ -1570,5 +1569,213 @@ impl<'a> ThinCheckerState<'a> {
             };
             self.error_type_not_assignable_at(return_type, expected_type, error_node);
         }
+    }
+
+    /// Check a class declaration.
+    fn check_class_declaration(&mut self, stmt_idx: NodeIndex) {
+        let Some(node) = self.arena.get(stmt_idx) else {
+            return;
+        };
+
+        let Some(class) = self.arena.get_class(node) else {
+            return;
+        };
+
+        // Check each class member
+        for &member_idx in &class.members.nodes {
+            self.check_class_member(member_idx);
+        }
+    }
+
+    /// Check a class member (property, method, constructor, accessor).
+    fn check_class_member(&mut self, member_idx: NodeIndex) {
+        let Some(node) = self.arena.get(member_idx) else {
+            return;
+        };
+
+        match node.kind {
+            syntax_kind_ext::PROPERTY_DECLARATION => {
+                self.check_property_declaration(member_idx);
+            }
+            syntax_kind_ext::METHOD_DECLARATION => {
+                self.check_method_declaration(member_idx);
+            }
+            syntax_kind_ext::CONSTRUCTOR => {
+                self.check_constructor_declaration(member_idx);
+            }
+            syntax_kind_ext::GET_ACCESSOR | syntax_kind_ext::SET_ACCESSOR => {
+                self.check_accessor_declaration(member_idx);
+            }
+            _ => {
+                // Other class member types (static blocks, index signatures, etc.)
+                self.get_type_of_node(member_idx);
+            }
+        }
+    }
+
+    /// Check a property declaration.
+    fn check_property_declaration(&mut self, member_idx: NodeIndex) {
+        let Some(node) = self.arena.get(member_idx) else {
+            return;
+        };
+
+        let Some(prop) = self.arena.get_property_decl(node) else {
+            return;
+        };
+
+        // If property has type annotation and initializer, check type compatibility
+        if !prop.type_annotation.is_none() && !prop.initializer.is_none() {
+            let declared_type = self.get_type_from_type_node(prop.type_annotation);
+            let init_type = self.get_type_of_node(prop.initializer);
+
+            if declared_type != TypeId::ANY && !self.is_assignable_to(init_type, declared_type) {
+                self.error_type_not_assignable_at(init_type, declared_type, prop.initializer);
+            }
+        } else if !prop.initializer.is_none() {
+            // Just check the initializer to catch errors within it
+            self.get_type_of_node(prop.initializer);
+        }
+    }
+
+    /// Check a method declaration.
+    fn check_method_declaration(&mut self, member_idx: NodeIndex) {
+        let Some(node) = self.arena.get(member_idx) else {
+            return;
+        };
+
+        let Some(method) = self.arena.get_method_decl(node) else {
+            return;
+        };
+
+        // Enter a new local scope for the method body
+        self.push_local_scope();
+
+        // Get declared return type
+        let return_type = if !method.type_annotation.is_none() {
+            self.get_type_from_type_node(method.type_annotation)
+        } else {
+            TypeId::ANY
+        };
+        self.push_return_type(return_type);
+
+        // Add parameters to local scope
+        for &param_idx in &method.parameters.nodes {
+            if let Some(param_node) = self.arena.get(param_idx) {
+                if let Some(param) = self.arena.get_parameter(param_node) {
+                    if let Some(name_node) = self.arena.get(param.name) {
+                        if let Some(name_data) = self.arena.get_identifier(name_node) {
+                            let param_type = if !param.type_annotation.is_none() {
+                                self.get_type_from_type_node(param.type_annotation)
+                            } else {
+                                TypeId::ANY
+                            };
+                            self.add_local(name_data.escaped_text.clone(), param_type);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check method body
+        if !method.body.is_none() {
+            self.check_statement(method.body);
+        }
+
+        self.pop_return_type();
+        self.pop_local_scope();
+    }
+
+    /// Check a constructor declaration.
+    fn check_constructor_declaration(&mut self, member_idx: NodeIndex) {
+        let Some(node) = self.arena.get(member_idx) else {
+            return;
+        };
+
+        let Some(ctor) = self.arena.get_constructor(node) else {
+            return;
+        };
+
+        // Enter a new local scope for the constructor body
+        self.push_local_scope();
+
+        // Constructors don't have explicit return types
+
+        // Add parameters to local scope
+        for &param_idx in &ctor.parameters.nodes {
+            if let Some(param_node) = self.arena.get(param_idx) {
+                if let Some(param) = self.arena.get_parameter(param_node) {
+                    if let Some(name_node) = self.arena.get(param.name) {
+                        if let Some(name_data) = self.arena.get_identifier(name_node) {
+                            let param_type = if !param.type_annotation.is_none() {
+                                self.get_type_from_type_node(param.type_annotation)
+                            } else {
+                                TypeId::ANY
+                            };
+                            self.add_local(name_data.escaped_text.clone(), param_type);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check constructor body
+        if !ctor.body.is_none() {
+            self.check_statement(ctor.body);
+        }
+
+        self.pop_local_scope();
+    }
+
+    /// Check an accessor declaration (getter/setter).
+    fn check_accessor_declaration(&mut self, member_idx: NodeIndex) {
+        let Some(node) = self.arena.get(member_idx) else {
+            return;
+        };
+
+        let Some(accessor) = self.arena.get_accessor(node) else {
+            return;
+        };
+
+        // Enter a new local scope for the accessor body
+        self.push_local_scope();
+
+        // For getters, get return type from annotation
+        // For setters, return type is void
+        let return_type = if node.kind == syntax_kind_ext::GET_ACCESSOR {
+            if !accessor.type_annotation.is_none() {
+                self.get_type_from_type_node(accessor.type_annotation)
+            } else {
+                TypeId::ANY
+            }
+        } else {
+            TypeId::VOID
+        };
+        self.push_return_type(return_type);
+
+        // Add parameters to local scope (for setters)
+        for &param_idx in &accessor.parameters.nodes {
+            if let Some(param_node) = self.arena.get(param_idx) {
+                if let Some(param) = self.arena.get_parameter(param_node) {
+                    if let Some(name_node) = self.arena.get(param.name) {
+                        if let Some(name_data) = self.arena.get_identifier(name_node) {
+                            let param_type = if !param.type_annotation.is_none() {
+                                self.get_type_from_type_node(param.type_annotation)
+                            } else {
+                                TypeId::ANY
+                            };
+                            self.add_local(name_data.escaped_text.clone(), param_type);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check accessor body
+        if !accessor.body.is_none() {
+            self.check_statement(accessor.body);
+        }
+
+        self.pop_return_type();
+        self.pop_local_scope();
     }
 }
