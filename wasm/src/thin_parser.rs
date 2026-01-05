@@ -4382,10 +4382,53 @@ impl ThinParserState {
         )
     }
 
-    /// Parse property assignment
+    /// Parse property assignment, method, getter, setter, or spread element
     fn parse_property_assignment(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+
+        // Handle spread element: ...expr
+        if self.is_token(SyntaxKind::DotDotDotToken) {
+            self.next_token();
+            let expression = self.parse_assignment_expression();
+            let end_pos = self.token_end();
+            return self.arena.add_unary_expr_ex(
+                syntax_kind_ext::SPREAD_ELEMENT,
+                start_pos,
+                end_pos,
+                crate::parser::thin_node::UnaryExprDataEx {
+                    expression,
+                    asterisk_token: false,
+                },
+            );
+        }
+
+        // Handle get accessor: get foo() { }
+        if self.is_token(SyntaxKind::GetKeyword) && self.look_ahead_is_object_method() {
+            return self.parse_object_get_accessor(start_pos);
+        }
+
+        // Handle set accessor: set foo(v) { }
+        if self.is_token(SyntaxKind::SetKeyword) && self.look_ahead_is_object_method() {
+            return self.parse_object_set_accessor(start_pos);
+        }
+
+        // Handle async method: async foo() { }
+        if self.is_token(SyntaxKind::AsyncKeyword) && self.look_ahead_is_object_method() {
+            return self.parse_object_method(start_pos, true, false);
+        }
+
+        // Handle generator method: *foo() { }
+        if self.is_token(SyntaxKind::AsteriskToken) {
+            self.next_token(); // consume '*'
+            return self.parse_object_method(start_pos, false, true);
+        }
+
         let name = self.parse_property_name();
+
+        // Handle method: foo() { } or foo<T>() { }
+        if self.is_token(SyntaxKind::OpenParenToken) || self.is_token(SyntaxKind::LessThanToken) {
+            return self.parse_object_method_after_name(start_pos, name, false, false);
+        }
 
         let initializer = if self.parse_optional(SyntaxKind::ColonToken) {
             self.parse_assignment_expression()
@@ -4403,6 +4446,169 @@ impl ThinParserState {
                 modifiers: None,
                 name,
                 initializer,
+            },
+        )
+    }
+
+    /// Look ahead to check if get/set/async is a method vs property name
+    fn look_ahead_is_object_method(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        self.next_token(); // skip get/set/async
+
+        // Check if followed by property name (identifier, string, number, [)
+        let is_method = self.is_token(SyntaxKind::Identifier)
+            || self.is_token(SyntaxKind::StringLiteral)
+            || self.is_token(SyntaxKind::NumericLiteral)
+            || self.is_token(SyntaxKind::OpenBracketToken)
+            || self.is_token(SyntaxKind::AsteriskToken); // async *foo()
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_method
+    }
+
+    /// Parse get accessor in object literal: get foo() { }
+    fn parse_object_get_accessor(&mut self, start_pos: u32) -> NodeIndex {
+        self.next_token(); // consume 'get'
+        let name = self.parse_property_name();
+
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_accessor(
+            syntax_kind_ext::GET_ACCESSOR,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::AccessorData {
+                modifiers: None,
+                name,
+                type_parameters: None,
+                parameters: self.make_node_list(vec![]),
+                type_annotation,
+                body,
+            },
+        )
+    }
+
+    /// Parse set accessor in object literal: set foo(v) { }
+    fn parse_object_set_accessor(&mut self, start_pos: u32) -> NodeIndex {
+        self.next_token(); // consume 'set'
+        let name = self.parse_property_name();
+
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_accessor(
+            syntax_kind_ext::SET_ACCESSOR,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::AccessorData {
+                modifiers: None,
+                name,
+                type_parameters: None,
+                parameters,
+                type_annotation: NodeIndex::NONE,
+                body,
+            },
+        )
+    }
+
+    /// Parse method in object literal: foo() { } or async foo() { } or *foo() { }
+    fn parse_object_method(&mut self, start_pos: u32, is_async: bool, is_generator: bool) -> NodeIndex {
+        // Build modifiers if async
+        let modifiers = if is_async {
+            self.next_token(); // consume 'async'
+            let mod_idx = self.arena.create_modifier(SyntaxKind::AsyncKeyword, start_pos);
+            Some(self.make_node_list(vec![mod_idx]))
+        } else {
+            None
+        };
+
+        // Check for generator after async: async *foo()
+        // or standalone generator: *foo()
+        let asterisk = if is_generator {
+            // Asterisk already consumed by caller for standalone generator
+            true
+        } else if self.parse_optional(SyntaxKind::AsteriskToken) {
+            // async *foo() - consume asterisk here
+            true
+        } else {
+            false
+        };
+
+        let name = self.parse_property_name();
+        self.parse_object_method_after_name(start_pos, name, asterisk, modifiers.is_some())
+    }
+
+    /// Parse method after name has been parsed
+    fn parse_object_method_after_name(&mut self, start_pos: u32, name: NodeIndex, asterisk: bool, is_async: bool) -> NodeIndex {
+        // Optional type parameters
+        let type_parameters = if self.is_token(SyntaxKind::LessThanToken) {
+            Some(self.parse_type_parameters())
+        } else {
+            None
+        };
+
+        self.parse_expected(SyntaxKind::OpenParenToken);
+        let parameters = self.parse_parameter_list();
+        self.parse_expected(SyntaxKind::CloseParenToken);
+
+        let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
+            self.parse_type()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_block()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let modifiers = if is_async {
+            let mod_idx = self.arena.create_modifier(SyntaxKind::AsyncKeyword, start_pos);
+            Some(self.make_node_list(vec![mod_idx]))
+        } else {
+            None
+        };
+
+        let end_pos = self.token_end();
+        self.arena.add_method_decl(
+            syntax_kind_ext::METHOD_DECLARATION,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::MethodDeclData {
+                modifiers,
+                asterisk_token: asterisk,
+                name,
+                question_token: false,
+                type_parameters,
+                parameters,
+                type_annotation,
+                body,
             },
         )
     }
