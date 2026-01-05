@@ -73,18 +73,17 @@ Complete implementation in `wasm/src/solver/`:
 
 **Goal**: Complete emitter with performance-first approach.
 
-### Phase 6.1: Study & Exploration (Use Gemini)
-Before implementation, analyze for performance opportunities:
-- ⬜ **Benchmark current emit** - measure throughput (bytes/sec)
-- ⬜ **Profile hot paths** - string building, whitespace, source maps
-- ⬜ **Study TypeScript emitter** - identify simplification opportunities
-- ⬜ **Gemini review** - ask for emit architecture recommendations
-- ⬜ **Explore alternatives**: rope data structures, streaming output, SIMD text processing
+### Phase 6.1: Study & Exploration ✅
+Performance analysis complete - see `specs/EMITTER_ANALYSIS.md`:
+- ✅ **Benchmark infrastructure** - `wasm/benches/emitter_bench.rs`
+- ✅ **Hot path analysis** - string building, indentation caching
+- ✅ **TypeScript emitter study** - generator state machine architecture
+- ✅ **Baseline test script** - `scripts/baseline-test-rust.mjs`
 
-### Phase 6.2: Generator Transforms
-- ⬜ `function*` syntax and `yield` expressions
-- ⬜ State machine generation for ES5 target
-- ⬜ Iterator protocol compliance
+### Phase 6.2: Generator Transforms (In Progress)
+- ✅ `function*` syntax and `yield` expressions (emit support)
+- 🔄 State machine generation for ES5 target (`transforms/generators.rs`)
+- ⬜ Iterator protocol compliance (full state machine codegen)
 
 ### Phase 6.3: Output Format Matching
 - ⬜ Match TypeScript baseline whitespace/semicolons

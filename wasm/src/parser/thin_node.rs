@@ -79,6 +79,18 @@ impl ThinNode {
         }
     }
 
+    /// Create a new thin node with data index and flags
+    #[inline]
+    pub fn with_data_and_flags(kind: u16, pos: u32, end: u32, data_index: u32, flags: u16) -> ThinNode {
+        ThinNode {
+            kind,
+            flags,
+            pos,
+            end,
+            data_index,
+        }
+    }
+
     /// Check if this node has associated data
     #[inline]
     pub fn has_data(&self) -> bool {
@@ -1450,10 +1462,15 @@ impl ThinNodeArena {
 
     /// Add a variable statement/declaration list node
     pub fn add_variable(&mut self, kind: u16, pos: u32, end: u32, data: VariableData) -> NodeIndex {
+        self.add_variable_with_flags(kind, pos, end, data, 0)
+    }
+
+    /// Add a variable statement/declaration list node with flags
+    pub fn add_variable_with_flags(&mut self, kind: u16, pos: u32, end: u32, data: VariableData, flags: u16) -> NodeIndex {
         let data_index = self.variables.len() as u32;
         self.variables.push(data);
         let index = self.nodes.len() as u32;
-        self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
+        self.nodes.push(ThinNode::with_data_and_flags(kind, pos, end, data_index, flags));
         self.extended_info.push(ExtendedNodeInfo::default());
         NodeIndex(index)
     }
@@ -2800,6 +2817,61 @@ impl ThinNodeArena {
         use super::syntax_kind_ext::TYPE_PARAMETER;
         if node.has_data() && node.kind == TYPE_PARAMETER {
             self.type_parameters.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get parenthesized expression data.
+    #[inline]
+    pub fn get_parenthesized(&self, node: &ThinNode) -> Option<&ParenthesizedData> {
+        use super::syntax_kind_ext::PARENTHESIZED_EXPRESSION;
+        if node.has_data() && node.kind == PARENTHESIZED_EXPRESSION {
+            self.parenthesized.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get template expression data.
+    #[inline]
+    pub fn get_template_expr(&self, node: &ThinNode) -> Option<&TemplateExprData> {
+        use super::syntax_kind_ext::TEMPLATE_EXPRESSION;
+        if node.has_data() && node.kind == TEMPLATE_EXPRESSION {
+            self.template_exprs.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get template span data.
+    #[inline]
+    pub fn get_template_span(&self, node: &ThinNode) -> Option<&TemplateSpanData> {
+        use super::syntax_kind_ext::TEMPLATE_SPAN;
+        if node.has_data() && node.kind == TEMPLATE_SPAN {
+            self.template_spans.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get spread element/assignment data.
+    #[inline]
+    pub fn get_spread(&self, node: &ThinNode) -> Option<&SpreadData> {
+        use super::syntax_kind_ext::{SPREAD_ELEMENT, SPREAD_ASSIGNMENT};
+        if node.has_data() && (node.kind == SPREAD_ELEMENT || node.kind == SPREAD_ASSIGNMENT) {
+            self.spread_data.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get shorthand property assignment data.
+    #[inline]
+    pub fn get_shorthand_property(&self, node: &ThinNode) -> Option<&ShorthandPropertyData> {
+        use super::syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT;
+        if node.has_data() && node.kind == SHORTHAND_PROPERTY_ASSIGNMENT {
+            self.shorthand_properties.get(node.data_index as usize)
         } else {
             None
         }
