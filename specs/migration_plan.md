@@ -58,18 +58,20 @@ Complete implementation in `wasm/src/solver/`:
 ### Baseline Comparison (First 100 tests)
 | Baseline | Pass Rate | Blockers |
 |----------|-----------|----------|
-| .errors.txt | **37.7%** (29/77) | Missing parser errors, parameter validation |
+| .errors.txt | **44.2%** (34/77) | Missing parser errors, error elaboration |
 | .js emit | 0% | Emitter format mismatch |
 
 ### Completed
 - ✅ Class/function overload validation (2389, 2390, 2391)
 - ✅ Parser error code infrastructure
+- ✅ Parser semantic errors (1068, 1440) for class members
+- ✅ Parameter property validation (2369)
 
 ### Next Steps
-1. ⬜ Parser semantic errors (1068, 1128, 1440)
+1. ⬜ Parser semantic errors (1128, additional coverage)
 2. ⬜ Error elaboration ("...because property 'x' has type...")
 3. ⬜ RelatedInformation (point to definition sites)
-4. ⬜ Parameter type validation (2369)
+4. ⬜ Interface/function type parameter property checks
 
 ---
 
