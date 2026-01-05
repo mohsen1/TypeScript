@@ -1,0 +1,379 @@
+//! Type narrowing for discriminated unions and type guards.
+//!
+//! Discriminated unions are unions where each member has a common "discriminant"
+//! property with a literal type that uniquely identifies that member.
+//!
+//! Example:
+//! ```typescript
+//! type Action =
+//!   | { type: "add", value: number }
+//!   | { type: "remove", id: string }
+//!   | { type: "clear" };
+//!
+//! function handle(action: Action) {
+//!   if (action.type === "add") {
+//!     // action is narrowed to { type: "add", value: number }
+//!   }
+//! }
+//! ```
+
+use std::sync::Arc;
+use crate::solver::types::*;
+use crate::solver::intern::TypeInterner;
+
+/// Result of finding discriminant properties in a union.
+#[derive(Clone, Debug)]
+pub struct DiscriminantInfo {
+    /// The name of the discriminant property
+    pub property_name: Arc<str>,
+    /// Map from literal value to the union member type
+    pub variants: Vec<(TypeId, TypeId)>, // (literal_type, member_type)
+}
+
+/// Narrowing context for type guards and control flow analysis.
+pub struct NarrowingContext<'a> {
+    interner: &'a TypeInterner,
+}
+
+impl<'a> NarrowingContext<'a> {
+    pub fn new(interner: &'a TypeInterner) -> Self {
+        NarrowingContext { interner }
+    }
+
+    /// Find discriminant properties in a union type.
+    ///
+    /// A discriminant property is one where:
+    /// 1. All union members have the property
+    /// 2. Each member has a unique literal type for that property
+    pub fn find_discriminants(&self, union_type: TypeId) -> Vec<DiscriminantInfo> {
+        let members = match self.interner.lookup(union_type) {
+            Some(TypeKey::Union(m)) => m,
+            _ => return vec![],
+        };
+
+        if members.len() < 2 {
+            return vec![];
+        }
+
+        // Collect all property names from all members
+        let mut all_properties: Vec<Arc<str>> = Vec::new();
+        let mut member_props: Vec<Vec<(Arc<str>, TypeId)>> = Vec::new();
+
+        for &member in &members {
+            if let Some(TypeKey::Object(props)) = self.interner.lookup(member) {
+                let props_vec: Vec<(Arc<str>, TypeId)> = props.iter()
+                    .map(|p| (p.name.clone(), p.type_id))
+                    .collect();
+
+                // Track all property names
+                for (name, _) in &props_vec {
+                    if !all_properties.contains(name) {
+                        all_properties.push(name.clone());
+                    }
+                }
+                member_props.push(props_vec);
+            } else {
+                // Non-object member - can't have discriminants
+                return vec![];
+            }
+        }
+
+        // Check each property to see if it's a valid discriminant
+        let mut discriminants = Vec::new();
+
+        for prop_name in &all_properties {
+            let mut is_discriminant = true;
+            let mut variants: Vec<(TypeId, TypeId)> = Vec::new();
+            let mut seen_literals: Vec<TypeId> = Vec::new();
+
+            for (i, props) in member_props.iter().enumerate() {
+                // Find this property in the member
+                let prop_type = props.iter()
+                    .find(|(name, _)| name == prop_name)
+                    .map(|(_, ty)| *ty);
+
+                match prop_type {
+                    Some(ty) => {
+                        // Must be a literal type
+                        if self.is_literal_type(ty) {
+                            // Must be unique among members
+                            if seen_literals.contains(&ty) {
+                                is_discriminant = false;
+                                break;
+                            }
+                            seen_literals.push(ty);
+                            variants.push((ty, members[i]));
+                        } else {
+                            is_discriminant = false;
+                            break;
+                        }
+                    }
+                    None => {
+                        // Property doesn't exist in this member
+                        is_discriminant = false;
+                        break;
+                    }
+                }
+            }
+
+            if is_discriminant && !variants.is_empty() {
+                discriminants.push(DiscriminantInfo {
+                    property_name: prop_name.clone(),
+                    variants,
+                });
+            }
+        }
+
+        discriminants
+    }
+
+    /// Narrow a union type based on a discriminant property check.
+    ///
+    /// Example: `action.type === "add"` narrows `Action` to `{ type: "add", value: number }`
+    pub fn narrow_by_discriminant(
+        &self,
+        union_type: TypeId,
+        property_name: &str,
+        literal_value: TypeId,
+    ) -> TypeId {
+        let discriminants = self.find_discriminants(union_type);
+
+        for disc in &discriminants {
+            if disc.property_name.as_ref() == property_name {
+                // Find the variant matching this literal
+                for (lit, member) in &disc.variants {
+                    if *lit == literal_value {
+                        return *member;
+                    }
+                }
+            }
+        }
+
+        // No narrowing possible - return original
+        union_type
+    }
+
+    /// Narrow a union type by excluding variants with a specific discriminant value.
+    ///
+    /// Example: `action.type !== "add"` narrows to `{ type: "remove", ... } | { type: "clear" }`
+    pub fn narrow_by_excluding_discriminant(
+        &self,
+        union_type: TypeId,
+        property_name: &str,
+        excluded_value: TypeId,
+    ) -> TypeId {
+        let members = match self.interner.lookup(union_type) {
+            Some(TypeKey::Union(m)) => m,
+            _ => return union_type,
+        };
+
+        let mut remaining: Vec<TypeId> = Vec::new();
+
+        for &member in &members {
+            if let Some(TypeKey::Object(props)) = self.interner.lookup(member) {
+                let prop_type = props.iter()
+                    .find(|p| p.name.as_ref() == property_name)
+                    .map(|p| p.type_id);
+
+                match prop_type {
+                    Some(ty) if ty == excluded_value => {
+                        // Exclude this member
+                    }
+                    _ => {
+                        remaining.push(member);
+                    }
+                }
+            } else {
+                remaining.push(member);
+            }
+        }
+
+        if remaining.is_empty() {
+            TypeId::NEVER
+        } else if remaining.len() == 1 {
+            remaining[0]
+        } else {
+            self.interner.union(remaining)
+        }
+    }
+
+    /// Narrow a type based on a typeof check.
+    ///
+    /// Example: `typeof x === "string"` narrows `string | number` to `string`
+    pub fn narrow_by_typeof(
+        &self,
+        source_type: TypeId,
+        typeof_result: &str,
+    ) -> TypeId {
+        let target_type = match typeof_result {
+            "string" => TypeId::STRING,
+            "number" => TypeId::NUMBER,
+            "boolean" => TypeId::BOOLEAN,
+            "bigint" => TypeId::BIGINT,
+            "symbol" => TypeId::SYMBOL,
+            "undefined" => TypeId::UNDEFINED,
+            "object" => TypeId::OBJECT, // includes null
+            "function" => return self.narrow_to_function(source_type),
+            _ => return source_type,
+        };
+
+        self.narrow_to_type(source_type, target_type)
+    }
+
+    /// Narrow a type to include only members assignable to target.
+    pub fn narrow_to_type(&self, source_type: TypeId, target_type: TypeId) -> TypeId {
+        // If source is the target, return it
+        if source_type == target_type {
+            return source_type;
+        }
+
+        // If source is a union, filter members
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
+            let matching: Vec<TypeId> = members.iter()
+                .filter(|&&m| self.is_assignable_to(m, target_type))
+                .copied()
+                .collect();
+
+            if matching.is_empty() {
+                return TypeId::NEVER;
+            } else if matching.len() == 1 {
+                return matching[0];
+            } else {
+                return self.interner.union(matching);
+            }
+        }
+
+        // Check if source is assignable to target
+        if self.is_assignable_to(source_type, target_type) {
+            source_type
+        } else {
+            TypeId::NEVER
+        }
+    }
+
+    /// Narrow a type to exclude members assignable to target.
+    pub fn narrow_excluding_type(&self, source_type: TypeId, excluded_type: TypeId) -> TypeId {
+        // If source is a union, filter out matching members
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
+            let remaining: Vec<TypeId> = members.iter()
+                .filter(|&&m| !self.is_assignable_to(m, excluded_type))
+                .copied()
+                .collect();
+
+            if remaining.is_empty() {
+                return TypeId::NEVER;
+            } else if remaining.len() == 1 {
+                return remaining[0];
+            } else {
+                return self.interner.union(remaining);
+            }
+        }
+
+        // If source is assignable to excluded, return never
+        if self.is_assignable_to(source_type, excluded_type) {
+            TypeId::NEVER
+        } else {
+            source_type
+        }
+    }
+
+    /// Narrow to function types only.
+    fn narrow_to_function(&self, source_type: TypeId) -> TypeId {
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
+            let functions: Vec<TypeId> = members.iter()
+                .filter(|&&m| self.is_function_type(m))
+                .copied()
+                .collect();
+
+            if functions.is_empty() {
+                return TypeId::NEVER;
+            } else if functions.len() == 1 {
+                return functions[0];
+            } else {
+                return self.interner.union(functions);
+            }
+        }
+
+        if self.is_function_type(source_type) {
+            source_type
+        } else {
+            TypeId::NEVER
+        }
+    }
+
+    /// Check if a type is a literal type.
+    fn is_literal_type(&self, type_id: TypeId) -> bool {
+        matches!(self.interner.lookup(type_id), Some(TypeKey::Literal(_)))
+    }
+
+    /// Check if a type is a function type.
+    fn is_function_type(&self, type_id: TypeId) -> bool {
+        matches!(self.interner.lookup(type_id), Some(TypeKey::Function(_)))
+    }
+
+    /// Simple assignability check for narrowing purposes.
+    fn is_assignable_to(&self, source: TypeId, target: TypeId) -> bool {
+        if source == target {
+            return true;
+        }
+
+        // never is assignable to everything
+        if source == TypeId::NEVER {
+            return true;
+        }
+
+        // everything is assignable to any/unknown
+        if target == TypeId::ANY || target == TypeId::UNKNOWN {
+            return true;
+        }
+
+        // Literal to base type
+        if let Some(TypeKey::Literal(lit)) = self.interner.lookup(source) {
+            match (lit, target) {
+                (LiteralValue::String(_), t) if t == TypeId::STRING => return true,
+                (LiteralValue::Number(_), t) if t == TypeId::NUMBER => return true,
+                (LiteralValue::Boolean(_), t) if t == TypeId::BOOLEAN => return true,
+                (LiteralValue::BigInt(_), t) if t == TypeId::BIGINT => return true,
+                _ => {}
+            }
+        }
+
+        // null/undefined to object (for typeof "object" narrowing)
+        if source == TypeId::NULL && target == TypeId::OBJECT {
+            return true;
+        }
+
+        false
+    }
+}
+
+/// Convenience function for finding discriminants.
+pub fn find_discriminants(interner: &TypeInterner, union_type: TypeId) -> Vec<DiscriminantInfo> {
+    let ctx = NarrowingContext::new(interner);
+    ctx.find_discriminants(union_type)
+}
+
+/// Convenience function for narrowing by discriminant.
+pub fn narrow_by_discriminant(
+    interner: &TypeInterner,
+    union_type: TypeId,
+    property_name: &str,
+    literal_value: TypeId,
+) -> TypeId {
+    let ctx = NarrowingContext::new(interner);
+    ctx.narrow_by_discriminant(union_type, property_name, literal_value)
+}
+
+/// Convenience function for typeof narrowing.
+pub fn narrow_by_typeof(
+    interner: &TypeInterner,
+    source_type: TypeId,
+    typeof_result: &str,
+) -> TypeId {
+    let ctx = NarrowingContext::new(interner);
+    ctx.narrow_by_typeof(source_type, typeof_result)
+}
+
+#[cfg(test)]
+#[path = "narrowing_tests.rs"]
+mod tests;
