@@ -317,9 +317,129 @@ impl<'a> ThinCheckerState<'a> {
             // void expression
             k if k == syntax_kind_ext::VOID_EXPRESSION => TypeId::UNDEFINED,
 
+            // =========================================================================
+            // Type Nodes
+            // =========================================================================
+
+            // Type reference (e.g., "number", "string", "MyType")
+            k if k == syntax_kind_ext::TYPE_REFERENCE => {
+                self.get_type_from_type_reference(idx)
+            }
+
+            // Keyword types
+            k if k == SyntaxKind::NumberKeyword as u16 => TypeId::NUMBER,
+            k if k == SyntaxKind::StringKeyword as u16 => TypeId::STRING,
+            k if k == SyntaxKind::BooleanKeyword as u16 => TypeId::BOOLEAN,
+            k if k == SyntaxKind::VoidKeyword as u16 => TypeId::VOID,
+            k if k == SyntaxKind::AnyKeyword as u16 => TypeId::ANY,
+            k if k == SyntaxKind::NeverKeyword as u16 => TypeId::NEVER,
+            k if k == SyntaxKind::UnknownKeyword as u16 => TypeId::UNKNOWN,
+            k if k == SyntaxKind::UndefinedKeyword as u16 => TypeId::UNDEFINED,
+            k if k == SyntaxKind::NullKeyword as u16 => TypeId::NULL,
+            k if k == SyntaxKind::ObjectKeyword as u16 => TypeId::OBJECT,
+            k if k == SyntaxKind::BigIntKeyword as u16 => TypeId::BIGINT,
+            k if k == SyntaxKind::SymbolKeyword as u16 => TypeId::SYMBOL,
+
+            // Union type (A | B)
+            k if k == syntax_kind_ext::UNION_TYPE => {
+                self.get_type_from_union_type(idx)
+            }
+
+            // Array type (T[])
+            k if k == syntax_kind_ext::ARRAY_TYPE => {
+                self.get_type_from_array_type(idx)
+            }
+
             // Default case
             _ => TypeId::ANY,
         }
+    }
+
+    /// Get type from a type reference node (e.g., "number", "string", "MyType").
+    fn get_type_from_type_reference(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        // Get the TypeRefData from the arena
+        let Some(type_ref) = self.arena.get_type_ref(node) else {
+            return TypeId::ANY;
+        };
+
+        let type_name_idx = type_ref.type_name;
+
+        // Get the identifier for the type name
+        if let Some(name_node) = self.arena.get(type_name_idx) {
+            if let Some(ident) = self.arena.get_identifier(name_node) {
+                // Check for built-in types
+                match ident.escaped_text.as_str() {
+                    "number" => return TypeId::NUMBER,
+                    "string" => return TypeId::STRING,
+                    "boolean" => return TypeId::BOOLEAN,
+                    "void" => return TypeId::VOID,
+                    "any" => return TypeId::ANY,
+                    "never" => return TypeId::NEVER,
+                    "unknown" => return TypeId::UNKNOWN,
+                    "undefined" => return TypeId::UNDEFINED,
+                    "null" => return TypeId::NULL,
+                    "object" => return TypeId::OBJECT,
+                    "bigint" => return TypeId::BIGINT,
+                    "symbol" => return TypeId::SYMBOL,
+                    "Array" => {
+                        // Array<T> - get type argument
+                        // TODO: Handle generic Array type
+                        return self.types.array(TypeId::ANY);
+                    }
+                    _ => {
+                        // TODO: Look up user-defined types from symbol table
+                        return TypeId::ANY;
+                    }
+                }
+            }
+        }
+
+        TypeId::ANY
+    }
+
+    /// Get type from a union type node (A | B).
+    fn get_type_from_union_type(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        // UnionType uses CompositeTypeData which has a types list
+        if let Some(composite) = self.arena.get_composite_type(node) {
+            let mut member_types = Vec::new();
+            for &type_idx in &composite.types.nodes {
+                member_types.push(self.get_type_of_node(type_idx));
+            }
+
+            if member_types.is_empty() {
+                return TypeId::NEVER;
+            }
+            if member_types.len() == 1 {
+                return member_types[0];
+            }
+
+            return self.types.union(member_types);
+        }
+
+        TypeId::ANY
+    }
+
+    /// Get type from an array type node (T[]).
+    fn get_type_from_array_type(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        // ArrayType uses TypeOperatorData which has the element type
+        if let Some(type_op) = self.arena.get_type_operator(node) {
+            let elem_type = self.get_type_of_node(type_op.type_node);
+            return self.types.array(elem_type);
+        }
+
+        self.types.array(TypeId::ANY)
     }
 
     // =========================================================================
@@ -1139,5 +1259,218 @@ impl<'a> ThinCheckerState<'a> {
     pub fn format_type(&self, type_id: TypeId) -> String {
         let mut formatter = crate::solver::TypeFormatter::new(&self.types);
         formatter.format(type_id)
+    }
+
+    // =========================================================================
+    // Source File Checking (Full Traversal)
+    // =========================================================================
+
+    /// Check a source file and populate diagnostics.
+    /// This is the entry point for type checking a parsed and bound file.
+    pub fn check_source_file(&mut self, root_idx: NodeIndex) {
+        let Some(node) = self.arena.get(root_idx) else {
+            return;
+        };
+
+        if let Some(sf) = self.arena.get_source_file(node) {
+            // Type check each top-level statement
+            for &stmt_idx in &sf.statements.nodes {
+                self.check_statement(stmt_idx);
+            }
+        }
+    }
+
+    /// Check a statement and produce type errors.
+    fn check_statement(&mut self, stmt_idx: NodeIndex) {
+        let Some(node) = self.arena.get(stmt_idx) else {
+            return;
+        };
+
+        match node.kind {
+            syntax_kind_ext::VARIABLE_STATEMENT => {
+                self.check_variable_statement(stmt_idx);
+            }
+            syntax_kind_ext::EXPRESSION_STATEMENT => {
+                // Type-check the expression - get it from the expression pool
+                // ExpressionStatement stores single expression at data_index
+                self.get_type_of_node(stmt_idx);
+            }
+            syntax_kind_ext::IF_STATEMENT => {
+                if let Some(if_data) = self.arena.get_if_statement(node) {
+                    // Check condition
+                    self.get_type_of_node(if_data.expression);
+                    // Check then branch
+                    self.check_statement(if_data.then_statement);
+                    // Check else branch if present
+                    if !if_data.else_statement.is_none() {
+                        self.check_statement(if_data.else_statement);
+                    }
+                }
+            }
+            syntax_kind_ext::RETURN_STATEMENT => {
+                // Return statement expression - just type check the node
+                self.get_type_of_node(stmt_idx);
+            }
+            syntax_kind_ext::BLOCK => {
+                if let Some(block) = self.arena.get_block(node) {
+                    for &inner_stmt in &block.statements.nodes {
+                        self.check_statement(inner_stmt);
+                    }
+                }
+            }
+            syntax_kind_ext::FUNCTION_DECLARATION => {
+                if let Some(func) = self.arena.get_function(node) {
+                    // Check function body if present
+                    if !func.body.is_none() {
+                        self.push_local_scope();
+
+                        // Add parameters to local scope
+                        for &param_idx in &func.parameters.nodes {
+                            if let Some(param_node) = self.arena.get(param_idx) {
+                                if let Some(param) = self.arena.get_parameter(param_node) {
+                                    // Get parameter name
+                                    if let Some(name_node) = self.arena.get(param.name) {
+                                        if let Some(ident) = self.arena.get_identifier(name_node) {
+                                            let param_type = if !param.type_annotation.is_none() {
+                                                self.get_type_of_node(param.type_annotation)
+                                            } else {
+                                                TypeId::ANY
+                                            };
+                                            self.add_local(ident.escaped_text.clone(), param_type);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        self.check_statement(func.body);
+                        self.pop_local_scope();
+                    }
+                }
+            }
+            syntax_kind_ext::WHILE_STATEMENT | syntax_kind_ext::DO_STATEMENT => {
+                if let Some(loop_data) = self.arena.get_loop(node) {
+                    self.get_type_of_node(loop_data.condition);
+                    self.check_statement(loop_data.statement);
+                }
+            }
+            syntax_kind_ext::FOR_STATEMENT => {
+                if let Some(loop_data) = self.arena.get_loop(node) {
+                    if !loop_data.initializer.is_none() {
+                        self.get_type_of_node(loop_data.initializer);
+                    }
+                    if !loop_data.condition.is_none() {
+                        self.get_type_of_node(loop_data.condition);
+                    }
+                    if !loop_data.incrementor.is_none() {
+                        self.get_type_of_node(loop_data.incrementor);
+                    }
+                    self.check_statement(loop_data.statement);
+                }
+            }
+            syntax_kind_ext::FOR_IN_STATEMENT | syntax_kind_ext::FOR_OF_STATEMENT => {
+                if let Some(for_data) = self.arena.get_for_in_of(node) {
+                    self.get_type_of_node(for_data.initializer);
+                    self.get_type_of_node(for_data.expression);
+                    self.check_statement(for_data.statement);
+                }
+            }
+            syntax_kind_ext::TRY_STATEMENT => {
+                if let Some(try_data) = self.arena.get_try(node) {
+                    self.check_statement(try_data.try_block);
+                    if !try_data.catch_clause.is_none() {
+                        if let Some(catch_node) = self.arena.get(try_data.catch_clause) {
+                            if let Some(catch) = self.arena.get_catch_clause(catch_node) {
+                                self.check_statement(catch.block);
+                            }
+                        }
+                    }
+                    if !try_data.finally_block.is_none() {
+                        self.check_statement(try_data.finally_block);
+                    }
+                }
+            }
+            // Type declarations - just register them, no expression checking needed
+            syntax_kind_ext::INTERFACE_DECLARATION |
+            syntax_kind_ext::TYPE_ALIAS_DECLARATION |
+            syntax_kind_ext::ENUM_DECLARATION |
+            syntax_kind_ext::MODULE_DECLARATION |
+            syntax_kind_ext::IMPORT_DECLARATION |
+            syntax_kind_ext::EXPORT_DECLARATION |
+            syntax_kind_ext::EMPTY_STATEMENT |
+            syntax_kind_ext::DEBUGGER_STATEMENT |
+            syntax_kind_ext::BREAK_STATEMENT |
+            syntax_kind_ext::CONTINUE_STATEMENT => {
+                // No action needed
+            }
+            syntax_kind_ext::CLASS_DECLARATION => {
+                // TODO: Check class members
+                self.get_type_of_node(stmt_idx);
+            }
+            _ => {
+                // Catch-all for other statement types
+                self.get_type_of_node(stmt_idx);
+            }
+        }
+    }
+
+    /// Check a variable statement (var/let/const declarations).
+    fn check_variable_statement(&mut self, stmt_idx: NodeIndex) {
+        let Some(node) = self.arena.get(stmt_idx) else {
+            return;
+        };
+
+        if let Some(var) = self.arena.get_variable(node) {
+            // VariableStatement.declarations contains VariableDeclarationList nodes
+            for &list_idx in &var.declarations.nodes {
+                self.check_variable_declaration_list(list_idx);
+            }
+        }
+    }
+
+    /// Check a variable declaration list (var/let/const x, y, z).
+    fn check_variable_declaration_list(&mut self, list_idx: NodeIndex) {
+        let Some(node) = self.arena.get(list_idx) else {
+            return;
+        };
+
+        // VariableDeclarationList uses the same VariableData structure
+        if let Some(var_list) = self.arena.get_variable(node) {
+            // Now these are actual VariableDeclaration nodes
+            for &decl_idx in &var_list.declarations.nodes {
+                self.check_variable_declaration(decl_idx);
+            }
+        }
+    }
+
+    /// Check a single variable declaration.
+    fn check_variable_declaration(&mut self, decl_idx: NodeIndex) {
+        let Some(node) = self.arena.get(decl_idx) else {
+            return;
+        };
+
+        let Some(var_decl) = self.arena.get_variable_declaration(node) else {
+            return;
+        };
+
+        // Get declared type from type annotation
+        let declared_type = if !var_decl.type_annotation.is_none() {
+            self.get_type_of_node(var_decl.type_annotation)
+        } else {
+            TypeId::ANY
+        };
+
+        // Get inferred type from initializer
+        if !var_decl.initializer.is_none() {
+            let init_type = self.get_type_of_node(var_decl.initializer);
+
+            // If there's a type annotation, check that initializer is assignable
+            if !var_decl.type_annotation.is_none() && declared_type != TypeId::ANY {
+                if !self.is_assignable_to(init_type, declared_type) {
+                    // Report type error
+                    self.error_type_not_assignable_at(init_type, declared_type, var_decl.initializer);
+                }
+            }
+        }
     }
 }

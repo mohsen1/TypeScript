@@ -305,17 +305,40 @@ These are TypeScript's "type-level functions" (see §4 of SOLVER.md).
 
 ## Path to 100%
 
-1. Complete solver (Priority 1-4 above)
-2. Connect solver to ThinChecker for type inference
-3. Generate diagnostics matching TypeScript baselines
-4. Compare output: `.errors.txt`, `.types`, `.js` files
+1. ✅ Complete solver (Priority 1-4 above)
+2. ✅ Connect solver to ThinChecker for type inference
+   - ThinChecker uses solver's TypeInterner ✅
+   - ThinChecker uses solver's SubtypeChecker ✅
+   - `check_source_file()` traversal ✅
+   - Variable declaration type checking ✅
+3. 🟡 Generate diagnostics matching TypeScript baselines
+   - Basic type mismatch diagnostics working ✅ (error 2322)
+   - **NEXT**: Expand to more expression types, function calls, etc.
+4. ⬜ Compare output: `.errors.txt`, `.types`, `.js` files
+
+### ThinChecker Type Checking Status
+
+Working:
+- `check_source_file()` - traverse all statements ✅
+- `check_statement()` - check each statement type ✅
+- `check_variable_statement()` - validate initializer matches type annotation ✅
+- Type annotation resolution (number, string, boolean, etc.) ✅
+- TYPE_REFERENCE nodes resolution ✅
+- Union types ✅
+- Array types ✅
+- Basic type mismatch diagnostics ✅
+
+Next:
+- Function parameter and return type checking
+- Class member type checking
+- More comprehensive diagnostic messages
 
 ---
 
 # Phase 9: Full Rust Mode ⬜
 
 - [ ] Remove TypeScript fallbacks
-- [ ] Performance optimization pass
+- [ ] Performance optimization pass. how fast we compile TypeScript's own source code? compared to tsc and tsc-go?
 - [ ] Memory usage optimization
 - [ ] WASM interface optimization (binary protocol)
 

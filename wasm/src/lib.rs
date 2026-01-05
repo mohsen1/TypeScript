@@ -222,14 +222,17 @@ impl ThinParser {
                 file_name,
             );
 
-            // Check the source file
-            let _type_id = checker.get_type_of_node(root_idx);
+            // Full source file type checking - traverse all statements
+            checker.check_source_file(root_idx);
 
             let result = serde_json::json!({
                 "typeCount": checker.types.len(),
                 "diagnostics": checker.diagnostics.iter().map(|d| {
                     serde_json::json!({
-                        "message": format!("{:?}", d.message_text),
+                        "message": d.message_text.clone(),
+                        "code": d.code,
+                        "start": d.start,
+                        "length": d.length,
                         "category": format!("{:?}", d.category),
                     })
                 }).collect::<Vec<_>>(),
