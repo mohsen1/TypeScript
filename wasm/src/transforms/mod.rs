@@ -7,6 +7,8 @@
 
 pub mod async_gen;
 pub mod class;
+pub mod class_es5;
+pub mod arrow_es5;
 pub mod es2015;
 pub mod generators;
 pub mod helpers;

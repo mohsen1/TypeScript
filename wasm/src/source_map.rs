@@ -242,7 +242,8 @@ impl SourceMapGenerator {
         self.prev_source_column = 0;
         self.prev_name_index = 0;
 
-        for mapping in &self.mappings {
+        let mappings = self.mappings.clone();
+        for mapping in &mappings {
             // Add semicolons for skipped lines
             while self.prev_generated_line < mapping.generated.line {
                 result.push(';');

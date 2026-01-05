@@ -1,17 +1,14 @@
 //! Tests for declaration_emitter.rs
 
 use crate::declaration_emitter::*;
-use crate::parser_impl::ParserState;
+use crate::thin_parser::ThinParserState;
 
 fn emit_declaration(source: &str) -> String {
-    let mut parser = ParserState::new("test.ts".to_string(), source.to_string());
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
-
-    let mut emitter = DeclarationEmitter::new();
-    if let Some(root_node) = parser.arena.get(root) {
-        emitter.emit_source_file(root_node, &parser.arena);
-    }
-    emitter.take_output()
+    
+    let mut emitter = DeclarationEmitter::new(&parser.arena);
+    emitter.emit(root)
 }
 
 #[test]
