@@ -133,7 +133,7 @@ pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
 ### Baseline Comparison (First 100 tests)
 | Baseline | Pass Rate | Blockers |
 |----------|-----------|----------|
-| .errors.txt | **51.9%** (40/77) | Missing parser errors, error elaboration |
+| .errors.txt | **54.5%** (42/77) | Missing parser errors, error elaboration |
 | .js emit | 0% | Emitter format mismatch |
 
 ### Completed
@@ -145,8 +145,9 @@ pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
 - ✅ Abstract method handling (skip 2391 for abstract)
 - ✅ Declare class parsing (skip impl checks for ambient)
 - ✅ Numeric method name support (0(), 1(), etc.)
-- ✅ Abstract class instantiation check (2511) - file-level direct `new` calls
+- ✅ Abstract class instantiation check (2511) - all contexts including local scopes
 - ✅ Expanded known globals (WeakRef, TypedArrays, Web APIs, etc.)
+- ✅ Nested scope symbol lookup (classes/functions in IIFEs/arrow functions)
 
 ### Next Steps
 1. ⬜ Parser semantic errors (1128, additional coverage)
@@ -156,11 +157,14 @@ pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
    - ✅ `error_type_not_assignable_with_reason_at()` in thin_checker.rs
    - ✅ Wired up: variable declarations, return statements, property declarations
 3. ⬜ RelatedInformation (point to definition sites)
-4. 🔄 Scoped name resolution (partial)
+4. ✅ Scoped name resolution
    - ✅ Local variables added to scope during type checking
    - ✅ Parameters added to scope in functions/methods/constructors
+   - ✅ Block scope support (push/pop scope for BLOCK nodes)
+   - ✅ For-loop variable scope (FOR_STATEMENT, FOR_IN, FOR_OF)
+   - ✅ Abstract class checks in local scopes (binder + checker enhanced)
+   - ✅ Symbol lookup fallback for all symbols (handles nested classes)
    - ⬜ Class member resolution (this.x vs x vs ClassName.x)
-   - ⬜ Abstract class checks in local scopes (needs binder enhancement)
 
 ---
 
