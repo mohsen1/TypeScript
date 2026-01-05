@@ -176,13 +176,27 @@ impl<'a> ClassES5Emitter<'a> {
                     continue;
                 }
                 
-                let method_name = self.get_identifier_text(method_data.name);
+                let use_bracket = !self.is_valid_identifier_name(method_data.name);
+                let method_name = if use_bracket {
+                    self.get_computed_property_name(method_data.name)
+                } else {
+                    self.get_identifier_text(method_data.name)
+                };
                 
                 // ClassName.prototype.methodName = function () { ... };
+                // or ClassName.prototype[1] = function () { ... };
+                // or ClassName.prototype["bar"] = function () { ... };
                 self.write_indent();
                 self.write(class_name);
-                self.write(".prototype.");
-                self.write(&method_name);
+                self.write(".prototype");
+                if use_bracket {
+                    self.write("[");
+                    self.write(&method_name);
+                    self.write("]");
+                } else {
+                    self.write(".");
+                    self.write(&method_name);
+                }
                 self.write(" = function (");
                 self.emit_parameters(&method_data.parameters);
                 self.write(") ");
@@ -841,6 +855,49 @@ impl<'a> ClassES5Emitter<'a> {
     
     fn get_identifier_text(&self, idx: NodeIndex) -> String {
         if let Some(node) = self.arena.get(idx) {
+            if let Some(ident) = self.arena.get_identifier(node) {
+                return ident.escaped_text.clone();
+            }
+            // Handle numeric literals as property names
+            if let Some(lit) = self.arena.get_literal(node) {
+                return lit.text.clone();
+            }
+        }
+        String::new()
+    }
+    
+    /// Check if a name is a valid identifier (can use dot notation) or needs bracket notation
+    fn is_valid_identifier_name(&self, idx: NodeIndex) -> bool {
+        if let Some(node) = self.arena.get(idx) {
+            // Identifiers use dot notation
+            if self.arena.get_identifier(node).is_some() {
+                return true;
+            }
+            // Numeric and string literals need bracket notation
+            if node.kind == SyntaxKind::NumericLiteral as u16 {
+                return false;
+            }
+            if node.kind == SyntaxKind::StringLiteral as u16 {
+                return false;
+            }
+        }
+        true // Default to dot notation
+    }
+    
+    /// Get the property name for bracket notation (with quotes for strings)
+    fn get_computed_property_name(&self, idx: NodeIndex) -> String {
+        if let Some(node) = self.arena.get(idx) {
+            // String literals need quotes in bracket notation
+            if node.kind == SyntaxKind::StringLiteral as u16 {
+                if let Some(lit) = self.arena.get_literal(node) {
+                    return format!("\"{}\"", lit.text);
+                }
+            }
+            // Other literals (numbers) are used as-is
+            if let Some(lit) = self.arena.get_literal(node) {
+                return lit.text.clone();
+            }
+            // Identifiers
             if let Some(ident) = self.arena.get_identifier(node) {
                 return ident.escaped_text.clone();
             }
