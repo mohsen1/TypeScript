@@ -75,34 +75,38 @@ Our emitter produces modern ES6+ output. ES5 transforms planned for Phase 6.3.
 ## Track B: Phase 6 - Emitter Completion (75% → 100%)
 
 **Goal**: Complete emitter with performance-first approach.
+**Full Plan**: See `specs/PHASE_6_PLAN.md` for detailed breakdown.
 
 ### Phase 6.1: Study & Exploration ✅
-Performance analysis complete - see `specs/EMITTER_ANALYSIS.md`:
-- ✅ **Benchmark infrastructure** - `wasm/benches/emitter_bench.rs`
-- ✅ **Hot path analysis** - string building, indentation caching
-- ✅ **TypeScript emitter study** - generator state machine architecture
-- ✅ **Baseline test script** - `scripts/baseline-test-rust.mjs`
+- ✅ Benchmark infrastructure (`wasm/benches/emitter_bench.rs`)
+- ✅ Hot path analysis, TypeScript emitter study
+- ✅ Baseline test script (`scripts/baseline-test-rust.mjs`)
 
 ### Phase 6.2: JavaScript Emit ✅
-- ✅ Strip TypeScript-only syntax for JS output
-- ✅ Skip interface/type declarations
-- ✅ Skip function/method bodies without implementation
-- ✅ Strip type annotations from parameters and variables
+- ✅ Strip TypeScript-only syntax (interfaces, type aliases, declarations)
+- ✅ Strip type annotations from functions, variables, parameters
 - ✅ Strip `private`/`protected`/`readonly` modifiers
-- ✅ Keep `static`/`async` modifiers for JavaScript
 
-### Phase 6.3: ES5 Transforms (Future)
-TypeScript baselines use ES5 target. Our emitter produces ES6+ output.
-ES5 transforms needed for baseline compatibility:
-- ⬜ Class → IIFE with prototype methods
-- ⬜ Arrow function → regular function
-- ⬜ Generator state machines (`transforms/generators.rs` started)
-- ⬜ Template literals → string concatenation
+### Phase 6.3: ES5 Transforms ⬜ (~10 days)
+| Transform | Effort | Status |
+|-----------|--------|--------|
+| Class → IIFE | 4 days | ⬜ |
+| Arrow → function | 1 day | ⬜ |
+| Generators | 4 days | 🔄 started |
+| Async/await | 2 days | ⬜ |
 
-### Phase 6.4: Output Format Matching
-- ⬜ Match TypeScript baseline whitespace/semicolons
-- ⬜ Source map generation
-- ⬜ Declaration file formatting (.d.ts emit)
+### Phase 6.4: Output Format ⬜ (~5 days)
+| Feature | Effort | Status |
+|---------|--------|--------|
+| Source maps | 2 days | ⬜ |
+| .d.ts emit | 2 days | ⬜ |
+| Formatting | 1 day | ⬜ |
+
+### Phase 6.5: Baseline Validation ⬜ (~3 days)
+| Baseline | Current | Target |
+|----------|---------|--------|
+| .js emit | 0% | 80%+ |
+| .d.ts emit | 0% | 80%+ |
 
 ### Key Files
 | Purpose | Location |
