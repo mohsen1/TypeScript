@@ -105,22 +105,24 @@ Our emitter produces modern ES6+ output. ES5 transforms planned for Phase 6.3.
 ### Phase 6.5: Baseline Validation 🔄 (~ongoing)
 | Baseline | Current | Target | Notes |
 |----------|---------|--------|-------|
-| .js emit | **9.8%** (86/875) | 80%+ | ES5 class/arrow transforms working |
+| .js emit | **31%** (27/87) | 80%+ | ES5 transforms, namespace→IIFE |
 | .d.ts emit | 0% | 80%+ | Framework ready |
 
-**Recent ES5 Improvements:**
+**Completed ES5 Improvements:**
 - Classes → IIFE with `/** @class */` comment
 - Methods → prototype assignments
 - Arrow functions → regular function expressions
 - Computed property names (numeric/string literals)
 - Empty body blocks on single line: `{ }`
 - Single-return function bodies on single line
+- **Namespace/module → IIFE transform** (`transforms/namespace_es5.rs`)
+- Export declarations handled via `EXPORT_DECLARATION` nodes
 
-**Remaining Blockers (for 100%):**
-- Namespace/module → IIFE transforms
-- CommonJS exports (module.exports, exports.X)
+**Remaining Blockers (for 80%+):**
+- Class inheritance (`__extends` helper for `extends`)
+- CommonJS exports (`module.exports`, `exports.X`)
 - `const` modifier on class properties (parse tolerance)
-- Parse errors (124+ tests skipped) -- this will be done in rust branch later
+- Parse errors (13 tests skipped) -- this will be done in rust branch later
 
 ### Key Files
 | Purpose | Location |
@@ -131,6 +133,7 @@ Our emitter produces modern ES6+ output. ES5 transforms planned for Phase 6.3.
 | Transforms | `wasm/src/transforms/` |
 | Class ES5 transform | `wasm/src/transforms/class_es5.rs` |
 | Arrow ES5 transform | `wasm/src/transforms/arrow_es5.rs` |
+| Namespace ES5 transform | `wasm/src/transforms/namespace_es5.rs` |
 | Generator emitter | `wasm/src/transforms/generator_emitter.rs` |
 | Async emitter | `wasm/src/transforms/async_emitter.rs` |
 
