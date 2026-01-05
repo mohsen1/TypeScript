@@ -22,6 +22,7 @@ use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::emitter::{PrinterOptions, NewLineKind};
+use crate::transforms::class_es5::ClassES5Emitter;
 
 // =============================================================================
 // ThinPrinter
@@ -55,6 +56,9 @@ pub struct ThinPrinter<'a> {
 
     /// Current output column (0-indexed)
     output_column: u32,
+
+    /// Whether to emit ES5 (classes→IIFEs, arrows→functions)
+    target_es5: bool,
 }
 
 impl<'a> ThinPrinter<'a> {
@@ -79,7 +83,27 @@ impl<'a> ThinPrinter<'a> {
             at_line_start: true,
             output_line: 0,
             output_column: 0,
+            target_es5: true, // Default to ES5 for baseline compatibility
         }
+    }
+
+    /// Create a new ThinPrinter targeting ES5.
+    pub fn new_es5(arena: &'a ThinNodeArena) -> Self {
+        let mut printer = Self::new(arena);
+        printer.target_es5 = true;
+        printer
+    }
+
+    /// Create a new ThinPrinter targeting ES6+.
+    pub fn new_es6(arena: &'a ThinNodeArena) -> Self {
+        let mut printer = Self::new(arena);
+        printer.target_es5 = false;
+        printer
+    }
+    
+    /// Set whether to target ES5 (classes→IIFEs, arrows→functions).
+    pub fn set_target_es5(&mut self, es5: bool) {
+        self.target_es5 = es5;
     }
 
     /// Get the output.
@@ -373,6 +397,41 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_type_reference(node);
             }
 
+            // Array type
+            k if k == syntax_kind_ext::ARRAY_TYPE => {
+                self.emit_array_type(node);
+            }
+
+            // Union type
+            k if k == syntax_kind_ext::UNION_TYPE => {
+                self.emit_union_type(node);
+            }
+
+            // Intersection type
+            k if k == syntax_kind_ext::INTERSECTION_TYPE => {
+                self.emit_intersection_type(node);
+            }
+
+            // Tuple type
+            k if k == syntax_kind_ext::TUPLE_TYPE => {
+                self.emit_tuple_type(node);
+            }
+
+            // Function type
+            k if k == syntax_kind_ext::FUNCTION_TYPE => {
+                self.emit_function_type(node);
+            }
+
+            // Type literal
+            k if k == syntax_kind_ext::TYPE_LITERAL => {
+                self.emit_type_literal(node);
+            }
+
+            // Parenthesized type
+            k if k == syntax_kind_ext::PARENTHESIZED_TYPE => {
+                self.emit_parenthesized_type(node);
+            }
+
             // Empty statement
             k if k == syntax_kind_ext::EMPTY_STATEMENT => {
                 self.write_semicolon();
@@ -482,13 +541,15 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_enum_member(node);
             }
             k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
-                self.emit_interface_declaration(node);
+                // Interface declarations are TypeScript-only - skip for JavaScript
+                // self.emit_interface_declaration(node);
             }
             k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
-                self.emit_type_alias_declaration(node);
+                // Type alias declarations are TypeScript-only - skip for JavaScript
+                // self.emit_type_alias_declaration(node);
             }
             k if k == syntax_kind_ext::MODULE_DECLARATION => {
-                self.emit_module_declaration(node);
+                self.emit_module_declaration(node, idx);
             }
 
             // Class members
@@ -534,6 +595,18 @@ impl<'a> ThinPrinter<'a> {
             }
             k if k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 => {
                 self.emit_no_substitution_template(node);
+            }
+            k if k == syntax_kind_ext::TEMPLATE_SPAN => {
+                self.emit_template_span(node);
+            }
+            k if k == SyntaxKind::TemplateHead as u16 => {
+                self.emit_template_head(node);
+            }
+            k if k == SyntaxKind::TemplateMiddle as u16 => {
+                self.emit_template_middle(node);
+            }
+            k if k == SyntaxKind::TemplateTail as u16 => {
+                self.emit_template_tail(node);
             }
 
             // Yield/Await/Spread
@@ -684,12 +757,13 @@ impl<'a> ThinPrinter<'a> {
         self.write("]");
     }
 
-    fn emit_parenthesized(&mut self, _node: &ThinNode) {
-        // Parenthesized expression - get the inner expression
-        // For now, just emit parens around something
-        // TODO: Add get_parenthesized_expr accessor
+    fn emit_parenthesized(&mut self, node: &ThinNode) {
+        let Some(paren) = self.arena.get_parenthesized(node) else {
+            return;
+        };
+
         self.write("(");
-        // Need accessor to get inner expression
+        self.emit(paren.expression);
         self.write(")");
     }
 
@@ -725,11 +799,26 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        self.write("{");
-        self.write_space();
-        self.emit_comma_separated(&obj.elements.nodes);
-        self.write_space();
-        self.write("}");
+        // Multi-line format for object literals with multiple properties
+        if obj.elements.nodes.len() > 1 {
+            self.write("{");
+            self.write_line();
+            self.increase_indent();
+            for (i, &prop) in obj.elements.nodes.iter().enumerate() {
+                self.emit(prop);
+                if i < obj.elements.nodes.len() - 1 {
+                    self.write(",");
+                }
+                self.write_line();
+            }
+            self.decrease_indent();
+            self.write("}");
+        } else {
+            // Single property: { key: value }
+            self.write("{ ");
+            self.emit(obj.elements.nodes[0]);
+            self.write(" }");
+        }
     }
 
     fn emit_property_assignment(&mut self, node: &ThinNode) {
@@ -743,10 +832,18 @@ impl<'a> ThinPrinter<'a> {
     }
 
     fn emit_shorthand_property(&mut self, node: &ThinNode) {
-        // Shorthand property - just emit the name
-        // TODO: Add accessor for shorthand property
-        if let Some(ident) = self.arena.get_identifier(node) {
-            self.write(&ident.escaped_text);
+        let Some(shorthand) = self.arena.get_shorthand_property(node) else {
+            // Fallback: try to get identifier data directly
+            if let Some(ident) = self.arena.get_identifier(node) {
+                self.write(&ident.escaped_text);
+            }
+            return;
+        };
+
+        self.emit(shorthand.name);
+        if shorthand.equals_token {
+            self.write(" = ");
+            // Object assignment pattern default value would go here
         }
     }
 
@@ -759,28 +856,55 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
+        // Transform arrow function to regular function for ES5
+        if self.target_es5 {
+            if func.is_async {
+                self.write("async ");
+            }
+            
+            self.write("function (");
+            self.emit_function_parameters_js(&func.parameters.nodes);
+            self.write(") ");
+            
+            // If body is not a block (concise arrow), wrap with return
+            let body_node = self.arena.get(func.body);
+            let is_block = body_node.map(|n| n.kind == syntax_kind_ext::BLOCK).unwrap_or(false);
+            
+            if is_block {
+                // Check if it's a simple single-return block
+                if let Some(block_node) = self.arena.get(func.body) {
+                    if let Some(block) = self.arena.get_block(block_node) {
+                        if block.statements.nodes.len() == 1 
+                            && self.is_simple_return_statement(block.statements.nodes[0]) {
+                            self.emit_single_line_block(func.body);
+                        } else {
+                            self.emit(func.body);
+                        }
+                    } else {
+                        self.emit(func.body);
+                    }
+                } else {
+                    self.emit(func.body);
+                }
+            } else {
+                // Concise body: (x) => x + 1  →  function (x) { return x + 1; }
+                self.write("{ return ");
+                self.emit(func.body);
+                self.write("; }");
+            }
+            return;
+        }
+
         if func.is_async {
             self.write("async ");
         }
 
-        // Parameters
-        let params = &func.parameters.nodes;
-        if params.len() == 1 && !func.type_annotation.is_none() {
-            // Single untyped param doesn't need parens (but we keep them for safety)
-            self.write("(");
-            self.emit_comma_separated(params);
-            self.write(")");
-        } else {
-            self.write("(");
-            self.emit_comma_separated(params);
-            self.write(")");
-        }
+        // Parameters (without types for JavaScript)
+        self.write("(");
+        self.emit_function_parameters_js(&func.parameters.nodes);
+        self.write(")");
 
-        // Return type annotation
-        if !func.type_annotation.is_none() {
-            self.write(": ");
-            self.emit(func.type_annotation);
-        }
+        // Skip return type for JavaScript
 
         self.write(" => ");
 
@@ -803,31 +927,79 @@ impl<'a> ThinPrinter<'a> {
             self.write("*");
         }
 
-        // Name (if any)
+        // Name (if any) - add space before open paren whether or not there's a name
         if !func.name.is_none() {
             self.write_space();
             self.emit(func.name);
         }
 
-        // Parameters
+        // Space before ( for TypeScript compatibility: function (x) vs function(x)
+        self.write(" ");
+
+        // Parameters (without types for JavaScript)
         self.write("(");
-        self.emit_comma_separated(&func.parameters.nodes);
-        self.write(")");
+        self.emit_function_parameters_js(&func.parameters.nodes);
+        self.write(") ");
 
-        // Return type
-        if !func.type_annotation.is_none() {
-            self.write(": ");
-            self.emit(func.type_annotation);
+        // Emit body - check if it's a simple single-statement body
+        let body_node = self.arena.get(func.body);
+        let is_simple_body = if let Some(body) = body_node {
+            if let Some(block) = self.arena.get_block(body) {
+                // Single return statement = simple body
+                block.statements.nodes.len() == 1
+                    && self.is_simple_return_statement(block.statements.nodes[0])
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        
+        if is_simple_body {
+            self.emit_single_line_block(func.body);
+        } else {
+            self.emit(func.body);
         }
-
-        self.write_space();
-        self.emit(func.body);
+    }
+    
+    /// Check if a statement is a simple return statement (for single-line emission)
+    fn is_simple_return_statement(&self, stmt_idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(stmt_idx) else { return false };
+        if node.kind != syntax_kind_ext::RETURN_STATEMENT {
+            return false;
+        }
+        // Consider it simple if it has an expression (not just "return;")
+        if let Some(ret) = self.arena.get_return_statement(node) {
+            return !ret.expression.is_none();
+        }
+        false
+    }
+    
+    /// Emit a block on a single line: { return expr; }
+    fn emit_single_line_block(&mut self, block_idx: NodeIndex) {
+        let Some(block_node) = self.arena.get(block_idx) else { return };
+        let Some(block) = self.arena.get_block(block_node) else { return };
+        
+        self.write("{ ");
+        for (i, &stmt_idx) in block.statements.nodes.iter().enumerate() {
+            if i > 0 {
+                self.write(" ");
+            }
+            self.emit(stmt_idx);
+        }
+        self.write(" }");
     }
 
     fn emit_function_declaration(&mut self, node: &ThinNode, _idx: NodeIndex) {
         let Some(func) = self.arena.get_function(node) else {
             return;
         };
+
+        // For JavaScript emit: skip declaration-only functions (no body)
+        // These are just type information in TypeScript
+        if func.body.is_none() {
+            return;
+        }
 
         if func.is_async {
             self.write("async ");
@@ -845,19 +1017,40 @@ impl<'a> ThinPrinter<'a> {
             self.emit(func.name);
         }
 
-        // Parameters
+        // Parameters - only emit names, not types for JavaScript
         self.write("(");
-        self.emit_comma_separated(&func.parameters.nodes);
+        self.emit_function_parameters_js(&func.parameters.nodes);
         self.write(")");
 
-        // Return type
-        if !func.type_annotation.is_none() {
-            self.write(": ");
-            self.emit(func.type_annotation);
-        }
+        // No return type for JavaScript
 
         self.write_space();
         self.emit(func.body);
+    }
+
+    /// Emit function parameters for JavaScript (no types)
+    fn emit_function_parameters_js(&mut self, params: &[NodeIndex]) {
+        let mut first = true;
+        for &param_idx in params {
+            if !first {
+                self.write(", ");
+            }
+            first = false;
+
+            if let Some(param_node) = self.arena.get(param_idx) {
+                if let Some(param) = self.arena.get_parameter(param_node) {
+                    if param.dot_dot_dot_token {
+                        self.write("...");
+                    }
+                    self.emit(param.name);
+                    // Skip type annotations and defaults for JS emit
+                    if !param.initializer.is_none() {
+                        self.write(" = ");
+                        self.emit(param.initializer);
+                    }
+                }
+            }
+        }
     }
 
     fn emit_parameter(&mut self, node: &ThinNode) {
@@ -895,6 +1088,12 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
+        // Empty blocks: emit as "{ }" on same line for ES5 compatibility
+        if block.statements.nodes.is_empty() {
+            self.write("{ }");
+            return;
+        }
+
         self.write("{");
         self.write_line();
         self.increase_indent();
@@ -927,9 +1126,17 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Emit keyword based on flags
-        // TODO: Check flags for let/const/var
-        self.write("let ");
+        // Emit keyword based on node flags
+        let flags = node.flags as u32;
+        let keyword = if flags & crate::parser::node_flags::CONST != 0 {
+            "const"
+        } else if flags & crate::parser::node_flags::LET != 0 {
+            "let"
+        } else {
+            "var"
+        };
+        self.write(keyword);
+        self.write(" ");
 
         self.emit_comma_separated(&decl_list.declarations.nodes);
     }
@@ -941,10 +1148,7 @@ impl<'a> ThinPrinter<'a> {
 
         self.emit(decl.name);
 
-        if !decl.type_annotation.is_none() {
-            self.write(": ");
-            self.emit(decl.type_annotation);
-        }
+        // Skip type annotation for JavaScript emit
 
         if !decl.initializer.is_none() {
             self.write(" = ");
@@ -1033,10 +1237,18 @@ impl<'a> ThinPrinter<'a> {
         self.emit(for_in_of.statement);
     }
 
-    fn emit_return_statement(&mut self, _node: &ThinNode) {
-        // TODO: Add return statement accessor
+    fn emit_return_statement(&mut self, node: &ThinNode) {
+        let Some(ret) = self.arena.get_return_statement(node) else {
+            self.write("return");
+            self.write_semicolon();
+            return;
+        };
+
         self.write("return");
-        // Check if there's an expression to return
+        if !ret.expression.is_none() {
+            self.write(" ");
+            self.emit(ret.expression);
+        }
         self.write_semicolon();
     }
 
@@ -1044,7 +1256,15 @@ impl<'a> ThinPrinter<'a> {
     // Classes
     // =========================================================================
 
-    fn emit_class_declaration(&mut self, node: &ThinNode, _idx: NodeIndex) {
+    fn emit_class_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
+        // Use ES5 IIFE transform when targeting ES5
+        if self.target_es5 {
+            let mut es5_emitter = ClassES5Emitter::new(self.arena);
+            let es5_output = es5_emitter.emit_class(idx);
+            self.write(&es5_output);
+            return;
+        }
+        
         let Some(class) = self.arena.get_class(node) else {
             return;
         };
@@ -1330,10 +1550,16 @@ impl<'a> ThinPrinter<'a> {
         self.write_semicolon();
     }
 
-    fn emit_named_exports(&mut self, _node: &ThinNode) {
-        // Similar to named imports but for exports
-        // TODO: Add get_named_exports accessor
-        self.write("{ }");
+    fn emit_named_exports(&mut self, node: &ThinNode) {
+        // Named exports uses the same data structure as named imports
+        let Some(exports) = self.arena.get_named_imports(node) else {
+            self.write("{ }");
+            return;
+        };
+
+        self.write("{ ");
+        self.emit_comma_separated(&exports.elements.nodes);
+        self.write(" }");
     }
 
     fn emit_export_specifier(&mut self, node: &ThinNode) {
@@ -1352,9 +1578,16 @@ impl<'a> ThinPrinter<'a> {
     // Additional Statements
     // =========================================================================
 
-    fn emit_throw_statement(&mut self, _node: &ThinNode) {
+    fn emit_throw_statement(&mut self, node: &ThinNode) {
+        // ThrowStatement uses ReturnData (same structure)
+        let Some(throw_data) = self.arena.get_return_statement(node) else {
+            self.write("throw");
+            self.write_semicolon();
+            return;
+        };
+
         self.write("throw ");
-        // TODO: Add throw statement accessor to get expression
+        self.emit(throw_data.expression);
         self.write_semicolon();
     }
 
@@ -1474,23 +1707,112 @@ impl<'a> ThinPrinter<'a> {
     // Type Emit Methods
     // =========================================================================
 
-    fn emit_union_type(&mut self, _node: &ThinNode) {
-        // TODO: Add union type accessor
-        // For now, emit nothing
+    fn emit_union_type(&mut self, node: &ThinNode) {
+        let Some(union) = self.arena.get_composite_type(node) else {
+            return;
+        };
+
+        let mut first = true;
+        for &type_idx in &union.types.nodes {
+            if !first {
+                self.write(" | ");
+            }
+            first = false;
+            self.emit(type_idx);
+        }
     }
 
-    fn emit_intersection_type(&mut self, _node: &ThinNode) {
-        // TODO: Add intersection type accessor
+    fn emit_intersection_type(&mut self, node: &ThinNode) {
+        let Some(intersection) = self.arena.get_composite_type(node) else {
+            return;
+        };
+
+        let mut first = true;
+        for &type_idx in &intersection.types.nodes {
+            if !first {
+                self.write(" & ");
+            }
+            first = false;
+            self.emit(type_idx);
+        }
     }
 
-    fn emit_array_type(&mut self, _node: &ThinNode) {
-        // TODO: Add array type accessor - emit element type then []
+    fn emit_array_type(&mut self, node: &ThinNode) {
+        let Some(array) = self.arena.get_array_type(node) else {
+            return;
+        };
+
+        self.emit(array.element_type);
+        self.write("[]");
     }
 
-    fn emit_tuple_type(&mut self, _node: &ThinNode) {
-        // TODO: Add tuple type accessor
+    fn emit_tuple_type(&mut self, node: &ThinNode) {
+        let Some(tuple) = self.arena.get_tuple_type(node) else {
+            self.write("[]");
+            return;
+        };
+
         self.write("[");
+        self.emit_comma_separated(&tuple.elements.nodes);
         self.write("]");
+    }
+
+    fn emit_function_type(&mut self, node: &ThinNode) {
+        let Some(func_type) = self.arena.get_function_type(node) else {
+            return;
+        };
+
+        // Type parameters
+        if let Some(ref type_params) = func_type.type_parameters {
+            if !type_params.nodes.is_empty() {
+                self.write("<");
+                self.emit_comma_separated(&type_params.nodes);
+                self.write(">");
+            }
+        }
+
+        // Parameters
+        self.write("(");
+        self.emit_comma_separated(&func_type.parameters.nodes);
+        self.write(") => ");
+
+        // Return type
+        self.emit(func_type.type_annotation);
+    }
+
+    fn emit_type_literal(&mut self, node: &ThinNode) {
+        let Some(type_lit) = self.arena.get_type_literal(node) else {
+            self.write("{}");
+            return;
+        };
+
+        if type_lit.members.nodes.is_empty() {
+            self.write("{}");
+            return;
+        }
+
+        self.write("{");
+        self.write_line();
+        self.increase_indent();
+
+        for &member_idx in &type_lit.members.nodes {
+            self.emit(member_idx);
+            self.write_semicolon();
+            self.write_line();
+        }
+
+        self.decrease_indent();
+        self.write("}");
+    }
+
+    fn emit_parenthesized_type(&mut self, node: &ThinNode) {
+        let Some(paren_type) = self.arena.get_wrapped_type(node) else {
+            return;
+        };
+
+        self.write("(");
+        self.emit(paren_type.type_node);
+        self.write(")");
     }
 
     // =========================================================================
@@ -1592,7 +1914,15 @@ impl<'a> ThinPrinter<'a> {
         self.write_semicolon();
     }
 
-    fn emit_module_declaration(&mut self, node: &ThinNode) {
+    fn emit_module_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
+        if self.target_es5 {
+            // Use ES5 namespace transform: namespace → IIFE pattern
+            let mut ns_emitter = crate::transforms::namespace_es5::NamespaceES5Emitter::new(self.arena);
+            let output = ns_emitter.emit_namespace(idx);
+            self.write(&output);
+            return;
+        }
+
         let Some(module) = self.arena.get_module(node) else {
             return;
         };
@@ -1607,16 +1937,60 @@ impl<'a> ThinPrinter<'a> {
     // Template Literals
     // =========================================================================
 
-    fn emit_template_expression(&mut self, _node: &ThinNode) {
-        // Template expressions have a head and spans
-        // TODO: Add get_template_expr accessor
-        self.write("`");
-        self.write("`");
+    fn emit_template_expression(&mut self, node: &ThinNode) {
+        let Some(tpl) = self.arena.get_template_expr(node) else {
+            self.write("``");
+            return;
+        };
+
+        // Emit the template head (opening backtick and initial text)
+        self.emit(tpl.head);
+
+        // Emit each template span (expression + middle/tail)
+        for &span_idx in &tpl.template_spans.nodes {
+            self.emit(span_idx);
+        }
     }
 
     fn emit_no_substitution_template(&mut self, node: &ThinNode) {
         if let Some(lit) = self.arena.get_literal(node) {
             self.write("`");
+            self.write(&lit.text);
+            self.write("`");
+        }
+    }
+
+    fn emit_template_span(&mut self, node: &ThinNode) {
+        let Some(span) = self.arena.get_template_span(node) else {
+            return;
+        };
+
+        // Emit ${expression}
+        self.write("${");
+        self.emit(span.expression);
+        self.write("}");
+        // Emit the literal part (middle or tail)
+        self.emit(span.literal);
+    }
+
+    fn emit_template_head(&mut self, node: &ThinNode) {
+        if let Some(lit) = self.arena.get_literal(node) {
+            // Template head starts with ` and ends with ${
+            self.write("`");
+            self.write(&lit.text);
+        }
+    }
+
+    fn emit_template_middle(&mut self, node: &ThinNode) {
+        if let Some(lit) = self.arena.get_literal(node) {
+            // Template middle is between } and ${
+            self.write(&lit.text);
+        }
+    }
+
+    fn emit_template_tail(&mut self, node: &ThinNode) {
+        if let Some(lit) = self.arena.get_literal(node) {
+            // Template tail ends with `
             self.write(&lit.text);
             self.write("`");
         }
@@ -1656,22 +2030,37 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Emit modifiers (static, async, etc.)
-        self.emit_class_member_modifiers(&method.modifiers);
+        // Skip method declarations without bodies (TypeScript-only overloads)
+        if method.body.is_none() {
+            return;
+        }
+
+        // Emit modifiers (static, async only for JavaScript)
+        self.emit_method_modifiers_js(&method.modifiers);
 
         self.emit(method.name);
         self.write("(");
-        self.emit_comma_separated(&method.parameters.nodes);
+        self.emit_function_parameters_js(&method.parameters.nodes);
         self.write(")");
 
-        if !method.type_annotation.is_none() {
-            self.write(": ");
-            self.emit(method.type_annotation);
-        }
+        // Skip return type for JavaScript emit
 
-        if !method.body.is_none() {
-            self.write(" ");
-            self.emit(method.body);
+        self.write(" ");
+        self.emit(method.body);
+    }
+
+    /// Emit method modifiers for JavaScript (static, async only)
+    fn emit_method_modifiers_js(&mut self, modifiers: &Option<NodeList>) {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    match mod_node.kind {
+                        k if k == SyntaxKind::StaticKeyword as u16 => self.write("static "),
+                        k if k == SyntaxKind::AsyncKeyword as u16 => self.write("async "),
+                        _ => {} // Skip private/protected/public/readonly/abstract
+                    }
+                }
+            }
         }
     }
 
@@ -1680,19 +2069,18 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Emit modifiers (static, readonly, private, etc.)
-        self.emit_class_member_modifiers(&prop.modifiers);
+        // For JavaScript: Skip property declarations that are TypeScript-only
+        // (declarations with type annotation but no initializer)
+        if prop.initializer.is_none() && !prop.type_annotation.is_none() {
+            return;
+        }
+
+        // Emit modifiers (static only for JavaScript)
+        self.emit_class_member_modifiers_js(&prop.modifiers);
 
         self.emit(prop.name);
 
-        if prop.question_token {
-            self.write("?");
-        }
-
-        if !prop.type_annotation.is_none() {
-            self.write(": ");
-            self.emit(prop.type_annotation);
-        }
+        // Skip type annotations for JavaScript emit
 
         if !prop.initializer.is_none() {
             self.write(" = ");
@@ -1700,6 +2088,20 @@ impl<'a> ThinPrinter<'a> {
         }
 
         self.write_semicolon();
+    }
+
+    /// Emit class member modifiers for JavaScript (only static is valid)
+    fn emit_class_member_modifiers_js(&mut self, modifiers: &Option<NodeList>) {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    // Only emit 'static' for JavaScript - skip private/readonly/public/protected
+                    if mod_node.kind == SyntaxKind::StaticKeyword as u16 {
+                        self.write("static ");
+                    }
+                }
+            }
+        }
     }
 
     fn emit_constructor_declaration(&mut self, node: &ThinNode) {
@@ -1876,20 +2278,43 @@ impl<'a> ThinPrinter<'a> {
     // Yield and Await
     // =========================================================================
 
-    fn emit_yield_expression(&mut self, _node: &ThinNode) {
-        // TODO: Add get_yield_expr accessor
+    fn emit_yield_expression(&mut self, node: &ThinNode) {
+        // YieldExpression is stored with UnaryExprData (operand = expression, operator = asterisk flag)
+        let Some(unary) = self.arena.get_unary_expr(node) else {
+            self.write("yield");
+            return;
+        };
+
         self.write("yield");
+        // Check if this is yield* (operator stores asterisk flag as SyntaxKind)
+        if unary.operator == crate::scanner::SyntaxKind::AsteriskToken as u16 {
+            self.write("*");
+        }
+        if !unary.operand.is_none() {
+            self.write(" ");
+            self.emit(unary.operand);
+        }
     }
 
-    fn emit_await_expression(&mut self, _node: &ThinNode) {
-        // TODO: Add get_await_expr accessor
+    fn emit_await_expression(&mut self, node: &ThinNode) {
+        // AwaitExpression is stored with UnaryExprData
+        let Some(unary) = self.arena.get_unary_expr(node) else {
+            self.write("await");
+            return;
+        };
+
         self.write("await ");
-        // Emit operand
+        self.emit(unary.operand);
     }
 
-    fn emit_spread_element(&mut self, _node: &ThinNode) {
-        // TODO: Add get_spread_element accessor
+    fn emit_spread_element(&mut self, node: &ThinNode) {
+        let Some(spread) = self.arena.get_spread(node) else {
+            self.write("...");
+            return;
+        };
+
         self.write("...");
+        self.emit(spread.expression);
     }
 
     // =========================================================================

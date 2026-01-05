@@ -25,7 +25,7 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 | Binder (ThinBinder) | ~2,900 | ✅ |
 | Type Checker + Solver | ~29,300 | ✅ 99% |
 
-**Total**: ~74,350 Rust LOC | 1015 tests passing
+**Total**: ~77,000 Rust LOC | 1018 tests passing
 
 ## Solver (specs/SOLVER.md) ✅
 Complete implementation in `wasm/src/solver/`:
@@ -134,7 +134,10 @@ pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
 | Baseline | Pass Rate | Blockers |
 |----------|-----------|----------|
 | .errors.txt | **61.0%** (47/77) | Parser error recovery, abstract class unions |
-| .js emit | 0% | Emitter format mismatch |
+| .js emit | 0% | Baselines use ES5 (IIFEs), we emit ES6+ |
+
+**Note**: TypeScript baselines use ES5 target (classes→IIFEs, arrows→functions).
+Our emitter produces modern ES6+ output. ES5 transforms planned for Phase 6.3.
 
 ### Completed
 - ✅ Class/function overload validation (2389, 2390, 2391)
@@ -175,31 +178,67 @@ pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
 ## Track B: Phase 6 - Emitter Completion (75% → 100%)
 
 **Goal**: Complete emitter with performance-first approach.
+**Full Plan**: See `specs/PHASE_6_PLAN.md` for detailed breakdown.
 
-### Phase 6.1: Study & Exploration (Use Gemini)
-Before implementation, analyze for performance opportunities:
-- ⬜ **Benchmark current emit** - measure throughput (bytes/sec)
-- ⬜ **Profile hot paths** - string building, whitespace, source maps
-- ⬜ **Study TypeScript emitter** - identify simplification opportunities
-- ⬜ **Gemini review** - ask for emit architecture recommendations
-- ⬜ **Explore alternatives**: rope data structures, streaming output, SIMD text processing
+### Phase 6.1: Study & Exploration ✅
+- ✅ Benchmark infrastructure (`wasm/benches/emitter_bench.rs`)
+- ✅ Hot path analysis, TypeScript emitter study
+- ✅ Baseline test script (`scripts/baseline-test-rust.mjs`)
 
-### Phase 6.2: Generator Transforms
-- ⬜ `function*` syntax and `yield` expressions
-- ⬜ State machine generation for ES5 target
-- ⬜ Iterator protocol compliance
+### Phase 6.2: JavaScript Emit ✅
+- ✅ Strip TypeScript-only syntax (interfaces, type aliases, declarations)
+- ✅ Strip type annotations from functions, variables, parameters
+- ✅ Strip `private`/`protected`/`readonly` modifiers
 
-### Phase 6.3: Output Format Matching
-- ⬜ Match TypeScript baseline whitespace/semicolons
-- ⬜ Source map accuracy
-- ⬜ Declaration file formatting
+### Phase 6.3: ES5 Transforms ✅
+| Transform | Effort | Status |
+|-----------|--------|--------|
+| Class → IIFE | 4 days | ✅ `transforms/class_es5.rs` |
+| Arrow → function | 1 day | ✅ `transforms/arrow_es5.rs` |
+| Generators | 4 days | ✅ `transforms/generator_emitter.rs` |
+| Async/await | 2 days | ✅ `transforms/async_emitter.rs` |
+
+### Phase 6.4: Output Format ✅ (~5 days)
+| Feature | Effort | Status |
+|---------|--------|--------|
+| Source maps | 2 days | ✅ VLQ encoding, inline maps |
+| .d.ts emit | 2 days | ✅ `declaration_emitter.rs` |
+| Formatting | 1 day | ✅ basic indentation |
+
+### Phase 6.5: Baseline Validation 🔄 (~ongoing)
+| Baseline | Current | Target | Notes |
+|----------|---------|--------|-------|
+| .js emit | **31%** (27/87) | 80%+ | ES5 transforms, namespace→IIFE |
+| .d.ts emit | 0% | 80%+ | Framework ready |
+
+**Completed ES5 Improvements:**
+- Classes → IIFE with `/** @class */` comment
+- Methods → prototype assignments
+- Arrow functions → regular function expressions
+- Computed property names (numeric/string literals)
+- Empty body blocks on single line: `{ }`
+- Single-return function bodies on single line
+- **Namespace/module → IIFE transform** (`transforms/namespace_es5.rs`)
+- Export declarations handled via `EXPORT_DECLARATION` nodes
+
+**Remaining Blockers (for 80%+):**
+- Class inheritance (`__extends` helper for `extends`)
+- CommonJS exports (`module.exports`, `exports.X`)
+- `const` modifier on class properties (parse tolerance)
+- Parse errors (13 tests skipped) -- this will be done in rust branch later
 
 ### Key Files
 | Purpose | Location |
 |---------|----------|
 | ThinEmitter | `wasm/src/thin_emitter.rs` |
+| Declaration emitter | `wasm/src/declaration_emitter.rs` |
+| Source maps | `wasm/src/source_map.rs` |
 | Transforms | `wasm/src/transforms/` |
-| Generator transforms | `wasm/src/transforms/async_gen.rs` |
+| Class ES5 transform | `wasm/src/transforms/class_es5.rs` |
+| Arrow ES5 transform | `wasm/src/transforms/arrow_es5.rs` |
+| Namespace ES5 transform | `wasm/src/transforms/namespace_es5.rs` |
+| Generator emitter | `wasm/src/transforms/generator_emitter.rs` |
+| Async emitter | `wasm/src/transforms/async_emitter.rs` |
 
 ---
 

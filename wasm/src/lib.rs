@@ -55,6 +55,7 @@ pub mod thin_emitter;
 #[cfg(test)]
 mod thin_emitter_tests;
 
+
 // Parallel processing with Rayon (Phase 0.4)
 pub mod parallel;
 
@@ -264,9 +265,22 @@ impl ThinParser {
         }
     }
 
-    /// Emit the source file as JavaScript.
+    /// Emit the source file as JavaScript (ES5 target to match TypeScript baselines).
     #[wasm_bindgen(js_name = emit)]
     pub fn emit(&self) -> String {
+        if let Some(root_idx) = self.source_file_idx {
+            let mut printer = ThinPrinter::new(self.parser.get_arena());
+            printer.set_target_es5(true); // Match TypeScript baselines
+            printer.emit(root_idx);
+            printer.get_output().to_string()
+        } else {
+            String::new()
+        }
+    }
+    
+    /// Emit the source file as JavaScript (ES6+ modern output).
+    #[wasm_bindgen(js_name = emitModern)]
+    pub fn emit_modern(&self) -> String {
         if let Some(root_idx) = self.source_file_idx {
             let mut printer = ThinPrinter::new(self.parser.get_arena());
             printer.emit(root_idx);

@@ -807,12 +807,14 @@ impl ThinParserState {
 
     /// Parse variable declaration list
     fn parse_variable_declaration_list(&mut self) -> NodeIndex {
+        use crate::parser::node_flags;
+
         let start_pos = self.token_pos();
 
-        // Consume var/let/const
-        let _flags = match self.token() {
-            SyntaxKind::LetKeyword => { self.next_token(); 1 }
-            SyntaxKind::ConstKeyword => { self.next_token(); 2 }
+        // Consume var/let/const and get flags
+        let flags: u16 = match self.token() {
+            SyntaxKind::LetKeyword => { self.next_token(); node_flags::LET as u16 }
+            SyntaxKind::ConstKeyword => { self.next_token(); node_flags::CONST as u16 }
             _ => { self.next_token(); 0 } // var
         };
 
@@ -828,7 +830,7 @@ impl ThinParserState {
         }
 
         let end_pos = self.token_end();
-        self.arena.add_variable(
+        self.arena.add_variable_with_flags(
             syntax_kind_ext::VARIABLE_DECLARATION_LIST,
             start_pos,
             end_pos,
@@ -836,6 +838,7 @@ impl ThinParserState {
                 modifiers: None,
                 declarations: self.make_node_list(declarations),
             },
+            flags,
         )
     }
 
@@ -6894,13 +6897,12 @@ impl ThinParserState {
                 self.next_token();
                 let end_pos = self.token_end();
 
-                current = self.arena.add_type_ref(
+                current = self.arena.add_array_type(
                     syntax_kind_ext::ARRAY_TYPE,
                     start_pos,
                     end_pos,
-                    crate::parser::thin_node::TypeRefData {
-                        type_name: current,
-                        type_arguments: None,
+                    crate::parser::thin_node::ArrayTypeData {
+                        element_type: current,
                     },
                 );
             } else {

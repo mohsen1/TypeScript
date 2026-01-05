@@ -6,10 +6,16 @@
 //! The transforms follow TypeScript's transformer pipeline architecture.
 
 pub mod async_gen;
+pub mod async_emitter;
 pub mod class;
+pub mod class_es5;
+pub mod arrow_es5;
 pub mod es2015;
+pub mod generators;
+pub mod generator_emitter;
 pub mod helpers;
 pub mod modules;
+pub mod namespace_es5;
 
 use crate::emitter::ScriptTarget;
 use crate::parser::{NodeArena, NodeIndex};
