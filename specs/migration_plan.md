@@ -133,7 +133,7 @@ pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
 ### Baseline Comparison (First 100 tests)
 | Baseline | Pass Rate | Blockers |
 |----------|-----------|----------|
-| .errors.txt | **54.5%** (42/77) | Missing parser errors, error elaboration |
+| .errors.txt | **58.4%** (45/77) | Type parameter scoping, parser error recovery |
 | .js emit | 0% | Emitter format mismatch |
 
 ### Completed
@@ -148,9 +148,12 @@ pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
 - ✅ Abstract class instantiation check (2511) - all contexts including local scopes
 - ✅ Expanded known globals (WeakRef, TypedArrays, Web APIs, etc.)
 - ✅ Nested scope symbol lookup (classes/functions in IIFEs/arrow functions)
+- ✅ Type reference validation (2304 for undefined types)
+- ✅ Export declaration traversal (check exported classes/functions)
 
 ### Next Steps
-1. ⬜ Parser semantic errors (1128, additional coverage)
+1. ⬜ Type parameter scoping (generic type parameters in scope)
+2. ⬜ Parser semantic errors (1128, additional coverage)
 2. ✅ Error elaboration ("...because property 'x' has type...")
    - ✅ `explain_failure()` API in `solver/subtype.rs`
    - ✅ `SubtypeFailureReason::to_diagnostic()` for structured error conversion
