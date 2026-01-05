@@ -734,6 +734,195 @@ impl<'a> DiagnosticBuilder<'a> {
 /// string formatting until rendering time.
 pub struct PendingDiagnosticBuilder;
 
+// =============================================================================
+// SubtypeFailureReason to PendingDiagnostic Conversion
+// =============================================================================
+
+use crate::solver::subtype::SubtypeFailureReason;
+
+impl SubtypeFailureReason {
+    /// Convert this failure reason to a PendingDiagnostic.
+    ///
+    /// This is the "explain slow" path - called only when we need to report
+    /// an error and want a detailed message about why the type check failed.
+    pub fn to_diagnostic(&self, source: TypeId, target: TypeId) -> PendingDiagnostic {
+        match self {
+            SubtypeFailureReason::MissingProperty { property_name, source_type, target_type } => {
+                PendingDiagnostic::error(
+                    codes::PROPERTY_MISSING,
+                    vec![
+                        property_name.as_ref().into(),
+                        (*source_type).into(),
+                        (*target_type).into(),
+                    ],
+                )
+            }
+
+            SubtypeFailureReason::PropertyTypeMismatch {
+                property_name,
+                source_property_type,
+                target_property_type,
+                nested_reason,
+            } => {
+                // Main error: Type not assignable
+                let mut diag = PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![source.into(), target.into()],
+                );
+
+                // Add elaboration: Types of property 'x' are incompatible
+                let elaboration = PendingDiagnostic::error(
+                    codes::NESTED_TYPE_MISMATCH,
+                    vec![
+                        property_name.as_ref().into(),
+                        (*source_property_type).into(),
+                        (*target_property_type).into(),
+                    ],
+                );
+                diag = diag.with_related(elaboration);
+
+                // If there's a nested reason, add that too
+                if let Some(nested) = nested_reason {
+                    let nested_diag = nested.to_diagnostic(*source_property_type, *target_property_type);
+                    diag = diag.with_related(nested_diag);
+                }
+
+                diag
+            }
+
+            SubtypeFailureReason::OptionalPropertyRequired { property_name } => {
+                // This is a specific case of type not assignable
+                PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![source.into(), target.into()],
+                ).with_related(PendingDiagnostic::error(
+                    codes::PROPERTY_MISSING, // Close enough - property is "missing" because it's optional
+                    vec![property_name.as_ref().into(), source.into(), target.into()],
+                ))
+            }
+
+            SubtypeFailureReason::ReturnTypeMismatch {
+                source_return,
+                target_return,
+                nested_reason,
+            } => {
+                let mut diag = PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![source.into(), target.into()],
+                );
+
+                // Add: Type 'X' is not assignable to type 'Y' (for return types)
+                let return_diag = PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![(*source_return).into(), (*target_return).into()],
+                );
+                diag = diag.with_related(return_diag);
+
+                if let Some(nested) = nested_reason {
+                    let nested_diag = nested.to_diagnostic(*source_return, *target_return);
+                    diag = diag.with_related(nested_diag);
+                }
+
+                diag
+            }
+
+            SubtypeFailureReason::ParameterTypeMismatch {
+                param_index: _,
+                source_param,
+                target_param,
+            } => {
+                PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![source.into(), target.into()],
+                ).with_related(PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![(*source_param).into(), (*target_param).into()],
+                ))
+            }
+
+            SubtypeFailureReason::TooManyParameters { source_count, target_count } => {
+                PendingDiagnostic::error(
+                    codes::ARG_COUNT_MISMATCH,
+                    vec![(*target_count).into(), (*source_count).into()],
+                )
+            }
+
+            SubtypeFailureReason::TupleElementMismatch { source_count, target_count } => {
+                PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![source.into(), target.into()],
+                ).with_related(PendingDiagnostic::error(
+                    codes::ARG_COUNT_MISMATCH,
+                    vec![(*target_count).into(), (*source_count).into()],
+                ))
+            }
+
+            SubtypeFailureReason::TupleElementTypeMismatch {
+                index: _,
+                source_element,
+                target_element,
+            } => {
+                PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![source.into(), target.into()],
+                ).with_related(PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![(*source_element).into(), (*target_element).into()],
+                ))
+            }
+
+            SubtypeFailureReason::ArrayElementMismatch {
+                source_element,
+                target_element,
+            } => {
+                PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![source.into(), target.into()],
+                ).with_related(PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![(*source_element).into(), (*target_element).into()],
+                ))
+            }
+
+            SubtypeFailureReason::IndexSignatureMismatch {
+                index_kind: _,
+                source_value_type,
+                target_value_type,
+            } => {
+                PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![source.into(), target.into()],
+                ).with_related(PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![(*source_value_type).into(), (*target_value_type).into()],
+                ))
+            }
+
+            SubtypeFailureReason::NoUnionMemberMatches {
+                source_type,
+                target_union_members: _,
+            } => {
+                // For now, just say type not assignable
+                // TODO: Could elaborate which union members were tried
+                PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![(*source_type).into(), target.into()],
+                )
+            }
+
+            SubtypeFailureReason::TypeMismatch {
+                source_type,
+                target_type,
+            } => {
+                PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![(*source_type).into(), (*target_type).into()],
+                )
+            }
+        }
+    }
+}
+
 impl PendingDiagnosticBuilder {
     /// Create a "Type X is not assignable to type Y" pending diagnostic.
     pub fn type_not_assignable(source: TypeId, target: TypeId) -> PendingDiagnostic {

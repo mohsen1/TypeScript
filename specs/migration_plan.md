@@ -42,6 +42,81 @@ Complete implementation in `wasm/src/solver/`:
 
 ---
 
+# 🏛️ ARCHITECTURAL DECISIONS
+
+## Solver-Checker Separation: "Check Fast, Explain Slow"
+
+**Critical principle to avoid the "Fat Controller" anti-pattern.**
+
+### The Problem: Boolean Blindness
+If `thin_checker.rs` has to reverse-engineer *why* a type check failed, it becomes unmaintainable spaghetti:
+```rust
+// ❌ BAD: Checker guessing what went wrong
+if !self.is_assignable_to(init_type, declared_type) {
+    // Checker has to inspect types manually to find the missing property!
+    self.error(node, "Type X is not assignable to Y", ...);
+}
+```
+
+### The Solution: Re-entrant Error Elaboration
+Adopt TypeScript's own pattern: **check silently, explain on demand.**
+
+1. **Fast Path (The Judge)**: `is_subtype_of(A, B) -> bool`
+   - Fast, cached, silent
+   - Used 99% of the time
+
+2. **Slow Path (The Detective)**: `explain_subtype_failure(A, B) -> Diagnostic`
+   - Slow, uncached, verbose
+   - Called *only* when Fast Path returns `false` and we need to report
+
+### Implementation Pattern
+```rust
+// ✅ GOOD: thin_checker.rs stays dumb
+if !self.solver.is_assignable_to(source, target) {
+    // Ask the solver for the "Why"
+    let diagnostic = self.solver.explain_assignability_error(source, target);
+    self.report_diagnostic(node, diagnostic);
+}
+```
+
+```rust
+// solver/subtype.rs - Explain API
+pub fn explain_failure(&self, sub: TypeId, sup: TypeId) -> PendingDiagnostic {
+    match (self.peek(sub), self.peek(sup)) {
+        (TypeKey::Object(s_props), TypeKey::Object(t_props)) => {
+            // Re-run object logic to find EXACT missing property
+            for t_prop in t_props {
+                if !s_props.contains(t_prop.name) {
+                    return PendingDiagnostic::new(
+                        code::PROPERTY_MISSING,
+                        vec![arg(t_prop.name), arg(sub), arg(sup)]
+                    );
+                }
+            }
+            // ... recurse into property types ...
+        }
+        // ... handle unions, functions, etc.
+    }
+    // Fallback generic error
+    PendingDiagnostic::new(code::TYPE_NOT_ASSIGNABLE, vec![arg(sub), arg(sup)])
+}
+```
+
+### Rules
+1. **`thin_checker.rs` only traverses AST and calls solver** - no type inspection logic
+2. **`solver/` owns all type reasoning** - including explaining failures
+3. **Use `PendingDiagnostic`** - solver creates structured data, checker renders strings
+
+### Key Files
+| Purpose | Location |
+|---------|----------|
+| Checker (AST traversal only) | `wasm/src/thin_checker.rs` |
+| Solver (type logic + explain) | `wasm/src/solver/` |
+| Explain API | `wasm/src/solver/subtype.rs` (`explain_failure()`, `SubtypeFailureReason`) |
+| Diagnostic structures | `wasm/src/solver/diagnostics.rs` |
+
+---
+
 # 🎯 CURRENT FOCUS: Parallel Tracks
 
 ## Track A: Phase 8 - Baseline Compatibility
@@ -70,11 +145,19 @@ Complete implementation in `wasm/src/solver/`:
 - ✅ Abstract method handling (skip 2391 for abstract)
 - ✅ Declare class parsing (skip impl checks for ambient)
 - ✅ Numeric method name support (0(), 1(), etc.)
+- ✅ Abstract class instantiation check (2511) - file-level direct `new` calls
 
 ### Next Steps
 1. ⬜ Parser semantic errors (1128, additional coverage)
-2. ⬜ Error elaboration ("...because property 'x' has type...")
+2. ✅ Error elaboration ("...because property 'x' has type...")
+   - ✅ `explain_failure()` API in `solver/subtype.rs`
+   - ✅ `SubtypeFailureReason::to_diagnostic()` for structured error conversion
+   - ✅ `error_type_not_assignable_with_reason_at()` in thin_checker.rs
+   - ✅ Wired up: variable declarations, return statements, property declarations
 3. ⬜ RelatedInformation (point to definition sites)
+4. ⬜ Scoped name resolution (needed for abstract class checks in local scopes)
+   - Binder currently only persists file_locals, not local scopes
+   - Needed for: abstract class checks, proper identifier resolution in nested scopes
 
 ---
 

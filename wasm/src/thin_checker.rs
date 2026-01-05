@@ -776,6 +776,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of new expression.
     fn get_type_of_new_expression(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
         let Some(node) = self.arena.get(idx) else {
             return TypeId::ANY;
         };
@@ -783,6 +785,37 @@ impl<'a> ThinCheckerState<'a> {
         let Some(new_expr) = self.arena.get_call_expr(node) else {
             return TypeId::ANY;
         };
+
+        // Check if trying to instantiate an abstract class
+        // The expression is typically an identifier referencing the class
+        if let Some(expr_node) = self.arena.get(new_expr.expression) {
+            // If it's a direct identifier (e.g., `new MyClass()`)
+            if let Some(ident) = self.arena.get_identifier(expr_node) {
+                let class_name = &ident.escaped_text;
+
+                // Try multiple ways to find the symbol:
+                // 1. Check if the identifier node has a direct symbol binding
+                // 2. Look up in file_locals
+                // 3. Check scoped locals (future: implement proper scope chain)
+
+                let symbol_opt = self.binder.get_node_symbol(new_expr.expression)
+                    .or_else(|| self.binder.file_locals.get(class_name));
+
+                if let Some(sym_id) = symbol_opt {
+                    if let Some(symbol) = self.binder.get_symbol(sym_id) {
+                        // Check if it has the ABSTRACT flag
+                        if symbol.flags & symbol_flags::ABSTRACT != 0 {
+                            self.error_at_node(
+                                idx,
+                                "Cannot create an instance of an abstract class.",
+                                diagnostic_codes::CANNOT_CREATE_INSTANCE_OF_ABSTRACT_CLASS,
+                            );
+                            return TypeId::ERROR;
+                        }
+                    }
+                }
+            }
+        }
 
         // Get the type of the constructor
         let _constructor_type = self.get_type_of_node(new_expr.expression);
@@ -1330,6 +1363,10 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     /// Report a type not assignable error using solver diagnostics with source tracking.
+    ///
+    /// This is the basic error that just says "Type X is not assignable to Y".
+    /// For detailed errors with elaboration (e.g., "property 'x' is missing"),
+    /// use `error_type_not_assignable_with_reason_at` instead.
     pub fn error_type_not_assignable_at(
         &mut self,
         source: TypeId,
@@ -1343,6 +1380,56 @@ impl<'a> ThinCheckerState<'a> {
             );
             let diag = builder.type_not_assignable(source, target, loc.start, loc.length());
             self.diagnostics.push(diag.to_checker_diagnostic(&self.file_name));
+        }
+    }
+
+    /// Report a type not assignable error with detailed elaboration.
+    ///
+    /// This method uses the solver's "explain" API to determine WHY the types
+    /// are incompatible (e.g., missing property, incompatible property types,
+    /// etc.) and produces a richer diagnostic with that information.
+    ///
+    /// **Architecture Note**: This follows the "Check Fast, Explain Slow" pattern.
+    /// The `is_assignable_to` check is fast (boolean). This explain call is slower
+    /// but produces better error messages. Only call this after a failed check.
+    pub fn error_type_not_assignable_with_reason_at(
+        &mut self,
+        source: TypeId,
+        target: TypeId,
+        idx: NodeIndex,
+    ) {
+        use crate::solver::{SubtypeChecker, TypeFormatter};
+
+        let Some(loc) = self.get_source_location(idx) else {
+            return;
+        };
+
+        // Use the solver's explain API to get the detailed reason
+        let mut checker = SubtypeChecker::new(&self.types);
+        let reason = checker.explain_failure(source, target);
+
+        match reason {
+            Some(failure_reason) => {
+                // Convert the reason to a PendingDiagnostic with elaboration
+                let pending = failure_reason.to_diagnostic(source, target)
+                    .with_span(crate::solver::SourceSpan::new(
+                        self.file_name.as_str(),
+                        loc.start,
+                        loc.length(),
+                    ));
+
+                // Render the pending diagnostic to a TypeDiagnostic
+                let mut formatter = TypeFormatter::new(&self.types);
+                let type_diag = formatter.render(&pending);
+
+                // Convert to checker diagnostic and add
+                self.diagnostics.push(type_diag.to_checker_diagnostic(&self.file_name));
+            }
+            None => {
+                // Fallback: shouldn't happen if called after a failed check,
+                // but just use the basic error message
+                self.error_type_not_assignable_at(source, target, idx);
+            }
         }
     }
 
@@ -1730,8 +1817,8 @@ impl<'a> ThinCheckerState<'a> {
             // If there's a type annotation, check that initializer is assignable
             if !var_decl.type_annotation.is_none() && declared_type != TypeId::ANY {
                 if !self.is_assignable_to(init_type, declared_type) {
-                    // Report type error
-                    self.error_type_not_assignable_at(init_type, declared_type, var_decl.initializer);
+                    // Report type error with elaboration (e.g., "property 'x' is missing")
+                    self.error_type_not_assignable_with_reason_at(init_type, declared_type, var_decl.initializer);
                 }
 
                 // For object literals, also check for excess properties and missing required properties
@@ -1888,12 +1975,14 @@ impl<'a> ThinCheckerState<'a> {
             } else {
                 stmt_idx
             };
-            self.error_type_not_assignable_at(return_type, expected_type, error_node);
+            self.error_type_not_assignable_with_reason_at(return_type, expected_type, error_node);
         }
     }
 
     /// Check a class declaration.
     fn check_class_declaration(&mut self, stmt_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
         let Some(node) = self.arena.get(stmt_idx) else {
             return;
         };
@@ -1901,6 +1990,21 @@ impl<'a> ThinCheckerState<'a> {
         let Some(class) = self.arena.get_class(node) else {
             return;
         };
+
+        // Check for reserved class names (error 2414)
+        if !class.name.is_none() {
+            if let Some(name_node) = self.arena.get(class.name) {
+                if let Some(ident) = self.arena.get_identifier(name_node) {
+                    if ident.escaped_text == "any" {
+                        self.error_at_node(
+                            class.name,
+                            "Class name cannot be 'any'.",
+                            diagnostic_codes::CLASS_NAME_CANNOT_BE_ANY,
+                        );
+                    }
+                }
+            }
+        }
 
         // Check if this is a declared class (ambient declaration)
         let is_declared = self.has_declare_modifier(&class.modifiers);
@@ -2375,7 +2479,7 @@ impl<'a> ThinCheckerState<'a> {
             let init_type = self.get_type_of_node(prop.initializer);
 
             if declared_type != TypeId::ANY && !self.is_assignable_to(init_type, declared_type) {
-                self.error_type_not_assignable_at(init_type, declared_type, prop.initializer);
+                self.error_type_not_assignable_with_reason_at(init_type, declared_type, prop.initializer);
             }
         } else if !prop.initializer.is_none() {
             // Just check the initializer to catch errors within it

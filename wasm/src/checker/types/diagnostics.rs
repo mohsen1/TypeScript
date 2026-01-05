@@ -131,6 +131,8 @@ pub mod diagnostic_codes {
     pub const CANNOT_READ_PROPERTY_OF_UNDEFINED: u32 = 2532;
 
     // Class errors
+    pub const CLASS_NAME_CANNOT_BE_ANY: u32 = 2414;  // Class name cannot be 'any'.
+    pub const CANNOT_CREATE_INSTANCE_OF_ABSTRACT_CLASS: u32 = 2511;  // Cannot create an instance of an abstract class.
     pub const SUPER_ONLY_IN_DERIVED_CLASS: u32 = 2335;
     pub const THIS_CANNOT_BE_REFERENCED: u32 = 2332;
     pub const PROPERTY_HAS_NO_INITIALIZER: u32 = 2564;

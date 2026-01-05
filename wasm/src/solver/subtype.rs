@@ -829,6 +829,383 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 }
 
+// =============================================================================
+// Error Explanation API
+// =============================================================================
+
+/// Reason why a subtype check failed.
+/// Used by `explain_failure` to provide detailed error messages.
+#[derive(Clone, Debug)]
+pub enum SubtypeFailureReason {
+    /// A required property is missing in the source type.
+    MissingProperty {
+        property_name: std::sync::Arc<str>,
+        source_type: TypeId,
+        target_type: TypeId,
+    },
+    /// Property types are incompatible.
+    PropertyTypeMismatch {
+        property_name: std::sync::Arc<str>,
+        source_property_type: TypeId,
+        target_property_type: TypeId,
+        nested_reason: Option<Box<SubtypeFailureReason>>,
+    },
+    /// Optional property cannot satisfy required property.
+    OptionalPropertyRequired {
+        property_name: std::sync::Arc<str>,
+    },
+    /// Return types are incompatible.
+    ReturnTypeMismatch {
+        source_return: TypeId,
+        target_return: TypeId,
+        nested_reason: Option<Box<SubtypeFailureReason>>,
+    },
+    /// Parameter types are incompatible.
+    ParameterTypeMismatch {
+        param_index: usize,
+        source_param: TypeId,
+        target_param: TypeId,
+    },
+    /// Too many parameters in source.
+    TooManyParameters {
+        source_count: usize,
+        target_count: usize,
+    },
+    /// Tuple element count mismatch.
+    TupleElementMismatch {
+        source_count: usize,
+        target_count: usize,
+    },
+    /// Tuple element type mismatch.
+    TupleElementTypeMismatch {
+        index: usize,
+        source_element: TypeId,
+        target_element: TypeId,
+    },
+    /// Array element type mismatch.
+    ArrayElementMismatch {
+        source_element: TypeId,
+        target_element: TypeId,
+    },
+    /// Index signature value type mismatch.
+    IndexSignatureMismatch {
+        index_kind: &'static str, // "string" or "number"
+        source_value_type: TypeId,
+        target_value_type: TypeId,
+    },
+    /// No union member matches.
+    NoUnionMemberMatches {
+        source_type: TypeId,
+        target_union_members: Vec<TypeId>,
+    },
+    /// Generic type mismatch (no more specific reason).
+    TypeMismatch {
+        source_type: TypeId,
+        target_type: TypeId,
+    },
+}
+
+impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
+    /// Explain why `source` is not assignable to `target`.
+    ///
+    /// This is the "slow path" - called only when `is_assignable_to` returns false
+    /// and we need to generate an error message. Re-runs the subtype logic with
+    /// tracing enabled to produce a structured failure reason.
+    ///
+    /// Returns `None` if the types are actually compatible (shouldn't happen
+    /// if called correctly after a failed check).
+    pub fn explain_failure(&mut self, source: TypeId, target: TypeId) -> Option<SubtypeFailureReason> {
+        // Fast path: if types are equal, no failure
+        if source == target {
+            return None;
+        }
+
+        // Check for any/unknown/never special cases
+        if source == TypeId::ANY || target == TypeId::ANY || target == TypeId::UNKNOWN {
+            return None;
+        }
+        if source == TypeId::NEVER {
+            return None;
+        }
+        if source == TypeId::ERROR || target == TypeId::ERROR {
+            return None;
+        }
+
+        // Look up the type keys
+        let source_key = self.interner.lookup(source)?;
+        let target_key = self.interner.lookup(target)?;
+
+        self.explain_failure_inner(source, target, &source_key, &target_key)
+    }
+
+    fn explain_failure_inner(
+        &mut self,
+        source: TypeId,
+        target: TypeId,
+        source_key: &TypeKey,
+        target_key: &TypeKey,
+    ) -> Option<SubtypeFailureReason> {
+        match (source_key, target_key) {
+            // Object to object - find the specific missing/mismatched property
+            (TypeKey::Object(s_props), TypeKey::Object(t_props)) => {
+                self.explain_object_failure(source, target, s_props, t_props)
+            }
+
+            // Object with index to object with index
+            (TypeKey::ObjectWithIndex(s_shape), TypeKey::ObjectWithIndex(t_shape)) => {
+                self.explain_indexed_object_failure(source, target, s_shape, t_shape)
+            }
+
+            // Simple object to indexed object
+            (TypeKey::Object(s_props), TypeKey::ObjectWithIndex(t_shape)) => {
+                // First check properties
+                if let Some(reason) = self.explain_object_failure(source, target, s_props, &t_shape.properties) {
+                    return Some(reason);
+                }
+                // Then check index signature constraints
+                if let Some(ref string_idx) = t_shape.string_index {
+                    for prop in s_props {
+                        if !self.check_subtype(prop.type_id, string_idx.value_type).is_true() {
+                            return Some(SubtypeFailureReason::IndexSignatureMismatch {
+                                index_kind: "string",
+                                source_value_type: prop.type_id,
+                                target_value_type: string_idx.value_type,
+                            });
+                        }
+                    }
+                }
+                None
+            }
+
+            // Function to function
+            (TypeKey::Function(s_fn), TypeKey::Function(t_fn)) => {
+                self.explain_function_failure(s_fn, t_fn)
+            }
+
+            // Array to array
+            (TypeKey::Array(s_elem), TypeKey::Array(t_elem)) => {
+                if !self.check_subtype(*s_elem, *t_elem).is_true() {
+                    Some(SubtypeFailureReason::ArrayElementMismatch {
+                        source_element: *s_elem,
+                        target_element: *t_elem,
+                    })
+                } else {
+                    None
+                }
+            }
+
+            // Tuple to tuple
+            (TypeKey::Tuple(s_elems), TypeKey::Tuple(t_elems)) => {
+                self.explain_tuple_failure(s_elems, t_elems)
+            }
+
+            // Union target - source must match at least one member
+            (_, TypeKey::Union(members)) => {
+                // If none match, explain which member was closest
+                // For now, just report that no member matches
+                Some(SubtypeFailureReason::NoUnionMemberMatches {
+                    source_type: source,
+                    target_union_members: members.clone(),
+                })
+            }
+
+            // Default: generic type mismatch
+            _ => Some(SubtypeFailureReason::TypeMismatch {
+                source_type: source,
+                target_type: target,
+            }),
+        }
+    }
+
+    /// Explain why an object type assignment failed.
+    fn explain_object_failure(
+        &mut self,
+        source: TypeId,
+        target: TypeId,
+        source_props: &[PropertyInfo],
+        target_props: &[PropertyInfo],
+    ) -> Option<SubtypeFailureReason> {
+        for t_prop in target_props {
+            let s_prop = source_props.iter().find(|p| p.name == t_prop.name);
+
+            match s_prop {
+                Some(sp) => {
+                    // Check optional/required mismatch
+                    if sp.optional && !t_prop.optional {
+                        return Some(SubtypeFailureReason::OptionalPropertyRequired {
+                            property_name: t_prop.name.clone(),
+                        });
+                    }
+
+                    // Check property type compatibility
+                    if !self.check_subtype(sp.type_id, t_prop.type_id).is_true() {
+                        // Recursively explain the nested failure
+                        let nested = self.explain_failure(sp.type_id, t_prop.type_id);
+                        return Some(SubtypeFailureReason::PropertyTypeMismatch {
+                            property_name: t_prop.name.clone(),
+                            source_property_type: sp.type_id,
+                            target_property_type: t_prop.type_id,
+                            nested_reason: nested.map(Box::new),
+                        });
+                    }
+                }
+                None => {
+                    // Required property is missing
+                    if !t_prop.optional {
+                        return Some(SubtypeFailureReason::MissingProperty {
+                            property_name: t_prop.name.clone(),
+                            source_type: source,
+                            target_type: target,
+                        });
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Explain why an indexed object type assignment failed.
+    fn explain_indexed_object_failure(
+        &mut self,
+        source: TypeId,
+        target: TypeId,
+        source_shape: &ObjectShape,
+        target_shape: &ObjectShape,
+    ) -> Option<SubtypeFailureReason> {
+        // First check properties
+        if let Some(reason) = self.explain_object_failure(
+            source,
+            target,
+            &source_shape.properties,
+            &target_shape.properties,
+        ) {
+            return Some(reason);
+        }
+
+        // Check string index signature
+        if let Some(ref t_string_idx) = target_shape.string_index {
+            if let Some(ref s_string_idx) = source_shape.string_index {
+                if !self.check_subtype(s_string_idx.value_type, t_string_idx.value_type).is_true() {
+                    return Some(SubtypeFailureReason::IndexSignatureMismatch {
+                        index_kind: "string",
+                        source_value_type: s_string_idx.value_type,
+                        target_value_type: t_string_idx.value_type,
+                    });
+                }
+            }
+        }
+
+        // Check number index signature
+        if let Some(ref t_number_idx) = target_shape.number_index {
+            if let Some(ref s_number_idx) = source_shape.number_index {
+                if !self.check_subtype(s_number_idx.value_type, t_number_idx.value_type).is_true() {
+                    return Some(SubtypeFailureReason::IndexSignatureMismatch {
+                        index_kind: "number",
+                        source_value_type: s_number_idx.value_type,
+                        target_value_type: t_number_idx.value_type,
+                    });
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Explain why a function type assignment failed.
+    fn explain_function_failure(
+        &mut self,
+        source: &FunctionShape,
+        target: &FunctionShape,
+    ) -> Option<SubtypeFailureReason> {
+        // Check return type
+        if !self.check_subtype(source.return_type, target.return_type).is_true() {
+            let nested = self.explain_failure(source.return_type, target.return_type);
+            return Some(SubtypeFailureReason::ReturnTypeMismatch {
+                source_return: source.return_type,
+                target_return: target.return_type,
+                nested_reason: nested.map(Box::new),
+            });
+        }
+
+        // Check parameter count
+        if source.params.len() > target.params.len() {
+            return Some(SubtypeFailureReason::TooManyParameters {
+                source_count: source.params.len(),
+                target_count: target.params.len(),
+            });
+        }
+
+        // Check parameter types
+        for (i, s_param) in source.params.iter().enumerate() {
+            if let Some(t_param) = target.params.get(i) {
+                // Bivariant check
+                if !self.check_subtype(s_param.type_id, t_param.type_id).is_true()
+                    && !self.check_subtype(t_param.type_id, s_param.type_id).is_true()
+                {
+                    return Some(SubtypeFailureReason::ParameterTypeMismatch {
+                        param_index: i,
+                        source_param: s_param.type_id,
+                        target_param: t_param.type_id,
+                    });
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Explain why a tuple type assignment failed.
+    fn explain_tuple_failure(
+        &mut self,
+        source: &[TupleElement],
+        target: &[TupleElement],
+    ) -> Option<SubtypeFailureReason> {
+        let source_required = source.iter().filter(|e| !e.optional && !e.rest).count();
+        let target_required = target.iter().filter(|e| !e.optional && !e.rest).count();
+
+        if source_required < target_required {
+            return Some(SubtypeFailureReason::TupleElementMismatch {
+                source_count: source.len(),
+                target_count: target.len(),
+            });
+        }
+
+        for (i, t_elem) in target.iter().enumerate() {
+            if t_elem.rest {
+                // Check rest elements
+                for (j, s_elem) in source.iter().enumerate().skip(i) {
+                    if !self.check_subtype(s_elem.type_id, t_elem.type_id).is_true() {
+                        return Some(SubtypeFailureReason::TupleElementTypeMismatch {
+                            index: j,
+                            source_element: s_elem.type_id,
+                            target_element: t_elem.type_id,
+                        });
+                    }
+                }
+                break;
+            }
+
+            if let Some(s_elem) = source.get(i) {
+                if !self.check_subtype(s_elem.type_id, t_elem.type_id).is_true() {
+                    return Some(SubtypeFailureReason::TupleElementTypeMismatch {
+                        index: i,
+                        source_element: s_elem.type_id,
+                        target_element: t_elem.type_id,
+                    });
+                }
+            } else if !t_elem.optional {
+                return Some(SubtypeFailureReason::TupleElementMismatch {
+                    source_count: source.len(),
+                    target_count: target.len(),
+                });
+            }
+        }
+
+        None
+    }
+}
+
 /// Convenience function for one-off subtype checks (without resolver)
 pub fn is_subtype_of(interner: &TypeInterner, source: TypeId, target: TypeId) -> bool {
     let mut checker = SubtypeChecker::new(interner);
