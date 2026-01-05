@@ -168,3 +168,68 @@ fn test_thin_checker_type_identity() {
     let lit2 = checker.types.literal_string("test");
     assert!(checker.are_types_identical(lit1, lit2));
 }
+
+// ============== Function overload validation ==============
+
+#[test]
+fn test_function_overload_missing_implementation_2391() {
+    use crate::thin_parser::ThinParserState;
+    let source = r#"function foo();"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2391),
+        "Expected error 2391 (Function implementation is missing), got: {:?}", codes);
+}
+
+#[test]
+fn test_function_overload_with_implementation() {
+    use crate::thin_parser::ThinParserState;
+    let source = r#"
+function foo(): void;
+function foo() {}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(!codes.contains(&2391),
+        "Should not have error 2391 when implementation exists, got: {:?}", codes);
+}
+
+#[test]
+fn test_function_overload_wrong_name_2389() {
+    use crate::thin_parser::ThinParserState;
+    let source = r#"
+function foo(): void;
+function bar() {}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2389) || codes.contains(&2391),
+        "Expected error 2389 or 2391 for wrong implementation name, got: {:?}", codes);
+}

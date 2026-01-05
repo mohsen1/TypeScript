@@ -1489,6 +1489,9 @@ impl<'a> ThinCheckerState<'a> {
             for &stmt_idx in &sf.statements.nodes {
                 self.check_statement(stmt_idx);
             }
+
+            // Check for function overload implementations (2389, 2391)
+            self.check_function_implementations(&sf.statements.nodes);
         }
     }
 
@@ -1528,6 +1531,8 @@ impl<'a> ThinCheckerState<'a> {
                     for &inner_stmt in &block.statements.nodes {
                         self.check_statement(inner_stmt);
                     }
+                    // Check for function overload implementations in blocks
+                    self.check_function_implementations(&block.statements.nodes);
                 }
             }
             syntax_kind_ext::FUNCTION_DECLARATION => {
@@ -1615,7 +1620,6 @@ impl<'a> ThinCheckerState<'a> {
             syntax_kind_ext::INTERFACE_DECLARATION |
             syntax_kind_ext::TYPE_ALIAS_DECLARATION |
             syntax_kind_ext::ENUM_DECLARATION |
-            syntax_kind_ext::MODULE_DECLARATION |
             syntax_kind_ext::IMPORT_DECLARATION |
             syntax_kind_ext::EXPORT_DECLARATION |
             syntax_kind_ext::EMPTY_STATEMENT |
@@ -1623,6 +1627,14 @@ impl<'a> ThinCheckerState<'a> {
             syntax_kind_ext::BREAK_STATEMENT |
             syntax_kind_ext::CONTINUE_STATEMENT => {
                 // No action needed
+            }
+            syntax_kind_ext::MODULE_DECLARATION => {
+                // Check module body for function overload implementations
+                if let Some(module) = self.arena.get_module(node) {
+                    if !module.body.is_none() {
+                        self.check_module_body(module.body);
+                    }
+                }
             }
             syntax_kind_ext::CLASS_DECLARATION => {
                 self.check_class_declaration(stmt_idx);
@@ -1862,6 +1874,270 @@ impl<'a> ThinCheckerState<'a> {
         // Check each class member
         for &member_idx in &class.members.nodes {
             self.check_class_member(member_idx);
+        }
+
+        // Check for missing method/constructor implementations (2389, 2390, 2391)
+        self.check_class_member_implementations(&class.members.nodes);
+    }
+
+    /// Check that all method/constructor overload signatures have implementations.
+    /// Reports errors 2389, 2390, 2391.
+    fn check_class_member_implementations(&mut self, members: &[NodeIndex]) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        let mut i = 0;
+        while i < members.len() {
+            let member_idx = members[i];
+            let Some(node) = self.arena.get(member_idx) else {
+                i += 1;
+                continue;
+            };
+
+            match node.kind {
+                syntax_kind_ext::CONSTRUCTOR => {
+                    if let Some(ctor) = self.arena.get_constructor(node) {
+                        if ctor.body.is_none() {
+                            // Constructor overload signature - check for implementation
+                            let has_impl = self.find_constructor_impl(members, i + 1);
+                            if !has_impl {
+                                self.error_at_node(
+                                    member_idx,
+                                    "Constructor implementation is missing.",
+                                    diagnostic_codes::CONSTRUCTOR_IMPLEMENTATION_MISSING
+                                );
+                            }
+                        }
+                    }
+                }
+                syntax_kind_ext::METHOD_DECLARATION => {
+                    if let Some(method) = self.arena.get_method_decl(node) {
+                        if method.body.is_none() {
+                            // Method overload signature - check for implementation
+                            let method_name = self.get_method_name_from_node(member_idx);
+                            if let Some(name) = method_name {
+                                let (has_impl, impl_name) = self.find_method_impl(members, i + 1, &name);
+                                if !has_impl {
+                                    self.error_at_node(
+                                        member_idx,
+                                        "Function implementation is missing or not immediately following the declaration.",
+                                        diagnostic_codes::FUNCTION_IMPLEMENTATION_MISSING
+                                    );
+                                } else if let Some(actual_name) = impl_name {
+                                    if actual_name != name {
+                                        // Implementation has wrong name
+                                        self.error_at_node(
+                                            members[i + 1],
+                                            &format!("Function implementation name must be '{}'.", name),
+                                            diagnostic_codes::FUNCTION_IMPLEMENTATION_NAME_MUST_BE
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+    }
+
+    /// Check if there's a constructor implementation after position `start`.
+    fn find_constructor_impl(&self, members: &[NodeIndex], start: usize) -> bool {
+        for i in start..members.len() {
+            let member_idx = members[i];
+            let Some(node) = self.arena.get(member_idx) else {
+                continue;
+            };
+            if node.kind == syntax_kind_ext::CONSTRUCTOR {
+                if let Some(ctor) = self.arena.get_constructor(node) {
+                    if !ctor.body.is_none() {
+                        return true;
+                    }
+                    // Another constructor overload - keep looking
+                }
+            } else {
+                // Non-constructor member - no implementation found
+                return false;
+            }
+        }
+        false
+    }
+
+    /// Check if there's a method implementation with the given name after position `start`.
+    fn find_method_impl(&self, members: &[NodeIndex], start: usize, name: &str) -> (bool, Option<String>) {
+        if start >= members.len() {
+            return (false, None);
+        }
+
+        let member_idx = members[start];
+        let Some(node) = self.arena.get(member_idx) else {
+            return (false, None);
+        };
+
+        if node.kind == syntax_kind_ext::METHOD_DECLARATION {
+            if let Some(method) = self.arena.get_method_decl(node) {
+                if !method.body.is_none() {
+                    // This is an implementation - check if name matches
+                    let impl_name = self.get_method_name_from_node(member_idx);
+                    if let Some(ref impl_name_str) = impl_name {
+                        return (true, impl_name);
+                    }
+                }
+            }
+        }
+        (false, None)
+    }
+
+    /// Get the name of a method declaration.
+    fn get_method_name_from_node(&self, member_idx: NodeIndex) -> Option<String> {
+        let Some(node) = self.arena.get(member_idx) else {
+            return None;
+        };
+
+        if let Some(method) = self.arena.get_method_decl(node) {
+            let Some(name_node) = self.arena.get(method.name) else {
+                return None;
+            };
+            if let Some(id) = self.arena.get_identifier(name_node) {
+                return Some(id.escaped_text.clone());
+            }
+        }
+        None
+    }
+
+    /// Check that all top-level function overload signatures have implementations.
+    /// Reports errors 2389, 2391.
+    fn check_function_implementations(&mut self, statements: &[NodeIndex]) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        let mut i = 0;
+        while i < statements.len() {
+            let stmt_idx = statements[i];
+            let Some(node) = self.arena.get(stmt_idx) else {
+                i += 1;
+                continue;
+            };
+
+            if node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                if let Some(func) = self.arena.get_function(node) {
+                    if func.body.is_none() {
+                        // Function overload signature - check for implementation
+                        let func_name = self.get_function_name_from_node(stmt_idx);
+                        if let Some(name) = func_name {
+                            let (has_impl, impl_name) = self.find_function_impl(statements, i + 1, &name);
+                            if !has_impl {
+                                self.error_at_node(
+                                    stmt_idx,
+                                    "Function implementation is missing or not immediately following the declaration.",
+                                    diagnostic_codes::FUNCTION_IMPLEMENTATION_MISSING
+                                );
+                            } else if let Some(actual_name) = impl_name {
+                                if actual_name != name {
+                                    // Implementation has wrong name
+                                    self.error_at_node(
+                                        statements[i + 1],
+                                        &format!("Function implementation name must be '{}'.", name),
+                                        diagnostic_codes::FUNCTION_IMPLEMENTATION_NAME_MUST_BE
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            i += 1;
+        }
+    }
+
+    /// Check if there's a function implementation with the given name after position `start`.
+    fn find_function_impl(&self, statements: &[NodeIndex], start: usize, name: &str) -> (bool, Option<String>) {
+        if start >= statements.len() {
+            return (false, None);
+        }
+
+        let stmt_idx = statements[start];
+        let Some(node) = self.arena.get(stmt_idx) else {
+            return (false, None);
+        };
+
+        if node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+            if let Some(func) = self.arena.get_function(node) {
+                // Check if this is an implementation (has body)
+                if !func.body.is_none() {
+                    // This is an implementation - check if name matches
+                    let impl_name = self.get_function_name_from_node(stmt_idx);
+                    return (true, impl_name);
+                } else {
+                    // Another overload signature without body - need to look further
+                    // but we should check if this is the same function name
+                    let overload_name = self.get_function_name_from_node(stmt_idx);
+                    if overload_name.as_ref() == Some(&name.to_string()) {
+                        // Same function, continue looking for implementation
+                        return self.find_function_impl(statements, start + 1, name);
+                    }
+                }
+            }
+        }
+
+        (false, None)
+    }
+
+    /// Get the name of a function declaration.
+    fn get_function_name_from_node(&self, stmt_idx: NodeIndex) -> Option<String> {
+        let Some(node) = self.arena.get(stmt_idx) else {
+            return None;
+        };
+
+        if let Some(func) = self.arena.get_function(node) {
+            if !func.name.is_none() {
+                let Some(name_node) = self.arena.get(func.name) else {
+                    return None;
+                };
+                if let Some(id) = self.arena.get_identifier(name_node) {
+                    return Some(id.escaped_text.clone());
+                }
+            }
+        }
+        None
+    }
+
+    /// Check a module body for function overload implementations.
+    fn check_module_body(&mut self, body_idx: NodeIndex) {
+        let Some(body_node) = self.arena.get(body_idx) else {
+            return;
+        };
+
+        // Module body can be a MODULE_BLOCK or another MODULE_DECLARATION (for nested namespaces)
+        if body_node.kind == syntax_kind_ext::MODULE_BLOCK {
+            if let Some(block) = self.arena.get_module_block(body_node) {
+                if let Some(ref statements) = block.statements {
+                    // Check statements
+                    for &stmt_idx in &statements.nodes {
+                        self.check_statement(stmt_idx);
+                    }
+                    // Check for function overload implementations
+                    self.check_function_implementations(&statements.nodes);
+                }
+            }
+        } else if body_node.kind == syntax_kind_ext::MODULE_DECLARATION {
+            // Nested namespace - recurse
+            self.check_statement(body_idx);
+        }
+    }
+
+    /// Report an error at a specific node.
+    fn error_at_node(&mut self, node_idx: NodeIndex, message: &str, code: u32) {
+        if let Some((start, length)) = self.get_node_span(node_idx) {
+            self.diagnostics.push(crate::checker::Diagnostic {
+                file: self.file_name.clone(),
+                start,
+                length,
+                message_text: message.to_string(),
+                category: crate::checker::DiagnosticCategory::Error,
+                code,
+                related_information: Vec::new(),
+            });
         }
     }
 

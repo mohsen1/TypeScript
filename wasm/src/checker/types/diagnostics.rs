@@ -112,7 +112,9 @@ pub mod diagnostic_codes {
     pub const EXPECTED_ARGUMENTS: u32 = 2554;  // Expected {0} arguments, but got {1}
     pub const EXPECTED_AT_LEAST_ARGUMENTS: u32 = 2555;
     pub const NO_OVERLOAD_MATCHES_CALL: u32 = 2769;
-    pub const EACH_OVERLOAD_SIGNATURE_MUST_HAVE_IMPLEMENTATION: u32 = 2391;
+    pub const FUNCTION_IMPLEMENTATION_NAME_MUST_BE: u32 = 2389;  // Function implementation name must be '{0}'
+    pub const CONSTRUCTOR_IMPLEMENTATION_MISSING: u32 = 2390;  // Constructor implementation is missing
+    pub const FUNCTION_IMPLEMENTATION_MISSING: u32 = 2391;  // Function implementation is missing
     pub const NOT_ALL_CODE_PATHS_RETURN_VALUE: u32 = 2366;
     pub const FUNCTION_LACKS_RETURN_TYPE: u32 = 2355;
     pub const FUNCTION_RETURN_TYPE_MISMATCH: u32 = 2322;
