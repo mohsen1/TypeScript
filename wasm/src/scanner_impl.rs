@@ -354,14 +354,15 @@ impl ScannerState {
                     }
                 }
 
-                // Whitespace (ASCII single-byte)
+                // Whitespace - ASCII single-byte chars and NON_BREAKING_SPACE (2 bytes in UTF-8)
                 CharacterCodes::TAB
                 | CharacterCodes::VERTICAL_TAB
                 | CharacterCodes::FORM_FEED
                 | CharacterCodes::SPACE
                 | CharacterCodes::NON_BREAKING_SPACE => {
                     if self.skip_trivia {
-                        self.pos += 1;
+                        // Use char_len_at for proper UTF-8 handling (NON_BREAKING_SPACE is 2 bytes)
+                        self.pos += self.char_len_at(self.pos);
                         while self.pos < self.end && is_white_space_single_line(self.char_code_unchecked(self.pos)) {
                             self.pos += self.char_len_at(self.pos);
                         }
@@ -890,7 +891,9 @@ impl ScannerState {
                 self.pos += 1;
                 if self.pos < self.end {
                     let escaped = self.char_code_unchecked(self.pos);
-                    self.pos += 1;
+                    // Get byte length of the escaped character BEFORE advancing
+                    let escaped_char_len = self.char_len_at(self.pos);
+                    self.pos += escaped_char_len;
                     match escaped {
                         CharacterCodes::LOWER_N => result.push('\n'),
                         CharacterCodes::LOWER_R => result.push('\r'),
@@ -898,6 +901,20 @@ impl ScannerState {
                         CharacterCodes::BACKTICK => result.push('`'),
                         CharacterCodes::DOLLAR => result.push('$'),
                         CharacterCodes::BACKSLASH => result.push('\\'),
+                        // Line continuation: backslash followed by line terminator
+                        CharacterCodes::LINE_FEED
+                        | CharacterCodes::CARRIAGE_RETURN
+                        | CharacterCodes::LINE_SEPARATOR
+                        | CharacterCodes::PARAGRAPH_SEPARATOR => {
+                            // Line continuation - don't add anything to result
+                            // Also handle CR+LF as a single line break
+                            if escaped == CharacterCodes::CARRIAGE_RETURN
+                                && self.pos < self.end
+                                && self.char_code_unchecked(self.pos) == CharacterCodes::LINE_FEED
+                            {
+                                self.pos += 1;
+                            }
+                        }
                         _ => {
                             result.push('\\');
                             if let Some(c) = char::from_u32(escaped) {
@@ -1268,14 +1285,16 @@ impl ScannerState {
     fn scan_template_escape_sequence(&mut self) -> String {
         // Skip the backslash
         self.pos += 1;
-        
+
         if self.pos >= self.end {
             return String::from("\\");
         }
-        
+
         let ch = self.char_code_unchecked(self.pos);
-        self.pos += 1;
-        
+        // Use char_len_at for proper UTF-8 handling of multi-byte chars
+        let ch_len = self.char_len_at(self.pos);
+        self.pos += ch_len;
+
         match ch {
             CharacterCodes::_0 => {
                 // Check if it's followed by a digit (octal)
@@ -1297,7 +1316,9 @@ impl ScannerState {
             CharacterCodes::BACKTICK => String::from("`"),
             CharacterCodes::BACKSLASH => String::from("\\"),
             CharacterCodes::DOLLAR => String::from("$"),
-            CharacterCodes::LINE_FEED => String::new(), // Line continuation
+            CharacterCodes::LINE_FEED
+            | CharacterCodes::LINE_SEPARATOR
+            | CharacterCodes::PARAGRAPH_SEPARATOR => String::new(), // Line continuation
             CharacterCodes::CARRIAGE_RETURN => {
                 // Skip following LF if present
                 if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LINE_FEED {
