@@ -135,6 +135,7 @@ pub mod diagnostic_codes {
     // Class errors
     pub const CLASS_NAME_CANNOT_BE_ANY: u32 = 2414;  // Class name cannot be 'any'.
     pub const CANNOT_CREATE_INSTANCE_OF_ABSTRACT_CLASS: u32 = 2511;  // Cannot create an instance of an abstract class.
+    pub const CANNOT_FIND_NAME_DID_YOU_MEAN_STATIC: u32 = 2662;  // Cannot find name 'X'. Did you mean the static member 'C.X'?
     pub const SUPER_ONLY_IN_DERIVED_CLASS: u32 = 2335;
     pub const THIS_CANNOT_BE_REFERENCED: u32 = 2332;
     pub const PROPERTY_HAS_NO_INITIALIZER: u32 = 2564;

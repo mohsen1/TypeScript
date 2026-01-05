@@ -487,6 +487,45 @@ fn test_abstract_class_in_local_scope_2511() {
 }
 
 #[test]
+fn test_static_member_suggestion_2662() {
+    // Error 2662: Cannot find name 'foo'. Did you mean the static member 'C.foo'?
+    use crate::thin_parser::ThinParserState;
+    let source = r#"
+class C {
+    static foo: string;
+
+    bar() {
+        let k = foo;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Debug: show all diagnostics
+    eprintln!("=== Diagnostics for static member suggestion ===");
+    for d in &checker.diagnostics {
+        eprintln!("  code={}, msg={}", d.code, d.message_text);
+    }
+
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2662),
+        "Expected error 2662 (Cannot find name 'foo'. Did you mean the static member 'C.foo'?), got: {:?}", codes);
+
+    // Should NOT have generic "cannot find name" error 2304
+    assert!(!codes.contains(&2304),
+        "Should not have generic error 2304, should have specific 2662 instead. Got: {:?}", codes);
+}
+
+#[test]
 fn test_interface_name_cannot_be_reserved_2427() {
     // Error 2427: Interface name cannot be 'string' (or other primitive types)
     use crate::thin_parser::ThinParserState;

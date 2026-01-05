@@ -98,6 +98,19 @@ pub struct ThinCheckerState<'a> {
 
     /// Stack of expected return types for functions (for return statement checking).
     return_type_stack: Vec<TypeId>,
+
+    /// Current enclosing class info (name, static member names) for error 2662 suggestion.
+    /// When inside a class method/constructor, this helps suggest static members.
+    enclosing_class: Option<EnclosingClassInfo>,
+}
+
+/// Info about the enclosing class for static member suggestions.
+#[derive(Clone)]
+struct EnclosingClassInfo {
+    /// Name of the class.
+    name: String,
+    /// Names of static members.
+    static_members: Vec<String>,
 }
 
 /// Maximum depth for recursive type instantiation.
@@ -140,6 +153,7 @@ impl<'a> ThinCheckerState<'a> {
             call_depth: RefCell::new(0),
             local_scope_stack: Vec::new(),
             return_type_stack: Vec::new(),
+            enclosing_class: None,
         }
     }
 
@@ -566,6 +580,18 @@ impl<'a> ThinCheckerState<'a> {
             | "queueMicrotask" | "structuredClone" | "atob" | "btoa"
             | "performance" | "crypto" | "navigator" | "location" | "history" => TypeId::ANY,
             _ => {
+                // Check if we're inside a class and the name matches a static member (error 2662)
+                // Clone values to avoid borrow issues
+                if let Some(ref class_info) = self.enclosing_class.clone() {
+                    if class_info.static_members.contains(&name.to_string()) {
+                        self.error_cannot_find_name_static_member_at(
+                            name,
+                            &class_info.name,
+                            idx,
+                        );
+                        return TypeId::ERROR;
+                    }
+                }
                 // Report "cannot find name" error
                 self.error_cannot_find_name_at(name, idx);
                 TypeId::ERROR
@@ -1599,6 +1625,32 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Report error 2662: Cannot find name 'X'. Did you mean the static member 'C.X'?
+    pub fn error_cannot_find_name_static_member_at(
+        &mut self,
+        name: &str,
+        class_name: &str,
+        idx: NodeIndex,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        if let Some(loc) = self.get_source_location(idx) {
+            let message = format!(
+                "Cannot find name '{}'. Did you mean the static member '{}.{}'?",
+                name, class_name, name
+            );
+            self.diagnostics.push(Diagnostic {
+                code: diagnostic_codes::CANNOT_FIND_NAME_DID_YOU_MEAN_STATIC,
+                category: crate::checker::state::DiagnosticCategory::Error,
+                message_text: message,
+                file: self.file_name.clone(),
+                start: loc.start,
+                length: loc.length(),
+                related_information: Vec::new(),
+            });
+        }
+    }
+
     /// Report an argument count mismatch error using solver diagnostics with source tracking.
     pub fn error_argument_count_mismatch_at(
         &mut self,
@@ -2202,6 +2254,32 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
+        // Collect class name and static members for error 2662 suggestions
+        let class_name = if !class.name.is_none() {
+            if let Some(name_node) = self.arena.get(class.name) {
+                if let Some(ident) = self.arena.get_identifier(name_node) {
+                    Some(ident.escaped_text.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        let static_members = self.collect_static_member_names(&class.members.nodes);
+
+        // Save previous enclosing class and set current
+        let prev_enclosing_class = self.enclosing_class.take();
+        if let Some(name) = class_name {
+            self.enclosing_class = Some(EnclosingClassInfo {
+                name,
+                static_members,
+            });
+        }
+
         // Check each class member
         for &member_idx in &class.members.nodes {
             self.check_class_member(member_idx);
@@ -2212,6 +2290,9 @@ impl<'a> ThinCheckerState<'a> {
         if !is_declared {
             self.check_class_member_implementations(&class.members.nodes);
         }
+
+        // Restore previous enclosing class
+        self.enclosing_class = prev_enclosing_class;
 
         self.pop_local_scope();
     }
@@ -2302,6 +2383,81 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         false
+    }
+
+    /// Check if a node has the `static` modifier.
+    fn has_static_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::StaticKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Collect names of static members in a class.
+    fn collect_static_member_names(&self, members: &[NodeIndex]) -> Vec<String> {
+        let mut static_names = Vec::new();
+
+        for &member_idx in members {
+            if let Some(member_node) = self.arena.get(member_idx) {
+                // Check property declarations
+                if member_node.kind == syntax_kind_ext::PROPERTY_DECLARATION {
+                    if let Some(prop) = self.arena.get_property_decl(member_node) {
+                        if self.has_static_modifier(&prop.modifiers) {
+                            if let Some(name_node) = self.arena.get(prop.name) {
+                                if let Some(ident) = self.arena.get_identifier(name_node) {
+                                    static_names.push(ident.escaped_text.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+                // Check method declarations
+                else if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                    if let Some(method) = self.arena.get_method_decl(member_node) {
+                        if self.has_static_modifier(&method.modifiers) {
+                            if let Some(name_node) = self.arena.get(method.name) {
+                                if let Some(ident) = self.arena.get_identifier(name_node) {
+                                    static_names.push(ident.escaped_text.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+                // Check getter declarations
+                else if member_node.kind == syntax_kind_ext::GET_ACCESSOR {
+                    if let Some(getter) = self.arena.get_accessor(member_node) {
+                        if self.has_static_modifier(&getter.modifiers) {
+                            if let Some(name_node) = self.arena.get(getter.name) {
+                                if let Some(ident) = self.arena.get_identifier(name_node) {
+                                    static_names.push(ident.escaped_text.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+                // Check setter declarations
+                else if member_node.kind == syntax_kind_ext::SET_ACCESSOR {
+                    if let Some(setter) = self.arena.get_accessor(member_node) {
+                        if self.has_static_modifier(&setter.modifiers) {
+                            if let Some(name_node) = self.arena.get(setter.name) {
+                                if let Some(ident) = self.arena.get_identifier(name_node) {
+                                    static_names.push(ident.escaped_text.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        static_names
     }
 
     /// Recursively check a type node for parameter properties in function types.

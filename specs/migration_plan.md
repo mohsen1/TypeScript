@@ -28,66 +28,15 @@ see SESSION_LOG.md -- always amended with each session's work
 
 # 🎯 CURRENT FOCUS: Phase 8 - Baseline Compatibility
 
-**Goal**: Match TypeScript's test baselines for `tests/cases/compiler`.
+**Goal**: 100% match on TypeScript's test baselines.
 
-### Current Status
-| Baseline | Pass Rate | Notes |
-|----------|-----------|-------|
-| .errors.txt | **66.2%** (51/77) | Focus area |
-| .js emit | **36.8%** (28/76) | Fixed baseline comparison bug |
+### Current Status (12,408 tests)
+| Baseline | Compiler | Conformance | Crash Rate |
+|----------|----------|-------------|------------|
+| .errors.txt | 38.6% (2,070/5,360) | 33.8% (1,741/5,157) | 0.05% |
+| .js emit | 3.3% (194/5,837) | ~3% | 0.05% |
 
 ### Next Steps
-
-#### Priority 0: Multi-thread work
-
-##### Objective: Refactor to Shared Global Type Interner for Thread-Safe Deduplication
-
-We are transitioning the compiler architecture from "Isolated State" (where every thread has its own type registry) to "Shared State" (a single global type universe). This is critical for memory efficiency and enabling O(1) global type equality checks across threads.
-
-###### Architectural Changes
-
-1.  **Hoist the Interner**: The `TypeInterner` must no longer be owned by the short-lived `ThinCheckerState`. It must be owned by the long-lived `MergedProgram` (or a similar global context) and passed by reference.
-2.  **Thread Safety**: Ensure `TypeInterner` remains thread-safe (`Sync`). Currently, it uses `std::sync::RwLock`.
-    *   *Performance Note:* Please switch imports to `parking_lot::RwLock` if available, or keep `std::sync::RwLock` but verify logic minimizes write-lock duration.
-
-###### Specific Task Instructions
-
-1. Update `src/solver/intern.rs`
-- Ensure `TypeInterner` is fully thread-safe (it currently uses `RwLock`, which is correct for this phase).
-- Verify that `intern()` operations utilize read-locks for the fast path and only upgrade to write-locks when a new type actually needs to be inserted.
-
-2. Update `src/parallel.rs`
-- Modify the `MergedProgram` struct:
-  ```rust
-  pub struct MergedProgram {
-      pub type_interner: TypeInterner, // NEW: The global source of truth
-      pub files: Vec<BoundFile>,
-      // ... existing fields
-  }
-  ```
-- Update `merge_bind_results` (or the equivalent construction site) to initialize a `TypeInterner::new()` and store it in `MergedProgram`.
-
-3. Update `src/thin_checker.rs`
-- Modify `ThinCheckerState<'a>`:
-  - Change `pub types: TypeInterner` to `pub types: &'a TypeInterner`.
-- Update `ThinCheckerState::new()` signature to accept `interner: &'a TypeInterner` instead of creating one internally.
-
-4. Wire it up in `src/parallel.rs`
-- In `check_functions_parallel`, inside the `par_iter()` loop:
-  - Do NOT let the checker create a new interner.
-  - Pass a reference to `program.type_interner` when initializing `ThinCheckerState`.
-
-5. Fix Call Sites
-- You will encounter compilation errors in tests or `thin_parser.rs` where `ThinCheckerState` is instantiated isolated.
-- For isolated instances (like `ThinParser::check_source_file`), allow the caller to create a temporary `TypeInterner` and pass its reference, or refactor `ThinParser` to own an interner if it persists.
-
-###### Criteria for Success
-- `cargo check` passes.
-- `ThinCheckerState` no longer owns `TypeInterner`.
-- Multiple threads running `check_functions_parallel` are sharing the **same** underlying `HashMap` in the interner.
-- `TypeId` equality works across different files/threads.
-
-
 
 **Type Checking (26 failing tests)**
 1. ✅ Export assignment validation (2309, 2304)
@@ -117,6 +66,43 @@ We are transitioning the compiler architecture from "Isolated State" (where ever
 | Type errors | 2339, 2355, 2511, 2662 | 12 | Property access, returns, abstract |
 | Accessor errors | 1183, 6234, 18045 | 4 | Ambient context, hints |
 | Abstract members | 2715, 2729, 2416, 2540 | 4 | Abstract property handling |
+
+### Emit TODOs (96.7% failing)
+| Feature | Tests | % | Notes |
+|---------|-------|---|-------|
+| **Modules** | 1,935 | 33% | `import`/`export` → CommonJS/ESM |
+| **let/const** | 205 | 4% | Block scoping → `var` for ES5 |
+| **Arrow functions** | 159 | 3% | `=>` → `function` for ES5 |
+| **Class fields** | 404 | 7% | Static fields, private `#` |
+| **Namespace** | 168 | 3% | IIFE wrapping |
+| **Enums** | 145 | 2% | Enum object emit |
+| **Decorators** | 98 | 2% | `__decorate` helper |
+| **Async/await** | 88 | 2% | `__awaiter` helper |
+| **for-of** | 39 | 1% | Iterator downlevel |
+| **Spread/rest** | 24 | <1% | `__spread`/`__rest` helpers |
+| **Generators** | 26 | <1% | `__generator` helper |
+
+### Type Checking TODOs (top missing codes)
+| Code | Count | Description |
+|------|-------|-------------|
+| TS5107 | 323 | Option requires value |
+| TS2322 | 306 | Type not assignable |
+| TS2339 | 138 | Property does not exist |
+| TS6133 | 123 | Declared but never used |
+| TS2304 | 102 | Cannot find name |
+| TS2345 | 100 | Argument type mismatch |
+| TS2300 | 96 | Duplicate identifier |
+| TS2307 | 58 | Cannot find module |
+| TS2741 | 47 | Missing property |
+| TS7006 | 43 | Implicit any parameter |
+| TS1128 | 35 | Declaration expected |
+
+### Quick Wins
+- ⬜ TS2322/2345: Improve type assignability checks
+- ⬜ TS2339: Property lookup on union/intersection types  
+- ⬜ TS2304: Module resolution, global declarations
+- ⬜ TS2300: Duplicate detection in binder
+- ⬜ Modules: Start with `export {}` and named exports
 
 ---
 
