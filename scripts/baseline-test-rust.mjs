@@ -376,7 +376,7 @@ for (const file of files) {
         const baselineContent = readFileSync(jsBaseline, 'utf-8');
         const expectedJs = extractJsFromBaseline(baselineContent, testName);
 
-        if (result.emittedJs) {
+        if (result.emittedJs !== undefined) {
             const normalizeJs = (s) => s.replace(/\r\n/g, '\n').trim();
             const expectedNorm = normalizeJs(expectedJs);
             const actualNorm = normalizeJs(result.emittedJs);
