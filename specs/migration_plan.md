@@ -120,7 +120,7 @@ Our emitter produces modern ES6+ output. ES5 transforms planned for Phase 6.3.
 - Namespace/module → IIFE transforms
 - CommonJS exports (module.exports, exports.X)
 - `const` modifier on class properties (parse tolerance)
-- Parse errors (124+ tests skipped)
+- Parse errors (124+ tests skipped) -- this will be done in rust branch later
 
 ### Key Files
 | Purpose | Location |
