@@ -981,8 +981,8 @@ These issues were identified by Gemini but NOT yet fixed:
 - All TypeScript syntax supported
 
 ## 2026-01-05: ThinParser Batch Test Improvements (Session 22-23)
-**Batch Test Progress: 76.4% (308/403 files on 500-file test) - 0 Crashes**
-**Large Scale Test: 73.9% (610/825 files on 1000-file test) - 0 Crashes**
+**Batch Test Progress: 78.4% (316/403 files on 500-file test) - 0 Crashes**
+**Large Scale Test: 76.0% (627/825 files on 1000-file test) - 0 Crashes**
 
 ### Session 22 Fixes:
 - [x] Generic function types `<T>() => T` - FunctionType with type_parameters
@@ -1000,21 +1000,26 @@ These issues were identified by Gemini but NOT yet fixed:
 - [x] Generic method signatures `{ foo<T>(): T; }` in type members
 - [x] Generic class methods `foo<T>() { }` with async/modifiers
 - [x] Keywords as property names in object types: `{ type: any; readonly: T; get: any; }`
-  - Added look-ahead to distinguish keyword-as-modifier vs keyword-as-property-name
+  - Added look_ahead_is_property_name_after_keyword()
   - Added is_property_name_keyword() for 50+ keywords
 - [x] String literal enum member names: `enum E { "non identifier" }`
 - [x] Instantiation expressions: `typeof Err<U>` (TypeScript 4.7+ feature)
 - [x] As expressions: `x as Type` in expression context
 - [x] Satisfies expressions: `x satisfies Type`
 - [x] Chained type assertions: `x as T as U`
+- [x] Spread elements in objects: `{ ...expr }`
+- [x] Object literal methods: `{ foo() { } }`
+- [x] Object literal get/set accessors: `{ get foo() { }, set bar(v) { } }`
+- [x] Object literal async/generator methods: `{ async foo() { }, *bar() { } }`
+- [x] Mapped types without explicit type: `{ [P in K] }` (implicit any)
 
 ### Test Results:
 - 857 unit tests passing (all Rust tests)
 - 0 crashes (was 7 at start of Session 23)
-- 95 remaining parse failures
+- 87 remaining parse failures
 
-### Remaining Parse Failures (95 files):
+### Remaining Parse Failures (87 files):
 - Import equals with literal values: `import n = 5;` (intentional error cases)
 - Accessor without body: `get foo()` (intentional error test)
+- Anonymous modules: `module { }` (legacy syntax)
 - Complex generic/JSX disambiguation edge cases
-- Various edge cases requiring further investigation
