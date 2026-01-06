@@ -331,9 +331,14 @@ pub enum PropertyAccessResult {
         property_name: String,
     },
 
-    /// Type is possibly null or undefined
+    /// Type is possibly null or undefined.
+    /// Contains the type of the property from non-nullable members (if any),
+    /// and the specific nullable type causing the error.
     PossiblyNullOrUndefined {
-        type_id: TypeId,
+        /// Type from valid non-nullable members (for recovery/optional chaining)
+        property_type: Option<TypeId>,
+        /// The nullable type causing the issue: NULL, UNDEFINED, or union of both
+        cause: TypeId,
     },
 
     /// Type is unknown
@@ -362,7 +367,10 @@ impl<'a> PropertyAccessEvaluator<'a> {
         }
 
         if obj_type == TypeId::NULL || obj_type == TypeId::UNDEFINED {
-            return PropertyAccessResult::PossiblyNullOrUndefined { type_id: obj_type };
+            return PropertyAccessResult::PossiblyNullOrUndefined {
+                property_type: None,
+                cause: obj_type,
+            };
         }
 
         // Look up the type key
@@ -408,12 +416,26 @@ impl<'a> PropertyAccessEvaluator<'a> {
             }
 
             TypeKey::Union(ref members) => {
-                // Property access on union: must exist on ALL members
-                let mut result_types = Vec::new();
+                // Property access on union: partition into nullable and non-nullable members
+                let mut valid_results = Vec::new();
+                let mut nullable_causes = Vec::new();
 
                 for &member in members {
+                    // Check for null/undefined directly
+                    if member == TypeId::NULL || member == TypeId::UNDEFINED {
+                        nullable_causes.push(member);
+                        continue;
+                    }
+
                     match self.resolve_property_access(member, prop_name) {
-                        PropertyAccessResult::Success(t) => result_types.push(t),
+                        PropertyAccessResult::Success(t) => valid_results.push(t),
+                        PropertyAccessResult::PossiblyNullOrUndefined { property_type, cause } => {
+                            if let Some(t) = property_type {
+                                valid_results.push(t);
+                            }
+                            nullable_causes.push(cause);
+                        }
+                        // If any non-nullable member is missing the property, it's a PropertyNotFound error
                         _ => return PropertyAccessResult::PropertyNotFound {
                             type_id: obj_type,
                             property_name: prop_name.to_string(),
@@ -421,8 +443,30 @@ impl<'a> PropertyAccessEvaluator<'a> {
                     }
                 }
 
+                // If there are nullable causes, return PossiblyNullOrUndefined
+                if !nullable_causes.is_empty() {
+                    let cause = if nullable_causes.len() == 1 {
+                        nullable_causes[0]
+                    } else {
+                        self.interner.union(nullable_causes)
+                    };
+
+                    let property_type = if valid_results.is_empty() {
+                        None
+                    } else if valid_results.len() == 1 {
+                        Some(valid_results[0])
+                    } else {
+                        Some(self.interner.union(valid_results))
+                    };
+
+                    return PropertyAccessResult::PossiblyNullOrUndefined {
+                        property_type,
+                        cause,
+                    };
+                }
+
                 // Union of all result types
-                PropertyAccessResult::Success(self.interner.union(result_types))
+                PropertyAccessResult::Success(self.interner.union(valid_results))
             }
 
             TypeKey::Intersection(ref members) => {

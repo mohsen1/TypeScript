@@ -1255,10 +1255,30 @@ impl<'a> ThinCheckerState<'a> {
                     TypeId::ERROR
                 }
 
-                PropertyAccessResult::PossiblyNullOrUndefined { .. } => {
-                    // Report error about accessing property on possibly null/undefined
-                    self.error_property_not_exist_at(property_name, object_type, idx);
-                    TypeId::ERROR
+                PropertyAccessResult::PossiblyNullOrUndefined { property_type, cause } => {
+                    // Check for optional chaining (?.)
+                    if access.question_dot_token {
+                        // Suppress error, return (property_type | undefined)
+                        let base_type = property_type.unwrap_or(TypeId::ANY);
+                        return self.ctx.types.union(vec![base_type, TypeId::UNDEFINED]);
+                    }
+
+                    // Report error based on the cause
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+
+                    let (code, message) = if cause == TypeId::NULL {
+                        (diagnostic_codes::OBJECT_IS_POSSIBLY_NULL, "Object is possibly 'null'.")
+                    } else if cause == TypeId::UNDEFINED {
+                        (diagnostic_codes::OBJECT_IS_POSSIBLY_UNDEFINED, "Object is possibly 'undefined'.")
+                    } else {
+                        (diagnostic_codes::OBJECT_IS_POSSIBLY_NULL_OR_UNDEFINED, "Object is possibly 'null' or 'undefined'.")
+                    };
+
+                    // Report the error on the expression part
+                    self.error_at_node(access.expression, message, code);
+
+                    // Error recovery: return the property type found in valid members
+                    property_type.unwrap_or(TypeId::ERROR)
                 }
 
                 PropertyAccessResult::IsUnknown => {
