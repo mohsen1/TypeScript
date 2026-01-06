@@ -24,7 +24,7 @@ Our focus is to make wasm checker complete
 
 These issues block incremental compilation and fast LSP queries.
 
-#### The "Transient Scope" Trap (Checker State)
+#### The "Transient Scope" Trap (Checker State) - ⏳ IN PROGRESS
 
 **Problem:** The checker manually manages scope stacks inside checker logic:
 ```rust
@@ -33,18 +33,28 @@ pub fn push_local_scope(&mut self) { ... }
 pub fn add_local(&mut self, name: String, ...) { ... }
 ```
 
-**Impact:** 
+**Impact:**
 - Ties Checker to specific **traversal order**
 - Cannot implement "Lazy Checking" (e.g., "Check function 'foo' right now because LSP asked")
 - If you jump straight to `foo`, the scope_stack is empty
 - **Result:** We will NEVER achieve incremental compilation or fast LSP queries with this design
 
-**Action Required:**
-- [ ] Checker must be **stateless regarding scope**
-- [ ] Delete `local_scope_stack` from `CheckerContext`
-- [ ] Query the Binder: `Binder::get_scope_for_node(node_id)` 
-- [ ] Or ensure Binder resolved all identifiers to `SymbolId`s before Checker runs
-- [ ] Checker asks: *"What is the symbol for 'x' at node 123?"* - not "what's on my stack"
+**Progress (2026-01-06):**
+- [x] Added `Scope` and `ScopeId` structures to `binder.rs`
+- [x] Updated `ThinBinderState` with persistent scope system:
+  - `pub scopes: Vec<Scope>` - Persistent scopes for querying
+  - `pub node_scope_ids: FxHashMap<u32, ScopeId>` - Maps AST nodes to scopes
+  - `current_scope_id: ScopeId` - Tracks current scope during binding
+- [x] Implemented `resolve_identifier(arena, node_idx) -> Option<SymbolId>` API
+  - Enables stateless checking by querying scope info without traversal order
+  - Walks up AST to find enclosing scope, then walks scope chain
+- [x] Integrated persistent scope management into binding:
+  - `enter_scope` / `exit_scope` now maintain both legacy and persistent scopes
+  - Symbols added to persistent scope table during binding
+  - File-level scope created as root persistent scope
+- [ ] **Next:** Remove `local_scope_stack` from `CheckerContext`
+- [ ] **Next:** Update checker to use `binder.resolve_identifier()` instead of scope stack
+- [ ] **Next:** Test stateless checking with function type queries
 
 #### TypeKey Refactor (Shared with Solver)
 

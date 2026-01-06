@@ -475,14 +475,23 @@ impl FlowNodeArena {
 }
 
 // =============================================================================
-// Binder State
+// Persistent Scope System
 // =============================================================================
 
-use wasm_bindgen::prelude::*;
-use crate::parser::{Node, NodeArena};
+/// Unique identifier for a persistent scope.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize)]
+pub struct ScopeId(pub u32);
+
+impl ScopeId {
+    pub const NONE: ScopeId = ScopeId(u32::MAX);
+
+    pub fn is_none(&self) -> bool {
+        self.0 == u32::MAX
+    }
+}
 
 /// Container kind - tracks what kind of scope we're in
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 pub enum ContainerKind {
     /// Source file (global scope)
     SourceFile,
@@ -495,6 +504,44 @@ pub enum ContainerKind {
     /// Block (if, while, for, etc.) - only creates block scope
     Block,
 }
+
+/// A persistent scope containing symbols and a link to its parent.
+/// This enables stateless checking by allowing the checker to query
+/// scope information without maintaining a traversal-order-dependent stack.
+#[derive(Clone, Debug, Serialize)]
+pub struct Scope {
+    /// Parent scope ID (for scope chain lookup)
+    pub parent: ScopeId,
+    /// Symbols defined in this scope
+    pub table: SymbolTable,
+    /// The kind of container this scope represents
+    pub kind: ContainerKind,
+    /// The AST node that created this scope
+    pub container_node: NodeIndex,
+}
+
+impl Scope {
+    pub fn new(parent: ScopeId, kind: ContainerKind, node: NodeIndex) -> Self {
+        Scope {
+            parent,
+            table: SymbolTable::new(),
+            kind,
+            container_node: node,
+        }
+    }
+
+    /// Check if this scope is a function scope (where var hoisting happens)
+    pub fn is_function_scope(&self) -> bool {
+        matches!(self.kind, ContainerKind::SourceFile | ContainerKind::Function | ContainerKind::Module)
+    }
+}
+
+// =============================================================================
+// Binder State
+// =============================================================================
+
+use wasm_bindgen::prelude::*;
+use crate::parser::{Node, NodeArena};
 
 /// Scope context - tracks scope chain and hoisting
 #[derive(Clone, Debug)]

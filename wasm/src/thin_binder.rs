@@ -12,7 +12,7 @@ use crate::scanner::SyntaxKind;
 use crate::binder::{
     SymbolId, SymbolArena, SymbolTable, Symbol, symbol_flags,
     FlowNodeArena, FlowNodeId, flow_flags,
-    ContainerKind, ScopeContext,
+    ContainerKind, ScopeContext, Scope, ScopeId,
 };
 use crate::parser::node_flags;
 use rustc_hash::FxHashMap;
@@ -33,7 +33,7 @@ pub struct ThinBinderState {
     current_flow: FlowNodeId,
     /// Unreachable flow node
     unreachable_flow: FlowNodeId,
-    /// Scope chain - stack of scope contexts
+    /// Scope chain - stack of scope contexts (legacy, for hoisting)
     scope_chain: Vec<ScopeContext>,
     /// Current scope index in scope_chain
     current_scope_idx: usize,
@@ -46,6 +46,14 @@ pub struct ThinBinderState {
     hoisted_vars: Vec<(String, NodeIndex)>,
     /// Hoisted function declarations
     hoisted_functions: Vec<NodeIndex>,
+
+    // ===== Persistent Scope System (for stateless checking) =====
+    /// Persistent scopes - enables querying scope information without traversal order
+    pub scopes: Vec<Scope>,
+    /// Map from AST node (that creates a scope) to its ScopeId
+    pub node_scope_ids: FxHashMap<u32, ScopeId>,
+    /// Current active ScopeId during binding
+    current_scope_id: ScopeId,
 }
 
 impl ThinBinderState {
@@ -67,6 +75,9 @@ impl ThinBinderState {
             node_flow: FxHashMap::default(),
             hoisted_vars: Vec::new(),
             hoisted_functions: Vec::new(),
+            scopes: Vec::new(),
+            node_scope_ids: FxHashMap::default(),
+            current_scope_id: ScopeId::NONE,
         }
     }
 
@@ -96,16 +107,129 @@ impl ThinBinderState {
             node_flow: FxHashMap::default(),
             hoisted_vars: Vec::new(),
             hoisted_functions: Vec::new(),
+            scopes: Vec::new(),
+            node_scope_ids: FxHashMap::default(),
+            current_scope_id: ScopeId::NONE,
+        }
+    }
+
+    /// Resolve an identifier to a symbol by walking up the persistent scope tree.
+    /// This method enables stateless checking - the checker can query scope information
+    /// without maintaining a traversal-order-dependent stack.
+    ///
+    /// Returns the SymbolId for the identifier, or None if not found.
+    pub fn resolve_identifier(&self, arena: &ThinNodeArena, node_idx: NodeIndex) -> Option<SymbolId> {
+        let node = arena.get(node_idx)?;
+
+        // Get the identifier text
+        let name = if let Some(ident) = arena.get_identifier(node) {
+            &ident.escaped_text
+        } else {
+            return None;
+        };
+
+        // Find the starting scope by walking up the AST to find the nearest scope-creating node
+        let mut scope_id = self.find_enclosing_scope(arena, node_idx)?;
+
+        // Walk up the scope chain
+        while !scope_id.is_none() {
+            if let Some(scope) = self.scopes.get(scope_id.0 as usize) {
+                if let Some(sym_id) = scope.table.get(name) {
+                    return Some(sym_id);
+                }
+                scope_id = scope.parent;
+            } else {
+                break;
+            }
+        }
+
+        // Finally check file locals / globals
+        self.file_locals.get(name)
+    }
+
+    /// Find the enclosing scope for a given node by walking up the AST.
+    /// Returns the ScopeId of the nearest scope-creating ancestor node.
+    fn find_enclosing_scope(&self, arena: &ThinNodeArena, node_idx: NodeIndex) -> Option<ScopeId> {
+        let mut current = node_idx;
+
+        // Walk up the AST using parent pointers to find the nearest scope
+        while !current.is_none() {
+            // Check if this node creates a scope
+            if let Some(&scope_id) = self.node_scope_ids.get(&current.0) {
+                return Some(scope_id);
+            }
+
+            // Move to parent node
+            if let Some(node) = arena.get(current) {
+                if let Some(ext) = arena.get_extended(current) {
+                    current = ext.parent;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        // If no scope found, return the root scope (index 0) if it exists
+        if !self.scopes.is_empty() {
+            Some(ScopeId(0))
+        } else {
+            None
+        }
+    }
+
+    /// Enter a new persistent scope (in addition to legacy scope chain).
+    /// This method is called when binding begins for a scope-creating node.
+    fn enter_persistent_scope(&mut self, kind: ContainerKind, node: NodeIndex) {
+        // Create new scope linked to current
+        let new_scope_id = ScopeId(self.scopes.len() as u32);
+        let new_scope = Scope::new(self.current_scope_id, kind, node);
+        self.scopes.push(new_scope);
+
+        // Map node to this scope
+        if !node.is_none() {
+            self.node_scope_ids.insert(node.0, new_scope_id);
+        }
+
+        // Update current scope
+        self.current_scope_id = new_scope_id;
+    }
+
+    /// Exit the current persistent scope.
+    fn exit_persistent_scope(&mut self) {
+        if !self.current_scope_id.is_none() {
+            if let Some(scope) = self.scopes.get(self.current_scope_id.0 as usize) {
+                self.current_scope_id = scope.parent;
+            }
+        }
+    }
+
+    /// Declare a symbol in the current persistent scope.
+    /// This adds the symbol to the persistent scope table for later querying.
+    fn declare_in_persistent_scope(&mut self, name: String, sym_id: SymbolId) {
+        if !self.current_scope_id.is_none() {
+            if let Some(scope) = self.scopes.get_mut(self.current_scope_id.0 as usize) {
+                scope.table.set(name, sym_id);
+            }
         }
     }
 
     /// Bind a source file using ThinNodeArena.
     pub fn bind_source_file(&mut self, arena: &ThinNodeArena, root: NodeIndex) {
-        // Initialize scope chain with source file scope
+        // Initialize scope chain with source file scope (legacy)
         self.scope_chain.clear();
         self.scope_chain.push(ScopeContext::new(ContainerKind::SourceFile, root, None));
         self.current_scope_idx = 0;
         self.current_scope = SymbolTable::new();
+
+        // Initialize persistent scope system
+        self.scopes.clear();
+        self.node_scope_ids.clear();
+        self.current_scope_id = ScopeId::NONE;
+
+        // Create root persistent scope for the source file
+        self.enter_persistent_scope(ContainerKind::SourceFile, root);
 
         // Create START flow node for the file
         let start_flow = self.flow_nodes.alloc(flow_flags::START);
@@ -217,6 +341,9 @@ impl ThinBinderState {
                         }
                         self.current_scope.set(name.to_string(), sym_id);
                         self.node_symbols.insert(func_idx.0, sym_id);
+
+                        // Also add to persistent scope
+                        self.declare_in_persistent_scope(name.to_string(), sym_id);
                     }
                 }
             }
@@ -584,10 +711,14 @@ impl ThinBinderState {
     // Scope management
 
     fn enter_scope(&mut self, kind: ContainerKind, node: NodeIndex) {
+        // Legacy scope chain management
         let parent = Some(self.current_scope_idx);
         self.scope_chain.push(ScopeContext::new(kind, node, parent));
         self.current_scope_idx = self.scope_chain.len() - 1;
         self.push_scope();
+
+        // Persistent scope management (for stateless checking)
+        self.enter_persistent_scope(kind, node);
     }
 
     fn exit_scope(&mut self) {
@@ -627,12 +758,25 @@ impl ThinBinderState {
             }
         }
 
+        // Copy current scope to persistent scope before popping
+        if !self.current_scope_id.is_none() {
+            if let Some(persistent_scope) = self.scopes.get_mut(self.current_scope_id.0 as usize) {
+                // Merge current_scope into persistent scope
+                for (name, &sym_id) in self.current_scope.iter() {
+                    persistent_scope.table.set(name.clone(), sym_id);
+                }
+            }
+        }
+
         self.pop_scope();
         if let Some(ctx) = self.scope_chain.get(self.current_scope_idx) {
             if let Some(parent) = ctx.parent_idx {
                 self.current_scope_idx = parent;
             }
         }
+
+        // Exit persistent scope
+        self.exit_persistent_scope();
     }
 
     fn push_scope(&mut self) {
