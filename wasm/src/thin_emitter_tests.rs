@@ -99,6 +99,11 @@ fn test_thin_emit_for_of_es5() {
         output
     );
     assert!(
+        output.contains(".return"),
+        "Expected iterator closing in ES5 output: {}",
+        output
+    );
+    assert!(
         !output.contains("for (var v of arr)"),
         "ES5 output should not contain raw for-of: {}",
         output
