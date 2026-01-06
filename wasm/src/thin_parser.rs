@@ -68,8 +68,6 @@ pub struct ThinParserState {
     parse_diagnostics: Vec<ParseDiagnostic>,
     /// Node count for assigning IDs
     node_count: u32,
-    /// Identifiers found during parsing
-    identifiers: Vec<String>,
     /// Recursion depth for stack overflow protection
     recursion_depth: u32,
 }
@@ -89,7 +87,6 @@ impl ThinParserState {
             current_token: SyntaxKind::Unknown,
             parse_diagnostics: Vec::new(),
             node_count: 0,
-            identifiers: Vec::new(),
             recursion_depth: 0,
         }
     }
@@ -453,7 +450,6 @@ impl ThinParserState {
             script_kind: 3,
             is_declaration_file: false,
             has_no_default_lib: false,
-            identifiers: self.identifiers.clone(),
             comments, // Cached comment ranges
             parent: NodeIndex::NONE,
             id: 0,
@@ -5053,7 +5049,6 @@ impl ThinParserState {
         let end_pos = self.token_end();
         // Use zero-copy accessor and clone only when storing
         let text = self.scanner.get_token_value_ref().to_string();
-        self.identifiers.push(text.clone());
         self.parse_expected(SyntaxKind::Identifier);
 
         self.arena.add_identifier(
@@ -5076,7 +5071,6 @@ impl ThinParserState {
         // Capture end position BEFORE consuming the token
         let end_pos = self.token_end();
         let text = self.scanner.get_token_value_ref().to_string();
-        self.identifiers.push(text.clone());
 
         if self.is_identifier_or_keyword() {
             self.next_token();
@@ -5102,7 +5096,6 @@ impl ThinParserState {
         // Capture end position BEFORE consuming the token
         let end_pos = self.token_end();
         let text = self.scanner.get_token_value_ref().to_string();
-        self.identifiers.push(text.clone());
         self.parse_expected(SyntaxKind::PrivateIdentifier);
 
         self.arena.add_identifier(
@@ -5898,7 +5891,6 @@ impl ThinParserState {
                 let start_pos = self.token_pos();
                 // Use zero-copy accessor
                 let text = self.scanner.get_token_value_ref().to_string();
-                self.identifiers.push(text.clone());
                 self.next_token(); // Accept any token as property name
                 let end_pos = self.token_end();
 
@@ -7424,7 +7416,6 @@ impl ThinParserState {
     fn parse_keyword_as_identifier(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
         let text = self.scanner.get_token_value_ref().to_string();
-        self.identifiers.push(text.clone());
         self.next_token();
         let end_pos = self.token_end();
 

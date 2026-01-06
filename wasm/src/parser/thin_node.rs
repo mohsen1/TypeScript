@@ -854,7 +854,6 @@ pub struct SourceFileData {
     pub script_kind: u32,
     pub is_declaration_file: bool,
     pub has_no_default_lib: bool,
-    pub identifiers: Vec<String>,
     /// Cached comment ranges for the entire file (computed once during parsing).
     /// This avoids O(N) rescanning on every hover/documentation request.
     pub comments: Vec<crate::comments::CommentRange>,

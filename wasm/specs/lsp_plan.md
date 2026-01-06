@@ -117,6 +117,28 @@ These issues block LSP responsiveness.
 - No cloning overhead in hot path
 - Only clone when storing in SourceFileData.text for AST persistence
 
+#### Dead Code Elimination ✅ COMPLETED (2026-01-06)
+
+**Problem:** `identifiers: Vec<String>` field in ThinParserState and SourceFileData was populated but never read - pure dead weight.
+
+**Solution Implemented:**
+- [x] **Removed identifiers field from ThinParserState:** Eliminated Vec allocation
+- [x] **Removed identifiers field from SourceFileData:** Eliminated storage in AST
+- [x] **Removed all identifiers.push() calls:** Cleaned up 5 call sites in parser (parse_identifier, parse_identifier_name, parse_private_identifier, parse_property_name, parse_keyword_as_identifier)
+- [x] **All tests pass:** 691/691 tests passing
+
+**Memory Impact:**
+- **Before:** Vec<String> allocated and cloned for every identifier in source
+- **After:** No allocation - identifiers only stored where needed (IdentifierData.escaped_text)
+- **Example:** File with 10,000 identifiers: Eliminated 10,000 String clones + Vec overhead
+
+**Implementation Details:**
+- Removed from ThinParserState struct (line 72)
+- Removed from SourceFileData struct (line 857)
+- Removed from parse_source_file initialization (line 453)
+- Cleaned up 5 push sites throughout parser
+- Identifiers still accessible via arena.get_identifier() when needed
+
 #### Remaining Optimizations
    - Consider caching type information for repeated queries
 
@@ -133,9 +155,9 @@ These issues block LSP responsiveness.
 
 #### Testing
 
-All tests pass (603/603):
+All tests pass (691/691):
 ```bash
-./wasm/test.sh  # ✅ All pass (5 ignored tests are expected)
+./wasm/test.sh  # ✅ All pass
 ```
 
 ## Quick Reference
