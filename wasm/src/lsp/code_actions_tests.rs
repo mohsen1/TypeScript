@@ -1,5 +1,7 @@
 use super::*;
-use crate::checker::types::diagnostics::diagnostic_codes::UNUSED_IMPORT;
+use crate::checker::types::diagnostics::diagnostic_codes::{
+    PROPERTY_DOES_NOT_EXIST_ON_TYPE, UNUSED_IMPORT,
+};
 use crate::lsp::position::LineMap;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_parser::ThinParserState;
@@ -10,6 +12,36 @@ fn range_for_substring(source: &str, line_map: &LineMap, needle: &str) -> Range 
     let start_pos = line_map.offset_to_position(start, source);
     let end_pos = line_map.offset_to_position(end, source);
     Range::new(start_pos, end_pos)
+}
+
+fn range_for_offset(source: &str, line_map: &LineMap, start: usize, len: usize) -> Range {
+    let start = start as u32;
+    let end = start + len as u32;
+    let start_pos = line_map.offset_to_position(start, source);
+    let end_pos = line_map.offset_to_position(end, source);
+    Range::new(start_pos, end_pos)
+}
+
+fn apply_text_edits(source: &str, line_map: &LineMap, edits: &[TextEdit]) -> String {
+    let mut result = source.to_string();
+    let mut edits_with_offsets: Vec<(usize, usize, &TextEdit)> = edits
+        .iter()
+        .map(|edit| {
+            let start = line_map
+                .position_to_offset(edit.range.start, source)
+                .unwrap_or(0) as usize;
+            let end = line_map
+                .position_to_offset(edit.range.end, source)
+                .unwrap_or(0) as usize;
+            (start, end, edit)
+        })
+        .collect();
+
+    edits_with_offsets.sort_by(|a, b| b.0.cmp(&a.0));
+    for (start, end, edit) in edits_with_offsets {
+        result.replace_range(start..end, &edit.new_text);
+    }
+    result
 }
 
 #[test]
@@ -356,4 +388,160 @@ fn test_quickfix_preserves_type_only_named_import() {
     let edits = edit.changes.get("test.ts").unwrap();
     assert_eq!(edits.len(), 1);
     assert_eq!(edits[0].new_text, "import { type Foo } from \"mod\";\n");
+}
+
+#[test]
+fn test_quickfix_add_missing_property_object_literal_single_line() {
+    let source = "const foo = { a: 1 }; foo.b;\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let access_offset = source.find("foo.b").unwrap();
+    let prop_offset = access_offset + "foo.".len();
+    let range = range_for_offset(source, &line_map, prop_offset, 1);
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Warning),
+        code: Some(PROPERTY_DOES_NOT_EXIST_ON_TYPE),
+        source: None,
+        message: "missing property".to_string(),
+        related_information: None,
+    };
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    let updated = apply_text_edits(source, &line_map, edits);
+    assert_eq!(
+        updated,
+        "const foo = { a: 1, b: undefined }; foo.b;\n"
+    );
+}
+
+#[test]
+fn test_quickfix_add_missing_property_object_literal_multiline() {
+    let source = "const foo = {\n  a: 1\n};\nfoo.b;\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let access_offset = source.find("foo.b").unwrap();
+    let prop_offset = access_offset + "foo.".len();
+    let range = range_for_offset(source, &line_map, prop_offset, 1);
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Warning),
+        code: Some(PROPERTY_DOES_NOT_EXIST_ON_TYPE),
+        source: None,
+        message: "missing property".to_string(),
+        related_information: None,
+    };
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    let updated = apply_text_edits(source, &line_map, edits);
+    assert_eq!(
+        updated,
+        "const foo = {\n  a: 1,\n  b: undefined\n};\nfoo.b;\n"
+    );
+}
+
+#[test]
+fn test_quickfix_add_missing_property_to_class() {
+    let source = "class Foo {\n  method() {\n    this.bar;\n  }\n}\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let access_offset = source.find("this.bar").unwrap();
+    let prop_offset = access_offset + "this.".len();
+    let range = range_for_offset(source, &line_map, prop_offset, 3);
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Warning),
+        code: Some(PROPERTY_DOES_NOT_EXIST_ON_TYPE),
+        source: None,
+        message: "missing property".to_string(),
+        related_information: None,
+    };
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    let updated = apply_text_edits(source, &line_map, edits);
+    assert_eq!(
+        updated,
+        "class Foo {\n  method() {\n    this.bar;\n  }\n  bar: any;\n}\n"
+    );
 }

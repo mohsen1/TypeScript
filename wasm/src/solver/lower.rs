@@ -14,6 +14,7 @@ use crate::solver::types::*;
 use crate::solver::TypeDatabase;
 use crate::interner::Atom;
 use std::cell::RefCell;
+use rustc_hash::FxHashMap;
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -27,6 +28,124 @@ pub struct TypeLowering<'a> {
     /// If provided, this enables correct abstract class detection.
     resolver: Option<&'a dyn Fn(NodeIndex) -> Option<u32>>,
     type_param_scopes: RefCell<Vec<Vec<(Atom, TypeId)>>>,
+}
+
+struct InterfaceParts {
+    properties: FxHashMap<Atom, PropertyMerge>,
+    call_signatures: Vec<CallSignature>,
+    construct_signatures: Vec<CallSignature>,
+    string_index: Option<IndexSignature>,
+    number_index: Option<IndexSignature>,
+}
+
+enum PropertyMerge {
+    Property(PropertyInfo),
+    Method(MethodOverloads),
+    Conflict(PropertyInfo),
+}
+
+struct MethodOverloads {
+    signatures: Vec<CallSignature>,
+    optional: bool,
+}
+
+impl InterfaceParts {
+    fn new() -> Self {
+        InterfaceParts {
+            properties: FxHashMap::default(),
+            call_signatures: Vec::new(),
+            construct_signatures: Vec::new(),
+            string_index: None,
+            number_index: None,
+        }
+    }
+
+    fn merge_property(&mut self, prop: PropertyInfo) {
+        use std::collections::hash_map::Entry;
+
+        match self.properties.entry(prop.name) {
+            Entry::Vacant(entry) => {
+                entry.insert(PropertyMerge::Property(prop));
+            }
+            Entry::Occupied(mut entry) => {
+                match entry.get_mut() {
+                    PropertyMerge::Property(existing) => {
+                        if existing.type_id == prop.type_id
+                            && existing.optional == prop.optional
+                            && existing.readonly == prop.readonly
+                        {
+                            return;
+                        }
+                        let conflict = PropertyInfo {
+                            name: prop.name,
+                            type_id: TypeId::ERROR,
+                            optional: existing.optional && prop.optional,
+                            readonly: existing.readonly && prop.readonly,
+                        };
+                        entry.insert(PropertyMerge::Conflict(conflict));
+                    }
+                    PropertyMerge::Method(methods) => {
+                        let conflict = PropertyInfo {
+                            name: prop.name,
+                            type_id: TypeId::ERROR,
+                            optional: methods.optional && prop.optional,
+                            readonly: false,
+                        };
+                        entry.insert(PropertyMerge::Conflict(conflict));
+                    }
+                    PropertyMerge::Conflict(_) => {}
+                }
+            }
+        }
+    }
+
+    fn merge_method(&mut self, name: Atom, signature: CallSignature, optional: bool) {
+        use std::collections::hash_map::Entry;
+
+        match self.properties.entry(name) {
+            Entry::Vacant(entry) => {
+                entry.insert(PropertyMerge::Method(MethodOverloads {
+                    signatures: vec![signature],
+                    optional,
+                }));
+            }
+            Entry::Occupied(mut entry) => {
+                match entry.get_mut() {
+                    PropertyMerge::Method(methods) => {
+                        methods.signatures.push(signature);
+                        methods.optional |= optional;
+                    }
+                    PropertyMerge::Property(prop) => {
+                        let conflict = PropertyInfo {
+                            name,
+                            type_id: TypeId::ERROR,
+                            optional: prop.optional && optional,
+                            readonly: false,
+                        };
+                        entry.insert(PropertyMerge::Conflict(conflict));
+                    }
+                    PropertyMerge::Conflict(_) => {}
+                }
+            }
+        }
+    }
+
+    fn merge_index_signature(&mut self, index: IndexSignature) {
+        let target = if index.key_type == TypeId::NUMBER {
+            &mut self.number_index
+        } else {
+            &mut self.string_index
+        };
+
+        if let Some(existing) = target.as_mut() {
+            if existing.value_type != index.value_type || existing.readonly != index.readonly {
+                existing.value_type = TypeId::ERROR;
+                existing.readonly = false;
+            }
+        } else {
+            *target = Some(index);
+        }
+    }
 }
 
 impl<'a> TypeLowering<'a> {
@@ -585,6 +704,122 @@ impl<'a> TypeLowering<'a> {
         } else {
             self.interner.object(vec![])
         }
+    }
+
+    pub fn lower_interface_declarations(&self, declarations: &[NodeIndex]) -> TypeId {
+        if declarations.is_empty() {
+            return TypeId::ERROR;
+        }
+
+        let mut parts = InterfaceParts::new();
+        let mut type_params: Option<&NodeList> = None;
+        let mut found = false;
+
+        for &decl_idx in declarations {
+            let Some(node) = self.arena.get(decl_idx) else { continue };
+            let Some(interface) = self.arena.get_interface(node) else { continue };
+            found = true;
+            if type_params.is_none() {
+                type_params = interface.type_parameters.as_ref();
+            }
+        }
+
+        if !found {
+            return TypeId::ERROR;
+        }
+
+        if let Some(params) = type_params {
+            self.push_type_param_scope();
+            let _ = self.collect_type_parameters(params);
+        }
+
+        for &decl_idx in declarations {
+            let Some(node) = self.arena.get(decl_idx) else { continue };
+            let Some(interface) = self.arena.get_interface(node) else { continue };
+            self.collect_interface_members(&interface.members, &mut parts);
+        }
+
+        if type_params.is_some() {
+            self.pop_type_param_scope();
+        }
+
+        self.finish_interface_parts(parts)
+    }
+
+    fn collect_interface_members(&self, members: &NodeList, parts: &mut InterfaceParts) {
+        for &idx in &members.nodes {
+            let Some(member) = self.arena.get(idx) else { continue };
+
+            if let Some(sig) = self.arena.get_signature(member) {
+                match member.kind {
+                    k if k == syntax_kind_ext::CALL_SIGNATURE => {
+                        parts.call_signatures.push(self.lower_call_signature(sig));
+                    }
+                    k if k == syntax_kind_ext::CONSTRUCT_SIGNATURE => {
+                        parts.construct_signatures.push(self.lower_call_signature(sig));
+                    }
+                    k if k == syntax_kind_ext::METHOD_SIGNATURE => {
+                        if let Some(name) = self.lower_signature_name(sig.name) {
+                            let signature = self.lower_call_signature(sig);
+                            parts.merge_method(name, signature, sig.question_token);
+                        }
+                    }
+                    _ => {
+                        if let Some(prop) = self.lower_type_element(idx) {
+                            parts.merge_property(prop);
+                        }
+                    }
+                }
+                continue;
+            }
+
+            if let Some(index_sig) = self.arena.get_index_signature(member) {
+                if let Some(index_info) = self.lower_index_signature(index_sig) {
+                    parts.merge_index_signature(index_info);
+                }
+            }
+        }
+    }
+
+    fn finish_interface_parts(&self, parts: InterfaceParts) -> TypeId {
+        let mut properties = Vec::with_capacity(parts.properties.len());
+        for (name, entry) in parts.properties {
+            match entry {
+                PropertyMerge::Property(prop) => properties.push(prop),
+                PropertyMerge::Method(methods) => {
+                    let type_id = self.interner.callable(CallableShape {
+                        call_signatures: methods.signatures,
+                        construct_signatures: Vec::new(),
+                        properties: Vec::new(),
+                    });
+                    properties.push(PropertyInfo {
+                        name,
+                        type_id,
+                        optional: methods.optional,
+                        readonly: false,
+                    });
+                }
+                PropertyMerge::Conflict(prop) => properties.push(prop),
+            }
+        }
+
+        if !parts.call_signatures.is_empty() || !parts.construct_signatures.is_empty() {
+            return self.interner.callable(CallableShape {
+                call_signatures: parts.call_signatures,
+                construct_signatures: parts.construct_signatures,
+                properties,
+            });
+        }
+
+        if parts.string_index.is_some() || parts.number_index.is_some() {
+            return self.interner.object_with_index(ObjectShape {
+                properties,
+                string_index: parts.string_index,
+                number_index: parts.number_index,
+            });
+        }
+
+        self.interner.object(properties)
     }
 
     fn lower_call_signature(&self, sig: &SignatureData) -> CallSignature {
