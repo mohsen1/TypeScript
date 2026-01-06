@@ -143,6 +143,64 @@ fn test_property_access_string() {
 }
 
 #[test]
+fn test_property_access_number_method() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let result = evaluator.resolve_property_access(TypeId::NUMBER, "toFixed");
+    match result {
+        PropertyAccessResult::Success { type_id, .. } => match interner.lookup(type_id) {
+            Some(TypeKey::Function(func)) => assert_eq!(func.return_type, TypeId::STRING),
+            other => panic!("Expected function, got {:?}", other),
+        },
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_property_access_boolean_method() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let result = evaluator.resolve_property_access(TypeId::BOOLEAN, "valueOf");
+    match result {
+        PropertyAccessResult::Success { type_id, .. } => match interner.lookup(type_id) {
+            Some(TypeKey::Function(func)) => assert_eq!(func.return_type, TypeId::BOOLEAN),
+            other => panic!("Expected function, got {:?}", other),
+        },
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_property_access_bigint_method() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let result = evaluator.resolve_property_access(TypeId::BIGINT, "toString");
+    match result {
+        PropertyAccessResult::Success { type_id, .. } => match interner.lookup(type_id) {
+            Some(TypeKey::Function(func)) => assert_eq!(func.return_type, TypeId::STRING),
+            other => panic!("Expected function, got {:?}", other),
+        },
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_property_access_literal_string_length() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let literal = interner.literal_string("hello");
+    let result = evaluator.resolve_property_access(literal, "length");
+    match result {
+        PropertyAccessResult::Success { type_id: t, .. } => assert_eq!(t, TypeId::NUMBER),
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_binary_op_addition() {
     let interner = TypeInterner::new();
     let evaluator = BinaryOpEvaluator::new(&interner);

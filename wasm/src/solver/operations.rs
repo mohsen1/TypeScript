@@ -675,10 +675,36 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 }
             }
 
+            // TS apparent members: literals inherit primitive wrapper methods.
+            TypeKey::Literal(ref literal) => {
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                match literal {
+                    LiteralValue::String(_) => self.resolve_string_property(prop_name, prop_atom),
+                    LiteralValue::Number(_) => self.resolve_number_property(prop_name, prop_atom),
+                    LiteralValue::Boolean(_) => self.resolve_boolean_property(prop_name, prop_atom),
+                    LiteralValue::BigInt(_) => self.resolve_bigint_property(prop_name, prop_atom),
+                }
+            }
+
             // Built-in properties
             TypeKey::Intrinsic(IntrinsicKind::String) => {
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
                 self.resolve_string_property(prop_name, prop_atom)
+            }
+
+            TypeKey::Intrinsic(IntrinsicKind::Number) => {
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                self.resolve_number_property(prop_name, prop_atom)
+            }
+
+            TypeKey::Intrinsic(IntrinsicKind::Boolean) => {
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                self.resolve_boolean_property(prop_name, prop_atom)
+            }
+
+            TypeKey::Intrinsic(IntrinsicKind::Bigint) => {
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                self.resolve_bigint_property(prop_name, prop_atom)
             }
 
             TypeKey::Array(_) => {
@@ -693,6 +719,29 @@ impl<'a> PropertyAccessEvaluator<'a> {
         }
     }
 
+    fn any_args_function(&self, return_type: TypeId) -> TypeId {
+        let rest_array = self.interner.array(TypeId::ANY);
+        let rest_param = ParamInfo {
+            name: None,
+            type_id: rest_array,
+            optional: false,
+            rest: true,
+        };
+        self.interner.function(FunctionShape {
+            params: vec![rest_param],
+            return_type,
+            type_params: Vec::new(),
+            is_constructor: false,
+        })
+    }
+
+    fn method_result(&self, return_type: TypeId) -> PropertyAccessResult {
+        PropertyAccessResult::Success {
+            type_id: self.any_args_function(return_type),
+            from_index_signature: false,
+        }
+    }
+
     /// Resolve properties on string type.
     fn resolve_string_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
         match prop_name {
@@ -700,9 +749,63 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 type_id: TypeId::NUMBER,
                 from_index_signature: false,
             },
-            // Add more string properties as needed
+            "at" | "charAt" | "concat" | "padEnd" | "padStart" | "repeat" | "slice" |
+            "substring" | "toLocaleLowerCase" | "toLocaleUpperCase" | "toLowerCase" |
+            "toString" | "toUpperCase" | "trim" | "trimEnd" | "trimStart" | "valueOf" => {
+                self.method_result(TypeId::STRING)
+            }
+            "charCodeAt" | "codePointAt" | "indexOf" | "lastIndexOf" | "search" => {
+                self.method_result(TypeId::NUMBER)
+            }
+            "endsWith" | "includes" | "startsWith" => {
+                self.method_result(TypeId::BOOLEAN)
+            }
+            "match" | "matchAll" => self.method_result(TypeId::ANY),
+            "replace" | "replaceAll" => self.method_result(TypeId::STRING),
+            "split" => {
+                let array_type = self.interner.array(TypeId::STRING);
+                self.method_result(array_type)
+            }
             _ => PropertyAccessResult::PropertyNotFound {
                 type_id: TypeId::STRING,
+                property_name: prop_atom,
+            },
+        }
+    }
+
+    /// Resolve properties on number type.
+    fn resolve_number_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
+        match prop_name {
+            "toExponential" | "toFixed" | "toLocaleString" | "toPrecision" | "toString" => {
+                self.method_result(TypeId::STRING)
+            }
+            "valueOf" => self.method_result(TypeId::NUMBER),
+            _ => PropertyAccessResult::PropertyNotFound {
+                type_id: TypeId::NUMBER,
+                property_name: prop_atom,
+            },
+        }
+    }
+
+    /// Resolve properties on boolean type.
+    fn resolve_boolean_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
+        match prop_name {
+            "toLocaleString" | "toString" => self.method_result(TypeId::STRING),
+            "valueOf" => self.method_result(TypeId::BOOLEAN),
+            _ => PropertyAccessResult::PropertyNotFound {
+                type_id: TypeId::BOOLEAN,
+                property_name: prop_atom,
+            },
+        }
+    }
+
+    /// Resolve properties on bigint type.
+    fn resolve_bigint_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
+        match prop_name {
+            "toLocaleString" | "toString" => self.method_result(TypeId::STRING),
+            "valueOf" => self.method_result(TypeId::BIGINT),
+            _ => PropertyAccessResult::PropertyNotFound {
+                type_id: TypeId::BIGINT,
                 property_name: prop_atom,
             },
         }
@@ -721,11 +824,8 @@ impl<'a> PropertyAccessEvaluator<'a> {
             }
             // Symbol.prototype.toString(): string
             // Symbol.prototype.valueOf(): symbol
-            // For now, return ANY for methods as full function type synthesis is complex
-            "toString" | "valueOf" => PropertyAccessResult::Success {
-                type_id: TypeId::ANY,
-                from_index_signature: false,
-            },
+            "toString" => self.method_result(TypeId::STRING),
+            "valueOf" => self.method_result(TypeId::SYMBOL),
             _ => PropertyAccessResult::PropertyNotFound {
                 type_id: TypeId::SYMBOL,
                 property_name: prop_atom,
@@ -745,43 +845,43 @@ impl<'a> PropertyAccessEvaluator<'a> {
             "toSpliced" | "with" => {
                 // These return array-related types; for now, return ANY as placeholder
                 // Full type inference would require understanding the callback return type
-                PropertyAccessResult::Success { type_id: TypeId::ANY, from_index_signature: false }
+                self.method_result(TypeId::ANY)
             }
 
             // Array methods that return specific types
             "at" | "find" | "findLast" | "pop" | "shift" => {
                 // Returns element type or undefined; use ANY as placeholder
-                PropertyAccessResult::Success { type_id: TypeId::ANY, from_index_signature: false }
+                self.method_result(TypeId::ANY)
             }
 
             "every" | "includes" | "some" => {
                 // Returns boolean
-                PropertyAccessResult::Success { type_id: TypeId::BOOLEAN, from_index_signature: false }
+                self.method_result(TypeId::BOOLEAN)
             }
 
             "findIndex" | "findLastIndex" | "indexOf" | "lastIndexOf" | "push" | "unshift" => {
                 // Returns number
-                PropertyAccessResult::Success { type_id: TypeId::NUMBER, from_index_signature: false }
+                self.method_result(TypeId::NUMBER)
             }
 
             "forEach" | "copyWithin" | "fill" => {
                 // forEach returns undefined, copyWithin/fill return this
-                PropertyAccessResult::Success { type_id: TypeId::UNDEFINED, from_index_signature: false }
+                self.method_result(TypeId::UNDEFINED)
             }
 
             "join" | "toLocaleString" | "toString" => {
                 // Returns string
-                PropertyAccessResult::Success { type_id: TypeId::STRING, from_index_signature: false }
+                self.method_result(TypeId::STRING)
             }
 
             "entries" | "keys" | "values" => {
                 // Returns iterator; use ANY as placeholder
-                PropertyAccessResult::Success { type_id: TypeId::ANY, from_index_signature: false }
+                self.method_result(TypeId::ANY)
             }
 
             "reduce" | "reduceRight" => {
                 // Returns the accumulator type; use ANY as placeholder
-                PropertyAccessResult::Success { type_id: TypeId::ANY, from_index_signature: false }
+                self.method_result(TypeId::ANY)
             }
 
             _ => PropertyAccessResult::PropertyNotFound {
