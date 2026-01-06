@@ -62,6 +62,7 @@ pub struct RenameProvider<'a> {
     binder: &'a ThinBinderState,
     line_map: &'a LineMap,
     file_name: String,
+    source_text: &'a str,
 }
 
 impl<'a> RenameProvider<'a> {
@@ -71,19 +72,21 @@ impl<'a> RenameProvider<'a> {
         binder: &'a ThinBinderState,
         line_map: &'a LineMap,
         file_name: String,
+        source_text: &'a str,
     ) -> Self {
         Self {
             arena,
             binder,
             line_map,
             file_name,
+            source_text,
         }
     }
 
     /// Check if the symbol at the position can be renamed.
     /// Returns the Range of the identifier if valid, or None.
     pub fn prepare_rename(&self, position: Position) -> Option<Range> {
-        let offset = self.line_map.position_to_offset(position);
+        let offset = self.line_map.position_to_offset(position, self.source_text)?;
         let node_idx = find_node_at_offset(self.arena, offset);
 
         if node_idx.is_none() {
@@ -95,8 +98,8 @@ impl<'a> RenameProvider<'a> {
         // Only allow renaming identifiers
         if node.kind == SyntaxKind::Identifier as u16 ||
            node.kind == SyntaxKind::PrivateIdentifier as u16 {
-            let start = self.line_map.offset_to_position(node.pos);
-            let end = self.line_map.offset_to_position(node.end);
+            let start = self.line_map.offset_to_position(node.pos, self.source_text);
+            let end = self.line_map.offset_to_position(node.end, self.source_text);
             return Some(Range::new(start, end));
         }
 
@@ -125,7 +128,13 @@ impl<'a> RenameProvider<'a> {
 
         // 3. Find all references (declarations + usages)
         // We reuse the existing FindReferences logic to ensure consistency
-        let finder = FindReferences::new(self.arena, self.binder, self.line_map, self.file_name.clone());
+        let finder = FindReferences::new(
+            self.arena,
+            self.binder,
+            self.line_map,
+            self.file_name.clone(),
+            self.source_text,
+        );
 
         // We use find_references which includes the definition
         let locations = finder.find_references(root, position)
@@ -217,7 +226,7 @@ mod rename_tests {
         binder.bind_source_file(arena, root);
 
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string());
+        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         // Rename 'oldName' at declaration (0, 4)
         let pos = Position::new(0, 4);
@@ -251,7 +260,7 @@ mod rename_tests {
         let mut binder = ThinBinderState::new();
         binder.bind_source_file(arena, root);
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string());
+        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         let pos = Position::new(0, 4);
 
@@ -269,7 +278,7 @@ mod rename_tests {
         let mut binder = ThinBinderState::new();
         binder.bind_source_file(arena, root);
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string());
+        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         let pos = Position::new(0, 4);
 
@@ -290,7 +299,7 @@ mod rename_tests {
         binder.bind_source_file(arena, root);
 
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string());
+        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         // Rename 'foo' at the call site (1, 0)
         let pos = Position::new(1, 0);
@@ -319,7 +328,7 @@ mod rename_tests {
         let mut binder = ThinBinderState::new();
         binder.bind_source_file(arena, root);
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string());
+        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         // Position on the number literal '1', not an identifier
         let pos = Position::new(0, 8);
@@ -338,7 +347,7 @@ mod rename_tests {
         let mut binder = ThinBinderState::new();
         binder.bind_source_file(arena, root);
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string());
+        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         let pos = Position::new(0, 4);
 

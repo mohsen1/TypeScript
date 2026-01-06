@@ -1189,12 +1189,10 @@ impl<'a> ClassES5Emitter<'a> {
                 self.emit_while_statement(stmt_idx);
             }
             k if k == syntax_kind_ext::THROW_STATEMENT => {
-                // TODO: Implement throw statement when API available
-                self.write("throw /* TODO */;");
+                self.emit_throw_statement(stmt_idx);
             }
             k if k == syntax_kind_ext::TRY_STATEMENT => {
-                // TODO: Implement try statement
-                self.write("try { /* TODO */ }");
+                self.emit_try_statement(stmt_idx);
             }
             _ => {
                 // Fallback: emit expression if possible
@@ -1459,6 +1457,21 @@ impl<'a> ClassES5Emitter<'a> {
             self.emit_statement(try_stmt.finally_block);
         }
     }
+
+    fn emit_throw_statement(&mut self, stmt_idx: NodeIndex) {
+        let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
+        let Some(throw_data) = self.arena.get_return_statement(stmt_node) else {
+            self.write("throw;");
+            return;
+        };
+
+        self.write("throw");
+        if !throw_data.expression.is_none() {
+            self.write(" ");
+            self.emit_expression(throw_data.expression);
+        }
+        self.write(";");
+    }
     
     fn emit_expression(&mut self, expr_idx: NodeIndex) {
         let Some(expr_node) = self.arena.get(expr_idx) else { return };
@@ -1584,8 +1597,11 @@ impl<'a> ClassES5Emitter<'a> {
                 }
             }
             k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
-                // TODO: Implement parenthesized expression
-                self.write("(/* TODO */)");
+                if let Some(paren) = self.arena.get_parenthesized(expr_node) {
+                    self.write("(");
+                    self.emit_expression(paren.expression);
+                    self.write(")");
+                }
             }
             k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
                 if let Some(cond) = self.arena.get_conditional_expr(expr_node) {
