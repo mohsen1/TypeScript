@@ -188,6 +188,11 @@ fn test_two_phase_emission_es5_class_for_in_of() {
         "ES5 output should bind iterator values: {}",
         output
     );
+    assert!(
+        output.contains(".return"),
+        "ES5 output should close iterators: {}",
+        output
+    );
 }
 
 #[test]

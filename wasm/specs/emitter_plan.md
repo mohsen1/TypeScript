@@ -43,6 +43,7 @@ Pick the most doable and impactful
 18. Class ES5 transform: emit for-in/for-of statements [done]
 19. Class ES5 transform: emit binding patterns in declarations [done]
 20. ES5 emit: downlevel for-of loops with __values helper [done]
+21. ES5 emit: close for-of iterators with try/finally [done]
 
 
 ## Quick Reference

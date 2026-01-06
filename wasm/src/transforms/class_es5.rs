@@ -1692,9 +1692,23 @@ impl<'a> ClassES5Emitter<'a> {
             return;
         }
 
+        let error_name = self.get_temp_var_name();
+        let return_name = self.get_temp_var_name();
         let iterator_name = self.get_temp_var_name();
         let result_name = self.get_temp_var_name();
 
+        self.write("var ");
+        self.write(&error_name);
+        self.write(", ");
+        self.write(&return_name);
+        self.write(";");
+        self.write_line();
+
+        self.write("try {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write_indent();
         self.write("for (var ");
         self.write(&iterator_name);
         self.write(" = __values(");
@@ -1721,6 +1735,71 @@ impl<'a> ClassES5Emitter<'a> {
 
         self.write_indent();
         self.emit_statement(for_in_of.statement);
+        self.write_line();
+
+        self.decrease_indent();
+        self.write_indent();
+        self.write("}");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write_indent();
+        self.write("}");
+        self.write_line();
+
+        self.write_indent();
+        self.write("catch (");
+        self.write(&error_name);
+        self.write("_1) { ");
+        self.write(&error_name);
+        self.write(" = { error: ");
+        self.write(&error_name);
+        self.write("_1 }; }");
+        self.write_line();
+
+        self.write_indent();
+        self.write("finally {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write_indent();
+        self.write("try {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write_indent();
+        self.write("if (");
+        self.write(&result_name);
+        self.write(" && !");
+        self.write(&result_name);
+        self.write(".done && (");
+        self.write(&return_name);
+        self.write(" = ");
+        self.write(&iterator_name);
+        self.write(".return)) ");
+        self.write(&return_name);
+        self.write(".call(");
+        self.write(&iterator_name);
+        self.write(");");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write_indent();
+        self.write("} finally {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write_indent();
+        self.write("if (");
+        self.write(&error_name);
+        self.write(") throw ");
+        self.write(&error_name);
+        self.write(".error;");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write_indent();
+        self.write("}");
         self.write_line();
 
         self.decrease_indent();
@@ -1761,6 +1840,11 @@ impl<'a> ClassES5Emitter<'a> {
                     self.emit_for_of_declaration_value(decl_idx, result_name, &mut first);
                 }
             }
+            self.write(";");
+        } else if self.is_binding_pattern(initializer) {
+            self.write("var ");
+            let mut first = true;
+            self.emit_es5_destructuring_from_value(initializer, result_name, &mut first);
             self.write(";");
         } else {
             self.emit_expression(initializer);

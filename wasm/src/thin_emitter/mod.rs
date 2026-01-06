@@ -2758,8 +2758,21 @@ impl<'a> ThinPrinter<'a> {
     }
 
     fn emit_for_of_statement_es5(&mut self, for_in_of: &crate::parser::thin_node::ForInOfData) {
+        let error_name = self.get_temp_var_name();
+        let return_name = self.get_temp_var_name();
         let iterator_name = self.get_temp_var_name();
         let result_name = self.get_temp_var_name();
+
+        self.write("var ");
+        self.write(&error_name);
+        self.write(", ");
+        self.write(&return_name);
+        self.write_semicolon();
+        self.write_line();
+
+        self.write("try {");
+        self.write_line();
+        self.increase_indent();
 
         self.write("for (var ");
         self.write(&iterator_name);
@@ -2786,6 +2799,64 @@ impl<'a> ThinPrinter<'a> {
         self.write_line();
         self.decrease_indent();
         self.write("}");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("}");
+        self.write_line();
+
+        self.write("catch (");
+        self.write(&error_name);
+        self.write("_1) { ");
+        self.write(&error_name);
+        self.write(" = { error: ");
+        self.write(&error_name);
+        self.write("_1 }; }");
+        self.write_line();
+
+        self.write("finally {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write("try {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write("if (");
+        self.write(&result_name);
+        self.write(" && !");
+        self.write(&result_name);
+        self.write(".done && (");
+        self.write(&return_name);
+        self.write(" = ");
+        self.write(&iterator_name);
+        self.write(".return)) ");
+        self.write(&return_name);
+        self.write(".call(");
+        self.write(&iterator_name);
+        self.write(")");
+        self.write_semicolon();
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("} finally {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write("if (");
+        self.write(&error_name);
+        self.write(") throw ");
+        self.write(&error_name);
+        self.write(".error");
+        self.write_semicolon();
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("}");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("}");
     }
 
     fn emit_for_of_value_binding_es5(&mut self, initializer: NodeIndex, result_name: &str) {
@@ -2805,6 +2876,11 @@ impl<'a> ThinPrinter<'a> {
                     self.emit_for_of_declaration_value_es5(decl_idx, result_name, &mut first);
                 }
             }
+            self.write_semicolon();
+        } else if self.is_binding_pattern(initializer) {
+            self.write("var ");
+            let mut first = true;
+            self.emit_es5_destructuring_from_value(initializer, result_name, &mut first);
             self.write_semicolon();
         } else {
             self.emit_expression(initializer);

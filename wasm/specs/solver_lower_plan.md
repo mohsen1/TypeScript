@@ -9,7 +9,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
 **Independence:** MEDIUM - Needs stable TypeKey definitions from Track A. Heavy AST interaction.
 
 ## Current Status
-🟡 **In Progress** - Interface merging wired into checker type resolution; Phase 6 lowering tests added; module augmentation supported; BigInt literal test blocked by parser.
+🟡 **In Progress** - Declaration space separation complete; comprehensive tests expanded; continuing with additional polish.
 
 ## Tasks
 
@@ -25,7 +25,8 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - Test: `number` annotation -> Intrinsic(Number)
   - Test: `"hello"` -> Literal with correct Atom
   - Test: Verify deduplication (same type -> same TypeId)
-  - [ ] Add BigInt literal type test once `123n` parses in type position
+  - [x] Add BigInt literal type test once `123n` parses in type position
+  - [x] Test: Negative numeric and bigint literal types
 
 ### Phase 2: Complex Type Structures
 - [x] Implement object type lowering
@@ -74,7 +75,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
 - [x] Implement interface merging
   - Multiple `interface Foo` declarations merge into one type
   - Merge properties, handle conflicts
-- [ ] Implement declaration space separation
+- [x] Implement declaration space separation
   - [x] Type space vs value space (handle same name for class/type)
   - [x] Module augmentation support
 - [x] Tests for merging
@@ -90,7 +91,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - Check if already lowered (cache)
   - Otherwise, lower the symbol's type annotation
   - Store in cache for next lookup
-- [ ] Add comprehensive tests
+- [x] Add comprehensive tests
   - [x] Test: Interface index signature property access (4111)
   - [x] Test: Explicit property bypasses 4111
   - [x] Test: Union with index signature triggers 4111

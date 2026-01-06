@@ -5004,6 +5004,7 @@ impl ThinParserState {
         match self.token() {
             SyntaxKind::Identifier => self.parse_identifier(),
             SyntaxKind::NumericLiteral => self.parse_numeric_literal(),
+            SyntaxKind::BigIntLiteral => self.parse_bigint_literal(),
             SyntaxKind::StringLiteral => self.parse_string_literal(),
             SyntaxKind::TrueKeyword |
             SyntaxKind::FalseKeyword => self.parse_boolean_literal(),
@@ -5303,6 +5304,22 @@ impl ThinParserState {
             start_pos,
             end_pos,
             LiteralData { text, raw_text: None, value },
+        )
+    }
+
+    /// Parse bigint literal
+    /// Uses zero-copy accessor, stores the raw text (e.g. "123n")
+    fn parse_bigint_literal(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        let end_pos = self.token_end();
+        let text = self.scanner.get_token_value_ref().to_string();
+        self.next_token();
+
+        self.arena.add_literal(
+            SyntaxKind::BigIntLiteral as u16,
+            start_pos,
+            end_pos,
+            LiteralData { text, raw_text: None, value: None },
         )
     }
 
@@ -6298,6 +6315,7 @@ impl ThinParserState {
         // Handle literal types: "foo", 42, true, false
         if self.is_token(SyntaxKind::StringLiteral)
             || self.is_token(SyntaxKind::NumericLiteral)
+            || self.is_token(SyntaxKind::BigIntLiteral)
             || self.is_token(SyntaxKind::TrueKeyword)
             || self.is_token(SyntaxKind::FalseKeyword)
         {
@@ -6499,7 +6517,7 @@ impl ThinParserState {
         tuple
     }
 
-    /// Parse literal type: "foo", 42, true, false
+    /// Parse literal type: "foo", 42, 123n, true, false
     fn parse_literal_type(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
 
@@ -6507,6 +6525,7 @@ impl ThinParserState {
         let literal = match self.token() {
             SyntaxKind::StringLiteral => self.parse_string_literal(),
             SyntaxKind::NumericLiteral => self.parse_numeric_literal(),
+            SyntaxKind::BigIntLiteral => self.parse_bigint_literal(),
             SyntaxKind::TrueKeyword | SyntaxKind::FalseKeyword => self.parse_boolean_literal(),
             _ => {
                 // Fallback - shouldn't happen
@@ -6534,8 +6553,12 @@ impl ThinParserState {
         let operator_kind = self.token() as u16;
         self.next_token();
 
-        // Parse the numeric literal operand
-        let operand = self.parse_numeric_literal();
+        // Parse the numeric or bigint literal operand
+        let operand = if self.is_token(SyntaxKind::BigIntLiteral) {
+            self.parse_bigint_literal()
+        } else {
+            self.parse_numeric_literal()
+        };
 
         let prefix_end = self.token_end();
 
