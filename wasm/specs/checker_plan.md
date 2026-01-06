@@ -38,8 +38,8 @@ Our focus is to make wasm checker complete
     - Updated all property resolution paths to propagate from_index_signature flag
     - Implemented error check in get_type_of_property_access for dot notation access
     - Flag is contagious across union members (TypeScript strict behavior)
+    - Added 4 comprehensive test cases (1 active solver-level test, 3 integration tests documented but disabled until interface type lowering is implemented)
     - All 614 tests pass
-    - TODO: Add comprehensive test cases in follow-up
 - ⬜ Ambient module patterns (errors 2305, 5061, 2819)
 - ⬜ Various missing error codes (see test failures)
 - ✅ Fix tuple subtyping logic (CRITICAL - COMPLETED)
