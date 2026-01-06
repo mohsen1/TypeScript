@@ -33,7 +33,13 @@ Our focus is to make wasm checker complete
     - Added Symbol property access handling (description, toString, valueOf)
     - Added 7 comprehensive test cases
     - All 614 tests pass
-- ⬜ Property access from index signature (error 4111)
+- ✅ Property access from index signature (error 4111) (COMPLETED)
+    - Modified PropertyAccessResult to track whether property was resolved via index signature
+    - Updated all property resolution paths to propagate from_index_signature flag
+    - Implemented error check in get_type_of_property_access for dot notation access
+    - Flag is contagious across union members (TypeScript strict behavior)
+    - All 614 tests pass
+    - TODO: Add comprehensive test cases in follow-up
 - ⬜ Ambient module patterns (errors 2305, 5061, 2819)
 - ⬜ Various missing error codes (see test failures)
 - ✅ Fix tuple subtyping logic (CRITICAL - COMPLETED)

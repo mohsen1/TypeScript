@@ -1284,7 +1284,21 @@ impl<'a> ThinCheckerState<'a> {
             let result = evaluator.resolve_property_access(object_type, property_name);
 
             match result {
-                PropertyAccessResult::Success(prop_type) => prop_type,
+                PropertyAccessResult::Success { type_id: prop_type, from_index_signature } => {
+                    // Check for error 4111: property access from index signature
+                    if from_index_signature {
+                        use crate::checker::types::diagnostics::diagnostic_codes;
+                        self.error_at_node(
+                            access.name_or_argument,
+                            &format!(
+                                "Property '{}' comes from an index signature, so it must be accessed with ['{}'].",
+                                property_name, property_name
+                            ),
+                            diagnostic_codes::PROPERTY_ACCESS_FROM_INDEX_SIGNATURE,
+                        );
+                    }
+                    prop_type
+                }
 
                 PropertyAccessResult::PropertyNotFound { .. } => {
                     self.error_property_not_exist_at(property_name, object_type, idx);

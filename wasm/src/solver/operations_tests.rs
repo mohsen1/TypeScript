@@ -117,7 +117,7 @@ fn test_property_access_object() {
     // Access existing property
     let result = evaluator.resolve_property_access(obj, "x");
     match result {
-        PropertyAccessResult::Success(t) => assert_eq!(t, TypeId::NUMBER),
+        PropertyAccessResult::Success { type_id: t, .. } => assert_eq!(t, TypeId::NUMBER),
         _ => panic!("Expected success, got {:?}", result),
     }
 
@@ -136,7 +136,7 @@ fn test_property_access_string() {
 
     let result = evaluator.resolve_property_access(TypeId::STRING, "length");
     match result {
-        PropertyAccessResult::Success(t) => assert_eq!(t, TypeId::NUMBER),
+        PropertyAccessResult::Success { type_id: t, .. } => assert_eq!(t, TypeId::NUMBER),
         _ => panic!("Expected success, got {:?}", result),
     }
 }

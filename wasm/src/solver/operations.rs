@@ -323,7 +323,12 @@ impl<'a> CallEvaluator<'a> {
 #[derive(Clone, Debug)]
 pub enum PropertyAccessResult {
     /// Property exists, returns its type
-    Success(TypeId),
+    Success {
+        type_id: TypeId,
+        /// True if this property was resolved via an index signature
+        /// (not an explicit property declaration). Used for error 4111.
+        from_index_signature: bool,
+    },
 
     /// Property does not exist on this type
     PropertyNotFound {
@@ -392,7 +397,10 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 // Search for the property
                 for prop in props {
                     if prop.name.as_ref() == prop_name {
-                        return PropertyAccessResult::Success(prop.type_id);
+                        return PropertyAccessResult::Success {
+                            type_id: prop.type_id,
+                            from_index_signature: false,
+                        };
                     }
                 }
                 PropertyAccessResult::PropertyNotFound {
@@ -402,16 +410,22 @@ impl<'a> PropertyAccessEvaluator<'a> {
             }
 
             TypeKey::ObjectWithIndex(ref shape) => {
-                // Check named properties first
+                // Check named properties first (explicit properties take precedence)
                 for prop in &shape.properties {
                     if prop.name.as_ref() == prop_name {
-                        return PropertyAccessResult::Success(prop.type_id);
+                        return PropertyAccessResult::Success {
+                            type_id: prop.type_id,
+                            from_index_signature: false,
+                        };
                     }
                 }
 
-                // Check string index signature
+                // Check string index signature (THIS is the case for error 4111)
                 if let Some(ref idx) = shape.string_index {
-                    return PropertyAccessResult::Success(idx.value_type);
+                    return PropertyAccessResult::Success {
+                        type_id: idx.value_type,
+                        from_index_signature: true,  // Resolved via index signature!
+                    };
                 }
 
                 PropertyAccessResult::PropertyNotFound {
@@ -424,6 +438,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 // Property access on union: partition into nullable and non-nullable members
                 let mut valid_results = Vec::new();
                 let mut nullable_causes = Vec::new();
+                let mut any_from_index = false;  // Track if any member used index signature
 
                 for &member in members {
                     // Check for null/undefined directly
@@ -433,7 +448,12 @@ impl<'a> PropertyAccessEvaluator<'a> {
                     }
 
                     match self.resolve_property_access(member, prop_name) {
-                        PropertyAccessResult::Success(t) => valid_results.push(t),
+                        PropertyAccessResult::Success { type_id, from_index_signature } => {
+                            valid_results.push(type_id);
+                            if from_index_signature {
+                                any_from_index = true;  // Propagate: if ANY member uses index, flag it
+                            }
+                        }
                         PropertyAccessResult::PossiblyNullOrUndefined { property_type, cause } => {
                             if let Some(t) = property_type {
                                 valid_results.push(t);
@@ -471,14 +491,17 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 }
 
                 // Union of all result types
-                PropertyAccessResult::Success(self.interner.union(valid_results))
+                PropertyAccessResult::Success {
+                    type_id: self.interner.union(valid_results),
+                    from_index_signature: any_from_index,  // Contagious across union members
+                }
             }
 
             TypeKey::Intersection(ref members) => {
                 // Property access on intersection: check each member
                 for &member in members {
-                    if let PropertyAccessResult::Success(t) = self.resolve_property_access(member, prop_name) {
-                        return PropertyAccessResult::Success(t);
+                    if let PropertyAccessResult::Success { type_id, from_index_signature } = self.resolve_property_access(member, prop_name) {
+                        return PropertyAccessResult::Success { type_id, from_index_signature };
                     }
                 }
 
@@ -507,7 +530,10 @@ impl<'a> PropertyAccessEvaluator<'a> {
     /// Resolve properties on string type.
     fn resolve_string_property(&self, prop_name: &str) -> PropertyAccessResult {
         match prop_name {
-            "length" => PropertyAccessResult::Success(TypeId::NUMBER),
+            "length" => PropertyAccessResult::Success {
+                type_id: TypeId::NUMBER,
+                from_index_signature: false,
+            },
             // Add more string properties as needed
             _ => PropertyAccessResult::PropertyNotFound {
                 type_id: TypeId::STRING,
@@ -522,12 +548,18 @@ impl<'a> PropertyAccessEvaluator<'a> {
             // Symbol.prototype.description: string | undefined
             "description" => {
                 let union = self.interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
-                PropertyAccessResult::Success(union)
+                PropertyAccessResult::Success {
+                    type_id: union,
+                    from_index_signature: false,
+                }
             }
             // Symbol.prototype.toString(): string
             // Symbol.prototype.valueOf(): symbol
             // For now, return ANY for methods as full function type synthesis is complex
-            "toString" | "valueOf" => PropertyAccessResult::Success(TypeId::ANY),
+            "toString" | "valueOf" => PropertyAccessResult::Success {
+                type_id: TypeId::ANY,
+                from_index_signature: false,
+            },
             _ => PropertyAccessResult::PropertyNotFound {
                 type_id: TypeId::SYMBOL,
                 property_name: prop_name.to_string(),
@@ -539,7 +571,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
     fn resolve_array_property(&self, array_type: TypeId, prop_name: &str) -> PropertyAccessResult {
         match prop_name {
             // Array properties
-            "length" => PropertyAccessResult::Success(TypeId::NUMBER),
+            "length" => PropertyAccessResult::Success { type_id: TypeId::NUMBER, from_index_signature: false },
 
             // Array methods that return arrays
             "concat" | "filter" | "flat" | "flatMap" | "map" | "reverse" |
@@ -547,43 +579,43 @@ impl<'a> PropertyAccessEvaluator<'a> {
             "toSpliced" | "with" => {
                 // These return array-related types; for now, return ANY as placeholder
                 // Full type inference would require understanding the callback return type
-                PropertyAccessResult::Success(TypeId::ANY)
+                PropertyAccessResult::Success { type_id: TypeId::ANY, from_index_signature: false }
             }
 
             // Array methods that return specific types
             "at" | "find" | "findLast" | "pop" | "shift" => {
                 // Returns element type or undefined; use ANY as placeholder
-                PropertyAccessResult::Success(TypeId::ANY)
+                PropertyAccessResult::Success { type_id: TypeId::ANY, from_index_signature: false }
             }
 
             "every" | "includes" | "some" => {
                 // Returns boolean
-                PropertyAccessResult::Success(TypeId::BOOLEAN)
+                PropertyAccessResult::Success { type_id: TypeId::BOOLEAN, from_index_signature: false }
             }
 
             "findIndex" | "findLastIndex" | "indexOf" | "lastIndexOf" | "push" | "unshift" => {
                 // Returns number
-                PropertyAccessResult::Success(TypeId::NUMBER)
+                PropertyAccessResult::Success { type_id: TypeId::NUMBER, from_index_signature: false }
             }
 
             "forEach" | "copyWithin" | "fill" => {
                 // forEach returns undefined, copyWithin/fill return this
-                PropertyAccessResult::Success(TypeId::UNDEFINED)
+                PropertyAccessResult::Success { type_id: TypeId::UNDEFINED, from_index_signature: false }
             }
 
             "join" | "toLocaleString" | "toString" => {
                 // Returns string
-                PropertyAccessResult::Success(TypeId::STRING)
+                PropertyAccessResult::Success { type_id: TypeId::STRING, from_index_signature: false }
             }
 
             "entries" | "keys" | "values" => {
                 // Returns iterator; use ANY as placeholder
-                PropertyAccessResult::Success(TypeId::ANY)
+                PropertyAccessResult::Success { type_id: TypeId::ANY, from_index_signature: false }
             }
 
             "reduce" | "reduceRight" => {
                 // Returns the accumulator type; use ANY as placeholder
-                PropertyAccessResult::Success(TypeId::ANY)
+                PropertyAccessResult::Success { type_id: TypeId::ANY, from_index_signature: false }
             }
 
             _ => PropertyAccessResult::PropertyNotFound {

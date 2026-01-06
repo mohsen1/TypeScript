@@ -251,6 +251,7 @@ pub mod diagnostic_codes {
     pub const INDEX_SIGNATURE_MISSING: u32 = 2329;
     pub const NO_INDEX_SIGNATURE: u32 = 7053;
     pub const INDEX_SIGNATURE_PARAMETER_MUST_BE_STRING_OR_NUMBER: u32 = 1023;
+    pub const PROPERTY_ACCESS_FROM_INDEX_SIGNATURE: u32 = 4111;  // Property comes from an index signature, so it must be accessed with ['prop']
 
     // Switch/control flow
     pub const SWITCH_NOT_EXHAUSTIVE: u32 = 2761;

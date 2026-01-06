@@ -1114,7 +1114,7 @@ fn test_strict_null_checks_non_nullable_success() {
     // Access property on non-nullable type should succeed
     let result = evaluator.resolve_property_access(obj_type, "x");
     match result {
-        PropertyAccessResult::Success(prop_type) => {
+        PropertyAccessResult::Success { type_id: prop_type, .. } => {
             assert_eq!(prop_type, TypeId::NUMBER);
         }
         _ => panic!("Expected Success, got {:?}", result),
@@ -1250,7 +1250,7 @@ fn test_symbol_property_access_description() {
 
     let result = evaluator.resolve_property_access(TypeId::SYMBOL, "description");
     match result {
-        PropertyAccessResult::Success(prop_type) => {
+        PropertyAccessResult::Success { type_id: prop_type, .. } => {
             // description should be string | undefined
             let key = types.lookup(prop_type).expect("Property type should exist");
             match key {
@@ -1277,7 +1277,7 @@ fn test_symbol_property_access_methods() {
     // toString and valueOf should return ANY for now (function types are complex)
     let result_to_string = evaluator.resolve_property_access(TypeId::SYMBOL, "toString");
     match result_to_string {
-        PropertyAccessResult::Success(prop_type) => {
+        PropertyAccessResult::Success { type_id: prop_type, .. } => {
             assert_eq!(prop_type, TypeId::ANY);
         }
         _ => panic!("Expected Success for symbol.toString, got: {:?}", result_to_string),
@@ -1285,7 +1285,7 @@ fn test_symbol_property_access_methods() {
 
     let result_value_of = evaluator.resolve_property_access(TypeId::SYMBOL, "valueOf");
     match result_value_of {
-        PropertyAccessResult::Success(prop_type) => {
+        PropertyAccessResult::Success { type_id: prop_type, .. } => {
             assert_eq!(prop_type, TypeId::ANY);
         }
         _ => panic!("Expected Success for symbol.valueOf, got: {:?}", result_value_of),
