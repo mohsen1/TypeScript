@@ -26,6 +26,7 @@ use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::source_writer::SourceWriter;
+use crate::transform_context::TransformContext;
 use crate::transforms::class_es5::ClassES5Emitter;
 use crate::transforms::arrow_es5::contains_this_reference;
 
@@ -349,6 +350,7 @@ impl Default for PrinterOptions {
 ///
 /// Uses SourceWriter for output generation (enables source map support).
 /// Uses EmitContext for transform-specific state management.
+/// Uses TransformContext for directive-based transforms (Phase 2 architecture).
 pub struct ThinPrinter<'a> {
     /// The ThinNodeArena containing the AST.
     pub(super) arena: &'a ThinNodeArena,
@@ -358,6 +360,9 @@ pub struct ThinPrinter<'a> {
 
     /// Emit context holding options and transform state
     pub(super) ctx: EmitContext,
+
+    /// Transform directives from lowering pass (optional, defaults to empty)
+    pub(super) transforms: TransformContext,
 
     /// Source text for detecting single-line constructs
     pub(super) source_text: Option<&'a str>,
@@ -396,9 +401,29 @@ impl<'a> ThinPrinter<'a> {
             arena,
             writer,
             ctx,
+            transforms: TransformContext::new(), // Empty by default, can be set later
             source_text: None,
             last_processed_pos: 0,
         }
+    }
+
+    /// Create a new ThinPrinter with transform directives.
+    /// This is the Phase 2 constructor that accepts pre-computed transforms.
+    pub fn with_transforms(arena: &'a ThinNodeArena, transforms: TransformContext) -> Self {
+        let mut printer = Self::new(arena);
+        printer.transforms = transforms;
+        printer
+    }
+
+    /// Create a new ThinPrinter with transforms and options.
+    pub fn with_transforms_and_options(
+        arena: &'a ThinNodeArena,
+        transforms: TransformContext,
+        options: PrinterOptions,
+    ) -> Self {
+        let mut printer = Self::with_options(arena, options);
+        printer.transforms = transforms;
+        printer
     }
 
     /// Create a new ThinPrinter targeting ES5.
@@ -644,6 +669,120 @@ impl<'a> ThinPrinter<'a> {
     }
 
     // =========================================================================
+    // Transform Application (Phase 2 Architecture)
+    // =========================================================================
+
+    /// Apply a transform directive to a node.
+    /// This is called when a node has an entry in the TransformContext.
+    fn apply_transform(&mut self, node: &ThinNode, idx: NodeIndex) {
+        use crate::transform_context::TransformDirective;
+
+        // Clone the directive to avoid borrow checker issues
+        let Some(directive) = self.transforms.get(idx).cloned() else {
+            // No transform, emit normally (should not happen if has_transform returned true)
+            self.emit_node_default(node, idx);
+            return;
+        };
+
+        match directive {
+            TransformDirective::Identity => {
+                // No transformation needed, emit as-is
+                self.emit_node_default(node, idx);
+            }
+
+            TransformDirective::ES5Class { class_node, .. } => {
+                // Delegate to existing ClassES5Emitter
+                let mut es5_emitter = ClassES5Emitter::new(self.arena);
+                es5_emitter.set_indent_level(self.writer.indent_level());
+                if let Some(source_text) = self.source_text {
+                    es5_emitter.set_source_text(source_text);
+                }
+                let es5_output = es5_emitter.emit_class(class_node);
+                self.write(&es5_output);
+            }
+
+            TransformDirective::CommonJSExport {
+                name,
+                is_default,
+                inner,
+            } => {
+                // First apply the inner transform/emit
+                match &*inner {
+                    TransformDirective::ES5Class { class_node, .. } => {
+                        let mut es5_emitter = ClassES5Emitter::new(self.arena);
+                        es5_emitter.set_indent_level(self.writer.indent_level());
+                        if let Some(source_text) = self.source_text {
+                            es5_emitter.set_source_text(source_text);
+                        }
+                        let es5_output = es5_emitter.emit_class(*class_node);
+                        self.write(&es5_output);
+                    }
+                    TransformDirective::Identity => {
+                        self.emit_node_default(node, idx);
+                    }
+                    _ => {
+                        // For other inner transforms, emit normally for now
+                        self.emit_node_default(node, idx);
+                    }
+                }
+
+                // Then add the export assignment
+                self.write_line();
+                if is_default {
+                    self.write("exports.default = ");
+                } else {
+                    self.write("exports.");
+                    self.write(&name);
+                    self.write(" = ");
+                }
+                self.write(&name);
+                self.write(";");
+            }
+
+            TransformDirective::ES5ArrowFunction { arrow_node, .. } => {
+                // TODO: Implement arrow function transform
+                // For now, fall back to default emit
+                self.emit_node_default(node, arrow_node);
+            }
+
+            TransformDirective::ES5AsyncFunction { function_node } => {
+                // TODO: Implement async function transform
+                // For now, fall back to default emit
+                self.emit_node_default(node, function_node);
+            }
+
+            TransformDirective::ModuleWrapper { .. } => {
+                // TODO: Implement module wrapper transform
+                // For now, fall back to default emit
+                self.emit_node_default(node, idx);
+            }
+
+            TransformDirective::Chain(directives) => {
+                // Apply transforms in sequence
+                // For now, just apply the first directive
+                // TODO: Implement proper chaining
+                if let Some(first) = directives.first() {
+                    // This is a simplified version - proper implementation would need
+                    // to thread transforms through properly
+                    self.emit_node_default(node, idx);
+                } else {
+                    self.emit_node_default(node, idx);
+                }
+            }
+        }
+    }
+
+    /// Emit a node using default logic (no transforms).
+    /// This is the old emit_node logic extracted for reuse.
+    fn emit_node_default(&mut self, node: &ThinNode, idx: NodeIndex) {
+        // This will be populated by moving the match statement from emit_node
+        // For now, just recursively call emit_node which will use the match
+        // We'll refactor this properly in the next step
+        let kind = node.kind;
+        self.emit_node_by_kind(node, idx, kind);
+    }
+
+    // =========================================================================
     // Main Emit Method
     // =========================================================================
 
@@ -686,8 +825,20 @@ impl<'a> ThinPrinter<'a> {
 
     /// Emit a node.
     fn emit_node(&mut self, node: &ThinNode, idx: NodeIndex) {
-        let kind = node.kind;
+        // Phase 2 Architecture: Check transform directives first
+        if self.transforms.has_transform(idx) {
+            self.apply_transform(node, idx);
+            return;
+        }
 
+        // No transform, emit using default logic
+        let kind = node.kind;
+        self.emit_node_by_kind(node, idx, kind);
+    }
+
+    /// Emit a node by kind using default logic (no transforms).
+    /// This is the main dispatch method for emission.
+    fn emit_node_by_kind(&mut self, node: &ThinNode, idx: NodeIndex, kind: u16) {
         match kind {
             // Identifiers
             k if k == SyntaxKind::Identifier as u16 => {

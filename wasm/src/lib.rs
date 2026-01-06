@@ -51,6 +51,8 @@ pub mod thin_emitter;
 mod thin_emitter_tests;
 #[cfg(test)]
 mod emitter_edge_case_tests;
+#[cfg(test)]
+mod emitter_transform_integration_tests;
 
 
 // Parallel processing with Rayon (Phase 0.4)
