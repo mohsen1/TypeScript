@@ -25,6 +25,7 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Error 2322: accessor type compatibility (getter return ⊆ setter param)
 - ✅ Error 2511: abstract union type detection (type_contains_abstract_class)
 - ✅ TypeQuery symbol resolution for abstract class detection through type aliases
+- ✅ Union type resolution for abstract class detection (get_type_from_union_type)
 
 ## Checker Refactoring (see specs/REFACTOR_CHECKER.md)
 - 🔄 Split ThinCheckerState into Context + specialized Checkers (expr, stmt, decl)
