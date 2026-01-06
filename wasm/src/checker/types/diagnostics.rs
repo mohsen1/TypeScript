@@ -198,6 +198,9 @@ pub mod diagnostic_codes {
     pub const FUNCTION_RETURN_TYPE_MISMATCH: u32 = 2322;
     pub const PARAMETER_PROPERTY_NOT_ALLOWED: u32 = 2369;  // A parameter property is only allowed in a constructor implementation.
 
+    // Variable declaration errors
+    pub const SUBSEQUENT_VARIABLE_DECLARATIONS_MUST_HAVE_SAME_TYPE: u32 = 2403;  // Subsequent variable declarations must have the same type
+
     // Null/undefined errors
     pub const OBJECT_IS_POSSIBLY_UNDEFINED: u32 = 2532;
     pub const OBJECT_IS_POSSIBLY_NULL: u32 = 2531;

@@ -373,6 +373,11 @@ impl<'a> PropertyAccessEvaluator<'a> {
             };
         }
 
+        // Handle Symbol primitive properties
+        if obj_type == TypeId::SYMBOL {
+            return self.resolve_symbol_primitive_property(prop_name);
+        }
+
         // Look up the type key
         let key = match self.interner.lookup(obj_type) {
             Some(k) => k,
@@ -506,6 +511,25 @@ impl<'a> PropertyAccessEvaluator<'a> {
             // Add more string properties as needed
             _ => PropertyAccessResult::PropertyNotFound {
                 type_id: TypeId::STRING,
+                property_name: prop_name.to_string(),
+            },
+        }
+    }
+
+    /// Resolve properties on symbol primitive type.
+    fn resolve_symbol_primitive_property(&self, prop_name: &str) -> PropertyAccessResult {
+        match prop_name {
+            // Symbol.prototype.description: string | undefined
+            "description" => {
+                let union = self.interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+                PropertyAccessResult::Success(union)
+            }
+            // Symbol.prototype.toString(): string
+            // Symbol.prototype.valueOf(): symbol
+            // For now, return ANY for methods as full function type synthesis is complex
+            "toString" | "valueOf" => PropertyAccessResult::Success(TypeId::ANY),
+            _ => PropertyAccessResult::PropertyNotFound {
+                type_id: TypeId::SYMBOL,
                 property_name: prop_name.to_string(),
             },
         }

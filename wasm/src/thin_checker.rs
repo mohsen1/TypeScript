@@ -741,10 +741,12 @@ impl<'a> ThinCheckerState<'a> {
         match name.as_str() {
             "undefined" => TypeId::UNDEFINED,
             "NaN" | "Infinity" => TypeId::NUMBER,
+            // Symbol constructor - synthesize proper type for call signature validation
+            "Symbol" => self.get_symbol_constructor_type(),
             // Global objects that are always available
             "console" | "Math" | "JSON" | "Object" | "Array" | "String"
             | "Number" | "Boolean" | "Date" | "RegExp" | "Error" | "Promise"
-            | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Symbol" | "Proxy"
+            | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Proxy"
             | "Reflect" | "globalThis" | "window" | "document"
             | "FinalizationRegistry" | "BigInt" | "ArrayBuffer" | "SharedArrayBuffer"
             | "DataView" | "Int8Array" | "Uint8Array" | "Uint8ClampedArray"
@@ -776,6 +778,40 @@ impl<'a> ThinCheckerState<'a> {
                 TypeId::ERROR
             }
         }
+    }
+
+    /// Synthesize the Symbol constructor type.
+    ///
+    /// Returns a callable type with signature: `Symbol(description?: string | number): symbol`
+    /// Note: Symbol cannot be constructed with `new`, so no construct signatures.
+    fn get_symbol_constructor_type(&self) -> TypeId {
+        use crate::solver::{CallSignature, CallableShape, ParamInfo};
+        use std::sync::Arc;
+
+        // Parameter: description?: string | number
+        let description_param_type = self.ctx.types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+        let description_param = ParamInfo {
+            name: Some(Arc::from("description")),
+            type_id: description_param_type,
+            optional: true,
+            rest: false,
+        };
+
+        // Call signature: (description?: string | number) => symbol
+        let call_sig = CallSignature {
+            type_params: vec![],
+            params: vec![description_param],
+            return_type: TypeId::SYMBOL,
+        };
+
+        // Callable shape (no construct signatures - can't use `new Symbol()`)
+        let shape = CallableShape {
+            call_signatures: vec![call_sig],
+            construct_signatures: vec![],
+            properties: vec![], // Could add Symbol.for, Symbol.keyFor, etc. later
+        };
+
+        self.ctx.types.callable(shape)
     }
 
     /// Apply control flow narrowing to a type at a specific identifier usage.
@@ -2043,6 +2079,35 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Report error 2403: Subsequent variable declarations must have the same type.
+    pub fn error_subsequent_variable_declaration(
+        &mut self,
+        name: &str,
+        prev_type: TypeId,
+        current_type: TypeId,
+        idx: NodeIndex,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        if let Some(loc) = self.get_source_location(idx) {
+            let prev_type_str = self.format_type(prev_type);
+            let current_type_str = self.format_type(current_type);
+            let message = format!(
+                "Subsequent variable declarations must have the same type. Variable '{}' must be of type '{}', but here has type '{}'.",
+                name, prev_type_str, current_type_str
+            );
+            self.ctx.diagnostics.push(Diagnostic {
+                code: diagnostic_codes::SUBSEQUENT_VARIABLE_DECLARATIONS_MUST_HAVE_SAME_TYPE,
+                category: DiagnosticCategory::Error,
+                message_text: message,
+                file: self.ctx.file_name.clone(),
+                start: loc.start,
+                length: loc.length(),
+                related_information: Vec::new(),
+            });
+        }
+    }
+
     /// Report error 2715: Abstract property 'X' in class 'C' cannot be accessed in the constructor.
     pub fn error_abstract_property_in_constructor(
         &mut self,
@@ -2485,6 +2550,18 @@ impl<'a> ThinCheckerState<'a> {
         } else {
             declared_type
         };
+
+        // Check for variable redeclaration in the current scope (TS2403)
+        // Note: This applies specifically to 'var' merging where types must match.
+        // let/const duplicates are caught earlier by the binder (TS2451).
+        if let Some(ref name) = var_name {
+            if let Some(prev_type) = self.ctx.lookup_local_in_current_scope(name) {
+                // Types must be identical for subsequent declarations
+                if !self.are_types_identical(final_type, prev_type) {
+                    self.error_subsequent_variable_declaration(name, prev_type, final_type, decl_idx);
+                }
+            }
+        }
 
         // Add variable to local scope (if we're inside a function/method)
         if let Some(name) = var_name {

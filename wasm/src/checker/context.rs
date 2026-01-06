@@ -175,6 +175,12 @@ impl<'a> CheckerContext<'a> {
         None
     }
 
+    /// Look up a local variable in the current (innermost) scope only.
+    /// This is used for redeclaration checking (TS2403).
+    pub fn lookup_local_in_current_scope(&self, name: &str) -> Option<TypeId> {
+        self.local_scope_stack.last()?.get(name).copied()
+    }
+
     /// Push an expected return type onto the stack.
     pub fn push_return_type(&mut self, return_type: TypeId) {
         self.return_type_stack.push(return_type);

@@ -1139,3 +1139,173 @@ fn test_strict_null_checks_null_only() {
         _ => panic!("Expected PossiblyNullOrUndefined, got {:?}", result),
     }
 }
+
+// ============== Symbol type checking tests ==============
+
+#[test]
+fn test_symbol_constructor_call_signature() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test Symbol() with valid arguments
+    let source = r#"const s1 = Symbol();
+const s2 = Symbol("name");
+const s3 = Symbol(42);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have no errors - all calls are valid
+    assert_eq!(checker.ctx.diagnostics.len(), 0);
+}
+
+#[test]
+fn test_symbol_constructor_too_many_args() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test Symbol() with too many arguments - should error TS2554
+    let source = r#"const s = Symbol("name", "extra");"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have an error for too many arguments
+    // Could be 2554 (expected arguments) or 2349 (cannot invoke) depending on validation path
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2554) || codes.contains(&2349),
+        "Expected error 2554 or 2349 for too many arguments, got: {:?}", codes);
+}
+
+#[test]
+fn test_variable_redeclaration_same_type() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that redeclaring a variable with the same type is allowed
+    let source = r#"function test() {
+    var x: string;
+    var x: string;
+}"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have no errors - same type is allowed
+    assert_eq!(checker.ctx.diagnostics.len(), 0);
+}
+
+#[test]
+fn test_variable_redeclaration_different_type_2403() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that redeclaring a variable with different type causes error TS2403
+    // Must be inside a function where local scopes are active
+    let source = r#"function test() {
+    var x: string;
+    var x: number;
+}"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Should have error 2403: Subsequent variable declarations must have the same type
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2403), "Expected error 2403 for variable redeclaration, got: {:?}", codes);
+}
+
+#[test]
+fn test_symbol_property_access_description() {
+    use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult, TypeKey};
+    use std::sync::Arc;
+
+    // Test accessing .description on symbol type
+    let types = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&types);
+
+    let result = evaluator.resolve_property_access(TypeId::SYMBOL, "description");
+    match result {
+        PropertyAccessResult::Success(prop_type) => {
+            // description should be string | undefined
+            let key = types.lookup(prop_type).expect("Property type should exist");
+            match key {
+                TypeKey::Union(ref members) => {
+                    assert_eq!(members.len(), 2);
+                    assert!(members.contains(&TypeId::STRING));
+                    assert!(members.contains(&TypeId::UNDEFINED));
+                }
+                _ => panic!("Expected union type for description, got: {:?}", key),
+            }
+        }
+        _ => panic!("Expected Success for symbol.description, got: {:?}", result),
+    }
+}
+
+#[test]
+fn test_symbol_property_access_methods() {
+    use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
+
+    // Test accessing methods on symbol type
+    let types = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&types);
+
+    // toString and valueOf should return ANY for now (function types are complex)
+    let result_to_string = evaluator.resolve_property_access(TypeId::SYMBOL, "toString");
+    match result_to_string {
+        PropertyAccessResult::Success(prop_type) => {
+            assert_eq!(prop_type, TypeId::ANY);
+        }
+        _ => panic!("Expected Success for symbol.toString, got: {:?}", result_to_string),
+    }
+
+    let result_value_of = evaluator.resolve_property_access(TypeId::SYMBOL, "valueOf");
+    match result_value_of {
+        PropertyAccessResult::Success(prop_type) => {
+            assert_eq!(prop_type, TypeId::ANY);
+        }
+        _ => panic!("Expected Success for symbol.valueOf, got: {:?}", result_value_of),
+    }
+}
+
+#[test]
+fn test_symbol_property_not_found() {
+    use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
+
+    // Test accessing non-existent property on symbol type
+    let types = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&types);
+
+    let result = evaluator.resolve_property_access(TypeId::SYMBOL, "nonexistent");
+    match result {
+        PropertyAccessResult::PropertyNotFound { type_id, property_name } => {
+            assert_eq!(type_id, TypeId::SYMBOL);
+            assert_eq!(property_name, "nonexistent");
+        }
+        _ => panic!("Expected PropertyNotFound for unknown property, got: {:?}", result),
+    }
+}

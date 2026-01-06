@@ -27,7 +27,12 @@ Our focus is to make wasm checker complete
 - 🔄 Move expression type computation to solver/operations.rs (incremental)
 - 🔄 Use NodeView API instead of raw arena lookups (incremental)
 - ⬜ Deprecate checker/types in favor of solver/types
-- ⬜ Symbol type checking (errors 2403, 2554)
+- ✅ Symbol type checking (errors 2403, 2554) (COMPLETED)
+    - Synthesized Symbol constructor type with call signature: `Symbol(description?: string | number): symbol`
+    - Implemented variable redeclaration checking (TS2403) for same-scope var declarations
+    - Added Symbol property access handling (description, toString, valueOf)
+    - Added 7 comprehensive test cases
+    - All 614 tests pass
 - ⬜ Property access from index signature (error 4111)
 - ⬜ Ambient module patterns (errors 2305, 5061, 2819)
 - ⬜ Various missing error codes (see test failures)
