@@ -86,6 +86,7 @@ Following Gemini's guidance, implemented comprehensive AST traversal:
    - Go-to-Definition: ✅ Working (finds declarations from usages)
    - Find References: ✅ Working (finds all usages of a symbol)
    - Completions: ✅ Working (suggests identifiers from scope chain)
+   - Hover: ✅ Working (shows type and documentation)
    - Handles scoping correctly with scope stack
 
 5. **Completions Feature** (2026-01-06)
@@ -102,15 +103,36 @@ Following Gemini's guidance, implemented comprehensive AST traversal:
 
    **Gemini Review:** CHANGES REQUESTED (nested scopes)
 
+6. **Hover Feature** (2026-01-06)
+   - Added `hover.rs` with `HoverInfo` and `HoverProvider` types
+   - Shows type information and documentation when hovering over symbols
+   - Integrates with ThinChecker to compute types on-demand
+   - Extracts JSDoc comments for documentation display
+   - Formats output as Markdown (TypeScript code blocks + documentation)
+   - Tests: 3/3 passing
+
+   **Implementation Details:**
+   - Creates transient `ThinCheckerState` to get type of symbol
+   - Uses `format_type()` to display human-readable types
+   - Extracts JSDoc comments immediately preceding declarations
+   - Supports all symbol kinds (function, class, interface, enum, type, module, etc.)
+
+   **Known Limitations:**
+   - Performance: O(N) comment scan on every hover (TODO: cache comments)
+   - Currently extracts immediate JSDoc only (not inherited docs)
+
+   **Gemini Review:** All issues fixed ✅
+
 #### Test Results
 
-All 623 tests pass! ✅ (2 ignored)
-- LSP-specific tests: 17/18 passing (1 ignored - nested scopes)
+All 626 tests pass! ✅ (2 ignored)
+- LSP-specific tests: 20/21 passing (1 ignored - nested scopes)
 - Position utilities: 3/3 passing
 - Resolver tests: 1/1 passing
 - Definition tests: 2/2 passing
 - References tests: 2/2 passing
-- Completions tests: 2/3 passing
+- Completions tests: 2/3 passing (1 ignored - nested scopes)
+- Hover tests: 3/3 passing
 - Integration tests: 3/3 passing
 - Utils tests: 3/3 passing
 
@@ -122,9 +144,13 @@ All 623 tests pass! ✅ (2 ignored)
    - Enable the ignored completions test
 
 2. **Add More LSP Features**
-   - Hover information (show type/documentation for symbol at cursor)
    - Signature help (show function parameter info)
    - Rename refactoring
+   - Semantic tokens (syntax highlighting)
+
+3. **Performance Optimizations**
+   - Cache comment ranges in ThinParser (avoid O(N) scan on every hover)
+   - Consider caching type information for repeated queries
 
 2. **Extend AST Coverage** (if needed)
    - Add more expression types as needed (template literals, JSX, etc.)

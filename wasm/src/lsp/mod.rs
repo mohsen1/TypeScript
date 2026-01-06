@@ -4,7 +4,8 @@
 //! - Go to Definition
 //! - Find References
 //! - Completions
-//! - (Future: Hover, Signature Help, etc.)
+//! - Hover
+//! - (Future: Signature Help, Rename, etc.)
 //!
 //! Architecture:
 //! - Position utilities for line/column <-> offset conversion
@@ -17,6 +18,7 @@ pub mod resolver;
 pub mod definition;
 pub mod references;
 pub mod completions;
+pub mod hover;
 
 #[cfg(test)]
 mod tests;
@@ -24,4 +26,5 @@ mod tests;
 pub use definition::GoToDefinition;
 pub use references::FindReferences;
 pub use completions::{Completions, CompletionItem, CompletionItemKind};
+pub use hover::{HoverProvider, HoverInfo};
 pub use position::{Position, Location, SourceLocation, Range};
