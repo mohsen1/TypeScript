@@ -134,6 +134,10 @@ pub struct ModuleTransformState {
 
     /// Whether "use strict" has been emitted
     pub strict_mode_emitted: bool,
+
+    /// Whether the file contains an `export =` assignment (CommonJS export assignment)
+    /// If true, other named exports should be suppressed in CommonJS emit.
+    pub has_export_assignment: bool,
 }
 
 impl ModuleTransformState {
