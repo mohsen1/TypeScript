@@ -19,6 +19,12 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Callable interface type lowering (function-like interfaces)
 - ✅ Function type annotations for error 2355
 - ✅ Error 2676: accessor abstract consistency (get/set must both be abstract or both non-abstract)
+- ✅ Error 1253: abstract members in non-abstract class
+- ✅ Accessor body checks in ambient contexts (1183)
+- ✅ Error 1248: const keyword on class members (moved from parser to checker)
+
+## Code Cleanup
+- ✅ Deleted ~35k lines of dead code (old fat-node parser, emitter, checker, services)
 
 ## Recent Emitter Improvements
 - ✅ Fixed baseline comparison script to extract JS portion correctly
