@@ -396,9 +396,11 @@ impl ThinBinderState {
                 self.bind_module_declaration(arena, node, idx);
             }
             k if k == syntax_kind_ext::MODULE_BLOCK => {
-                if let Some(block) = arena.get_block(node) {
-                    for &stmt_idx in &block.statements.nodes {
-                        self.bind_node(arena, stmt_idx);
+                if let Some(block) = arena.get_module_block(node) {
+                    if let Some(ref statements) = block.statements {
+                        for &stmt_idx in &statements.nodes {
+                            self.bind_node(arena, stmt_idx);
+                        }
                     }
                 }
             }
