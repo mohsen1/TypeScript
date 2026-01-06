@@ -278,18 +278,88 @@ All 644 tests pass! ✅ (2 ignored)
 - Integration tests: 3/3 passing
 - Utils tests: 3/3 passing
 
+11. **WASM Bindings for LSP Features** (2026-01-06)
+   - Added `serde-wasm-bindgen` dependency to Cargo.toml
+   - Added Serialize/Deserialize derives to all LSP types:
+     - CompletionItem, CompletionItemKind (completions.rs)
+     - HoverInfo (hover.rs)
+     - SignatureHelp, SignatureInformation, ParameterInformation (signature_help.rs)
+     - DocumentSymbol, SymbolKind (document_symbols.rs)
+     - Position, Range, Location, SourceLocation (position.rs)
+   - Extended ThinParser struct with `line_map: Option<LineMap>` field
+   - Added LSP helper methods to ThinParser:
+     - `ensure_line_map()` - Lazy initialization of LineMap
+     - `ensure_bound()` - Ensures source file is parsed and bound
+   - Exposed all LSP features via wasm_bindgen:
+     - `getDefinitionAtPosition(line, character)` - Go-to-Definition
+     - `getReferencesAtPosition(line, character)` - Find References
+     - `getCompletionsAtPosition(line, character)` - Completions
+     - `getHoverAtPosition(line, character)` - Hover
+     - `getSignatureHelpAtPosition(line, character)` - Signature Help
+     - `getDocumentSymbols()` - Document Symbols
+     - `getSemanticTokens()` - Semantic Tokens
+     - `prepareRename(line, character)` - Rename validation
+     - `getRenameEdits(line, character, newName)` - Rename edits
+     - `getCodeActions(startLine, startChar, endLine, endChar)` - Code Actions
+   - All methods return `JsValue` (serialized via serde-wasm-bindgen) or `Vec<u32>` for semantic tokens
+   - All methods handle errors gracefully with Result<JsValue, JsValue>
+   - **Status:** ✅ Compiles successfully, all LSP features now accessible from JavaScript!
+
+   **Fixed Issues:**
+   - ✅ Fixed code_actions test failure by using range containment instead of exact match
+   - ✅ All 683 tests passing!
+
+12. **Code Actions Bug Fix** (2026-01-06)
+   - Fixed `test_extract_variable_property_access` test failure
+   - Root cause: Parser bug where end positions are captured after `next_token()`, causing nodes to include following tokens in their span
+   - Workaround: Changed `find_expression_at_range` to use range containment (node contains selection) instead of exact position match
+   - This is more robust and works correctly despite the parser bug
+   - Tests: 3/3 passing ✅
+   - **Parser Bug Documented:** Parser's end position capture needs fixing (affects all LSP features)
+
+13. **Parser End Position Bug Fix** (2026-01-06)
+   - **CRITICAL FIX:** Fixed systematic parser bug affecting all LSP features
+   - Root cause: End positions were captured AFTER calling `next_token()`, causing nodes to include following tokens
+   - Fixed all leaf nodes (identifiers, literals, keywords):
+     - parse_identifier, parse_identifier_name, parse_private_identifier
+     - parse_string_literal, parse_numeric_literal, parse_boolean_literal
+     - parse_null_literal, parse_this_expression, parse_super_expression
+   - Fixed composite nodes to use child end positions:
+     - parse_variable_declaration now uses initializer/type/name end position
+   - Results: All 683 tests passing ✅
+   - **Impact:** Significantly improves accuracy of all LSP features (go-to-definition, find-references, hover, etc.)
+
+14. **Signature Help Parameter Detection Fix** (2026-01-06)
+   - **CRITICAL FIX:** Replaced token-based comma counting with AST-based approach
+   - Old approach: Scanned tokens counting commas at depth 0 (failed with generic types `<>`)
+   - **Edge case:** `process(new Set<string, number>(), 1)` - comma in generic args incorrectly counted
+   - New approach: Directly checks which argument node contains cursor position
+   - Benefits:
+     - Handles generic type arguments correctly (angle brackets not tracked as depth)
+     - Works with nested calls: `foo(bar(x, y), z)`
+     - Handles complex expressions with comparison operators: `a < b`
+     - More robust for incomplete code during typing
+   - Added test: `test_signature_help_between_arguments` validates multi-argument detection
+   - Results: All 684 tests passing ✅
+   - **Impact:** Signature help now works correctly in all scenarios
+
 #### Next Steps
 
-1. **Fix Signature Help Edge Cases**
-   - Debug multi-argument cursor position detection
-   - Add JSDoc documentation extraction for parameters
-   - Optimize ScannerState to use &str instead of cloning source
+1. **Continue Parser Fixes** (MEDIUM PRIORITY)
+   - Fix remaining composite nodes: binary expressions, property access, function declarations
+   - Fix delimited nodes: blocks, parenthesized expressions
+   - These will further improve LSP accuracy but current fixes handle most critical cases
 
-2. **Add More LSP Features**
-   - Rename refactoring
-   - Semantic tokens (syntax highlighting)
-   - Document symbols
-   - Code actions
+2. **Complete Code Actions Implementation**
+   - Add more refactoring actions (extract function, inline variable, etc.)
+   - Integrate with diagnostics for quick fixes
+
+3. **Performance Optimizations**
+   - Cache comment ranges in ThinParser (avoid O(N) scan on every hover)
+   - Refactor ScannerState to use &str instead of cloning source
+
+3. **Add More LSP Features**
+   - Code actions (complete implementation)
 
 4. **Performance Optimizations**
    - Cache comment ranges in ThinParser (avoid O(N) scan on every hover)

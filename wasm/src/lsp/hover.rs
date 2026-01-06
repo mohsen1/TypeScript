@@ -13,7 +13,7 @@ use crate::thin_checker::ThinCheckerState;
 use crate::comments::{get_comment_ranges, get_leading_comments, get_jsdoc_content, is_jsdoc_comment};
 
 /// Information returned for a hover request.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct HoverInfo {
     /// The contents of the hover (usually Markdown)
     pub contents: Vec<String>,

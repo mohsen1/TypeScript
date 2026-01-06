@@ -9,7 +9,7 @@ use crate::scanner::SyntaxKind;
 use crate::lsp::position::{Range, Position, LineMap};
 
 /// A symbol kind (matches LSP SymbolKind values).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[repr(u8)]
 pub enum SymbolKind {
     File = 1,
@@ -41,7 +41,7 @@ pub enum SymbolKind {
 }
 
 /// Represents programming constructs like variables, classes, interfaces, etc.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DocumentSymbol {
     /// The name of this symbol.
     pub name: String,
