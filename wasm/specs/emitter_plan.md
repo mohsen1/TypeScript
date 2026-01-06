@@ -17,10 +17,12 @@ Our focus is to make wasm emitter complete
 - ⏳ CommonJS exports - **IN PROGRESS** (~11 tests)
   - ✅ Added `__esModule` marker (correctly excludes `export =` cases)
   - ✅ Added enum and namespace support to export collection
-  - ⬜ **ISSUE**: `exports.X = void 0;` initialization not being emitted
-    - `collect_export_names` returns empty array - needs investigation
-    - Expected: `exports.C = void 0;` after "use strict"
-    - Actual: Missing this line entirely
+  - ✅ Fixed `exports.X = void 0;` initialization emission
+    - Root cause: Parser wraps exports in EXPORT_DECLARATION nodes
+    - collect_export_names now checks export_clause field
+  - ⬜ **REMAINING**: Suppress `exports.X = X;` when file has `export =`
+    - Currently emits both `exports.C = void 0;` AND `exports.C = C;`
+    - Should only emit initialization when `export =` present
 - ⬜ Comment preservation in emit - ~3 tests
 - ⬜ Parse error tolerance (some tests skipped) - ~2 tests
 - ... add more tasks (Ask Gemini when needed)
