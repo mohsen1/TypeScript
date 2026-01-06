@@ -876,3 +876,65 @@ c.ro = "error: lhs of assignment can't be readonly";
     assert!(count_2540 >= 1,
         "Expected at least 1 error 2540 for readonly property assignment, got {} in: {:?}", count_2540, codes);
 }
+
+#[test]
+fn test_abstractPropertyNegative_errors() {
+    // Test the full abstractPropertyNegative test case to verify expected errors
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface A {
+    prop: string;
+    m(): string;
+}
+abstract class B implements A {
+    abstract prop: string;
+    public abstract readonly ro: string;
+    abstract get readonlyProp(): string;
+    abstract m(): string;
+    abstract get mismatch(): string;
+    abstract set mismatch(val: number);
+}
+class C extends B {
+    readonly ro = "readonly please";
+    abstract notAllowed: string;
+    get concreteWithNoBody(): string;
+}
+let c = new C();
+c.ro = "error: lhs of assignment can't be readonly";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+
+    checker.check_source_file(root);
+
+    println!("Diagnostics:");
+    for diag in &checker.ctx.diagnostics {
+        println!("  TS{}: {}", diag.code, diag.message_text);
+    }
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Expected errors:
+    // - 2654: Non-abstract class 'C' is missing implementations
+    // - 1253: Abstract properties can only appear within an abstract class
+    // - 2540: Cannot assign to 'ro' because it is a read-only property
+    // - 2676: Accessors must both be abstract or non-abstract (on mismatch getter/setter)
+
+    // We should NOT have 2322 (accessor type compatibility) for abstract accessors
+    let count_2322 = codes.iter().filter(|&&c| c == 2322).count();
+    assert_eq!(count_2322, 0, "Should not produce 2322 errors for abstract accessor pairs");
+
+    // We should have the expected errors
+    assert!(codes.contains(&2654), "Should have error 2654 for missing implementations");
+    assert!(codes.contains(&1253), "Should have error 1253 for abstract in non-abstract class");
+    assert!(codes.contains(&2540), "Should have error 2540 for readonly assignment");
+}
