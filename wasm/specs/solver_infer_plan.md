@@ -62,6 +62,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
   - [x] Test index signature inference: `{ [key: string]: T }` with `{ [key: string]: number }`
   - [x] Test union source inference: `{ value: T }` with `{ value: number } | { value: string }`
   - [x] Test optional union inference: `T | undefined` with `number`
+  - [x] Test rest parameter inference: `(...args: T[])` with `number, string`
 
 ### Phase 5: Structural Constraints
 - [x] Constrain Application args when bases match
