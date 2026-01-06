@@ -75,6 +75,8 @@ impl<'a> ScopeWalker<'a> {
                 || k == syntax_kind_ext::CATCH_CLAUSE
                 || k == syntax_kind_ext::CLASS_DECLARATION
                 || k == syntax_kind_ext::CLASS_EXPRESSION
+                || k == syntax_kind_ext::MODULE_DECLARATION
+                || k == syntax_kind_ext::MODULE_BLOCK
         )
     }
 
@@ -187,6 +189,46 @@ impl<'a> ScopeWalker<'a> {
                 if let Some(decl) = self.arena.get_variable_declaration(node) {
                     if let Some(res) = f(self, decl.name) { return Some(res); }
                     if !decl.initializer.is_none() { if let Some(res) = f(self, decl.initializer) { return Some(res); } }
+                }
+            }
+
+            k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
+                if let Some(iface) = self.arena.get_interface(node) {
+                    if !iface.name.is_none() { if let Some(res) = f(self, iface.name) { return Some(res); } }
+                    for &member in &iface.members.nodes {
+                        if let Some(res) = f(self, member) { return Some(res); }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                if let Some(alias) = self.arena.get_type_alias(node) {
+                    if !alias.name.is_none() { if let Some(res) = f(self, alias.name) { return Some(res); } }
+                    if !alias.type_node.is_none() { if let Some(res) = f(self, alias.type_node) { return Some(res); } }
+                }
+            }
+            k if k == syntax_kind_ext::ENUM_DECLARATION => {
+                if let Some(enum_decl) = self.arena.get_enum(node) {
+                    if !enum_decl.name.is_none() { if let Some(res) = f(self, enum_decl.name) { return Some(res); } }
+                    for &member in &enum_decl.members.nodes {
+                        if let Some(res) = f(self, member) { return Some(res); }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                if let Some(module) = self.arena.get_module(node) {
+                    if !module.name.is_none() { if let Some(res) = f(self, module.name) { return Some(res); } }
+                    if !module.body.is_none() { if let Some(res) = f(self, module.body) { return Some(res); } }
+                }
+            }
+
+            k if k == syntax_kind_ext::IMPORT_DECLARATION => {
+                if let Some(import) = self.arena.get_import_decl(node) {
+                    if !import.import_clause.is_none() { if let Some(res) = f(self, import.import_clause) { return Some(res); } }
+                }
+            }
+            k if k == syntax_kind_ext::EXPORT_DECLARATION => {
+                if let Some(export) = self.arena.get_export_decl(node) {
+                    if !export.export_clause.is_none() { if let Some(res) = f(self, export.export_clause) { return Some(res); } }
                 }
             }
 
@@ -393,6 +435,18 @@ impl<'a> ScopeWalker<'a> {
     }
 
     /// Register local declarations from a container node.
+    ///
+    /// # Known Limitations
+    ///
+    /// **`var` hoisting**: This implementation registers all declarations in the current scope,
+    /// including `var` declarations. In JavaScript, `var` declarations should be hoisted to the
+    /// nearest function scope, not the block scope. This means that `var` declarations inside
+    /// blocks will be incorrectly scoped to the block instead of the function, which may cause
+    /// incorrect resolution for hoisted usages.
+    ///
+    /// This is acceptable for the LSP's lightweight resolver design, as full hoisting semantics
+    /// are complex and would require tracking function scope boundaries during traversal.
+    /// The ThinBinder handles hoisting correctly during the binding phase.
     fn register_local_declarations(&mut self, container: NodeIndex) {
         // Iterate over direct children to find declarations
         self.for_each_child(container, |walker, child_idx| {
@@ -403,9 +457,48 @@ impl<'a> ScopeWalker<'a> {
                 }
             }
 
-            // For VariableDeclarationList, we need to go one level deeper
+            // For VariableStatement, recurse into it to find VariableDeclarationList
             if let Some(node) = walker.arena.get(child_idx) {
-                if node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+                if node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
+                    walker.for_each_child(child_idx, |w, list_idx| {
+                        // Inside VariableStatement is VariableDeclarationList
+                        if let Some(list_node) = w.arena.get(list_idx) {
+                            if list_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+                                w.for_each_child(list_idx, |w2, decl_idx| {
+                                    // Inside List is VariableDeclaration - this has the symbol!
+                                    if let Some(&sym_id) = w2.binder.node_symbols.get(&decl_idx.0) {
+                                        if let Some(symbol) = w2.binder.symbols.get(sym_id) {
+                                            w2.declare_local(symbol.escaped_name.clone(), sym_id);
+                                        }
+                                    }
+                                    None::<()>
+                                });
+                            }
+                        }
+                        None::<()>
+                    });
+                }
+                // For ExportDeclaration, unwrap to find the inner declaration
+                else if node.kind == syntax_kind_ext::EXPORT_DECLARATION {
+                    if let Some(export) = walker.arena.get_export_decl(node) {
+                        if !export.export_clause.is_none() {
+                            // Check if export_clause is a declaration (e.g., export const x = 1)
+                            if let Some(export_clause_node) = walker.arena.get(export.export_clause) {
+                                // Recurse into the export_clause to find the actual declaration
+                                walker.for_each_child(export.export_clause, |w, inner_idx| {
+                                    if let Some(&sym_id) = w.binder.node_symbols.get(&inner_idx.0) {
+                                        if let Some(symbol) = w.binder.symbols.get(sym_id) {
+                                            w.declare_local(symbol.escaped_name.clone(), sym_id);
+                                        }
+                                    }
+                                    None::<()>
+                                });
+                            }
+                        }
+                    }
+                }
+                // For VariableDeclarationList (direct child), we need to go one level deeper
+                else if node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
                     walker.for_each_child(child_idx, |w, decl_idx| {
                         if let Some(&sym_id) = w.binder.node_symbols.get(&decl_idx.0) {
                             if let Some(symbol) = w.binder.symbols.get(sym_id) {

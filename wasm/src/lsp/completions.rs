@@ -235,7 +235,6 @@ mod completions_tests {
     }
 
     #[test]
-    #[ignore] // TODO: Fix scope chain for nested scopes
     fn test_completions_with_scope() {
         // const x = 1;
         // function foo() {

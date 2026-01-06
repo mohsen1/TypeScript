@@ -94,14 +94,20 @@ Following Gemini's guidance, implemented comprehensive AST traversal:
    - Implemented `Completions` provider using `ScopeWalker.get_scope_chain()`
    - Provides context-aware identifier suggestions
    - Handles shadowing correctly (inner scope variables override outer scope)
-   - Tests: 2/3 passing (1 ignored - nested scopes limitation)
+   - Tests: 3/3 passing ✅
+
+   **Nested Scope Support Fixed (2026-01-06):**
+   - Fixed `ScopeWalker.register_local_declarations` to properly handle `VARIABLE_STATEMENT` nodes
+   - The issue was that the walker only checked for `VARIABLE_DECLARATION_LIST` but not `VARIABLE_STATEMENT`
+   - Now correctly traverses: `VARIABLE_STATEMENT` → `VARIABLE_DECLARATION_LIST` → `VARIABLE_DECLARATION`
+   - Added support for `EXPORT_DECLARATION` unwrapping to find inner declarations
+   - Added missing node types to `for_each_child`: `INTERFACE_DECLARATION`, `TYPE_ALIAS_DECLARATION`, `ENUM_DECLARATION`, `MODULE_DECLARATION`, `IMPORT_DECLARATION`, `EXPORT_DECLARATION`
+   - Added `MODULE_DECLARATION` and `MODULE_BLOCK` to `node_creates_scope` for proper namespace scoping
 
    **Known Limitations:**
-   - Nested scopes (inside functions/blocks) not yet supported
-   - Requires ThinBinder to bind declarations inside function bodies
-   - Currently works for file-level declarations only
+   - `var` hoisting: Variables declared with `var` inside blocks are registered in the block scope instead of being hoisted to the function scope. This is documented and acceptable for the LSP's lightweight resolver design. ThinBinder handles hoisting correctly during binding phase.
 
-   **Gemini Review:** CHANGES REQUESTED (nested scopes)
+   **Gemini Review:** All critical issues fixed ✅
 
 6. **Hover Feature** (2026-01-06)
    - Added `hover.rs` with `HoverInfo` and `HoverProvider` types
@@ -148,13 +154,13 @@ Following Gemini's guidance, implemented comprehensive AST traversal:
 
 #### Test Results
 
-All 628 tests pass! ✅ (3 ignored)
-- LSP-specific tests: 22/24 passing (2 ignored - nested scopes, multi-arg cursor detection)
+All 629 tests pass! ✅ (2 ignored)
+- LSP-specific tests: 23/24 passing (1 ignored - multi-arg cursor detection)
 - Position utilities: 3/3 passing
 - Resolver tests: 1/1 passing
 - Definition tests: 2/2 passing
 - References tests: 2/2 passing
-- Completions tests: 2/3 passing (1 ignored - nested scopes)
+- Completions tests: 3/3 passing ✅
 - Hover tests: 3/3 passing
 - Signature Help tests: 2/3 passing (1 ignored - multi-arg cursor detection)
 - Integration tests: 3/3 passing
@@ -167,12 +173,7 @@ All 628 tests pass! ✅ (3 ignored)
    - Add JSDoc documentation extraction for parameters
    - Optimize ScannerState to use &str instead of cloning source
 
-2. **Fix Nested Scope Support**
-   - Update ThinBinder to bind declarations inside function bodies
-   - Fix `ScopeWalker.walk_for_scope` to handle Block nodes correctly
-   - Enable the ignored completions test
-
-3. **Add More LSP Features**
+2. **Add More LSP Features**
    - Rename refactoring
    - Semantic tokens (syntax highlighting)
    - Document symbols
