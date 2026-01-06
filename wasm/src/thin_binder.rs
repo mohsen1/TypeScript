@@ -8,6 +8,7 @@
 
 use crate::parser::thin_node::{ThinNodeArena, ThinNode};
 use crate::parser::{NodeIndex, NodeList, syntax_kind_ext};
+use crate::scanner::SyntaxKind;
 use crate::binder::{
     SymbolId, SymbolArena, SymbolTable, Symbol, symbol_flags,
     FlowNodeArena, FlowNodeId, flow_flags,
@@ -38,6 +39,9 @@ pub struct ThinBinderState {
     current_scope_idx: usize,
     /// Node-to-symbol mapping
     pub node_symbols: FxHashMap<u32, SymbolId>,
+    /// Node-to-flow mapping: tracks which flow node was active at each AST node
+    /// Used by the checker for control flow analysis (type narrowing)
+    pub node_flow: FxHashMap<u32, FlowNodeId>,
     /// Hoisted var declarations
     hoisted_vars: Vec<(String, NodeIndex)>,
     /// Hoisted function declarations
@@ -60,6 +64,7 @@ impl ThinBinderState {
             scope_chain: Vec::new(),
             current_scope_idx: 0,
             node_symbols: FxHashMap::default(),
+            node_flow: FxHashMap::default(),
             hoisted_vars: Vec::new(),
             hoisted_functions: Vec::new(),
         }
@@ -88,6 +93,7 @@ impl ThinBinderState {
             scope_chain: Vec::new(),
             current_scope_idx: 0,
             node_symbols,
+            node_flow: FxHashMap::default(),
             hoisted_vars: Vec::new(),
             hoisted_functions: Vec::new(),
         }
@@ -285,13 +291,54 @@ impl ThinBinderState {
                 }
             }
 
-            // If statement
+            // If statement - build flow graph for type narrowing
             k if k == syntax_kind_ext::IF_STATEMENT => {
                 if let Some(if_stmt) = arena.get_if_statement(node) {
+                    // Bind the condition expression (record identifiers in it)
+                    self.bind_expression(arena, if_stmt.expression);
+
+                    // Save the pre-condition flow
+                    let pre_condition_flow = self.current_flow;
+
+                    // Create TRUE_CONDITION flow for the then branch
+                    let true_flow = self.create_flow_condition(
+                        flow_flags::TRUE_CONDITION,
+                        pre_condition_flow,
+                        if_stmt.expression,
+                    );
+
+                    // Bind the then branch with narrowed flow
+                    self.current_flow = true_flow;
                     self.bind_node(arena, if_stmt.then_statement);
-                    if !if_stmt.else_statement.is_none() {
+                    let after_then_flow = self.current_flow;
+
+                    // Handle else branch if present
+                    let after_else_flow = if !if_stmt.else_statement.is_none() {
+                        // Create FALSE_CONDITION flow for the else branch
+                        let false_flow = self.create_flow_condition(
+                            flow_flags::FALSE_CONDITION,
+                            pre_condition_flow,
+                            if_stmt.expression,
+                        );
+
+                        // Bind the else branch with narrowed flow
+                        self.current_flow = false_flow;
                         self.bind_node(arena, if_stmt.else_statement);
-                    }
+                        self.current_flow
+                    } else {
+                        // No else branch - false condition goes directly to merge
+                        self.create_flow_condition(
+                            flow_flags::FALSE_CONDITION,
+                            pre_condition_flow,
+                            if_stmt.expression,
+                        )
+                    };
+
+                    // Create merge point for branches
+                    let merge_label = self.create_branch_label();
+                    self.add_antecedent(merge_label, after_then_flow);
+                    self.add_antecedent(merge_label, after_else_flow);
+                    self.current_flow = merge_label;
                 }
             }
 
@@ -909,6 +956,144 @@ impl ThinBinderState {
 
     pub fn get_symbols(&self) -> &SymbolArena {
         &self.symbols
+    }
+
+    /// Get the flow node that was active at a given AST node.
+    /// Used by the checker for control flow analysis.
+    pub fn get_node_flow(&self, node: NodeIndex) -> Option<FlowNodeId> {
+        self.node_flow.get(&node.0).copied()
+    }
+
+    /// Record the current flow node for an AST node.
+    /// Called during binding to track flow position for identifiers and other expressions.
+    fn record_flow(&mut self, node: NodeIndex) {
+        if !self.current_flow.is_none() {
+            self.node_flow.insert(node.0, self.current_flow);
+        }
+    }
+
+    // =========================================================================
+    // Flow graph construction helpers
+    // =========================================================================
+
+    /// Create a branch label flow node for merging control flow paths.
+    fn create_branch_label(&mut self) -> FlowNodeId {
+        self.flow_nodes.alloc(flow_flags::BRANCH_LABEL)
+    }
+
+    /// Create a flow condition node for tracking type narrowing.
+    fn create_flow_condition(&mut self, flags: u32, antecedent: FlowNodeId, condition: NodeIndex) -> FlowNodeId {
+        let id = self.flow_nodes.alloc(flags);
+        if let Some(node) = self.flow_nodes.get_mut(id) {
+            node.antecedent.push(antecedent);
+            node.node = condition;
+        }
+        id
+    }
+
+    /// Add an antecedent to a flow node (for merging branches).
+    fn add_antecedent(&mut self, label: FlowNodeId, antecedent: FlowNodeId) {
+        if antecedent.is_none() || antecedent == self.unreachable_flow {
+            return;
+        }
+        if let Some(node) = self.flow_nodes.get_mut(label) {
+            if !node.antecedent.contains(&antecedent) {
+                node.antecedent.push(antecedent);
+            }
+        }
+    }
+
+    // =========================================================================
+    // Expression binding for flow analysis
+    // =========================================================================
+
+    /// Bind an expression and record flow positions for identifiers.
+    /// This is used for condition expressions in if/while/for statements.
+    fn bind_expression(&mut self, arena: &ThinNodeArena, idx: NodeIndex) {
+        if idx.is_none() {
+            return;
+        }
+
+        let node = match arena.get(idx) {
+            Some(n) => n,
+            None => return,
+        };
+
+        // Record flow position for this node
+        self.record_flow(idx);
+
+        match node.kind {
+            // Identifiers - record flow position for type narrowing
+            k if k == SyntaxKind::Identifier as u16 => {
+                // Already recorded above
+            }
+
+            // Binary expressions - recurse into operands
+            k if k == syntax_kind_ext::BINARY_EXPRESSION => {
+                if let Some(bin) = arena.get_binary_expr(node) {
+                    self.bind_expression(arena, bin.left);
+                    self.bind_expression(arena, bin.right);
+                }
+            }
+
+            // Prefix unary (e.g., typeof x, !x)
+            k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION => {
+                if let Some(unary) = arena.get_unary_expr(node) {
+                    self.bind_expression(arena, unary.operand);
+                }
+            }
+
+            // Property access (e.g., x.foo) or element access (e.g., x[0])
+            k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION ||
+                 k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
+                if let Some(access) = arena.get_access_expr(node) {
+                    self.bind_expression(arena, access.expression);
+                    // For element access, also bind the argument
+                    if k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION {
+                        self.bind_expression(arena, access.name_or_argument);
+                    }
+                }
+            }
+
+            // Call expression (e.g., isString(x))
+            k if k == syntax_kind_ext::CALL_EXPRESSION => {
+                if let Some(call) = arena.get_call_expr(node) {
+                    self.bind_expression(arena, call.expression);
+                    if let Some(args) = &call.arguments {
+                        for &arg in &args.nodes {
+                            self.bind_expression(arena, arg);
+                        }
+                    }
+                }
+            }
+
+            // Parenthesized expression
+            k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
+                if let Some(paren) = arena.get_parenthesized(node) {
+                    self.bind_expression(arena, paren.expression);
+                }
+            }
+
+            // Type assertion (e.g., x as string)
+            k if k == syntax_kind_ext::AS_EXPRESSION ||
+                 k == syntax_kind_ext::TYPE_ASSERTION => {
+                if let Some(as_expr) = arena.get_access_expr(node) {
+                    self.bind_expression(arena, as_expr.expression);
+                }
+            }
+
+            // Conditional expression (ternary)
+            k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
+                if let Some(cond) = arena.get_conditional_expr(node) {
+                    self.bind_expression(arena, cond.condition);
+                    self.bind_expression(arena, cond.when_true);
+                    self.bind_expression(arena, cond.when_false);
+                }
+            }
+
+            // Literals, keywords, etc. - no need to recurse
+            _ => {}
+        }
     }
 }
 
