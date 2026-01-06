@@ -4,6 +4,15 @@ Development sessions for the TypeScript → Rust/WASM migration.
 
 ---
 
+## 2026-01-06: Session 36 - Checker Architecture Refactor
+- **ThinCheckerState refactored to wrap CheckerContext**
+  - All state fields moved to `CheckerContext` in `checker/context.rs`
+  - `ThinCheckerState` now contains single `ctx: CheckerContext<'a>` field
+  - Scope management methods delegate to context
+  - Updated lib.rs, parallel.rs, test files for new structure
+  - This enables future separation into specialized checker modules
+- **534 tests passing**
+
 ## 2026-01-06: Session 35 - Emitter Track Merge & Checker Improvements
 - **Merged `emitter-track` branch** into `rust`
   - JS emit baseline: 36.8% → **59.2%** (45/76)
