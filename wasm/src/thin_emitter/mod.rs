@@ -3766,6 +3766,90 @@ impl<'a> ThinPrinter<'a> {
                             }
                         }
                     }
+                    k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                        if let Some(module) = self.arena.get_module(node) {
+                            if self.has_export_modifier(&module.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if we should emit the __esModule marker.
+    /// Returns true if the file contains any ES6 module syntax (import/export),
+    /// excluding `export =` which is legacy CommonJS.
+    fn should_emit_es_module_marker(&self, statements: &NodeList) -> bool {
+        // First check: if file has export =, don't emit __esModule at all
+        for &stmt_idx in &statements.nodes {
+            if let Some(node) = self.arena.get(stmt_idx) {
+                if node.kind == syntax_kind_ext::EXPORT_ASSIGNMENT {
+                    return false;
+                }
+            }
+        }
+
+        // Second check: look for ES6 module syntax
+        for &stmt_idx in &statements.nodes {
+            if let Some(node) = self.arena.get(stmt_idx) {
+                match node.kind {
+                    k if k == syntax_kind_ext::IMPORT_DECLARATION => return true,
+                    k if k == syntax_kind_ext::EXPORT_DECLARATION => return true,
+                    // Note: EXPORT_ASSIGNMENT (export =) is excluded - it's CommonJS style
+                    // Check for export modifier on declarations
+                    k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+                        if let Some(var_stmt) = self.arena.get_variable(node) {
+                            if self.has_export_modifier(&var_stmt.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                        if let Some(func) = self.arena.get_function(node) {
+                            if self.has_export_modifier(&func.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                        if let Some(class) = self.arena.get_class(node) {
+                            if self.has_export_modifier(&class.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::ENUM_DECLARATION => {
+                        if let Some(enum_decl) = self.arena.get_enum(node) {
+                            if self.has_export_modifier(&enum_decl.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                        if let Some(module) = self.arena.get_module(node) {
+                            if self.has_export_modifier(&module.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
+                        if let Some(iface) = self.arena.get_interface(node) {
+                            if self.has_export_modifier(&iface.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                        if let Some(type_alias) = self.arena.get_type_alias(node) {
+                            if self.has_export_modifier(&type_alias.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -3780,6 +3864,13 @@ impl<'a> ThinPrinter<'a> {
         // "use strict";
         self.write("\"use strict\";");
         self.write_line();
+
+        // Emit __esModule if this is an ES module (has imports or ES exports)
+        // Note: 'export =' is CommonJS style and doesn't get __esModule
+        if self.should_emit_es_module_marker(statements) {
+            self.write("Object.defineProperty(exports, \"__esModule\", { value: true });");
+            self.write_line();
+        }
 
         // Collect and emit exports initialization
         // TypeScript emits: exports.C = void 0; (NOT Object.defineProperty)

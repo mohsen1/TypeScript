@@ -81,6 +81,26 @@ pub fn collect_export_names(arena: &ThinNodeArena, statements: &[NodeIndex]) -> 
                     }
                 }
             }
+            // export enum E {}
+            k if k == syntax_kind_ext::ENUM_DECLARATION => {
+                if let Some(enum_decl) = arena.get_enum(node) {
+                    if has_export_modifier_from_list(arena, &enum_decl.modifiers) {
+                        if let Some(name) = get_identifier_text(arena, enum_decl.name) {
+                            exports.push(name);
+                        }
+                    }
+                }
+            }
+            // export namespace N {}
+            k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                if let Some(module) = arena.get_module(node) {
+                    if has_export_modifier_from_list(arena, &module.modifiers) {
+                        if let Some(name) = get_identifier_text(arena, module.name) {
+                            exports.push(name);
+                        }
+                    }
+                }
+            }
             // export { a, b, c }
             k if k == syntax_kind_ext::EXPORT_DECLARATION => {
                 if let Some(export_decl) = arena.get_export_decl(node) {
