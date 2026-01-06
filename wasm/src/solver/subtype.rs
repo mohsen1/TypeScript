@@ -984,6 +984,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         if target_has_rest {
             let rest_param = target.params.last().unwrap();
             let rest_elem_type = self.get_array_element_type(rest_param.type_id);
+            let rest_is_top = self.allow_bivariant_rest
+                && (rest_elem_type == TypeId::ANY || rest_elem_type == TypeId::UNKNOWN);
+
+            if rest_is_top {
+                return SubtypeResult::True;
+            }
 
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
@@ -1042,6 +1048,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         if target_has_rest {
             let rest_param = target.params.last().unwrap();
             let rest_elem_type = self.get_array_element_type(rest_param.type_id);
+            let rest_is_top = self.allow_bivariant_rest
+                && (rest_elem_type == TypeId::ANY || rest_elem_type == TypeId::UNKNOWN);
+
+            if rest_is_top {
+                return SubtypeResult::True;
+            }
 
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
@@ -1100,6 +1112,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         if target_has_rest {
             let rest_param = target.params.last().unwrap();
             let rest_elem_type = self.get_array_element_type(rest_param.type_id);
+            let rest_is_top = self.allow_bivariant_rest
+                && (rest_elem_type == TypeId::ANY || rest_elem_type == TypeId::UNKNOWN);
+
+            if rest_is_top {
+                return SubtypeResult::True;
+            }
 
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];

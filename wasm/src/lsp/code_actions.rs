@@ -11,11 +11,11 @@
 //! - Organize Imports (sort-only)
 //! - Remove Unused Import (diagnostic-based quick fix)
 //! - Add Missing Property (diagnostic-based quick fix, local declarations)
+//! - Add Missing Import (diagnostic-based quick fix, candidate-based)
 //!
 //! Future features:
 //! - Remove Unused Declarations (diagnostic-based quick fix)
-//! - Add Missing Property (diagnostic-based quick fix)
-//! - Add Missing Import (diagnostic-based quick fix)
+//! - Add Missing Import (project-wide candidate generation)
 
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
@@ -53,6 +53,50 @@ pub enum CodeActionKind {
     SourceOrganizeImports,
 }
 
+#[derive(Debug, Clone)]
+pub enum ImportCandidateKind {
+    Named { export_name: String },
+    Default,
+    Namespace,
+}
+
+#[derive(Debug, Clone)]
+pub struct ImportCandidate {
+    pub module_specifier: String,
+    pub local_name: String,
+    pub kind: ImportCandidateKind,
+    pub is_type_only: bool,
+}
+
+impl ImportCandidate {
+    pub fn named(module_specifier: String, export_name: String, local_name: String) -> Self {
+        Self {
+            module_specifier,
+            local_name,
+            kind: ImportCandidateKind::Named { export_name },
+            is_type_only: false,
+        }
+    }
+
+    pub fn default(module_specifier: String, local_name: String) -> Self {
+        Self {
+            module_specifier,
+            local_name,
+            kind: ImportCandidateKind::Default,
+            is_type_only: false,
+        }
+    }
+
+    pub fn namespace(module_specifier: String, local_name: String) -> Self {
+        Self {
+            module_specifier,
+            local_name,
+            kind: ImportCandidateKind::Namespace,
+            is_type_only: false,
+        }
+    }
+}
+
 /// A code action represents a change that can be performed in code.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -74,6 +118,8 @@ pub struct CodeActionContext {
     pub diagnostics: Vec<LspDiagnostic>,
     /// Only return actions of these kinds (client filter).
     pub only: Option<Vec<CodeActionKind>>,
+    /// Candidate imports for missing import quick fixes.
+    pub import_candidates: Vec<ImportCandidate>,
 }
 
 // =============================================================================
@@ -129,9 +175,10 @@ impl<'a> CodeActionProvider<'a> {
                 if let Some(action) = self.missing_property_quickfix(diag) {
                     actions.push(action);
                 }
+                actions.extend(self.missing_import_quickfixes(root, diag, &context.import_candidates));
             }
         }
-        // TODO: Add Missing Import (2304)
+        // TODO: Feed project-wide import candidates into code action context.
 
         // Source Actions (file-level)
         let request_organize = context.only
@@ -241,6 +288,51 @@ impl<'a> CodeActionProvider<'a> {
             edit: Some(WorkspaceEdit { changes }),
             is_preferred: false,
         })
+    }
+
+    fn missing_import_quickfixes(
+        &self,
+        root: NodeIndex,
+        diag: &LspDiagnostic,
+        candidates: &[ImportCandidate],
+    ) -> Vec<CodeAction> {
+        let code = match diag.code {
+            Some(code) => code,
+            None => return Vec::new(),
+        };
+        if code != crate::checker::types::diagnostics::diagnostic_codes::CANNOT_FIND_NAME {
+            return Vec::new();
+        }
+
+        let Some(missing_name) = self.diagnostic_identifier(diag) else {
+            return Vec::new();
+        };
+
+        let mut actions = Vec::new();
+        for candidate in candidates {
+            if candidate.local_name != missing_name {
+                continue;
+            }
+            let Some(edit) = self.build_import_edit(root, candidate) else {
+                continue;
+            };
+
+            let mut changes = std::collections::HashMap::new();
+            changes.insert(self.file_name.clone(), vec![edit]);
+
+            let title = format!(
+                "Import '{}' from '{}'",
+                candidate.local_name, candidate.module_specifier
+            );
+            actions.push(CodeAction {
+                title,
+                kind: CodeActionKind::QuickFix,
+                edit: Some(WorkspaceEdit { changes }),
+                is_preferred: false,
+            });
+        }
+
+        actions
     }
 
     /// Organize imports: sort contiguous import blocks by module specifier.
@@ -632,6 +724,84 @@ impl<'a> CodeActionProvider<'a> {
         let start_pos = self.line_map.offset_to_position(node.pos, self.source);
         let end_pos = self.line_map.offset_to_position(end, self.source);
         (Range::new(start_pos, end_pos), trailing)
+    }
+
+    fn diagnostic_identifier(&self, diag: &LspDiagnostic) -> Option<String> {
+        let start_offset = self.line_map.position_to_offset(diag.range.start, self.source)?;
+        let node_idx = find_node_at_offset(self.arena, start_offset);
+        if node_idx.is_none() {
+            return None;
+        }
+        let node = self.arena.get(node_idx)?;
+        if node.kind != SyntaxKind::Identifier as u16 {
+            return None;
+        }
+        self.arena.get_identifier_text(node_idx).map(|text| text.to_string())
+    }
+
+    fn build_import_edit(&self, root: NodeIndex, candidate: &ImportCandidate) -> Option<TextEdit> {
+        let (insert_pos, needs_newline) = self.import_insertion_point(root)?;
+        let mut new_text = String::new();
+        if needs_newline {
+            new_text.push('\n');
+        }
+
+        new_text.push_str("import ");
+        if candidate.is_type_only {
+            new_text.push_str("type ");
+        }
+
+        match &candidate.kind {
+            ImportCandidateKind::Named { export_name } => {
+                if export_name == &candidate.local_name {
+                    new_text.push_str(&format!("{{ {} }}", export_name));
+                } else {
+                    new_text.push_str(&format!(
+                        "{{ {} as {} }}",
+                        export_name, candidate.local_name
+                    ));
+                }
+            }
+            ImportCandidateKind::Default => {
+                new_text.push_str(&candidate.local_name);
+            }
+            ImportCandidateKind::Namespace => {
+                new_text.push_str(&format!("* as {}", candidate.local_name));
+            }
+        }
+
+        new_text.push_str(" from \"");
+        new_text.push_str(&candidate.module_specifier);
+        new_text.push_str("\";\n");
+
+        Some(TextEdit {
+            range: Range::new(insert_pos, insert_pos),
+            new_text,
+        })
+    }
+
+    fn import_insertion_point(&self, root: NodeIndex) -> Option<(Position, bool)> {
+        let root_node = self.arena.get(root)?;
+        let source_file = self.arena.get_source_file(root_node)?;
+
+        let mut last_import = None;
+        for &stmt_idx in &source_file.statements.nodes {
+            let Some(stmt_node) = self.arena.get(stmt_idx) else { continue; };
+            if stmt_node.kind == syntax_kind_ext::IMPORT_DECLARATION
+                || stmt_node.kind == syntax_kind_ext::IMPORT_EQUALS_DECLARATION
+            {
+                last_import = Some(stmt_idx);
+            }
+        }
+
+        if let Some(last_import) = last_import {
+            let import_node = self.arena.get(last_import)?;
+            let (range, trailing) = self.import_decl_range(import_node);
+            let needs_newline = trailing.is_empty();
+            return Some((range.end, needs_newline));
+        }
+
+        Some((Position::new(0, 0), false))
     }
 
     fn property_access_info(&self, node_idx: NodeIndex) -> Option<PropertyAccessInfo> {

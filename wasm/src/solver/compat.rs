@@ -67,6 +67,9 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
             false
         } else if self.violates_weak_type(source, target) {
             false
+        } else if self.is_empty_object_target(target) {
+            // `{}` accepts any non-nullish value (including primitives). See https://github.com/microsoft/TypeScript/issues/60582.
+            self.is_assignable_to_empty_object(source)
         } else {
             self.subtype.strict_function_types = self.strict_function_types;
             self.subtype.allow_void_return = true;
@@ -91,6 +94,11 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
                 source_type: source,
                 target_type: target,
             });
+        }
+        if self.is_empty_object_target(target) {
+            if self.is_assignable_to_empty_object(source) {
+                return None;
+            }
         }
 
         self.subtype.strict_function_types = self.strict_function_types;
@@ -163,6 +171,48 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         }
 
         false
+    }
+
+    fn is_empty_object_target(&self, target: TypeId) -> bool {
+        match self.interner.lookup(target) {
+            Some(TypeKey::Object(props)) => props.is_empty(),
+            Some(TypeKey::ObjectWithIndex(shape)) => {
+                shape.properties.is_empty() && shape.string_index.is_none() && shape.number_index.is_none()
+            }
+            _ => false,
+        }
+    }
+
+    fn is_assignable_to_empty_object(&self, source: TypeId) -> bool {
+        if source == TypeId::ANY || source == TypeId::NEVER || source == TypeId::ERROR {
+            return true;
+        }
+        if source == TypeId::UNKNOWN
+            || source == TypeId::NULL
+            || source == TypeId::UNDEFINED
+            || source == TypeId::VOID
+        {
+            return false;
+        }
+
+        let key = match self.interner.lookup(source) {
+            Some(key) => key,
+            None => return false,
+        };
+
+        match &key {
+            TypeKey::Union(members) => members
+                .iter()
+                .all(|member| self.is_assignable_to_empty_object(*member)),
+            TypeKey::Intersection(members) => members
+                .iter()
+                .any(|member| self.is_assignable_to_empty_object(*member)),
+            TypeKey::TypeParameter(param) => match param.constraint {
+                Some(constraint) => self.is_assignable_to_empty_object(constraint),
+                None => false,
+            },
+            _ => true,
+        }
     }
 }
 

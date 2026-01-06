@@ -40,6 +40,8 @@ Pick the most doable and impactful
 15. Class ES5 transform: destructure for-loop initializers [done]
 16. Class ES5 transform: emit switch/break/continue/do statements [done]
 17. ThinEmitter: emit case blocks for switch statements [done]
+18. Class ES5 transform: emit for-in/for-of statements [done]
+19. Class ES5 transform: emit binding patterns in declarations [done]
 
 
 ## Quick Reference

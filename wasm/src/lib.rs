@@ -684,6 +684,7 @@ impl ThinParser {
         let context = CodeActionContext {
             diagnostics: Vec::new(),
             only: None,
+            import_candidates: Vec::new(),
         };
 
         let result = provider.provide_code_actions(root, range, context);

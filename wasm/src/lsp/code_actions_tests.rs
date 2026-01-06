@@ -1,6 +1,6 @@
 use super::*;
 use crate::checker::types::diagnostics::diagnostic_codes::{
-    PROPERTY_DOES_NOT_EXIST_ON_TYPE, UNUSED_IMPORT,
+    CANNOT_FIND_NAME, PROPERTY_DOES_NOT_EXIST_ON_TYPE, UNUSED_IMPORT,
 };
 use crate::lsp::position::LineMap;
 use crate::thin_binder::ThinBinderState;
@@ -74,6 +74,7 @@ fn test_extract_variable_property_access() {
         CodeActionContext {
             diagnostics: Vec::new(),
             only: None,
+            import_candidates: Vec::new(),
         },
     );
 
@@ -120,6 +121,7 @@ fn test_extract_variable_no_action_for_simple_literal() {
         CodeActionContext {
             diagnostics: Vec::new(),
             only: None,
+            import_candidates: Vec::new(),
         },
     );
 
@@ -156,6 +158,7 @@ fn test_extract_variable_empty_range() {
         CodeActionContext {
             diagnostics: Vec::new(),
             only: None,
+            import_candidates: Vec::new(),
         },
     );
 
@@ -192,6 +195,7 @@ fn test_organize_imports_sort_only() {
         CodeActionContext {
             diagnostics: Vec::new(),
             only: Some(vec![CodeActionKind::SourceOrganizeImports]),
+            import_candidates: Vec::new(),
         },
     );
 
@@ -242,6 +246,7 @@ fn test_quickfix_remove_unused_named_import() {
         CodeActionContext {
             diagnostics: vec![diag],
             only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: Vec::new(),
         },
     );
 
@@ -288,6 +293,7 @@ fn test_quickfix_remove_unused_named_import_entire_decl() {
         CodeActionContext {
             diagnostics: vec![diag],
             only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: Vec::new(),
         },
     );
 
@@ -334,6 +340,7 @@ fn test_quickfix_remove_unused_default_import() {
         CodeActionContext {
             diagnostics: vec![diag],
             only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: Vec::new(),
         },
     );
 
@@ -380,6 +387,7 @@ fn test_quickfix_preserves_type_only_named_import() {
         CodeActionContext {
             diagnostics: vec![diag],
             only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: Vec::new(),
         },
     );
 
@@ -429,6 +437,7 @@ fn test_quickfix_add_missing_property_object_literal_single_line() {
         CodeActionContext {
             diagnostics: vec![diag],
             only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: Vec::new(),
         },
     );
 
@@ -481,6 +490,7 @@ fn test_quickfix_add_missing_property_object_literal_multiline() {
         CodeActionContext {
             diagnostics: vec![diag],
             only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: Vec::new(),
         },
     );
 
@@ -533,6 +543,7 @@ fn test_quickfix_add_missing_property_to_class() {
         CodeActionContext {
             diagnostics: vec![diag],
             only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: Vec::new(),
         },
     );
 
@@ -544,4 +555,213 @@ fn test_quickfix_add_missing_property_to_class() {
         updated,
         "class Foo {\n  method() {\n    this.bar;\n  }\n  bar: any;\n}\n"
     );
+}
+
+#[test]
+fn test_quickfix_add_missing_import_named() {
+    let source = "foo();\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "foo");
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Error),
+        code: Some(CANNOT_FIND_NAME),
+        source: None,
+        message: "Cannot find name 'foo'.".to_string(),
+        related_information: None,
+    };
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: vec![ImportCandidate::named(
+                "./foo".to_string(),
+                "foo".to_string(),
+                "foo".to_string(),
+            )],
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    let updated = apply_text_edits(source, &line_map, edits);
+    assert_eq!(updated, "import { foo } from \"./foo\";\nfoo();\n");
+}
+
+#[test]
+fn test_quickfix_add_missing_import_after_existing_import() {
+    let source = "import { bar } from \"./bar\";\nfoo();\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "foo");
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Error),
+        code: Some(CANNOT_FIND_NAME),
+        source: None,
+        message: "Cannot find name 'foo'.".to_string(),
+        related_information: None,
+    };
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: vec![ImportCandidate::named(
+                "./foo".to_string(),
+                "foo".to_string(),
+                "foo".to_string(),
+            )],
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    let updated = apply_text_edits(source, &line_map, edits);
+    assert_eq!(
+        updated,
+        "import { bar } from \"./bar\";\nimport { foo } from \"./foo\";\nfoo();\n"
+    );
+}
+
+#[test]
+fn test_quickfix_add_missing_import_default() {
+    let source = "Foo();\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "Foo");
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Error),
+        code: Some(CANNOT_FIND_NAME),
+        source: None,
+        message: "Cannot find name 'Foo'.".to_string(),
+        related_information: None,
+    };
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: vec![ImportCandidate::default(
+                "./foo".to_string(),
+                "Foo".to_string(),
+            )],
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    let updated = apply_text_edits(source, &line_map, edits);
+    assert_eq!(updated, "import Foo from \"./foo\";\nFoo();\n");
+}
+
+#[test]
+fn test_quickfix_add_missing_import_namespace() {
+    let source = "ns.foo;\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "ns");
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Error),
+        code: Some(CANNOT_FIND_NAME),
+        source: None,
+        message: "Cannot find name 'ns'.".to_string(),
+        related_information: None,
+    };
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: vec![ImportCandidate::namespace(
+                "./foo".to_string(),
+                "ns".to_string(),
+            )],
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    let updated = apply_text_edits(source, &line_map, edits);
+    assert_eq!(updated, "import * as ns from \"./foo\";\nns.foo;\n");
 }

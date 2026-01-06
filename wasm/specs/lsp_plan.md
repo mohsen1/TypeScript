@@ -30,7 +30,8 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
 3. **Add More LSP Features**
    - [x] Code action: remove unused import (6133)
    - [x] Code action: add missing property (2339, object literals + `this` in class)
-   - [ ] Code action: add missing import (2304)
+   - [x] Code action: add missing import (2304, candidate-based)
+   - [ ] Feed project export candidates into code action context
 
 2. **Extend AST Coverage** (if needed)
    - [x] Traverse template expressions in LSP resolver for references/completions
