@@ -261,6 +261,56 @@ fn test_instantiate_nested() {
 }
 
 #[test]
+fn test_instantiate_application_promise() {
+    let interner = TypeInterner::new();
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let promise_base = interner.reference(SymbolRef(1));
+    let promise_t = interner.application(promise_base, vec![t_type]);
+
+    let result = instantiate_generic(&interner, promise_t, &[t_param], &[TypeId::STRING]);
+    let expected = interner.application(promise_base, vec![TypeId::STRING]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_instantiate_application_map_nested() {
+    let interner = TypeInterner::new();
+
+    let k_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let v_param = TypeParamInfo {
+        name: interner.intern_string("V"),
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+    let v_type = interner.intern(TypeKey::TypeParameter(v_param.clone()));
+    let array_v = interner.array(v_type);
+
+    let map_base = interner.reference(SymbolRef(2));
+    let map_kv = interner.application(map_base, vec![k_type, array_v]);
+
+    let result = instantiate_generic(
+        &interner,
+        map_kv,
+        &[k_param, v_param],
+        &[TypeId::STRING, TypeId::NUMBER],
+    );
+    let expected = interner.application(map_base, vec![TypeId::STRING, interner.array(TypeId::NUMBER)]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_instantiate_intrinsics_unchanged() {
     let interner = TypeInterner::new();
 

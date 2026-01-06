@@ -9,7 +9,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 **Independence:** HIGH - Mostly interacts with TypeId and TypeInterner, minimal dependencies on other solver logic.
 
 ## Current Status
-🟡 **In Progress** - Inference foundation, instantiation, and constraint tests are in place; integration and occurs-check remain.
+🟡 **In Progress** - Occurs-check and generic application instantiation are implemented; integration APIs remain.
 
 ## Tasks
 
@@ -18,22 +18,22 @@ Implement the mathematical engine for type inference and generic instantiation. 
   - [x] Create `InferenceVar` type (wraps ena's InferenceVariable)
   - [x] Implement `new_inference_var()` -> InferenceVar
   - [x] Implement `unify(var1, var2)` using ena's union-find
-- [ ] Add tests for basic unification
+- [x] Add tests for basic unification
   - [x] Test: `unify(T, number)` then resolve T -> number
   - [x] Test: `unify(T, U)` then `unify(U, string)` -> both resolve to string
   - [x] Test: Circular unification detection (occurs-check)
 
 ### Phase 2: Generic Instantiation
-- [ ] Implement `instantiate_generic(type: TypeId, args: &[TypeId]) -> TypeId`
+- [x] Implement `instantiate_generic(type: TypeId, args: &[TypeId]) -> TypeId`
   - [x] Handle `Array<T>` + `[number]` -> `Array<number>`
-  - [ ] Handle `Promise<T>` instantiation (needs generic `Ref` args)
+  - [x] Handle `Promise<T>` instantiation (generic `Application` args)
   - [x] Cache instantiations to avoid duplicates
 - [x] Add substitution logic
   - [x] Walk type structure replacing type parameters with concrete types
-  - [ ] Handle nested generics: `Map<K, Array<V>>` (needs generic `Ref` args)
-- [ ] Tests for instantiation
+  - [x] Handle nested generics: `Map<K, Array<V>>` (generic `Application` args)
+- [x] Tests for instantiation
   - [x] Test: `Array<T>` with T=number -> `Array<number>`
-  - [ ] Test: `Map<K,V>` with K=string, V=number
+  - [x] Test: `Map<K,V>` with K=string, V=number
   - [x] Test: Nested generics
 
 ### Phase 3: Constraint Solving
