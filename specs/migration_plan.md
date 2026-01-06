@@ -63,12 +63,13 @@ This catches design issues early and ensures consistent code quality.
 8. ⬜ Declaration expected (1128) - after certain tokens
 9. ✅ Const modifier on class members (1248) - `const` invalid on properties
 10. ✅ Accessor body in ambient context (1183) - no body in declare class/interface/type
-11. ⬜ Accessor in ambient context ES5 (18045) - `accessor` keyword needs ES5+
+11. ✅ Abstract in non-abstract class (1253) - abstract members need abstract class
+12. ⬜ Accessor in ambient context ES5 (18045) - `accessor` keyword needs ES5+
 
 **Advanced Diagnostics**
 
-12. ⬜ RelatedInformation - point to definition sites for context
-13. ⬜ Accessor diagnostic hints (6234) - "did you mean to call it?"
+13. ⬜ RelatedInformation - point to definition sites for context
+14. ⬜ Accessor diagnostic hints (6234) - "did you mean to call it?"
 
 ### Blockers Analysis (26 failing tests)
 | Category | Codes | Tests | Notes |

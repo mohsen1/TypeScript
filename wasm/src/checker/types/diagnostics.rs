@@ -213,6 +213,7 @@ pub mod diagnostic_codes {
     pub const ABSTRACT_PROPERTY_IN_NON_ABSTRACT_CLASS: u32 = 2515;
     pub const ABSTRACT_MEMBER_IN_NON_ABSTRACT_CLASS: u32 = 2515;  // Same code for methods
     pub const CANNOT_ASSIGN_TO_READONLY_PROPERTY: u32 = 2540;
+    pub const ACCESSORS_MUST_BOTH_BE_ABSTRACT_OR_NOT: u32 = 2676;  // Accessors must both be abstract or non-abstract.
     pub const CLASS_INCORRECTLY_IMPLEMENTS_INTERFACE: u32 = 2420;
     pub const CLASS_INCORRECTLY_EXTENDS_BASE_CLASS: u32 = 2415;
     pub const MEMBER_IS_NOT_ACCESSIBLE: u32 = 2341;

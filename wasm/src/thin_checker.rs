@@ -2429,6 +2429,10 @@ impl<'a> ThinCheckerState<'a> {
             self.check_class_member_implementations(&class.members.nodes);
         }
 
+        // Check for accessor abstract consistency (error 2676)
+        // Getter and setter must both be abstract or both non-abstract
+        self.check_accessor_abstract_consistency(&class.members.nodes);
+
         // Restore previous enclosing class
         self.enclosing_class = prev_enclosing_class;
 
@@ -2778,6 +2782,65 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         (false, None)
+    }
+
+    /// Check that accessor pairs (get/set) have consistent abstract modifiers.
+    /// Reports error TS2676 if one is abstract and the other is not.
+    fn check_accessor_abstract_consistency(&mut self, members: &[NodeIndex]) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        use std::collections::HashMap;
+
+        // Collect getters and setters by name
+        #[derive(Default)]
+        struct AccessorPair {
+            getter: Option<(NodeIndex, bool)>,  // (node_idx, is_abstract)
+            setter: Option<(NodeIndex, bool)>,
+        }
+
+        let mut accessors: HashMap<String, AccessorPair> = HashMap::new();
+
+        for &member_idx in members {
+            let Some(node) = self.arena.get(member_idx) else {
+                continue;
+            };
+
+            if node.kind == syntax_kind_ext::GET_ACCESSOR || node.kind == syntax_kind_ext::SET_ACCESSOR {
+                if let Some(accessor) = self.arena.get_accessor(node) {
+                    let is_abstract = self.has_abstract_modifier(&accessor.modifiers);
+
+                    // Get accessor name
+                    if let Some(name) = self.get_property_name(accessor.name) {
+                        let pair = accessors.entry(name).or_default();
+                        if node.kind == syntax_kind_ext::GET_ACCESSOR {
+                            pair.getter = Some((member_idx, is_abstract));
+                        } else {
+                            pair.setter = Some((member_idx, is_abstract));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check for abstract mismatch
+        for (_, pair) in accessors {
+            if let (Some((getter_idx, getter_abstract)), Some((setter_idx, setter_abstract))) =
+                (pair.getter, pair.setter)
+            {
+                if getter_abstract != setter_abstract {
+                    // Report error on both accessors
+                    self.error_at_node(
+                        getter_idx,
+                        "Accessors must both be abstract or non-abstract.",
+                        diagnostic_codes::ACCESSORS_MUST_BOTH_BE_ABSTRACT_OR_NOT,
+                    );
+                    self.error_at_node(
+                        setter_idx,
+                        "Accessors must both be abstract or non-abstract.",
+                        diagnostic_codes::ACCESSORS_MUST_BOTH_BE_ABSTRACT_OR_NOT,
+                    );
+                }
+            }
+        }
     }
 
     /// Get the name of a method declaration.
