@@ -77,13 +77,32 @@ pub fn add_local(&mut self, name: String, ...) { ... }
 - [ ] Measure and document performance improvements
 - [ ] Add comprehensive tests for stateless resolution
 
-#### TypeKey Refactor (Shared with Solver)
+#### TypeKey Refactor (Shared with Solver) - ⏳ IN PROGRESS
 
-**Problem:** See SOLVER.md - `Arc<str>` in type keys destroys performance.
+**Problem:** `Arc<str>` in type keys destroys performance - forces expensive string hashing and atomic reference counting during every type comparison and interning operation.
 
-**Action Required:**
-- [ ] Coordinate with Solver track to use `Atom` (u32) instead of `Arc<str>`
-- [ ] All type operations must use interned strings
+**Progress (2026-01-06):**
+- [x] Replaced all `Arc<str>` with `Atom` (u32) in `solver/types.rs`:
+  - `LiteralValue::String/BigInt` now use Atom
+  - `PropertyInfo.name` now Atom
+  - `TupleElement.name` now `Option<Atom>`
+  - `ParamInfo.name` now `Option<Atom>`
+  - `TypeParamInfo.name` now Atom
+  - `TemplateSpan::Text` now Atom
+- [x] Updated `TypeInterner` to include string interner:
+  - Added `string_interner: RwLock<Interner>` field
+  - Pre-interns common TypeScript identifiers (100+ keywords)
+  - `intern_string()` method for type construction
+  - `resolve_atom()` method for diagnostics
+- [ ] **Next:** Fix compilation errors in `thin_checker.rs` (call sites need updating)
+- [ ] **Next:** Update `TypeLowering` in `solver/lower.rs` to intern strings
+- [ ] **Next:** Update `TypeFormatter` in `solver/diagnostics.rs` to resolve Atoms
+- [ ] **Next:** Verify tests pass and measure performance improvement
+
+**Impact:**
+- Type equality/hashing now O(1) integer operations (was expensive string hashing)
+- Eliminates atomic reference counting overhead
+- Required foundation for Salsa integration (Task #2)
 
 ### Integrate Salsa for Incremental Queries
 
