@@ -3198,6 +3198,14 @@ impl<'a> ThinPrinter<'a> {
             self.write("\");");
             self.write_line();
 
+            if export.export_clause.is_none() {
+                self.write("__exportStar(");
+                self.write(&module_var);
+                self.write(", exports);");
+                self.write_line();
+                return;
+            }
+
             // Then emit Object.defineProperty for each export
             if let Some(clause_node) = self.arena.get(export.export_clause) {
                 if let Some(named_exports) = self.arena.get_named_imports(clause_node) {
@@ -3225,9 +3233,6 @@ impl<'a> ThinPrinter<'a> {
                         }
                     }
                 }
-            } else {
-                // export * from "module" - need __exportStar helper
-                // TODO: implement export star
             }
             return;
         }

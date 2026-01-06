@@ -499,6 +499,24 @@ fn test_commonjs_reexport() {
 }
 
 #[test]
+fn test_commonjs_export_star() {
+    let source = r#"export * from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(output.contains("__exportStar("), "Expected __exportStar call in CommonJS output: {}", output);
+}
+
+#[test]
 fn test_commonjs_export_const() {
     let source = "export const x = 42;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
