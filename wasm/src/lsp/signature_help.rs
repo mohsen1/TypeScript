@@ -14,7 +14,7 @@ use crate::scanner_impl::ScannerState;
 use crate::scanner::SyntaxKind;
 
 /// Represents a parameter in a signature.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ParameterInformation {
     /// The label of this parameter (e.g., "x: number")
     pub label: String,
@@ -23,7 +23,7 @@ pub struct ParameterInformation {
 }
 
 /// Represents a single signature (overload).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SignatureInformation {
     /// The label of the signature (e.g., "add(x: number, y: number): number")
     pub label: String,
@@ -34,7 +34,7 @@ pub struct SignatureInformation {
 }
 
 /// The response for a signature help request.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SignatureHelp {
     /// One or more signatures (for overloads)
     pub signatures: Vec<SignatureInformation>,

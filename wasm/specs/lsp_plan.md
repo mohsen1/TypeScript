@@ -245,18 +245,49 @@ All 644 tests pass! ✅ (2 ignored)
 - Integration tests: 3/3 passing
 - Utils tests: 3/3 passing
 
+11. **WASM Bindings for LSP Features** (2026-01-06)
+   - Added `serde-wasm-bindgen` dependency to Cargo.toml
+   - Added Serialize/Deserialize derives to all LSP types:
+     - CompletionItem, CompletionItemKind (completions.rs)
+     - HoverInfo (hover.rs)
+     - SignatureHelp, SignatureInformation, ParameterInformation (signature_help.rs)
+     - DocumentSymbol, SymbolKind (document_symbols.rs)
+     - Position, Range, Location, SourceLocation (position.rs)
+   - Extended ThinParser struct with `line_map: Option<LineMap>` field
+   - Added LSP helper methods to ThinParser:
+     - `ensure_line_map()` - Lazy initialization of LineMap
+     - `ensure_bound()` - Ensures source file is parsed and bound
+   - Exposed all LSP features via wasm_bindgen:
+     - `getDefinitionAtPosition(line, character)` - Go-to-Definition
+     - `getReferencesAtPosition(line, character)` - Find References
+     - `getCompletionsAtPosition(line, character)` - Completions
+     - `getHoverAtPosition(line, character)` - Hover
+     - `getSignatureHelpAtPosition(line, character)` - Signature Help
+     - `getDocumentSymbols()` - Document Symbols
+     - `getSemanticTokens()` - Semantic Tokens
+     - `prepareRename(line, character)` - Rename validation
+     - `getRenameEdits(line, character, newName)` - Rename edits
+     - `getCodeActions(startLine, startChar, endLine, endChar)` - Code Actions
+   - All methods return `JsValue` (serialized via serde-wasm-bindgen) or `Vec<u32>` for semantic tokens
+   - All methods handle errors gracefully with Result<JsValue, JsValue>
+   - **Status:** ✅ Compiles successfully, all LSP features now accessible from JavaScript!
+
+   **Known Issue:**
+   - 1 test failing in code_actions (test_extract_variable_property_access) - pre-existing, related to incomplete code actions implementation
+
 #### Next Steps
 
-1. **Fix Signature Help Edge Cases**
+1. **Fix Code Actions Test Failure**
+   - Debug and fix test_extract_variable_property_access
+   - Complete code actions implementation
+
+2. **Fix Signature Help Edge Cases**
    - Debug multi-argument cursor position detection
    - Add JSDoc documentation extraction for parameters
    - Optimize ScannerState to use &str instead of cloning source
 
-2. **Add More LSP Features**
-   - Rename refactoring
-   - Semantic tokens (syntax highlighting)
-   - Document symbols
-   - Code actions
+3. **Add More LSP Features**
+   - Code actions (complete implementation)
 
 4. **Performance Optimizations**
    - Cache comment ranges in ThinParser (avoid O(N) scan on every hover)

@@ -11,7 +11,7 @@ use crate::lsp::resolver::ScopeWalker;
 use crate::lsp::utils::find_node_at_offset;
 
 /// The kind of completion item.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum CompletionItemKind {
     /// A variable or constant
     Variable,
@@ -28,7 +28,7 @@ pub enum CompletionItemKind {
 }
 
 /// A completion item to be suggested to the user.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CompletionItem {
     /// The label to display in the completion list
     pub label: String,

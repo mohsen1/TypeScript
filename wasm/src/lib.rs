@@ -115,6 +115,12 @@ use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
 use crate::thin_emitter::ThinPrinter;
 use crate::solver::TypeInterner;
+use crate::lsp::position::{LineMap, Position, Range};
+use crate::lsp::{
+    GoToDefinition, FindReferences, Completions, HoverProvider, SignatureHelpProvider,
+    DocumentSymbolProvider, RenameProvider, SemanticTokensProvider, CodeActionProvider,
+    CodeActionContext,
+};
 
 /// High-performance parser using ThinNode architecture (16 bytes/node).
 /// This is the optimized path for Phase 8 test suite evaluation.
@@ -126,6 +132,8 @@ pub struct ThinParser {
     /// Local type interner for single-file checking.
     /// For multi-file compilation, use MergedProgram.type_interner instead.
     type_interner: TypeInterner,
+    /// Line map for LSP position conversion (lazy initialized)
+    line_map: Option<LineMap>,
 }
 
 #[wasm_bindgen]
@@ -138,6 +146,7 @@ impl ThinParser {
             source_file_idx: None,
             binder: None,
             type_interner: TypeInterner::new(),
+            line_map: None,
         }
     }
 
@@ -146,6 +155,9 @@ impl ThinParser {
     pub fn parse_source_file(&mut self) -> u32 {
         let idx = self.parser.parse_source_file();
         self.source_file_idx = Some(idx);
+        // Invalidate derived state on re-parse
+        self.line_map = None;
+        self.binder = None;
         idx.0
     }
 
@@ -248,8 +260,8 @@ impl ThinParser {
             );
 
             let type_id = checker.get_type_of_node(parser::NodeIndex(node_idx));
-            // Use basic type display since ThinCheckerState doesn't have type_to_string
-            format!("TypeId({})", type_id.0)
+            // Use format_type for human-readable output
+            checker.format_type(type_id)
         } else {
             "unknown".to_string()
         }
@@ -275,7 +287,8 @@ impl ThinParser {
     #[wasm_bindgen(js_name = emitModern)]
     pub fn emit_modern(&self) -> String {
         if let Some(root_idx) = self.source_file_idx {
-            let mut printer = ThinPrinter::new(self.parser.get_arena());
+            // Use new_es6 to avoid downleveling to ES5
+            let mut printer = ThinPrinter::new_es6(self.parser.get_arena());
             printer.emit(root_idx);
             printer.get_output().to_string()
         } else {
@@ -292,6 +305,234 @@ impl ThinParser {
         } else {
             "{}".to_string()
         }
+    }
+
+    // =========================================================================
+    // LSP Feature Methods
+    // =========================================================================
+
+    /// Ensure internal LineMap is built.
+    fn ensure_line_map(&mut self) {
+        if self.line_map.is_none() {
+            self.line_map = Some(LineMap::build(self.parser.get_source_text()));
+        }
+    }
+
+    /// Ensure source file is parsed and bound.
+    fn ensure_bound(&mut self) -> Result<(), JsValue> {
+        if self.source_file_idx.is_none() {
+            return Err(JsValue::from_str("Source file not parsed"));
+        }
+        if self.binder.is_none() {
+            self.bind_source_file();
+        }
+        Ok(())
+    }
+
+    /// Go to Definition: Returns array of Location objects.
+    #[wasm_bindgen(js_name = getDefinitionAtPosition)]
+    pub fn get_definition_at_position(&mut self, line: u32, character: u32) -> Result<JsValue, JsValue> {
+        self.ensure_bound()?;
+        self.ensure_line_map();
+
+        let root = self.source_file_idx.unwrap();
+        let binder = self.binder.as_ref().unwrap();
+        let line_map = self.line_map.as_ref().unwrap();
+        let file_name = self.parser.get_file_name().to_string();
+
+        let provider = GoToDefinition::new(self.parser.get_arena(), binder, line_map, file_name);
+        let pos = Position::new(line, character);
+
+        let result = provider.get_definition(root, pos);
+        Ok(serde_wasm_bindgen::to_value(&result)?)
+    }
+
+    /// Find References: Returns array of Location objects.
+    #[wasm_bindgen(js_name = getReferencesAtPosition)]
+    pub fn get_references_at_position(&mut self, line: u32, character: u32) -> Result<JsValue, JsValue> {
+        self.ensure_bound()?;
+        self.ensure_line_map();
+
+        let root = self.source_file_idx.unwrap();
+        let binder = self.binder.as_ref().unwrap();
+        let line_map = self.line_map.as_ref().unwrap();
+        let file_name = self.parser.get_file_name().to_string();
+
+        let provider = FindReferences::new(self.parser.get_arena(), binder, line_map, file_name);
+        let pos = Position::new(line, character);
+
+        let result = provider.find_references(root, pos);
+        Ok(serde_wasm_bindgen::to_value(&result)?)
+    }
+
+    /// Completions: Returns array of CompletionItem objects.
+    #[wasm_bindgen(js_name = getCompletionsAtPosition)]
+    pub fn get_completions_at_position(&mut self, line: u32, character: u32) -> Result<JsValue, JsValue> {
+        self.ensure_bound()?;
+        self.ensure_line_map();
+
+        let root = self.source_file_idx.unwrap();
+        let binder = self.binder.as_ref().unwrap();
+        let line_map = self.line_map.as_ref().unwrap();
+
+        let provider = Completions::new(self.parser.get_arena(), binder, line_map);
+        let pos = Position::new(line, character);
+
+        let result = provider.get_completions(root, pos);
+        Ok(serde_wasm_bindgen::to_value(&result)?)
+    }
+
+    /// Hover: Returns HoverInfo object.
+    #[wasm_bindgen(js_name = getHoverAtPosition)]
+    pub fn get_hover_at_position(&mut self, line: u32, character: u32) -> Result<JsValue, JsValue> {
+        self.ensure_bound()?;
+        self.ensure_line_map();
+
+        let root = self.source_file_idx.unwrap();
+        let binder = self.binder.as_ref().unwrap();
+        let line_map = self.line_map.as_ref().unwrap();
+        let source_text = self.parser.get_source_text();
+        let file_name = self.parser.get_file_name().to_string();
+
+        let provider = HoverProvider::new(
+            self.parser.get_arena(),
+            binder,
+            line_map,
+            &self.type_interner,
+            source_text,
+            file_name
+        );
+        let pos = Position::new(line, character);
+
+        let result = provider.get_hover(root, pos);
+        Ok(serde_wasm_bindgen::to_value(&result)?)
+    }
+
+    /// Signature Help: Returns SignatureHelp object.
+    #[wasm_bindgen(js_name = getSignatureHelpAtPosition)]
+    pub fn get_signature_help_at_position(&mut self, line: u32, character: u32) -> Result<JsValue, JsValue> {
+        self.ensure_bound()?;
+        self.ensure_line_map();
+
+        let root = self.source_file_idx.unwrap();
+        let binder = self.binder.as_ref().unwrap();
+        let line_map = self.line_map.as_ref().unwrap();
+        let source_text = self.parser.get_source_text();
+        let file_name = self.parser.get_file_name().to_string();
+
+        let provider = SignatureHelpProvider::new(
+            self.parser.get_arena(),
+            binder,
+            line_map,
+            &self.type_interner,
+            source_text,
+            file_name
+        );
+        let pos = Position::new(line, character);
+
+        let result = provider.get_signature_help(root, pos);
+        Ok(serde_wasm_bindgen::to_value(&result)?)
+    }
+
+    /// Document Symbols: Returns array of DocumentSymbol objects.
+    #[wasm_bindgen(js_name = getDocumentSymbols)]
+    pub fn get_document_symbols(&mut self) -> Result<JsValue, JsValue> {
+        self.ensure_bound()?;
+        self.ensure_line_map();
+
+        let root = self.source_file_idx.unwrap();
+        let line_map = self.line_map.as_ref().unwrap();
+
+        let provider = DocumentSymbolProvider::new(self.parser.get_arena(), line_map);
+
+        let result = provider.get_document_symbols(root);
+        Ok(serde_wasm_bindgen::to_value(&result)?)
+    }
+
+    /// Semantic Tokens: Returns flat array of u32 (delta encoded).
+    #[wasm_bindgen(js_name = getSemanticTokens)]
+    pub fn get_semantic_tokens(&mut self) -> Result<Vec<u32>, JsValue> {
+        self.ensure_bound()?;
+        self.ensure_line_map();
+
+        let root = self.source_file_idx.unwrap();
+        let binder = self.binder.as_ref().unwrap();
+        let line_map = self.line_map.as_ref().unwrap();
+
+        let mut provider = SemanticTokensProvider::new(self.parser.get_arena(), binder, line_map);
+
+        Ok(provider.get_semantic_tokens(root))
+    }
+
+    /// Rename - Prepare: Check if rename is valid at position.
+    #[wasm_bindgen(js_name = prepareRename)]
+    pub fn prepare_rename(&mut self, line: u32, character: u32) -> Result<JsValue, JsValue> {
+        self.ensure_bound()?;
+        self.ensure_line_map();
+
+        let binder = self.binder.as_ref().unwrap();
+        let line_map = self.line_map.as_ref().unwrap();
+        let file_name = self.parser.get_file_name().to_string();
+
+        let provider = RenameProvider::new(self.parser.get_arena(), binder, line_map, file_name);
+        let pos = Position::new(line, character);
+
+        let result = provider.prepare_rename(pos);
+        Ok(serde_wasm_bindgen::to_value(&result)?)
+    }
+
+    /// Rename - Edits: Get workspace edits for rename.
+    #[wasm_bindgen(js_name = getRenameEdits)]
+    pub fn get_rename_edits(&mut self, line: u32, character: u32, new_name: String) -> Result<JsValue, JsValue> {
+        self.ensure_bound()?;
+        self.ensure_line_map();
+
+        let root = self.source_file_idx.unwrap();
+        let binder = self.binder.as_ref().unwrap();
+        let line_map = self.line_map.as_ref().unwrap();
+        let file_name = self.parser.get_file_name().to_string();
+
+        let provider = RenameProvider::new(self.parser.get_arena(), binder, line_map, file_name);
+        let pos = Position::new(line, character);
+
+        match provider.provide_rename_edits(root, pos, new_name) {
+            Ok(edit) => Ok(serde_wasm_bindgen::to_value(&edit)?),
+            Err(e) => Err(JsValue::from_str(&e)),
+        }
+    }
+
+    /// Code Actions: Get code actions for a range.
+    #[wasm_bindgen(js_name = getCodeActions)]
+    pub fn get_code_actions(&mut self, start_line: u32, start_char: u32, end_line: u32, end_char: u32) -> Result<JsValue, JsValue> {
+        self.ensure_bound()?;
+        self.ensure_line_map();
+
+        let root = self.source_file_idx.unwrap();
+        let binder = self.binder.as_ref().unwrap();
+        let line_map = self.line_map.as_ref().unwrap();
+        let file_name = self.parser.get_file_name().to_string();
+        let source_text = self.parser.get_source_text();
+
+        let provider = CodeActionProvider::new(
+            self.parser.get_arena(),
+            binder,
+            line_map,
+            file_name,
+            source_text
+        );
+
+        let range = Range::new(
+            Position::new(start_line, start_char),
+            Position::new(end_line, end_char)
+        );
+
+        let context = CodeActionContext {
+            diagnostics: Vec::new(), // TODO: Pass diagnostics from checker
+            only: None,
+        };
+
+        let result = provider.provide_code_actions(root, range, context);
+        Ok(serde_wasm_bindgen::to_value(&result)?)
     }
 }
 
