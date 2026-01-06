@@ -2505,6 +2505,13 @@ impl<'a> ThinPrinter<'a> {
     // Classes
     // =========================================================================
 
+    /// Emit a class declaration.
+    ///
+    /// **Architecture Note**: This method contains the old inline transform logic for
+    /// backward compatibility. When transforms are provided via TransformContext,
+    /// the transform system handles ES5/CommonJS transforms and this method is NOT called.
+    ///
+    /// New code should use: LoweringPass → TransformContext → apply_transform()
     fn emit_class_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
         let Some(class) = self.arena.get_class(node) else {
             return;
@@ -2527,7 +2534,8 @@ impl<'a> ThinPrinter<'a> {
             String::new()
         };
 
-        // Use ES5 IIFE transform when targeting ES5
+        // Use ES5 IIFE transform when targeting ES5 (OLD PATH - for backward compatibility)
+        // When TransformContext is used, this is handled by TransformDirective::ES5Class
         if self.ctx.target_es5 {
             let mut es5_emitter = ClassES5Emitter::new(self.arena);
             es5_emitter.set_indent_level(self.writer.indent_level());
@@ -2552,6 +2560,33 @@ impl<'a> ThinPrinter<'a> {
             }
             return;
         }
+
+        // ES6+ path: emit native class syntax
+        self.emit_class_es6(node, idx);
+
+        // CommonJS: emit exports.ClassName = ClassName; after the class (OLD PATH)
+        // When TransformContext is used, this is handled by TransformDirective::CommonJSExport
+        if is_exported && !class_name.is_empty() {
+            self.write_line();
+            if is_default {
+                self.write("exports.default = ");
+            } else {
+                self.write("exports.");
+                self.write(&class_name);
+                self.write(" = ");
+            }
+            self.write(&class_name);
+            self.write(";");
+        }
+    }
+
+    /// Emit a class using ES6 native class syntax (no transforms).
+    /// This is the pure emission logic that can be reused by both the old API
+    /// and the new transform system.
+    fn emit_class_es6(&mut self, node: &ThinNode, _idx: NodeIndex) {
+        let Some(class) = self.arena.get_class(node) else {
+            return;
+        };
 
         // Emit modifiers (including decorators) - skip export/default for CommonJS
         if let Some(ref modifiers) = class.modifiers {
@@ -2595,20 +2630,6 @@ impl<'a> ThinPrinter<'a> {
 
         self.decrease_indent();
         self.write("}");
-
-        // CommonJS: emit exports.ClassName = ClassName; after the class
-        if is_exported && !class_name.is_empty() {
-            self.write_line();
-            if is_default {
-                self.write("exports.default = ");
-            } else {
-                self.write("exports.");
-                self.write(&class_name);
-                self.write(" = ");
-            }
-            self.write(&class_name);
-            self.write(";");
-        }
     }
 
     // =========================================================================
