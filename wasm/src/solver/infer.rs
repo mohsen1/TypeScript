@@ -12,7 +12,6 @@
 
 use ena::unify::{InPlaceUnificationTable, UnifyKey, UnifyValue, NoError};
 use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::TypeDatabase;
@@ -134,9 +133,7 @@ pub struct InferenceContext<'a> {
     /// Unification table for inference variables
     table: InPlaceUnificationTable<InferenceVar>,
     /// Map from type parameter names to inference variables
-    type_params: Vec<(Arc<str>, InferenceVar)>,
-    /// Map from inference vars to interned names for occurs-checks
-    type_param_atoms: HashMap<u32, Atom>,
+    type_params: Vec<(Atom, InferenceVar)>,
     /// Constraints for each inference variable
     constraints: HashMap<u32, ConstraintSet>,
 }
@@ -147,7 +144,6 @@ impl<'a> InferenceContext<'a> {
             interner,
             table: InPlaceUnificationTable::new(),
             type_params: Vec::new(),
-            type_param_atoms: HashMap::new(),
             constraints: HashMap::new(),
         }
     }
@@ -158,18 +154,16 @@ impl<'a> InferenceContext<'a> {
     }
 
     /// Create an inference variable for a type parameter
-    pub fn fresh_type_param(&mut self, name: Arc<str>) -> InferenceVar {
+    pub fn fresh_type_param(&mut self, name: Atom) -> InferenceVar {
         let var = self.fresh_var();
-        let atom = self.interner.intern_string(name.as_ref());
         self.type_params.push((name, var));
-        self.type_param_atoms.insert(var.0, atom);
         var
     }
 
     /// Look up an inference variable by type parameter name
-    pub fn find_type_param(&self, name: &str) -> Option<InferenceVar> {
+    pub fn find_type_param(&self, name: Atom) -> Option<InferenceVar> {
         self.type_params.iter()
-            .find(|(n, _)| n.as_ref() == name)
+            .find(|(n, _)| *n == name)
             .map(|(_, v)| *v)
     }
 
@@ -266,13 +260,13 @@ impl<'a> InferenceContext<'a> {
 
     fn occurs_in(&mut self, var: InferenceVar, ty: TypeId) -> bool {
         let root = self.table.find(var);
-        if self.type_param_atoms.is_empty() {
+        if self.type_params.is_empty() {
             return false;
         }
 
         let mut visited = HashSet::new();
-        for (&var_id, &atom) in &self.type_param_atoms {
-            if self.table.find(InferenceVar(var_id)) == root {
+        for &(atom, param_var) in &self.type_params {
+            if self.table.find(param_var) == root {
                 if self.type_contains_param(ty, atom, &mut visited) {
                     return true;
                 }
@@ -382,13 +376,13 @@ impl<'a> InferenceContext<'a> {
     }
 
     /// Resolve all type parameters to concrete types
-    pub fn resolve_all(&mut self) -> Result<Vec<(Arc<str>, TypeId)>, InferenceError> {
+    pub fn resolve_all(&mut self) -> Result<Vec<(Atom, TypeId)>, InferenceError> {
         // Clone type_params to avoid borrow conflict
         let type_params: Vec<_> = self.type_params.clone();
         let mut results = Vec::new();
         for (name, var) in type_params {
             match self.probe(var) {
-                Some(ty) => results.push((name.clone(), ty)),
+                Some(ty) => results.push((name, ty)),
                 None => return Err(InferenceError::Unresolved(var)),
             }
         }
@@ -501,7 +495,7 @@ impl<'a> InferenceContext<'a> {
     }
 
     /// Resolve all type parameters using constraints.
-    pub fn resolve_all_with_constraints(&mut self) -> Result<Vec<(Arc<str>, TypeId)>, InferenceError> {
+    pub fn resolve_all_with_constraints(&mut self) -> Result<Vec<(Atom, TypeId)>, InferenceError> {
         let type_params: Vec<_> = self.type_params.clone();
         let mut results = Vec::new();
 

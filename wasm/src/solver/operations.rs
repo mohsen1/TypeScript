@@ -181,9 +181,7 @@ impl<'a> CallEvaluator<'a> {
 
         // 1. Create inference variables and placeholders for each type parameter
         for tp in &func.type_params {
-            // Resolve Atom to String for inference context (still uses Arc<str>)
-            let tp_name_str = self.interner.resolve_atom(tp.name);
-            let var = infer_ctx.fresh_type_param(std::sync::Arc::from(tp_name_str.as_str()));
+            let var = infer_ctx.fresh_type_param(tp.name);
             type_param_vars.push(var);
 
             // Create a unique placeholder type for this inference variable

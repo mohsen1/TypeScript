@@ -18,6 +18,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
   - [x] Create `InferenceVar` type (wraps ena's InferenceVariable)
   - [x] Implement `new_inference_var()` -> InferenceVar
   - [x] Implement `unify(var1, var2)` using ena's union-find
+  - [x] Store inference type param names as Atom (no Arc<str> allocations)
 - [x] Add tests for basic unification
   - [x] Test: `unify(T, number)` then resolve T -> number
   - [x] Test: `unify(T, U)` then `unify(U, string)` -> both resolve to string
