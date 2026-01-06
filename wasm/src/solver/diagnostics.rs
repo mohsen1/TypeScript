@@ -15,6 +15,7 @@
 //! discarded during overload resolution.
 
 use std::sync::Arc;
+use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::TypeDatabase;
 use crate::binder::SymbolId;
@@ -45,6 +46,8 @@ pub enum DiagnosticArg {
     Type(TypeId),
     /// A symbol reference (will be looked up by name)
     Symbol(SymbolId),
+    /// An interned string
+    Atom(Atom),
     /// A plain string
     String(Arc<str>),
     /// A number
@@ -60,6 +63,12 @@ impl From<TypeId> for DiagnosticArg {
 impl From<SymbolId> for DiagnosticArg {
     fn from(s: SymbolId) -> Self {
         DiagnosticArg::Symbol(s)
+    }
+}
+
+impl From<Atom> for DiagnosticArg {
+    fn from(a: Atom) -> Self {
+        DiagnosticArg::Atom(a)
     }
 }
 
@@ -371,6 +380,7 @@ impl<'a> TypeFormatter<'a> {
                         format!("Symbol({})", sym_id.0)
                     }
                 }
+                DiagnosticArg::Atom(atom) => self.interner.resolve_atom(*atom),
                 DiagnosticArg::String(s) => s.to_string(),
                 DiagnosticArg::Number(n) => n.to_string(),
             };
@@ -762,7 +772,7 @@ impl SubtypeFailureReason {
                 PendingDiagnostic::error(
                     codes::PROPERTY_MISSING,
                     vec![
-                        property_name.as_ref().into(),
+                        (*property_name).into(),
                         (*source_type).into(),
                         (*target_type).into(),
                     ],
@@ -785,7 +795,7 @@ impl SubtypeFailureReason {
                 let elaboration = PendingDiagnostic::error(
                     codes::NESTED_TYPE_MISMATCH,
                     vec![
-                        property_name.as_ref().into(),
+                        (*property_name).into(),
                         (*source_property_type).into(),
                         (*target_property_type).into(),
                     ],
@@ -808,7 +818,7 @@ impl SubtypeFailureReason {
                     vec![source.into(), target.into()],
                 ).with_related(PendingDiagnostic::error(
                     codes::PROPERTY_MISSING, // Close enough - property is "missing" because it's optional
-                    vec![property_name.as_ref().into(), source.into(), target.into()],
+                    vec![(*property_name).into(), source.into(), target.into()],
                 ))
             }
 

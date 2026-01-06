@@ -10,6 +10,7 @@
 //! - TypeResolver trait for lazy symbol resolution
 
 use std::collections::HashSet;
+use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::TypeDatabase;
 
@@ -1224,20 +1225,20 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 pub enum SubtypeFailureReason {
     /// A required property is missing in the source type.
     MissingProperty {
-        property_name: std::sync::Arc<str>,
+        property_name: Atom,
         source_type: TypeId,
         target_type: TypeId,
     },
     /// Property types are incompatible.
     PropertyTypeMismatch {
-        property_name: std::sync::Arc<str>,
+        property_name: Atom,
         source_property_type: TypeId,
         target_property_type: TypeId,
         nested_reason: Option<Box<SubtypeFailureReason>>,
     },
     /// Optional property cannot satisfy required property.
     OptionalPropertyRequired {
-        property_name: std::sync::Arc<str>,
+        property_name: Atom,
     },
     /// Return types are incompatible.
     ReturnTypeMismatch {
@@ -1423,9 +1424,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 Some(sp) => {
                     // Check optional/required mismatch
                     if sp.optional && !t_prop.optional {
-                        let prop_name_str = self.interner.resolve_atom(t_prop.name);
                         return Some(SubtypeFailureReason::OptionalPropertyRequired {
-                            property_name: std::sync::Arc::from(prop_name_str.as_str()),
+                            property_name: t_prop.name,
                         });
                     }
 
@@ -1435,9 +1435,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     if !self.check_subtype(source_type, target_type).is_true() {
                         // Recursively explain the nested failure
                         let nested = self.explain_failure(source_type, target_type);
-                        let prop_name_str = self.interner.resolve_atom(t_prop.name);
                         return Some(SubtypeFailureReason::PropertyTypeMismatch {
-                            property_name: std::sync::Arc::from(prop_name_str.as_str()),
+                            property_name: t_prop.name,
                             source_property_type: source_type,
                             target_property_type: target_type,
                             nested_reason: nested.map(Box::new),
@@ -1447,9 +1446,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 None => {
                     // Required property is missing
                     if !t_prop.optional {
-                        let prop_name_str = self.interner.resolve_atom(t_prop.name);
                         return Some(SubtypeFailureReason::MissingProperty {
-                            property_name: std::sync::Arc::from(prop_name_str.as_str()),
+                            property_name: t_prop.name,
                             source_type: source,
                             target_type: target,
                         });

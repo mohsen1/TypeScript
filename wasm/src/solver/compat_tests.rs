@@ -174,11 +174,12 @@ fn test_explain_failure_missing_property() {
     let mut checker = CompatChecker::new(&interner);
 
     let (animal, dog) = make_animal_dog(&interner);
+    let breed_name = interner.intern_string("breed");
 
     let reason = checker.explain_failure(animal, dog);
     assert!(
         matches!(reason, Some(SubtypeFailureReason::MissingProperty { property_name, .. })
-            if property_name.as_ref() == "breed")
+            if property_name == breed_name)
     );
 }
 
