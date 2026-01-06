@@ -471,6 +471,7 @@ impl<'a> CodeActionProvider<'a> {
                         specifier: spec_idx,
                         import_name,
                         local_name,
+                        is_type_only: spec.is_type_only,
                     });
                 }
             }
@@ -509,11 +510,16 @@ impl<'a> CodeActionProvider<'a> {
         if has_named {
             let mut items = Vec::new();
             for spec in named_specs {
-                if spec.import_name == spec.local_name {
-                    items.push(spec.import_name);
-                } else {
-                    items.push(format!("{} as {}", spec.import_name, spec.local_name));
+                let mut item = String::new();
+                if spec.is_type_only && !clause.is_type_only {
+                    item.push_str("type ");
                 }
+                if spec.import_name == spec.local_name {
+                    item.push_str(&spec.import_name);
+                } else {
+                    item.push_str(&format!("{} as {}", spec.import_name, spec.local_name));
+                }
+                items.push(item);
             }
             parts.push(format!("{{ {} }}", items.join(", ")));
         }
@@ -784,6 +790,7 @@ struct NamedImportSpec {
     specifier: NodeIndex,
     import_name: String,
     local_name: String,
+    is_type_only: bool,
 }
 
 #[derive(Clone, Debug)]

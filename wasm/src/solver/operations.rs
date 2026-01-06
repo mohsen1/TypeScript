@@ -277,7 +277,30 @@ impl<'a> CallEvaluator<'a> {
         let source_key = self.interner.lookup(source);
         let target_key = self.interner.lookup(target);
 
+        let is_nullish = |ty: TypeId| matches!(ty, TypeId::NULL | TypeId::UNDEFINED | TypeId::VOID);
+
         match (source_key, target_key) {
+            (Some(TypeKey::Union(ref s_members)), _) => {
+                for &member in s_members {
+                    self.constrain_types(ctx, var_map, member, target);
+                }
+            }
+            (_, Some(TypeKey::Intersection(ref t_members))) => {
+                for &member in t_members {
+                    self.constrain_types(ctx, var_map, source, member);
+                }
+            }
+            (_, Some(TypeKey::Union(ref t_members))) => {
+                let mut non_nullable = Vec::new();
+                for &member in t_members {
+                    if !is_nullish(member) {
+                        non_nullable.push(member);
+                    }
+                }
+                if non_nullable.len() == 1 {
+                    self.constrain_types(ctx, var_map, source, non_nullable[0]);
+                }
+            }
             (Some(TypeKey::Array(s_elem)), Some(TypeKey::Array(t_elem))) => {
                 self.constrain_types(ctx, var_map, s_elem, t_elem);
             }

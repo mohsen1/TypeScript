@@ -1182,6 +1182,11 @@ pub enum SubtypeFailureReason {
         source_type: TypeId,
         target_union_members: Vec<TypeId>,
     },
+    /// No overlapping properties for weak type target.
+    NoCommonProperties {
+        source_type: TypeId,
+        target_type: TypeId,
+    },
     /// Generic type mismatch (no more specific reason).
     TypeMismatch {
         source_type: TypeId,
