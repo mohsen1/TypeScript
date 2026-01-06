@@ -196,8 +196,7 @@ impl<'a> CallEvaluator<'a> {
             });
             let placeholder_id = self.interner.intern(placeholder_key);
 
-            // TypeSubstitution still uses Arc<str>, so resolve the atom
-            substitution.insert(std::sync::Arc::from(self.interner.resolve_atom(tp.name).as_str()), placeholder_id);
+            substitution.insert(tp.name, placeholder_id);
             var_map.insert(placeholder_id, var);
         }
 
@@ -253,8 +252,7 @@ impl<'a> CallEvaluator<'a> {
                 TypeId::UNKNOWN
             };
 
-            let name_str = self.interner.resolve_atom(tp.name);
-            final_subst.insert(std::sync::Arc::from(name_str.as_str()), ty);
+            final_subst.insert(tp.name, ty);
 
             if let Some(constraint) = tp.constraint {
                 let constraint_ty = instantiate_type(self.interner, constraint, &final_subst);

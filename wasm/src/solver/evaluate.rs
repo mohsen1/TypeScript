@@ -298,10 +298,8 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             // First intern the Atom as a literal string type
             let key_literal = self.interner.intern(TypeKey::Literal(LiteralValue::String(key_name)));
 
-            // TypeSubstitution still uses Arc<str>, so resolve both the type param name and key
             let mut subst = TypeSubstitution::new();
-            let type_param_name = self.interner.resolve_atom(mapped.type_param.name);
-            subst.insert(std::sync::Arc::from(type_param_name.as_str()), key_literal);
+            subst.insert(mapped.type_param.name, key_literal);
 
             // Substitute into the template
             let property_type = instantiate_type(self.interner, mapped.template, &subst);
