@@ -9,184 +9,99 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 
 see SESSION_LOG.md -- always amended with each session's work
 
-# ✅ COMPLETED
-
-- **Phase 0-5**: Scanner, Parser, Binder, Solver (~77,000 LOC, 1041 tests)
-- **Phase 6**: Emitter (ES5 transforms, source maps, .d.ts) - **59.2% JS baseline**
-- **Phase 7**: Language Service (60%) - go-to-def, find refs, completions
-
-## Recent Checker Improvements
-- ✅ Callable interface type lowering (function-like interfaces)
-- ✅ Function type annotations for error 2355
-- ✅ Error 2676: accessor abstract consistency (get/set must both be abstract or both non-abstract)
-- ✅ Error 1253: abstract members in non-abstract class
-- ✅ Accessor body checks in ambient contexts (1183)
-- ✅ Error 1248: const keyword on class members (moved from parser to checker)
-- ✅ Error 2322: accessor type compatibility (getter return ⊆ setter param)
-- ✅ Error 2511: abstract union type detection (type_contains_abstract_class)
-
-## Checker Refactoring (see specs/REFACTOR_CHECKER.md)
-- 🔄 Split ThinCheckerState into Context + specialized Checkers (expr, stmt, decl)
-  - ✅ Created `checker/context.rs` with CheckerContext struct
-  - ⬜ Refactor ThinCheckerState to use CheckerContext
-  - ⬜ Create expressions.rs, statements.rs, declarations.rs
-- ⬜ Move expression type computation to solver/operations.rs
-- ⬜ Use NodeView API instead of raw arena lookups
-- ⬜ Deprecate checker/types in favor of solver/types
-
-## Code Cleanup
-- ✅ Deleted ~35k lines of dead code (old fat-node parser, emitter, checker, services)
-
-## Recent Emitter Improvements
-- ✅ Fixed baseline comparison script to extract JS portion correctly
-- ✅ Instance property initializers → `this.x = value;` in constructor
-- ✅ Distinguish `implements` vs `extends` in heritage clauses
-- ✅ Parameter properties (`public x, private y`) → `this.x = x; this.y = y;`
-- ✅ Constructor overloads: only emit implementation, skip signatures
-- ✅ Single-line empty block detection (preserve `{ }` vs `{\n}`)
-- ✅ Class extends: emit base class name, _super parameter, derived constructor with _super.apply
-- ✅ Combined getter/setter pairs into single `Object.defineProperty` calls
-- ✅ Skip abstract accessors in emit
-- ✅ Source order emit for methods/accessors
-- ✅ Declare variable skip (`declare const foo: number;` → empty)
-- ✅ Arrow function `this` capture (`var _this = this;`) for base and derived classes
-- ✅ Destructuring transform (`let { x } = obj;` → `var _a = obj, x = _a.x;`)
-- ✅ Block scoping infrastructure (`BlockScopeState` for let/const → var)
-- ✅ Private fields transform (`#field` → WeakMap pattern with helpers)
-- ✅ Namespace ES5 IIFE transform (qualified names like A.B.C, nested namespaces)
-- ✅ Enum ES5 IIFE transform (numeric/string enums, reverse mapping)
-- ✅ Async/await ES5 transform (`__awaiter`/`__generator` helpers)
-- ✅ Wired up transform modules to ThinPrinter (EnumES5Emitter, AsyncES5Emitter)
-
-## Emitter Architecture Refactor (complete)
-- ✅ Created `SourceWriter` abstraction for output generation with source map tracking
-- ✅ Created `EmitContext` for transform-specific state management
-- ✅ Refactored `ThinPrinter` to use `SourceWriter` (decouples output from AST traversal)
-- ✅ UTF-16 column counting for correct source map positions
-- ✅ Refactored `ThinPrinter` to use `EmitContext` for all transform state
-- ✅ Separated arrow function ES5/native emit paths
-- ✅ Converted `thin_emitter.rs` to directory module (`thin_emitter/mod.rs`)
-- ✅ Marked fields/methods `pub(super)` for future submodule splitting
-- ⏳ Split `emit_node` into modules - structure ready, splitting deferred until needed
-
-## Emitter TODOs (for JS baseline 80%+)
-- ✅ CommonJS module transform (preamble, imports→require, re-exports)
-- ⬜ CommonJS export declarations (`exports.X = X;` after declarations)
-- ⬜ Comment preservation in emit - ~3 tests
-- ⬜ Parse error tolerance (some tests skipped) - ~2 tests
-
-## Language Service TODOs (40% remaining)
-- ⬜ Formatting engine
-- ⬜ Code fixes/refactorings
-- ⬜ Incremental Builds
-
 ---
 
 # 🎯 CURRENT FOCUS: Phase 8 - Baseline Compatibility
 
 **Goal**: 100% match on TypeScript's test baselines.
 
-### Current Status (12,408 tests)
-| Baseline | Compiler (100 sample) | Conformance | Crash Rate |
-|----------|----------------------|-------------|------------|
-| .errors.txt | **77.9%** (60/77 subset) | 33.8% (1,741/5,157) | 0.05% |
-| .js emit | **60.5%** (46/76 subset) | ~3% | 0.05% |
+### Current Status (100-file samples)
+| Baseline | Compiler | Conformance | Crash Rate |
+|----------|----------|-------------|------------|
+| .errors.txt | **77.9%** (60/77) | 23.3% (21/90) | 0% |
+| .js emit | **60.5%** (46/76) | 17.0% (15/88) | 0% |
 
 ### Work Process
 
 ⚠️ **CRITICAL: For each task, ALWAYS:**
 1. **BEFORE**: `node scripts/ask-gemini.mjs "How should I implement [task]?"` - get guidance
-2. **IMPLEMENT**: Write code, run tests. add tests
+2. **IMPLEMENT**: Write code, run tests, add tests
 3. **AFTER**: `node scripts/ask-gemini.mjs --review wasm/src/[file].rs` - get review
-
-This catches design issues early and ensures consistent code quality.
-
-
-
-
-### Next Steps - Emitter Focus
-
-**Priority 1: Module System (33% of failing tests)**
-1. ✅ CommonJS preamble (`"use strict"`, `__esModule`)
-2. ✅ ES module imports → `require()` transform
-3. ✅ Re-exports → `Object.defineProperty`
-4. ✅ Export declarations → `exports.X = X;` (export const/function/class)
-
-**Priority 2: Block Scoping (4% of failing tests)**
-5. ✅ `let`/`const` → `var` for ES5 (BlockScopeState for variable tracking)
-
-**Priority 3: Class Features (7% of failing tests)**
-5. ✅ Static fields initialization (already implemented)
-6. ✅ Private fields (`#`) transform (WeakMap pattern, helpers)
-
-**Priority 4: Namespace & Enums (5% of failing tests)**
-7. ✅ Namespace IIFE improvements (qualified names, nested namespaces, exports)
-8. ✅ Enum object emit (IIFE with reverse mapping, string enums)
-
-**Priority 5: Async/Generators (4% of failing tests)**
-9. ✅ `__awaiter` helper for async/await (wired to ThinPrinter)
-10. ✅ `__generator` helper for generators (state machine with switch/case)
-
-**Priority 6: Remaining Features**
-11. ⬜ `__decorate` helper for decorators
-12. ⬜ `for-of` iterator downlevel
-13. ⬜ `__spread`/`__rest` helpers
-
-### Emit TODOs (40.8% failing → target 80%+)
-| Feature | Tests | % | Notes |
-|---------|-------|---|-------|
-| **Modules** | 1,935 | 33% | `import`/`export` → CommonJS/ESM |
-| **let/const** | 205 | 4% | Block scoping → `var` for ES5 |
-| **Arrow functions** | 159 | 3% | `=>` → `function` for ES5 |
-| **Class fields** | 404 | 7% | Static fields, private `#` |
-| **Namespace** | 168 | 3% | IIFE wrapping |
-| **Enums** | 145 | 2% | Enum object emit |
-| **Decorators** | 98 | 2% | `__decorate` helper |
-| **Async/await** | 88 | 2% | `__awaiter` helper |
-| **for-of** | 39 | 1% | Iterator downlevel |
-| **Spread/rest** | 24 | <1% | `__spread`/`__rest` helpers |
-| **Generators** | 26 | <1% | `__generator` helper |
 
 ---
 
-# Phase 9: Finishing up all TODOs ⬜
-- ⬜ 100% baseline in all aspects
-- ⬜ all todos left from previous phases
-- ⬜ Benchmarking: Create a benchmark suite (e.g., parsing a large library like three.js or typescript itself) to measure actual throughput (MB/s).
-- ⬜ Incremental Builds: The ThinNode architecture allows for efficient incremental reparsing, but the "diffing" logic isn't visible yet.
-- ⬜ todos in code
-- ⬜ missing unit tests and test coverage. aim for near 100% coverage of rust code
+# ✅ COMPLETED PHASES
+
+## Phase 0-5: Core Compiler (~77,000 LOC, 1041 tests)
+- Scanner, Parser, Binder, Solver
+
+## Phase 6: Emitter
+- ✅ ES5 class transform (IIFE with prototype methods)
+- ✅ ES5 arrow function transform (function + `_this` capture)
+- ✅ ES5 enum transform (IIFE with reverse mapping)
+- ✅ ES5 namespace transform (IIFE with qualified names)
+- ✅ ES5 async/await transform (`__awaiter`/`__generator` helpers)
+- ✅ ES5 private fields transform (WeakMap pattern)
+- ✅ ES5 destructuring transform (temp vars)
+- ✅ ES5 block scoping (let/const → var)
+- ✅ CommonJS module transform (preamble, require, exports)
+- ✅ Source map support (SourceWriter with UTF-16 columns)
+- ✅ EmitContext for transform state management
+
+## Phase 7: Language Service (60%)
+- go-to-def, find refs, completions
+
+---
+
+# ⬜ REMAINING WORK
+
+## Emitter TODOs (to reach 80%+ JS baseline)
+
+**High Priority:**
+1. ⬜ Symbol property emit (ES5SymbolProperty tests failing)
+2. ⬜ Ambient declaration handling (skip `declare enum/namespace`)
+3. ⬜ Export assignment emit (`export =` and `export default`)
+4. ⬜ System.register module format
+
+**Medium Priority:**
+5. ⬜ Decorators (`__decorate` helper)
+6. ⬜ `for-of` iterator downlevel
+7. ⬜ Spread/rest (`__spread`/`__rest` helpers)
+8. ⬜ Comment preservation in emit
+
+**Low Priority:**
+9. ⬜ Parse error tolerance
+10. ⬜ JSDoc preservation
+
+## Checker TODOs (to reach 80%+ errors baseline)
+- ⬜ Symbol type checking (errors 2403, 2554)
+- ⬜ Property access from index signature (error 4111)
+- ⬜ Ambient module patterns (errors 2305, 5061, 2819)
+- ⬜ Various missing error codes (see test failures)
+
+## Language Service TODOs (40% remaining)
+- ⬜ Formatting engine
+- ⬜ Code fixes/refactorings
+- ⬜ Incremental builds
+
+---
+
+# Phase 9: Polish ⬜
+- ⬜ 100% baseline compatibility
+- ⬜ Benchmarking suite (three.js, typescript itself)
+- ⬜ Near 100% Rust test coverage
 
 # Phase 10: Full Rust Mode ⬜
-
 - ⬜ Remove TypeScript fallbacks
-- ⬜ Delete old CheckerState (checker/state.rs) - use only ThinCheckerState
-- ⬜ Delete old ParserState (parser_impl.rs) - use only ThinParser
-- ⬜ Port Language Service to use ThinNode/ThinChecker APIs
+- ⬜ Delete old CheckerState, ParserState
 - ⬜ Performance benchmarks vs tsc and tsc-go
-- ⬜ Memory usage optimization
 
+# Phase 11: Release ⬜
+- ⬜ Own repo (mohsen1/tsc-rust)
+- ⬜ NPM + Cargo packaging
+- ⬜ CI/CD pipeline
+- ⬜ Documentation
 
-# Phase 11: Prepare for Release ⬜
-
-## Strategy
-- **Track upstream**: Mirror TypeScript releases (5.x → 6.x)
-- **Language features**: 100% compatible—no less, no more
-- **API/CLI**: Match tsc behavior; extra flags allowed (e.g., `--wasm-threads`)
-
-## TODOs
-- ⬜ Own repo mohsen1/tsc-rust
-- ⬜ Upstream sync workflow (track `microsoft/TypeScript` releases)
-- ⬜ Compatibility test suite (run against TS test baselines on each release)
-- ⬜ Version alignment (match TS version numbers, e.g., `tsc-rust@5.7.0`)
-- ⬜ CLI parity audit (`tsc --help` flags, exit codes, output format)
-- ⬜ API compatibility layer (programmatic API matches `typescript` npm)
-- ⬜ Packaging for npm (`@mohsen1/tsc-rust` or similar)
-- ⬜ Packaging for cargo (`tsc-rust` crate)
-- ⬜ Pre-built WASM binaries for major platforms
-- ⬜ CI/CD release pipeline (GitHub Actions)
-- ⬜ Documentation (migration guide, API docs, README)
-- ⬜ Branding & naming
 ---
 
 # Quick Reference
@@ -197,6 +112,7 @@ This catches design issues early and ensures consistent code quality.
 
 # Baseline comparison
 node scripts/baseline-test-rust.mjs
+node scripts/baseline-test-rust.mjs conformance
 
 # Build WASM
 ./wasm/build-wasm.sh
