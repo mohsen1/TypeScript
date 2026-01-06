@@ -46,7 +46,10 @@ pub use signature_help::{SignatureHelpProvider, SignatureHelp, SignatureInformat
 pub use document_symbols::{DocumentSymbolProvider, DocumentSymbol, SymbolKind};
 pub use rename::{RenameProvider, WorkspaceEdit, TextEdit};
 pub use semantic_tokens::{SemanticTokensProvider, SemanticTokenType, semantic_token_modifiers};
-pub use code_actions::{CodeActionProvider, CodeAction, CodeActionKind, CodeActionContext};
+pub use code_actions::{
+    CodeActionProvider, CodeAction, CodeActionKind, CodeActionContext, ImportCandidate,
+    ImportCandidateKind,
+};
 pub use position::{Position, Location, SourceLocation, Range};
 pub use project::{Project, ProjectFile};
 pub use diagnostics::{LspDiagnostic, DiagnosticSeverity};
