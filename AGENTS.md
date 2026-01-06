@@ -107,6 +107,7 @@ Commit frequently and atomically
 ## 🎯 When Your Track Feels "Done"
 
 If checker work feels complete, that means you have MORE work to do:
+- **Check out review files you wasm/specs** - maybe something we can address now in our track?
 - **Add comprehensive tests** - edge cases, error cases, performance tests
 - **Review architecture adherence** - does your code follow `wasm/WASM_ARCHITECTURE.md`?
 - **Clean up todos** - remove completed items, update progress
@@ -123,3 +124,9 @@ If checker work feels complete, that means you have MORE work to do:
 1. **BEFORE**: `node scripts/ask-gemini.mjs "How should I implement [task]?"` - get guidance
 2. **IMPLEMENT**: Write code, run tests. add tests
 3. **AFTER**: `node scripts/ask-gemini.mjs --review wasm/src/[file].rs` - get review
+
+
+⚠️ **CRITICAL: Keep syncing `origin/rust` branch`**
+1. After each task completion pull in origin/rust
+2. Resolve conflicts. Other tracks are making progress too
+3. Commit and push
