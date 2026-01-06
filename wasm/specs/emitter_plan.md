@@ -26,6 +26,7 @@ Note:
 7. Deprecate inline transform logic (breaking change)
 8. More unit test if there are gaps [added parity tests; auto-detect/export-assignment coverage]
 9. Emit ES6 class heritage clauses (extends) [done]
+10. Class ES5 transform: emit try/throw statements and parenthesized expressions [done]
 
 
 ## Quick Reference

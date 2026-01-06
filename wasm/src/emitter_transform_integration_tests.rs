@@ -91,6 +91,46 @@ fn test_two_phase_emission_es6_class_no_transform() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_try_throw_parenthesized() {
+    let source = "class Foo { method() { try { throw new Error(\"x\"); } catch (e) { return (e); } } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("try {"),
+        "ES5 output should contain try block: {}",
+        output
+    );
+    assert!(
+        output.contains("throw new Error(\"x\")"),
+        "ES5 output should contain throw statement: {}",
+        output
+    );
+    assert!(
+        output.contains("catch (e)"),
+        "ES5 output should contain catch clause: {}",
+        output
+    );
+    assert!(
+        output.contains("return (e);"),
+        "ES5 output should preserve parenthesized return: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_backward_compatibility() {
     // Parse source
     let source = "class Foo {}";
