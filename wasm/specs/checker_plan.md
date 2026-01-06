@@ -17,21 +17,13 @@ Pass tests/cases/compiler.
 
 Our focus is to make wasm checker complete
 
--  Fix the Solver Stack Overflow Risk
-    In `src/solver/subtype.rs`, add a depth check:
-
-    ```rust
-    // Add to SubtypeChecker struct
-    depth: u32,
-
-    // In check_subtype
-    if self.depth > 100 {
-        return SubtypeResult::Provisional; // Or Error
-    }
-    self.depth += 1;
-    // ... check ...
-    self.depth -= 1;
-```
+- ✅ Fix the Solver Stack Overflow Risk (COMPLETED)
+    Added depth tracking to SubtypeChecker:
+    - Added `depth: u32` field to struct
+    - Initialize to 0 in both constructors
+    - Check `depth > 100` after fast paths, return Provisional
+    - Increment before recursion, decrement after
+    - All tests pass (593/593)
 - 🔄 Move expression type computation to solver/operations.rs (incremental)
 - 🔄 Use NodeView API instead of raw arena lookups (incremental)
 - ⬜ Deprecate checker/types in favor of solver/types
@@ -39,6 +31,15 @@ Our focus is to make wasm checker complete
 - ⬜ Property access from index signature (error 4111)
 - ⬜ Ambient module patterns (errors 2305, 5061, 2819)
 - ⬜ Various missing error codes (see test failures)
+- ⬜ Fix tuple subtyping logic (CRITICAL from Gemini review)
+    - Currently too permissive: allows extra elements in source
+    - TypeScript: `[number, string]` is NOT assignable to `[number]`
+    - Need to check if target has rest element, reject extra source elements if not
+- ⬜ Fix function parameter variance (MAJOR from Gemini review)
+    - Currently bivariant (legacy mode), should be contravariant (strict mode)
+    - Consider making strictFunctionTypes the default
+- ⬜ Remove unused ref_cache field (MINOR from Gemini review)
+    - Currently marked #[allow(dead_code)], not implemented
 - ... add more tasks (Ask Gemini when needed)
 
 

@@ -110,6 +110,8 @@ pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
     /// Cache of resolved Ref types (for future use in Ref resolution optimization)
     #[allow(dead_code)]
     ref_cache: HashSet<(SymbolRef, TypeId)>,
+    /// Current recursion depth (for stack overflow prevention)
+    depth: u32,
 }
 
 impl<'a> SubtypeChecker<'a, NoopResolver> {
@@ -121,6 +123,7 @@ impl<'a> SubtypeChecker<'a, NoopResolver> {
             resolver: &NOOP,
             in_progress: HashSet::new(),
             ref_cache: HashSet::new(),
+            depth: 0,
         }
     }
 }
@@ -133,6 +136,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             resolver,
             in_progress: HashSet::new(),
             ref_cache: HashSet::new(),
+            depth: 0,
         }
     }
 
@@ -192,6 +196,16 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
 
         // =========================================================================
+        // Depth Check (stack overflow prevention)
+        // =========================================================================
+
+        if self.depth > 100 {
+            // Recursion too deep - return provisional true to prevent stack overflow
+            // This is a safety measure for deeply nested or expanding recursive types
+            return SubtypeResult::Provisional;
+        }
+
+        // =========================================================================
         // Cycle detection (coinduction)
         // =========================================================================
 
@@ -202,13 +216,15 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::Provisional;
         }
 
-        // Mark as in-progress
+        // Mark as in-progress and increment depth
         self.in_progress.insert(pair);
+        self.depth += 1;
 
         // Do the actual check
         let result = self.check_subtype_inner(source, target);
 
-        // Remove from in-progress
+        // Remove from in-progress and decrement depth
+        self.depth -= 1;
         self.in_progress.remove(&pair);
 
         result
