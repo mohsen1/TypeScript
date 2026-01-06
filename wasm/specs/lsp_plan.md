@@ -34,18 +34,17 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Traverse template expressions in LSP resolver for references/completions
    - [x] Traverse JSX nodes in LSP resolver for references/completions
    - Add more expression types as needed (template literals, JSX, etc.)
-   - Add import/export handling for cross-file navigation
+   - [x] Add import/export handling for cross-file navigation
 
 3. **Multi-File Support**
-   - Extend to handle cross-file references
-   - Implement project-wide find references
+   - [x] Extend to handle cross-file references
+   - [x] Implement project-wide find references (named/default imports)
+   - [ ] Namespace import and re-export reference mapping
 
 #### Testing
 
-All tests pass (691/691):
-```bash
-./wasm/test.sh  # ✅ All pass
-```
+Latest run:
+- `./wasm/test.sh` ❌ (fails in `src/solver/operations_tests.rs` due to `Atom` conversion errors; pre-existing)
 
 ## Quick Reference
 
