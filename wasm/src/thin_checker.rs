@@ -2152,14 +2152,14 @@ impl<'a> ThinCheckerState<'a> {
         target: TypeId,
         idx: NodeIndex,
     ) {
-        use crate::solver::{SubtypeChecker, TypeFormatter};
+        use crate::solver::{CompatChecker, TypeFormatter};
 
         let Some(loc) = self.get_source_location(idx) else {
             return;
         };
 
         // Use the solver's explain API to get the detailed reason
-        let mut checker = SubtypeChecker::new(self.ctx.types);
+        let mut checker = CompatChecker::new(self.ctx.types);
         let reason = checker.explain_failure(source, target);
 
         match reason {
