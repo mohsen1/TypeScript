@@ -4,6 +4,21 @@ Development sessions for the TypeScript → Rust/WASM migration.
 
 ---
 
+## 2026-01-06: Session 35 - Emitter Track Merge & Checker Improvements
+- **Merged `emitter-track` branch** into `rust`
+  - JS emit baseline: 36.8% → **59.2%** (45/76)
+  - Destructuring transform, arrow `this` capture, class inheritance
+  - Parameter properties, constructor overloads, accessor emit
+- **Checker Improvements**:
+  - TS2322: Accessor type compatibility (getter return ⊆ setter param)
+  - TS2676: Accessor abstract consistency
+  - TS1253: Abstract members in non-abstract class
+  - TS1183: Accessor body checks in ambient contexts
+  - TS1248: Const keyword on class members
+  - Callable interface type lowering
+- **Current Baseline**: 79.2% errors (61/77), 59.2% JS emit (45/76)
+- **534 tests passing**
+
 ## 2026-01-05: Session 34 - Baseline Comparison Infrastructure
 - **Phase 8 Infrastructure Complete**
 - Created `scripts/baseline-test-rust.mjs` - batch baseline comparison runner
