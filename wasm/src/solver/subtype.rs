@@ -120,6 +120,9 @@ pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
     /// Whether rest parameters of any/unknown should be treated as bivariant.
     /// See https://github.com/microsoft/TypeScript/issues/20007.
     pub allow_bivariant_rest: bool,
+    /// Whether optional properties are exact (exclude implicit `undefined`).
+    /// Default: false (legacy TS behavior).
+    pub exact_optional_property_types: bool,
 }
 
 impl<'a> SubtypeChecker<'a, NoopResolver> {
@@ -134,6 +137,7 @@ impl<'a> SubtypeChecker<'a, NoopResolver> {
             strict_function_types: true, // Default to strict (sound) behavior
             allow_void_return: false,
             allow_bivariant_rest: false,
+            exact_optional_property_types: false,
         }
     }
 }
@@ -149,6 +153,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             strict_function_types: true,
             allow_void_return: false,
             allow_bivariant_rest: false,
+            exact_optional_property_types: false,
         }
     }
 
@@ -732,13 +737,15 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             match s_prop {
                 Some(sp) => {
-                    // Property exists, check type compatibility
-                    if !self.check_subtype(sp.type_id, t_prop.type_id).is_true() {
-                        return SubtypeResult::False;
-                    }
                     // Check optional compatibility
                     // Optional in source can't satisfy required in target
                     if sp.optional && !t_prop.optional {
+                        return SubtypeResult::False;
+                    }
+                    // Property exists, check type compatibility
+                    let source_type = self.optional_property_type(sp);
+                    let target_type = self.optional_property_type(t_prop);
+                    if !self.check_subtype(source_type, target_type).is_true() {
                         return SubtypeResult::False;
                     }
                 }
@@ -774,7 +781,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     // Target has string index, source doesn't
                     // All source properties must be compatible with target's string index
                     for prop in &source.properties {
-                        if !self.check_subtype(prop.type_id, t_string_idx.value_type).is_true() {
+                        let prop_type = self.optional_property_type(prop);
+                        if !self.check_subtype(prop_type, t_string_idx.value_type).is_true() {
                             return SubtypeResult::False;
                         }
                     }
@@ -819,6 +827,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         // Check properties against index signatures
         for prop in source {
+            let prop_type = self.optional_property_type(prop);
             // Check if property name is numeric
             let prop_name_str = self.interner.resolve_atom(prop.name);
             let is_numeric = prop_name_str.parse::<f64>().is_ok();
@@ -826,7 +835,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             if is_numeric {
                 // Numeric properties must satisfy number index signature if present
                 if let Some(ref number_idx) = target.number_index {
-                    if !self.check_subtype(prop.type_id, number_idx.value_type).is_true() {
+                    if !self.check_subtype(prop_type, number_idx.value_type).is_true() {
                         return SubtypeResult::False;
                     }
                 }
@@ -834,7 +843,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             // All properties (numeric or not) must also satisfy string index signature if present
             if let Some(ref string_idx) = target.string_index {
-                if !self.check_subtype(prop.type_id, string_idx.value_type).is_true() {
+                if !self.check_subtype(prop_type, string_idx.value_type).is_true() {
                     return SubtypeResult::False;
                 }
             }
@@ -873,6 +882,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::True;
         }
         self.check_subtype(source_return, target_return)
+    }
+
+    fn optional_property_type(&self, prop: &PropertyInfo) -> TypeId {
+        if prop.optional && !self.exact_optional_property_types {
+            self.interner.union(vec![prop.type_id, TypeId::UNDEFINED])
+        } else {
+            prop.type_id
+        }
     }
 
     /// Check function subtyping
@@ -1338,10 +1355,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 // Then check index signature constraints
                 if let Some(ref string_idx) = t_shape.string_index {
                     for prop in s_props {
-                        if !self.check_subtype(prop.type_id, string_idx.value_type).is_true() {
+                        let prop_type = self.optional_property_type(prop);
+                        if !self.check_subtype(prop_type, string_idx.value_type).is_true() {
                             return Some(SubtypeFailureReason::IndexSignatureMismatch {
                                 index_kind: "string",
-                                source_value_type: prop.type_id,
+                                source_value_type: prop_type,
                                 target_value_type: string_idx.value_type,
                             });
                         }
@@ -1412,14 +1430,16 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     }
 
                     // Check property type compatibility
-                    if !self.check_subtype(sp.type_id, t_prop.type_id).is_true() {
+                    let source_type = self.optional_property_type(sp);
+                    let target_type = self.optional_property_type(t_prop);
+                    if !self.check_subtype(source_type, target_type).is_true() {
                         // Recursively explain the nested failure
-                        let nested = self.explain_failure(sp.type_id, t_prop.type_id);
+                        let nested = self.explain_failure(source_type, target_type);
                         let prop_name_str = self.interner.resolve_atom(t_prop.name);
                         return Some(SubtypeFailureReason::PropertyTypeMismatch {
                             property_name: std::sync::Arc::from(prop_name_str.as_str()),
-                            source_property_type: sp.type_id,
-                            target_property_type: t_prop.type_id,
+                            source_property_type: source_type,
+                            target_property_type: target_type,
                             nested_reason: nested.map(Box::new),
                         });
                     }
