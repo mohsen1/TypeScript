@@ -21,7 +21,7 @@ You must track todo items and progress in the appropriate plan file
 
 ## The Architecture
 
-**`specs/WASM_ARCHITECTURE.md`**. This is the guide for how we do things. Always read
+**`specs/WASM_ARCHITECTURE.md`**. This is the guide for how we do things. **Always read this**
 
 ## The workflow
 
