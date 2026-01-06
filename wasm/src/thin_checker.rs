@@ -392,7 +392,8 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(composite) = self.ctx.arena.get_composite_type(node) {
             let mut member_types = Vec::new();
             for &type_idx in &composite.types.nodes {
-                member_types.push(self.get_type_of_node(type_idx));
+                // Use get_type_from_type_node to properly resolve typeof expressions via binder
+                member_types.push(self.get_type_from_type_node(type_idx));
             }
 
             if member_types.is_empty() {
@@ -1730,15 +1731,20 @@ impl<'a> ThinCheckerState<'a> {
     pub fn get_type_from_type_node(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::TypeLowering;
 
-        // First check if this is a type reference or type query that needs validation
+        // First check if this is a type that needs special handling with binder resolution
         if let Some(node) = self.ctx.arena.get(idx) {
             if node.kind == syntax_kind_ext::TYPE_REFERENCE {
                 // Validate the type reference exists before lowering
                 return self.get_type_from_type_reference(idx);
             }
             if node.kind == syntax_kind_ext::TYPE_QUERY {
-                // Handle typeof X - need to resolve symbol properly
+                // Handle typeof X - need to resolve symbol properly via binder
                 return self.get_type_from_type_query(idx);
+            }
+            if node.kind == syntax_kind_ext::UNION_TYPE {
+                // Handle union types specially to ensure nested typeof expressions
+                // are resolved via binder (for abstract class detection)
+                return self.get_type_from_union_type(idx);
             }
         }
 

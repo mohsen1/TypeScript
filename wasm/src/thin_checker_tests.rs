@@ -669,3 +669,35 @@ new cls2();
     assert!(codes.contains(&2511),
         "Expected error 2511 for abstract class instantiation through type alias, got: {:?}", codes);
 }
+
+#[test]
+fn test_abstract_class_union_type_2511() {
+    // Error 2511: Cannot create an instance of an abstract class - through union type
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class ConcreteA {}
+abstract class AbstractA { a: string; }
+
+type ConcretesOrAbstracts = typeof ConcreteA | typeof AbstractA;
+
+declare const cls1: ConcretesOrAbstracts;
+
+new cls1();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2511),
+        "Expected error 2511 for abstract class in union type instantiation, got: {:?}", codes);
+}
