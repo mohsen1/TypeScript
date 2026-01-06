@@ -852,7 +852,7 @@ impl<'a> ThinPrinter<'a> {
 
             // Declarations
             k if k == syntax_kind_ext::ENUM_DECLARATION => {
-                self.emit_enum_declaration(node);
+                self.emit_enum_declaration(node, idx);
             }
             k if k == syntax_kind_ext::ENUM_MEMBER => {
                 self.emit_enum_member(node);
@@ -1376,6 +1376,12 @@ impl<'a> ThinPrinter<'a> {
             String::new()
         };
 
+        // ES5 async transform: wrap in __awaiter/__generator
+        if self.ctx.target_es5 && func.is_async {
+            self.emit_async_function_es5(func, &func_name, is_exported, is_default);
+            return;
+        }
+
         if func.is_async {
             self.write("async ");
         }
@@ -1413,6 +1419,64 @@ impl<'a> ThinPrinter<'a> {
                 self.write(" = ");
             }
             self.write(&func_name);
+            self.write(";");
+        }
+    }
+
+    /// Emit an async function transformed to ES5 __awaiter/__generator pattern
+    fn emit_async_function_es5(
+        &mut self,
+        func: &crate::parser::thin_node::FunctionData,
+        func_name: &str,
+        is_exported: bool,
+        is_default: bool,
+    ) {
+        // function name(params) {
+        self.write("function");
+        if !func_name.is_empty() {
+            self.write_space();
+            self.write(func_name);
+        }
+        self.write("(");
+        self.emit_function_parameters_js(&func.parameters.nodes);
+        self.write(") {");
+        self.write_line();
+
+        // Emit indented __awaiter body
+        //     return __awaiter(this, void 0, void 0, function () {
+        //         return __generator(this, function (_a) { ... });
+        //     });
+        let mut async_emitter = crate::transforms::async_es5::AsyncES5Emitter::new(self.arena);
+        // Transform emitter handles its own indentation, starting from level 1 (inside function)
+        async_emitter.set_indent_level(1);
+
+        let generator_body = if async_emitter.body_contains_await(func.body) {
+            async_emitter.emit_generator_body_with_await(func.body)
+        } else {
+            async_emitter.emit_simple_generator_body(func.body)
+        };
+
+        // Write with surrounding __awaiter wrapper
+        self.write("    return __awaiter(this, void 0, void 0, function () {");
+        self.write_line();
+        self.write("        ");
+        self.write(&generator_body);
+        self.write_line();
+        self.write("    });");
+        self.write_line();
+        self.write("}");
+
+        // CommonJS: emit exports.funcName = funcName; after the function
+        if is_exported && !func_name.is_empty() {
+            self.write_line();
+            if is_default {
+                self.write("exports.default = ");
+            } else {
+                self.write("exports.");
+                self.write(func_name);
+                self.write(" = ");
+            }
+            self.write(func_name);
             self.write(";");
         }
     }
@@ -2756,11 +2820,26 @@ impl<'a> ThinPrinter<'a> {
     // Declarations - Enum, Interface, Type Alias
     // =========================================================================
 
-    fn emit_enum_declaration(&mut self, node: &ThinNode) {
+    fn emit_enum_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
         let Some(enum_decl) = self.arena.get_enum(node) else {
             return;
         };
 
+        // Skip ambient declarations (declare enum)
+        if self.has_declare_modifier(&enum_decl.modifiers) {
+            return;
+        }
+
+        // For ES5 target: transform to IIFE pattern
+        if self.ctx.target_es5 {
+            let mut enum_emitter = crate::transforms::enum_es5::EnumES5Emitter::new(self.arena);
+            enum_emitter.set_indent_level(self.writer.indent_level());
+            let output = enum_emitter.emit_enum(idx);
+            self.write(&output);
+            return;
+        }
+
+        // For modern targets: emit TypeScript-style enum
         self.write("enum ");
         self.emit(enum_decl.name);
         self.write(" {");

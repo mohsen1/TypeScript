@@ -113,13 +113,31 @@ fn test_thin_emit_enum_declaration() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
+    // Default ThinPrinter targets ES5, so enum is transformed to IIFE
     let mut printer = ThinPrinter::new(&parser.arena);
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("enum"), "Expected 'enum' in output: {}", output);
-    assert!(output.contains("Color"), "Expected 'Color' in output: {}", output);
-    assert!(output.contains("Red"), "Expected 'Red' in output: {}", output);
+    // ES5 output should be IIFE pattern, not raw 'enum' keyword
+    assert!(output.contains("var Color;"), "Expected 'var Color;' in ES5 output: {}", output);
+    assert!(output.contains("(function (Color)"), "Expected IIFE pattern in ES5 output: {}", output);
+    assert!(output.contains("Color[Color[\"Red\"]"), "Expected reverse mapping for Red in ES5 output: {}", output);
+}
+
+#[test]
+fn test_thin_emit_enum_declaration_es6() {
+    let source = "enum Color { Red, Green, Blue }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    // ES6 mode should preserve the enum keyword (TypeScript style)
+    let mut printer = ThinPrinter::new_es6(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("enum"), "Expected 'enum' in ES6 output: {}", output);
+    assert!(output.contains("Color"), "Expected 'Color' in ES6 output: {}", output);
+    assert!(output.contains("Red"), "Expected 'Red' in ES6 output: {}", output);
 }
 
 /// Full ThinNode pipeline integration test:
