@@ -213,6 +213,7 @@ pub mod diagnostic_codes {
     pub const PROPERTY_HAS_NO_INITIALIZER: u32 = 2564;
     pub const ABSTRACT_PROPERTY_IN_NON_ABSTRACT_CLASS: u32 = 2515;
     pub const ABSTRACT_MEMBER_IN_NON_ABSTRACT_CLASS: u32 = 2515;  // Same code for methods
+    pub const NON_ABSTRACT_CLASS_MISSING_IMPLEMENTATIONS: u32 = 2654;  // Non-abstract class '{0}' is missing implementations for the following members of '{1}': {2}.
     pub const CANNOT_ASSIGN_TO_READONLY_PROPERTY: u32 = 2540;
     pub const ACCESSORS_MUST_BOTH_BE_ABSTRACT_OR_NOT: u32 = 2676;  // Accessors must both be abstract or non-abstract.
     pub const CLASS_INCORRECTLY_IMPLEMENTS_INTERFACE: u32 = 2420;

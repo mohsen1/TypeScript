@@ -789,3 +789,52 @@ class WrongTypePropertyImpl extends WrongTypeProperty {
     assert!(count_2416 >= 1,
         "Expected at least 1 error 2416 for property not assignable to base, got {} in: {:?}", count_2416, codes);
 }
+
+#[test]
+fn test_non_abstract_class_missing_implementations_2654() {
+    // Error 2654: Non-abstract class 'C' is missing implementations for
+    // the following members of 'B': 'prop', 'm'.
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+abstract class B {
+    abstract prop: number;
+    abstract m(): void;
+}
+class C extends B {
+    // Missing implementations for 'prop' and 'm'
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+
+    checker.check_source_file(root);
+
+    println!("Diagnostics:");
+    for diag in &checker.ctx.diagnostics {
+        println!("  TS{}: {}", diag.code, diag.message_text);
+    }
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have error 2654 for missing abstract implementations
+    let count_2654 = codes.iter().filter(|&&c| c == 2654).count();
+    assert!(count_2654 >= 1,
+        "Expected at least 1 error 2654 for missing abstract implementations, got {} in: {:?}", count_2654, codes);
+
+    // Check the message mentions the missing members
+    let has_prop = checker.ctx.diagnostics.iter()
+        .any(|d| d.code == 2654 && d.message_text.contains("'prop'"));
+    let has_m = checker.ctx.diagnostics.iter()
+        .any(|d| d.code == 2654 && d.message_text.contains("'m'"));
+    assert!(has_prop, "Error 2654 should mention missing 'prop'");
+    assert!(has_m, "Error 2654 should mention missing 'm'");
+}

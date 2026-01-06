@@ -2666,6 +2666,9 @@ impl<'a> ThinCheckerState<'a> {
         // Property type in derived class must be assignable to same property in base class
         self.check_property_inheritance_compatibility(stmt_idx, &class);
 
+        // Check that non-abstract class implements all abstract members from base class (error 2654)
+        self.check_abstract_member_implementations(stmt_idx, &class);
+
         // Restore previous enclosing class
         self.ctx.enclosing_class = prev_enclosing_class;
 
@@ -3506,6 +3509,195 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Check that non-abstract class implements all abstract members from base class (error 2654).
+    /// Reports "Non-abstract class 'X' is missing implementations for the following members of 'Y': {members}."
+    fn check_abstract_member_implementations(
+        &mut self,
+        class_idx: NodeIndex,
+        class_data: &crate::parser::thin_node::ClassData,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        use crate::scanner::SyntaxKind;
+
+        // Only check non-abstract classes
+        if self.has_abstract_modifier(&class_data.modifiers) {
+            return;
+        }
+
+        // Find base class from heritage clauses
+        let Some(ref heritage_clauses) = class_data.heritage_clauses else {
+            return;
+        };
+
+        let mut base_class_idx: Option<NodeIndex> = None;
+        let mut base_class_name = String::new();
+
+        for &clause_idx in &heritage_clauses.nodes {
+            let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
+                continue;
+            };
+
+            let Some(heritage) = self.ctx.arena.get_heritage_clause(clause_node) else {
+                continue;
+            };
+
+            // Only check extends clauses
+            if heritage.token != SyntaxKind::ExtendsKeyword as u16 {
+                continue;
+            }
+
+            // Get the base class
+            if let Some(&type_idx) = heritage.types.nodes.first() {
+                if let Some(type_node) = self.ctx.arena.get(type_idx) {
+                    let expr_idx = if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
+                        expr_type_args.expression
+                    } else {
+                        type_idx
+                    };
+
+                    if let Some(expr_node) = self.ctx.arena.get(expr_idx) {
+                        if let Some(ident) = self.ctx.arena.get_identifier(expr_node) {
+                            base_class_name = ident.escaped_text.clone();
+
+                            if let Some(sym_id) = self.ctx.binder.file_locals.get(&base_class_name) {
+                                if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                                    if !symbol.value_declaration.is_none() {
+                                        base_class_idx = Some(symbol.value_declaration);
+                                    } else if let Some(&decl_idx) = symbol.declarations.first() {
+                                        base_class_idx = Some(decl_idx);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            break;
+        }
+
+        let Some(base_idx) = base_class_idx else {
+            return;
+        };
+
+        let Some(base_node) = self.ctx.arena.get(base_idx) else {
+            return;
+        };
+
+        let Some(base_class) = self.ctx.arena.get_class(base_node) else {
+            return;
+        };
+
+        // Collect implemented members from derived class
+        let mut implemented_members = std::collections::HashSet::new();
+        for &member_idx in &class_data.members.nodes {
+            if let Some(name) = self.get_member_name(member_idx) {
+                // Check if this member is not abstract (i.e., it's an implementation)
+                if !self.member_is_abstract(member_idx) {
+                    implemented_members.insert(name);
+                }
+            }
+        }
+
+        // Collect abstract members from base class that are not implemented
+        let mut missing_members: Vec<String> = Vec::new();
+        for &member_idx in &base_class.members.nodes {
+            if self.member_is_abstract(member_idx) {
+                if let Some(name) = self.get_member_name(member_idx) {
+                    if !implemented_members.contains(&name) {
+                        missing_members.push(name);
+                    }
+                }
+            }
+        }
+
+        // Report error if there are missing implementations
+        if !missing_members.is_empty() {
+            let derived_class_name = if !class_data.name.is_none() {
+                if let Some(name_node) = self.ctx.arena.get(class_data.name) {
+                    if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                        ident.escaped_text.clone()
+                    } else {
+                        String::from("<anonymous>")
+                    }
+                } else {
+                    String::from("<anonymous>")
+                }
+            } else {
+                String::from("<anonymous>")
+            };
+
+            // Format: "Non-abstract class 'C' is missing implementations for the following members of 'B': 'prop', 'readonlyProp', 'm', 'mismatch'."
+            let missing_list = missing_members
+                .iter()
+                .map(|s| format!("'{}'", s))
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            self.error_at_node(
+                class_idx,
+                &format!(
+                    "Non-abstract class '{}' is missing implementations for the following members of '{}': {}.",
+                    derived_class_name, base_class_name, missing_list
+                ),
+                diagnostic_codes::NON_ABSTRACT_CLASS_MISSING_IMPLEMENTATIONS,
+            );
+        }
+    }
+
+    /// Check if a class member has the abstract modifier.
+    fn member_is_abstract(&self, member_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(member_idx) else {
+            return false;
+        };
+
+        match node.kind {
+            k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                if let Some(prop) = self.ctx.arena.get_property_decl(node) {
+                    self.has_abstract_modifier(&prop.modifiers)
+                } else {
+                    false
+                }
+            }
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                if let Some(method) = self.ctx.arena.get_method_decl(node) {
+                    self.has_abstract_modifier(&method.modifiers)
+                } else {
+                    false
+                }
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                if let Some(accessor) = self.ctx.arena.get_accessor(node) {
+                    self.has_abstract_modifier(&accessor.modifiers)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    /// Get the name of a class member (property, method, or accessor).
+    fn get_member_name(&self, member_idx: NodeIndex) -> Option<String> {
+        let Some(node) = self.ctx.arena.get(member_idx) else {
+            return None;
+        };
+
+        let name_idx = match node.kind {
+            k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                self.ctx.arena.get_property_decl(node).map(|p| p.name)
+            }
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                self.ctx.arena.get_method_decl(node).map(|m| m.name)
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                self.ctx.arena.get_accessor(node).map(|a| a.name)
+            }
+            _ => None,
+        }?;
+
+        self.get_property_name(name_idx)
+    }
+
     /// Get the name of a method declaration.
     /// Handles both identifier names and numeric literal names.
     fn get_method_name_from_node(&self, member_idx: NodeIndex) -> Option<String> {
@@ -3968,33 +4160,6 @@ impl<'a> ThinCheckerState<'a> {
             _ => {
                 // For other expressions, we don't recurse further to keep it simple
             }
-        }
-    }
-
-    /// Get the name of a class member (property or method).
-    fn get_member_name(&self, member_idx: NodeIndex) -> Option<String> {
-        let node = self.ctx.arena.get(member_idx)?;
-
-        match node.kind {
-            k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
-                let prop = self.ctx.arena.get_property_decl(node)?;
-                let name_node = self.ctx.arena.get(prop.name)?;
-                let ident = self.ctx.arena.get_identifier(name_node)?;
-                Some(ident.escaped_text.clone())
-            }
-            k if k == syntax_kind_ext::METHOD_DECLARATION => {
-                let method = self.ctx.arena.get_method_decl(node)?;
-                let name_node = self.ctx.arena.get(method.name)?;
-                let ident = self.ctx.arena.get_identifier(name_node)?;
-                Some(ident.escaped_text.clone())
-            }
-            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
-                let accessor = self.ctx.arena.get_accessor(node)?;
-                let name_node = self.ctx.arena.get(accessor.name)?;
-                let ident = self.ctx.arena.get_identifier(name_node)?;
-                Some(ident.escaped_text.clone())
-            }
-            _ => None,
         }
     }
 
