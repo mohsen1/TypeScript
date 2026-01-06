@@ -136,9 +136,50 @@ use crate::lsp::position::{LineMap, Position, Range};
 use crate::lsp::{
     GoToDefinition, FindReferences, Completions, HoverProvider, SignatureHelpProvider,
     DocumentSymbolProvider, RenameProvider, SemanticTokensProvider, CodeActionProvider,
-    CodeActionContext,
+    CodeActionContext, ImportCandidate, ImportCandidateKind,
 };
 use crate::lsp::diagnostics::convert_diagnostic;
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ImportCandidateInput {
+    module_specifier: String,
+    local_name: String,
+    kind: String,
+    export_name: Option<String>,
+    #[serde(default)]
+    is_type_only: bool,
+}
+
+impl TryFrom<ImportCandidateInput> for ImportCandidate {
+    type Error = JsValue;
+
+    fn try_from(input: ImportCandidateInput) -> Result<Self, Self::Error> {
+        let local_name = input.local_name;
+        let kind = match input.kind.as_str() {
+            "named" => {
+                let export_name = input.export_name.unwrap_or_else(|| local_name.clone());
+                ImportCandidateKind::Named { export_name }
+            }
+            "default" => ImportCandidateKind::Default,
+            "namespace" => ImportCandidateKind::Namespace,
+            other => {
+                return Err(JsValue::from_str(&format!(
+                    "Unsupported import candidate kind: {}",
+                    other
+                )));
+            }
+        };
+
+        Ok(ImportCandidate {
+            module_specifier: input.module_specifier,
+            local_name,
+            kind,
+            is_type_only: input.is_type_only,
+        })
+    }
+}
 
 /// Opaque wrapper for transform directives across the wasm boundary.
 #[wasm_bindgen]
@@ -685,6 +726,72 @@ impl ThinParser {
             diagnostics: Vec::new(),
             only: None,
             import_candidates: Vec::new(),
+        };
+
+        let result = provider.provide_code_actions(root, range, context);
+        Ok(serde_wasm_bindgen::to_value(&result)?)
+    }
+
+    /// Code Actions: Get code actions for a range with diagnostics context.
+    #[wasm_bindgen(js_name = getCodeActionsWithContext)]
+    pub fn get_code_actions_with_context(
+        &mut self,
+        start_line: u32,
+        start_char: u32,
+        end_line: u32,
+        end_char: u32,
+        diagnostics: JsValue,
+        only: JsValue,
+        import_candidates: JsValue,
+    ) -> Result<JsValue, JsValue> {
+        self.ensure_bound()?;
+        self.ensure_line_map();
+
+        let diagnostics = if diagnostics.is_null() || diagnostics.is_undefined() {
+            Vec::new()
+        } else {
+            serde_wasm_bindgen::from_value(diagnostics)?
+        };
+
+        let only = if only.is_null() || only.is_undefined() {
+            None
+        } else {
+            Some(serde_wasm_bindgen::from_value(only)?)
+        };
+
+        let import_candidates = if import_candidates.is_null() || import_candidates.is_undefined() {
+            Vec::new()
+        } else {
+            let inputs: Vec<ImportCandidateInput> = serde_wasm_bindgen::from_value(import_candidates)?;
+            inputs
+                .into_iter()
+                .map(ImportCandidate::try_from)
+                .collect::<Result<Vec<_>, _>>()?
+        };
+
+        let root = self.source_file_idx.unwrap();
+        let binder = self.binder.as_ref().unwrap();
+        let line_map = self.line_map.as_ref().unwrap();
+        let file_name = self.parser.get_file_name().to_string();
+        let source_text = self.parser.get_source_text();
+
+        let provider = CodeActionProvider::new(
+            self.parser.get_arena(),
+            binder,
+            line_map,
+            file_name,
+            source_text,
+        );
+
+        let range = Range::new(
+            Position::new(start_line, start_char),
+            Position::new(end_line, end_char),
+        );
+
+        let context = CodeActionContext {
+            diagnostics,
+            only,
+            import_candidates,
         };
 
         let result = provider.provide_code_actions(root, range, context);

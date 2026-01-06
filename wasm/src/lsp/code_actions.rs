@@ -26,14 +26,14 @@ use crate::lsp::diagnostics::LspDiagnostic;
 use crate::lsp::rename::{WorkspaceEdit, TextEdit};
 use crate::lsp::utils::find_node_at_offset;
 use crate::scanner::SyntaxKind;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 // =============================================================================
 // Code Action Types
 // =============================================================================
 
 /// Kind of code action (matches LSP spec).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CodeActionKind {
     /// Quick fix for an error or warning.
     #[serde(rename = "quickfix")]
@@ -177,7 +177,6 @@ impl<'a> CodeActionProvider<'a> {
                 actions.extend(self.missing_import_quickfixes(root, diag, &context.import_candidates));
             }
         }
-        // TODO: Wire import candidates into single-file wasm bindings.
 
         // Source Actions (file-level)
         let request_organize = context.only
