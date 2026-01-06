@@ -11,7 +11,10 @@
 
 use std::collections::HashSet;
 use crate::solver::types::*;
-use crate::solver::intern::TypeInterner;
+use crate::solver::TypeDatabase;
+
+#[cfg(test)]
+use crate::solver::TypeInterner;
 
 /// Result of a subtype check
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -40,7 +43,7 @@ impl SubtypeResult {
 pub trait TypeResolver {
     /// Resolve a symbol reference to its structural type.
     /// Returns None if the symbol cannot be resolved.
-    fn resolve_ref(&self, symbol: SymbolRef, interner: &TypeInterner) -> Option<TypeId>;
+    fn resolve_ref(&self, symbol: SymbolRef, interner: &dyn TypeDatabase) -> Option<TypeId>;
 }
 
 /// A no-op resolver that doesn't resolve any references.
@@ -48,7 +51,7 @@ pub trait TypeResolver {
 pub struct NoopResolver;
 
 impl TypeResolver for NoopResolver {
-    fn resolve_ref(&self, _symbol: SymbolRef, _interner: &TypeInterner) -> Option<TypeId> {
+    fn resolve_ref(&self, _symbol: SymbolRef, _interner: &dyn TypeDatabase) -> Option<TypeId> {
         None
     }
 }
@@ -95,7 +98,7 @@ impl TypeEnvironment {
 }
 
 impl TypeResolver for TypeEnvironment {
-    fn resolve_ref(&self, symbol: SymbolRef, _interner: &TypeInterner) -> Option<TypeId> {
+    fn resolve_ref(&self, symbol: SymbolRef, _interner: &dyn TypeDatabase) -> Option<TypeId> {
         self.get(symbol)
     }
 }
@@ -103,7 +106,7 @@ impl TypeResolver for TypeEnvironment {
 /// Subtype checking context.
 /// Maintains the "seen" set for cycle detection.
 pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
-    interner: &'a TypeInterner,
+    interner: &'a dyn TypeDatabase,
     resolver: &'a R,
     /// Active subtype pairs being checked (for cycle detection)
     in_progress: HashSet<(TypeId, TypeId)>,
@@ -116,7 +119,7 @@ pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
 
 impl<'a> SubtypeChecker<'a, NoopResolver> {
     /// Create a new SubtypeChecker without a resolver (basic mode).
-    pub fn new(interner: &'a TypeInterner) -> SubtypeChecker<'a, NoopResolver> {
+    pub fn new(interner: &'a dyn TypeDatabase) -> SubtypeChecker<'a, NoopResolver> {
         static NOOP: NoopResolver = NoopResolver;
         SubtypeChecker {
             interner,
@@ -130,7 +133,7 @@ impl<'a> SubtypeChecker<'a, NoopResolver> {
 
 impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     /// Create a new SubtypeChecker with a custom resolver.
-    pub fn with_resolver(interner: &'a TypeInterner, resolver: &'a R) -> Self {
+    pub fn with_resolver(interner: &'a dyn TypeDatabase, resolver: &'a R) -> Self {
         SubtypeChecker {
             interner,
             resolver,
@@ -398,6 +401,22 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     }
                 }
                 SubtypeResult::False
+            }
+
+            // Generic application to application
+            (TypeKey::Application(s_app), TypeKey::Application(t_app)) => {
+                if s_app.args.len() != t_app.args.len() {
+                    SubtypeResult::False
+                } else if !self.check_subtype(s_app.base, t_app.base).is_true() {
+                    SubtypeResult::False
+                } else {
+                    for (s_arg, t_arg) in s_app.args.iter().zip(t_app.args.iter()) {
+                        if !self.check_subtype(*s_arg, *t_arg).is_true() {
+                            return SubtypeResult::False;
+                        }
+                    }
+                    SubtypeResult::True
+                }
             }
 
             // Reference types - try to resolve and compare structurally
@@ -1487,14 +1506,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 }
 
 /// Convenience function for one-off subtype checks (without resolver)
-pub fn is_subtype_of(interner: &TypeInterner, source: TypeId, target: TypeId) -> bool {
+pub fn is_subtype_of(interner: &dyn TypeDatabase, source: TypeId, target: TypeId) -> bool {
     let mut checker = SubtypeChecker::new(interner);
     checker.is_subtype_of(source, target)
 }
 
 /// Convenience function for one-off subtype checks with a resolver
 pub fn is_subtype_of_with_resolver<R: TypeResolver>(
-    interner: &TypeInterner,
+    interner: &dyn TypeDatabase,
     resolver: &R,
     source: TypeId,
     target: TypeId,

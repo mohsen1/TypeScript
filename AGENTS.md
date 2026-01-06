@@ -33,10 +33,10 @@ Loop:
   5. If pass → update *_plan.md, commit
   6. **CRITICAL: Sync with origin after EVERY task**
      - Run: `git add . && git commit -m "[wasm] your changes"`
-     - Run: `git push origin HEAD` (pushes your current branch)
+     - Run: `git push origin rust` (ALL tracks push to shared rust branch)
      - Run: `git fetch origin && git merge origin/rust`
      - Resolve any conflicts if they occur
-     - Run: `git push origin HEAD` (if there were merges)
+     - Run: `git push origin rust` (if there were merges)
      - This keeps all tracks in sync and prevents divergence
   7. Repeat
 `

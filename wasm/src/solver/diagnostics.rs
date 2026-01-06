@@ -16,8 +16,11 @@
 
 use std::sync::Arc;
 use crate::solver::types::*;
-use crate::solver::intern::TypeInterner;
+use crate::solver::TypeDatabase;
 use crate::binder::SymbolId;
+
+#[cfg(test)]
+use crate::solver::TypeInterner;
 
 /// Diagnostic severity level.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -287,7 +290,7 @@ pub fn get_message_template(code: u32) -> &'static str {
 
 /// Context for generating type strings.
 pub struct TypeFormatter<'a> {
-    interner: &'a TypeInterner,
+    interner: &'a dyn TypeDatabase,
     /// Symbol arena for looking up symbol names (optional)
     symbol_arena: Option<&'a crate::binder::SymbolArena>,
     /// Maximum depth for nested type printing
@@ -297,7 +300,7 @@ pub struct TypeFormatter<'a> {
 }
 
 impl<'a> TypeFormatter<'a> {
-    pub fn new(interner: &'a TypeInterner) -> Self {
+    pub fn new(interner: &'a dyn TypeDatabase) -> Self {
         TypeFormatter {
             interner,
             symbol_arena: None,
@@ -307,7 +310,7 @@ impl<'a> TypeFormatter<'a> {
     }
 
     /// Create a formatter with access to symbol names.
-    pub fn with_symbols(interner: &'a TypeInterner, symbol_arena: &'a crate::binder::SymbolArena) -> Self {
+    pub fn with_symbols(interner: &'a dyn TypeDatabase, symbol_arena: &'a crate::binder::SymbolArena) -> Self {
         TypeFormatter {
             interner,
             symbol_arena: Some(symbol_arena),
@@ -426,6 +429,12 @@ impl<'a> TypeFormatter<'a> {
             TypeKey::Callable(shape) => self.format_callable(shape),
             TypeKey::TypeParameter(info) => self.interner.resolve_atom(info.name),
             TypeKey::Ref(sym) => format!("Ref({})", sym.0),
+            TypeKey::Application(app) => {
+                let args: Vec<String> = app.args.iter()
+                    .map(|&arg| self.format(arg))
+                    .collect();
+                format!("{}<{}>", self.format(app.base), args.join(", "))
+            }
             TypeKey::Conditional(cond) => self.format_conditional(cond),
             TypeKey::Mapped(mapped) => self.format_mapped(mapped),
             TypeKey::IndexAccess(obj, idx) => {
@@ -623,12 +632,12 @@ impl<'a> TypeFormatter<'a> {
 /// Builder for creating type error diagnostics.
 pub struct DiagnosticBuilder<'a> {
     #[allow(dead_code)]
-    interner: &'a TypeInterner,
+    interner: &'a dyn TypeDatabase,
     formatter: TypeFormatter<'a>,
 }
 
 impl<'a> DiagnosticBuilder<'a> {
-    pub fn new(interner: &'a TypeInterner) -> Self {
+    pub fn new(interner: &'a dyn TypeDatabase) -> Self {
         DiagnosticBuilder {
             interner,
             formatter: TypeFormatter::new(interner),
@@ -1013,7 +1022,7 @@ pub struct SpannedDiagnosticBuilder<'a> {
 }
 
 impl<'a> SpannedDiagnosticBuilder<'a> {
-    pub fn new(interner: &'a TypeInterner, file: impl Into<Arc<str>>) -> Self {
+    pub fn new(interner: &'a dyn TypeDatabase, file: impl Into<Arc<str>>) -> Self {
         SpannedDiagnosticBuilder {
             builder: DiagnosticBuilder::new(interner),
             file: file.into(),
@@ -1234,13 +1243,13 @@ impl SourceLocation {
 
 /// A diagnostic collector that accumulates diagnostics with source tracking.
 pub struct DiagnosticCollector<'a> {
-    interner: &'a TypeInterner,
+    interner: &'a dyn TypeDatabase,
     file: Arc<str>,
     diagnostics: Vec<TypeDiagnostic>,
 }
 
 impl<'a> DiagnosticCollector<'a> {
-    pub fn new(interner: &'a TypeInterner, file: impl Into<Arc<str>>) -> Self {
+    pub fn new(interner: &'a dyn TypeDatabase, file: impl Into<Arc<str>>) -> Self {
         DiagnosticCollector {
             interner,
             file: file.into(),
