@@ -288,7 +288,8 @@ pub fn get_import_bindings(
                 // Namespace imports have a name but no elements
                 if !named_imports.name.is_none() && named_imports.elements.nodes.is_empty() {
                     if let Some(name) = get_identifier_text(arena, named_imports.name) {
-                        bindings.push(format!("var {} = {};", name, module_var));
+                        // Use __importStar helper for namespace imports
+                        bindings.push(format!("var {} = __importStar({});", name, module_var));
                     }
                 } else {
                     // Named imports: import { a, b } from "..."

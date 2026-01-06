@@ -3868,7 +3868,13 @@ impl<'a> ThinPrinter<'a> {
 
         let mut comment_idx = 0;
 
-        // Emit header comments BEFORE "use strict" (license headers, etc.)
+        // CommonJS: Emit "use strict" FIRST (before comments and helpers)
+        if self.ctx.is_commonjs() {
+            self.write("\"use strict\";");
+            self.write_line();
+        }
+
+        // Emit header comments AFTER "use strict" but BEFORE helpers
         let first_stmt_pos = source.statements.nodes.first()
             .and_then(|&idx| self.arena.get(idx))
             .map(|n| n.pos)
@@ -3890,13 +3896,28 @@ impl<'a> ThinPrinter<'a> {
             }
         }
 
-        // CommonJS: Emit "use strict" after header comments
+        // Emit runtime helpers (must come BEFORE __esModule marker)
+        // Order: "use strict" → helpers → __esModule → exports init
+        let mut helpers = crate::transforms::helpers::HelpersNeeded::default();
+
+        // Detect CommonJS import/export helpers
         if self.ctx.is_commonjs() {
-            self.write("\"use strict\";");
-            self.write_line();
+            self.detect_commonjs_helpers(&source.statements, &mut helpers);
         }
 
-        // CommonJS: Emit __esModule and exports initialization
+        // Detect ES5 class helpers
+        if self.ctx.target_es5 && self.needs_extends_helper(&source.statements) {
+            helpers.extends = true;
+        }
+
+        // Emit all needed helpers
+        let helpers_code = crate::transforms::helpers::emit_helpers(&helpers);
+        if !helpers_code.is_empty() {
+            self.write(&helpers_code);
+            // emit_helpers() already adds newlines, no need to add more
+        }
+
+        // CommonJS: Emit __esModule and exports initialization (AFTER helpers)
         if self.ctx.is_commonjs() {
             use crate::transforms::module_commonjs;
 
@@ -3919,11 +3940,6 @@ impl<'a> ThinPrinter<'a> {
                 self.write(" = void 0;");
                 self.write_line();
             }
-        }
-
-        // Check if any class extends another - if so, emit __extends helper
-        if self.ctx.target_es5 && self.needs_extends_helper(&source.statements) {
-            self.emit_extends_helper();
         }
 
         // Emit statements with their comments
@@ -4155,6 +4171,44 @@ impl<'a> ThinPrinter<'a> {
             }
             self.write(" = void 0;");
             self.write_line();
+        }
+    }
+
+    /// Detect which CommonJS import/export helpers are needed for the file
+    fn detect_commonjs_helpers(&self, statements: &NodeList, helpers: &mut crate::transforms::helpers::HelpersNeeded) {
+        use crate::parser::syntax_kind_ext;
+
+        for &stmt_idx in &statements.nodes {
+            let Some(node) = self.arena.get(stmt_idx) else { continue };
+
+            match node.kind {
+                k if k == syntax_kind_ext::IMPORT_DECLARATION => {
+                    if let Some(import) = self.arena.get_import_decl(node) {
+                        // Check for: import * as ns from "mod"
+                        if let Some(clause_node) = self.arena.get(import.import_clause) {
+                            if let Some(clause) = self.arena.get_import_clause(clause_node) {
+                                if let Some(bindings_node) = self.arena.get(clause.named_bindings) {
+                                    // NAMESPACE_IMPORT = 275
+                                    if bindings_node.kind == syntax_kind_ext::NAMESPACE_IMPORT {
+                                        helpers.import_star = true;
+                                        helpers.create_binding = true; // __importStar depends on __createBinding
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::EXPORT_DECLARATION => {
+                    if let Some(export) = self.arena.get_export_decl(node) {
+                        // Check for: export * from "mod" (module_specifier present, no export_clause)
+                        if !export.module_specifier.is_none() && export.export_clause.is_none() {
+                            helpers.export_star = true;
+                            helpers.create_binding = true; // __exportStar depends on __createBinding
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
