@@ -589,9 +589,9 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(param_node) = self.ctx.arena.get(param_idx) {
                 if let Some(param) = self.ctx.arena.get_parameter(param_node) {
                     // Get parameter name
-                    let name: Option<Arc<str>> = if let Some(name_node) = self.ctx.arena.get(param.name) {
+                    let name = if let Some(name_node) = self.ctx.arena.get(param.name) {
                         if let Some(name_data) = self.ctx.arena.get_identifier(name_node) {
-                            Some(Arc::from(name_data.escaped_text.as_str()))
+                            Some(self.ctx.types.intern_string(&name_data.escaped_text))
                         } else {
                             None
                         }
@@ -733,7 +733,7 @@ impl<'a> ThinCheckerState<'a> {
                             };
 
                             properties.push(PropertyInfo {
-                                name: Arc::from(id_data.escaped_text.as_str()),
+                                name: self.ctx.types.intern_string(&id_data.escaped_text),
                                 type_id,
                                 optional: sig.question_token,
                                 readonly: false, // TODO: Check for readonly modifier
@@ -1549,9 +1549,9 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(param_node) = self.ctx.arena.get(param_idx) {
                 if let Some(param) = self.ctx.arena.get_parameter(param_node) {
                     // Get parameter name
-                    let name: Option<Arc<str>> = if let Some(name_node) = self.ctx.arena.get(param.name) {
+                    let name = if let Some(name_node) = self.ctx.arena.get(param.name) {
                         if let Some(name_data) = self.ctx.arena.get_identifier(name_node) {
-                            Some(Arc::from(name_data.escaped_text.as_str()))
+                            Some(self.ctx.types.intern_string(&name_data.escaped_text))
                         } else {
                             None
                         }
