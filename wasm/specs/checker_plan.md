@@ -19,126 +19,28 @@ Pass tests/cases/compiler.
 
 Our focus is to make wasm checker complete
 
+### Immediate Priorities
+- [ ] **Fix Atom Refactor Compilation Errors** (High Priority)
+  - Fix `solver/lower.rs` (intern strings from AST)
+  - Fix `solver/diagnostics.rs` (resolve atoms for error messages)
+  - Fix `solver/subtype.rs` (property name comparisons)
+- [ ] **Define TypeDatabase Trait** (Preparation for Salsa)
 
-### 🚨 URGENT: Critical Architectural Fixes (MUST DO FIRST)
+**Status:** 🚧 **Broken Build**. The `TypeKey` refactor (String -> Atom) is half-finished.
+**Context:** You changed `TypeKey` to use `Atom` (u32) instead of `Arc<str>`, which broke the solver logic that expects strings. This is the **highest priority** task in the entire repo.
 
-These issues block incremental compilation and fast LSP queries.
+**Step 1 (Fix Build):**
+*   **Goal:** Fix ~40 compilation errors in `wasm/src/solver/`.
+*   **Focus:**
+    *   `solver/lower.rs`: Update `lower_literal_type` and `lower_identifier_type` to use `interner.intern_string()`.
+    *   `solver/diagnostics.rs`: Update `TypeFormatter` to resolve Atoms back to strings using `interner.resolve_atom()` before printing.
+    *   `solver/intern.rs`: Ensure `TypeInterner` exposes a thread-safe `resolve_atom` method.
 
-#### The "Transient Scope" Trap (Checker State) - ⏳ IN PROGRESS
+**Step 2 (The "Salsa Gap"):**
+*   **Goal:** Define the `TypeDatabase` trait to prepare for incremental compilation.
+*   **Action:** Create `wasm/src/solver/db.rs`. Define the query interface so the solver stops accessing raw data structures directly.
 
-**Problem:** The checker manually manages scope stacks inside checker logic:
-```rust
-// In ThinCheckerState
-pub fn push_local_scope(&mut self) { ... }
-pub fn add_local(&mut self, name: String, ...) { ... }
-```
 
-**Impact:**
-- Ties Checker to specific **traversal order**
-- Cannot implement "Lazy Checking" (e.g., "Check function 'foo' right now because LSP asked")
-- If you jump straight to `foo`, the scope_stack is empty
-- **Result:** We will NEVER achieve incremental compilation or fast LSP queries with this design
-
-**Progress (2026-01-06):**
-
-**Phase 1: Binder Infrastructure (Completed)**
-- [x] Added `Scope` and `ScopeId` structures to `binder.rs`
-- [x] Updated `ThinBinderState` with persistent scope system:
-  - `pub scopes: Vec<Scope>` - Persistent scopes for querying
-  - `pub node_scope_ids: FxHashMap<u32, ScopeId>` - Maps AST nodes to scopes
-  - `current_scope_id: ScopeId` - Tracks current scope during binding
-- [x] Implemented `resolve_identifier(arena, node_idx) -> Option<SymbolId>` API
-  - Enables stateless checking by querying scope info without traversal order
-  - Walks up AST to find enclosing scope, then walks scope chain
-- [x] Integrated persistent scope management into binding:
-  - `enter_scope` / `exit_scope` now maintain both legacy and persistent scopes
-  - Symbols added to persistent scope table during binding
-  - File-level scope created as root persistent scope
-
-**Phase 2: Checker Integration (Completed)**
-- [x] Updated `get_type_of_identifier` in `thin_checker.rs`:
-  - Now calls `binder.resolve_identifier()` FIRST (stateless approach)
-  - Falls back to legacy `lookup_local()` for compatibility
-  - Maintains both code paths during transition
-- [x] Successfully compiles with new stateless approach
-- [x] Binder tests pass (13/13) - scope resolution working correctly
-- [x] Changes committed and pushed to `checker-track`
-
-**Architecture Achievement:**
-✅ **Stateless checking is now enabled!**
-- Checker can resolve identifier types without scope stack dependency
-- No longer tied to traversal order
-- Foundation for lazy checking and incremental compilation is complete
-
-**Next Phase (Future Work):**
-- [ ] Remove legacy `lookup_local()` fallback once fully validated
-- [ ] Remove `local_scope_stack` entirely from `CheckerContext`
-- [ ] Implement lazy function checking for LSP
-- [ ] Measure and document performance improvements
-- [ ] Add comprehensive tests for stateless resolution
-
-#### TypeKey Refactor (Shared with Solver) - ⏳ IN PROGRESS
-
-**Problem:** `Arc<str>` in type keys destroys performance - forces expensive string hashing and atomic reference counting during every type comparison and interning operation.
-
-**Progress (2026-01-06):**
-- [x] Replaced all `Arc<str>` with `Atom` (u32) in `solver/types.rs`:
-  - `LiteralValue::String/BigInt` now use Atom
-  - `PropertyInfo.name` now Atom
-  - `TupleElement.name` now `Option<Atom>`
-  - `ParamInfo.name` now `Option<Atom>`
-  - `TypeParamInfo.name` now Atom
-  - `TemplateSpan::Text` now Atom
-- [x] Updated `TypeInterner` to include string interner:
-  - Added `string_interner: RwLock<Interner>` field
-  - Pre-interns common TypeScript identifiers (100+ keywords)
-  - `intern_string()` method for type construction
-  - `resolve_atom()` method for diagnostics
-- [x] **Partial:** Fixed 2/3 type construction sites in `thin_checker.rs`
-  - Parameter names now use `intern_string()`
-  - PropertyInfo construction uses `intern_string()`
-- [ ] **In Progress:** ~40 compilation errors across solver files need fixing:
-  - `solver/lower.rs` - TypeLowering needs to intern strings (6 errors)
-  - `solver/diagnostics.rs` - TypeFormatter needs to resolve Atoms (10 errors)
-  - `solver/intern.rs` - Comparison methods need Atom support (3 errors)
-  - `solver/subtype.rs` - Property comparisons need resolution (4 errors)
-  - `solver/instantiate.rs`, `solver/evaluate.rs`, etc. (17+ errors)
-- [ ] **Next Session:** Systematically fix each solver file
-- [ ] **Then:** Verify all tests pass and measure performance improvement
-
-**Scope Note:** This is a large architectural refactor touching 10+ files.
-Estimated 2-3 more commits needed to complete all call site migrations.
-
-**Impact:**
-- Type equality/hashing now O(1) integer operations (was expensive string hashing)
-- Eliminates atomic reference counting overhead
-- Required foundation for Salsa integration (Task #2)
-
-### Integrate Salsa for Incremental Queries
-
-**Problem:** Manual `RwLock<HashMap>` interner blocks incremental compilation.
-
-**Action Required:**
-- [ ] **Add `salsa` crate** to `wasm/Cargo.toml` dependencies
-- [ ] Define query interface using Salsa macros:
-```rust
-#[salsa::query_group(TypeDatabaseStorage)]
-pub trait TypeDatabase {
-    #[salsa::interned]
-    fn intern_type(&self, key: TypeKey) -> TypeId;
-    fn resolve_symbol_type(&self, symbol: SymbolId) -> TypeId;
-    fn check_subtype(&self, sub: TypeId, sup: TypeId) -> bool;
-}
-```
-- [ ] Replace `RwLock<HashMap>` with Salsa's `#[salsa::interned]`
-- [ ] All solver/checker components accept `&dyn TypeDatabase`
-- [ ] **Benefits:** automatic memoization, incremental recomputation, cycle detection
-
-- 🔄 Move expression type computation to solver/operations.rs (incremental)
-- 🔄 Use NodeView API instead of raw arena lookups (incremental)
-- ⬜ Deprecate checker/types in favor of solver/types
-- ⬜ Various missing error codes (see test failures)
-- ... add more tasks (Ask Gemini when needed)
 
 
 
