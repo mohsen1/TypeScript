@@ -6,6 +6,39 @@
 Incrementally rewrite the TypeScript compiler in Rust, compiled to WebAssembly
 for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 
+---
+
+## 🚨 URGENT: Critical Infrastructure (MUST FIX NOW)
+
+These issues block LSP responsiveness.
+
+### Parent Mapping for Navigation
+
+**Problem:** `ThinNode` (16 bytes) doesn't store a `parent` pointer.
+
+**Impact:**
+- `ScopeWalker` reconstructs scopes on demand - this is good
+- BUT: `find_node_at_offset` followed by "walk up" strategies (like SignatureHelp) require either:
+  - Full tree traversal every time (slow)
+  - A side-table `Vec<ParentIndex>` (need to verify this exists)
+
+**Action Required:**
+- [ ] **Verify:** Does `ThinNodeArena` have a parent mapping mechanism?
+- [ ] **If No:** Add a parallel array `Vec<NodeIndex>` where `parent[child_idx] = parent_idx`
+- [ ] **If Space Permits:** Consider adding `parent: u32` to `ThinNode` (would make it 20 bytes)
+- [ ] Ensure LSP "walk up to parent" operations are O(1), not O(N)
+
+### Stateless Resolution (Shared with Checker)
+
+**Problem:** LSP features must work without full type-checking pass.
+
+**Action Required:**
+- [ ] Ensure LSP can query Binder directly for symbol resolution
+- [ ] Don't require Checker's transient scope stack (see checker_plan.md)
+- [ ] Support "jump to function 'foo'" without checking the whole file first
+
+---
+
 # Files
 
 src/lsp/ (New), src/thin_binder.rs

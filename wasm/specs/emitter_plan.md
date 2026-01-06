@@ -6,6 +6,46 @@
 Incrementally rewrite the TypeScript compiler in Rust, compiled to WebAssembly
 for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 
+---
+
+## 🚨 URGENT: Architectural Cleanup (Before Adding Features)
+
+These issues make the emitter hard to test and maintain.
+
+### The "Configuration Matrix" Spaghetti
+
+**Problem:** `emit_class_declaration` and similar methods mix Code Generation with Transformation:
+```rust
+if self.ctx.target_es5 {
+    // ... 50 lines of ES5 IIFE logic ...
+}
+if is_exported && is_commonjs {
+   // ... CommonJS logic ...
+}
+// ... Regular emit ...
+```
+
+**Impact:**
+- Cyclomatic complexity makes emitter unreadable and hard to test
+- `emit_class_declaration` handles: ES6 syntax, ES5 IIFE, CommonJS exports, Decorators
+- Bug fixes in one branch don't apply to others
+
+**Action Required:**
+- [ ] Strictly separate **Transforms** from **Printers**
+- [ ] **Phase 1 (Transform):** `LoweringPass` converts `ClassDeclaration` -> `VariableDeclaration` + `CallExpression` (for ES5)
+- [ ] **Phase 2 (Print):** The Printer just prints `VariableDeclaration`. It doesn't know about ES5 classes.
+- [ ] Since we use "Read Only" AST (DOD), implement "Virtual Nodes" or a "Projection" layer for transforms
+- [ ] Do NOT embed transform logic inside the string printer
+
+### Benchmark with Real Code
+
+**Action Required:**
+- [ ] Use TypeScript's own source (`src/compiler/checker.ts`) as benchmark input
+- [ ] Measure emission throughput on real-world code
+- [ ] Target: > 50 MB/s (beat TypeScript-Go)
+
+---
+
 ### Goal
 100% accurate JS output and Source Maps.
 
