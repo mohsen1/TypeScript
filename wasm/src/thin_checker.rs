@@ -2444,6 +2444,22 @@ impl<'a> ThinCheckerState<'a> {
         false
     }
 
+    /// Get the const modifier node from a list of modifiers, if present.
+    /// Returns the NodeIndex of the const modifier for error reporting.
+    fn get_const_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> Option<NodeIndex> {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::ConstKeyword as u16 {
+                        return Some(mod_idx);
+                    }
+                }
+            }
+        }
+        None
+    }
+
     /// Check if a member with the given name is static by looking up its symbol flags.
     /// Uses the binder's symbol information for efficient O(1) flag checks.
     fn is_static_member(&self, member_nodes: &[NodeIndex], name: &str) -> bool {
@@ -2977,6 +2993,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check a property declaration.
     fn check_property_declaration(&mut self, member_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
         let Some(node) = self.arena.get(member_idx) else {
             return;
         };
@@ -2984,6 +3002,15 @@ impl<'a> ThinCheckerState<'a> {
         let Some(prop) = self.arena.get_property_decl(node) else {
             return;
         };
+
+        // Error 1248: A class member cannot have the 'const' keyword
+        if let Some(const_mod) = self.get_const_modifier(&prop.modifiers) {
+            self.error_at_node(
+                const_mod,
+                "A class member cannot have the 'const' keyword.",
+                diagnostic_codes::CONST_MODIFIER_CANNOT_APPEAR_ON_A_CLASS_ELEMENT,
+            );
+        }
 
         // If property has type annotation and initializer, check type compatibility
         if !prop.type_annotation.is_none() && !prop.initializer.is_none() {
@@ -3010,6 +3037,15 @@ impl<'a> ThinCheckerState<'a> {
         let Some(method) = self.arena.get_method_decl(node) else {
             return;
         };
+
+        // Error 1248: A class member cannot have the 'const' keyword
+        if let Some(const_mod) = self.get_const_modifier(&method.modifiers) {
+            self.error_at_node(
+                const_mod,
+                "A class member cannot have the 'const' keyword.",
+                diagnostic_codes::CONST_MODIFIER_CANNOT_APPEAR_ON_A_CLASS_ELEMENT,
+            );
+        }
 
         // Error 1183: An implementation cannot be declared in ambient contexts
         // Check if we're in a declared class and the method has a body

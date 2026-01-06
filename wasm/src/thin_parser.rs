@@ -1770,12 +1770,8 @@ impl ThinParserState {
                     self.next_token();
                     self.arena.create_modifier(SyntaxKind::AccessorKeyword, start_pos)
                 }
-                // Handle const as a modifier - error in class members (1248)
+                // Handle const as a modifier - error is reported by checker (1248)
                 SyntaxKind::ConstKeyword => {
-                    self.parse_error_at_current_token(
-                        "'const' modifier cannot appear on a class element.",
-                        diagnostic_codes::CONST_MODIFIER_CANNOT_APPEAR_ON_A_CLASS_ELEMENT
-                    );
                     self.next_token();
                     self.arena.create_modifier(SyntaxKind::ConstKeyword, start_pos)
                 }

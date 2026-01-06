@@ -40,12 +40,65 @@ see SESSION_LOG.md -- always amended with each session's work
 
 ⚠️ **CRITICAL: For each task, ALWAYS:**
 1. **BEFORE**: `node scripts/ask-gemini.mjs "How should I implement [task]?"` - get guidance
-2. **IMPLEMENT**: Write code, run tests
+2. **IMPLEMENT**: Write code, run tests. add tests
 3. **AFTER**: `node scripts/ask-gemini.mjs --review wasm/src/[file].rs` - get review
 
 This catches design issues early and ensures consistent code quality.
 
 ### Next Steps
+
+#### First
+The analysis identifies several modules that are effectively dead code. While some "old" components (like `checker/`, `binder.rs`, `parser_impl.rs`) are technically reachable via the legacy `createParser` API, other components have no public entry points in `lib.rs` or are disconnected from the execution graph.
+
+<details>
+### Dead Code Report
+
+The following modules are compiled but never used in the production pipeline (wasm public API):
+
+1.  **`emitter.rs` (Old Emitter)**
+    *   **Status**: Dead.
+    *   **Reason**: Works on "fat" `Node` AST. The legacy `ParserState` exposed in `lib.rs` has no `emit()` method. The new `ThinParser` uses `thin_emitter.rs` (working on `ThinNode` AST).
+    *   **Files**: `emitter.rs`, `emitter_tests.rs`.
+
+2.  **`services/` (Language Service)**
+    *   **Status**: Dead.
+    *   **Reason**: Although `pub mod services` exists, there is no `createLanguageService` or similar factory exposed in `lib.rs`. The logic is unreachable from the WASM boundary. It also depends on the legacy `checker` which is being phased out.
+    *   **Files**: `services/mod.rs`, `services_tests.rs`.
+
+3.  **`transforms/` (Fat Node Transformers)**
+    *   **Status**: Dead.
+    *   **Reason**: These implement the `Transformer` trait for "fat" `Node` ASTs. Since the legacy parser has no emit/transform pipeline exposed, these run on nothing. The new `ThinPrinter` performs on-the-fly output generation using specific helpers (like `class_es5.rs`), bypassing this transformation pipeline entirely.
+    *   **Files**:
+        *   `transforms/async_gen.rs`
+        *   `transforms/class.rs` (The `ClassTransformer` struct, distinct from `class_es5.rs` which is **live**)
+        *   `transforms/es2015.rs`
+        *   `transforms/generators.rs`
+        *   `transforms/modules.rs`
+        *   `transforms/async_emitter.rs`
+        *   `transforms/generator_emitter.rs`
+
+4.  **`declarations_emitter.rs`**
+    *   **Status**: Potentially Dead / Unused.
+    *   **Reason**: While it works on `ThinNodeArena` (the new architecture), it is not wired into `ThinParser` or any other public API in `lib.rs`. `ThinParser` only exposes `emit()` and `emitModern()`, which use `ThinPrinter`.
+
+### Summary of "Old" vs "New" Pipeline
+
+| Component | Legacy (Fat Node) | Modern (Thin Node) | Status |
+| :--- | :--- | :--- | :--- |
+| **Parser** | `parser_impl.rs` | `thin_parser.rs` | Legacy is **Live** (via `createParser`), Modern is **Live**. |
+| **Binder** | `binder.rs` | `thin_binder.rs` | Legacy is **Live** (via `ParserState`), Modern is **Live**. |
+| **Checker** | `checker/` | `thin_checker.rs` + `solver/` | Legacy is **Live** (via `ParserState`), Modern is **Live**. |
+| **Emitter** | `emitter.rs` | `thin_emitter.rs` | **Legacy is DEAD**. |
+| **LSP** | `services/` | *(None)* | **Legacy is DEAD**. |
+
+### Recommendation
+
+To clean up the codebase, you can safely delete:
+1.  `emitter.rs` and its tests.
+2.  `services/` directory.
+3.  `transforms/` directory (except for `class_es5.rs` and `namespace_es5.rs`, which are used by `thin_emitter.rs`).
+
+</details>
 
 **Type Checking (25 failing tests)**
 1. ✅ Export assignment validation (2309, 2304)

@@ -237,7 +237,7 @@ impl ThinParser {
                 "typeCount": self.type_interner.len(),
                 "diagnostics": checker.diagnostics.iter().map(|d| {
                     serde_json::json!({
-                        "message": d.message_text.clone(),
+                        "message_text": d.message_text.clone(),
                         "code": d.code,
                         "start": d.start,
                         "length": d.length,

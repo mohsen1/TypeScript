@@ -558,14 +558,15 @@ interface WasmParserStateInstance {
 }
 
 /**
- * Create a new Rust parser instance.
+ * Create a new Rust parser instance using ThinParser (optimized path).
  * Returns undefined if wasm is unavailable.
  * @internal
  */
 export function wasmCreateParser(fileName: string, sourceText: string): WasmParserStateInstance | undefined {
     const wasm = getWasm();
     if (!wasm) return undefined;
-    return wasm.createParser(fileName, sourceText);
+    // Use ThinParser for optimized type checking with all new diagnostics
+    return (wasm as any).createThinParser(fileName, sourceText);
 }
 
 /**

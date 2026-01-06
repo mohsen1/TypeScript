@@ -581,3 +581,30 @@ fn test_interface_name_cannot_be_reserved_2427() {
     assert!(codes.contains(&2427),
         "Expected error 2427 (Interface name cannot be 'string'), got: {:?}", codes);
 }
+
+#[test]
+fn test_const_modifier_on_class_property_1248() {
+    // Error 1248: A class member cannot have the 'const' keyword
+    use crate::thin_parser::ThinParserState;
+    let source = r#"class AtomicNumbers { static const H = 1; }"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Debug: show all diagnostics
+    eprintln!("=== Diagnostics for 'static const H = 1' ===");
+    for d in &checker.diagnostics {
+        eprintln!("  code={}, msg={}", d.code, d.message_text);
+    }
+
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&1248),
+        "Expected error 1248 (A class member cannot have the 'const' keyword), got: {:?}", codes);
+}
