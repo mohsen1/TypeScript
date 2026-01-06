@@ -37,6 +37,7 @@ Pick the most doable and impactful
 12. CommonJS export names: handle binding patterns in destructuring exports [done]
 13. Class ES5 transform: destructured parameters emit assignments [done]
 14. Declaration emitter: emit heritage clauses (extends/implements) [done]
+15. Class ES5 transform: destructure for-loop initializers [done]
 
 
 ## Quick Reference

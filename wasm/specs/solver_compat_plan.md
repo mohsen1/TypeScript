@@ -62,7 +62,12 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
   - Test: Excess property errors on literals
   - Test: Fresh vs non-fresh object types
 
-### Phase 5: Integration & Polish
+### Phase 5: Weak Type Detection
+- [x] Implement weak type detection (no common properties)
+  - Reject assignments to types with only optional properties and no overlap
+- [x] Tests for weak types
+
+### Phase 6: Integration & Polish
 - [x] Wire compat.rs to be the public API
   - ThinChecker assignability now routes through `CompatChecker`
 - [x] Add comprehensive error messages

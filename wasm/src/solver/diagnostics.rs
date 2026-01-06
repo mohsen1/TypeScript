@@ -921,6 +921,13 @@ impl SubtypeFailureReason {
                 )
             }
 
+            SubtypeFailureReason::NoCommonProperties { source_type, target_type } => {
+                PendingDiagnostic::error(
+                    codes::NO_COMMON_PROPERTIES,
+                    vec![(*source_type).into(), (*target_type).into()],
+                )
+            }
+
             SubtypeFailureReason::TypeMismatch {
                 source_type,
                 target_type,
