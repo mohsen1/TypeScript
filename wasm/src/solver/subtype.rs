@@ -115,6 +115,8 @@ pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
     /// Whether to use strict function types (contravariant parameters).
     /// Default: true (sound, correct behavior)
     pub strict_function_types: bool,
+    /// Whether to allow any return type when the target return is void.
+    pub allow_void_return: bool,
 }
 
 impl<'a> SubtypeChecker<'a, NoopResolver> {
@@ -127,6 +129,7 @@ impl<'a> SubtypeChecker<'a, NoopResolver> {
             in_progress: HashSet::new(),
             depth: 0,
             strict_function_types: true, // Default to strict (sound) behavior
+            allow_void_return: false,
         }
     }
 }
@@ -140,6 +143,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             in_progress: HashSet::new(),
             depth: 0,
             strict_function_types: true,
+            allow_void_return: false,
         }
     }
 
@@ -801,6 +805,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
     }
 
+    /// Check return type compatibility with void special-casing.
+    fn check_return_compat(&mut self, source_return: TypeId, target_return: TypeId) -> SubtypeResult {
+        if self.allow_void_return && target_return == TypeId::VOID {
+            return SubtypeResult::True;
+        }
+        self.check_subtype(source_return, target_return)
+    }
+
     /// Check function subtyping
     fn check_function_subtype(&mut self, source: &FunctionShape, target: &FunctionShape) -> SubtypeResult {
         // Constructor vs non-constructor
@@ -809,7 +821,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
 
         // Return type is covariant
-        if !self.check_subtype(source.return_type, target.return_type).is_true() {
+        if !self.check_return_compat(source.return_type, target.return_type).is_true() {
             return SubtypeResult::False;
         }
 
@@ -927,7 +939,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     /// Check call signature subtyping
     fn check_call_signature_subtype(&mut self, source: &CallSignature, target: &CallSignature) -> SubtypeResult {
         // Return type is covariant
-        if !self.check_subtype(source.return_type, target.return_type).is_true() {
+        if !self.check_return_compat(source.return_type, target.return_type).is_true() {
             return SubtypeResult::False;
         }
 
@@ -985,7 +997,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     /// Check call signature subtype to function shape
     fn check_call_signature_subtype_to_fn(&mut self, source: &CallSignature, target: &FunctionShape) -> SubtypeResult {
         // Return type is covariant
-        if !self.check_subtype(source.return_type, target.return_type).is_true() {
+        if !self.check_return_compat(source.return_type, target.return_type).is_true() {
             return SubtypeResult::False;
         }
 
@@ -1043,7 +1055,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     /// Check function shape subtype to call signature
     fn check_call_signature_subtype_fn(&mut self, source: &FunctionShape, target: &CallSignature) -> SubtypeResult {
         // Return type is covariant
-        if !self.check_subtype(source.return_type, target.return_type).is_true() {
+        if !self.check_return_compat(source.return_type, target.return_type).is_true() {
             return SubtypeResult::False;
         }
 
@@ -1392,7 +1404,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         target: &FunctionShape,
     ) -> Option<SubtypeFailureReason> {
         // Check return type
-        if !self.check_subtype(source.return_type, target.return_type).is_true() {
+        if !(self.allow_void_return && target.return_type == TypeId::VOID)
+            && !self.check_subtype(source.return_type, target.return_type).is_true()
+        {
             let nested = self.explain_failure(source.return_type, target.return_type);
             return Some(SubtypeFailureReason::ReturnTypeMismatch {
                 source_return: source.return_type,

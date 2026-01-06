@@ -2395,25 +2395,58 @@ impl<'a> ThinPrinter<'a> {
             for &decl_idx in &decl_list.declarations.nodes {
                 let Some(decl_node) = self.arena.get(decl_idx) else { continue };
                 let Some(decl) = self.arena.get_variable_declaration(decl_node) else { continue };
-
-                // Get the name - for simple identifiers
-                if let Some(name) = self.get_binding_name(decl.name) {
-                    names.push(name);
-                }
+                self.collect_binding_names(decl.name, &mut names);
             }
         }
         names
     }
 
-    /// Get the name from a binding pattern or identifier
-    fn get_binding_name(&self, name_idx: NodeIndex) -> Option<String> {
-        let node = self.arena.get(name_idx)?;
+    fn collect_binding_names(&self, name_idx: NodeIndex, names: &mut Vec<String>) {
+        if name_idx.is_none() {
+            return;
+        }
+
+        let Some(node) = self.arena.get(name_idx) else {
+            return;
+        };
+
         if node.kind == SyntaxKind::Identifier as u16 {
-            let id = self.arena.get_identifier(node)?;
-            Some(id.escaped_text.clone())
-        } else {
-            // TODO: handle binding patterns (destructuring)
-            None
+            if let Some(id) = self.arena.get_identifier(node) {
+                names.push(id.escaped_text.clone());
+            }
+            return;
+        }
+
+        match node.kind {
+            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                || k == syntax_kind_ext::ARRAY_BINDING_PATTERN =>
+            {
+                if let Some(pattern) = self.arena.get_binding_pattern(node) {
+                    for &elem_idx in &pattern.elements.nodes {
+                        self.collect_binding_names_from_element(elem_idx, names);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::BINDING_ELEMENT => {
+                if let Some(elem) = self.arena.get_binding_element(node) {
+                    self.collect_binding_names(elem.name, names);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn collect_binding_names_from_element(&self, elem_idx: NodeIndex, names: &mut Vec<String>) {
+        if elem_idx.is_none() {
+            return;
+        }
+
+        let Some(elem_node) = self.arena.get(elem_idx) else {
+            return;
+        };
+
+        if let Some(elem) = self.arena.get_binding_element(elem_node) {
+            self.collect_binding_names(elem.name, names);
         }
     }
 
@@ -3198,6 +3231,14 @@ impl<'a> ThinPrinter<'a> {
             self.write("\");");
             self.write_line();
 
+            if export.export_clause.is_none() {
+                self.write("__exportStar(");
+                self.write(&module_var);
+                self.write(", exports);");
+                self.write_line();
+                return;
+            }
+
             // Then emit Object.defineProperty for each export
             if let Some(clause_node) = self.arena.get(export.export_clause) {
                 if let Some(named_exports) = self.arena.get_named_imports(clause_node) {
@@ -3225,9 +3266,6 @@ impl<'a> ThinPrinter<'a> {
                         }
                     }
                 }
-            } else {
-                // export * from "module" - need __exportStar helper
-                // TODO: implement export star
             }
             return;
         }
@@ -3380,9 +3418,7 @@ impl<'a> ThinPrinter<'a> {
                         for &decl_idx in &decl_list.declarations.nodes {
                             if let Some(decl_node) = self.arena.get(decl_idx) {
                                 if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
-                                    if let Some(name) = self.get_binding_name(decl.name) {
-                                        names.push(name);
-                                    }
+                                    self.collect_binding_names(decl.name, &mut names);
                                 }
                             }
                         }

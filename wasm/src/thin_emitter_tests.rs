@@ -499,6 +499,24 @@ fn test_commonjs_reexport() {
 }
 
 #[test]
+fn test_commonjs_export_star() {
+    let source = r#"export * from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(output.contains("__exportStar("), "Expected __exportStar call in CommonJS output: {}", output);
+}
+
+#[test]
 fn test_commonjs_export_const() {
     let source = "export const x = 42;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -514,6 +532,37 @@ fn test_commonjs_export_const() {
     let output = printer.get_output();
     assert!(output.contains("var x = 42;"), "Expected 'var x = 42;' in CommonJS output: {}", output);
     assert!(output.contains("exports.x = x;"), "Expected 'exports.x = x;' in CommonJS output: {}", output);
+}
+
+#[test]
+fn test_commonjs_export_const_destructuring() {
+    let source = "export const { a, b: c } = obj;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("exports.a = exports.c = void 0;"),
+        "Expected CommonJS exports init for destructured names: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.a = a;"),
+        "Expected 'exports.a = a;' in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.c = c;"),
+        "Expected 'exports.c = c;' in CommonJS output: {}",
+        output
+    );
 }
 
 #[test]

@@ -15,7 +15,7 @@
 //! - Organize Imports (source action)
 
 use crate::parser::NodeIndex;
-use crate::parser::thin_node::ThinNodeArena;
+use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::comments::get_leading_comments_from_cache;
 use crate::thin_binder::ThinBinderState;
@@ -319,8 +319,8 @@ impl<'a> CodeActionProvider<'a> {
     fn get_module_specifier(&self, import_idx: NodeIndex) -> Option<String> {
         let node = self.arena.get(import_idx)?;
         let import_decl = self.arena.get_import_decl(node)?;
-        let spec_node = self.arena.get(import_decl.module_specifier)?;
-        let text = self.arena.get_literal_text(spec_node)?;
+        let spec_idx = import_decl.module_specifier;
+        let text = self.arena.get_literal_text(spec_idx)?;
         Some(text.to_string())
     }
 

@@ -27,6 +27,8 @@ Note:
 8. More unit test if there are gaps [added parity tests; auto-detect/export-assignment coverage]
 9. Emit ES6 class heritage clauses (extends) [done]
 10. Class ES5 transform: emit try/throw statements and parenthesized expressions [done]
+11. CommonJS export star (export * from) support [done]
+12. CommonJS export names: handle binding patterns in destructuring exports [done]
 
 
 ## Quick Reference
