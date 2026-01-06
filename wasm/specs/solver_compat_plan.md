@@ -63,8 +63,8 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
   - Test: Fresh vs non-fresh object types
 
 ### Phase 5: Integration & Polish
-- [ ] Wire compat.rs to be the public API
-  - Other modules call `is_assignable()` not `is_subtype()`
+- [x] Wire compat.rs to be the public API
+  - ThinChecker assignability now routes through `CompatChecker`
 - [ ] Add comprehensive error messages
   - Explain WHY assignment failed (which property, which parameter)
 - [ ] Performance optimization
