@@ -472,7 +472,7 @@ pub enum PropertyAccessResult {
     /// Property does not exist on this type
     PropertyNotFound {
         type_id: TypeId,
-        property_name: String,
+        property_name: Atom,
     },
 
     /// Type is possibly null or undefined.
@@ -528,16 +528,20 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
         // Handle Symbol primitive properties
         if obj_type == TypeId::SYMBOL {
-            return self.resolve_symbol_primitive_property(prop_name);
+            let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+            return self.resolve_symbol_primitive_property(prop_name, prop_atom);
         }
 
         // Look up the type key
         let key = match self.interner.lookup(obj_type) {
             Some(k) => k,
-            None => return PropertyAccessResult::PropertyNotFound {
-                type_id: obj_type,
-                property_name: prop_name.to_string(),
-            },
+            None => {
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                return PropertyAccessResult::PropertyNotFound {
+                    type_id: obj_type,
+                    property_name: prop_atom,
+                };
+            }
         };
 
         match key {
@@ -554,7 +558,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 }
                 PropertyAccessResult::PropertyNotFound {
                     type_id: obj_type,
-                    property_name: prop_name.to_string(),
+                    property_name: prop_atom,
                 }
             }
 
@@ -580,7 +584,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
                 PropertyAccessResult::PropertyNotFound {
                     type_id: obj_type,
-                    property_name: prop_name.to_string(),
+                    property_name: prop_atom,
                 }
             }
 
@@ -612,11 +616,11 @@ impl<'a> PropertyAccessEvaluator<'a> {
                             nullable_causes.push(cause);
                         }
                         // If any non-nullable member is missing the property, it's a PropertyNotFound error
-                        _ => return PropertyAccessResult::PropertyNotFound {
-                            type_id: obj_type,
-                            property_name: prop_name.to_string(),
-                        },
-                    }
+                    _ => return PropertyAccessResult::PropertyNotFound {
+                        type_id: obj_type,
+                        property_name: prop_atom,
+                    },
+                }
                 }
 
                 // If there are nullable causes, return PossiblyNullOrUndefined
@@ -661,28 +665,30 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
                 PropertyAccessResult::PropertyNotFound {
                     type_id: obj_type,
-                    property_name: prop_name.to_string(),
+                    property_name: prop_atom,
                 }
             }
 
             // Built-in properties
             TypeKey::Intrinsic(IntrinsicKind::String) => {
-                self.resolve_string_property(prop_name)
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                self.resolve_string_property(prop_name, prop_atom)
             }
 
             TypeKey::Array(_) => {
-                self.resolve_array_property(obj_type, prop_name)
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                self.resolve_array_property(obj_type, prop_name, prop_atom)
             }
 
             _ => PropertyAccessResult::PropertyNotFound {
                 type_id: obj_type,
-                property_name: prop_name.to_string(),
+                property_name: prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name)),
             },
         }
     }
 
     /// Resolve properties on string type.
-    fn resolve_string_property(&self, prop_name: &str) -> PropertyAccessResult {
+    fn resolve_string_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
         match prop_name {
             "length" => PropertyAccessResult::Success {
                 type_id: TypeId::NUMBER,
@@ -691,13 +697,13 @@ impl<'a> PropertyAccessEvaluator<'a> {
             // Add more string properties as needed
             _ => PropertyAccessResult::PropertyNotFound {
                 type_id: TypeId::STRING,
-                property_name: prop_name.to_string(),
+                property_name: prop_atom,
             },
         }
     }
 
     /// Resolve properties on symbol primitive type.
-    fn resolve_symbol_primitive_property(&self, prop_name: &str) -> PropertyAccessResult {
+    fn resolve_symbol_primitive_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
         match prop_name {
             // Symbol.prototype.description: string | undefined
             "description" => {
@@ -716,13 +722,13 @@ impl<'a> PropertyAccessEvaluator<'a> {
             },
             _ => PropertyAccessResult::PropertyNotFound {
                 type_id: TypeId::SYMBOL,
-                property_name: prop_name.to_string(),
+                property_name: prop_atom,
             },
         }
     }
 
     /// Resolve properties on array type.
-    fn resolve_array_property(&self, array_type: TypeId, prop_name: &str) -> PropertyAccessResult {
+    fn resolve_array_property(&self, array_type: TypeId, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
         match prop_name {
             // Array properties
             "length" => PropertyAccessResult::Success { type_id: TypeId::NUMBER, from_index_signature: false },
@@ -774,7 +780,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
             _ => PropertyAccessResult::PropertyNotFound {
                 type_id: array_type,
-                property_name: prop_name.to_string(),
+                property_name: prop_atom,
             },
         }
     }

@@ -1380,12 +1380,13 @@ fn test_symbol_property_not_found() {
     // Test accessing non-existent property on symbol type
     let types = TypeInterner::new();
     let evaluator = PropertyAccessEvaluator::new(&types);
+    let name_atom = types.intern_string("nonexistent");
 
     let result = evaluator.resolve_property_access(TypeId::SYMBOL, "nonexistent");
     match result {
         PropertyAccessResult::PropertyNotFound { type_id, property_name } => {
             assert_eq!(type_id, TypeId::SYMBOL);
-            assert_eq!(property_name, "nonexistent");
+            assert_eq!(property_name, name_atom);
         }
         _ => panic!("Expected PropertyNotFound for unknown property, got: {:?}", result),
     }
@@ -1638,6 +1639,44 @@ type AliasB = Outer.B;
             assert_eq!(prop.type_id, TypeId::STRING);
         }
         _ => panic!("Expected AliasB to resolve to Object type, got {:?}", alias_b_key),
+    }
+}
+
+#[test]
+fn test_checker_namespace_merges_with_class_exports() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+class Foo {}
+namespace Foo {
+    export interface Bar { x: number; }
+}
+type Alias = Foo.Bar;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let alias_sym = binder.file_locals.get("Alias").expect("Alias should exist");
+    let alias_type = checker.get_type_of_symbol(alias_sym);
+    let alias_key = types.lookup(alias_type).expect("Alias type should exist");
+    match alias_key {
+        TypeKey::Object(props) => {
+            let prop = props.iter()
+                .find(|prop| types.resolve_atom(prop.name) == "x")
+                .expect("Expected property x");
+            assert_eq!(prop.type_id, TypeId::NUMBER);
+        }
+        _ => panic!("Expected Alias to resolve to Object type, got {:?}", alias_key),
     }
 }
 
