@@ -9,7 +9,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
 **Independence:** MEDIUM - Needs stable TypeKey definitions from Track A. Heavy AST interaction.
 
 ## Current Status
-🟡 **In Progress** - Interface merging wired into checker type resolution; 4111 tests enabled; BigInt literal test blocked by parser.
+🟡 **In Progress** - Interface merging wired into checker type resolution; Phase 6 lowering tests added; BigInt literal test blocked by parser; module augmentation pending.
 
 ## Tasks
 
@@ -94,9 +94,9 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Interface index signature property access (4111)
   - [x] Test: Explicit property bypasses 4111
   - [x] Test: Union with index signature triggers 4111
-  - [ ] Test: Lowering full source file
-  - [ ] Test: Cross-module type references
-  - [ ] Test: Circular type references (handle gracefully)
+  - [x] Test: Lowering full source file
+  - [x] Test: Cross-module type references
+  - [x] Test: Circular type references (handle gracefully)
 
 ## Architecture Notes
 - All strings MUST go through interner.intern_string() -> Atom
