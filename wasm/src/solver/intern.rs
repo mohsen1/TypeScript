@@ -8,20 +8,35 @@
 //! - Memory efficient (each unique structure stored once)
 //! - Cache-friendly (work with u32 arrays instead of heap objects)
 
-use std::collections::HashMap;
 use std::sync::RwLock;
+use std::hash::{Hash, Hasher};
+use rustc_hash::{FxHashMap, FxHasher};
 use crate::solver::types::*;
 use crate::interner::{Atom, Interner};
+
+const SHARD_BITS: u32 = 6;
+const SHARD_COUNT: usize = 1 << SHARD_BITS; // 64 shards
+const SHARD_MASK: u32 = (SHARD_COUNT as u32) - 1;
+
+struct TypeShard {
+    key_to_index: RwLock<FxHashMap<TypeKey, u32>>,
+    index_to_key: RwLock<Vec<TypeKey>>,
+}
+
+impl TypeShard {
+    fn new() -> Self {
+        TypeShard {
+            key_to_index: RwLock::new(FxHashMap::default()),
+            index_to_key: RwLock::new(Vec::new()),
+        }
+    }
+}
 
 /// Type interning table.
 /// Thread-safe via RwLock for concurrent access.
 pub struct TypeInterner {
-    /// Map from TypeKey to TypeId for deduplication
-    key_to_id: RwLock<HashMap<TypeKey, TypeId>>,
-    /// Reverse map from TypeId to TypeKey for lookup
-    id_to_key: RwLock<Vec<TypeKey>>,
-    /// Next available TypeId
-    next_id: RwLock<u32>,
+    /// Sharded storage for user-defined types
+    shards: [TypeShard; SHARD_COUNT],
     /// String interner for property names and string literals
     /// Thread-safe for concurrent access during type construction
     pub string_interner: RwLock<Interner>,
@@ -34,16 +49,10 @@ impl TypeInterner {
         // Pre-intern common TypeScript identifiers for better performance
         string_interner.intern_common();
 
-        let interner = TypeInterner {
-            key_to_id: RwLock::new(HashMap::new()),
-            id_to_key: RwLock::new(Vec::new()),
-            next_id: RwLock::new(TypeId::FIRST_USER),
+        TypeInterner {
+            shards: std::array::from_fn(|_| TypeShard::new()),
             string_interner: RwLock::new(string_interner),
-        };
-
-        // Pre-register intrinsic types
-        interner.register_intrinsics();
-        interner
+        }
     }
 
     /// Intern a string into an Atom.
@@ -58,84 +67,105 @@ impl TypeInterner {
         self.string_interner.read().unwrap().resolve(atom).to_string()
     }
 
-    /// Register all intrinsic types at their fixed positions
-    fn register_intrinsics(&self) {
-        let mut key_to_id = self.key_to_id.write().unwrap();
-        let mut id_to_key = self.id_to_key.write().unwrap();
-
-        // Ensure we have enough space for intrinsics
-        id_to_key.resize(TypeId::FIRST_USER as usize, TypeKey::Error);
-
-        let intrinsics = [
-            (TypeId::NONE, TypeKey::Error),
-            (TypeId::ERROR, TypeKey::Error),
-            (TypeId::NEVER, TypeKey::Intrinsic(IntrinsicKind::Never)),
-            (TypeId::UNKNOWN, TypeKey::Intrinsic(IntrinsicKind::Unknown)),
-            (TypeId::ANY, TypeKey::Intrinsic(IntrinsicKind::Any)),
-            (TypeId::VOID, TypeKey::Intrinsic(IntrinsicKind::Void)),
-            (TypeId::UNDEFINED, TypeKey::Intrinsic(IntrinsicKind::Undefined)),
-            (TypeId::NULL, TypeKey::Intrinsic(IntrinsicKind::Null)),
-            (TypeId::BOOLEAN, TypeKey::Intrinsic(IntrinsicKind::Boolean)),
-            (TypeId::NUMBER, TypeKey::Intrinsic(IntrinsicKind::Number)),
-            (TypeId::STRING, TypeKey::Intrinsic(IntrinsicKind::String)),
-            (TypeId::BIGINT, TypeKey::Intrinsic(IntrinsicKind::Bigint)),
-            (TypeId::SYMBOL, TypeKey::Intrinsic(IntrinsicKind::Symbol)),
-            (TypeId::OBJECT, TypeKey::Intrinsic(IntrinsicKind::Object)),
-        ];
-
-        for (id, key) in intrinsics {
-            id_to_key[id.0 as usize] = key.clone();
-            key_to_id.insert(key, id);
-        }
-    }
-
     /// Intern a type key and return its TypeId.
     /// If the key already exists, returns the existing TypeId.
     /// Otherwise, creates a new TypeId and stores the key.
     pub fn intern(&self, key: TypeKey) -> TypeId {
-        // Fast path: check if already interned
-        {
-            let key_to_id = self.key_to_id.read().unwrap();
-            if let Some(&id) = key_to_id.get(&key) {
-                return id;
-            }
-        }
-
-        // Slow path: need to insert
-        let mut key_to_id = self.key_to_id.write().unwrap();
-        let mut id_to_key = self.id_to_key.write().unwrap();
-        let mut next_id = self.next_id.write().unwrap();
-
-        // Double-check after acquiring write lock
-        if let Some(&id) = key_to_id.get(&key) {
+        if let Some(id) = self.get_intrinsic_id(&key) {
             return id;
         }
 
-        // Create new TypeId
-        let id = TypeId(*next_id);
-        *next_id += 1;
+        let mut hasher = FxHasher::default();
+        key.hash(&mut hasher);
+        let shard_idx = (hasher.finish() as usize) & (SHARD_COUNT - 1);
+        let shard = &self.shards[shard_idx];
 
-        // Store in both maps
-        id_to_key.push(key.clone());
-        key_to_id.insert(key, id);
+        {
+            let map = shard.key_to_index.read().unwrap();
+            if let Some(&local_index) = map.get(&key) {
+                return self.make_id(local_index, shard_idx as u32);
+            }
+        }
 
-        id
+        let mut map = shard.key_to_index.write().unwrap();
+        let mut storage = shard.index_to_key.write().unwrap();
+
+        if let Some(&local_index) = map.get(&key) {
+            return self.make_id(local_index, shard_idx as u32);
+        }
+
+        let local_index = storage.len() as u32;
+        if local_index > (u32::MAX >> SHARD_BITS) {
+            panic!("TypeInterner shard {} overflow", shard_idx);
+        }
+
+        storage.push(key.clone());
+        map.insert(key, local_index);
+
+        self.make_id(local_index, shard_idx as u32)
     }
 
     /// Look up the TypeKey for a given TypeId
     pub fn lookup(&self, id: TypeId) -> Option<TypeKey> {
-        let id_to_key = self.id_to_key.read().unwrap();
-        id_to_key.get(id.0 as usize).cloned()
+        if id.is_intrinsic() || id.is_error() {
+            return self.get_intrinsic_key(id);
+        }
+
+        let raw_val = id.0.checked_sub(TypeId::FIRST_USER)?;
+        let shard_idx = (raw_val & SHARD_MASK) as usize;
+        let local_index = raw_val >> SHARD_BITS;
+
+        let shard = self.shards.get(shard_idx)?;
+        let storage = shard.index_to_key.read().unwrap();
+        storage.get(local_index as usize).cloned()
     }
 
     /// Get the number of interned types
     pub fn len(&self) -> usize {
-        self.id_to_key.read().unwrap().len()
+        let mut total = TypeId::FIRST_USER as usize;
+        for shard in &self.shards {
+            total += shard.index_to_key.read().unwrap().len();
+        }
+        total
     }
 
     /// Check if the interner is empty (only has intrinsics)
     pub fn is_empty(&self) -> bool {
         self.len() <= TypeId::FIRST_USER as usize
+    }
+
+    #[inline]
+    fn make_id(&self, local_index: u32, shard_idx: u32) -> TypeId {
+        let raw_val = (local_index << SHARD_BITS) | (shard_idx & SHARD_MASK);
+        TypeId(TypeId::FIRST_USER + raw_val)
+    }
+
+    fn get_intrinsic_id(&self, key: &TypeKey) -> Option<TypeId> {
+        match key {
+            TypeKey::Intrinsic(kind) => Some(kind.to_type_id()),
+            TypeKey::Error => Some(TypeId::ERROR),
+            _ => None,
+        }
+    }
+
+    fn get_intrinsic_key(&self, id: TypeId) -> Option<TypeKey> {
+        match id {
+            TypeId::NONE => Some(TypeKey::Error),
+            TypeId::ERROR => Some(TypeKey::Error),
+            TypeId::NEVER => Some(TypeKey::Intrinsic(IntrinsicKind::Never)),
+            TypeId::UNKNOWN => Some(TypeKey::Intrinsic(IntrinsicKind::Unknown)),
+            TypeId::ANY => Some(TypeKey::Intrinsic(IntrinsicKind::Any)),
+            TypeId::VOID => Some(TypeKey::Intrinsic(IntrinsicKind::Void)),
+            TypeId::UNDEFINED => Some(TypeKey::Intrinsic(IntrinsicKind::Undefined)),
+            TypeId::NULL => Some(TypeKey::Intrinsic(IntrinsicKind::Null)),
+            TypeId::BOOLEAN => Some(TypeKey::Intrinsic(IntrinsicKind::Boolean)),
+            TypeId::NUMBER => Some(TypeKey::Intrinsic(IntrinsicKind::Number)),
+            TypeId::STRING => Some(TypeKey::Intrinsic(IntrinsicKind::String)),
+            TypeId::BIGINT => Some(TypeKey::Intrinsic(IntrinsicKind::Bigint)),
+            TypeId::SYMBOL => Some(TypeKey::Intrinsic(IntrinsicKind::Symbol)),
+            TypeId::OBJECT => Some(TypeKey::Intrinsic(IntrinsicKind::Object)),
+            _ => None,
+        }
     }
 
     // =========================================================================
@@ -163,6 +193,12 @@ impl TypeInterner {
         self.intern(TypeKey::Literal(LiteralValue::Boolean(value)))
     }
 
+    /// Intern a literal bigint type
+    pub fn literal_bigint(&self, value: &str) -> TypeId {
+        let atom = self.intern_string(value);
+        self.intern(TypeKey::Literal(LiteralValue::BigInt(atom)))
+    }
+
     /// Intern a union type, normalizing and deduplicating members
     pub fn union(&self, mut members: Vec<TypeId>) -> TypeId {
         // Flatten nested unions
@@ -180,6 +216,9 @@ impl TypeInterner {
         flat.dedup();
 
         // Handle special cases
+        if flat.contains(&TypeId::ERROR) {
+            return TypeId::ERROR;
+        }
         if flat.is_empty() {
             return TypeId::NEVER;
         }
@@ -223,6 +262,9 @@ impl TypeInterner {
         flat.dedup();
 
         // Handle special cases
+        if flat.contains(&TypeId::ERROR) {
+            return TypeId::ERROR;
+        }
         if flat.is_empty() {
             return TypeId::UNKNOWN;
         }
@@ -233,8 +275,12 @@ impl TypeInterner {
         if flat.contains(&TypeId::NEVER) {
             return TypeId::NEVER;
         }
-        // Remove `any` and `unknown` from intersections (they don't constrain)
-        flat.retain(|&id| id != TypeId::ANY && id != TypeId::UNKNOWN);
+        // If any member is `any`, the intersection is `any`
+        if flat.contains(&TypeId::ANY) {
+            return TypeId::ANY;
+        }
+        // Remove `unknown` from intersections (identity element)
+        flat.retain(|&id| id != TypeId::UNKNOWN);
         if flat.is_empty() {
             return TypeId::UNKNOWN;
         }
@@ -282,6 +328,11 @@ impl TypeInterner {
     /// Intern a type reference
     pub fn reference(&self, symbol: SymbolRef) -> TypeId {
         self.intern(TypeKey::Ref(symbol))
+    }
+
+    /// Intern a generic type application
+    pub fn application(&self, base: TypeId, args: Vec<TypeId>) -> TypeId {
+        self.intern(TypeKey::Application(TypeApplication { base, args }))
     }
 }
 

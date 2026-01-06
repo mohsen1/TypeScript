@@ -400,6 +400,22 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 SubtypeResult::False
             }
 
+            // Generic application to application
+            (TypeKey::Application(s_app), TypeKey::Application(t_app)) => {
+                if s_app.args.len() != t_app.args.len() {
+                    SubtypeResult::False
+                } else if !self.check_subtype(s_app.base, t_app.base).is_true() {
+                    SubtypeResult::False
+                } else {
+                    for (s_arg, t_arg) in s_app.args.iter().zip(t_app.args.iter()) {
+                        if !self.check_subtype(*s_arg, *t_arg).is_true() {
+                            return SubtypeResult::False;
+                        }
+                    }
+                    SubtypeResult::True
+                }
+            }
+
             // Reference types - try to resolve and compare structurally
             (TypeKey::Ref(s_sym), TypeKey::Ref(t_sym)) => {
                 // Same symbol reference - trivially equal

@@ -1103,9 +1103,12 @@ impl<'a> ThinCheckerState<'a> {
         if flags & symbol_flags::FUNCTION_SCOPED_VARIABLE != 0 {
             if !value_decl.is_none() {
                 if let Some(node) = self.ctx.arena.get(value_decl) {
-                    if let Some(param) = self.ctx.arena.get_parameter(node) {
+                        if let Some(param) = self.ctx.arena.get_parameter(node) {
                         if !param.type_annotation.is_none() {
-                            let lowering = TypeLowering::new(self.ctx.arena, &self.ctx.types);
+                            let resolver = |node_idx: NodeIndex| {
+                                self.ctx.binder.resolve_identifier(self.ctx.arena, node_idx).map(|id| id.0)
+                            };
+                            let lowering = TypeLowering::with_resolver(self.ctx.arena, &self.ctx.types, &resolver);
                             return lowering.lower_type(param.type_annotation);
                         }
                     }
@@ -2080,7 +2083,10 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Use TypeLowering which handles all type nodes
-        let lowering = TypeLowering::new(self.ctx.arena, &self.ctx.types);
+        let resolver = |node_idx: NodeIndex| {
+            self.ctx.binder.resolve_identifier(self.ctx.arena, node_idx).map(|id| id.0)
+        };
+        let lowering = TypeLowering::with_resolver(self.ctx.arena, &self.ctx.types, &resolver);
         lowering.lower_type(idx)
     }
 

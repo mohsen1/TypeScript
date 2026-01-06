@@ -5,7 +5,6 @@
 //!
 //! Lowering is lazy - types are only computed when queried.
 
-use std::sync::Arc;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::base::NodeIndex;
 use crate::parser::NodeList;
@@ -19,9 +18,9 @@ use crate::solver::intern::TypeInterner;
 pub struct TypeLowering<'a> {
     arena: &'a ThinNodeArena,
     interner: &'a TypeInterner,
-    /// Optional symbol resolver - resolves names to SymbolIds.
+    /// Optional symbol resolver - resolves identifier nodes to SymbolIds.
     /// If provided, this enables correct abstract class detection.
-    resolver: Option<&'a dyn Fn(&str) -> Option<u32>>,
+    resolver: Option<&'a dyn Fn(NodeIndex) -> Option<u32>>,
 }
 
 impl<'a> TypeLowering<'a> {
@@ -34,25 +33,14 @@ impl<'a> TypeLowering<'a> {
     pub fn with_resolver(
         arena: &'a ThinNodeArena,
         interner: &'a TypeInterner,
-        resolver: &'a dyn Fn(&str) -> Option<u32>,
+        resolver: &'a dyn Fn(NodeIndex) -> Option<u32>,
     ) -> Self {
         TypeLowering { arena, interner, resolver: Some(resolver) }
     }
 
-    /// Resolve a name to a symbol ID, falling back to hashing if no resolver provided.
-    fn resolve_symbol(&self, name: &str) -> u32 {
-        if let Some(resolver) = self.resolver {
-            if let Some(id) = resolver(name) {
-                return id;
-            }
-        }
-
-        // Fallback to hash
-        use std::hash::{Hash, Hasher};
-        use std::collections::hash_map::DefaultHasher;
-        let mut hasher = DefaultHasher::new();
-        name.hash(&mut hasher);
-        hasher.finish() as u32
+    /// Resolve a node to a symbol ID if a resolver is provided.
+    fn resolve_symbol(&self, node_idx: NodeIndex) -> Option<u32> {
+        self.resolver.and_then(|resolver| resolver(node_idx))
     }
 
     /// Lower a type node to a TypeId.
@@ -125,7 +113,6 @@ impl<'a> TypeLowering<'a> {
             // Type literal (object type)
             // =========================================================================
             k if k == syntax_kind_ext::TYPE_LITERAL => {
-                eprintln!("[DEBUG lower_type] Matched TYPE_LITERAL for kind={}", k);
                 self.lower_type_literal(node_idx)
             }
 
@@ -240,11 +227,7 @@ impl<'a> TypeLowering<'a> {
             // =========================================================================
             // Unknown/unsupported - return ANY for now
             // =========================================================================
-            _ => {
-                // Debug: print unhandled kind
-                eprintln!("[DEBUG lower_type] Unhandled kind: {} (TYPE_LITERAL={})", node.kind, syntax_kind_ext::TYPE_LITERAL);
-                TypeId::ANY
-            }
+            _ => TypeId::ANY,
         }
     }
 
@@ -306,18 +289,74 @@ impl<'a> TypeLowering<'a> {
 
         if let Some(data) = self.arena.get_tuple_type(node) {
             let elements: Vec<TupleElement> = data.elements.nodes.iter()
-                .map(|&idx| {
-                    TupleElement {
-                        type_id: self.lower_type(idx),
-                        name: None, // TODO: Support named tuple elements
-                        optional: false, // TODO: Check for optional marker
-                        rest: false, // TODO: Check for rest element
-                    }
-                })
+                .map(|&idx| self.lower_tuple_element(idx))
                 .collect();
             self.interner.tuple(elements)
         } else {
             self.interner.tuple(vec![])
+        }
+    }
+
+    /// Lower a tuple element, preserving name, optional, and rest metadata.
+    fn lower_tuple_element(&self, node_idx: NodeIndex) -> TupleElement {
+        let Some(node) = self.arena.get(node_idx) else {
+            return TupleElement {
+                type_id: TypeId::ERROR,
+                name: None,
+                optional: false,
+                rest: false,
+            };
+        };
+
+        match node.kind {
+            k if k == syntax_kind_ext::NAMED_TUPLE_MEMBER => {
+                if let Some(data) = self.arena.get_named_tuple_member(node) {
+                    let name = if let Some(name_node) = self.arena.get(data.name) {
+                        if let Some(id_data) = self.arena.get_identifier(name_node) {
+                            Some(self.interner.intern_string(&id_data.escaped_text))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    return TupleElement {
+                        type_id: self.lower_type(data.type_node),
+                        name,
+                        optional: data.question_token,
+                        rest: data.dot_dot_dot_token,
+                    };
+                }
+            }
+            k if k == syntax_kind_ext::REST_TYPE => {
+                if let Some(data) = self.arena.type_operators.get(node.data_index as usize) {
+                    return TupleElement {
+                        type_id: self.lower_type(data.type_node),
+                        name: None,
+                        optional: false,
+                        rest: true,
+                    };
+                }
+            }
+            k if k == syntax_kind_ext::OPTIONAL_TYPE => {
+                if let Some(data) = self.arena.type_operators.get(node.data_index as usize) {
+                    return TupleElement {
+                        type_id: self.lower_type(data.type_node),
+                        name: None,
+                        optional: true,
+                        rest: false,
+                    };
+                }
+            }
+            _ => {}
+        }
+
+        TupleElement {
+            type_id: self.lower_type(node_idx),
+            name: None,
+            optional: false,
+            rest: false,
         }
     }
 
@@ -372,6 +411,14 @@ impl<'a> TypeLowering<'a> {
         }
     }
 
+    /// Extract a parameter name if it is an identifier.
+    fn lower_parameter_name(&self, node_idx: NodeIndex) -> Option<crate::interner::Atom> {
+        let node = self.arena.get(node_idx)?;
+        self.arena
+            .get_identifier(node)
+            .map(|ident| self.interner.intern_string(&ident.escaped_text))
+    }
+
     /// Lower a function type ((a: T, b: U) => R)
     fn lower_function_type(&self, node_idx: NodeIndex) -> TypeId {
         let node = match self.arena.get(node_idx) {
@@ -386,7 +433,7 @@ impl<'a> TypeLowering<'a> {
                     if let Some(param_node) = self.arena.get(idx) {
                         if let Some(param_data) = self.arena.get_parameter(param_node) {
                             return Some(ParamInfo {
-                                name: None, // TODO: Extract parameter name
+                                name: self.lower_parameter_name(param_data.name),
                                 type_id: self.lower_type(param_data.type_annotation),
                                 optional: param_data.question_token,
                                 rest: param_data.dot_dot_dot_token,
@@ -578,6 +625,14 @@ impl<'a> TypeLowering<'a> {
                             TypeId::NUMBER
                         }
                     }
+                    k if k == SyntaxKind::BigIntLiteral as u16 => {
+                        if let Some(lit_data) = self.arena.get_literal(literal_node) {
+                            let text = lit_data.text.strip_suffix('n').unwrap_or(&lit_data.text);
+                            self.interner.literal_bigint(text)
+                        } else {
+                            TypeId::BIGINT
+                        }
+                    }
                     k if k == SyntaxKind::TrueKeyword as u16 => {
                         self.interner.literal_boolean(true)
                     }
@@ -603,8 +658,16 @@ impl<'a> TypeLowering<'a> {
 
         if let Some(data) = self.arena.get_type_ref(node) {
             // For now, just lower the type name as an identifier
-            // TODO: Handle type arguments
-            self.lower_type(data.type_name)
+            let base_type = self.lower_type(data.type_name);
+            if let Some(args) = &data.type_arguments {
+                if !args.nodes.is_empty() {
+                    let type_args: Vec<TypeId> = args.nodes.iter()
+                        .map(|&idx| self.lower_type(idx))
+                        .collect();
+                    return self.interner.application(base_type, type_args);
+                }
+            }
+            base_type
         } else {
             TypeId::ERROR
         }
@@ -620,7 +683,11 @@ impl<'a> TypeLowering<'a> {
         if let Some(data) = self.arena.get_identifier(node) {
             let name = &data.escaped_text;
 
-            // Check for built-in type names
+            if let Some(symbol_id) = self.resolve_symbol(node_idx) {
+                return self.interner.reference(SymbolRef(symbol_id));
+            }
+
+            // Check for built-in type names only if not resolved (shadowing-safe)
             match name.as_ref() {
                 "any" => return TypeId::ANY,
                 "unknown" => return TypeId::UNKNOWN,
@@ -637,10 +704,7 @@ impl<'a> TypeLowering<'a> {
                 _ => {}
             }
 
-            // Create a reference for named types
-            // Use resolver if available, otherwise fall back to hash
-            let symbol_id = self.resolve_symbol(name);
-            self.interner.reference(SymbolRef(symbol_id))
+            TypeId::ERROR
         } else {
             TypeId::ERROR
         }
@@ -670,14 +734,10 @@ impl<'a> TypeLowering<'a> {
 
         if let Some(data) = self.arena.get_type_query(node) {
             // Create a symbol reference from the expression name
-            // Use resolver if available for correct symbol ID lookup
-            if let Some(expr_node) = self.arena.get(data.expr_name) {
-                if let Some(id_data) = self.arena.get_identifier(expr_node) {
-                    let symbol_id = self.resolve_symbol(&id_data.escaped_text);
-                    return self.interner.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)));
-                }
+            if let Some(symbol_id) = self.resolve_symbol(data.expr_name) {
+                return self.interner.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)));
             }
-            TypeId::ANY
+            TypeId::ERROR
         } else {
             TypeId::ERROR
         }
@@ -773,13 +833,20 @@ impl<'a> TypeLowering<'a> {
 
             // Add template spans (type + text pairs)
             for &span_idx in &data.template_spans.nodes {
-                if self.arena.get(span_idx).is_some() {
-                    // Template span has a type and literal parts
-                    // For simplicity, we'll just add the type reference
-                    // TODO: Parse template span structure properly
-                    let type_id = self.lower_type(span_idx);
-                    if type_id != TypeId::ANY && type_id != TypeId::ERROR {
-                        spans.push(TemplateSpan::Type(type_id));
+                if let Some(span_node) = self.arena.get(span_idx) {
+                    if span_node.kind == syntax_kind_ext::TEMPLATE_LITERAL_TYPE_SPAN {
+                        if let Some(span_data) = self.arena.template_spans.get(span_node.data_index as usize) {
+                            let type_id = self.lower_type(span_data.expression);
+                            spans.push(TemplateSpan::Type(type_id));
+
+                            if let Some(lit_node) = self.arena.get(span_data.literal) {
+                                if let Some(lit_data) = self.arena.get_literal(lit_node) {
+                                    if !lit_data.text.is_empty() {
+                                        spans.push(TemplateSpan::Text(self.interner.intern_string(&lit_data.text)));
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -820,7 +887,7 @@ impl<'a> TypeLowering<'a> {
                     if let Some(param_node) = self.arena.get(idx) {
                         if let Some(param_data) = self.arena.get_parameter(param_node) {
                             return Some(ParamInfo {
-                                name: None,
+                                name: self.lower_parameter_name(param_data.name),
                                 type_id: self.lower_type(param_data.type_annotation),
                                 optional: param_data.question_token,
                                 rest: param_data.dot_dot_dot_token,

@@ -426,6 +426,12 @@ impl<'a> TypeFormatter<'a> {
             TypeKey::Callable(shape) => self.format_callable(shape),
             TypeKey::TypeParameter(info) => self.interner.resolve_atom(info.name),
             TypeKey::Ref(sym) => format!("Ref({})", sym.0),
+            TypeKey::Application(app) => {
+                let args: Vec<String> = app.args.iter()
+                    .map(|&arg| self.format(arg))
+                    .collect();
+                format!("{}<{}>", self.format(app.base), args.join(", "))
+            }
             TypeKey::Conditional(cond) => self.format_conditional(cond),
             TypeKey::Mapped(mapped) => self.format_mapped(mapped),
             TypeKey::IndexAccess(obj, idx) => {

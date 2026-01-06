@@ -158,6 +158,15 @@ impl<'a> TypeInstantiator<'a> {
                 self.interner.intern(key.clone())
             }
 
+            // Application: instantiate base and args
+            TypeKey::Application(app) => {
+                let base = self.instantiate(app.base);
+                let args: Vec<TypeId> = app.args.iter()
+                    .map(|&arg| self.instantiate(arg))
+                    .collect();
+                self.interner.application(base, args)
+            }
+
             // This type doesn't substitute
             TypeKey::ThisType => self.interner.intern(key.clone()),
 
