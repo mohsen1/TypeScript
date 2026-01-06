@@ -40,8 +40,10 @@ Our focus is to make wasm checker complete
 - ⬜ Fix function parameter variance (MAJOR from Gemini review)
     - Currently bivariant (legacy mode), should be contravariant (strict mode)
     - Consider making strictFunctionTypes the default
-- ⬜ Remove unused ref_cache field (MINOR from Gemini review)
-    - Currently marked #[allow(dead_code)], not implemented
+- ✅ Remove unused ref_cache field (MINOR - COMPLETED)
+    - Removed unused field from SubtypeChecker struct
+    - Removed from both constructors (new and with_resolver)
+    - All 606 tests still pass
 - ✅ Fix tuple to array subtyping for rest elements (BLOCKER - COMPLETED)
     - Fixed: Rest elements now properly unwrapped before comparison
     - `[string, ...string[]]` is now assignable to `string[]`
