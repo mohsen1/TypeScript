@@ -53,6 +53,10 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Destructuring transform (`let { x } = obj;` → `var _a = obj, x = _a.x;`)
 - ✅ Block scoping infrastructure (`BlockScopeState` for let/const → var)
 - ✅ Private fields transform (`#field` → WeakMap pattern with helpers)
+- ✅ Namespace ES5 IIFE transform (qualified names like A.B.C, nested namespaces)
+- ✅ Enum ES5 IIFE transform (numeric/string enums, reverse mapping)
+- ✅ Async/await ES5 transform (`__awaiter`/`__generator` helpers)
+- ✅ Wired up transform modules to ThinPrinter (EnumES5Emitter, AsyncES5Emitter)
 
 ## Emitter Architecture Refactor (complete)
 - ✅ Created `SourceWriter` abstraction for output generation with source map tracking
@@ -116,12 +120,17 @@ This catches design issues early and ensures consistent code quality.
 6. ✅ Private fields (`#`) transform (WeakMap pattern, helpers)
 
 **Priority 4: Namespace & Enums (5% of failing tests)**
-7. ⬜ Namespace IIFE improvements
-8. ⬜ Enum object emit
+7. ✅ Namespace IIFE improvements (qualified names, nested namespaces, exports)
+8. ✅ Enum object emit (IIFE with reverse mapping, string enums)
 
 **Priority 5: Async/Generators (4% of failing tests)**
-9. ⬜ `__awaiter` helper for async/await
-10. ⬜ `__generator` helper for generators
+9. ✅ `__awaiter` helper for async/await (wired to ThinPrinter)
+10. ✅ `__generator` helper for generators (state machine with switch/case)
+
+**Priority 6: Remaining Features**
+11. ⬜ `__decorate` helper for decorators
+12. ⬜ `for-of` iterator downlevel
+13. ⬜ `__spread`/`__rest` helpers
 
 ### Emit TODOs (40.8% failing → target 80%+)
 | Feature | Tests | % | Notes |
