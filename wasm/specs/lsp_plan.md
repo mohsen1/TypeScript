@@ -33,6 +33,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Code action: add missing import (2304, candidate-based)
    - [x] Feed project export candidates into code action context
    - [x] Expose wasm code actions context (diagnostics + import candidates)
+   - [x] Missing import: surface default exports and re-exports
 
 2. **Extend AST Coverage** (if needed)
    - [x] Traverse template expressions in LSP resolver for references/completions
