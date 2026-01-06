@@ -312,48 +312,41 @@ impl<'a> TypeLowering<'a> {
             };
         };
 
-        match node.kind {
-            k if k == syntax_kind_ext::NAMED_TUPLE_MEMBER => {
-                if let Some(data) = self.arena.get_named_tuple_member(node) {
-                    let name = if let Some(name_node) = self.arena.get(data.name) {
-                        if let Some(id_data) = self.arena.get_identifier(name_node) {
-                            Some(self.interner.intern_string(&id_data.escaped_text))
-                        } else {
-                            None
-                        }
+        if node.kind == syntax_kind_ext::NAMED_TUPLE_MEMBER {
+            if let Some(data) = self.arena.get_named_tuple_member(node) {
+                let name = if let Some(name_node) = self.arena.get(data.name) {
+                    if let Some(id_data) = self.arena.get_identifier(name_node) {
+                        Some(self.interner.intern_string(&id_data.escaped_text))
                     } else {
                         None
-                    };
+                    }
+                } else {
+                    None
+                };
 
-                    return TupleElement {
-                        type_id: self.lower_type(data.type_node),
-                        name,
-                        optional: data.question_token,
-                        rest: data.dot_dot_dot_token,
-                    };
-                }
+                return TupleElement {
+                    type_id: self.lower_type(data.type_node),
+                    name,
+                    optional: data.question_token,
+                    rest: data.dot_dot_dot_token,
+                };
             }
-            k if k == syntax_kind_ext::REST_TYPE => {
-                if let Some(data) = self.arena.type_operators.get(node.data_index as usize) {
-                    return TupleElement {
-                        type_id: self.lower_type(data.type_node),
-                        name: None,
-                        optional: false,
-                        rest: true,
-                    };
-                }
-            }
-            k if k == syntax_kind_ext::OPTIONAL_TYPE => {
-                if let Some(data) = self.arena.type_operators.get(node.data_index as usize) {
-                    return TupleElement {
-                        type_id: self.lower_type(data.type_node),
-                        name: None,
-                        optional: true,
-                        rest: false,
-                    };
-                }
-            }
-            _ => {}
+        }
+
+        if node.kind == syntax_kind_ext::REST_TYPE || node.kind == syntax_kind_ext::OPTIONAL_TYPE {
+            let wrapped = if let Some(data) = self.arena.get_wrapped_type(node) {
+                Some(data.type_node)
+            } else {
+                self.arena.type_operators.get(node.data_index as usize)
+                    .map(|data| data.type_node)
+            };
+
+            return TupleElement {
+                type_id: wrapped.map_or_else(|| self.lower_type(node_idx), |inner| self.lower_type(inner)),
+                name: None,
+                optional: node.kind == syntax_kind_ext::OPTIONAL_TYPE,
+                rest: node.kind == syntax_kind_ext::REST_TYPE,
+            };
         }
 
         TupleElement {
@@ -1100,12 +1093,14 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_wrapped_type(node) {
-            // Just unwrap and lower the inner type
-            // The optional/rest nature is handled at the tuple level
-            self.lower_type(data.type_node)
-        } else {
-            TypeId::ERROR
+            return self.lower_type(data.type_node);
         }
+
+        if let Some(data) = self.arena.type_operators.get(node.data_index as usize) {
+            return self.lower_type(data.type_node);
+        }
+
+        TypeId::ERROR
     }
 }
 
