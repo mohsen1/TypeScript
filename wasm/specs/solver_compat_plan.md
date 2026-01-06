@@ -67,7 +67,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
   - Reject assignments to types with only optional properties and no overlap
 - [x] Tests for weak types
 
-### Phase 6: Integration & Polish
+### Phase 6: Rest Parameter Bivariance
+- [x] Accept `(...args: any[] | unknown[]) => ...` as a universal supertype for params
+- [x] Tests for rest-parameter bivariance
+
+### Phase 7: Integration & Polish
 - [x] Wire compat.rs to be the public API
   - ThinChecker assignability now routes through `CompatChecker`
 - [x] Add comprehensive error messages
