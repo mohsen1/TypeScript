@@ -9,7 +9,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
 **Independence:** MEDIUM - Needs stable TypeKey definitions from Track A. Heavy AST interaction.
 
 ## Current Status
-🟡 **In Progress** - Phase 3 rest/overload signature tests added; BigInt literal test blocked by parser.
+🟡 **In Progress** - Phase 4 generic parameter scoping/tests added; BigInt literal test blocked by parser.
 
 ## Tasks
 
@@ -59,16 +59,16 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Overloaded signatures (Vec<Signature>)
 
 ### Phase 4: Generic Types
-- [ ] Implement type parameter lowering
+- [x] Implement type parameter lowering
   - `<T>` -> create TypeKey::TypeParameter(name: Atom, constraint: Option<TypeId>)
   - `<T extends string>` -> store constraint
-- [ ] Implement generic type references
+- [x] Implement generic type references
   - `Array<T>` where T is a type parameter
   - Track type parameter scope (which generic declaration)
-- [ ] Tests for generics
-  - Test: Generic function declaration
-  - Test: Generic class/interface
-  - Test: Constrained type parameters
+- [x] Tests for generics
+  - [x] Test: Generic function declaration
+  - [x] Test: Generic class/interface
+  - [x] Test: Constrained type parameters
 
 ### Phase 5: Interface Merging & Declaration Spaces
 - [ ] Implement interface merging
