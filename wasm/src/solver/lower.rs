@@ -5,13 +5,14 @@
 //!
 //! Lowering is lazy - types are only computed when queried.
 
-use crate::parser::thin_node::ThinNodeArena;
+use crate::parser::thin_node::{ThinNodeArena, SignatureData, IndexSignatureData};
 use crate::parser::base::NodeIndex;
 use crate::parser::NodeList;
 use crate::scanner::SyntaxKind;
 use crate::parser::syntax_kind_ext;
 use crate::solver::types::*;
 use crate::solver::intern::TypeInterner;
+use crate::interner::Atom;
 
 /// Type lowering context.
 /// Converts AST type nodes into interned TypeIds.
@@ -471,13 +472,141 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_type_literal(node) {
-            let properties: Vec<PropertyInfo> = data.members.nodes.iter()
-                .filter_map(|&idx| self.lower_type_element(idx))
-                .collect();
+            let mut properties = Vec::new();
+            let mut call_signatures = Vec::new();
+            let mut construct_signatures = Vec::new();
+            let mut string_index = None;
+            let mut number_index = None;
+
+            for &idx in &data.members.nodes {
+                let Some(member) = self.arena.get(idx) else { continue };
+
+                if let Some(sig) = self.arena.get_signature(member) {
+                    match member.kind {
+                        k if k == syntax_kind_ext::CALL_SIGNATURE => {
+                            call_signatures.push(self.lower_call_signature(sig));
+                        }
+                        k if k == syntax_kind_ext::CONSTRUCT_SIGNATURE => {
+                            construct_signatures.push(self.lower_call_signature(sig));
+                        }
+                        k if k == syntax_kind_ext::METHOD_SIGNATURE => {
+                            if let Some(name) = self.lower_signature_name(sig.name) {
+                                let type_id = self.lower_method_signature(sig);
+                                properties.push(PropertyInfo {
+                                    name,
+                                    type_id,
+                                    optional: sig.question_token,
+                                    readonly: self.has_readonly_modifier(&sig.modifiers),
+                                });
+                            }
+                        }
+                        _ => {
+                            if let Some(prop) = self.lower_type_element(idx) {
+                                properties.push(prop);
+                            }
+                        }
+                    }
+                    continue;
+                }
+
+                if let Some(index_sig) = self.arena.get_index_signature(member) {
+                    if let Some(index_info) = self.lower_index_signature(index_sig) {
+                        if index_info.key_type == TypeId::NUMBER {
+                            number_index = Some(index_info);
+                        } else {
+                            string_index = Some(index_info);
+                        }
+                    }
+                }
+            }
+
+            if !call_signatures.is_empty() || !construct_signatures.is_empty() {
+                return self.interner.callable(CallableShape {
+                    call_signatures,
+                    construct_signatures,
+                    properties,
+                });
+            }
+
+            if string_index.is_some() || number_index.is_some() {
+                return self.interner.object_with_index(ObjectShape {
+                    properties,
+                    string_index,
+                    number_index,
+                });
+            }
+
             self.interner.object(properties)
         } else {
             self.interner.object(vec![])
         }
+    }
+
+    fn lower_call_signature(&self, sig: &SignatureData) -> CallSignature {
+        let params = self.lower_signature_params(sig);
+        let return_type = self.lower_type(sig.type_annotation);
+        let type_params = self.lower_type_parameters(&sig.type_parameters);
+
+        CallSignature {
+            type_params,
+            params,
+            return_type,
+        }
+    }
+
+    fn lower_method_signature(&self, sig: &SignatureData) -> TypeId {
+        let params = self.lower_signature_params(sig);
+        let return_type = self.lower_type(sig.type_annotation);
+        let type_params = self.lower_type_parameters(&sig.type_parameters);
+
+        self.interner.function(FunctionShape {
+            type_params,
+            params,
+            return_type,
+            is_constructor: false,
+        })
+    }
+
+    fn lower_signature_params(&self, sig: &SignatureData) -> Vec<ParamInfo> {
+        let Some(params) = &sig.parameters else { return Vec::new() };
+        params.nodes.iter().filter_map(|&idx| {
+            let param_node = self.arena.get(idx)?;
+            let param_data = self.arena.get_parameter(param_node)?;
+            Some(ParamInfo {
+                name: self.lower_parameter_name(param_data.name),
+                type_id: self.lower_type(param_data.type_annotation),
+                optional: param_data.question_token,
+                rest: param_data.dot_dot_dot_token,
+            })
+        }).collect()
+    }
+
+    fn lower_signature_name(&self, node_idx: NodeIndex) -> Option<Atom> {
+        let node = self.arena.get(node_idx)?;
+        if let Some(id_data) = self.arena.get_identifier(node) {
+            return Some(self.interner.intern_string(&id_data.escaped_text));
+        }
+        if let Some(lit_data) = self.arena.get_literal(node) {
+            if !lit_data.text.is_empty() {
+                return Some(self.interner.intern_string(&lit_data.text));
+            }
+        }
+        None
+    }
+
+    fn lower_index_signature(&self, sig: &IndexSignatureData) -> Option<IndexSignature> {
+        let param_idx = sig.parameters.nodes.first().copied().unwrap_or(NodeIndex::NONE);
+        let param_node = self.arena.get(param_idx)?;
+        let param_data = self.arena.get_parameter(param_node)?;
+        let key_type = self.lower_type(param_data.type_annotation);
+        let value_type = self.lower_type(sig.type_annotation);
+        let readonly = self.has_readonly_modifier(&sig.modifiers);
+
+        Some(IndexSignature {
+            key_type,
+            value_type,
+            readonly,
+        })
     }
 
     /// Lower a type element (property signature, method signature, etc.)
@@ -487,19 +616,7 @@ impl<'a> TypeLowering<'a> {
         // Check if it's a property or method signature
         if let Some(sig) = self.arena.get_signature(node) {
             // Get property name as Arc<str>
-            let name = if sig.name != NodeIndex::NONE {
-                if let Some(name_node) = self.arena.get(sig.name) {
-                    if let Some(id_data) = self.arena.get_identifier(name_node) {
-                        self.interner.intern_string(&id_data.escaped_text)
-                    } else {
-                        return None;
-                    }
-                } else {
-                    return None;
-                }
-            } else {
-                return None;
-            };
+            let name = self.lower_signature_name(sig.name)?;
 
             // Check for readonly modifier
             let readonly = self.has_readonly_modifier(&sig.modifiers);

@@ -143,6 +143,28 @@ fn parse_type_reference(source: &str, name: &str) -> (ThinNodeArena, crate::pars
     panic!("Could not find type reference in parsed AST");
 }
 
+/// Helper to parse a type alias and return the type literal node index.
+fn parse_type_literal(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        source.to_string(),
+    );
+    let _root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let arena = std::mem::take(&mut parser.arena);
+    for i in 0..arena.len() {
+        let idx = crate::parser::base::NodeIndex(i as u32);
+        if let Some(node) = arena.get(idx) {
+            if node.kind == syntax_kind_ext::TYPE_LITERAL {
+                return (arena, idx);
+            }
+        }
+    }
+
+    panic!("Could not find type literal in parsed AST");
+}
+
 #[test]
 fn test_lower_function_type_with_type_parameter() {
     // Parse: type F = <T>(x: T) => T
@@ -439,5 +461,62 @@ fn test_lower_mapped_type_remove_modifiers() {
             assert_eq!(mapped.optional_modifier, Some(MappedModifier::Remove));
         }
         _ => panic!("Expected Mapped type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_call_signature() {
+    let (arena, literal_idx) = parse_type_literal("type T = { (x: string): number; foo: string; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Callable(callable) => {
+            assert_eq!(callable.call_signatures.len(), 1);
+            assert_eq!(callable.construct_signatures.len(), 0);
+            assert_eq!(callable.properties.len(), 1);
+            assert_eq!(interner.resolve_atom(callable.properties[0].name), "foo");
+            assert_eq!(callable.properties[0].type_id, TypeId::STRING);
+        }
+        _ => panic!("Expected Callable type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_construct_signature() {
+    let (arena, literal_idx) = parse_type_literal("type T = { new (x: string): number; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Callable(callable) => {
+            assert_eq!(callable.call_signatures.len(), 0);
+            assert_eq!(callable.construct_signatures.len(), 1);
+        }
+        _ => panic!("Expected Callable type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_index_signature() {
+    let (arena, literal_idx) = parse_type_literal("type T = { [key: string]: number; foo: string; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::ObjectWithIndex(shape) => {
+            assert_eq!(shape.properties.len(), 1);
+            assert_eq!(interner.resolve_atom(shape.properties[0].name), "foo");
+            let string_index = shape.string_index.expect("Expected string index signature");
+            assert_eq!(string_index.key_type, TypeId::STRING);
+            assert_eq!(string_index.value_type, TypeId::NUMBER);
+        }
+        _ => panic!("Expected ObjectWithIndex type, got {:?}", key),
     }
 }

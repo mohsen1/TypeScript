@@ -31,7 +31,7 @@ Our focus is to make wasm checker complete
 - [x] **Lower mapped types fully** (constraint + modifiers)
 - [x] **Handle generic type arguments** (TypeRef instantiation or TypeApplication)
 - [x] **Remove unsafe symbol hash fallback** (require binder-based resolver)
-- [ ] **Lower type literals with signatures/indexers** (call/construct/index in `{ ... }`)
+- [x] **Lower type literals with signatures/indexers** (call/construct/index in `{ ... }`)
 - [x] **Respect intrinsic shadowing** (resolve symbols before intrinsic keyword match)
 - [ ] **Define TypeDatabase Trait** (Preparation for Salsa)
 
