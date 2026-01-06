@@ -73,6 +73,7 @@ impl InterfaceParts {
                         if existing.type_id == prop.type_id
                             && existing.optional == prop.optional
                             && existing.readonly == prop.readonly
+                            && existing.is_method == prop.is_method
                         {
                             return;
                         }
@@ -81,6 +82,7 @@ impl InterfaceParts {
                             type_id: TypeId::ERROR,
                             optional: existing.optional && prop.optional,
                             readonly: existing.readonly && prop.readonly,
+                            is_method: false,
                         };
                         entry.insert(PropertyMerge::Conflict(conflict));
                     }
@@ -90,6 +92,7 @@ impl InterfaceParts {
                             type_id: TypeId::ERROR,
                             optional: methods.optional && prop.optional,
                             readonly: false,
+                            is_method: false,
                         };
                         entry.insert(PropertyMerge::Conflict(conflict));
                     }
@@ -121,6 +124,7 @@ impl InterfaceParts {
                             type_id: TypeId::ERROR,
                             optional: prop.optional && optional,
                             readonly: false,
+                            is_method: false,
                         };
                         entry.insert(PropertyMerge::Conflict(conflict));
                     }
@@ -668,6 +672,7 @@ impl<'a> TypeLowering<'a> {
                                     type_id,
                                     optional: sig.question_token,
                                     readonly: self.has_readonly_modifier(&sig.modifiers),
+                                    is_method: true,
                                 });
                             }
                         }
@@ -804,6 +809,7 @@ impl<'a> TypeLowering<'a> {
                         type_id,
                         optional: methods.optional,
                         readonly: false,
+                        is_method: true,
                     });
                 }
                 PropertyMerge::Conflict(prop) => properties.push(prop),
@@ -917,6 +923,7 @@ impl<'a> TypeLowering<'a> {
                 type_id: self.lower_type(sig.type_annotation),
                 optional: sig.question_token,
                 readonly,
+                is_method: false,
             })
         } else {
             None

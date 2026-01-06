@@ -124,6 +124,7 @@ fn test_instantiate_object() {
             type_id: type_param_t,
             optional: false,
             readonly: false,
+            is_method: false,
         },
     ]);
 
@@ -139,6 +140,7 @@ fn test_instantiate_object() {
             type_id: TypeId::NUMBER,
             optional: false,
             readonly: false,
+            is_method: false,
         },
     ]);
     assert_eq!(result, expected);

@@ -104,12 +104,14 @@ fn test_property_access_object() {
             type_id: TypeId::NUMBER,
             optional: false,
             readonly: false,
+            is_method: false,
         },
         PropertyInfo {
             name: interner.intern_string("y"),
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
+            is_method: false,
         },
     ]);
 
@@ -501,6 +503,7 @@ fn test_infer_generic_object_property() {
         type_id: t_type,
         optional: false,
         readonly: false,
+        is_method: false,
     }]);
 
     let func = FunctionShape {
@@ -520,6 +523,7 @@ fn test_infer_generic_object_property() {
         type_id: TypeId::STRING,
         optional: false,
         readonly: false,
+        is_method: false,
     }]);
     let result = infer_generic_function(&interner, &mut subtype, &func, &[arg]);
     assert_eq!(result, TypeId::STRING);
@@ -627,6 +631,7 @@ fn test_infer_generic_union_source() {
         type_id: t_type,
         optional: false,
         readonly: false,
+        is_method: false,
     }]);
 
     let func = FunctionShape {
@@ -646,12 +651,14 @@ fn test_infer_generic_union_source() {
         type_id: TypeId::NUMBER,
         optional: false,
         readonly: false,
+        is_method: false,
     }]);
     let boxed_string = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
         type_id: TypeId::STRING,
         optional: false,
         readonly: false,
+        is_method: false,
     }]);
 
     let union_arg = interner.union(vec![boxed_number, boxed_string]);

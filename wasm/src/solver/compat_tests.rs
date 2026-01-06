@@ -11,6 +11,7 @@ fn make_animal_dog(interner: &TypeInterner) -> (TypeId, TypeId) {
         type_id: TypeId::STRING,
         optional: false,
         readonly: false,
+        is_method: false,
     }]);
 
     let dog = interner.object(vec![
@@ -19,12 +20,14 @@ fn make_animal_dog(interner: &TypeInterner) -> (TypeId, TypeId) {
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
+            is_method: false,
         },
         PropertyInfo {
             name: breed,
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
+            is_method: false,
         },
     ]);
 
@@ -118,6 +121,110 @@ fn test_function_variance_strict() {
     });
 
     assert!(!checker.is_assignable(fn_dog, fn_animal));
+}
+
+#[test]
+fn test_method_bivariance_even_strict() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    checker.set_strict_function_types(true);
+
+    let name = interner.intern_string("fn");
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let source_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let target_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: string_or_number,
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let source = interner.object(vec![PropertyInfo {
+        name,
+        type_id: source_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let target = interner.object(vec![PropertyInfo {
+        name,
+        type_id: target_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(checker.is_assignable(source, target));
+}
+
+#[test]
+fn test_function_property_stays_strict() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    checker.set_strict_function_types(true);
+
+    let name = interner.intern_string("fn");
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let source_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let target_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: string_or_number,
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let source = interner.object(vec![PropertyInfo {
+        name,
+        type_id: source_fn,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let target = interner.object(vec![PropertyInfo {
+        name,
+        type_id: target_fn,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(!checker.is_assignable(source, target));
 }
 
 #[test]
@@ -234,6 +341,7 @@ fn test_weak_type_rejects_no_common_properties() {
         type_id: TypeId::NUMBER,
         optional: true,
         readonly: false,
+        is_method: false,
     }]);
 
     let source = interner.object(vec![PropertyInfo {
@@ -241,6 +349,7 @@ fn test_weak_type_rejects_no_common_properties() {
         type_id: TypeId::NUMBER,
         optional: false,
         readonly: false,
+        is_method: false,
     }]);
 
     assert!(!checker.is_assignable(source, weak_target));
@@ -262,6 +371,7 @@ fn test_weak_type_allows_overlap() {
         type_id: TypeId::NUMBER,
         optional: true,
         readonly: false,
+        is_method: false,
     }]);
 
     let source = interner.object(vec![PropertyInfo {
@@ -269,6 +379,7 @@ fn test_weak_type_allows_overlap() {
         type_id: TypeId::NUMBER,
         optional: false,
         readonly: false,
+        is_method: false,
     }]);
 
     assert!(checker.is_assignable(source, weak_target));
@@ -287,6 +398,7 @@ fn test_weak_type_skips_empty_target() {
         type_id: TypeId::NUMBER,
         optional: false,
         readonly: false,
+        is_method: false,
     }]);
 
     assert!(checker.is_assignable(source, empty_target));
@@ -525,6 +637,7 @@ fn test_object_keyword_accepts_non_primitives() {
         type_id: TypeId::STRING,
         optional: false,
         readonly: false,
+        is_method: false,
     }]);
     assert!(checker.is_assignable(obj, TypeId::OBJECT));
 
@@ -568,12 +681,14 @@ fn test_optional_property_allows_undefined() {
         type_id: TypeId::UNDEFINED,
         optional: true,
         readonly: false,
+        is_method: false,
     }]);
     let target = interner.object(vec![PropertyInfo {
         name,
         type_id: TypeId::NUMBER,
         optional: true,
         readonly: false,
+        is_method: false,
     }]);
 
     assert!(checker.is_assignable(source, target));
@@ -590,12 +705,14 @@ fn test_optional_property_rejects_required_target() {
         type_id: TypeId::NUMBER,
         optional: true,
         readonly: false,
+        is_method: false,
     }]);
     let target = interner.object(vec![PropertyInfo {
         name,
         type_id: TypeId::NUMBER,
         optional: false,
         readonly: false,
+        is_method: false,
     }]);
 
     assert!(!checker.is_assignable(source, target));
@@ -612,6 +729,7 @@ fn test_optional_property_rejects_string_index_signature() {
         type_id: TypeId::NUMBER,
         optional: true,
         readonly: false,
+        is_method: false,
     }]);
 
     let target = interner.object_with_index(ObjectShape {

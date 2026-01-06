@@ -113,8 +113,8 @@ fn test_index_access_object_literal() {
 
     // { x: number, y: string }["x"] -> number
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ]);
     let key_x = interner.literal_string("x");
 
@@ -128,8 +128,8 @@ fn test_index_access_object_string_key() {
 
     // { x: number, y: string }["y"] -> string
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ]);
     let key_y = interner.literal_string("y");
 
@@ -143,7 +143,7 @@ fn test_index_access_object_missing_key() {
 
     // { x: number }["z"] -> undefined
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
     let key_z = interner.literal_string("z");
 
@@ -157,8 +157,8 @@ fn test_index_access_object_union_key() {
 
     // { x: number, y: string }["x" | "y"] -> number | string
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ]);
     let key_x = interner.literal_string("x");
     let key_y = interner.literal_string("y");
@@ -268,7 +268,7 @@ fn test_evaluate_type_non_meta() {
     assert_eq!(evaluate_type(&interner, TypeId::NUMBER), TypeId::NUMBER);
 
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
     assert_eq!(evaluate_type(&interner, obj), obj);
 }
@@ -283,8 +283,8 @@ fn test_keyof_object() {
 
     // keyof { x: number, y: string } = "x" | "y"
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ]);
 
     let result = evaluate_keyof(&interner, obj);
@@ -385,8 +385,8 @@ fn test_mapped_type_basic() {
 
     // Result should be { x: number, y: number }
     let expected = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
     assert_eq!(result, expected);
 }
@@ -414,7 +414,7 @@ fn test_mapped_type_single_key() {
     let result = evaluate_mapped(&interner, &mapped);
 
     let expected = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("foo"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("foo"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ]);
     assert_eq!(result, expected);
 }
@@ -445,8 +445,8 @@ fn test_mapped_type_with_optional_modifier() {
 
     // Result should be { x?: number, y?: number }
     let expected = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: true, readonly: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::NUMBER, optional: true, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: true, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::NUMBER, optional: true, readonly: false, is_method: false },
     ]);
     assert_eq!(result, expected);
 }
@@ -474,7 +474,7 @@ fn test_mapped_type_with_readonly_modifier() {
     let result = evaluate_mapped(&interner, &mapped);
 
     let expected = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: true },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: true, is_method: false },
     ]);
     assert_eq!(result, expected);
 }
@@ -512,8 +512,8 @@ fn test_mapped_type_with_template_substitution() {
 
     // Result should be { x: "x", y: "y" }
     let expected = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: key_x, optional: false, readonly: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: key_y, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: key_x, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: key_y, optional: false, readonly: false, is_method: false },
     ]);
     assert_eq!(result, expected);
 }
