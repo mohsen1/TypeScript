@@ -11,11 +11,11 @@ fn test_inference_basic() {
     // Should start unresolved
     assert!(ctx.probe(var).is_none());
 
-    // Unify with string
-    ctx.unify_var_type(var, TypeId::STRING).unwrap();
+    // Unify with number
+    ctx.unify_var_type(var, TypeId::NUMBER).unwrap();
 
-    // Should now be string
-    assert_eq!(ctx.probe(var), Some(TypeId::STRING));
+    // Should now be number
+    assert_eq!(ctx.probe(var), Some(TypeId::NUMBER));
 }
 
 #[test]
@@ -48,6 +48,41 @@ fn test_inference_conflict() {
     // Try to unify with number - should fail
     let result = ctx.unify_var_type(var, TypeId::NUMBER);
     assert!(result.is_err());
+}
+
+#[test]
+fn test_inference_unify_vars() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var_t = ctx.fresh_type_param(Arc::from("T"));
+    let var_u = ctx.fresh_type_param(Arc::from("U"));
+
+    ctx.unify_vars(var_t, var_u).unwrap();
+    ctx.unify_var_type(var_u, TypeId::STRING).unwrap();
+
+    assert_eq!(ctx.probe(var_t), Some(TypeId::STRING));
+    assert_eq!(ctx.probe(var_u), Some(TypeId::STRING));
+}
+
+#[test]
+fn test_inference_unify_vars_conflict() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var_a = ctx.fresh_var();
+    let var_b = ctx.fresh_var();
+
+    ctx.unify_var_type(var_a, TypeId::STRING).unwrap();
+    ctx.unify_var_type(var_b, TypeId::NUMBER).unwrap();
+
+    let result = ctx.unify_vars(var_a, var_b);
+    assert!(matches!(
+        result,
+        Err(InferenceError::Conflict(a, b))
+            if (a == TypeId::STRING && b == TypeId::NUMBER)
+            || (a == TypeId::NUMBER && b == TypeId::STRING)
+    ));
 }
 
 // =============================================================================
@@ -101,6 +136,24 @@ fn test_constraint_multiple_lower_bounds() {
 
     let constraints = ctx.get_constraints(var).unwrap();
     assert_eq!(constraints.lower_bounds.len(), 2);
+}
+
+#[test]
+fn test_constraint_merge_on_unify() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var_a = ctx.fresh_var();
+    let var_b = ctx.fresh_var();
+
+    ctx.add_lower_bound(var_a, TypeId::STRING);
+    ctx.add_upper_bound(var_b, TypeId::NUMBER);
+
+    ctx.unify_vars(var_a, var_b).unwrap();
+
+    let constraints = ctx.get_constraints(var_a).unwrap();
+    assert!(constraints.lower_bounds.contains(&TypeId::STRING));
+    assert!(constraints.upper_bounds.contains(&TypeId::NUMBER));
 }
 
 // =============================================================================
@@ -158,6 +211,21 @@ fn test_resolve_upper_bound_only() {
 }
 
 #[test]
+fn test_resolve_multiple_upper_bounds_intersection() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(Arc::from("T"));
+
+    ctx.add_upper_bound(var, TypeId::STRING);
+    ctx.add_upper_bound(var, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    let expected = interner.intersection(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_resolve_bounds_valid() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
@@ -173,6 +241,27 @@ fn test_resolve_bounds_valid() {
     // Resolve should work: "hello" is subtype of string
     let result = ctx.resolve_with_constraints(var).unwrap();
     assert_eq!(result, hello);
+}
+
+#[test]
+fn test_resolve_bounds_conflict() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(Arc::from("T"));
+
+    ctx.add_lower_bound(var, TypeId::STRING);
+    ctx.add_upper_bound(var, TypeId::NUMBER);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower,
+            upper,
+            ..
+        }) if lower == TypeId::STRING && upper == TypeId::NUMBER
+    ));
 }
 
 #[test]

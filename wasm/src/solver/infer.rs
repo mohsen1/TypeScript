@@ -107,6 +107,15 @@ impl ConstraintSet {
     pub fn is_empty(&self) -> bool {
         self.lower_bounds.is_empty() && self.upper_bounds.is_empty()
     }
+
+    pub fn merge_from(&mut self, other: ConstraintSet) {
+        for ty in other.lower_bounds {
+            self.add_lower_bound(ty);
+        }
+        for ty in other.upper_bounds {
+            self.add_upper_bound(ty);
+        }
+    }
 }
 
 /// Type inference context for a single function call or expression.
@@ -179,9 +188,36 @@ impl<'a> InferenceContext<'a> {
 
     /// Unify two inference variables
     pub fn unify_vars(&mut self, a: InferenceVar, b: InferenceVar) -> Result<(), InferenceError> {
-        self.table.unify_var_var(a, b).map_err(|_| {
+        let root_a = self.table.find(a);
+        let root_b = self.table.find(b);
+
+        if root_a == root_b {
+            return Ok(());
+        }
+
+        let value_a = self.table.probe_value(root_a).0;
+        let value_b = self.table.probe_value(root_b).0;
+        if let (Some(a_ty), Some(b_ty)) = (value_a, value_b) {
+            if !self.types_compatible(a_ty, b_ty) {
+                return Err(InferenceError::Conflict(a_ty, b_ty));
+            }
+        }
+
+        self.table.unify_var_var(root_a, root_b).map_err(|_| {
             InferenceError::Conflict(TypeId::ERROR, TypeId::ERROR)
         })?;
+
+        let new_root = self.table.find(root_a);
+        let mut merged = ConstraintSet::new();
+        if let Some(constraints) = self.constraints.remove(&root_a.0) {
+            merged.merge_from(constraints);
+        }
+        if let Some(constraints) = self.constraints.remove(&root_b.0) {
+            merged.merge_from(constraints);
+        }
+        if !merged.is_empty() {
+            self.constraints.insert(new_root.0, merged);
+        }
         Ok(())
     }
 
@@ -289,21 +325,26 @@ impl<'a> InferenceContext<'a> {
 
         // Get constraints
         let constraints = self.constraints.get(&root.0).cloned().unwrap_or_default();
+        let upper_bounds = constraints.upper_bounds.clone();
 
         // Compute result from constraints
         let result = if !constraints.lower_bounds.is_empty() {
             // Best common type: union of all lower bounds
             self.best_common_type(&constraints.lower_bounds)
         } else if !constraints.upper_bounds.is_empty() {
-            // No lower bounds, use first upper bound (constraint)
-            constraints.upper_bounds[0]
+            // No lower bounds, use intersection of upper bounds
+            if constraints.upper_bounds.len() == 1 {
+                constraints.upper_bounds[0]
+            } else {
+                self.interner.intersection(constraints.upper_bounds)
+            }
         } else {
             // No constraints at all - return unknown
             TypeId::UNKNOWN
         };
 
         // Validate against upper bounds
-        for &upper in &constraints.upper_bounds {
+        for &upper in &upper_bounds {
             if !self.is_subtype(result, upper) {
                 return Err(InferenceError::BoundsViolation {
                     var,
@@ -400,6 +441,21 @@ impl<'a> InferenceContext<'a> {
                 (LiteralValue::BigInt(_), t) if t == TypeId::BIGINT => return true,
                 _ => {}
             }
+        }
+
+        // Intersection: A & B <: T if either member is a subtype of T
+        if let Some(TypeKey::Intersection(members)) = self.interner.lookup(source) {
+            return members.iter().any(|&member| self.is_subtype(member, target));
+        }
+
+        // Union: A | B <: T if both A <: T and B <: T
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(source) {
+            return members.iter().all(|&member| self.is_subtype(member, target));
+        }
+
+        // Target intersection: S <: (A & B) if S <: A and S <: B
+        if let Some(TypeKey::Intersection(members)) = self.interner.lookup(target) {
+            return members.iter().all(|&member| self.is_subtype(source, member));
         }
 
         // Check union membership

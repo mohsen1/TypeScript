@@ -4,50 +4,49 @@
 Implement the mathematical engine for type inference and generic instantiation. Focus on algorithms, not business rules.
 
 ## Scope
-**Files:** `src/solver/infer.rs`, `src/solver/unify.rs`, `src/solver/instantiate.rs`
+**Files:** `src/solver/infer.rs`, `src/solver/instantiate.rs`, `src/solver/operations.rs`
 
 **Independence:** HIGH - Mostly interacts with TypeId and TypeInterner, minimal dependencies on other solver logic.
 
 ## Current Status
-🟢 **Ready to Start** - TypeKey refactor is complete, APIs are stable.
+🟡 **In Progress** - Inference foundation, instantiation, and constraint tests are in place; integration and occurs-check remain.
 
 ## Tasks
 
 ### Phase 1: Inference Variables Foundation
-- [ ] Implement `InferenceContext` using `ena` unification table
-  - Create `InferenceVar` type (wraps ena's InferenceVariable)
-  - Implement `new_inference_var()` -> InferenceVar
-  - Implement `unify(var1, var2)` using ena's union-find
+- [x] Implement `InferenceContext` using `ena` unification table
+  - [x] Create `InferenceVar` type (wraps ena's InferenceVariable)
+  - [x] Implement `new_inference_var()` -> InferenceVar
+  - [x] Implement `unify(var1, var2)` using ena's union-find
 - [ ] Add tests for basic unification
-  - Test: `unify(T, number)` then resolve T -> number
-  - Test: `unify(T, U)` then `unify(U, string)` -> both resolve to string
-  - Test: Circular unification detection
+  - [x] Test: `unify(T, number)` then resolve T -> number
+  - [x] Test: `unify(T, U)` then `unify(U, string)` -> both resolve to string
+  - [ ] Test: Circular unification detection (occurs-check)
 
 ### Phase 2: Generic Instantiation
 - [ ] Implement `instantiate_generic(type: TypeId, args: &[TypeId]) -> TypeId`
-  - Handle `Array<T>` + `[number]` -> `Array<number>`
-  - Handle `Promise<T>` instantiation
-  - Cache instantiations to avoid duplicates
-- [ ] Add substitution logic
-  - Walk type structure replacing type parameters with concrete types
-  - Handle nested generics: `Map<K, Array<V>>`
+  - [x] Handle `Array<T>` + `[number]` -> `Array<number>`
+  - [ ] Handle `Promise<T>` instantiation (needs generic `Ref` args)
+  - [x] Cache instantiations to avoid duplicates
+- [x] Add substitution logic
+  - [x] Walk type structure replacing type parameters with concrete types
+  - [ ] Handle nested generics: `Map<K, Array<V>>` (needs generic `Ref` args)
 - [ ] Tests for instantiation
-  - Test: `Array<T>` with T=number -> `Array<number>`
-  - Test: `Map<K,V>` with K=string, V=number
-  - Test: Nested generics
+  - [x] Test: `Array<T>` with T=number -> `Array<number>`
+  - [ ] Test: `Map<K,V>` with K=string, V=number
+  - [x] Test: Nested generics
 
 ### Phase 3: Constraint Solving
-- [ ] Implement constraint system
-  - `add_constraint(var: InferenceVar, bound: TypeId, kind: BoundKind)`
-  - BoundKind: Upper (extends) vs Lower (super)
-  - Store constraints in Vec<(InferenceVar, TypeId, BoundKind)>
-- [ ] Implement `resolve_constraints() -> Result<(), Error>`
-  - Check for conflicts (upper bound not assignable to lower bound)
-  - Finalize inference variables to concrete types
-- [ ] Tests for constraints
-  - Test: `T extends string` -> T can be string literal
-  - Test: Conflicting bounds error
-  - Test: Multiple bounds intersection
+- [x] Implement constraint system
+  - [x] Lower/upper bounds tracked per inference var
+  - [x] Constraints merged on var unification
+- [x] Implement `resolve_constraints() -> Result<(), Error>`
+  - [x] Check for conflicts (upper bound not assignable to lower bound)
+  - [x] Finalize inference variables to concrete types
+- [x] Tests for constraints
+  - [x] Test: `T extends string` -> T can be string literal
+  - [x] Test: Conflicting bounds error
+  - [x] Test: Multiple bounds intersection
 
 ### Phase 4: Integration
 - [ ] Expose public API for other solver modules
