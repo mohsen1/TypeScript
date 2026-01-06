@@ -3,42 +3,43 @@
 ## Mission
 Migrate TypeScript compiler to Rust/WASM. **Beat TypeScript-Go in performance.**
 
-### Eventual Goal
-Rust port can run every single test case in test/cases faster than go port. Then we will release the port to the world. It should match TypeScript Go in terms of TS language feature (TS version). Later we can add new language features.
-
 ## 🎯 Philosophy: Performance-First Architecture
 
 We have time. No deadlines. Do it right.
 
-**Priority Order:**
-1. **Architectural wins** (ThinNode, arena allocation, parallelism) > line-by-line porting
-2. **Measure before optimizing** - run benchmarks, not guesses
-3. **Review at milestones** - use Gemini for architecture decisions, not just bug hunting
-
 
 ## The Plan
-**`specs/migration_plan.md`** is the single source of truth. Phase 0 (Performance) comes BEFORE completing remaining phases.
+
+There are 3 tracks running at the same time. Find out which track you are on based on git branch name. Each track manages its progress in a plan file in `wasm/specs`
+
+- `emitter-track`: `wasm/specs/emitter_plan.md`
+- `checker-track`: `wasm/specs/checker_plan.md`
+- `lsp-track`: `wasm/specs/lsp_plan.md`
+
+You must track todo items and progress in the appropriate plan file
+
 
 ## The Architecture
 
-**`specs/WASM_ARCHITECTURE.md`**. This is the guide for how we do things
+**`specs/WASM_ARCHITECTURE.md`**. This is the guide for how we do things. Always read
 
-## 🔁 WORK LOOP
+## The workflow
 
-```
-LOOP:
-  1. Read specs/migration_plan.md - understand current state
+Loop:
+  1. Read this track's *_plan.md file - understand current state
   2. Pick task with HIGHEST IMPACT (not just next in list)
   3. **BEFORE implementing**: Ask Gemini for advice
      - Run: node scripts/ask-gemini.mjs "How should I implement [task]?"
      - Get architectural guidance, edge cases, existing patterns to follow
-  4. Implement in wasm/src/*.rs
+  4. Implement in wasm/src/*.rs (make sure you add test too)
   5. Test: ./wasm/test.sh
-  6. If pass → update migration_plan.md, commit
+  6. If pass → update *_plan.md, commit
   7. **AFTER implementing**: Ask Gemini to review the implementation
      - Run: node scripts/ask-gemini.mjs --review wasm/src/[modified_file].rs
      - Address any issues found
   8. Final commit with review feedback addressed
+  9. Sync changes with the `rust` branch (main work branch), resolve conflicts if necessary
+  10. Repeat
 `
 
 ## 🛠️ Commands
@@ -76,9 +77,9 @@ node scripts/verifyChecker.mjs
 ## 📁 Key Locations
 
 - `wasm/src/` - All Rust code
-- `specs/WASM_ARCHITECTURE.md` - The main architecture. **always read**
-- `specs/migration_plan.md` - THE PLAN
-- `specs/SOLVER.md` - very important guide for solver
+- `wasm/specs/WASM_ARCHITECTURE.md` - The main architecture. **always read**
+- `wasm/specs/*_plan.md` - Plan files
+- `wasm/specs/SOLVER.md` - very important guide for solver
 
 
 ## ✅ Commit Format
@@ -90,12 +91,11 @@ Commit frequently and atomically
 
 ## 🚨 Rules
 
-1. **Architecture before features** - Phase 0 (ThinNode, parallelism) before Phase 6-8
+1. **Architecture in mind** - always keep in mind our big picture architecture
 2. **Never break the build** - tests must pass
 3. **ALWAYS use Docker for Rust** - ./wasm/test.sh only, NEVER raw cargo commands
-4. **Measure impact** - add benchmarks for perf claims
+4. **Separate test files** - `foo.rs` and `foo_tests.rs` or `tests/foo.rs` 
 5. **Update the plan** - mark tasks complete, add new discoveries
-6. IMPORTANT: **Separate test files** - `foo.rs` and `foo_tests.rs` or `tests/foo.rs` even in Rust files. if you see a file that has source and test in the same file move tests to separate file as a top priority
 7. **Gemini is your friend** - Gemini can unlock you when things are hard to debug, not sure about path to take. it can guide you how to start a work or review. make sure you use this help
 
 

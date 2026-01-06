@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sleep 60 && echo 'Continue with migration_plan.md' >&2; exit 2"
+            "command": "sleep 60 && echo 'Continue with tasks in plan' >&2; exit 2"
           }
         ]
       }
