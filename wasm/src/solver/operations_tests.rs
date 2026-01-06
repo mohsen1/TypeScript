@@ -12,9 +12,10 @@ fn test_call_simple_function() {
     let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
 
     // function(x: number): string
+    let param_x = interner.intern_string("x");
     let func = interner.function(FunctionShape {
         params: vec![ParamInfo {
-            name: Some("x".into()),
+            name: Some(param_x),
             type_id: TypeId::NUMBER,
             optional: false,
             rest: false,
@@ -39,9 +40,10 @@ fn test_call_argument_count_mismatch() {
     let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
 
     // function(x: number): string
+    let param_x = interner.intern_string("x");
     let func = interner.function(FunctionShape {
         params: vec![ParamInfo {
-            name: Some("x".into()),
+            name: Some(param_x),
             type_id: TypeId::NUMBER,
             optional: false,
             rest: false,
@@ -69,9 +71,10 @@ fn test_call_argument_type_mismatch() {
     let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
 
     // function(x: number): string
+    let param_x = interner.intern_string("x");
     let func = interner.function(FunctionShape {
         params: vec![ParamInfo {
-            name: Some("x".into()),
+            name: Some(param_x),
             type_id: TypeId::NUMBER,
             optional: false,
             rest: false,
@@ -99,15 +102,17 @@ fn test_property_access_object() {
     let evaluator = PropertyAccessEvaluator::new(&interner);
 
     // { x: number, y: string }
+    let prop_x = interner.intern_string("x");
+    let prop_y = interner.intern_string("y");
     let obj = interner.object(vec![
         PropertyInfo {
-            name: "x".into(),
+            name: prop_x,
             type_id: TypeId::NUMBER,
             optional: false,
             readonly: false,
         },
         PropertyInfo {
-            name: "y".into(),
+            name: prop_y,
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
@@ -201,10 +206,11 @@ fn test_call_generic_function_identity() {
     let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
 
     // function identity<T>(x: T): T
+    let param_x = interner.intern_string("x");
     let func = interner.function(FunctionShape {
         type_params: vec![t_param],
         params: vec![ParamInfo {
-            name: Some("x".into()),
+            name: Some(param_x),
             type_id: t_type,
             optional: false,
             rest: false,
@@ -238,10 +244,11 @@ fn test_call_generic_function_with_string() {
     let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
 
     // function identity<T>(x: T): T
+    let param_x = interner.intern_string("x");
     let func = interner.function(FunctionShape {
         type_params: vec![t_param],
         params: vec![ParamInfo {
-            name: Some("x".into()),
+            name: Some(param_x),
             type_id: t_type,
             optional: false,
             rest: false,
@@ -276,10 +283,11 @@ fn test_call_generic_array_function() {
     let array_t = interner.array(t_type);
 
     // function first<T>(arr: T[]): T
+    let param_arr = interner.intern_string("arr");
     let func = interner.function(FunctionShape {
         type_params: vec![t_param],
         params: vec![ParamInfo {
-            name: Some("arr".into()),
+            name: Some(param_arr),
             type_id: array_t,
             optional: false,
             rest: false,

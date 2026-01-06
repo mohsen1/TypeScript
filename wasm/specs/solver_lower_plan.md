@@ -9,7 +9,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
 **Independence:** MEDIUM - Needs stable TypeKey definitions from Track A. Heavy AST interaction.
 
 ## Current Status
-🟢 **Ready to Start** - TypeKey refactor is complete, Atom-based APIs ready.
+🟡 **In Progress** - Tuple element lowering (optional/rest/named) implemented and tested.
 
 ## Tasks
 
@@ -31,9 +31,10 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - `{ name: string, age: number }` -> TypeKey::Object
   - Store properties in side table (Vec<Property>)
   - Property: `{ name: Atom, type: TypeId, optional: bool }`
-- [ ] Implement array and tuple types
-  - `string[]` -> `Array<string>` (reference to intrinsic Array + type arg)
-  - `[string, number]` -> TypeKey::Tuple(Slice<TypeId>)
+- [x] Implement array and tuple types
+  - `string[]` -> TypeKey::Array(element)
+  - `[string, number]` -> TypeKey::Tuple(Vec<TupleElement>)
+  - Optional/rest/named tuple elements captured in TupleElement flags
 - [ ] Implement union and intersection types
   - `string | number` -> TypeKey::Union(Slice<TypeId>)
   - `A & B` -> TypeKey::Intersection(Slice<TypeId>)
@@ -41,6 +42,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - Test: Object type with multiple properties
   - Test: Nested objects
   - Test: Union/intersection normalization
+  - Test: Tuple optional/rest/named elements (done)
 
 ### Phase 3: Function Signatures
 - [ ] Implement function type lowering

@@ -47,6 +47,37 @@ fn parse_type_alias(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIn
     panic!("Could not find function type in parsed AST");
 }
 
+/// Helper to parse a type alias and return its type node index
+fn parse_type_alias_type_node(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        source.to_string(),
+    );
+    let _root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let arena = std::mem::take(&mut parser.arena);
+
+    let mut type_node = crate::parser::base::NodeIndex::NONE;
+    for i in 0..arena.len() {
+        let idx = crate::parser::base::NodeIndex(i as u32);
+        if let Some(node) = arena.get(idx) {
+            if node.kind == syntax_kind_ext::TYPE_ALIAS_DECLARATION {
+                if let Some(alias) = arena.get_type_alias(node) {
+                    type_node = alias.type_node;
+                    break;
+                }
+            }
+        }
+    }
+
+    if type_node == crate::parser::base::NodeIndex::NONE {
+        panic!("Could not find type alias in parsed AST");
+    }
+
+    (arena, type_node)
+}
+
 #[test]
 fn test_lower_function_type_with_type_parameter() {
     // Parse: type F = <T>(x: T) => T
@@ -181,5 +212,73 @@ fn test_lower_function_type_no_type_parameters() {
             assert_eq!(shape.type_params.len(), 0, "Expected no type parameters");
         }
         _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_tuple_optional_and_rest_elements() {
+    let (arena, tuple_type_idx) = parse_type_alias_type_node("type T = [number, string?, ...boolean[]];");
+
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(tuple_type_idx);
+
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Tuple(elements) => {
+            assert_eq!(elements.len(), 3);
+
+            assert_eq!(elements[0].type_id, TypeId::NUMBER);
+            assert!(!elements[0].optional);
+            assert!(!elements[0].rest);
+
+            assert_eq!(elements[1].type_id, TypeId::STRING);
+            assert!(elements[1].optional);
+            assert!(!elements[1].rest);
+
+            assert!(elements[2].rest);
+            assert!(!elements[2].optional);
+            match interner.lookup(elements[2].type_id) {
+                Some(TypeKey::Array(elem)) => assert_eq!(elem, TypeId::BOOLEAN),
+                other => panic!("Expected rest element to be array<boolean>, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Tuple type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_named_tuple_elements() {
+    let (arena, tuple_type_idx) = parse_type_alias_type_node("type T = [name: string, age?: number, ...flags: boolean[]];");
+
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(tuple_type_idx);
+
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Tuple(elements) => {
+            assert_eq!(elements.len(), 3);
+
+            let name = elements[0].name.expect("Expected name for first element");
+            assert_eq!(interner.resolve_atom(name).as_str(), "name");
+            assert_eq!(elements[0].type_id, TypeId::STRING);
+            assert!(!elements[0].optional);
+            assert!(!elements[0].rest);
+
+            let age = elements[1].name.expect("Expected name for second element");
+            assert_eq!(interner.resolve_atom(age).as_str(), "age");
+            assert_eq!(elements[1].type_id, TypeId::NUMBER);
+            assert!(elements[1].optional);
+            assert!(!elements[1].rest);
+
+            let flags = elements[2].name.expect("Expected name for third element");
+            assert_eq!(interner.resolve_atom(flags).as_str(), "flags");
+            assert!(elements[2].rest);
+            assert!(!elements[2].optional);
+        }
+        _ => panic!("Expected Tuple type, got {:?}", key),
     }
 }

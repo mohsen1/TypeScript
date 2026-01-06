@@ -5,7 +5,6 @@
 //!
 //! Lowering is lazy - types are only computed when queried.
 
-use std::sync::Arc;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::base::NodeIndex;
 use crate::parser::NodeList;
@@ -125,7 +124,6 @@ impl<'a> TypeLowering<'a> {
             // Type literal (object type)
             // =========================================================================
             k if k == syntax_kind_ext::TYPE_LITERAL => {
-                eprintln!("[DEBUG lower_type] Matched TYPE_LITERAL for kind={}", k);
                 self.lower_type_literal(node_idx)
             }
 
@@ -241,8 +239,6 @@ impl<'a> TypeLowering<'a> {
             // Unknown/unsupported - return ANY for now
             // =========================================================================
             _ => {
-                // Debug: print unhandled kind
-                eprintln!("[DEBUG lower_type] Unhandled kind: {} (TYPE_LITERAL={})", node.kind, syntax_kind_ext::TYPE_LITERAL);
                 TypeId::ANY
             }
         }
@@ -305,20 +301,64 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_tuple_type(node) {
-            let elements: Vec<TupleElement> = data.elements.nodes.iter()
-                .map(|&idx| {
-                    TupleElement {
-                        type_id: self.lower_type(idx),
-                        name: None, // TODO: Support named tuple elements
-                        optional: false, // TODO: Check for optional marker
-                        rest: false, // TODO: Check for rest element
-                    }
-                })
-                .collect();
+            let mut elements = Vec::with_capacity(data.elements.nodes.len());
+            for &idx in data.elements.nodes.iter() {
+                if let Some(element) = self.lower_tuple_element(idx) {
+                    elements.push(element);
+                }
+            }
             self.interner.tuple(elements)
         } else {
             self.interner.tuple(vec![])
         }
+    }
+
+    fn lower_tuple_element(&self, node_idx: NodeIndex) -> Option<TupleElement> {
+        if node_idx == NodeIndex::NONE {
+            return None;
+        }
+
+        let node = self.arena.get(node_idx)?;
+
+        if node.kind == syntax_kind_ext::NAMED_TUPLE_MEMBER {
+            let data = self.arena.get_named_tuple_member(node)?;
+            let name = self.tuple_element_name(data.name);
+            return Some(TupleElement {
+                type_id: self.lower_type(data.type_node),
+                name,
+                optional: data.question_token,
+                rest: data.dot_dot_dot_token,
+            });
+        }
+
+        if node.kind == syntax_kind_ext::OPTIONAL_TYPE || node.kind == syntax_kind_ext::REST_TYPE {
+            let wrapped = if let Some(wrapped) = self.arena.get_wrapped_type(node) {
+                wrapped.type_node
+            } else if let Some(op) = self.arena.get_type_operator(node) {
+                op.type_node
+            } else {
+                return None;
+            };
+            return Some(TupleElement {
+                type_id: self.lower_type(wrapped),
+                name: None,
+                optional: node.kind == syntax_kind_ext::OPTIONAL_TYPE,
+                rest: node.kind == syntax_kind_ext::REST_TYPE,
+            });
+        }
+
+        Some(TupleElement {
+            type_id: self.lower_type(node_idx),
+            name: None,
+            optional: false,
+            rest: false,
+        })
+    }
+
+    fn tuple_element_name(&self, name_idx: NodeIndex) -> Option<crate::interner::Atom> {
+        let node = self.arena.get(name_idx)?;
+        let ident = self.arena.get_identifier(node)?;
+        Some(self.interner.intern_string(&ident.escaped_text))
     }
 
     /// Lower type parameters from a NodeList.
@@ -858,12 +898,14 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_wrapped_type(node) {
-            // Just unwrap and lower the inner type
-            // The optional/rest nature is handled at the tuple level
-            self.lower_type(data.type_node)
-        } else {
-            TypeId::ERROR
+            return self.lower_type(data.type_node);
         }
+
+        if let Some(data) = self.arena.get_type_operator(node) {
+            return self.lower_type(data.type_node);
+        }
+
+        TypeId::ERROR
     }
 }
 
