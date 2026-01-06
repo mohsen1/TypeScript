@@ -90,6 +90,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Treat `object` as non-primitive top (accept objects, arrays, tuples, functions)
 - [x] Tests for `object` keyword accept/reject cases
 
+### Phase 10: Optional Property Widening
+- [x] Treat optional properties as `T | undefined` by default (exactOptionalPropertyTypes off)
+- [x] Tests for optional property assignability and index signature interactions
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
