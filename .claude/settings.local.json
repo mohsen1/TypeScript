@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "tmux send-keys -t ts.2 'Continue with the plan' && sleep 1 && tmux send-keys -t ts.2 Enter"
+          }
+        ]
+      }
+    ]
+  }
+}

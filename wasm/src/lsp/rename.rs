@@ -13,7 +13,8 @@ use crate::lsp::references::FindReferences;
 use crate::scanner::{self, SyntaxKind};
 
 /// A single text edit.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TextEdit {
     /// The range to replace.
     pub range: Range,
@@ -29,7 +30,7 @@ impl TextEdit {
 }
 
 /// A workspace edit (changes across multiple files).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct WorkspaceEdit {
     /// Map of file path -> list of edits.
     pub changes: HashMap<String, Vec<TextEdit>>,

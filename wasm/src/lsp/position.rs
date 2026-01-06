@@ -6,7 +6,7 @@
 use crate::parser::NodeIndex;
 
 /// A position in a source file (0-indexed line and column).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct Position {
     /// 0-indexed line number
     pub line: u32,
@@ -21,7 +21,7 @@ impl Position {
 }
 
 /// A range in a source file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub struct Range {
     pub start: Position,
     pub end: Position,

@@ -27,6 +27,7 @@ pub mod signature_help;
 pub mod document_symbols;
 pub mod rename;
 pub mod semantic_tokens;
+pub mod code_actions;
 
 #[cfg(test)]
 mod tests;
@@ -39,4 +40,5 @@ pub use signature_help::{SignatureHelpProvider, SignatureHelp, SignatureInformat
 pub use document_symbols::{DocumentSymbolProvider, DocumentSymbol, SymbolKind};
 pub use rename::{RenameProvider, WorkspaceEdit, TextEdit};
 pub use semantic_tokens::{SemanticTokensProvider, SemanticTokenType, semantic_token_modifiers};
+pub use code_actions::{CodeActionProvider, CodeAction, CodeActionKind, CodeActionContext};
 pub use position::{Position, Location, SourceLocation, Range};
