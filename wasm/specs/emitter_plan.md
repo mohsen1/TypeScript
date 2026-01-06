@@ -44,7 +44,44 @@ Our focus is to make wasm emitter complete
   - ✅ Helper detection system integrated with emit_source_file()
   - ✅ All 608 Rust tests pass
   - Note: Baseline still at 53.9% - remaining failures are type-checking issues
-- ... add more tasks (Ask Gemini when needed)
+
+## Future Enhancements
+
+These features would expand emitter capabilities but are not critical for baseline improvement:
+
+- ⏳ **System Module Support** (low priority for baseline)
+  - Would fix 1 out of 35 baseline failures (SystemModuleForStatementNoInitializer)
+  - 78 test files use System modules, but only 1 in 100-file baseline sample
+  - Requires: System.register() wrapper, setters, execute function
+  - ROI: Low - complex implementation for minimal baseline impact
+  - Recommendation: Defer until after checker/binder improvements
+
+- ⏳ **AMD Module Support** (low priority)
+  - Similar to System modules - wrapping transform needed
+  - Few test files in baseline sample
+
+- ⏳ **UMD Module Support** (low priority)
+  - Hybrid wrapper combining CommonJS/AMD/global
+  - Complex but rarely used in practice
+
+## Status Summary
+
+**The emitter is functionally complete for its primary scope:**
+- ✅ CommonJS modules (require/exports)
+- ✅ ES6 modules (import/export)
+- ✅ Comment preservation
+- ✅ Import/export helpers
+- ✅ ES5 downleveling (classes, arrows)
+- ✅ Parse error tolerance
+
+**Baseline at 53.9% (41/76 passing):**
+- Remaining failures are primarily type-checking/semantic errors
+- Not emission issues
+- Further improvement requires checker/binder track work
+
+**Next Steps:**
+- Focus shifts to `checker-track` for baseline improvement
+- Emitter enhancements (System/AMD/UMD) can be revisited later if needed
 
 
 
