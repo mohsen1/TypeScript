@@ -1127,7 +1127,13 @@ impl ThinBinderState {
                     // Named imports
                     if !clause.named_bindings.is_none() {
                         if let Some(bindings_node) = arena.get(clause.named_bindings) {
-                            if let Some(named) = arena.get_named_imports(bindings_node) {
+                            if bindings_node.kind == SyntaxKind::Identifier as u16 {
+                                if let Some(name) = self.get_identifier_name(arena, clause.named_bindings) {
+                                    let sym_id = self.symbols.alloc(symbol_flags::ALIAS, name.to_string());
+                                    self.current_scope.set(name.to_string(), sym_id);
+                                    self.node_symbols.insert(clause.named_bindings.0, sym_id);
+                                }
+                            } else if let Some(named) = arena.get_named_imports(bindings_node) {
                                 for &spec_idx in &named.elements.nodes {
                                     if let Some(spec_node) = arena.get(spec_idx) {
                                         if let Some(spec) = arena.get_specifier(spec_node) {

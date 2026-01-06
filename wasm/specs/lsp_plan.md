@@ -39,12 +39,14 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
 3. **Multi-File Support**
    - [x] Extend to handle cross-file references
    - [x] Implement project-wide find references (named/default imports)
-   - [ ] Namespace import and re-export reference mapping
+   - [x] Namespace import member references (`import * as ns`)
+   - [x] Re-export chains for named + export * (`export { foo } from`, `export * from`)
+   - [ ] Namespace re-exports (`export * as ns`) member mapping
 
 #### Testing
 
 Latest run:
-- `./wasm/test.sh` ❌ (fails in `src/solver/operations_tests.rs` due to `Atom` conversion errors; pre-existing)
+- `./wasm/test.sh` ❌ (fails in `src/emitter_transform_integration_tests.rs` for CommonJS auto-detect; pre-existing on rust)
 
 ## Quick Reference
 
