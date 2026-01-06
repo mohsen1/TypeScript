@@ -117,6 +117,9 @@ pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
     pub strict_function_types: bool,
     /// Whether to allow any return type when the target return is void.
     pub allow_void_return: bool,
+    /// Whether rest parameters of any/unknown should be treated as bivariant.
+    /// See https://github.com/microsoft/TypeScript/issues/20007.
+    pub allow_bivariant_rest: bool,
 }
 
 impl<'a> SubtypeChecker<'a, NoopResolver> {
@@ -130,6 +133,7 @@ impl<'a> SubtypeChecker<'a, NoopResolver> {
             depth: 0,
             strict_function_types: true, // Default to strict (sound) behavior
             allow_void_return: false,
+            allow_bivariant_rest: false,
         }
     }
 }
@@ -144,6 +148,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             depth: 0,
             strict_function_types: true,
             allow_void_return: false,
+            allow_bivariant_rest: false,
         }
     }
 
@@ -856,6 +861,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             let rest_param = target.params.last().unwrap();
             // Get the element type of the rest array
             let rest_elem_type = self.get_array_element_type(rest_param.type_id);
+            let rest_is_top = self.allow_bivariant_rest
+                && (rest_elem_type == TypeId::ANY || rest_elem_type == TypeId::UNKNOWN);
+
+            if rest_is_top {
+                return SubtypeResult::True;
+            }
 
             // Check source params that exceed target's fixed count against rest type
             for i in target_fixed_count..source_fixed_count {

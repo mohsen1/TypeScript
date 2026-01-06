@@ -70,6 +70,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         } else {
             self.subtype.strict_function_types = self.strict_function_types;
             self.subtype.allow_void_return = true;
+            self.subtype.allow_bivariant_rest = true;
             self.subtype.is_subtype_of(source, target)
         };
 
@@ -94,6 +95,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
 
         self.subtype.strict_function_types = self.strict_function_types;
         self.subtype.allow_void_return = true;
+        self.subtype.allow_bivariant_rest = true;
         self.subtype.explain_failure(source, target)
     }
 
