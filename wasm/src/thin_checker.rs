@@ -812,6 +812,16 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
+        // NEW STATELESS APPROACH: Query binder's persistent scope system
+        // This enables lazy checking without traversal-order dependency
+        if let Some(sym_id) = self.ctx.binder.resolve_identifier(self.ctx.arena, idx) {
+            // Get the declared type of the symbol
+            let declared_type = self.get_type_of_symbol(sym_id);
+            // Apply control flow analysis to narrow the type
+            return self.apply_flow_narrowing(idx, declared_type);
+        }
+
+        // LEGACY FALLBACK: Try old methods for backward compatibility during transition
         let name = &ident.escaped_text;
 
         // Check local scopes first to get the declared type

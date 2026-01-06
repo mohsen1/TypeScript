@@ -40,6 +40,8 @@ pub fn add_local(&mut self, name: String, ...) { ... }
 - **Result:** We will NEVER achieve incremental compilation or fast LSP queries with this design
 
 **Progress (2026-01-06):**
+
+**Phase 1: Binder Infrastructure (Completed)**
 - [x] Added `Scope` and `ScopeId` structures to `binder.rs`
 - [x] Updated `ThinBinderState` with persistent scope system:
   - `pub scopes: Vec<Scope>` - Persistent scopes for querying
@@ -52,9 +54,17 @@ pub fn add_local(&mut self, name: String, ...) { ... }
   - `enter_scope` / `exit_scope` now maintain both legacy and persistent scopes
   - Symbols added to persistent scope table during binding
   - File-level scope created as root persistent scope
-- [ ] **Next:** Remove `local_scope_stack` from `CheckerContext`
-- [ ] **Next:** Update checker to use `binder.resolve_identifier()` instead of scope stack
-- [ ] **Next:** Test stateless checking with function type queries
+
+**Phase 2: Checker Integration (In Progress)**
+- [x] Updated `get_type_of_identifier` in `thin_checker.rs`:
+  - Now calls `binder.resolve_identifier()` FIRST (stateless approach)
+  - Falls back to legacy `lookup_local()` for compatibility
+  - Maintains both code paths during transition
+- [x] Successfully compiles with new stateless approach
+- [ ] **Testing:** Running full test suite to verify correctness
+- [ ] **Next:** Once tests pass, remove legacy fallback code
+- [ ] **Next:** Remove `local_scope_stack` entirely from `CheckerContext`
+- [ ] **Next:** Measure performance improvement
 
 #### TypeKey Refactor (Shared with Solver)
 
