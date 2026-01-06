@@ -797,7 +797,8 @@ impl<'a> ThinCheckerState<'a> {
                                 name: self.ctx.types.intern_string(&id_data.escaped_text),
                                 type_id,
                                 optional: sig.question_token,
-                                readonly: false, // TODO: Check for readonly modifier
+                                readonly: false, // TODO: Check for readonly modifier,
+                                is_method: member_node.kind == METHOD_SIGNATURE,
                             });
                         }
                     }
@@ -1805,6 +1806,7 @@ impl<'a> ThinCheckerState<'a> {
                         type_id: value_type,
                         optional: false,
                         readonly: false,
+                        is_method: false,
                     });
                 }
             }
@@ -1817,6 +1819,7 @@ impl<'a> ThinCheckerState<'a> {
                         type_id: value_type,
                         optional: false,
                         readonly: false,
+                        is_method: false,
                     });
                 }
             }
@@ -1839,6 +1842,7 @@ impl<'a> ThinCheckerState<'a> {
                         type_id: method_type,
                         optional: false,
                         readonly: false,
+                        is_method: false,
                     });
                 }
             }
@@ -1868,6 +1872,7 @@ impl<'a> ThinCheckerState<'a> {
                         type_id: accessor_type,
                         optional: false,
                         readonly: false,
+                        is_method: false,
                     });
                 }
             }

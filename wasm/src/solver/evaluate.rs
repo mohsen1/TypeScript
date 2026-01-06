@@ -322,6 +322,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 type_id: property_type,
                 optional,
                 readonly,
+                is_method: false,
             });
         }
 
