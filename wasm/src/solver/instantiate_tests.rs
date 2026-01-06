@@ -190,6 +190,47 @@ fn test_instantiate_function() {
 }
 
 #[test]
+fn test_instantiate_function_shadowed_type_params() {
+    let interner = TypeInterner::new();
+    let t_name = interner.intern_string("T");
+
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let func = interner.function(FunctionShape {
+        type_params: vec![t_param.clone()],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: t_type,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    });
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::STRING);
+    let result = instantiate_type(&interner, func, &subst);
+
+    let expected = interner.function(FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: t_type,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    });
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_instantiate_tuple() {
     let interner = TypeInterner::new();
     let t_name = interner.intern_string("T");
@@ -371,6 +412,40 @@ fn test_instantiate_conditional() {
         extends_type: TypeId::STRING,
         true_type: hello_lit,
         false_type: TypeId::NEVER,
+    })));
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_instantiate_mapped_type_shadowed_param() {
+    let interner = TypeInterner::new();
+    let t_name = interner.intern_string("T");
+
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let mapped = interner.intern(TypeKey::Mapped(Box::new(MappedType {
+        type_param: t_param.clone(),
+        constraint: TypeId::STRING,
+        template: t_type,
+        readonly_modifier: None,
+        optional_modifier: None,
+    })));
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, TypeId::NUMBER);
+    let result = instantiate_type(&interner, mapped, &subst);
+
+    let expected = interner.intern(TypeKey::Mapped(Box::new(MappedType {
+        type_param: t_param,
+        constraint: TypeId::STRING,
+        template: t_type,
+        readonly_modifier: None,
+        optional_modifier: None,
     })));
     assert_eq!(result, expected);
 }
