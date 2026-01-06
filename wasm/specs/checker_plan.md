@@ -40,7 +40,16 @@ Our focus is to make wasm checker complete
     - Flag is contagious across union members (TypeScript strict behavior)
     - Added 4 comprehensive test cases (1 active solver-level test, 3 integration tests documented but disabled until interface type lowering is implemented)
     - All 614 tests pass
-- ⬜ Ambient module patterns (errors 2305, 5061, 2819)
+- ✅ Ambient module patterns (errors 5061, 2819) (COMPLETED)
+    - Implemented TS5061: Ambient module declaration cannot specify relative module name
+    - Implemented TS2819: Private identifiers not allowed in ambient classes
+    - Fixed parser bug: parse_ambient_declaration now creates parse_declare_module with declare modifier
+    - Added has_modifier helper to CheckerContext for checking modifier presence
+    - Added comprehensive checks in DeclarationChecker for module declarations
+    - Added checks in ThinCheckerState for private identifiers in ambient classes
+    - Added 5 comprehensive test cases
+    - All 623 tests pass
+    - Note: TS2305 (Module has no exported member) not yet implemented - requires module resolution system
 - ⬜ Various missing error codes (see test failures)
 - ✅ Fix tuple subtyping logic (CRITICAL - COMPLETED)
     - Fixed: Now properly rejects `[number, string]` as subtype of `[number]`

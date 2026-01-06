@@ -195,4 +195,18 @@ impl<'a> CheckerContext<'a> {
     pub fn current_return_type(&self) -> Option<TypeId> {
         self.return_type_stack.last().copied()
     }
+
+    /// Check if a modifier list contains a specific modifier kind.
+    pub fn has_modifier(&self, modifiers: &Option<crate::parser::NodeList>, kind: u16) -> bool {
+        if let Some(mods) = modifiers {
+            for &idx in &mods.nodes {
+                if let Some(node) = self.arena.get(idx) {
+                    if node.kind == kind {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
 }

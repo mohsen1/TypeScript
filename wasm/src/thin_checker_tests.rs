@@ -1434,3 +1434,174 @@ fn test_index_signature_at_solver_level() {
         _ => panic!("Expected Success, got: {:?}", result),
     }
 }
+
+// ============== Ambient module pattern tests (errors 5061, 2819) ==============
+
+#[test]
+fn test_ambient_module_relative_path_5061() {
+    use crate::thin_parser::ThinParserState;
+
+    // TS5061: Ambient module declaration cannot specify relative module name
+    let source = r#"
+declare module "./relative-module" {
+    export function foo(): void;
+}
+
+declare module "../another-relative" {
+    export const bar: number;
+}
+
+declare module "." {
+    export type Baz = string;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let error_count = codes.iter().filter(|&&c| c == 5061).count();
+
+    assert_eq!(error_count, 3,
+        "Expected 3 errors with code 5061 for relative module names, got: {:?}", codes);
+}
+
+#[test]
+fn test_ambient_module_absolute_path_ok() {
+    use crate::thin_parser::ThinParserState;
+
+    // Absolute module names should be allowed in ambient declarations
+    let source = r#"
+declare module "absolute-module" {
+    export function foo(): void;
+}
+
+declare module "@scoped/package" {
+    export const bar: number;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let error_5061_count = codes.iter().filter(|&&c| c == 5061).count();
+
+    assert_eq!(error_5061_count, 0,
+        "Expected no error 5061 for absolute module names, got: {:?}", codes);
+}
+
+#[test]
+fn test_private_identifier_in_ambient_class_2819() {
+    use crate::thin_parser::ThinParserState;
+
+    // TS2819: Private identifiers are not allowed in ambient contexts
+    let source = r#"
+declare class AmbientClass {
+    #privateField: string;
+    #anotherPrivate: number;
+
+    #privateMethod(): void;
+
+    get #privateGetter(): boolean;
+    set #privateSetter(value: boolean);
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let error_count = codes.iter().filter(|&&c| c == 2819).count();
+
+    // Should report error for all 5 private identifiers
+    assert!(error_count >= 4,
+        "Expected at least 4 errors with code 2819 for private identifiers in ambient class, got {} errors: {:?}",
+        error_count, codes);
+}
+
+#[test]
+fn test_private_identifier_in_non_ambient_class_ok() {
+    use crate::thin_parser::ThinParserState;
+
+    // Private identifiers should be allowed in non-ambient classes
+    let source = r#"
+class RegularClass {
+    #privateField: string;
+
+    constructor() {
+        this.#privateField = "test";
+    }
+
+    #privateMethod(): void {
+        console.log(this.#privateField);
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let error_2819_count = codes.iter().filter(|&&c| c == 2819).count();
+
+    assert_eq!(error_2819_count, 0,
+        "Expected no error 2819 for private identifiers in non-ambient class, got: {:?}", codes);
+}
+
+#[test]
+fn test_namespace_with_relative_path_ok() {
+    use crate::thin_parser::ThinParserState;
+
+    // Namespace declarations (without declare) can have any name, including relative-like names
+    // This test ensures we only check ambient modules (declare module)
+    let source = r#"
+namespace MyNamespace {
+    export function foo(): void {}
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let error_5061_count = codes.iter().filter(|&&c| c == 5061).count();
+
+    assert_eq!(error_5061_count, 0,
+        "Expected no error 5061 for namespace declarations (only ambient modules should error), got: {:?}", codes);
+}

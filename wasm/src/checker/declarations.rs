@@ -143,16 +143,43 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
 
     /// Check a module/namespace declaration.
     pub fn check_module_declaration(&mut self, module_idx: NodeIndex) {
+        use crate::scanner::SyntaxKind;
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+
         let Some(node) = self.ctx.arena.get(module_idx) else {
             return;
         };
 
         if let Some(module) = self.ctx.arena.get_module(node) {
+            // TS5061: Check for relative module names in ambient declarations
+            // declare module "./foo" { } -> Error
+            if self.ctx.has_modifier(&module.modifiers, SyntaxKind::DeclareKeyword as u16) {
+                if let Some(name_node) = self.ctx.arena.get(module.name) {
+                    if name_node.kind == SyntaxKind::StringLiteral as u16 {
+                        if let Some(lit) = self.ctx.arena.get_literal(name_node) {
+                            if self.is_relative_module_name(&lit.text) {
+                                self.ctx.error(
+                                    name_node.pos,
+                                    name_node.end - name_node.pos,
+                                    diagnostic_messages::AMBIENT_MODULE_DECLARATION_CANNOT_SPECIFY_RELATIVE_MODULE_NAME.to_string(),
+                                    diagnostic_codes::AMBIENT_MODULE_DECLARATION_CANNOT_SPECIFY_RELATIVE_MODULE_NAME,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
             if !module.body.is_none() {
                 // Check module body (which can be a block or nested module)
                 self.check_module_body(module.body);
             }
         }
+    }
+
+    /// Check if a module name is relative (starts with ./ or ../)
+    fn is_relative_module_name(&self, name: &str) -> bool {
+        name.starts_with("./") || name.starts_with("../") || name == "." || name == ".."
     }
 
     /// Check a module body (block or nested module).

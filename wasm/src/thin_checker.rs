@@ -2464,6 +2464,10 @@ impl<'a> ThinCheckerState<'a> {
                 // No action needed
             }
             syntax_kind_ext::MODULE_DECLARATION => {
+                // Check module declaration (errors 5061, 2819, etc.)
+                let mut checker = crate::checker::declarations::DeclarationChecker::new(&mut self.ctx);
+                checker.check_module_declaration(stmt_idx);
+
                 // Check module body for function overload implementations
                 if let Some(module) = self.ctx.arena.get_module(node) {
                     if !module.body.is_none() {
@@ -2913,9 +2917,42 @@ impl<'a> ThinCheckerState<'a> {
         let is_abstract_class = self.has_abstract_modifier(&class.modifiers);
 
         // Check for abstract members in non-abstract class (error 1253)
-        if !is_abstract_class {
-            for &member_idx in &class.members.nodes {
-                if let Some(member_node) = self.ctx.arena.get(member_idx) {
+        // and private identifiers in ambient classes (error 2819)
+        for &member_idx in &class.members.nodes {
+            if let Some(member_node) = self.ctx.arena.get(member_idx) {
+                // TS2819: Check for private identifiers in ambient classes
+                if is_declared {
+                    let member_name_idx = match member_node.kind {
+                        syntax_kind_ext::PROPERTY_DECLARATION => {
+                            self.ctx.arena.get_property_decl(member_node).map(|p| p.name)
+                        }
+                        syntax_kind_ext::METHOD_DECLARATION => {
+                            self.ctx.arena.get_method_decl(member_node).map(|m| m.name)
+                        }
+                        syntax_kind_ext::GET_ACCESSOR | syntax_kind_ext::SET_ACCESSOR => {
+                            self.ctx.arena.get_accessor(member_node).map(|a| a.name)
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(name_idx) = member_name_idx {
+                        if !name_idx.is_none() {
+                            if let Some(name_node) = self.ctx.arena.get(name_idx) {
+                                if name_node.kind == crate::scanner::SyntaxKind::PrivateIdentifier as u16 {
+                                    use crate::checker::types::diagnostics::diagnostic_messages;
+                                    self.error_at_node(
+                                        name_idx,
+                                        diagnostic_messages::PRIVATE_IDENTIFIER_IN_AMBIENT_CONTEXT,
+                                        diagnostic_codes::PRIVATE_IDENTIFIER_IN_AMBIENT_CONTEXT,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Check for abstract members in non-abstract class
+                if !is_abstract_class {
                     let member_has_abstract = match member_node.kind {
                         syntax_kind_ext::PROPERTY_DECLARATION => {
                             if let Some(prop) = self.ctx.arena.get_property_decl(member_node) {
