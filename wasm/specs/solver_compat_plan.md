@@ -71,7 +71,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Accept `(...args: any[] | unknown[]) => ...` as a universal supertype for params
 - [x] Tests for rest-parameter bivariance
 
-### Phase 7: Integration & Polish
+### Phase 7: Empty Object Assignability
+- [x] Treat `{}` as non-nullish top (accept primitives, arrays, functions)
+- [x] Tests for `{}` vs `object`/nullish cases
+
+### Phase 8: Integration & Polish
 - [x] Wire compat.rs to be the public API
   - ThinChecker assignability now routes through `CompatChecker`
 - [x] Add comprehensive error messages
