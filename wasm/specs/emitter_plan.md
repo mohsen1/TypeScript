@@ -45,7 +45,7 @@ Our focus is to make wasm emitter complete
   - ✅ All 608 Rust tests pass
   - Note: Baseline still at 53.9% - remaining failures are type-checking issues
 
-## Future Enhancements
+## Future Enhancements (WE SHOULD DO NOW)
 
 These features would expand emitter capabilities but are not critical for baseline improvement:
 
