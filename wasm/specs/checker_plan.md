@@ -28,7 +28,7 @@ Our focus is to make wasm checker complete
 - [x] **Lower tuple metadata** (named elements, rest, optional)
 - [x] **Fix template literal type spans** (TemplateLiteralType lowering)
 - [x] **Lower function parameter names** (ParamInfo.name)
-- [ ] **Lower mapped types fully** (constraint + modifiers)
+- [x] **Lower mapped types fully** (constraint + modifiers)
 - [x] **Handle generic type arguments** (TypeRef instantiation or TypeApplication)
 - [x] **Remove unsafe symbol hash fallback** (require binder-based resolver)
 - [ ] **Lower type literals with signatures/indexers** (call/construct/index in `{ ... }`)

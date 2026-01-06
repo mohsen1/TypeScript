@@ -559,24 +559,79 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_mapped_type(node) {
-            // For mapped types, we need to extract the type parameter
-            // The type_parameter field is the NodeIndex of the type parameter declaration
-            let param_name = self.interner.intern_string("K"); // Default name
-
+            let (type_param, constraint) = self.lower_mapped_type_param(data.type_parameter);
             let mapped = MappedType {
-                type_param: TypeParamInfo {
-                    name: param_name,
-                    constraint: None, // TODO: Extract constraint from type parameter
-                    default: None,
-                },
-                constraint: TypeId::ANY, // TODO: Extract from name_type
+                type_param,
+                constraint,
                 template: self.lower_type(data.type_node),
-                readonly_modifier: None, // TODO: Handle readonly modifier
-                optional_modifier: None, // TODO: Handle optional modifier
+                readonly_modifier: self.lower_mapped_modifier(data.readonly_token, SyntaxKind::ReadonlyKeyword as u16),
+                optional_modifier: self.lower_mapped_modifier(data.question_token, SyntaxKind::QuestionToken as u16),
             };
             self.interner.intern(TypeKey::Mapped(Box::new(mapped)))
         } else {
             TypeId::ERROR
+        }
+    }
+
+    fn lower_mapped_type_param(&self, node_idx: NodeIndex) -> (TypeParamInfo, TypeId) {
+        let node = match self.arena.get(node_idx) {
+            Some(n) => n,
+            None => {
+                let name = self.interner.intern_string("K");
+                return (TypeParamInfo { name, constraint: None, default: None }, TypeId::ANY);
+            }
+        };
+
+        if let Some(param_data) = self.arena.get_type_parameter(node) {
+            let name = self
+                .arena
+                .get(param_data.name)
+                .and_then(|ident_node| self.arena.get_identifier(ident_node))
+                .map(|ident| self.interner.intern_string(&ident.escaped_text))
+                .unwrap_or_else(|| self.interner.intern_string("K"));
+
+            let constraint = if param_data.constraint != NodeIndex::NONE {
+                Some(self.lower_type(param_data.constraint))
+            } else {
+                None
+            };
+
+            let default = if param_data.default != NodeIndex::NONE {
+                Some(self.lower_type(param_data.default))
+            } else {
+                None
+            };
+
+            let constraint_type = constraint.unwrap_or(TypeId::ANY);
+
+            (
+                TypeParamInfo {
+                    name,
+                    constraint,
+                    default,
+                },
+                constraint_type,
+            )
+        } else {
+            let name = self.interner.intern_string("K");
+            (TypeParamInfo { name, constraint: None, default: None }, TypeId::ANY)
+        }
+    }
+
+    fn lower_mapped_modifier(&self, token_idx: NodeIndex, default_kind: u16) -> Option<MappedModifier> {
+        use crate::scanner::SyntaxKind;
+
+        if token_idx == NodeIndex::NONE {
+            return None;
+        }
+
+        let kind = self.arena.get(token_idx).map(|node| node.kind)?;
+        if kind == SyntaxKind::PlusToken as u16 || kind == default_kind {
+            Some(MappedModifier::Add)
+        } else if kind == SyntaxKind::MinusToken as u16 {
+            Some(MappedModifier::Remove)
+        } else {
+            None
         }
     }
 

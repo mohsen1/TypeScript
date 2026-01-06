@@ -6820,11 +6820,12 @@ impl ThinParserState {
             self.arena.add_token(SyntaxKind::ReadonlyKeyword as u16, pos, self.token_end())
         } else if self.is_token(SyntaxKind::PlusToken) || self.is_token(SyntaxKind::MinusToken) {
             let pos = self.token_pos();
+            let kind = self.token() as u16;
             self.next_token();
             if self.is_token(SyntaxKind::ReadonlyKeyword) {
                 self.next_token();
             }
-            self.arena.add_token(SyntaxKind::ReadonlyKeyword as u16, pos, self.token_end())
+            self.arena.add_token(kind, pos, self.token_end())
         } else {
             NodeIndex::NONE
         };
@@ -6870,11 +6871,12 @@ impl ThinParserState {
             self.arena.add_token(SyntaxKind::QuestionToken as u16, pos, self.token_end())
         } else if self.is_token(SyntaxKind::PlusToken) || self.is_token(SyntaxKind::MinusToken) {
             let pos = self.token_pos();
+            let kind = self.token() as u16;
             self.next_token();
             if self.is_token(SyntaxKind::QuestionToken) {
                 self.next_token();
             }
-            self.arena.add_token(SyntaxKind::QuestionToken as u16, pos, self.token_end())
+            self.arena.add_token(kind, pos, self.token_end())
         } else {
             NodeIndex::NONE
         };

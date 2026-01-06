@@ -91,6 +91,28 @@ fn parse_template_literal_type(source: &str) -> (ThinNodeArena, crate::parser::b
     panic!("Could not find template literal type in parsed AST");
 }
 
+/// Helper to parse a type alias and return the mapped type node index.
+fn parse_mapped_type(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        source.to_string(),
+    );
+    let _root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let arena = std::mem::take(&mut parser.arena);
+    for i in 0..arena.len() {
+        let idx = crate::parser::base::NodeIndex(i as u32);
+        if let Some(node) = arena.get(idx) {
+            if node.kind == syntax_kind_ext::MAPPED_TYPE {
+                return (arena, idx);
+            }
+        }
+    }
+
+    panic!("Could not find mapped type in parsed AST");
+}
+
 /// Helper to parse a type alias and return the type reference node index for a name.
 fn parse_type_reference(source: &str, name: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
     let mut parser = ThinParserState::new(
@@ -380,5 +402,42 @@ fn test_lower_template_literal_type_spans() {
             }
         }
         _ => panic!("Expected TemplateLiteral type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_mapped_type_modifiers_and_constraint() {
+    let (arena, mapped_idx) = parse_mapped_type("type T = { readonly [K in string]?: number };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(mapped_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Mapped(mapped) => {
+            assert_eq!(interner.resolve_atom(mapped.type_param.name), "K");
+            assert_eq!(mapped.constraint, TypeId::STRING);
+            assert_eq!(mapped.template, TypeId::NUMBER);
+            assert_eq!(mapped.readonly_modifier, Some(MappedModifier::Add));
+            assert_eq!(mapped.optional_modifier, Some(MappedModifier::Add));
+        }
+        _ => panic!("Expected Mapped type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_mapped_type_remove_modifiers() {
+    let (arena, mapped_idx) = parse_mapped_type("type T = { -readonly [K in string]-?: number };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(mapped_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Mapped(mapped) => {
+            assert_eq!(mapped.readonly_modifier, Some(MappedModifier::Remove));
+            assert_eq!(mapped.optional_modifier, Some(MappedModifier::Remove));
+        }
+        _ => panic!("Expected Mapped type, got {:?}", key),
     }
 }
