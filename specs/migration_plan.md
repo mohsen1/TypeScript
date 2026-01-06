@@ -64,6 +64,7 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Destructuring transform (`let { x } = obj;` → `var _a = obj, x = _a.x;`)
 - ✅ CommonJS auto-detect (only apply module transforms to files with imports/exports)
 - ✅ Export assignment emit (`export = foo;` → `module.exports = foo;`)
+- ✅ ES5 computed property transform (`{ [k]: v }` → `(_a = {}, _a[k] = v, _a)`)
 
 ## Emitter Architecture Refactor (complete)
 - ✅ Created `SourceWriter` abstraction for output generation with source map tracking
@@ -145,8 +146,11 @@ These fixes improve JS emit baseline:
    - Added dispatch case for kind 278 in emit_node
    - Pattern: `export = foo;` → `module.exports = foo;`
 
-4. ⬜ **ES5 computed property transform** - `{ [k]: v }` is ES6
+4. ✅ **ES5 computed property transform** - `{ [k]: v }` is ES6
    - Emit as: `(_a = {}, _a[k] = v, _a)`
+   - Handles mixed computed and regular properties
+   - Handles spread assignments via Object.assign
+   - Handles method declarations and accessors via Object.defineProperty
 
 ---
 

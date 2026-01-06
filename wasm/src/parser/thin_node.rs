@@ -2957,6 +2957,17 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get computed property name data
+    #[inline]
+    pub fn get_computed_property(&self, node: &ThinNode) -> Option<&ComputedPropertyData> {
+        use super::syntax_kind_ext::COMPUTED_PROPERTY_NAME;
+        if node.has_data() && node.kind == COMPUTED_PROPERTY_NAME {
+            self.computed_properties.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Number of nodes in the arena
     pub fn len(&self) -> usize {
         self.nodes.len()
