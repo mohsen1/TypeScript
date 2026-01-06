@@ -11,6 +11,7 @@
 use std::collections::HashMap;
 use std::sync::RwLock;
 use crate::solver::types::*;
+use crate::interner::{Atom, Interner};
 
 /// Type interning table.
 /// Thread-safe via RwLock for concurrent access.
@@ -21,20 +22,40 @@ pub struct TypeInterner {
     id_to_key: RwLock<Vec<TypeKey>>,
     /// Next available TypeId
     next_id: RwLock<u32>,
+    /// String interner for property names and string literals
+    /// Thread-safe for concurrent access during type construction
+    pub string_interner: RwLock<Interner>,
 }
 
 impl TypeInterner {
     /// Create a new type interner with pre-registered intrinsics
     pub fn new() -> Self {
+        let mut string_interner = Interner::new();
+        // Pre-intern common TypeScript identifiers for better performance
+        string_interner.intern_common();
+
         let interner = TypeInterner {
             key_to_id: RwLock::new(HashMap::new()),
             id_to_key: RwLock::new(Vec::new()),
             next_id: RwLock::new(TypeId::FIRST_USER),
+            string_interner: RwLock::new(string_interner),
         };
 
         // Pre-register intrinsic types
         interner.register_intrinsics();
         interner
+    }
+
+    /// Intern a string into an Atom.
+    /// This is used when constructing types with property names or string literals.
+    pub fn intern_string(&self, s: &str) -> Atom {
+        self.string_interner.write().unwrap().intern(s)
+    }
+
+    /// Resolve an Atom back to its string value.
+    /// This is used when formatting types for error messages.
+    pub fn resolve_atom(&self, atom: Atom) -> String {
+        self.string_interner.read().unwrap().resolve(atom).to_string()
     }
 
     /// Register all intrinsic types at their fixed positions

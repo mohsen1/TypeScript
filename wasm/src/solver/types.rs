@@ -5,6 +5,7 @@
 
 use serde::Serialize;
 use std::sync::Arc;
+use crate::interner::Atom;
 
 /// A lightweight handle to an interned type.
 /// Equality check is O(1) - just compare the u32 values.
@@ -171,9 +172,9 @@ impl IntrinsicKind {
 /// Literal values (for literal types)
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum LiteralValue {
-    String(Arc<str>),
+    String(Atom),
     Number(OrderedFloat),
-    BigInt(Arc<str>),
+    BigInt(Atom),
     Boolean(bool),
 }
 
@@ -198,7 +199,7 @@ impl std::hash::Hash for OrderedFloat {
 /// Property information for object types
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PropertyInfo {
-    pub name: Arc<str>,
+    pub name: Atom,
     pub type_id: TypeId,
     pub optional: bool,
     pub readonly: bool,
@@ -231,7 +232,7 @@ pub struct ObjectShape {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TupleElement {
     pub type_id: TypeId,
-    pub name: Option<Arc<str>>,
+    pub name: Option<Atom>,
     pub optional: bool,
     pub rest: bool,
 }
@@ -275,7 +276,7 @@ pub struct CallableShape {
 /// Parameter information
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ParamInfo {
-    pub name: Option<Arc<str>>,
+    pub name: Option<Atom>,
     pub type_id: TypeId,
     pub optional: bool,
     pub rest: bool,
@@ -284,7 +285,7 @@ pub struct ParamInfo {
 /// Type parameter information
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TypeParamInfo {
-    pub name: Arc<str>,
+    pub name: Atom,
     pub constraint: Option<TypeId>,
     pub default: Option<TypeId>,
 }
@@ -322,7 +323,7 @@ pub enum MappedModifier {
 /// Template literal span
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TemplateSpan {
-    Text(Arc<str>),
+    Text(Atom),
     Type(TypeId),
 }
 
