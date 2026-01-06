@@ -53,6 +53,10 @@ mod thin_emitter_tests;
 mod emitter_edge_case_tests;
 #[cfg(test)]
 mod emitter_transform_integration_tests;
+#[cfg(test)]
+mod transform_api_tests;
+#[cfg(test)]
+mod emitter_parity_tests;
 
 
 // Parallel processing with Rayon (Phase 0.4)
@@ -120,10 +124,13 @@ pub fn create_binder() -> binder::BinderState {
 // ThinParser WASM Interface (High-Performance Parser)
 // =============================================================================
 
+use crate::emit_context::EmitContext;
+use crate::lowering_pass::LoweringPass;
 use crate::thin_parser::ThinParserState;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
-use crate::thin_emitter::ThinPrinter;
+use crate::thin_emitter::{ModuleKind, PrinterOptions, ScriptTarget, ThinPrinter};
+use crate::transform_context::TransformContext;
 use crate::solver::TypeInterner;
 use crate::lsp::position::{LineMap, Position, Range};
 use crate::lsp::{
@@ -131,6 +138,23 @@ use crate::lsp::{
     DocumentSymbolProvider, RenameProvider, SemanticTokensProvider, CodeActionProvider,
     CodeActionContext,
 };
+
+/// Opaque wrapper for transform directives across the wasm boundary.
+#[wasm_bindgen]
+pub struct WasmTransformContext {
+    inner: TransformContext,
+    target_es5: bool,
+    module_kind: ModuleKind,
+}
+
+#[wasm_bindgen]
+impl WasmTransformContext {
+    /// Get the number of transform directives generated.
+    #[wasm_bindgen(js_name = getCount)]
+    pub fn get_count(&self) -> usize {
+        self.inner.len()
+    }
+}
 
 /// High-performance parser using ThinNode architecture (16 bytes/node).
 /// This is the optimized path for Phase 8 test suite evaluation.
@@ -233,27 +257,41 @@ impl ThinParser {
 
         if let (Some(root_idx), Some(binder)) = (self.source_file_idx, &self.binder) {
             let file_name = self.parser.get_file_name().to_string();
-            let mut checker = ThinCheckerState::new(
-                self.parser.get_arena(),
-                binder,
-                &self.type_interner,
-                file_name,
-            );
+            let mut checker = if let Some(cache) = self.type_cache.take() {
+                ThinCheckerState::with_cache(
+                    self.parser.get_arena(),
+                    binder,
+                    &self.type_interner,
+                    file_name,
+                    cache,
+                )
+            } else {
+                ThinCheckerState::new(
+                    self.parser.get_arena(),
+                    binder,
+                    &self.type_interner,
+                    file_name,
+                )
+            };
 
             // Full source file type checking - traverse all statements
             checker.check_source_file(root_idx);
 
+            let diagnostics = checker.ctx.diagnostics.iter().map(|d| {
+                serde_json::json!({
+                    "message_text": d.message_text.clone(),
+                    "code": d.code,
+                    "start": d.start,
+                    "length": d.length,
+                    "category": format!("{:?}", d.category),
+                })
+            }).collect::<Vec<_>>();
+
+            self.type_cache = Some(checker.extract_cache());
+
             let result = serde_json::json!({
                 "typeCount": self.type_interner.len(),
-                "diagnostics": checker.ctx.diagnostics.iter().map(|d| {
-                    serde_json::json!({
-                        "message_text": d.message_text.clone(),
-                        "code": d.code,
-                        "start": d.start,
-                        "length": d.length,
-                        "category": format!("{:?}", d.category),
-                    })
-                }).collect::<Vec<_>>(),
+                "diagnostics": diagnostics,
             });
 
             serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
@@ -267,16 +305,28 @@ impl ThinParser {
     pub fn get_type_of_node(&mut self, node_idx: u32) -> String {
         if let (Some(_), Some(binder)) = (self.source_file_idx, &self.binder) {
             let file_name = self.parser.get_file_name().to_string();
-            let mut checker = ThinCheckerState::new(
-                self.parser.get_arena(),
-                binder,
-                &self.type_interner,
-                file_name,
-            );
+            let mut checker = if let Some(cache) = self.type_cache.take() {
+                ThinCheckerState::with_cache(
+                    self.parser.get_arena(),
+                    binder,
+                    &self.type_interner,
+                    file_name,
+                    cache,
+                )
+            } else {
+                ThinCheckerState::new(
+                    self.parser.get_arena(),
+                    binder,
+                    &self.type_interner,
+                    file_name,
+                )
+            };
 
             let type_id = checker.get_type_of_node(parser::NodeIndex(node_idx));
             // Use format_type for human-readable output
-            checker.format_type(type_id)
+            let result = checker.format_type(type_id);
+            self.type_cache = Some(checker.extract_cache());
+            result
         } else {
             "unknown".to_string()
         }
@@ -304,6 +354,71 @@ impl ThinParser {
         if let Some(root_idx) = self.source_file_idx {
             // Use new_es6 to avoid downleveling to ES5
             let mut printer = ThinPrinter::new_es6(self.parser.get_arena());
+            printer.emit(root_idx);
+            printer.get_output().to_string()
+        } else {
+            String::new()
+        }
+    }
+
+    /// Generate transform directives based on compiler options.
+    #[wasm_bindgen(js_name = generateTransforms)]
+    pub fn generate_transforms(&self, target: u32, module: u32) -> WasmTransformContext {
+        let mut options = PrinterOptions::default();
+        options.target = match target {
+            0 => ScriptTarget::ES3,
+            1 => ScriptTarget::ES5,
+            2 => ScriptTarget::ES2015,
+            3 => ScriptTarget::ES2016,
+            4 => ScriptTarget::ES2017,
+            5 => ScriptTarget::ES2018,
+            6 => ScriptTarget::ES2019,
+            7 => ScriptTarget::ES2020,
+            8 => ScriptTarget::ES2021,
+            9 => ScriptTarget::ES2022,
+            _ => ScriptTarget::ESNext,
+        };
+        options.module = match module {
+            0 => ModuleKind::None,
+            1 => ModuleKind::CommonJS,
+            2 => ModuleKind::AMD,
+            3 => ModuleKind::UMD,
+            4 => ModuleKind::System,
+            5 => ModuleKind::ES2015,
+            6 => ModuleKind::ES2020,
+            7 => ModuleKind::ES2022,
+            99 => ModuleKind::ESNext,
+            100 => ModuleKind::Node16,
+            199 => ModuleKind::NodeNext,
+            _ => ModuleKind::None,
+        };
+
+        let ctx = EmitContext::with_options(options);
+        let transforms = if let Some(root_idx) = self.source_file_idx {
+            let lowering = LoweringPass::new(self.parser.get_arena(), &ctx);
+            lowering.run(root_idx)
+        } else {
+            TransformContext::new()
+        };
+
+        WasmTransformContext {
+            inner: transforms,
+            target_es5: ctx.target_es5,
+            module_kind: ctx.options.module,
+        }
+    }
+
+    /// Emit the source file using pre-computed transforms.
+    #[wasm_bindgen(js_name = emitWithTransforms)]
+    pub fn emit_with_transforms(&self, context: &WasmTransformContext) -> String {
+        if let Some(root_idx) = self.source_file_idx {
+            let mut printer = ThinPrinter::with_transforms(
+                self.parser.get_arena(),
+                context.inner.clone(),
+            );
+            printer.set_target_es5(context.target_es5);
+            printer.set_module_kind(context.module_kind);
+            printer.set_source_text(self.parser.get_source_text());
             printer.emit(root_idx);
             printer.get_output().to_string()
         } else {
@@ -571,15 +686,6 @@ pub enum Comparison {
     LessThan = -1,
     EqualTo = 0,
     GreaterThan = 1,
-}
-
-// =============================================================================
-// POC function (keep for verification)
-// =============================================================================
-
-#[wasm_bindgen]
-pub fn add(a: i32, b: i32) -> i32 {
-    a + b
 }
 
 // =============================================================================

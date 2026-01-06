@@ -702,10 +702,18 @@ impl<'a> ThinPrinter<'a> {
             }
 
             TransformDirective::CommonJSExport {
-                name,
+                names,
                 is_default,
                 inner,
             } => {
+                if names.is_empty() {
+                    self.emit_node_default(node, idx);
+                    return;
+                }
+
+                let prev_module = self.ctx.options.module;
+                self.ctx.options.module = ModuleKind::None;
+
                 // First apply the inner transform/emit
                 match &*inner {
                     TransformDirective::ES5Class { class_node, .. } => {
@@ -717,6 +725,20 @@ impl<'a> ThinPrinter<'a> {
                         let es5_output = es5_emitter.emit_class(*class_node);
                         self.write(&es5_output);
                     }
+                    TransformDirective::ES5AsyncFunction { function_node } => {
+                        if let Some(func_node) = self.arena.get(*function_node) {
+                            if let Some(func) = self.arena.get_function(func_node) {
+                                self.emit_async_function_es5(func, &names[0], false, false);
+                            }
+                        }
+                    }
+                    TransformDirective::ES5ArrowFunction { arrow_node, .. } => {
+                        if let Some(arrow_node) = self.arena.get(*arrow_node) {
+                            if let Some(func) = self.arena.get_function(arrow_node) {
+                                self.emit_arrow_function_es5(arrow_node, func);
+                            }
+                        }
+                    }
                     TransformDirective::Identity => {
                         self.emit_node_default(node, idx);
                     }
@@ -726,34 +748,71 @@ impl<'a> ThinPrinter<'a> {
                     }
                 }
 
+                self.ctx.options.module = prev_module;
+
                 // Then add the export assignment
                 self.write_line();
                 if is_default {
                     self.write("exports.default = ");
+                    self.write(&names[0]);
+                    self.write(";");
                 } else {
-                    self.write("exports.");
-                    self.write(&name);
-                    self.write(" = ");
+                    for (i, name) in names.iter().enumerate() {
+                        if i > 0 {
+                            self.write_line();
+                        }
+                        self.write("exports.");
+                        self.write(name);
+                        self.write(" = ");
+                        self.write(name);
+                        self.write(";");
+                    }
                 }
-                self.write(&name);
-                self.write(";");
             }
 
             TransformDirective::ES5ArrowFunction { arrow_node, .. } => {
-                // TODO: Implement arrow function transform
-                // For now, fall back to default emit
-                self.emit_node_default(node, arrow_node);
+                if let Some(arrow_node) = self.arena.get(arrow_node) {
+                    if let Some(func) = self.arena.get_function(arrow_node) {
+                        self.emit_arrow_function_es5(arrow_node, func);
+                        return;
+                    }
+                }
+
+                self.emit_node_default(node, idx);
             }
 
             TransformDirective::ES5AsyncFunction { function_node } => {
-                // TODO: Implement async function transform
-                // For now, fall back to default emit
-                self.emit_node_default(node, function_node);
+                if let Some(func_node) = self.arena.get(function_node) {
+                    if let Some(func) = self.arena.get_function(func_node) {
+                        let is_exported = self.ctx.is_commonjs()
+                            && self.has_export_modifier(&func.modifiers)
+                            && !self.ctx.module_state.has_export_assignment;
+                        let is_default = self.has_default_modifier(&func.modifiers);
+
+                        let func_name = if !func.name.is_none() {
+                            self.get_identifier_text_idx(func.name)
+                        } else {
+                            String::new()
+                        };
+
+                        self.emit_async_function_es5(func, &func_name, is_exported, is_default);
+                        return;
+                    }
+                }
+
+                self.emit_node_default(node, idx);
             }
 
-            TransformDirective::ModuleWrapper { .. } => {
-                // TODO: Implement module wrapper transform
-                // For now, fall back to default emit
+            TransformDirective::ModuleWrapper {
+                format,
+                dependencies,
+                ..
+            } => {
+                if let Some(source) = self.arena.get_source_file(node) {
+                    self.emit_module_wrapper(&format, &dependencies, node, source);
+                    return;
+                }
+
                 self.emit_node_default(node, idx);
             }
 
@@ -780,6 +839,148 @@ impl<'a> ThinPrinter<'a> {
         // We'll refactor this properly in the next step
         let kind = node.kind;
         self.emit_node_by_kind(node, idx, kind);
+    }
+
+    fn emit_module_wrapper(
+        &mut self,
+        format: &crate::transform_context::ModuleFormat,
+        dependencies: &[String],
+        source_node: &ThinNode,
+        source: &crate::parser::thin_node::SourceFileData,
+    ) {
+        match format {
+            crate::transform_context::ModuleFormat::AMD => {
+                self.emit_amd_wrapper(dependencies, source_node);
+            }
+            crate::transform_context::ModuleFormat::UMD => {
+                self.emit_umd_wrapper(source_node);
+            }
+            crate::transform_context::ModuleFormat::System => {
+                self.emit_system_wrapper(dependencies, source_node);
+            }
+            _ => {
+                for &stmt_idx in &source.statements.nodes {
+                    self.emit(stmt_idx);
+                    self.write_line();
+                }
+            }
+        }
+    }
+
+    fn emit_amd_wrapper(
+        &mut self,
+        dependencies: &[String],
+        source_node: &ThinNode,
+    ) {
+        use crate::transforms::module_commonjs;
+
+        self.write("define([\"require\", \"exports\"");
+        for dep in dependencies {
+            self.write(", \"");
+            self.write(dep);
+            self.write("\"");
+        }
+        self.write("], function (require, exports");
+        for dep in dependencies {
+            let name = module_commonjs::sanitize_module_name(dep);
+            self.write(", ");
+            self.write(&name);
+        }
+        self.write(") {");
+        self.write_line();
+        self.increase_indent();
+
+        self.emit_module_wrapper_body(source_node);
+
+        self.decrease_indent();
+        self.write("});");
+    }
+
+    fn emit_umd_wrapper(
+        &mut self,
+        source_node: &ThinNode,
+    ) {
+        self.write("(function (factory) {");
+        self.write_line();
+        self.increase_indent();
+        self.write("if (typeof module === \"object\" && typeof module.exports === \"object\") {");
+        self.write_line();
+        self.increase_indent();
+        self.write("var v = factory(require, exports);");
+        self.write_line();
+        self.write("if (v !== undefined) module.exports = v;");
+        self.write_line();
+        self.decrease_indent();
+        self.write("}");
+        self.write_line();
+        self.write("else if (typeof define === \"function\" && define.amd) {");
+        self.write_line();
+        self.increase_indent();
+        self.write("define([\"require\", \"exports\"], factory);");
+        self.write_line();
+        self.decrease_indent();
+        self.write("}");
+        self.write_line();
+        self.decrease_indent();
+        self.write("})(function (require, exports) {");
+        self.write_line();
+        self.increase_indent();
+
+        self.emit_module_wrapper_body(source_node);
+
+        self.decrease_indent();
+        self.write("});");
+    }
+
+    fn emit_system_wrapper(
+        &mut self,
+        dependencies: &[String],
+        source_node: &ThinNode,
+    ) {
+        self.write("System.register([");
+        for (i, dep) in dependencies.iter().enumerate() {
+            if i > 0 {
+                self.write(", ");
+            }
+            self.write("\"");
+            self.write(dep);
+            self.write("\"");
+        }
+        self.write("], function (exports_1, context_1) {");
+        self.write_line();
+        self.increase_indent();
+        self.write("return {");
+        self.write_line();
+        self.increase_indent();
+        self.write("setters: [],");
+        self.write_line();
+        self.write("execute: function () {");
+        self.write_line();
+        self.increase_indent();
+
+        self.emit_module_wrapper_body(source_node);
+
+        self.decrease_indent();
+        self.write("}");
+        self.write_line();
+        self.decrease_indent();
+        self.write("};");
+        self.write_line();
+        self.decrease_indent();
+        self.write("});");
+    }
+
+    fn emit_module_wrapper_body(&mut self, source_node: &ThinNode) {
+        let prev_module = self.ctx.options.module;
+        let prev_auto_detect = self.ctx.auto_detect_module;
+
+        self.ctx.options.module = ModuleKind::CommonJS;
+        self.ctx.auto_detect_module = false;
+
+        self.emit_source_file(source_node);
+
+        self.ctx.options.module = prev_module;
+        self.ctx.auto_detect_module = prev_auto_detect;
     }
 
     // =========================================================================

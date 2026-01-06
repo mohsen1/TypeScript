@@ -119,6 +119,200 @@ fn test_two_phase_backward_compatibility() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_arrow_function() {
+    let source = "const add = (a, b) => a + b;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ES5ArrowFunction transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function"),
+        "ES5 arrow output should contain 'function'"
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 arrow output should not contain '=>'"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_async_function() {
+    let source = "async function foo() { return 1; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ES5AsyncFunction transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 async output should contain '__awaiter'"
+    );
+    assert!(
+        output.contains("__generator"),
+        "ES5 async output should contain '__generator'"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_amd_module_wrapper() {
+    let source = "import { foo } from \"./bar\"; export const x = foo;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::AMD;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ModuleWrapper transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("define([\"require\", \"exports\", \"./bar\"]"),
+        "AMD output should include define dependency list"
+    );
+    assert!(
+        output.contains("function (require, exports"),
+        "AMD output should include factory signature"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_umd_module_wrapper() {
+    let source = "export const x = 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::UMD;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ModuleWrapper transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("(function (factory) {"),
+        "UMD output should include wrapper header"
+    );
+    assert!(
+        output.contains("factory(require, exports)"),
+        "UMD output should include CommonJS factory path"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_system_module_wrapper() {
+    let source = "import { foo } from \"./bar\"; export const x = foo;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::System;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ModuleWrapper transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("System.register([\"./bar\"]"),
+        "System output should include System.register dependency list"
+    );
+    assert!(
+        output.contains("execute: function ()"),
+        "System output should include execute block"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_commonjs_multi_export_vars() {
+    let source = "export const a = 1, b = 2;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate CommonJS export transforms"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("exports.a = a;"),
+        "CommonJS output should export a"
+    );
+    assert!(
+        output.contains("exports.b = b;"),
+        "CommonJS output should export b"
+    );
+}
+
+#[test]
 fn test_transform_directive_composability() {
     // This test verifies that the architecture supports composable transforms
     // For now, we just verify that the TransformContext can be created and passed around
