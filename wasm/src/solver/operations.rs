@@ -282,6 +282,11 @@ impl<'a> CallEvaluator<'a> {
             (Some(TypeKey::Array(s_elem)), Some(TypeKey::Array(t_elem))) => {
                 self.constrain_types(ctx, var_map, s_elem, t_elem);
             }
+            (Some(TypeKey::Tuple(ref s_elems)), Some(TypeKey::Tuple(ref t_elems))) => {
+                for (s_elem, t_elem) in s_elems.iter().zip(t_elems.iter()) {
+                    self.constrain_types(ctx, var_map, s_elem.type_id, t_elem.type_id);
+                }
+            }
             (Some(TypeKey::Function(ref s_fn)), Some(TypeKey::Function(ref t_fn))) => {
                 // Contravariant parameters: target_param <: source_param
                 for (s_p, t_p) in s_fn.params.iter().zip(t_fn.params.iter()) {
@@ -290,8 +295,62 @@ impl<'a> CallEvaluator<'a> {
                 // Covariant return: source_return <: target_return
                 self.constrain_types(ctx, var_map, s_fn.return_type, t_fn.return_type);
             }
-            // TODO: Add support for Objects, Unions, Promises, etc.
+            (Some(TypeKey::Object(ref s_props)), Some(TypeKey::Object(ref t_props))) => {
+                self.constrain_properties(ctx, var_map, s_props, t_props);
+            }
+            (Some(TypeKey::ObjectWithIndex(ref s_shape)), Some(TypeKey::ObjectWithIndex(ref t_shape))) => {
+                self.constrain_properties(ctx, var_map, &s_shape.properties, &t_shape.properties);
+                if let (Some(s_idx), Some(t_idx)) = (&s_shape.string_index, &t_shape.string_index) {
+                    self.constrain_types(ctx, var_map, s_idx.value_type, t_idx.value_type);
+                }
+                if let (Some(s_idx), Some(t_idx)) = (&s_shape.number_index, &t_shape.number_index) {
+                    self.constrain_types(ctx, var_map, s_idx.value_type, t_idx.value_type);
+                }
+            }
+            (Some(TypeKey::Object(ref s_props)), Some(TypeKey::ObjectWithIndex(ref t_shape))) => {
+                self.constrain_properties(ctx, var_map, s_props, &t_shape.properties);
+            }
+            (Some(TypeKey::ObjectWithIndex(ref s_shape)), Some(TypeKey::Object(ref t_props))) => {
+                self.constrain_properties(ctx, var_map, &s_shape.properties, t_props);
+            }
+            (Some(TypeKey::Application(ref s_app)), Some(TypeKey::Application(ref t_app))) => {
+                if s_app.base == t_app.base && s_app.args.len() == t_app.args.len() {
+                    for (s_arg, t_arg) in s_app.args.iter().zip(t_app.args.iter()) {
+                        self.constrain_types(ctx, var_map, *s_arg, *t_arg);
+                    }
+                }
+            }
             _ => {}
+        }
+    }
+
+    fn constrain_properties(
+        &self,
+        ctx: &mut InferenceContext,
+        var_map: &HashMap<TypeId, crate::solver::infer::InferenceVar>,
+        source_props: &[PropertyInfo],
+        target_props: &[PropertyInfo],
+    ) {
+        let mut source_idx = 0;
+        let mut target_idx = 0;
+
+        while source_idx < source_props.len() && target_idx < target_props.len() {
+            let source = &source_props[source_idx];
+            let target = &target_props[target_idx];
+
+            match source.name.cmp(&target.name) {
+                std::cmp::Ordering::Equal => {
+                    self.constrain_types(ctx, var_map, source.type_id, target.type_id);
+                    source_idx += 1;
+                    target_idx += 1;
+                }
+                std::cmp::Ordering::Less => {
+                    source_idx += 1;
+                }
+                std::cmp::Ordering::Greater => {
+                    target_idx += 1;
+                }
+            }
         }
     }
 
