@@ -440,6 +440,7 @@ impl<'a> ClassES5Emitter<'a> {
 
     fn emit_methods(&mut self, class_name: &str, class_data: &ClassData) {
         // First, collect accessors by name for combining getter/setter pairs
+        // We need to know which pairs exist so we emit them together
         let mut accessor_map: std::collections::HashMap<String, (Option<NodeIndex>, Option<NodeIndex>, bool)> =
             std::collections::HashMap::new();
 
@@ -453,6 +454,10 @@ impl<'a> ClassES5Emitter<'a> {
                     if is_static {
                         continue;
                     }
+                    // Skip abstract accessors (they have no body and shouldn't be emitted)
+                    if self.is_abstract(&accessor_data.modifiers) {
+                        continue;
+                    }
                     let name = self.get_identifier_text(accessor_data.name);
                     let entry = accessor_map.entry(name).or_insert((None, None, is_static));
                     entry.0 = Some(member_idx);
@@ -464,6 +469,10 @@ impl<'a> ClassES5Emitter<'a> {
                     if is_static {
                         continue;
                     }
+                    // Skip abstract accessors (they have no body and shouldn't be emitted)
+                    if self.is_abstract(&accessor_data.modifiers) {
+                        continue;
+                    }
                     let name = self.get_identifier_text(accessor_data.name);
                     let entry = accessor_map.entry(name).or_insert((None, None, is_static));
                     entry.1 = Some(member_idx);
@@ -471,7 +480,10 @@ impl<'a> ClassES5Emitter<'a> {
             }
         }
 
-        // Now emit methods (non-accessors)
+        // Track which accessor names we've already emitted
+        let mut emitted_accessors: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        // Emit in source order - methods inline, accessors when we first encounter them
         for &member_idx in &class_data.members.nodes {
             let Some(member_node) = self.arena.get(member_idx) else { continue };
 
@@ -496,8 +508,6 @@ impl<'a> ClassES5Emitter<'a> {
                 };
 
                 // ClassName.prototype.methodName = function () { ... };
-                // or ClassName.prototype[1] = function () { ... };
-                // or ClassName.prototype["bar"] = function () { ... };
                 self.write_indent();
                 self.write(class_name);
                 self.write(".prototype");
@@ -539,12 +549,24 @@ impl<'a> ClassES5Emitter<'a> {
 
                 self.write(";");
                 self.write_line();
+            } else if member_node.kind == syntax_kind_ext::GET_ACCESSOR || member_node.kind == syntax_kind_ext::SET_ACCESSOR {
+                // Get accessor name and check if we've already emitted this pair
+                if let Some(accessor_data) = self.arena.get_accessor(member_node) {
+                    // Skip static/abstract (already filtered above, but double-check)
+                    if self.is_static(&accessor_data.modifiers) || self.is_abstract(&accessor_data.modifiers) {
+                        continue;
+                    }
+                    let name = self.get_identifier_text(accessor_data.name);
+                    if emitted_accessors.contains(&name) {
+                        continue;
+                    }
+                    // Emit this accessor pair now
+                    if let Some(&(getter_idx, setter_idx, is_static)) = accessor_map.get(&name) {
+                        self.emit_combined_accessor(class_name, &name, getter_idx, setter_idx, is_static);
+                        emitted_accessors.insert(name);
+                    }
+                }
             }
-        }
-
-        // Now emit combined accessors
-        for (name, (getter_idx, setter_idx, is_static)) in accessor_map {
-            self.emit_combined_accessor(class_name, &name, getter_idx, setter_idx, is_static);
         }
     }
     
@@ -1370,6 +1392,19 @@ impl<'a> ClassES5Emitter<'a> {
             for &mod_idx in &mods.nodes {
                 if let Some(mod_node) = self.arena.get(mod_idx) {
                     if mod_node.kind == SyntaxKind::StaticKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    fn is_abstract(&self, modifiers: &Option<NodeList>) -> bool {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::AbstractKeyword as u16 {
                         return true;
                     }
                 }

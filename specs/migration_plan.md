@@ -44,7 +44,7 @@ see SESSION_LOG.md -- always amended with each session's work
 | Baseline | Pass Rate | Notes |
 |----------|-----------|-------|
 | .errors.txt | **68.8%** (53/77) | +5% from rust merge improvements |
-| .js emit | **55.3%** (42/76) | Combined getter/setter, single-line accessor bodies |
+| .js emit | **59.2%** (45/76) | Skip abstract accessors, emit in source order |
 
 ### Work Process
 
