@@ -1,7 +1,74 @@
 //! Diagnostic codes and message templates for the type checker.
 //!
-//! The Diagnostic struct itself is in state.rs.
 //! Message templates match TypeScript's diagnosticMessages.json exactly.
+
+use serde::Serialize;
+
+// =============================================================================
+// Diagnostic Types
+// =============================================================================
+
+/// Diagnostic category.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub enum DiagnosticCategory {
+    Warning = 0,
+    Error = 1,
+    Suggestion = 2,
+    Message = 3,
+}
+
+/// Related information for a diagnostic (e.g., "see also" locations).
+#[derive(Clone, Debug, Serialize)]
+pub struct DiagnosticRelatedInformation {
+    pub file: String,
+    pub start: u32,
+    pub length: u32,
+    pub message_text: String,
+    pub category: DiagnosticCategory,
+    pub code: u32,
+}
+
+/// A type-checking diagnostic message with optional related information.
+#[derive(Clone, Debug, Serialize)]
+pub struct Diagnostic {
+    pub file: String,
+    pub start: u32,
+    pub length: u32,
+    pub message_text: String,
+    pub category: DiagnosticCategory,
+    pub code: u32,
+    /// Related information spans (e.g., where a type was declared)
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub related_information: Vec<DiagnosticRelatedInformation>,
+}
+
+impl Diagnostic {
+    /// Create a new error diagnostic.
+    pub fn error(file: String, start: u32, length: u32, message: String, code: u32) -> Self {
+        Diagnostic {
+            file,
+            start,
+            length,
+            message_text: message,
+            category: DiagnosticCategory::Error,
+            code,
+            related_information: Vec::new(),
+        }
+    }
+
+    /// Add related information to this diagnostic.
+    pub fn with_related(mut self, file: String, start: u32, length: u32, message: String) -> Self {
+        self.related_information.push(DiagnosticRelatedInformation {
+            file,
+            start,
+            length,
+            message_text: message,
+            category: DiagnosticCategory::Message,
+            code: 0,
+        });
+        self
+    }
+}
 
 /// Format a diagnostic message by replacing {0}, {1}, etc. with arguments.
 pub fn format_message(template: &str, args: &[&str]) -> String {

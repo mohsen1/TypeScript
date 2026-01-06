@@ -24,9 +24,6 @@ mod scanner_impl_tests;
 // Parser AST types (Phase 3)
 pub mod parser;
 
-// Parser implementation (Phase 3.2)
-pub mod parser_impl;
-
 // ThinParser - Cache-optimized parser using ThinNodeArena (Phase 0.1)
 pub mod thin_parser;
 #[cfg(test)]
@@ -34,8 +31,6 @@ mod thin_parser_tests;
 
 // Binder types and implementation (Phase 4)
 pub mod binder;
-#[cfg(test)]
-mod binder_tests;
 
 // ThinBinder - Binder using ThinNodeArena (Phase 0.1)
 pub mod thin_binder;
@@ -59,11 +54,6 @@ mod thin_emitter_tests;
 // Parallel processing with Rayon (Phase 0.4)
 pub mod parallel;
 
-// Emitter types and implementation (Phase 6)
-pub mod emitter;
-#[cfg(test)]
-mod emitter_tests;
-
 // Comment preservation (Phase 6.3)
 pub mod comments;
 #[cfg(test)]
@@ -82,11 +72,6 @@ mod declaration_emitter_tests;
 // JavaScript transforms (Phase 6.5+)
 pub mod transforms;
 
-// Language Service types and implementation (Phase 7)
-pub mod services;
-#[cfg(test)]
-mod services_tests;
-
 // Query-based Structural Solver (Phase 7.5)
 pub mod solver;
 
@@ -99,17 +84,6 @@ pub mod solver;
 #[wasm_bindgen(js_name = createScanner)]
 pub fn create_scanner(text: String, skip_trivia: bool) -> ScannerState {
     ScannerState::new(text, skip_trivia)
-}
-
-// =============================================================================
-// Parser Factory Function
-// =============================================================================
-
-/// Create a new parser for the given source text.
-/// This is the wasm-bindgen entry point for creating parsers from JavaScript.
-#[wasm_bindgen(js_name = createParser)]
-pub fn create_parser(file_name: String, source_text: String) -> parser_impl::ParserState {
-    parser_impl::ParserState::new(file_name, source_text)
 }
 
 // =============================================================================

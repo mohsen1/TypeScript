@@ -201,7 +201,37 @@ pub const SET_MODULE_DEFAULT_HELPER: &str = r#"var __setModuleDefault = (this &&
     o["default"] = v;
 });"#;
 
-use super::HelpersNeeded;
+/// Tracks which helper functions are needed in the output.
+#[derive(Default, Clone)]
+pub struct HelpersNeeded {
+    pub extends: bool,
+    pub assign: bool,
+    pub rest: bool,
+    pub decorate: bool,
+    pub param: bool,
+    pub metadata: bool,
+    pub awaiter: bool,
+    pub generator: bool,
+    pub values: bool,
+    pub read: bool,
+    pub spread: bool,
+    pub spread_arrays: bool,
+    pub spread_array: bool,
+    pub await_values: bool,
+    pub async_generator: bool,
+    pub async_delegator: bool,
+    pub async_values: bool,
+    pub export_star: bool,
+    pub import_default: bool,
+    pub import_star: bool,
+    pub make_template_object: bool,
+    pub class_private_field_get: bool,
+    pub class_private_field_set: bool,
+    pub class_private_field_in: bool,
+    pub create_binding: bool,
+    pub set_function_name: bool,
+    pub prop_key: bool,
+}
 
 /// Generate helper code for the needed helpers
 pub fn emit_helpers(helpers: &HelpersNeeded) -> String {

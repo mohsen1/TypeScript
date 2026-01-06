@@ -357,7 +357,7 @@ pub fn compile_files(files: Vec<(String, String)>) -> MergedProgram {
 
 use crate::thin_checker::ThinCheckerState;
 use crate::solver::TypeId;
-use crate::checker::state::Diagnostic;
+use crate::checker::types::diagnostics::Diagnostic;
 use crate::parser::syntax_kind_ext;
 
 /// Result of type checking a single function body

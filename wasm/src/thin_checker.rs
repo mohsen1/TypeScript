@@ -25,7 +25,7 @@ use crate::scanner::SyntaxKind;
 use crate::binder::{SymbolId, symbol_flags};
 use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeId, TypeInterner};
-use crate::checker::state::Diagnostic;
+use crate::checker::types::diagnostics::{Diagnostic, DiagnosticCategory};
 
 // =============================================================================
 // ThinCheckerState
@@ -1664,7 +1664,7 @@ impl<'a> ThinCheckerState<'a> {
             );
             self.diagnostics.push(Diagnostic {
                 code: diagnostic_codes::CANNOT_FIND_NAME_DID_YOU_MEAN_STATIC,
-                category: crate::checker::state::DiagnosticCategory::Error,
+                category: DiagnosticCategory::Error,
                 message_text: message,
                 file: self.file_name.clone(),
                 start: loc.start,
@@ -1690,7 +1690,7 @@ impl<'a> ThinCheckerState<'a> {
             );
             self.diagnostics.push(Diagnostic {
                 code: diagnostic_codes::ABSTRACT_PROPERTY_IN_CONSTRUCTOR,
-                category: crate::checker::state::DiagnosticCategory::Error,
+                category: DiagnosticCategory::Error,
                 message_text: message,
                 file: self.file_name.clone(),
                 start: loc.start,
@@ -2953,12 +2953,12 @@ impl<'a> ThinCheckerState<'a> {
     fn error_at_node(&mut self, node_idx: NodeIndex, message: &str, code: u32) {
         if let Some((start, end)) = self.get_node_span(node_idx) {
             let length = end.saturating_sub(start);
-            self.diagnostics.push(crate::checker::Diagnostic {
+            self.diagnostics.push(Diagnostic {
                 file: self.file_name.clone(),
                 start,
                 length,
                 message_text: message.to_string(),
-                category: crate::checker::DiagnosticCategory::Error,
+                category: DiagnosticCategory::Error,
                 code,
                 related_information: Vec::new(),
             });
