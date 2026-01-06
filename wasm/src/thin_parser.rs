@@ -6723,18 +6723,30 @@ impl ThinParserState {
     fn parse_template_literal_head(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
         let kind = self.token() as u16;
+        let text = self.scanner.get_token_value_ref().to_string();
         self.next_token();
         let end_pos = self.token_end();
-        self.arena.add_token(kind, start_pos, end_pos)
+        self.arena.add_literal(
+            kind,
+            start_pos,
+            end_pos,
+            LiteralData { text, raw_text: None, value: None },
+        )
     }
 
     /// Parse template literal span (TemplateMiddle or TemplateTail)
     fn parse_template_literal_span(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
         let kind = self.token() as u16;
+        let text = self.scanner.get_token_value_ref().to_string();
         self.next_token();
         let end_pos = self.token_end();
-        self.arena.add_token(kind, start_pos, end_pos)
+        self.arena.add_literal(
+            kind,
+            start_pos,
+            end_pos,
+            LiteralData { text, raw_text: None, value: None },
+        )
     }
 
     /// Parse object type literal or mapped type

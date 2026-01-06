@@ -91,8 +91,8 @@ fn parse_template_literal_type(source: &str) -> (ThinNodeArena, crate::parser::b
     panic!("Could not find template literal type in parsed AST");
 }
 
-/// Helper to parse a type alias and return the type reference node index
-fn parse_type_reference(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
+/// Helper to parse a type alias and return the type reference node index for a name.
+fn parse_type_reference(source: &str, name: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
         source.to_string(),
@@ -105,7 +105,15 @@ fn parse_type_reference(source: &str) -> (ThinNodeArena, crate::parser::base::No
         let idx = crate::parser::base::NodeIndex(i as u32);
         if let Some(node) = arena.get(idx) {
             if node.kind == syntax_kind_ext::TYPE_REFERENCE {
-                return (arena, idx);
+                if let Some(data) = arena.get_type_ref(node) {
+                    if let Some(type_name_node) = arena.get(data.type_name) {
+                        if let Some(ident) = arena.get_identifier(type_name_node) {
+                            if ident.escaped_text == name {
+                                return (arena, idx);
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -316,7 +324,7 @@ fn test_lower_function_parameter_names() {
 
 #[test]
 fn test_lower_type_reference_with_arguments() {
-    let (arena, type_ref_idx) = parse_type_reference("type T = Box<string>;");
+    let (arena, type_ref_idx) = parse_type_reference("type T = Box<string>;", "Box");
     let interner = TypeInterner::new();
 
     let resolver = |node_idx: NodeIndex| {

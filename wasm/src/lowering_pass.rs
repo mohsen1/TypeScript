@@ -80,6 +80,7 @@ impl<'a> LoweringPass<'a> {
             k if k == syntax_kind_ext::FUNCTION_DECLARATION => self.visit_function_declaration(node, idx),
             k if k == syntax_kind_ext::ARROW_FUNCTION => self.visit_arrow_function(node, idx),
             k if k == syntax_kind_ext::VARIABLE_STATEMENT => self.visit_variable_statement(node, idx),
+            k if k == syntax_kind_ext::EXPORT_DECLARATION => self.visit_export_declaration(node, idx),
             _ => self.visit_children(idx),
         }
     }
@@ -109,6 +110,40 @@ impl<'a> LoweringPass<'a> {
 
     /// Visit a class declaration
     fn visit_class_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
+        self.lower_class_declaration(node, idx, false, false);
+    }
+
+    fn visit_export_declaration(&mut self, node: &ThinNode, _idx: NodeIndex) {
+        let Some(export_decl) = self.arena.get_export_decl(node) else {
+            return;
+        };
+
+        if export_decl.export_clause.is_none() {
+            return;
+        }
+
+        if let Some(export_node) = self.arena.get(export_decl.export_clause) {
+            if export_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                self.lower_class_declaration(
+                    export_node,
+                    export_decl.export_clause,
+                    true,
+                    export_decl.is_default_export,
+                );
+                return;
+            }
+        }
+
+        self.visit(export_decl.export_clause);
+    }
+
+    fn lower_class_declaration(
+        &mut self,
+        node: &ThinNode,
+        idx: NodeIndex,
+        force_export: bool,
+        force_default: bool,
+    ) {
         let Some(class) = self.arena.get_class(node) else {
             return;
         };
@@ -118,12 +153,19 @@ impl<'a> LoweringPass<'a> {
             return;
         }
 
-        // Check if this class needs export wrapping (CommonJS)
-        let is_exported =
-            self.ctx.is_commonjs() && self.has_export_modifier(&class.modifiers)
-                && !self.ctx.module_state.has_export_assignment;
+        let mut is_exported = self.ctx.is_commonjs()
+            && !self.ctx.module_state.has_export_assignment
+            && (force_export || self.has_export_modifier(&class.modifiers));
 
-        let is_default = self.has_default_modifier(&class.modifiers);
+        if force_export && self.ctx.is_commonjs() && !self.ctx.module_state.has_export_assignment {
+            is_exported = true;
+        }
+
+        let is_default = if force_export {
+            force_default
+        } else {
+            self.has_default_modifier(&class.modifiers)
+        };
 
         // Get class name for export
         let class_name = if !class.name.is_none() {

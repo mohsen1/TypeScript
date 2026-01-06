@@ -35,7 +35,7 @@ Our focus is to make wasm checker complete
 - [x] **Respect intrinsic shadowing** (resolve symbols before intrinsic keyword match)
 - [ ] **Define TypeDatabase Trait** (Preparation for Salsa)
 
-**Status:** ⚠️ Tests currently fail in `lowering_pass::tests::test_lowering_pass_commonjs_export` (unrelated to solver changes). 
+**Status:** ✅ `./wasm/test.sh` passes.
 **Context:** The `TypeKey` refactor (String -> Atom) was half-finished and broke solver logic; this is now addressed, with follow-up tasks captured above.
 
 **Step 1 (Fix Build):**
