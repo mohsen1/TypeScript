@@ -1814,8 +1814,18 @@ impl ThinParserState {
                     self.arena.create_modifier(SyntaxKind::AccessorKeyword, start_pos)
                 }
                 // Handle const as a modifier - error is reported by checker (1248)
+                // But only if not followed by line break (ASI would make it a property name)
                 SyntaxKind::ConstKeyword => {
+                    // Look ahead: if there's a line break after const, treat as property name not modifier
+                    let snapshot = self.scanner.save_state();
+                    let saved_token = self.current_token;
                     self.next_token();
+                    if self.scanner.has_preceding_line_break() {
+                        // Restore and break - const is a property name
+                        self.scanner.restore_state(snapshot);
+                        self.current_token = saved_token;
+                        break;
+                    }
                     self.arena.create_modifier(SyntaxKind::ConstKeyword, start_pos)
                 }
                 // Handle 'var' - error: Variable declaration not allowed at this location

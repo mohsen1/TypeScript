@@ -291,6 +291,9 @@ pub mod diagnostic_codes {
     // Conditional type errors
     pub const INFER_CAN_ONLY_BE_USED_IN_EXTENDS_CLAUSE: u32 = 1338;
 
+    // Target version errors (18xxx)
+    pub const ACCESSOR_MODIFIER_ONLY_ES2015_PLUS: u32 = 18045;  // Properties with the 'accessor' modifier are only available when targeting ECMAScript 2015 and higher.
+
     // =========================================================================
     // Warning codes (4xxx - 6xxx)
     // =========================================================================

@@ -23,6 +23,7 @@ see SESSION_LOG.md -- always amended with each session's work
 ## Language Service TODOs (40% remaining)
 - ⬜ Formatting engine
 - ⬜ Code fixes/refactorings
+- ⬜ Incremental Builds
 
 ---
 
@@ -142,12 +143,13 @@ This catches design issues early and ensures consistent code quality.
 - **API/CLI**: Match tsc behavior; extra flags allowed (e.g., `--wasm-threads`)
 
 ## TODOs
+- ⬜ Own repo mohsen1/tsc-rust
 - ⬜ Upstream sync workflow (track `microsoft/TypeScript` releases)
 - ⬜ Compatibility test suite (run against TS test baselines on each release)
 - ⬜ Version alignment (match TS version numbers, e.g., `@mohsen1/typescript@5.7.0`)
 - ⬜ CLI parity audit (`tsc --help` flags, exit codes, output format)
 - ⬜ API compatibility layer (programmatic API matches `typescript` npm)
-- ⬜ Packaging for npm (`@aspect/tsc-rust` or similar)
+- ⬜ Packaging for npm (`@mohsen1/tsc-rust` or similar)
 - ⬜ Packaging for cargo (`tsc-rust` crate)
 - ⬜ Pre-built WASM binaries for major platforms
 - ⬜ CI/CD release pipeline (GitHub Actions)
