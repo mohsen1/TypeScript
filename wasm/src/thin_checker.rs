@@ -2799,6 +2799,9 @@ impl<'a> ThinCheckerState<'a> {
     /// **Note**: This check is specific to object literals and is NOT part of general
     /// structural subtyping. Excess properties in object literals are errors, but
     /// when assigning from a variable with extra properties, it's allowed.
+    /// See https://github.com/microsoft/TypeScript/issues/13813,
+    /// https://github.com/microsoft/TypeScript/issues/18075,
+    /// https://github.com/microsoft/TypeScript/issues/28616.
     ///
     /// Missing property errors are handled by the solver's `explain_failure` API
     /// via `error_type_not_assignable_with_reason_at`, so we only check excess

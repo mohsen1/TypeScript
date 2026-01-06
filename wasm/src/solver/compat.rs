@@ -35,6 +35,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
     }
 
     /// Configure strict function parameter checking.
+    /// See https://github.com/microsoft/TypeScript/issues/18654.
     pub fn set_strict_function_types(&mut self, strict: bool) {
         if self.strict_function_types != strict {
             self.strict_function_types = strict;
@@ -52,8 +53,10 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         let result = if source == target {
             true
         } else if source == TypeId::ANY || target == TypeId::ANY {
+            // `any` is the JS escape hatch (top + bottom). See https://github.com/microsoft/TypeScript/issues/10715.
             true
         } else if target == TypeId::UNKNOWN {
+            // `unknown` is top but not assignable to non-top types. See https://github.com/microsoft/TypeScript/issues/10715.
             true
         } else if source == TypeId::UNKNOWN {
             false

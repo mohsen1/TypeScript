@@ -975,9 +975,30 @@ impl<'a> DeclarationEmitter<'a> {
         self.write(">");
     }
     
-    fn emit_heritage_clauses(&mut self, _clauses: &NodeList) {
-        // TODO: Implement heritage clause handling when API is available
-        // This would emit "extends Base" or "implements IFace" clauses
+    fn emit_heritage_clauses(&mut self, clauses: &NodeList) {
+        for &clause_idx in &clauses.nodes {
+            let Some(clause_node) = self.arena.get(clause_idx) else { continue };
+            let Some(heritage) = self.arena.get_heritage_clause(clause_node) else { continue };
+
+            let keyword = match heritage.token {
+                k if k == SyntaxKind::ExtendsKeyword as u16 => "extends",
+                k if k == SyntaxKind::ImplementsKeyword as u16 => "implements",
+                _ => continue,
+            };
+
+            self.write(" ");
+            self.write(keyword);
+            self.write(" ");
+
+            let mut first = true;
+            for &type_idx in &heritage.types.nodes {
+                if !first {
+                    self.write(", ");
+                }
+                first = false;
+                self.emit_type(type_idx);
+            }
+        }
     }
     
     fn emit_member_modifiers(&mut self, modifiers: &Option<NodeList>) {
@@ -1033,6 +1054,27 @@ impl<'a> DeclarationEmitter<'a> {
                             self.emit_type(arg_idx);
                         }
                         self.write(">");
+                    }
+                }
+            }
+
+            // Expression with type arguments (heritage clauses)
+            k if k == syntax_kind_ext::EXPRESSION_WITH_TYPE_ARGUMENTS => {
+                if let Some(expr) = self.arena.get_expr_type_args(type_node) {
+                    self.emit_entity_name(expr.expression);
+                    if let Some(ref type_args) = expr.type_arguments {
+                        if !type_args.nodes.is_empty() {
+                            self.write("<");
+                            let mut first = true;
+                            for &arg_idx in &type_args.nodes {
+                                if !first {
+                                    self.write(", ");
+                                }
+                                first = false;
+                                self.emit_type(arg_idx);
+                            }
+                            self.write(">");
+                        }
                     }
                 }
             }
@@ -1144,6 +1186,35 @@ impl<'a> DeclarationEmitter<'a> {
             }
         }
     }
+
+    fn emit_entity_name(&mut self, node_idx: NodeIndex) {
+        let Some(node) = self.arena.get(node_idx) else { return };
+
+        match node.kind {
+            k if k == SyntaxKind::Identifier as u16 => {
+                if let Some(ident) = self.arena.get_identifier(node) {
+                    self.write(&ident.escaped_text);
+                }
+            }
+            k if k == SyntaxKind::ThisKeyword as u16 => self.write("this"),
+            k if k == SyntaxKind::SuperKeyword as u16 => self.write("super"),
+            k if k == syntax_kind_ext::QUALIFIED_NAME => {
+                if let Some(name) = self.arena.get_qualified_name(node) {
+                    self.emit_entity_name(name.left);
+                    self.write(".");
+                    self.emit_entity_name(name.right);
+                }
+            }
+            k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
+                if let Some(access) = self.arena.get_access_expr(node) {
+                    self.emit_entity_name(access.expression);
+                    self.write(".");
+                    self.emit_entity_name(access.name_or_argument);
+                }
+            }
+            _ => {}
+        }
+    }
     
     fn emit_expression(&mut self, expr_idx: NodeIndex) {
         let Some(expr_node) = self.arena.get(expr_idx) else { return };
@@ -1167,15 +1238,33 @@ impl<'a> DeclarationEmitter<'a> {
     
     fn emit_node(&mut self, node_idx: NodeIndex) {
         let Some(node) = self.arena.get(node_idx) else { return };
-        
-        if let Some(ident) = self.arena.get_identifier(node) {
-            self.write(&ident.escaped_text);
-        } else if let Some(lit) = self.arena.get_literal(node) {
-            self.write("\"");
-            self.write(&lit.text);
-            self.write("\"");
+
+        match node.kind {
+            k if k == SyntaxKind::Identifier as u16 => {
+                if let Some(ident) = self.arena.get_identifier(node) {
+                    self.write(&ident.escaped_text);
+                }
+            }
+            k if k == syntax_kind_ext::QUALIFIED_NAME
+                || k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+                || k == SyntaxKind::ThisKeyword as u16
+                || k == SyntaxKind::SuperKeyword as u16 => {
+                self.emit_entity_name(node_idx);
+            }
+            k if k == SyntaxKind::StringLiteral as u16 => {
+                if let Some(lit) = self.arena.get_literal(node) {
+                    self.write("\"");
+                    self.write(&lit.text);
+                    self.write("\"");
+                }
+            }
+            k if k == SyntaxKind::NumericLiteral as u16 => {
+                if let Some(lit) = self.arena.get_literal(node) {
+                    self.write(&lit.text);
+                }
+            }
+            _ => {}
         }
-        // Add more node types as needed
     }
     
     fn has_export_modifier(&self, modifiers: &Option<NodeList>) -> bool {
