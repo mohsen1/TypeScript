@@ -1605,3 +1605,57 @@ namespace MyNamespace {
     assert_eq!(error_5061_count, 0,
         "Expected no error 5061 for namespace declarations (only ambient modules should error), got: {:?}", codes);
 }
+
+// ============== Top-level scope tests (fixes critical bug) ==============
+
+#[test]
+fn test_top_level_variable_redeclaration_different_type_2403() {
+    use crate::thin_parser::ThinParserState;
+
+    // Top-level variables with different types should trigger error 2403
+    let source = r#"
+var x: string;
+var x: number;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2403),
+        "Expected error 2403 for top-level variable redeclaration with different type, got: {:?}", codes);
+}
+
+#[test]
+fn test_top_level_variable_redeclaration_same_type_ok() {
+    use crate::thin_parser::ThinParserState;
+
+    // Top-level variables with same type should be allowed
+    let source = r#"
+var x: string;
+var x: string;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let error_2403_count = codes.iter().filter(|&&c| c == 2403).count();
+
+    assert_eq!(error_2403_count, 0,
+        "Expected no error 2403 for top-level variable redeclaration with same type, got: {:?}", codes);
+}

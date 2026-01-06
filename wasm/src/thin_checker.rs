@@ -2241,6 +2241,10 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         if let Some(sf) = self.ctx.arena.get_source_file(node) {
+            // Push file-level scope for top-level variables
+            // This enables variable redeclaration checking (TS2403) and type tracking
+            self.push_local_scope();
+
             // Type check each top-level statement
             for &stmt_idx in &sf.statements.nodes {
                 self.check_statement(stmt_idx);
@@ -2251,6 +2255,9 @@ impl<'a> ThinCheckerState<'a> {
 
             // Check for export assignment with other exports (2309)
             self.check_export_assignment(&sf.statements.nodes);
+
+            // Pop file-level scope
+            self.pop_local_scope();
         }
     }
 
