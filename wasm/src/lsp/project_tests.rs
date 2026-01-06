@@ -61,3 +61,18 @@ fn test_project_cross_file_references_reexport_named() {
     assert!(refs.iter().any(|loc| loc.file_path == "b.ts"), "Should include re-export reference in b.ts");
     assert!(refs.iter().any(|loc| loc.file_path == "c.ts"), "Should include references from c.ts");
 }
+
+#[test]
+fn test_project_cross_file_references_namespace_reexport() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "export const foo = 1;\n".to_string());
+    project.set_file("b.ts".to_string(), "export * as ns from \"./a\";\n".to_string());
+    project.set_file("c.ts".to_string(), "import { ns } from \"./b\";\nns.foo;\n".to_string());
+
+    let refs = project.find_references("a.ts", Position::new(0, 13));
+    assert!(refs.is_some(), "Should find references through namespace re-export");
+
+    let refs = refs.unwrap();
+    assert!(refs.iter().any(|loc| loc.file_path == "c.ts"), "Should include namespace member reference in c.ts");
+}

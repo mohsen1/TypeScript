@@ -1,4 +1,5 @@
 use super::*;
+use crate::solver::subtype::SubtypeFailureReason;
 use crate::solver::types::*;
 
 fn make_animal_dog(interner: &TypeInterner) -> (TypeId, TypeId) {
@@ -165,4 +166,57 @@ fn test_void_return_assignability() {
 
     assert!(checker.is_assignable(returns_number, returns_void));
     assert!(!checker.is_assignable(returns_void, returns_number));
+}
+
+#[test]
+fn test_explain_failure_missing_property() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let (animal, dog) = make_animal_dog(&interner);
+
+    let reason = checker.explain_failure(animal, dog);
+    assert!(
+        matches!(reason, Some(SubtypeFailureReason::MissingProperty { property_name, .. })
+            if property_name.as_ref() == "breed")
+    );
+}
+
+#[test]
+fn test_explain_failure_parameter_mismatch_strict() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    checker.set_strict_function_types(true);
+
+    let (animal, dog) = make_animal_dog(&interner);
+
+    let fn_dog = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: dog,
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let fn_animal = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: animal,
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let reason = checker.explain_failure(fn_dog, fn_animal);
+    assert!(matches!(
+        reason,
+        Some(SubtypeFailureReason::ParameterTypeMismatch { param_index: 0, .. })
+    ));
 }

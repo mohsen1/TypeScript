@@ -65,7 +65,7 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 ### Phase 5: Integration & Polish
 - [x] Wire compat.rs to be the public API
   - ThinChecker assignability now routes through `CompatChecker`
-- [ ] Add comprehensive error messages
+- [x] Add comprehensive error messages
   - Explain WHY assignment failed (which property, which parameter)
 - [x] Performance optimization
   - Cache compat checks (memoization)
