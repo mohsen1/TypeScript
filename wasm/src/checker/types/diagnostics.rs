@@ -217,6 +217,7 @@ pub mod diagnostic_codes {
     pub const ACCESSORS_MUST_BOTH_BE_ABSTRACT_OR_NOT: u32 = 2676;  // Accessors must both be abstract or non-abstract.
     pub const CLASS_INCORRECTLY_IMPLEMENTS_INTERFACE: u32 = 2420;
     pub const CLASS_INCORRECTLY_EXTENDS_BASE_CLASS: u32 = 2415;
+    pub const PROPERTY_NOT_ASSIGNABLE_TO_SAME_IN_BASE: u32 = 2416;  // Property '{0}' in type '{1}' is not assignable to the same property in base type '{2}'.
     pub const MEMBER_IS_NOT_ACCESSIBLE: u32 = 2341;
     pub const PROPERTY_IS_PRIVATE: u32 = 2341;
     pub const PROPERTY_IS_PROTECTED: u32 = 2445;
