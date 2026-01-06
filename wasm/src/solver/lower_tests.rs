@@ -16,6 +16,77 @@ fn test_lowering_new() {
     let _lowering = TypeLowering::new(&arena, &interner);
 }
 
+#[test]
+fn test_lower_intrinsic_type_annotation() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = string;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    assert_eq!(type_id, TypeId::STRING);
+}
+
+#[test]
+fn test_lower_literal_string_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = \"hello\";");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::String(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "hello");
+        }
+        _ => panic!("Expected string literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_number_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 42;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 42.0);
+        }
+        _ => panic!("Expected number literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_boolean_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = true;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Boolean(true)) => {}
+        _ => panic!("Expected boolean literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_deduplicates_identical_types() {
+    let (arena_one, type_one) = parse_type_alias_type_node("type A = \"same\";");
+    let (arena_two, type_two) = parse_type_alias_type_node("type B = \"same\";");
+    let interner = TypeInterner::new();
+
+    let lowering_one = TypeLowering::new(&arena_one, &interner);
+    let lowering_two = TypeLowering::new(&arena_two, &interner);
+
+    let type_id_one = lowering_one.lower_type(type_one);
+    let type_id_two = lowering_two.lower_type(type_two);
+
+    assert_eq!(type_id_one, type_id_two);
+}
+
 // =============================================================================
 // Type Parameter Lowering Tests
 // =============================================================================
@@ -549,6 +620,43 @@ fn test_lower_type_literal_object_properties() {
             assert_eq!(bar.type_id, TypeId::NUMBER);
             assert!(!bar.optional);
             assert!(!bar.readonly);
+        }
+        _ => panic!("Expected Object type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_nested_object() {
+    let (arena, literal_idx) = parse_type_alias_type_node(
+        "type T = { config: { enabled: boolean; retries?: number }; };"
+    );
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Object(properties) => {
+            let config = properties.iter()
+                .find(|prop| interner.resolve_atom(prop.name) == "config")
+                .expect("Expected config property");
+
+            match interner.lookup(config.type_id) {
+                Some(TypeKey::Object(nested)) => {
+                    let enabled = nested.iter()
+                        .find(|prop| interner.resolve_atom(prop.name) == "enabled")
+                        .expect("Expected enabled property");
+                    assert_eq!(enabled.type_id, TypeId::BOOLEAN);
+                    assert!(!enabled.optional);
+
+                    let retries = nested.iter()
+                        .find(|prop| interner.resolve_atom(prop.name) == "retries")
+                        .expect("Expected retries property");
+                    assert_eq!(retries.type_id, TypeId::NUMBER);
+                    assert!(retries.optional);
+                }
+                other => panic!("Expected nested Object type, got {:?}", other),
+            }
         }
         _ => panic!("Expected Object type, got {:?}", key),
     }
