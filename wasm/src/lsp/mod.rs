@@ -7,7 +7,8 @@
 //! - Hover
 //! - Signature Help
 //! - Document Symbols
-//! - (Future: Rename, Semantic Tokens, etc.)
+//! - Rename
+//! - (Future: Semantic Tokens, Code Actions, etc.)
 //!
 //! Architecture:
 //! - Position utilities for line/column <-> offset conversion
@@ -23,6 +24,7 @@ pub mod completions;
 pub mod hover;
 pub mod signature_help;
 pub mod document_symbols;
+pub mod rename;
 
 #[cfg(test)]
 mod tests;
@@ -33,4 +35,5 @@ pub use completions::{Completions, CompletionItem, CompletionItemKind};
 pub use hover::{HoverProvider, HoverInfo};
 pub use signature_help::{SignatureHelpProvider, SignatureHelp, SignatureInformation, ParameterInformation};
 pub use document_symbols::{DocumentSymbolProvider, DocumentSymbol, SymbolKind};
+pub use rename::{RenameProvider, WorkspaceEdit, TextEdit};
 pub use position::{Position, Location, SourceLocation, Range};

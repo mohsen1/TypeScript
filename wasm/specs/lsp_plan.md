@@ -176,10 +176,38 @@ Following Gemini's guidance, implemented comprehensive AST traversal:
 
    **Gemini Review:** All issues fixed ✅
 
+9. **Rename Feature** (2026-01-06)
+   - Added `rename.rs` with `TextEdit`, `WorkspaceEdit`, and `RenameProvider` types
+   - Allows safe renaming of symbols across the codebase
+   - Two-phase operation:
+     - `prepare_rename`: Validates the position can be renamed (returns identifier range)
+     - `provide_rename_edits`: Generates all edits needed to rename the symbol
+   - Reuses `FindReferences` to find all occurrences (declarations + usages)
+   - Validates new name:
+     - Not empty
+     - Not a reserved word (but allows contextual keywords like 'string', 'type', 'async')
+     - Valid identifier characters
+   - Returns `WorkspaceEdit` with all changes organized by file
+   - Tests: 6/6 passing ✅
+
+   **Implementation Details:**
+   - `prepare_rename` checks if position is on an identifier or private identifier
+   - `provide_rename_edits` validates name, finds references, creates TextEdits
+   - Identifier validation allows contextual keywords (TypeScript allows `let string = "foo"`)
+   - Only rejects actual reserved words and strict mode reserved words
+   - Returns proper error messages for invalid operations
+
+   **Known Limitations:**
+   - No semantic conflict detection (doesn't check if new name shadows existing variable)
+   - Single-file only (will support multi-file when FindReferences supports it)
+   - No special handling for property access chains or destructuring patterns
+
+   **Gemini Review:** All issues fixed ✅
+
 #### Test Results
 
-All 634 tests pass! ✅ (2 ignored)
-- LSP-specific tests: 28/29 passing (1 ignored - multi-arg cursor detection)
+All 640 tests pass! ✅ (2 ignored)
+- LSP-specific tests: 34/35 passing (1 ignored - multi-arg cursor detection)
 - Position utilities: 3/3 passing
 - Resolver tests: 1/1 passing
 - Definition tests: 2/2 passing
@@ -188,6 +216,7 @@ All 634 tests pass! ✅ (2 ignored)
 - Hover tests: 3/3 passing
 - Signature Help tests: 2/3 passing (1 ignored - multi-arg cursor detection)
 - Document Symbols tests: 5/5 passing ✅
+- Rename tests: 6/6 passing ✅
 - Integration tests: 3/3 passing
 - Utils tests: 3/3 passing
 
