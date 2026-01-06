@@ -11,6 +11,7 @@ pub struct CompatChecker<'a, R: TypeResolver = NoopResolver> {
     interner: &'a TypeInterner,
     subtype: SubtypeChecker<'a, R>,
     strict_function_types: bool,
+    exact_optional_property_types: bool,
     cache: FxHashMap<(TypeId, TypeId), bool>,
 }
 
@@ -21,6 +22,7 @@ impl<'a> CompatChecker<'a, NoopResolver> {
             interner,
             subtype: SubtypeChecker::new(interner),
             strict_function_types: false,
+            exact_optional_property_types: false,
             cache: FxHashMap::default(),
         }
     }
@@ -33,6 +35,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
             interner,
             subtype: SubtypeChecker::with_resolver(interner, resolver),
             strict_function_types: false,
+            exact_optional_property_types: false,
             cache: FxHashMap::default(),
         }
     }
@@ -42,6 +45,15 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
     pub fn set_strict_function_types(&mut self, strict: bool) {
         if self.strict_function_types != strict {
             self.strict_function_types = strict;
+            self.cache.clear();
+        }
+    }
+
+    /// Configure exact optional property types.
+    /// See https://github.com/microsoft/TypeScript/issues/13195.
+    pub fn set_exact_optional_property_types(&mut self, exact: bool) {
+        if self.exact_optional_property_types != exact {
+            self.exact_optional_property_types = exact;
             self.cache.clear();
         }
     }
@@ -74,6 +86,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
             self.subtype.strict_function_types = self.strict_function_types;
             self.subtype.allow_void_return = true;
             self.subtype.allow_bivariant_rest = true;
+            self.subtype.exact_optional_property_types = self.exact_optional_property_types;
             self.subtype.is_subtype_of(source, target)
         };
 
@@ -104,6 +117,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         self.subtype.strict_function_types = self.strict_function_types;
         self.subtype.allow_void_return = true;
         self.subtype.allow_bivariant_rest = true;
+        self.subtype.exact_optional_property_types = self.exact_optional_property_types;
         self.subtype.explain_failure(source, target)
     }
 

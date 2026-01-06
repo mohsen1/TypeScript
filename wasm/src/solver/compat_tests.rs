@@ -747,6 +747,59 @@ fn test_optional_property_rejects_string_index_signature() {
 }
 
 #[test]
+fn test_exact_optional_property_rejects_undefined() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    checker.set_exact_optional_property_types(true);
+
+    let name = interner.intern_string("x");
+    let source = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::UNDEFINED,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let target = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(!checker.is_assignable(source, target));
+}
+
+#[test]
+fn test_exact_optional_property_allows_string_index_signature() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    checker.set_exact_optional_property_types(true);
+
+    let name = interner.intern_string("x");
+    let source = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let target = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    assert!(checker.is_assignable(source, target));
+}
+
+#[test]
 fn test_rest_any_callable_target_from_function() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
