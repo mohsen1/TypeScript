@@ -86,6 +86,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
   - Cache compat checks (memoization)
   - Short-circuit on `any` early
 
+### Phase 9: Object Keyword Assignability
+- [x] Treat `object` as non-primitive top (accept objects, arrays, tuples, functions)
+- [x] Tests for `object` keyword accept/reject cases
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

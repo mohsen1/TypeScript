@@ -327,6 +327,15 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 SubtypeResult::True
             }
 
+            // object keyword accepts any non-primitive type
+            (_, TypeKey::Intrinsic(IntrinsicKind::Object)) => {
+                if self.is_object_keyword_type(source) {
+                    SubtypeResult::True
+                } else {
+                    SubtypeResult::False
+                }
+            }
+
             // Array to array
             (TypeKey::Array(s_elem), TypeKey::Array(t_elem)) => {
                 // Arrays are covariant in TypeScript
@@ -577,8 +586,54 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             // void accepts undefined
             (IntrinsicKind::Undefined, IntrinsicKind::Void) => SubtypeResult::True,
 
-            // object accepts non-primitive types (but we handle that separately)
+            // object keyword handling is in check_subtype_inner
             _ => SubtypeResult::False,
+        }
+    }
+
+    fn is_object_keyword_type(&mut self, source: TypeId) -> bool {
+        match source {
+            TypeId::ANY | TypeId::NEVER | TypeId::ERROR | TypeId::OBJECT => return true,
+            TypeId::UNKNOWN
+            | TypeId::VOID
+            | TypeId::NULL
+            | TypeId::UNDEFINED
+            | TypeId::BOOLEAN
+            | TypeId::NUMBER
+            | TypeId::STRING
+            | TypeId::BIGINT
+            | TypeId::SYMBOL => return false,
+            _ => {}
+        }
+
+        let key = match self.interner.lookup(source) {
+            Some(key) => key,
+            None => return false,
+        };
+
+        match &key {
+            TypeKey::Object(_)
+            | TypeKey::ObjectWithIndex(_)
+            | TypeKey::Array(_)
+            | TypeKey::Tuple(_)
+            | TypeKey::Function(_)
+            | TypeKey::Callable(_)
+            | TypeKey::Mapped(_)
+            | TypeKey::Application(_)
+            | TypeKey::ThisType => true,
+            TypeKey::ReadonlyType(inner) => self.check_subtype(*inner, TypeId::OBJECT).is_true(),
+            TypeKey::TypeParameter(info) | TypeKey::Infer(info) => match info.constraint {
+                Some(constraint) => self.check_subtype(constraint, TypeId::OBJECT).is_true(),
+                None => false,
+            },
+            TypeKey::Ref(sym) => {
+                if let Some(resolved) = self.resolver.resolve_ref(*sym, self.interner) {
+                    self.check_subtype(resolved, TypeId::OBJECT).is_true()
+                } else {
+                    false
+                }
+            }
+            _ => false,
         }
     }
 
