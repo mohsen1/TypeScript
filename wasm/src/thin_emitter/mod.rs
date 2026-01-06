@@ -1624,7 +1624,9 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        let is_exported = self.ctx.is_commonjs() && self.has_export_modifier(&func.modifiers);
+        let is_exported = self.ctx.is_commonjs()
+            && self.has_export_modifier(&func.modifiers)
+            && !self.ctx.module_state.has_export_assignment;
         let is_default = self.has_default_modifier(&func.modifiers);
 
         // Get function name for export
@@ -1844,7 +1846,9 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        let is_exported = self.ctx.is_commonjs() && self.has_export_modifier(&var_stmt.modifiers);
+        let is_exported = self.ctx.is_commonjs()
+            && self.has_export_modifier(&var_stmt.modifiers)
+            && !self.ctx.module_state.has_export_assignment;
         let is_default = self.has_default_modifier(&var_stmt.modifiers);
 
         // Collect declaration names for export assignment
@@ -2214,7 +2218,9 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        let is_exported = self.ctx.is_commonjs() && self.has_export_modifier(&class.modifiers);
+        let is_exported = self.ctx.is_commonjs()
+            && self.has_export_modifier(&class.modifiers)
+            && !self.ctx.module_state.has_export_assignment;
         let is_default = self.has_default_modifier(&class.modifiers);
 
         // Get class name for export
@@ -2685,14 +2691,16 @@ impl<'a> ThinPrinter<'a> {
                     self.emit_variable_statement(clause_node);
                     self.write_line();
 
-                    // Emit exports.x = x; for each name
-                    for name in &export_names {
-                        self.write("exports.");
-                        self.write(name);
-                        self.write(" = ");
-                        self.write(name);
-                        self.write(";");
-                        self.write_line();
+                    // Emit exports.x = x; for each name (unless file has export =)
+                    if !self.ctx.module_state.has_export_assignment {
+                        for name in &export_names {
+                            self.write("exports.");
+                            self.write(name);
+                            self.write(" = ");
+                            self.write(name);
+                            self.write(";");
+                            self.write_line();
+                        }
                     }
                 }
                 // export function f() {} or export default function f() {}
@@ -2701,19 +2709,21 @@ impl<'a> ThinPrinter<'a> {
                     self.emit_function_declaration(clause_node, export.export_clause);
                     self.write_line();
 
-                    // Get function name and emit export
-                    if let Some(func) = self.arena.get_function(clause_node) {
-                        if let Some(name) = self.get_identifier_text_opt(func.name) {
-                            if export.is_default_export {
-                                self.write("exports.default = ");
-                            } else {
-                                self.write("exports.");
+                    // Get function name and emit export (unless file has export =)
+                    if !self.ctx.module_state.has_export_assignment {
+                        if let Some(func) = self.arena.get_function(clause_node) {
+                            if let Some(name) = self.get_identifier_text_opt(func.name) {
+                                if export.is_default_export {
+                                    self.write("exports.default = ");
+                                } else {
+                                    self.write("exports.");
+                                    self.write(&name);
+                                    self.write(" = ");
+                                }
                                 self.write(&name);
-                                self.write(" = ");
+                                self.write(";");
+                                self.write_line();
                             }
-                            self.write(&name);
-                            self.write(";");
-                            self.write_line();
                         }
                     }
                 }
@@ -2723,19 +2733,21 @@ impl<'a> ThinPrinter<'a> {
                     self.emit_class_declaration(clause_node, export.export_clause);
                     self.write_line();
 
-                    // Get class name and emit export
-                    if let Some(class) = self.arena.get_class(clause_node) {
-                        if let Some(name) = self.get_identifier_text_opt(class.name) {
-                            if export.is_default_export {
-                                self.write("exports.default = ");
-                            } else {
-                                self.write("exports.");
+                    // Get class name and emit export (unless file has export =)
+                    if !self.ctx.module_state.has_export_assignment {
+                        if let Some(class) = self.arena.get_class(clause_node) {
+                            if let Some(name) = self.get_identifier_text_opt(class.name) {
+                                if export.is_default_export {
+                                    self.write("exports.default = ");
+                                } else {
+                                    self.write("exports.");
+                                    self.write(&name);
+                                    self.write(" = ");
+                                }
                                 self.write(&name);
-                                self.write(" = ");
+                                self.write(";");
+                                self.write_line();
                             }
-                            self.write(&name);
-                            self.write(";");
-                            self.write_line();
                         }
                     }
                 }
@@ -3695,6 +3707,11 @@ impl<'a> ThinPrinter<'a> {
             self.ctx.options.module = ModuleKind::CommonJS;
         }
 
+        // Detect export assignment (export =) to suppress other exports
+        if self.has_export_assignment(&source.statements) {
+            self.ctx.module_state.has_export_assignment = true;
+        }
+
         // CommonJS preamble
         if self.ctx.is_commonjs() {
             self.emit_commonjs_preamble(&source.statements);
@@ -3713,6 +3730,18 @@ impl<'a> ThinPrinter<'a> {
                 self.write_line();
             }
         }
+    }
+
+    /// Check if the file contains an export assignment (export =)
+    fn has_export_assignment(&self, statements: &NodeList) -> bool {
+        for &stmt_idx in &statements.nodes {
+            if let Some(node) = self.arena.get(stmt_idx) {
+                if node.kind == syntax_kind_ext::EXPORT_ASSIGNMENT {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     /// Check if a file is a module (has import/export statements)
