@@ -72,8 +72,8 @@ pub enum TransformDirective {
     /// exports.Foo = Foo;
     /// ```
     CommonJSExport {
-        /// Name to export
-        name: String,
+        /// Names to export
+        names: Vec<String>,
         /// Whether this is a default export
         is_default: bool,
         /// The inner directive to apply first
@@ -130,6 +130,7 @@ pub enum ModuleFormat {
 }
 
 /// Transform context maps node indices to their transform directives
+#[derive(Clone)]
 pub struct TransformContext {
     /// Map of NodeIndex -> TransformDirective
     /// Only contains entries for nodes that need transformation
@@ -243,7 +244,7 @@ mod tests {
 
         // Chain ES5 class transform with CommonJS export
         let directive = TransformDirective::CommonJSExport {
-            name: "MyClass".to_string(),
+            names: vec!["MyClass".to_string()],
             is_default: false,
             inner: Box::new(TransformDirective::ES5Class {
                 class_node,
@@ -257,8 +258,8 @@ mod tests {
 
         let retrieved = ctx.get(class_node).unwrap();
         match retrieved {
-            TransformDirective::CommonJSExport { name, inner, .. } => {
-                assert_eq!(name, "MyClass");
+            TransformDirective::CommonJSExport { names, inner, .. } => {
+                assert_eq!(names, &["MyClass".to_string()]);
                 assert!(matches!(**inner, TransformDirective::ES5Class { .. }));
             }
             _ => panic!("Expected CommonJSExport directive"),
