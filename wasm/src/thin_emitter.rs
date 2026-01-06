@@ -1400,6 +1400,9 @@ impl<'a> ThinPrinter<'a> {
         if self.target_es5 {
             let mut es5_emitter = ClassES5Emitter::new(self.arena);
             es5_emitter.set_indent_level(self.indent_level);
+            if let Some(source_text) = self.source_text {
+                es5_emitter.set_source_text(source_text);
+            }
             let es5_output = es5_emitter.emit_class(idx);
             self.write(&es5_output);
             return;

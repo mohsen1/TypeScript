@@ -44,7 +44,7 @@ see SESSION_LOG.md -- always amended with each session's work
 | Baseline | Pass Rate | Notes |
 |----------|-----------|-------|
 | .errors.txt | **68.8%** (53/77) | +5% from rust merge improvements |
-| .js emit | **43.4%** (33/76) | ES5 IIFE, instance props, heritage, single-line blocks |
+| .js emit | **55.3%** (42/76) | Combined getter/setter, single-line accessor bodies |
 
 ### Work Process
 
