@@ -132,7 +132,6 @@ mod definition_tests {
     use crate::lsp::position::LineMap;
 
     #[test]
-    #[ignore] // TODO: Implement proper AST traversal in ScopeWalker
     fn test_goto_definition_simple_variable() {
         // const x = 1;
         // x + 1;

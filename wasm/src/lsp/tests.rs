@@ -7,7 +7,6 @@ use crate::thin_parser::ThinParserState;
 use crate::thin_binder::ThinBinderState;
 
 #[test]
-#[ignore] // TODO: Implement proper AST traversal in ScopeWalker
 fn test_lsp_workflow_simple() {
     // Simple test: const x = 1; x + x;
     let source = "const x = 1;\nx + x;";
@@ -33,7 +32,6 @@ fn test_lsp_workflow_simple() {
 }
 
 #[test]
-#[ignore] // TODO: Implement proper AST traversal in ScopeWalker
 fn test_lsp_with_function() {
     // Test with a function: function foo() {} foo();
     let source = "function foo() {}\nfoo();";

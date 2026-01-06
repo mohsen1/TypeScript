@@ -185,7 +185,6 @@ mod references_tests {
     use crate::lsp::position::LineMap;
 
     #[test]
-    #[ignore] // TODO: Implement proper AST traversal in ScopeWalker
     fn test_find_references_simple() {
         // const x = 1;
         // x + x;
