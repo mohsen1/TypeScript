@@ -336,7 +336,7 @@ impl<'a> TypeLowering<'a> {
                         let name = if data.name != NodeIndex::NONE {
                             if let Some(name_node) = self.arena.get(data.name) {
                                 if let Some(id_data) = self.arena.get_identifier(name_node) {
-                                    Arc::from(id_data.escaped_text.as_str())
+                                    self.interner.intern_string(&id_data.escaped_text)
                                 } else {
                                     return None;
                                 }
@@ -440,10 +440,10 @@ impl<'a> TypeLowering<'a> {
         // Check if it's a property or method signature
         if let Some(sig) = self.arena.get_signature(node) {
             // Get property name as Arc<str>
-            let name: Arc<str> = if sig.name != NodeIndex::NONE {
+            let name = if sig.name != NodeIndex::NONE {
                 if let Some(name_node) = self.arena.get(sig.name) {
                     if let Some(id_data) = self.arena.get_identifier(name_node) {
-                        Arc::from(id_data.escaped_text.as_str())
+                        self.interner.intern_string(&id_data.escaped_text)
                     } else {
                         return None;
                     }
@@ -514,7 +514,7 @@ impl<'a> TypeLowering<'a> {
         if let Some(data) = self.arena.get_mapped_type(node) {
             // For mapped types, we need to extract the type parameter
             // The type_parameter field is the NodeIndex of the type parameter declaration
-            let param_name: Arc<str> = Arc::from("K"); // Default name
+            let param_name = self.interner.intern_string("K"); // Default name
 
             let mapped = MappedType {
                 type_param: TypeParamInfo {
@@ -721,25 +721,25 @@ impl<'a> TypeLowering<'a> {
 
         if let Some(data) = self.arena.get_infer_type(node) {
             // Get the type parameter name
-            let name: Arc<str> = if let Some(tp_node) = self.arena.get(data.type_parameter) {
+            let name = if let Some(tp_node) = self.arena.get(data.type_parameter) {
                 // Type parameter node should have an identifier
                 if let Some(tp_data) = self.arena.get_type_parameter(tp_node) {
                     if let Some(name_node) = self.arena.get(tp_data.name) {
                         if let Some(id_data) = self.arena.get_identifier(name_node) {
-                            Arc::from(id_data.escaped_text.as_str())
+                            self.interner.intern_string(&id_data.escaped_text)
                         } else {
-                            Arc::from("infer")
+                            self.interner.intern_string("infer")
                         }
                     } else {
-                        Arc::from("infer")
+                        self.interner.intern_string("infer")
                     }
                 } else if let Some(id_data) = self.arena.get_identifier(tp_node) {
-                    Arc::from(id_data.escaped_text.as_str())
+                    self.interner.intern_string(&id_data.escaped_text)
                 } else {
-                    Arc::from("infer")
+                    self.interner.intern_string("infer")
                 }
             } else {
-                Arc::from("infer")
+                self.interner.intern_string("infer")
             };
 
             self.interner.intern(TypeKey::Infer(TypeParamInfo {
@@ -766,7 +766,7 @@ impl<'a> TypeLowering<'a> {
             if let Some(head_node) = self.arena.get(data.head) {
                 if let Some(head_lit) = self.arena.get_literal(head_node) {
                     if !head_lit.text.is_empty() {
-                        spans.push(TemplateSpan::Text(Arc::from(head_lit.text.as_str())));
+                        spans.push(TemplateSpan::Text(self.interner.intern_string(&head_lit.text)));
                     }
                 }
             }

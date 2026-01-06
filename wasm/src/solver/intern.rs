@@ -149,7 +149,8 @@ impl TypeInterner {
 
     /// Intern a literal string type
     pub fn literal_string(&self, value: &str) -> TypeId {
-        self.intern(TypeKey::Literal(LiteralValue::String(value.into())))
+        let atom = self.intern_string(value);
+        self.intern(TypeKey::Literal(LiteralValue::String(atom)))
     }
 
     /// Intern a literal number type

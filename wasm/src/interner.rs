@@ -14,7 +14,7 @@ use serde::Serialize;
 ///
 /// Atoms are cheap to copy (just a u32) and can be compared with == in O(1).
 /// To get the actual string, use `Interner::resolve(atom)`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Default, PartialOrd, Ord)]
 pub struct Atom(pub u32);
 
 impl Atom {
