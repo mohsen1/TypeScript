@@ -13,7 +13,7 @@ fn test_thin_checker_creation() {
     let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // Basic sanity check
-    assert!(checker.diagnostics.is_empty());
+    assert!(checker.ctx.diagnostics.is_empty());
 }
 
 #[test]
@@ -40,9 +40,9 @@ fn test_thin_checker_type_interner() {
 
     // Test that TypeInterner is properly initialized
     // Intrinsics should be pre-registered
-    assert!(checker.types.lookup(TypeId::STRING).is_some());
-    assert!(checker.types.lookup(TypeId::NUMBER).is_some());
-    assert!(checker.types.lookup(TypeId::ANY).is_some());
+    assert!(checker.ctx.types.lookup(TypeId::STRING).is_some());
+    assert!(checker.ctx.types.lookup(TypeId::NUMBER).is_some());
+    assert!(checker.ctx.types.lookup(TypeId::ANY).is_some());
 }
 
 #[test]
@@ -54,9 +54,9 @@ fn test_thin_checker_structural_equality() {
 
     // Test structural equality via TypeInterner
     // Same string literal should get same TypeId
-    let str1 = checker.types.literal_string("hello");
-    let str2 = checker.types.literal_string("hello");
-    let str3 = checker.types.literal_string("world");
+    let str1 = checker.ctx.types.literal_string("hello");
+    let str2 = checker.ctx.types.literal_string("hello");
+    let str3 = checker.ctx.types.literal_string("world");
 
     assert_eq!(str1, str2); // Same structure = same TypeId
     assert_ne!(str1, str3); // Different structure = different TypeId
@@ -71,15 +71,15 @@ fn test_thin_checker_union_normalization() {
 
     // Test union normalization
     // Union with `any` should be `any`
-    let with_any = checker.types.union(vec![TypeId::STRING, TypeId::ANY]);
+    let with_any = checker.ctx.types.union(vec![TypeId::STRING, TypeId::ANY]);
     assert_eq!(with_any, TypeId::ANY);
 
     // Union with `never` should exclude `never`
-    let with_never = checker.types.union(vec![TypeId::STRING, TypeId::NEVER]);
+    let with_never = checker.ctx.types.union(vec![TypeId::STRING, TypeId::NEVER]);
     assert_eq!(with_never, TypeId::STRING);
 
     // Single-element union should return the element
-    let single = checker.types.union(vec![TypeId::STRING]);
+    let single = checker.ctx.types.union(vec![TypeId::STRING]);
     assert_eq!(single, TypeId::STRING);
 }
 
@@ -121,15 +121,15 @@ fn test_thin_checker_subtype_literals() {
     let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // String literal is subtype of string
-    let hello = checker.types.literal_string("hello");
+    let hello = checker.ctx.types.literal_string("hello");
     assert!(checker.is_assignable_to(hello, TypeId::STRING));
 
     // Number literal is subtype of number
-    let forty_two = checker.types.literal_number(42.0);
+    let forty_two = checker.ctx.types.literal_number(42.0);
     assert!(checker.is_assignable_to(forty_two, TypeId::NUMBER));
 
     // Boolean literal is subtype of boolean
-    let t = checker.types.literal_boolean(true);
+    let t = checker.ctx.types.literal_boolean(true);
     assert!(checker.is_assignable_to(t, TypeId::BOOLEAN));
 
     // String literal is NOT assignable to number
@@ -173,8 +173,8 @@ fn test_thin_checker_type_identity() {
     assert!(!checker.are_types_identical(TypeId::STRING, TypeId::NUMBER));
 
     // Same literal values produce identical types (via interning)
-    let lit1 = checker.types.literal_string("test");
-    let lit2 = checker.types.literal_string("test");
+    let lit1 = checker.ctx.types.literal_string("test");
+    let lit2 = checker.ctx.types.literal_string("test");
     assert!(checker.are_types_identical(lit1, lit2));
 }
 
@@ -195,7 +195,7 @@ fn test_function_overload_missing_implementation_2391() {
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(codes.contains(&2391),
         "Expected error 2391 (Function implementation is missing), got: {:?}", codes);
 }
@@ -218,7 +218,7 @@ function foo() {}
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(!codes.contains(&2391),
         "Should not have error 2391 when implementation exists, got: {:?}", codes);
 }
@@ -241,7 +241,7 @@ function bar() {}
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(codes.contains(&2389) || codes.contains(&2391),
         "Expected error 2389 or 2391 for wrong implementation name, got: {:?}", codes);
 }
@@ -263,7 +263,7 @@ fn test_parameter_property_in_function_2369() {
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(codes.contains(&2369),
         "Expected error 2369 for parameter property in function, got: {:?}", codes);
 }
@@ -283,7 +283,7 @@ fn test_parameter_property_in_arrow_2369() {
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(codes.contains(&2369),
         "Expected error 2369 for parameter property in arrow function, got: {:?}", codes);
 }
@@ -309,7 +309,7 @@ class C {
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     // Should have exactly one 2369 error for the overload, not for the implementation
     let count_2369 = codes.iter().filter(|&&c| c == 2369).count();
     assert_eq!(count_2369, 1,
@@ -336,7 +336,7 @@ class C {
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(!codes.contains(&2369),
         "Should not have error 2369 in constructor implementation, got: {:?}", codes);
 }
@@ -357,7 +357,7 @@ fn test_class_name_any_error_2414() {
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(codes.contains(&2414),
         "Expected error 2414 (Class name cannot be 'any'), got: {:?}", codes);
 }
@@ -385,7 +385,7 @@ fn test_local_variable_scope_resolution() {
     checker.check_source_file(root);
 
     // Should have no "Cannot find name" errors (2304)
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(!codes.contains(&2304),
         "Should not have 'Cannot find name' error for local variable, got: {:?}", codes);
 }
@@ -413,7 +413,7 @@ fn test_for_loop_variable_scope() {
     checker.check_source_file(root);
 
     // Should have no "Cannot find name" errors (2304) for loop variable 'i'
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(!codes.contains(&2304),
         "Should not have 'Cannot find name' error for loop variable, got: {:?}", codes);
 }
@@ -466,12 +466,12 @@ fn test_abstract_class_in_local_scope_2511() {
 
     // Debug: Check diagnostics
     eprintln!("=== Diagnostics ===");
-    for d in &checker.diagnostics {
+    for d in &checker.ctx.diagnostics {
         eprintln!("  code={}, msg={}", d.code, d.message_text);
     }
 
     // Should have error 2511 for `new A()` but not for `new B()`
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(codes.contains(&2511),
         "Expected error 2511 for abstract class instantiation in local scope, got: {:?}", codes);
 
@@ -512,11 +512,11 @@ class C {
 
     // Debug: show all diagnostics
     eprintln!("=== Diagnostics for static member suggestion ===");
-    for d in &checker.diagnostics {
+    for d in &checker.ctx.diagnostics {
         eprintln!("  code={}, msg={}", d.code, d.message_text);
     }
 
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(codes.contains(&2662),
         "Expected error 2662 (Cannot find name 'foo'. Did you mean the static member 'C.foo'?), got: {:?}", codes);
 
@@ -550,7 +550,7 @@ abstract class AbstractClass {
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(codes.contains(&2715),
         "Expected error 2715 (Abstract property cannot be accessed in constructor), got: {:?}", codes);
 }
@@ -573,11 +573,11 @@ fn test_interface_name_cannot_be_reserved_2427() {
 
     // Debug: show all diagnostics
     eprintln!("=== Diagnostics for 'interface string {{}}' ===");
-    for d in &checker.diagnostics {
+    for d in &checker.ctx.diagnostics {
         eprintln!("  code={}, msg={}", d.code, d.message_text);
     }
 
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(codes.contains(&2427),
         "Expected error 2427 (Interface name cannot be 'string'), got: {:?}", codes);
 }
@@ -600,11 +600,11 @@ fn test_const_modifier_on_class_property_1248() {
 
     // Debug: show all diagnostics
     eprintln!("=== Diagnostics for 'static const H = 1' ===");
-    for d in &checker.diagnostics {
+    for d in &checker.ctx.diagnostics {
         eprintln!("  code={}, msg={}", d.code, d.message_text);
     }
 
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(codes.contains(&1248),
         "Expected error 1248 (A class member cannot have the 'const' keyword), got: {:?}", codes);
 }
@@ -631,13 +631,13 @@ fn test_accessor_type_compatibility_2322() {
 
     // Debug: show all diagnostics
     eprintln!("=== Diagnostics for accessor type mismatch ===");
-    for d in &checker.diagnostics {
+    for d in &checker.ctx.diagnostics {
         eprintln!("  code={}, msg={}", d.code, d.message_text);
     }
 
-    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     assert!(codes.contains(&2322),
         "Expected error 2322 (Type not assignable), got codes: {:?} diagnostics: {:?}",
         codes,
-        checker.diagnostics.iter().map(|d| (d.code, d.message_text.clone())).collect::<Vec<_>>());
+        checker.ctx.diagnostics.iter().map(|d| (d.code, d.message_text.clone())).collect::<Vec<_>>());
 }

@@ -149,7 +149,7 @@ fn test_thin_pipeline_integration() {
     let types = TypeInterner::new();
     let checker = ThinCheckerState::new(&parser.arena, &binder, &types, "test.ts".to_string());
     // Basic check - the checker exists and can be created
-    let _ = &checker.types; // Access types arena to verify it exists
+    let _ = &checker.ctx.types; // Access types arena to verify it exists
 
     // Step 4: Emit
     let mut printer = ThinPrinter::new(&parser.arena);
