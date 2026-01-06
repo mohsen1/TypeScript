@@ -1106,7 +1106,6 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type of new expression.
     fn get_type_of_new_expression(&mut self, idx: NodeIndex) -> TypeId {
         use crate::checker::types::diagnostics::diagnostic_codes;
-
         let Some(node) = self.arena.get(idx) else {
             return TypeId::ANY;
         };
@@ -1147,12 +1146,55 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // Get the type of the constructor
-        let _constructor_type = self.get_type_of_node(new_expr.expression);
+        // Get the type of the constructor expression
+        let constructor_type = self.get_type_of_node(new_expr.expression);
+
+        // Check if the constructor type contains any abstract classes (for union types)
+        // e.g., `new cls()` where `cls: typeof AbstractA | typeof AbstractB`
+        if self.type_contains_abstract_class(constructor_type) {
+            self.error_at_node(
+                idx,
+                "Cannot create an instance of an abstract class.",
+                diagnostic_codes::CANNOT_CREATE_INSTANCE_OF_ABSTRACT_CLASS,
+            );
+            return TypeId::ERROR;
+        }
 
         // For now, return any for new expressions
         // TODO: Extract instance type from constructor
         TypeId::ANY
+    }
+
+    /// Check if a type contains any abstract class constructors.
+    /// This handles union types like `typeof AbstractA | typeof ConcreteB`.
+    fn type_contains_abstract_class(&self, type_id: TypeId) -> bool {
+        use crate::solver::{TypeKey, SymbolRef};
+        use crate::binder::SymbolId;
+
+        let Some(type_key) = self.types.lookup(type_id) else {
+            return false;
+        };
+
+        match type_key {
+            // TypeQuery is `typeof ClassName` - check if the symbol is abstract
+            TypeKey::TypeQuery(SymbolRef(sym_id)) => {
+                // Convert SymbolRef(u32) to SymbolId(u32)
+                if let Some(symbol) = self.binder.get_symbol(SymbolId(sym_id)) {
+                    symbol.flags & symbol_flags::ABSTRACT != 0
+                } else {
+                    false
+                }
+            }
+            // Union type - check if ANY constituent is abstract
+            TypeKey::Union(members) => {
+                members.iter().any(|&member| self.type_contains_abstract_class(member))
+            }
+            // Intersection type - check if ANY constituent is abstract
+            TypeKey::Intersection(members) => {
+                members.iter().any(|&member| self.type_contains_abstract_class(member))
+            }
+            _ => false,
+        }
     }
 
     /// Get type of property access expression.
