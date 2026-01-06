@@ -296,3 +296,165 @@ fn test_call_generic_array_function() {
         _ => panic!("Expected success, got {:?}", result),
     }
 }
+
+#[test]
+fn test_infer_call_signature_identity() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let sig = CallSignature {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: t_type,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+    };
+
+    let result = infer_call_signature(&interner, &mut subtype, &sig, &[TypeId::NUMBER]);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_infer_generic_function_identity() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: t_type,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    };
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::STRING]);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_infer_generic_array_map() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let u_param = TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let u_type = interner.intern(TypeKey::TypeParameter(u_param.clone()));
+    let array_t = interner.array(t_type);
+    let array_u = interner.array(u_type);
+
+    let callback_param = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: t_type,
+            optional: false,
+            rest: false,
+        }],
+        return_type: u_type,
+        is_constructor: false,
+    });
+
+    let map_func = FunctionShape {
+        type_params: vec![t_param, u_param],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("arr")),
+                type_id: array_t,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("callback")),
+                type_id: callback_param,
+                optional: false,
+                rest: false,
+            },
+        ],
+        return_type: array_u,
+        is_constructor: false,
+    };
+
+    let number_array = interner.array(TypeId::NUMBER);
+    let callback_arg = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::STRING,
+        is_constructor: false,
+    });
+
+    let result = infer_generic_function(
+        &interner,
+        &mut subtype,
+        &map_func,
+        &[number_array, callback_arg],
+    );
+    let expected = interner.array(TypeId::STRING);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_infer_generic_constructor_instantiation() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let box_base = interner.reference(SymbolRef(42));
+    let box_t = interner.application(box_base, vec![t_type]);
+
+    let ctor = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: t_type,
+            optional: false,
+            rest: false,
+        }],
+        return_type: box_t,
+        is_constructor: true,
+    };
+
+    let result = infer_generic_function(&interner, &mut subtype, &ctor, &[TypeId::NUMBER]);
+    let expected = interner.application(box_base, vec![TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}

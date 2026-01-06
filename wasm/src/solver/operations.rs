@@ -73,6 +73,26 @@ impl<'a> CallEvaluator<'a> {
         CallEvaluator { interner, subtype }
     }
 
+    pub fn infer_call_signature(&mut self, sig: &CallSignature, arg_types: &[TypeId]) -> TypeId {
+        let func = FunctionShape {
+            params: sig.params.clone(),
+            return_type: sig.return_type,
+            type_params: sig.type_params.clone(),
+            is_constructor: false,
+        };
+        match self.resolve_function_call(&func, arg_types) {
+            CallResult::Success(ret) => ret,
+            _ => TypeId::ANY,
+        }
+    }
+
+    pub fn infer_generic_function(&mut self, func: &FunctionShape, arg_types: &[TypeId]) -> TypeId {
+        match self.resolve_function_call(func, arg_types) {
+            CallResult::Success(ret) => ret,
+            _ => TypeId::ANY,
+        }
+    }
+
     /// Resolve a function call: func(args...) -> result
     ///
     /// This is pure type logic - no AST nodes, just types in and types out.
@@ -317,6 +337,26 @@ impl<'a> CallEvaluator<'a> {
             failures,
         }
     }
+}
+
+pub fn infer_call_signature<'a>(
+    interner: &'a dyn TypeDatabase,
+    subtype: &'a mut SubtypeChecker<'a>,
+    sig: &CallSignature,
+    arg_types: &[TypeId],
+) -> TypeId {
+    let mut evaluator = CallEvaluator::new(interner, subtype);
+    evaluator.infer_call_signature(sig, arg_types)
+}
+
+pub fn infer_generic_function<'a>(
+    interner: &'a dyn TypeDatabase,
+    subtype: &'a mut SubtypeChecker<'a>,
+    func: &FunctionShape,
+    arg_types: &[TypeId],
+) -> TypeId {
+    let mut evaluator = CallEvaluator::new(interner, subtype);
+    evaluator.infer_generic_function(func, arg_types)
 }
 
 // =============================================================================

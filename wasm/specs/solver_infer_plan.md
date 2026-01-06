@@ -9,7 +9,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 **Independence:** HIGH - Mostly interacts with TypeId and TypeInterner, minimal dependencies on other solver logic.
 
 ## Current Status
-🟡 **In Progress** - Occurs-check and generic application instantiation are implemented; integration APIs remain.
+🟢 **Complete** - Integration tests cover array mapping inference and generic class instantiation.
 
 ## Tasks
 
@@ -49,13 +49,13 @@ Implement the mathematical engine for type inference and generic instantiation. 
   - [x] Test: Multiple bounds intersection
 
 ### Phase 4: Integration
-- [ ] Expose public API for other solver modules
-  - `infer_call_signature(fn_type, args) -> TypeId`
-  - `infer_generic_function(fn, args) -> TypeId`
+- [x] Expose public API for other solver modules
+  - [x] `infer_call_signature(fn_type, args) -> TypeId`
+  - [x] `infer_generic_function(fn, args) -> TypeId`
 - [ ] Add comprehensive test suite
-  - Test function call inference: `identity<T>(x: T) => x` with number
-  - Test array methods: `[1,2,3].map(x => x.toString())`
-  - Test generic class instantiation
+  - [x] Test function call inference: `identity<T>(x: T) => x` with number
+  - [x] Test array methods: `[1,2,3].map(x => x.toString())`
+  - [x] Test generic class instantiation
 
 ## Architecture Notes
 - Use `ena` crate for union-find data structure
