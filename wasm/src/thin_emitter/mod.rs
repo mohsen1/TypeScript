@@ -372,9 +372,20 @@ impl<'a> ThinPrinter<'a> {
         Self::with_options(arena, PrinterOptions::default())
     }
 
+    /// Create a new ThinPrinter with pre-allocated output capacity
+    /// This reduces allocations when the expected output size is known (e.g., ~1.5x source size)
+    pub fn with_capacity(arena: &'a ThinNodeArena, capacity: usize) -> Self {
+        Self::with_capacity_and_options(arena, capacity, PrinterOptions::default())
+    }
+
     /// Create a new ThinPrinter with options.
     pub fn with_options(arena: &'a ThinNodeArena, options: PrinterOptions) -> Self {
-        let mut writer = SourceWriter::new();
+        Self::with_capacity_and_options(arena, 1024, options)
+    }
+
+    /// Create a new ThinPrinter with pre-allocated capacity and options.
+    pub fn with_capacity_and_options(arena: &'a ThinNodeArena, capacity: usize, options: PrinterOptions) -> Self {
+        let mut writer = SourceWriter::with_capacity(capacity);
         writer.set_new_line_kind(options.new_line);
 
         // Create EmitContext with ES5 targeting by default for baseline compatibility

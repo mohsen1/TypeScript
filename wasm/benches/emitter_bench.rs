@@ -228,49 +228,7 @@ fn bench_emit_write_performance(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark: Compare ThinPrinter vs legacy Printer
-fn bench_printer_comparison(c: &mut Criterion) {
-    let mut group = c.benchmark_group("printer_comparison");
-
-    let source = MEDIUM_SOURCE;
-    let bytes = source.len() as u64;
-
-    group.throughput(Throughput::Bytes(bytes));
-
-    // ThinPrinter with ThinParser
-    group.bench_function("thin_printer", |b| {
-        b.iter(|| {
-            let mut parser = ThinParserState::new(
-                "bench.ts".to_string(),
-                source.to_string(),
-            );
-            let root = parser.parse_source_file();
-            
-            let mut printer = ThinPrinter::new(&parser.arena);
-            printer.emit(root);
-            black_box(printer.take_output())
-        })
-    });
-
-    // Legacy Printer with regular Parser
-    group.bench_function("legacy_printer", |b| {
-        b.iter(|| {
-            let mut parser = ParserState::new(
-                "bench.ts".to_string(),
-                source.to_string(),
-            );
-            let _root = parser.parse_source_file();
-            
-            // Legacy printer uses Node enum
-            let printer = Printer::new();
-            // Note: Legacy printer requires NodeArena not ThinNodeArena
-            // For now just measure the construction
-            black_box(printer)
-        })
-    });
-
-    group.finish();
-}
+// Benchmark removed - legacy Printer no longer exists, only ThinPrinter is supported
 
 /// Benchmark: Source map generation overhead
 fn bench_emit_with_sourcemap(c: &mut Criterion) {
@@ -322,7 +280,6 @@ criterion_group!(
     bench_emit_complex,
     bench_emit_throughput,
     bench_emit_write_performance,
-    bench_printer_comparison,
     bench_emit_with_sourcemap,
 );
 

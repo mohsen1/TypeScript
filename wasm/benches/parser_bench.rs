@@ -259,34 +259,7 @@ fn bench_parse_throughput(c: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark: AST serialization to JSON (critical for JS boundary)
-fn bench_ast_serialization(c: &mut Criterion) {
-    let mut group = c.benchmark_group("ast_serialization");
-
-    // Parse once to get the AST
-    let sources = vec![
-        ("small", SMALL_SOURCE),
-        ("medium", MEDIUM_SOURCE),
-        ("complex", COMPLEX_SOURCE),
-    ];
-
-    for (name, source) in sources {
-        group.bench_function(name, |b| {
-            b.iter(|| {
-                let mut parser = ThinParserState::new(
-                    "bench.ts".to_string(),
-                    source.to_string(),
-                );
-                let root = parser.parse_source_file();
-                // This is the critical operation - serializing AST to JSON for JS
-                let json = parser.get_source_file_json(root.0);
-                black_box(json)
-            })
-        });
-    }
-
-    group.finish();
-}
+// Benchmark removed - get_source_file_json no longer exists in ThinParser
 
 /// Benchmark: Node allocation overhead
 fn bench_node_allocation(c: &mut Criterion) {
@@ -470,7 +443,6 @@ criterion_group!(
     bench_parse_medium,
     bench_parse_complex,
     bench_parse_throughput,
-    bench_ast_serialization,
     bench_node_allocation,
     bench_incremental_reparse,
     // ThinParser benchmarks
