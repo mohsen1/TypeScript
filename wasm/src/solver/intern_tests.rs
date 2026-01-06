@@ -24,6 +24,21 @@ fn test_interner_deduplication() {
 }
 
 #[test]
+fn test_interner_bigint_literal() {
+    let interner = TypeInterner::new();
+
+    let id = interner.literal_bigint("123");
+    let key = interner.lookup(id).expect("bigint literal should be interned");
+
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "123");
+        }
+        _ => panic!("Expected bigint literal, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_interner_union_normalization() {
     let interner = TypeInterner::new();
 
@@ -42,6 +57,10 @@ fn test_interner_union_normalization() {
     // Empty union is `never`
     let empty = interner.union(vec![]);
     assert_eq!(empty, TypeId::NEVER);
+
+    // Union with `error` should be `error`
+    let with_error = interner.union(vec![TypeId::STRING, TypeId::ERROR]);
+    assert_eq!(with_error, TypeId::ERROR);
 }
 
 #[test]
@@ -59,6 +78,14 @@ fn test_interner_intersection_normalization() {
     // Empty intersection is `unknown`
     let empty = interner.intersection(vec![]);
     assert_eq!(empty, TypeId::UNKNOWN);
+
+    // Intersection with `any` should be `any`
+    let with_any = interner.intersection(vec![TypeId::STRING, TypeId::ANY]);
+    assert_eq!(with_any, TypeId::ANY);
+
+    // Intersection with `error` should be `error`
+    let with_error = interner.intersection(vec![TypeId::STRING, TypeId::ERROR]);
+    assert_eq!(with_error, TypeId::ERROR);
 }
 
 #[test]
@@ -80,4 +107,17 @@ fn test_interner_object_sorting() {
     let id2 = interner.object(props2);
 
     assert_eq!(id1, id2);
+}
+
+#[test]
+fn test_interner_application_deduplication() {
+    let interner = TypeInterner::new();
+
+    let base = interner.reference(SymbolRef(1));
+    let app1 = interner.application(base, vec![TypeId::STRING]);
+    let app2 = interner.application(base, vec![TypeId::STRING]);
+    let app3 = interner.application(base, vec![TypeId::NUMBER]);
+
+    assert_eq!(app1, app2);
+    assert_ne!(app1, app3);
 }

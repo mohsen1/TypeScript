@@ -19,7 +19,7 @@
 //! - Optimized independently
 
 use crate::solver::types::*;
-use crate::solver::intern::TypeInterner;
+use crate::solver::TypeDatabase;
 use crate::solver::subtype::SubtypeChecker;
 use crate::solver::diagnostics::PendingDiagnostic;
 use crate::solver::infer::InferenceContext;
@@ -64,12 +64,12 @@ pub enum CallResult {
 
 /// Evaluates function calls.
 pub struct CallEvaluator<'a> {
-    interner: &'a TypeInterner,
+    interner: &'a dyn TypeDatabase,
     subtype: &'a mut SubtypeChecker<'a>,
 }
 
 impl<'a> CallEvaluator<'a> {
-    pub fn new(interner: &'a TypeInterner, subtype: &'a mut SubtypeChecker<'a>) -> Self {
+    pub fn new(interner: &'a dyn TypeDatabase, subtype: &'a mut SubtypeChecker<'a>) -> Self {
         CallEvaluator { interner, subtype }
     }
 
@@ -356,11 +356,11 @@ pub enum PropertyAccessResult {
 
 /// Evaluates property access.
 pub struct PropertyAccessEvaluator<'a> {
-    interner: &'a TypeInterner,
+    interner: &'a dyn TypeDatabase,
 }
 
 impl<'a> PropertyAccessEvaluator<'a> {
-    pub fn new(interner: &'a TypeInterner) -> Self {
+    pub fn new(interner: &'a dyn TypeDatabase) -> Self {
         PropertyAccessEvaluator { interner }
     }
 
@@ -650,11 +650,11 @@ pub enum BinaryOpResult {
 
 /// Evaluates binary operations.
 pub struct BinaryOpEvaluator<'a> {
-    interner: &'a TypeInterner,
+    interner: &'a dyn TypeDatabase,
 }
 
 impl<'a> BinaryOpEvaluator<'a> {
-    pub fn new(interner: &'a TypeInterner) -> Self {
+    pub fn new(interner: &'a dyn TypeDatabase) -> Self {
         BinaryOpEvaluator { interner }
     }
 
