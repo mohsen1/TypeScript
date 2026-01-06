@@ -57,9 +57,7 @@ fn collect_export_name_from_declaration(arena: &ThinNodeArena, decl_node: &ThinN
         k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
             if let Some(var_stmt) = arena.get_variable(decl_node) {
                 for &decl_idx in &var_stmt.declarations.nodes {
-                    if let Some(name) = get_declaration_name(arena, decl_idx) {
-                        exports.push(name);
-                    }
+                    collect_declaration_names(arena, decl_idx, exports);
                 }
             }
         }
@@ -110,9 +108,7 @@ pub fn collect_export_names(arena: &ThinNodeArena, statements: &[NodeIndex]) -> 
                 if let Some(var_stmt) = arena.get_variable(node) {
                     if has_export_modifier_from_list(arena, &var_stmt.modifiers) {
                         for &decl_idx in &var_stmt.declarations.nodes {
-                            if let Some(name) = get_declaration_name(arena, decl_idx) {
-                                exports.push(name);
-                            }
+                            collect_declaration_names(arena, decl_idx, &mut exports);
                         }
                     }
                 }
@@ -368,11 +364,68 @@ pub fn has_default_modifier_from_list(arena: &ThinNodeArena, modifiers: &Option<
     has_modifier(arena, modifiers, SyntaxKind::DefaultKeyword as u16)
 }
 
-/// Get the name from a variable declaration
-fn get_declaration_name(arena: &ThinNodeArena, decl_idx: NodeIndex) -> Option<String> {
-    let decl_node = arena.get(decl_idx)?;
-    let decl = arena.get_variable_declaration(decl_node)?;
-    get_identifier_text(arena, decl.name)
+/// Collect exported names from a variable declaration (identifier or binding pattern).
+fn collect_declaration_names(arena: &ThinNodeArena, decl_idx: NodeIndex, exports: &mut Vec<String>) {
+    let Some(decl_node) = arena.get(decl_idx) else {
+        return;
+    };
+    let Some(decl) = arena.get_variable_declaration(decl_node) else {
+        return;
+    };
+    collect_binding_names(arena, decl.name, exports);
+}
+
+fn collect_binding_names(arena: &ThinNodeArena, name_idx: NodeIndex, exports: &mut Vec<String>) {
+    if name_idx.is_none() {
+        return;
+    }
+
+    let Some(node) = arena.get(name_idx) else {
+        return;
+    };
+
+    if node.kind == SyntaxKind::Identifier as u16 {
+        if let Some(id) = arena.get_identifier(node) {
+            exports.push(id.escaped_text.clone());
+        }
+        return;
+    }
+
+    match node.kind {
+        k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN
+            || k == syntax_kind_ext::ARRAY_BINDING_PATTERN =>
+        {
+            if let Some(pattern) = arena.get_binding_pattern(node) {
+                for &elem_idx in &pattern.elements.nodes {
+                    collect_binding_names_from_element(arena, elem_idx, exports);
+                }
+            }
+        }
+        k if k == syntax_kind_ext::BINDING_ELEMENT => {
+            if let Some(elem) = arena.get_binding_element(node) {
+                collect_binding_names(arena, elem.name, exports);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn collect_binding_names_from_element(
+    arena: &ThinNodeArena,
+    elem_idx: NodeIndex,
+    exports: &mut Vec<String>,
+) {
+    if elem_idx.is_none() {
+        return;
+    }
+
+    let Some(elem_node) = arena.get(elem_idx) else {
+        return;
+    };
+
+    if let Some(elem) = arena.get_binding_element(elem_node) {
+        collect_binding_names(arena, elem.name, exports);
+    }
 }
 
 /// Get identifier text from a node index
@@ -492,5 +545,26 @@ mod tests {
 
         assert!(!export_names.is_empty(), "Expected to find exported class name");
         assert_eq!(export_names, vec!["C"], "Expected to find class name 'C' in exports");
+    }
+
+    #[test]
+    fn test_collect_export_names_with_destructuring() {
+        use crate::thin_parser::ThinParserState;
+
+        let source = "export const { a, b: c } = obj;";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+            panic!("Failed to get source file");
+        };
+
+        let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+        assert_eq!(
+            export_names,
+            vec!["a", "c"],
+            "Expected destructured export names"
+        );
     }
 }

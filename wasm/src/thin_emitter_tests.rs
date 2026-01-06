@@ -535,6 +535,37 @@ fn test_commonjs_export_const() {
 }
 
 #[test]
+fn test_commonjs_export_const_destructuring() {
+    let source = "export const { a, b: c } = obj;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("exports.a = exports.c = void 0;"),
+        "Expected CommonJS exports init for destructured names: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.a = a;"),
+        "Expected 'exports.a = a;' in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.c = c;"),
+        "Expected 'exports.c = c;' in CommonJS output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_commonjs_export_function() {
     let source = "export function add(a, b) { return a + b; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
