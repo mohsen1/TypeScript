@@ -28,6 +28,9 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Union type resolution for abstract class detection (get_type_from_union_type)
 - ✅ Error 2729: property used before initialization (this.X in initializers)
 - ✅ Array method support in PropertyAccessEvaluator (map, filter, etc. no longer report 2339)
+- ✅ Error 2416: property not assignable to same property in base type
+- ✅ Error 2654: non-abstract class missing implementations for abstract members
+- ✅ Error 2540: cannot assign to readonly property (via AST-level modifier check)
 
 ## Checker Refactoring (see specs/REFACTOR_CHECKER.md)
 - ✅ Split ThinCheckerState into Context + specialized Checkers (expr, stmt, decl)
