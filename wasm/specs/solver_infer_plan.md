@@ -83,6 +83,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Store subtype failure property names as Atom for diagnostics
 - [x] Avoid allocation when constraining non-nullish union targets
 - [x] Respect type parameter shadowing in instantiation scopes
+- [x] Use FxHashMap for substitution and inference maps
 
 ## Architecture Notes
 - Use `ena` crate for union-find data structure

@@ -9,10 +9,10 @@
 //! - Deep recursive substitution through nested types
 //! - Handling of constraints and defaults
 
-use std::collections::HashMap;
 use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::TypeDatabase;
+use rustc_hash::FxHashMap;
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -21,14 +21,14 @@ use crate::solver::TypeInterner;
 #[derive(Clone, Debug, Default)]
 pub struct TypeSubstitution {
     /// Maps type parameter names to their substituted types
-    map: HashMap<Atom, TypeId>,
+    map: FxHashMap<Atom, TypeId>,
 }
 
 impl TypeSubstitution {
     /// Create an empty substitution.
     pub fn new() -> Self {
         TypeSubstitution {
-            map: HashMap::new(),
+            map: FxHashMap::default(),
         }
     }
 
@@ -37,7 +37,7 @@ impl TypeSubstitution {
     /// `type_params` - The declared type parameters (e.g., `<T, U>`)
     /// `type_args` - The provided type arguments (e.g., `<string, number>`)
     pub fn from_args(type_params: &[TypeParamInfo], type_args: &[TypeId]) -> Self {
-        let mut map = HashMap::new();
+        let mut map = FxHashMap::default();
         for (param, &arg) in type_params.iter().zip(type_args.iter()) {
             map.insert(param.name, arg);
         }
@@ -70,7 +70,7 @@ pub struct TypeInstantiator<'a> {
     interner: &'a dyn TypeDatabase,
     substitution: &'a TypeSubstitution,
     /// Track visited types to handle cycles
-    visiting: HashMap<TypeId, TypeId>,
+    visiting: FxHashMap<TypeId, TypeId>,
     /// Type parameter names that are shadowed in the current scope.
     shadowed: Vec<Atom>,
 }
@@ -81,7 +81,7 @@ impl<'a> TypeInstantiator<'a> {
         TypeInstantiator {
             interner,
             substitution,
-            visiting: HashMap::new(),
+            visiting: FxHashMap::default(),
             shadowed: Vec::new(),
         }
     }

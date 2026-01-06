@@ -25,7 +25,7 @@ use crate::solver::subtype::SubtypeChecker;
 use crate::solver::diagnostics::PendingDiagnostic;
 use crate::solver::infer::InferenceContext;
 use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 
 // =============================================================================
 // Function Call Resolution
@@ -177,7 +177,7 @@ impl<'a> CallEvaluator<'a> {
     fn resolve_generic_call(&mut self, func: &FunctionShape, arg_types: &[TypeId]) -> CallResult {
         let mut infer_ctx = InferenceContext::new(self.interner);
         let mut substitution = TypeSubstitution::new();
-        let mut var_map: HashMap<TypeId, crate::solver::infer::InferenceVar> = HashMap::new();
+        let mut var_map: FxHashMap<TypeId, crate::solver::infer::InferenceVar> = FxHashMap::default();
         let mut type_param_vars = Vec::with_capacity(func.type_params.len());
 
         // 1. Create inference variables and placeholders for each type parameter
@@ -269,7 +269,7 @@ impl<'a> CallEvaluator<'a> {
     fn constrain_types(
         &self,
         ctx: &mut InferenceContext,
-        var_map: &HashMap<TypeId, crate::solver::infer::InferenceVar>,
+        var_map: &FxHashMap<TypeId, crate::solver::infer::InferenceVar>,
         source: TypeId,
         target: TypeId
     ) {
@@ -369,7 +369,7 @@ impl<'a> CallEvaluator<'a> {
     fn constrain_properties(
         &self,
         ctx: &mut InferenceContext,
-        var_map: &HashMap<TypeId, crate::solver::infer::InferenceVar>,
+        var_map: &FxHashMap<TypeId, crate::solver::infer::InferenceVar>,
         source_props: &[PropertyInfo],
         target_props: &[PropertyInfo],
     ) {
