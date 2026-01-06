@@ -72,6 +72,12 @@ pub mod source_writer;
 // EmitContext - Transform state management for the emitter
 pub mod emit_context;
 
+// TransformContext - Projection layer for AST transforms (Phase 6.1)
+pub mod transform_context;
+
+// LoweringPass - Phase 1 of Transform/Print architecture (Phase 6.1)
+pub mod lowering_pass;
+
 // Declaration file emitter (Phase 6.4)
 pub mod declaration_emitter;
 #[cfg(test)]
