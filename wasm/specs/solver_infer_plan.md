@@ -9,7 +9,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 **Independence:** HIGH - Mostly interacts with TypeId and TypeInterner, minimal dependencies on other solver logic.
 
 ## Current Status
-🟢 **Complete** - Integration tests cover array mapping inference plus application/object constraints.
+🟢 **Complete** - Integration tests cover array mapping inference plus application/object/tuple/index constraints.
 
 ## Tasks
 
@@ -52,12 +52,14 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Expose public API for other solver modules
   - [x] `infer_call_signature(fn_type, args) -> TypeId`
   - [x] `infer_generic_function(fn, args) -> TypeId`
-- [ ] Add comprehensive test suite
+- [x] Add comprehensive test suite
   - [x] Test function call inference: `identity<T>(x: T) => x` with number
   - [x] Test array methods: `[1,2,3].map(x => x.toString())`
   - [x] Test generic class instantiation
   - [x] Test application parameter inference: `Promise<T>` with `Promise<number>`
   - [x] Test object property inference: `{ value: T }` with `{ value: string }`
+  - [x] Test tuple element inference: `[T, T]` with `[number, number]`
+  - [x] Test index signature inference: `{ [key: string]: T }` with `{ [key: string]: number }`
 
 ### Phase 5: Structural Constraints
 - [x] Constrain Application args when bases match

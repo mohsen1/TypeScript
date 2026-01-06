@@ -25,7 +25,6 @@ use crate::solver::diagnostics::PendingDiagnostic;
 use crate::solver::infer::InferenceContext;
 use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
 use std::collections::HashMap;
-use std::sync::Arc;
 
 // =============================================================================
 // Function Call Resolution
