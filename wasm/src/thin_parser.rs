@@ -3278,6 +3278,7 @@ impl ThinParserState {
             ExportDeclData {
                 modifiers: None,
                 is_type_only: false,
+                is_default_export: false,
                 export_clause: import_decl,
                 module_specifier: NodeIndex::NONE,
                 attributes: NodeIndex::NONE,
@@ -3329,6 +3330,7 @@ impl ThinParserState {
             ExportDeclData {
                 modifiers: None,
                 is_type_only: false,
+                is_default_export: true,
                 export_clause: expression,
                 module_specifier: NodeIndex::NONE,
                 attributes: NodeIndex::NONE,
@@ -3359,6 +3361,7 @@ impl ThinParserState {
             ExportDeclData {
                 modifiers: None,
                 is_type_only,
+                is_default_export: false,
                 export_clause,
                 module_specifier,
                 attributes: NodeIndex::NONE,
@@ -3386,6 +3389,7 @@ impl ThinParserState {
             ExportDeclData {
                 modifiers: None,
                 is_type_only,
+                is_default_export: false,
                 export_clause,
                 module_specifier,
                 attributes: NodeIndex::NONE,
@@ -3514,6 +3518,7 @@ impl ThinParserState {
             ExportDeclData {
                 modifiers: None,
                 is_type_only: false,
+                is_default_export: false,
                 export_clause: declaration,
                 module_specifier: NodeIndex::NONE,
                 attributes: NodeIndex::NONE,

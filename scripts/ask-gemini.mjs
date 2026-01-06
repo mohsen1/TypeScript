@@ -32,11 +32,11 @@ const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 // Default configuration - only wasm directory (Rust migration focus)
 // Using 800k to stay safely under Gemini's 1M token limit (yek uses OpenAI tokenizer)
 const DEFAULT_TOKENS = "800k";
-const DEFAULT_DIRS = ["wasm/"];
+const DEFAULT_DIRS = ["wasm/", "specs/"];
 
 // Review mode configuration - maximize context for thorough reviews
 const REVIEW_TOKENS = "800k";
-const REVIEW_DIRS = ["wasm/"];
+const REVIEW_DIRS = ["wasm/", "specs/"];
 
 // Code review system prompt for Rust migration
 const CODE_REVIEW_PROMPT = `You are **RustReviewer**, an uncompromising senior systems engineer with 15+ years of experience in compiler development and Rust. You are reviewing code for the TypeScript-to-Rust migration project. Your reviews are **brutally honest**, **technically precise**, and **actionable**.

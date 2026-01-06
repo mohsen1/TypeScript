@@ -540,6 +540,8 @@ pub struct SpecifierData {
 pub struct ExportDeclData {
     pub modifiers: Option<NodeList>,
     pub is_type_only: bool,
+    /// True if this is `export default ...`
+    pub is_default_export: bool,
     pub export_clause: NodeIndex,
     pub module_specifier: NodeIndex,
     pub attributes: NodeIndex,

@@ -2452,7 +2452,7 @@ impl<'a> ThinPrinter<'a> {
                         self.write_line();
                     }
                 }
-                // export function f() {}
+                // export function f() {} or export default function f() {}
                 k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
                     // Emit the function declaration
                     self.emit_function_declaration(clause_node, export.export_clause);
@@ -2461,16 +2461,20 @@ impl<'a> ThinPrinter<'a> {
                     // Get function name and emit export
                     if let Some(func) = self.arena.get_function(clause_node) {
                         if let Some(name) = self.get_identifier_text_opt(func.name) {
-                            self.write("exports.");
-                            self.write(&name);
-                            self.write(" = ");
+                            if export.is_default_export {
+                                self.write("exports.default = ");
+                            } else {
+                                self.write("exports.");
+                                self.write(&name);
+                                self.write(" = ");
+                            }
                             self.write(&name);
                             self.write(";");
                             self.write_line();
                         }
                     }
                 }
-                // export class C {}
+                // export class C {} or export default class C {}
                 k if k == syntax_kind_ext::CLASS_DECLARATION => {
                     // Emit the class declaration
                     self.emit_class_declaration(clause_node, export.export_clause);
@@ -2479,9 +2483,13 @@ impl<'a> ThinPrinter<'a> {
                     // Get class name and emit export
                     if let Some(class) = self.arena.get_class(clause_node) {
                         if let Some(name) = self.get_identifier_text_opt(class.name) {
-                            self.write("exports.");
-                            self.write(&name);
-                            self.write(" = ");
+                            if export.is_default_export {
+                                self.write("exports.default = ");
+                            } else {
+                                self.write("exports.");
+                                self.write(&name);
+                                self.write(" = ");
+                            }
                             self.write(&name);
                             self.write(";");
                             self.write_line();
@@ -2513,8 +2521,16 @@ impl<'a> ThinPrinter<'a> {
                         }
                     }
                 }
-                // Other declarations (interface, type alias) - skip for CommonJS
-                _ => {}
+                // Type-only declarations (interface, type alias) - skip for CommonJS
+                k if k == syntax_kind_ext::INTERFACE_DECLARATION => {}
+                k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {}
+                // export default <expression> - emit as exports.default = expr;
+                _ => {
+                    // This is likely an expression-based default export: export default 42;
+                    self.write("exports.default = ");
+                    self.emit(export.export_clause);
+                    self.write_semicolon();
+                }
             }
         }
     }
