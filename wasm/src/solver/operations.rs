@@ -305,14 +305,20 @@ impl<'a> CallEvaluator<'a> {
                 }
             }
             (_, Some(TypeKey::Union(ref t_members))) => {
-                let mut non_nullable = Vec::new();
+                let mut non_nullable = None;
+                let mut count = 0;
                 for &member in t_members {
                     if !is_nullish(member) {
-                        non_nullable.push(member);
+                        count += 1;
+                        if count == 1 {
+                            non_nullable = Some(member);
+                        } else {
+                            break;
+                        }
                     }
                 }
-                if non_nullable.len() == 1 {
-                    self.constrain_types(ctx, var_map, source, non_nullable[0]);
+                if count == 1 {
+                    self.constrain_types(ctx, var_map, source, non_nullable.unwrap());
                 }
             }
             (Some(TypeKey::Array(s_elem)), Some(TypeKey::Array(t_elem))) => {

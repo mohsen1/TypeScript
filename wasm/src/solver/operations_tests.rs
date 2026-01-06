@@ -697,6 +697,35 @@ fn test_infer_generic_optional_union_target() {
 }
 
 #[test]
+fn test_infer_generic_optional_union_target_with_null() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let optional_t = interner.union(vec![t_type, TypeId::UNDEFINED, TypeId::NULL]);
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: optional_t,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    };
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::NUMBER]);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
 fn test_infer_generic_rest_parameters() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
