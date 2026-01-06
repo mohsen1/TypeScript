@@ -1863,7 +1863,7 @@ impl<'a> ThinCheckerState<'a> {
 
 
     // =========================================================================
-    // Type Relations (uses solver::SubtypeChecker)
+    // Type Relations (uses solver::CompatChecker for assignability)
     // =========================================================================
 
     /// Check if `source` type is assignable to `target` type.
@@ -1871,9 +1871,9 @@ impl<'a> ThinCheckerState<'a> {
     /// Uses the solver's SubtypeChecker with coinductive cycle detection.
     /// Note: Does not resolve Ref types (use `is_assignable_to_with_resolution` for that).
     pub fn is_assignable_to(&self, source: TypeId, target: TypeId) -> bool {
-        use crate::solver::SubtypeChecker;
-        let mut checker = SubtypeChecker::new(self.ctx.types);
-        checker.is_assignable_to(source, target)
+        use crate::solver::CompatChecker;
+        let mut checker = CompatChecker::new(self.ctx.types);
+        checker.is_assignable(source, target)
     }
 
     /// Check if `source` type is assignable to `target` type, resolving Ref types.
@@ -1885,9 +1885,9 @@ impl<'a> ThinCheckerState<'a> {
         target: TypeId,
         env: &crate::solver::TypeEnvironment,
     ) -> bool {
-        use crate::solver::SubtypeChecker;
-        let mut checker = SubtypeChecker::with_resolver(self.ctx.types, env);
-        checker.is_assignable_to(source, target)
+        use crate::solver::CompatChecker;
+        let mut checker = CompatChecker::with_resolver(self.ctx.types, env);
+        checker.is_assignable(source, target)
     }
 
     /// Check if `source` type is a subtype of `target` type.
@@ -1922,10 +1922,10 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check if a type is assignable to a union of types.
     pub fn is_assignable_to_union(&self, source: TypeId, targets: &[TypeId]) -> bool {
-        use crate::solver::SubtypeChecker;
-        let mut checker = SubtypeChecker::new(self.ctx.types);
+        use crate::solver::CompatChecker;
+        let mut checker = CompatChecker::new(self.ctx.types);
         for &target in targets {
-            if checker.is_assignable_to(source, target) {
+            if checker.is_assignable(source, target) {
                 return true;
             }
         }
@@ -3785,8 +3785,7 @@ impl<'a> ThinCheckerState<'a> {
                 }
 
                 // Check if getter return type is assignable to setter param type
-                let mut subtype_checker = crate::solver::SubtypeChecker::new(self.ctx.types);
-                if !subtype_checker.is_assignable_to(getter_type, setter_type) {
+                if !self.is_assignable_to(getter_type, setter_type) {
                     // Get type strings for error message
                     let getter_type_str = self.format_type(getter_type);
                     let setter_type_str = self.format_type(setter_type);
@@ -4083,8 +4082,7 @@ impl<'a> ThinCheckerState<'a> {
                 }
 
                 // Check type compatibility - derived type must be assignable to base type
-                let mut subtype_checker = crate::solver::SubtypeChecker::new(self.ctx.types);
-                if !subtype_checker.is_assignable_to(member_type, base_type) {
+                if !self.is_assignable_to(member_type, base_type) {
                     // Format type strings for error message
                     let member_type_str = self.format_type(member_type);
                     let base_type_str = self.format_type(base_type);
@@ -4274,8 +4272,7 @@ impl<'a> ThinCheckerState<'a> {
                         }
 
                         // Check type compatibility - derived type must be assignable to base type
-                        let mut subtype_checker = crate::solver::SubtypeChecker::new(self.ctx.types);
-                        if !subtype_checker.is_assignable_to(member_type, base_type) {
+                        if !self.is_assignable_to(member_type, base_type) {
                             // Report error 2430 on the interface name (not the member)
                             let member_type_str = self.format_type(member_type);
                             let base_type_str = self.format_type(base_type);
