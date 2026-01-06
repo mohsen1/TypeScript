@@ -66,8 +66,6 @@ pub struct ThinParserState {
     current_token: SyntaxKind,
     /// List of parse diagnostics
     parse_diagnostics: Vec<ParseDiagnostic>,
-    /// The source text
-    source_text: String,
     /// Node count for assigning IDs
     node_count: u32,
     /// Identifiers found during parsing
@@ -80,7 +78,9 @@ impl ThinParserState {
     /// Create a new ThinParser for the given source text.
     pub fn new(file_name: String, source_text: String) -> ThinParserState {
         let estimated_nodes = source_text.len() / 20; // Rough estimate
-        let scanner = ScannerState::new(source_text.clone(), true);
+        // Zero-copy: Pass source_text directly to scanner without cloning
+        // This eliminates the 2x memory overhead from duplicating the source
+        let scanner = ScannerState::new(source_text, true);
         ThinParserState {
             scanner,
             arena: ThinNodeArena::with_capacity(estimated_nodes),
@@ -88,7 +88,6 @@ impl ThinParserState {
             context_flags: 0,
             current_token: SyntaxKind::Unknown,
             parse_diagnostics: Vec::new(),
-            source_text,
             node_count: 0,
             identifiers: Vec::new(),
             recursion_depth: 0,
@@ -433,7 +432,8 @@ impl ThinParserState {
 
         // Cache comment ranges once during parsing (O(N) scan, done only once)
         // This avoids rescanning on every hover/documentation request
-        let comments = crate::comments::get_comment_ranges(&self.source_text);
+        // Use scanner's source text (no duplicate allocation)
+        let comments = crate::comments::get_comment_ranges(self.scanner.source_text());
 
         // Create source file node
         let end_pos = self.token_end();
@@ -447,7 +447,7 @@ impl ThinParserState {
             statements,
             end_of_file_token: eof_token,
             file_name: self.file_name.clone(),
-            text: self.source_text.clone(),
+            text: self.scanner.source_text().to_string(), // Clone only when storing in AST
             language_version: 99,
             language_variant: 0,
             script_kind: 3,
@@ -7489,9 +7489,10 @@ impl ThinParserState {
         self.arena.len()
     }
 
-    /// Get the source text
+    /// Get the source text.
+    /// Delegates to the scanner which owns the source text.
     pub fn get_source_text(&self) -> &str {
-        &self.source_text
+        self.scanner.source_text()
     }
 
     /// Get the file name

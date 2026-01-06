@@ -95,8 +95,29 @@ These issues block LSP responsiveness.
 - Only iterates backwards through adjacent comments (typically 1-3)
 - Hover response time improved dramatically on large files
 
+#### Zero-Copy Source Text ✅ COMPLETED (2026-01-06)
+
+**Problem:** ThinParserState duplicated source text - owned a copy AND cloned it into ScannerState, doubling memory usage.
+
+**Solution Implemented:**
+- [x] **Removed source_text field from ThinParserState:** Eliminated duplicate storage
+- [x] **Removed .clone() in constructor:** Pass source_text directly to ScannerState
+- [x] **Delegated get_source_text():** Returns &str from scanner.source_text()
+- [x] **Updated parse_source_file():** Uses scanner.source_text() for comment caching
+- [x] **All tests pass:** 691/691 tests passing
+
+**Memory Impact:**
+- **Before:** 2x source text (once in ThinParserState, once in ScannerState)
+- **After:** 1x source text (only in ScannerState)
+- **Example:** 5MB file: 10MB → 5MB (50% reduction in source text memory)
+
+**Implementation Details:**
+- Scanner owns the source String
+- ThinParserState accesses via delegation (&str reference)
+- No cloning overhead in hot path
+- Only clone when storing in SourceFileData.text for AST persistence
+
 #### Remaining Optimizations
-   - Refactor ScannerState to use &str instead of cloning source (reduce memory 2x)
    - Consider caching type information for repeated queries
 
 3. **Add More LSP Features**
