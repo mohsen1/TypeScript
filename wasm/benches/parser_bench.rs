@@ -8,7 +8,6 @@
 //! - Serialization overhead (critical for JS boundary)
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId, Throughput};
-use wasm::parser_impl::ParserState;
 use wasm::thin_parser::ThinParserState;
 
 /// Small TypeScript source
@@ -197,7 +196,7 @@ fn generate_large_source(classes: usize, methods_per_class: usize) -> String {
 fn bench_parse_small(c: &mut Criterion) {
     c.bench_function("parse_small", |b| {
         b.iter(|| {
-            let mut parser = ParserState::new(
+            let mut parser = ThinParserState::new(
                 "bench.ts".to_string(),
                 black_box(SMALL_SOURCE.to_string()),
             );
@@ -211,7 +210,7 @@ fn bench_parse_small(c: &mut Criterion) {
 fn bench_parse_medium(c: &mut Criterion) {
     c.bench_function("parse_medium", |b| {
         b.iter(|| {
-            let mut parser = ParserState::new(
+            let mut parser = ThinParserState::new(
                 "bench.ts".to_string(),
                 black_box(MEDIUM_SOURCE.to_string()),
             );
@@ -225,7 +224,7 @@ fn bench_parse_medium(c: &mut Criterion) {
 fn bench_parse_complex(c: &mut Criterion) {
     c.bench_function("parse_complex", |b| {
         b.iter(|| {
-            let mut parser = ParserState::new(
+            let mut parser = ThinParserState::new(
                 "bench.ts".to_string(),
                 black_box(COMPLEX_SOURCE.to_string()),
             );
@@ -247,7 +246,7 @@ fn bench_parse_throughput(c: &mut Criterion) {
         group.throughput(Throughput::Bytes(bytes));
         group.bench_with_input(BenchmarkId::new("parse", &label), &source, |b, source| {
             b.iter(|| {
-                let mut parser = ParserState::new(
+                let mut parser = ThinParserState::new(
                     "bench.ts".to_string(),
                     black_box(source.clone()),
                 );
@@ -274,7 +273,7 @@ fn bench_ast_serialization(c: &mut Criterion) {
     for (name, source) in sources {
         group.bench_function(name, |b| {
             b.iter(|| {
-                let mut parser = ParserState::new(
+                let mut parser = ThinParserState::new(
                     "bench.ts".to_string(),
                     source.to_string(),
                 );
@@ -293,7 +292,7 @@ fn bench_ast_serialization(c: &mut Criterion) {
 fn bench_node_allocation(c: &mut Criterion) {
     c.bench_function("node_allocation", |b| {
         b.iter(|| {
-            let mut parser = ParserState::new(
+            let mut parser = ThinParserState::new(
                 "bench.ts".to_string(),
                 MEDIUM_SOURCE.to_string(),
             );
@@ -319,7 +318,7 @@ fn bench_incremental_reparse(c: &mut Criterion) {
 
         b.iter(|| {
             for source in &sources {
-                let mut parser = ParserState::new(
+                let mut parser = ThinParserState::new(
                     "bench.ts".to_string(),
                     source.clone(),
                 );
@@ -378,7 +377,7 @@ fn bench_parser_comparison(c: &mut Criterion) {
 
     group.bench_function("regular_parser", |b| {
         b.iter(|| {
-            let mut parser = ParserState::new(
+            let mut parser = ThinParserState::new(
                 "bench.ts".to_string(),
                 black_box(source.to_string()),
             );

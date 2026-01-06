@@ -6,8 +6,6 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use wasm::{
     thin_parser::ThinParserState,
     thin_emitter::ThinPrinter,
-    emitter::{Printer, PrinterOptions},
-    parser_impl::ParserState,
 };
 
 // =============================================================================
