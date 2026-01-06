@@ -787,6 +787,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     ///
     /// In strict mode (contravariant): target_type <: source_type
     /// In legacy mode (bivariant): target_type <: source_type OR source_type <: target_type
+    /// See https://github.com/microsoft/TypeScript/issues/18654.
     fn are_parameters_compatible(&mut self, source_type: TypeId, target_type: TypeId) -> bool {
         // Contravariant check: Target <: Source
         // Example: (x: Animal) => void <: (x: Cat) => void
@@ -808,6 +809,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     /// Check return type compatibility with void special-casing.
     fn check_return_compat(&mut self, source_return: TypeId, target_return: TypeId) -> SubtypeResult {
         if self.allow_void_return && target_return == TypeId::VOID {
+            // `() => void` treats the return value as ignored. See https://github.com/microsoft/TypeScript/issues/25274.
             return SubtypeResult::True;
         }
         self.check_subtype(source_return, target_return)

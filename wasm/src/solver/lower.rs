@@ -13,6 +13,7 @@ use crate::parser::syntax_kind_ext;
 use crate::solver::types::*;
 use crate::solver::TypeDatabase;
 use crate::interner::Atom;
+use std::cell::RefCell;
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -25,11 +26,17 @@ pub struct TypeLowering<'a> {
     /// Optional symbol resolver - resolves identifier nodes to SymbolIds.
     /// If provided, this enables correct abstract class detection.
     resolver: Option<&'a dyn Fn(NodeIndex) -> Option<u32>>,
+    type_param_scopes: RefCell<Vec<Vec<(Atom, TypeId)>>>,
 }
 
 impl<'a> TypeLowering<'a> {
     pub fn new(arena: &'a ThinNodeArena, interner: &'a dyn TypeDatabase) -> Self {
-        TypeLowering { arena, interner, resolver: None }
+        TypeLowering {
+            arena,
+            interner,
+            resolver: None,
+            type_param_scopes: RefCell::new(Vec::new()),
+        }
     }
 
     /// Create a TypeLowering with a symbol resolver.
@@ -39,12 +46,44 @@ impl<'a> TypeLowering<'a> {
         interner: &'a dyn TypeDatabase,
         resolver: &'a dyn Fn(NodeIndex) -> Option<u32>,
     ) -> Self {
-        TypeLowering { arena, interner, resolver: Some(resolver) }
+        TypeLowering {
+            arena,
+            interner,
+            resolver: Some(resolver),
+            type_param_scopes: RefCell::new(Vec::new()),
+        }
     }
 
     /// Resolve a node to a symbol ID if a resolver is provided.
     fn resolve_symbol(&self, node_idx: NodeIndex) -> Option<u32> {
         self.resolver.and_then(|resolver| resolver(node_idx))
+    }
+
+    fn push_type_param_scope(&self) {
+        self.type_param_scopes.borrow_mut().push(Vec::new());
+    }
+
+    fn pop_type_param_scope(&self) {
+        let _ = self.type_param_scopes.borrow_mut().pop();
+    }
+
+    fn add_type_param_binding(&self, name: Atom, type_id: TypeId) {
+        if let Some(scope) = self.type_param_scopes.borrow_mut().last_mut() {
+            scope.push((name, type_id));
+        }
+    }
+
+    fn lookup_type_param(&self, name: &str) -> Option<TypeId> {
+        let atom = self.interner.intern_string(name);
+        let scopes = self.type_param_scopes.borrow();
+        for scope in scopes.iter().rev() {
+            for (scope_name, type_id) in scope.iter().rev() {
+                if *scope_name == atom {
+                    return Some(*type_id);
+                }
+            }
+        }
+        None
     }
 
     /// Lower a type node to a TypeId.
@@ -357,55 +396,67 @@ impl<'a> TypeLowering<'a> {
         }
     }
 
-    /// Lower type parameters from a NodeList.
-    /// Returns a Vec<TypeParamInfo> for use in FunctionShape.
-    fn lower_type_parameters(&self, type_params: &Option<NodeList>) -> Vec<TypeParamInfo> {
-        match type_params {
-            None => vec![],
-            Some(list) => {
-                list.nodes.iter()
-                    .filter_map(|&idx| {
-                        let node = self.arena.get(idx)?;
-                        let data = self.arena.get_type_parameter(node)?;
+    fn with_type_params<R>(
+        &self,
+        type_params: &Option<NodeList>,
+        f: impl FnOnce() -> R,
+    ) -> (Vec<TypeParamInfo>, R) {
+        let Some(list) = type_params else {
+            return (Vec::new(), f());
+        };
 
-                        // Get the name from the identifier node
-                        let name = if data.name != NodeIndex::NONE {
-                            if let Some(name_node) = self.arena.get(data.name) {
-                                if let Some(id_data) = self.arena.get_identifier(name_node) {
-                                    self.interner.intern_string(&id_data.escaped_text)
-                                } else {
-                                    return None;
-                                }
-                            } else {
-                                return None;
-                            }
-                        } else {
-                            return None;
-                        };
+        if list.nodes.is_empty() {
+            return (Vec::new(), f());
+        }
 
-                        // Lower constraint if present (e.g., T extends SomeType)
-                        let constraint = if data.constraint != NodeIndex::NONE {
-                            Some(self.lower_type(data.constraint))
-                        } else {
-                            None
-                        };
+        self.push_type_param_scope();
+        let params = self.collect_type_parameters(list);
+        let result = f();
+        self.pop_type_param_scope();
 
-                        // Lower default if present (e.g., T = DefaultType)
-                        let default = if data.default != NodeIndex::NONE {
-                            Some(self.lower_type(data.default))
-                        } else {
-                            None
-                        };
+        (params, result)
+    }
 
-                        Some(TypeParamInfo {
-                            name,
-                            constraint,
-                            default,
-                        })
-                    })
-                    .collect()
+    fn collect_type_parameters(&self, list: &NodeList) -> Vec<TypeParamInfo> {
+        let mut params = Vec::with_capacity(list.nodes.len());
+        for &idx in &list.nodes {
+            if let Some(info) = self.lower_type_parameter(idx) {
+                let type_id = self.interner.intern(TypeKey::TypeParameter(info.clone()));
+                self.add_type_param_binding(info.name, type_id);
+                params.push(info);
             }
         }
+        params
+    }
+
+    fn lower_type_parameter(&self, node_idx: NodeIndex) -> Option<TypeParamInfo> {
+        let node = self.arena.get(node_idx)?;
+        let data = self.arena.get_type_parameter(node)?;
+
+        let name = self
+            .arena
+            .get(data.name)
+            .and_then(|name_node| self.arena.get_identifier(name_node))
+            .map(|id_data| self.interner.intern_string(&id_data.escaped_text))
+            .unwrap_or_else(|| self.interner.intern_string("T"));
+
+        let constraint = if data.constraint != NodeIndex::NONE {
+            Some(self.lower_type(data.constraint))
+        } else {
+            None
+        };
+
+        let default = if data.default != NodeIndex::NONE {
+            Some(self.lower_type(data.default))
+        } else {
+            None
+        };
+
+        Some(TypeParamInfo {
+            name,
+            constraint,
+            default,
+        })
     }
 
     /// Extract a parameter name if it is an identifier.
@@ -424,28 +475,26 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_function_type(node) {
-            // Lower parameters
-            let params: Vec<ParamInfo> = data.parameters.nodes.iter()
-                .filter_map(|&idx| {
-                    if let Some(param_node) = self.arena.get(idx) {
-                        if let Some(param_data) = self.arena.get_parameter(param_node) {
-                            return Some(ParamInfo {
-                                name: self.lower_parameter_name(param_data.name),
-                                type_id: self.lower_type(param_data.type_annotation),
-                                optional: param_data.question_token,
-                                rest: param_data.dot_dot_dot_token,
-                            });
+            let (type_params, (params, return_type)) = self.with_type_params(&data.type_parameters, || {
+                let params: Vec<ParamInfo> = data.parameters.nodes.iter()
+                    .filter_map(|&idx| {
+                        if let Some(param_node) = self.arena.get(idx) {
+                            if let Some(param_data) = self.arena.get_parameter(param_node) {
+                                return Some(ParamInfo {
+                                    name: self.lower_parameter_name(param_data.name),
+                                    type_id: self.lower_type(param_data.type_annotation),
+                                    optional: param_data.question_token,
+                                    rest: param_data.dot_dot_dot_token,
+                                });
+                            }
                         }
-                    }
-                    None
-                })
-                .collect();
+                        None
+                    })
+                    .collect();
 
-            // Lower return type
-            let return_type = self.lower_type(data.type_annotation);
-
-            // Lower type parameters
-            let type_params = self.lower_type_parameters(&data.type_parameters);
+                let return_type = self.lower_type(data.type_annotation);
+                (params, return_type)
+            });
 
             let shape = FunctionShape {
                 type_params,
@@ -539,9 +588,11 @@ impl<'a> TypeLowering<'a> {
     }
 
     fn lower_call_signature(&self, sig: &SignatureData) -> CallSignature {
-        let params = self.lower_signature_params(sig);
-        let return_type = self.lower_type(sig.type_annotation);
-        let type_params = self.lower_type_parameters(&sig.type_parameters);
+        let (type_params, (params, return_type)) = self.with_type_params(&sig.type_parameters, || {
+            let params = self.lower_signature_params(sig);
+            let return_type = self.lower_type(sig.type_annotation);
+            (params, return_type)
+        });
 
         CallSignature {
             type_params,
@@ -551,9 +602,11 @@ impl<'a> TypeLowering<'a> {
     }
 
     fn lower_method_signature(&self, sig: &SignatureData) -> TypeId {
-        let params = self.lower_signature_params(sig);
-        let return_type = self.lower_type(sig.type_annotation);
-        let type_params = self.lower_type_parameters(&sig.type_parameters);
+        let (type_params, (params, return_type)) = self.with_type_params(&sig.type_parameters, || {
+            let params = self.lower_signature_params(sig);
+            let return_type = self.lower_type(sig.type_annotation);
+            (params, return_type)
+        });
 
         self.interner.function(FunctionShape {
             type_params,
@@ -673,10 +726,15 @@ impl<'a> TypeLowering<'a> {
 
         if let Some(data) = self.arena.get_mapped_type(node) {
             let (type_param, constraint) = self.lower_mapped_type_param(data.type_parameter);
+            self.push_type_param_scope();
+            let type_param_id = self.interner.intern(TypeKey::TypeParameter(type_param.clone()));
+            self.add_type_param_binding(type_param.name, type_param_id);
+            let template = self.lower_type(data.type_node);
+            self.pop_type_param_scope();
             let mapped = MappedType {
                 type_param,
                 constraint,
-                template: self.lower_type(data.type_node),
+                template,
                 readonly_modifier: self.lower_mapped_modifier(data.readonly_token, SyntaxKind::ReadonlyKeyword as u16),
                 optional_modifier: self.lower_mapped_modifier(data.question_token, SyntaxKind::QuestionToken as u16),
             };
@@ -850,6 +908,10 @@ impl<'a> TypeLowering<'a> {
 
         if let Some(data) = self.arena.get_identifier(node) {
             let name = &data.escaped_text;
+
+            if let Some(type_param) = self.lookup_type_param(name) {
+                return type_param;
+            }
 
             if let Some(symbol_id) = self.resolve_symbol(node_idx) {
                 return self.interner.reference(SymbolRef(symbol_id));
@@ -1049,28 +1111,26 @@ impl<'a> TypeLowering<'a> {
 
         // Constructor types use the same data structure as function types
         if let Some(data) = self.arena.get_function_type(node) {
-            // Lower parameters
-            let params: Vec<ParamInfo> = data.parameters.nodes.iter()
-                .filter_map(|&idx| {
-                    if let Some(param_node) = self.arena.get(idx) {
-                        if let Some(param_data) = self.arena.get_parameter(param_node) {
-                            return Some(ParamInfo {
-                                name: self.lower_parameter_name(param_data.name),
-                                type_id: self.lower_type(param_data.type_annotation),
-                                optional: param_data.question_token,
-                                rest: param_data.dot_dot_dot_token,
-                            });
+            let (type_params, (params, return_type)) = self.with_type_params(&data.type_parameters, || {
+                let params: Vec<ParamInfo> = data.parameters.nodes.iter()
+                    .filter_map(|&idx| {
+                        if let Some(param_node) = self.arena.get(idx) {
+                            if let Some(param_data) = self.arena.get_parameter(param_node) {
+                                return Some(ParamInfo {
+                                    name: self.lower_parameter_name(param_data.name),
+                                    type_id: self.lower_type(param_data.type_annotation),
+                                    optional: param_data.question_token,
+                                    rest: param_data.dot_dot_dot_token,
+                                });
+                            }
                         }
-                    }
-                    None
-                })
-                .collect();
+                        None
+                    })
+                    .collect();
 
-            // Lower return type
-            let return_type = self.lower_type(data.type_annotation);
-
-            // Lower type parameters
-            let type_params = self.lower_type_parameters(&data.type_parameters);
+                let return_type = self.lower_type(data.type_annotation);
+                (params, return_type)
+            });
 
             let shape = FunctionShape {
                 type_params,

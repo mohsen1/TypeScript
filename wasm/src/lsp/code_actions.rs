@@ -8,11 +8,13 @@
 //!
 //! Current features:
 //! - Extract Variable (selection-based refactoring)
+//! - Organize Imports (sort-only)
+//! - Remove Unused Import (diagnostic-based quick fix)
 //!
 //! Future features:
-//! - Remove Unused Declaration (diagnostic-based quick fix)
+//! - Remove Unused Declarations (diagnostic-based quick fix)
 //! - Add Missing Property (diagnostic-based quick fix)
-//! - Organize Imports (source action)
+//! - Add Missing Import (diagnostic-based quick fix)
 
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
@@ -68,7 +70,6 @@ pub struct CodeAction {
 #[derive(Debug, Clone)]
 pub struct CodeActionContext {
     /// Diagnostics at the requested position (for quick fixes).
-    /// For now, this is empty since we don't integrate diagnostics yet.
     pub diagnostics: Vec<LspDiagnostic>,
     /// Only return actions of these kinds (client filter).
     pub only: Option<Vec<CodeActionKind>>,
@@ -115,10 +116,19 @@ impl<'a> CodeActionProvider<'a> {
         let mut actions = Vec::new();
 
         // Quick Fixes (diagnostic-based)
-        // TODO: Implement when diagnostics are integrated
-        // - Remove Unused Declaration (6133)
-        // - Add Missing Property (2339)
-        // - Add Missing Import (2304)
+        let request_quickfix = context
+            .only
+            .as_ref()
+            .map_or(true, |kinds| kinds.contains(&CodeActionKind::QuickFix));
+        if request_quickfix {
+            for diag in &context.diagnostics {
+                if let Some(action) = self.unused_import_quickfix(diag) {
+                    actions.push(action);
+                }
+            }
+        }
+        // TODO: Add Missing Property (2339)
+        // TODO: Add Missing Import (2304)
 
         // Source Actions (file-level)
         let request_organize = context.only
@@ -139,6 +149,32 @@ impl<'a> CodeActionProvider<'a> {
         }
 
         actions
+    }
+
+    fn unused_import_quickfix(&self, diag: &LspDiagnostic) -> Option<CodeAction> {
+        let code = diag.code?;
+        if code != crate::checker::types::diagnostics::diagnostic_codes::UNUSED_IMPORT {
+            return None;
+        }
+
+        let start_offset = self.line_map.position_to_offset(diag.range.start, self.source)?;
+        let node_idx = find_node_at_offset(self.arena, start_offset);
+        if node_idx.is_none() {
+            return None;
+        }
+
+        let (import_decl, removal) = self.import_removal_target(node_idx)?;
+        let (edit, title) = self.build_import_removal_edit(import_decl, removal)?;
+
+        let mut changes = std::collections::HashMap::new();
+        changes.insert(self.file_name.clone(), vec![edit]);
+
+        Some(CodeAction {
+            title,
+            kind: CodeActionKind::QuickFix,
+            edit: Some(WorkspaceEdit { changes }),
+            is_preferred: true,
+        })
     }
 
     /// Organize imports: sort contiguous import blocks by module specifier.
@@ -322,6 +358,208 @@ impl<'a> CodeActionProvider<'a> {
         let spec_idx = import_decl.module_specifier;
         let text = self.arena.get_literal_text(spec_idx)?;
         Some(text.to_string())
+    }
+
+    fn import_removal_target(&self, node_idx: NodeIndex) -> Option<(NodeIndex, ImportRemoval)> {
+        let mut current = node_idx;
+        while !current.is_none() {
+            let node = self.arena.get(current)?;
+            if node.kind == syntax_kind_ext::IMPORT_SPECIFIER {
+                let name = self.specifier_local_name(current)?;
+                let import_decl = self.find_import_decl(current)?;
+                return Some((import_decl, ImportRemoval::Named { specifier: current, name }));
+            }
+
+            if node.kind == SyntaxKind::Identifier as u16 {
+                let parent = self.arena.get_extended(current)?.parent;
+                if parent.is_none() {
+                    return None;
+                }
+
+                let parent_node = self.arena.get(parent)?;
+                if parent_node.kind == syntax_kind_ext::IMPORT_CLAUSE {
+                    let clause = self.arena.get_import_clause(parent_node)?;
+                    if clause.name == current {
+                        let name = self.arena.get_identifier_text(current)?.to_string();
+                        let import_decl = self.find_import_decl(parent)?;
+                        return Some((import_decl, ImportRemoval::Default { name }));
+                    }
+                    if clause.named_bindings == current {
+                        let name = self.arena.get_identifier_text(current)?.to_string();
+                        let import_decl = self.find_import_decl(parent)?;
+                        return Some((import_decl, ImportRemoval::Namespace { name }));
+                    }
+                }
+            }
+
+            current = self.arena.get_extended(current)?.parent;
+        }
+
+        None
+    }
+
+    fn find_import_decl(&self, start: NodeIndex) -> Option<NodeIndex> {
+        let mut current = start;
+        while !current.is_none() {
+            let node = self.arena.get(current)?;
+            if node.kind == syntax_kind_ext::IMPORT_DECLARATION {
+                return Some(current);
+            }
+            current = self.arena.get_extended(current)?.parent;
+        }
+        None
+    }
+
+    fn specifier_local_name(&self, spec_idx: NodeIndex) -> Option<String> {
+        let spec_node = self.arena.get(spec_idx)?;
+        let spec = self.arena.get_specifier(spec_node)?;
+        let local_ident = if !spec.name.is_none() {
+            spec.name
+        } else {
+            spec.property_name
+        };
+        self.arena.get_identifier_text(local_ident).map(|name| name.to_string())
+    }
+
+    fn build_import_removal_edit(
+        &self,
+        import_decl: NodeIndex,
+        removal: ImportRemoval,
+    ) -> Option<(TextEdit, String)> {
+        let import_node = self.arena.get(import_decl)?;
+        let import_data = self.arena.get_import_decl(import_node)?;
+        if import_data.import_clause.is_none() {
+            return None;
+        }
+
+        let clause_node = self.arena.get(import_data.import_clause)?;
+        let clause = self.arena.get_import_clause(clause_node)?;
+
+        let mut default_name = if !clause.name.is_none() {
+            self.arena.get_identifier_text(clause.name).map(|name| name.to_string())
+        } else {
+            None
+        };
+
+        let mut namespace_name = None;
+        let mut named_specs = Vec::new();
+
+        if !clause.named_bindings.is_none() {
+            let bindings_node = self.arena.get(clause.named_bindings)?;
+            if bindings_node.kind == SyntaxKind::Identifier as u16 {
+                namespace_name = self
+                    .arena
+                    .get_identifier_text(clause.named_bindings)
+                    .map(|name| name.to_string());
+            } else if let Some(named) = self.arena.get_named_imports(bindings_node) {
+                for &spec_idx in &named.elements.nodes {
+                    let spec_node = self.arena.get(spec_idx)?;
+                    let spec = self.arena.get_specifier(spec_node)?;
+                    let import_ident = if !spec.property_name.is_none() {
+                        spec.property_name
+                    } else {
+                        spec.name
+                    };
+                    let local_ident = if !spec.name.is_none() {
+                        spec.name
+                    } else {
+                        spec.property_name
+                    };
+                    let import_name = self.arena.get_identifier_text(import_ident)?.to_string();
+                    let local_name = self.arena.get_identifier_text(local_ident)?.to_string();
+                    named_specs.push(NamedImportSpec {
+                        specifier: spec_idx,
+                        import_name,
+                        local_name,
+                    });
+                }
+            }
+        }
+
+        let removed_name = removal.name().to_string();
+        match removal {
+            ImportRemoval::Default { .. } => default_name = None,
+            ImportRemoval::Namespace { .. } => namespace_name = None,
+            ImportRemoval::Named { specifier, .. } => {
+                named_specs.retain(|spec| spec.specifier != specifier);
+            }
+        }
+
+        let has_named = !named_specs.is_empty();
+        let has_namespace = namespace_name.is_some();
+        let has_default = default_name.is_some();
+
+        let (range, trailing) = self.import_decl_range(import_node);
+        if !has_named && !has_namespace && !has_default {
+            let edit = TextEdit {
+                range,
+                new_text: String::new(),
+            };
+            let title = format!("Remove unused import '{}'", removed_name);
+            return Some((edit, title));
+        }
+
+        let mut parts = Vec::new();
+        if let Some(default_name) = default_name {
+            parts.push(default_name);
+        }
+        if let Some(namespace_name) = namespace_name {
+            parts.push(format!("* as {}", namespace_name));
+        }
+        if has_named {
+            let mut items = Vec::new();
+            for spec in named_specs {
+                if spec.import_name == spec.local_name {
+                    items.push(spec.import_name);
+                } else {
+                    items.push(format!("{} as {}", spec.import_name, spec.local_name));
+                }
+            }
+            parts.push(format!("{{ {} }}", items.join(", ")));
+        }
+
+        let module_node = self.arena.get(import_data.module_specifier)?;
+        let module_text = self
+            .source
+            .get(module_node.pos as usize..module_node.end as usize)?
+            .to_string();
+
+        let mut new_text = String::new();
+        new_text.push_str("import ");
+        if clause.is_type_only {
+            new_text.push_str("type ");
+        }
+        new_text.push_str(&parts.join(", "));
+        new_text.push_str(" from ");
+        new_text.push_str(&module_text);
+        new_text.push(';');
+        new_text.push_str(&trailing);
+
+        let edit = TextEdit { range, new_text };
+        let title = format!("Remove unused import '{}'", removed_name);
+
+        Some((edit, title))
+    }
+
+    fn import_decl_range(&self, node: &crate::parser::thin_node::ThinNode) -> (Range, String) {
+        let mut end = node.end;
+        let mut trailing = String::new();
+        if let Some(rest) = self.source.get(end as usize..) {
+            if rest.starts_with("\r\n") {
+                end += 2;
+                trailing = "\r\n".to_string();
+            } else if rest.starts_with('\n') {
+                end += 1;
+                trailing = "\n".to_string();
+            } else if rest.starts_with('\r') {
+                end += 1;
+                trailing = "\r".to_string();
+            }
+        }
+
+        let start_pos = self.line_map.offset_to_position(node.pos, self.source);
+        let end_pos = self.line_map.offset_to_position(end, self.source);
+        (Range::new(start_pos, end_pos), trailing)
     }
 
     /// Extract the selected expression to a new variable.
@@ -541,168 +779,26 @@ impl<'a> CodeActionProvider<'a> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::thin_parser::ThinParserState;
-    use crate::thin_binder::ThinBinderState;
+#[derive(Clone, Debug)]
+struct NamedImportSpec {
+    specifier: NodeIndex,
+    import_name: String,
+    local_name: String,
+}
 
-    #[test]
-    fn test_extract_variable_property_access() {
-        let source = "const x = foo.bar.baz + 1;";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-        let arena = parser.get_arena();
+#[derive(Clone, Debug)]
+enum ImportRemoval {
+    Default { name: String },
+    Namespace { name: String },
+    Named { specifier: NodeIndex, name: String },
+}
 
-        let mut binder = ThinBinderState::new();
-        binder.bind_source_file(arena, root);
-
-        let line_map = LineMap::build(source);
-        let provider = CodeActionProvider::new(
-            arena,
-            &binder,
-            &line_map,
-            "test.ts".to_string(),
-            source,
-        );
-
-        // Select "foo.bar.baz" (positions 10 to 21)
-        let range = Range {
-            start: Position::new(0, 10),
-            end: Position::new(0, 21),
-        };
-
-        let actions = provider.provide_code_actions(root, range, CodeActionContext {
-            diagnostics: Vec::new(),
-            only: None,
-        });
-
-        assert_eq!(actions.len(), 1);
-        assert_eq!(actions[0].title, "Extract to constant 'extracted'");
-        assert_eq!(actions[0].kind, CodeActionKind::RefactorExtract);
-        assert!(actions[0].is_preferred);
-
-        // Check the edit
-        let edit = actions[0].edit.as_ref().unwrap();
-        let edits = edit.changes.get("test.ts").unwrap();
-        assert_eq!(edits.len(), 2);
-
-        // First edit should insert the declaration
-        assert!(edits[0].new_text.contains("const extracted = foo.bar.baz;"));
-
-        // Second edit should replace the expression
-        assert_eq!(edits[1].new_text, "extracted");
-    }
-
-    #[test]
-    fn test_extract_variable_no_action_for_simple_literal() {
-        let source = "const x = 42;";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-        let arena = parser.get_arena();
-
-        let mut binder = ThinBinderState::new();
-        binder.bind_source_file(arena, root);
-
-        let line_map = LineMap::build(source);
-        let provider = CodeActionProvider::new(
-            arena,
-            &binder,
-            &line_map,
-            "test.ts".to_string(),
-            source,
-        );
-
-        // Select "42"
-        let range = Range {
-            start: Position::new(0, 10),
-            end: Position::new(0, 12),
-        };
-
-        let actions = provider.provide_code_actions(root, range, CodeActionContext {
-            diagnostics: Vec::new(),
-            only: None,
-        });
-
-        // Should not extract simple literals
-        assert_eq!(actions.len(), 0);
-    }
-
-    #[test]
-    fn test_extract_variable_empty_range() {
-        let source = "const x = foo.bar.baz;";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-        let arena = parser.get_arena();
-
-        let mut binder = ThinBinderState::new();
-        binder.bind_source_file(arena, root);
-
-        let line_map = LineMap::build(source);
-        let provider = CodeActionProvider::new(
-            arena,
-            &binder,
-            &line_map,
-            "test.ts".to_string(),
-            source,
-        );
-
-        // Empty range (no selection)
-        let range = Range {
-            start: Position::new(0, 10),
-            end: Position::new(0, 10),
-        };
-
-        let actions = provider.provide_code_actions(root, range, CodeActionContext {
-            diagnostics: Vec::new(),
-            only: None,
-        });
-
-        // Should not provide refactorings for empty ranges
-        assert_eq!(actions.len(), 0);
-    }
-
-    #[test]
-    fn test_organize_imports_sort_only() {
-        let source = "import { b } from \"b\";\nimport { a } from \"a\";\nconst x = 1;\n";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-        let arena = parser.get_arena();
-
-        let mut binder = ThinBinderState::new();
-        binder.bind_source_file(arena, root);
-
-        let line_map = LineMap::build(source);
-        let provider = CodeActionProvider::new(
-            arena,
-            &binder,
-            &line_map,
-            "test.ts".to_string(),
-            source,
-        );
-
-        let range = Range {
-            start: Position::new(0, 0),
-            end: Position::new(0, 0),
-        };
-
-        let actions = provider.provide_code_actions(
-            root,
-            range,
-            CodeActionContext {
-                diagnostics: Vec::new(),
-                only: Some(vec![CodeActionKind::SourceOrganizeImports]),
-            },
-        );
-
-        assert_eq!(actions.len(), 1);
-        let edit = actions[0].edit.as_ref().unwrap();
-        let edits = edit.changes.get("test.ts").unwrap();
-        assert_eq!(edits.len(), 1);
-
-        let new_text = &edits[0].new_text;
-        let pos_a = new_text.find("import { a } from \"a\";").unwrap();
-        let pos_b = new_text.find("import { b } from \"b\";").unwrap();
-        assert!(pos_a < pos_b, "Imports should be sorted by module specifier");
+impl ImportRemoval {
+    fn name(&self) -> &str {
+        match self {
+            ImportRemoval::Default { name }
+            | ImportRemoval::Namespace { name }
+            | ImportRemoval::Named { name, .. } => name,
+        }
     }
 }

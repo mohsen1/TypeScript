@@ -9,7 +9,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
 **Independence:** MEDIUM - Needs stable TypeKey definitions from Track A. Heavy AST interaction.
 
 ## Current Status
-🟡 **In Progress** - Phase 1/2 lowering tests added; BigInt literal test blocked by parser.
+🟡 **In Progress** - Phase 4 generic parameter scoping/tests added; BigInt literal test blocked by parser.
 
 ## Tasks
 
@@ -46,29 +46,29 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Tuple optional/rest/named elements
 
 ### Phase 3: Function Signatures
-- [ ] Implement function type lowering
+- [x] Implement function type lowering
   - `(x: string) => number` -> TypeKey::Function
   - Store signature: params (Vec<Param>), return type (TypeId)
-- [ ] Handle optional and rest parameters
+- [x] Handle optional and rest parameters
   - `(x?: string)` -> Param { optional: true }
   - `(...args: string[])` -> Param { rest: true, type: Array<string> }
-- [ ] Tests for function types
-  - Test: Simple function signature
-  - Test: Optional parameters
-  - Test: Rest parameters
-  - Test: Overloaded signatures (Vec<Signature>)
+- [x] Tests for function types
+  - [x] Test: Simple function signature
+  - [x] Test: Optional parameters
+  - [x] Test: Rest parameters
+  - [x] Test: Overloaded signatures (Vec<Signature>)
 
 ### Phase 4: Generic Types
-- [ ] Implement type parameter lowering
+- [x] Implement type parameter lowering
   - `<T>` -> create TypeKey::TypeParameter(name: Atom, constraint: Option<TypeId>)
   - `<T extends string>` -> store constraint
-- [ ] Implement generic type references
+- [x] Implement generic type references
   - `Array<T>` where T is a type parameter
   - Track type parameter scope (which generic declaration)
-- [ ] Tests for generics
-  - Test: Generic function declaration
-  - Test: Generic class/interface
-  - Test: Constrained type parameters
+- [x] Tests for generics
+  - [x] Test: Generic function declaration
+  - [x] Test: Generic class/interface
+  - [x] Test: Constrained type parameters
 
 ### Phase 5: Interface Merging & Declaration Spaces
 - [ ] Implement interface merging
