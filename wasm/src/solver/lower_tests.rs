@@ -75,6 +75,38 @@ fn test_lower_literal_bigint_type() {
 }
 
 #[test]
+fn test_lower_literal_negative_number_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = -42;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, -42.0);
+        }
+        _ => panic!("Expected negative number literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_negative_bigint_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = -123n;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "-123");
+        }
+        _ => panic!("Expected negative bigint literal type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_literal_boolean_type() {
     let (arena, type_idx) = parse_type_alias_type_node("type T = true;");
     let interner = TypeInterner::new();

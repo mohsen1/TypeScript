@@ -26,6 +26,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - Test: `"hello"` -> Literal with correct Atom
   - Test: Verify deduplication (same type -> same TypeId)
   - [x] Add BigInt literal type test once `123n` parses in type position
+  - [x] Test: Negative numeric and bigint literal types
 
 ### Phase 2: Complex Type Structures
 - [x] Implement object type lowering
