@@ -59,22 +59,31 @@ fn is_whitespace_single_line(ch: char) -> bool {
     ch == ' ' || ch == '\t' || ch == '\u{000B}' || ch == '\u{000C}'
 }
 
+/// UTF-8 safe helper to get the character at a byte position.
+/// Returns None if pos is out of bounds or not on a char boundary.
+fn char_at(text: &str, pos: usize) -> Option<char> {
+    if pos >= text.len() {
+        return None;
+    }
+    text[pos..].chars().next()
+}
+
 /// Get trailing comments starting at a position in the source text.
 /// Trailing comments are comments that appear on the same line after a token,
 /// before a newline.
 pub fn get_trailing_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
     let mut comments = Vec::new();
-    let bytes = text.as_bytes();
-    let len = bytes.len();
+    let len = text.len();
     let mut i = pos;
 
     // Scan for trailing comments (on the same line, before newline)
     while i < len {
-        let ch = bytes[i] as char;
+        let ch = char_at(text, i).unwrap_or('\0');
+        let char_len = ch.len_utf8();
 
         // Skip whitespace (but not newlines)
         if is_whitespace_single_line(ch) {
-            i += 1;
+            i += char_len;
             continue;
         }
 
@@ -83,38 +92,43 @@ pub fn get_trailing_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> 
             break;
         }
 
-        // Check for comment start
+        // Check for comment start (/ is ASCII, safe to check byte directly)
         if ch == '/' && i + 1 < len {
-            let next_ch = bytes[i + 1] as char;
+            let next_byte = text.as_bytes()[i + 1];
 
-            if next_ch == '/' {
+            if next_byte == b'/' {
                 // Single-line comment: // ...
                 let start = i;
                 i += 2;
-                while i < len && !is_line_break(bytes[i] as char) {
-                    i += 1;
+                while i < len {
+                    let c = char_at(text, i).unwrap_or('\0');
+                    if is_line_break(c) {
+                        break;
+                    }
+                    i += c.len_utf8();
                 }
                 comments.push(CommentRange {
                     pos: start as u32,
                     end: i as u32,
                     kind: CommentKind::SingleLine,
-                    has_trailing_newline: i < len && is_line_break(bytes[i] as char),
+                    has_trailing_newline: i < len && is_line_break(char_at(text, i).unwrap_or('\0')),
                 });
                 continue;
-            } else if next_ch == '*' {
+            } else if next_byte == b'*' {
                 // Multi-line comment: /* ... */
                 let start = i;
                 i += 2;
                 let mut has_newline = false;
                 while i + 1 < len {
-                    if bytes[i] as char == '*' && bytes[i + 1] as char == '/' {
+                    let c = char_at(text, i).unwrap_or('\0');
+                    if c == '*' && text.as_bytes()[i + 1] == b'/' {
                         i += 2;
                         break;
                     }
-                    if is_line_break(bytes[i] as char) {
+                    if is_line_break(c) {
                         has_newline = true;
                     }
-                    i += 1;
+                    i += c.len_utf8();
                 }
                 // For trailing comments, we stop after the first multi-line comment
                 // if it spans multiple lines
@@ -143,33 +157,38 @@ pub fn get_trailing_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> 
 /// potentially on preceding lines.
 pub fn get_leading_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
     let mut comments = Vec::new();
-    let bytes = text.as_bytes();
+    let len = text.len();
     let mut i = pos;
 
     // Skip shebang at the start of file
-    if i == 0 && bytes.len() >= 2 && bytes[0] == b'#' && bytes[1] == b'!' {
-        while i < bytes.len() && !is_line_break(bytes[i] as char) {
-            i += 1;
+    if i == 0 && len >= 2 && text.as_bytes()[0] == b'#' && text.as_bytes()[1] == b'!' {
+        while i < len {
+            let c = char_at(text, i).unwrap_or('\0');
+            if is_line_break(c) {
+                break;
+            }
+            i += c.len_utf8();
         }
     }
 
     // Scan for leading comments
     let mut pending: Option<CommentRange> = None;
 
-    while i < bytes.len() {
-        let ch = bytes[i] as char;
+    while i < len {
+        let ch = char_at(text, i).unwrap_or('\0');
+        let char_len = ch.len_utf8();
 
         // Skip whitespace
         if is_whitespace_single_line(ch) {
-            i += 1;
+            i += char_len;
             continue;
         }
 
         // Handle newlines - they mark comment boundaries
         if is_line_break(ch) {
-            i += 1;
+            i += char_len;
             // Skip \r\n as a single newline
-            if ch == '\r' && i < bytes.len() && bytes[i] == b'\n' {
+            if ch == '\r' && i < len && text.as_bytes()[i] == b'\n' {
                 i += 1;
             }
             if let Some(mut p) = pending.take() {
@@ -179,11 +198,11 @@ pub fn get_leading_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
             continue;
         }
 
-        // Check for comment start
-        if ch == '/' && i + 1 < bytes.len() {
-            let next_ch = bytes[i + 1] as char;
+        // Check for comment start (/ is ASCII, safe to check byte directly)
+        if ch == '/' && i + 1 < len {
+            let next_byte = text.as_bytes()[i + 1];
 
-            if next_ch == '/' {
+            if next_byte == b'/' {
                 // Emit any pending comment first
                 if let Some(p) = pending.take() {
                     comments.push(p);
@@ -191,8 +210,12 @@ pub fn get_leading_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
                 // Single-line comment
                 let start = i;
                 i += 2;
-                while i < bytes.len() && !is_line_break(bytes[i] as char) {
-                    i += 1;
+                while i < len {
+                    let c = char_at(text, i).unwrap_or('\0');
+                    if is_line_break(c) {
+                        break;
+                    }
+                    i += c.len_utf8();
                 }
                 pending = Some(CommentRange {
                     pos: start as u32,
@@ -201,7 +224,7 @@ pub fn get_leading_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
                     has_trailing_newline: false,
                 });
                 continue;
-            } else if next_ch == '*' {
+            } else if next_byte == b'*' {
                 // Emit any pending comment first
                 if let Some(p) = pending.take() {
                     comments.push(p);
@@ -209,12 +232,13 @@ pub fn get_leading_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
                 // Multi-line comment
                 let start = i;
                 i += 2;
-                while i + 1 < bytes.len() {
-                    if bytes[i] == b'*' && bytes[i + 1] == b'/' {
+                while i + 1 < len {
+                    if text.as_bytes()[i] == b'*' && text.as_bytes()[i + 1] == b'/' {
                         i += 2;
                         break;
                     }
-                    i += 1;
+                    let c = char_at(text, i).unwrap_or('\0');
+                    i += c.len_utf8();
                 }
                 pending = Some(CommentRange {
                     pos: start as u32,
@@ -3823,20 +3847,18 @@ impl<'a> ThinPrinter<'a> {
             self.ctx.module_state.has_export_assignment = true;
         }
 
-        // CommonJS preamble
-        if self.ctx.is_commonjs() {
-            self.emit_commonjs_preamble(&source.statements);
-        }
-
-        // Check if any class extends another - if so, emit __extends helper
-        if self.ctx.target_es5 && self.needs_extends_helper(&source.statements) {
-            self.emit_extends_helper();
-        }
-
-        // Extract all comments once at the start (if not removing comments)
+        // Extract and filter comments (strip compiler directives)
         let all_comments = if !self.ctx.options.remove_comments {
             if let Some(text) = self.source_text {
                 crate::comments::get_comment_ranges(text)
+                    .into_iter()
+                    .filter(|c| {
+                        // Filter out triple-slash directives (/// <reference ..., /// <amd ...)
+                        // TypeScript strips these from JS output
+                        let content = c.get_text(text);
+                        !content.starts_with("/// <reference") && !content.starts_with("/// <amd")
+                    })
+                    .collect()
             } else {
                 Vec::new()
             }
@@ -3846,6 +3868,65 @@ impl<'a> ThinPrinter<'a> {
 
         let mut comment_idx = 0;
 
+        // Emit header comments BEFORE "use strict" (license headers, etc.)
+        let first_stmt_pos = source.statements.nodes.first()
+            .and_then(|&idx| self.arena.get(idx))
+            .map(|n| n.pos)
+            .unwrap_or(node.end);
+
+        if let Some(text) = self.source_text {
+            while comment_idx < all_comments.len() {
+                let comment = &all_comments[comment_idx];
+                if comment.end <= first_stmt_pos {
+                    let comment_text = comment.get_text(text);
+                    self.write(comment_text);
+                    if comment.has_trailing_new_line {
+                        self.write_line();
+                    }
+                    comment_idx += 1;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        // CommonJS: Emit "use strict" after header comments
+        if self.ctx.is_commonjs() {
+            self.write("\"use strict\";");
+            self.write_line();
+        }
+
+        // CommonJS: Emit __esModule and exports initialization
+        if self.ctx.is_commonjs() {
+            use crate::transforms::module_commonjs;
+
+            // Emit __esModule if this is an ES module
+            if self.should_emit_es_module_marker(&source.statements) {
+                self.write("Object.defineProperty(exports, \"__esModule\", { value: true });");
+                self.write_line();
+            }
+
+            // Collect and emit exports initialization
+            let export_names = module_commonjs::collect_export_names(self.arena, &source.statements.nodes);
+            if !export_names.is_empty() {
+                for (i, name) in export_names.iter().enumerate() {
+                    if i > 0 {
+                        self.write(" = ");
+                    }
+                    self.write("exports.");
+                    self.write(name);
+                }
+                self.write(" = void 0;");
+                self.write_line();
+            }
+        }
+
+        // Check if any class extends another - if so, emit __extends helper
+        if self.ctx.target_es5 && self.needs_extends_helper(&source.statements) {
+            self.emit_extends_helper();
+        }
+
+        // Emit statements with their comments
         for &stmt_idx in &source.statements.nodes {
             if let Some(stmt_node) = self.arena.get(stmt_idx) {
                 // Emit any comments that appear before this statement
@@ -3874,6 +3955,19 @@ impl<'a> ThinPrinter<'a> {
             // Only add newline if something was actually emitted
             if self.writer.len() > before_len {
                 self.write_line();
+            }
+        }
+
+        // Emit remaining trailing comments at the end of file
+        if let Some(text) = self.source_text {
+            while comment_idx < all_comments.len() {
+                let comment = &all_comments[comment_idx];
+                let comment_text = comment.get_text(text);
+                self.write(comment_text);
+                if comment.has_trailing_new_line {
+                    self.write_line();
+                }
+                comment_idx += 1;
             }
         }
     }
