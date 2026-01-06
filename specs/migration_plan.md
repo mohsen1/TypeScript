@@ -23,6 +23,13 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Accessor body checks in ambient contexts (1183)
 - ✅ Error 1248: const keyword on class members (moved from parser to checker)
 - ✅ Error 2322: accessor type compatibility (getter return ⊆ setter param)
+- ✅ Error 2511: abstract union type detection (type_contains_abstract_class)
+
+## Checker Refactoring (see specs/REFACTOR_CHECKER.md)
+- ⬜ Split ThinCheckerState into Context + specialized Checkers (expr, stmt, decl)
+- ⬜ Move expression type computation to solver/operations.rs
+- ⬜ Use NodeView API instead of raw arena lookups
+- ⬜ Deprecate checker/types in favor of solver/types
 
 ## Code Cleanup
 - ✅ Deleted ~35k lines of dead code (old fat-node parser, emitter, checker, services)
@@ -74,6 +81,11 @@ see SESSION_LOG.md -- always amended with each session's work
 This catches design issues early and ensures consistent code quality.
 
 ### Next Steps
+
+
+#### First thing first, priority 0: Clean up the spatting
+
+see `specs/REFACTOR_CHECKER.md`. Write up a todo and clean up according to this plan
 
 **Type Checking (25 failing tests)**
 1. ✅ Export assignment validation (2309, 2304)
