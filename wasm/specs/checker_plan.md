@@ -63,6 +63,15 @@ Our focus is to make wasm checker complete
     - Allows proper detection of readonly property assignments on class instances
     - Test test_abstractPropertyNegative_errors now passes
     - All 625 tests pass
+- 🔄 Implement namespace member checking (error 2694) (IN PROGRESS)
+    - ✅ Added exports/members fields to Symbol struct
+    - ✅ Updated ThinBinder to persist symbol tables when exiting module/class scopes
+    - ✅ Implemented qualified name resolution (A.B syntax)
+    - ✅ Added error reporting for TS2694
+    - ✅ Added get_qualified_name getter to ThinNodeArena
+    - ⏳ TODO: Debug namespace export capture (exports not being populated correctly)
+    - ⏳ TODO: Handle import aliases (`import x = ns.member`)
+    - All 627 tests pass
 - ⬜ Various missing error codes (see test failures)
 - ✅ Fix tuple subtyping logic (CRITICAL - COMPLETED)
     - Fixed: Now properly rejects `[number, string]` as subtype of `[number]`

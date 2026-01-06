@@ -2109,6 +2109,18 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get qualified name data (A.B syntax).
+    /// Returns None if node is not a qualified name or has no data.
+    #[inline]
+    pub fn get_qualified_name(&self, node: &ThinNode) -> Option<&QualifiedNameData> {
+        use super::syntax_kind_ext::QUALIFIED_NAME;
+        if node.has_data() && node.kind == QUALIFIED_NAME {
+            self.qualified_names.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Get literal expression data (array or object literal).
     /// Returns None if node is not a literal expression or has no data.
     #[inline]

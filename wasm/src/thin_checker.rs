@@ -328,6 +328,13 @@ impl<'a> ThinCheckerState<'a> {
 
         let type_name_idx = type_ref.type_name;
 
+        // Check if type_name is a qualified name (A.B)
+        if let Some(name_node) = self.ctx.arena.get(type_name_idx) {
+            if name_node.kind == syntax_kind_ext::QUALIFIED_NAME {
+                return self.resolve_qualified_name(type_name_idx);
+            }
+        }
+
         // Get the identifier for the type name
         if let Some(name_node) = self.ctx.arena.get(type_name_idx) {
             if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
@@ -377,6 +384,96 @@ impl<'a> ThinCheckerState<'a> {
                     }
                 }
             }
+        }
+
+        TypeId::ANY
+    }
+
+    /// Resolve a qualified name (A.B) to a type.
+    /// Returns the type of the rightmost member, or reports TS2694 if not found.
+    fn resolve_qualified_name(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        let Some(qn) = self.ctx.arena.get_qualified_name(node) else {
+            return TypeId::ANY;
+        };
+
+        // Resolve the left side (could be Identifier or another QualifiedName)
+        let left_type = if let Some(left_node) = self.ctx.arena.get(qn.left) {
+            if left_node.kind == syntax_kind_ext::QUALIFIED_NAME {
+                self.resolve_qualified_name(qn.left)
+            } else if left_node.kind == SyntaxKind::Identifier as u16 {
+                // Resolve identifier as a type reference
+                self.get_type_from_type_reference_by_name(qn.left)
+            } else {
+                TypeId::ANY
+            }
+        } else {
+            TypeId::ANY
+        };
+
+        if left_type == TypeId::ANY || left_type == TypeId::ERROR {
+            return TypeId::ANY;
+        }
+
+        // Get the right side name (B in A.B)
+        let right_name = if let Some(right_node) = self.ctx.arena.get(qn.right) {
+            if let Some(id) = self.ctx.arena.get_identifier(right_node) {
+                id.escaped_text.clone()
+            } else {
+                return TypeId::ANY;
+            }
+        } else {
+            return TypeId::ANY;
+        };
+
+        // Look up the member in the left side's exports
+        if let Some(crate::solver::TypeKey::Ref(crate::solver::SymbolRef(sym_id))) = self.ctx.types.lookup(left_type) {
+            if let Some(symbol) = self.ctx.binder.get_symbol(crate::binder::SymbolId(sym_id)) {
+                // Check exports table
+                if let Some(ref exports) = symbol.exports {
+                    if let Some(member_sym_id) = exports.get(&right_name) {
+                        return self.get_type_of_symbol(member_sym_id);
+                    }
+                }
+
+                // Not found - report TS2694
+                self.error_namespace_no_export(&symbol.escaped_name, &right_name, qn.right);
+                return TypeId::ERROR;
+            }
+        }
+
+        // Left side wasn't a reference to a namespace/module
+        TypeId::ANY
+    }
+
+    /// Helper to resolve an identifier as a type reference (for qualified name left sides).
+    fn get_type_from_type_reference_by_name(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        if let Some(ident) = self.ctx.arena.get_identifier(node) {
+            let name = &ident.escaped_text;
+
+            // Check local scopes
+            if let Some(type_id) = self.lookup_local(name) {
+                return type_id;
+            }
+            // Check file locals
+            if let Some(sym_id) = self.ctx.binder.file_locals.get(name) {
+                return self.get_type_of_symbol(sym_id);
+            }
+            // Check all symbols
+            if let Some(sym_id) = self.ctx.binder.get_symbols().find_by_name(name) {
+                return self.get_type_of_symbol(sym_id);
+            }
+
+            // Not found
+            self.error_cannot_find_name_at(name, idx);
+            return TypeId::ERROR;
         }
 
         TypeId::ANY
@@ -2208,6 +2305,22 @@ impl<'a> ThinCheckerState<'a> {
             );
             let diag = builder.readonly_property(prop_name, loc.start, loc.length());
             self.ctx.diagnostics.push(diag.to_checker_diagnostic(&self.ctx.file_name));
+        }
+    }
+
+    /// Report TS2694: Namespace has no exported member.
+    pub fn error_namespace_no_export(&mut self, namespace_name: &str, member_name: &str, idx: NodeIndex) {
+        if let Some(loc) = self.get_source_location(idx) {
+            let message = format!("Namespace '{}' has no exported member '{}'.", namespace_name, member_name);
+            self.ctx.diagnostics.push(Diagnostic {
+                code: 2694,
+                category: DiagnosticCategory::Error,
+                message_text: message,
+                start: loc.start,
+                length: loc.length(),
+                file: self.ctx.file_name.clone(),
+                related_information: Vec::new(),
+            });
         }
     }
 
