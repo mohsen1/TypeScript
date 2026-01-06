@@ -85,13 +85,13 @@ This catches design issues early and ensures consistent code quality.
 
 ### Next Steps
 
-⚠️ **PRIORITY 0: Checker Architecture Cleanup**
+⚠️ **PRIORITY 0: Checker Architecture Cleanup** (Partially Complete)
 
-Before adding more features, clean up the checker architecture per `specs/REFACTOR_CHECKER.md`:
-1. Refactor ThinCheckerState to use CheckerContext
-2. Move expression type computation to solver
-3. Use NodeView API consistently
-4. This will make future type checking work easier
+Clean up the checker architecture per `specs/REFACTOR_CHECKER.md`:
+1. ✅ Refactor ThinCheckerState to use CheckerContext (wraps `ctx: CheckerContext<'a>`)
+2. 🔄 Move expression type computation to solver (incremental, as features are added)
+3. 🔄 Use NodeView API consistently (incremental, as code is touched)
+4. ⬜ Create specialized checker modules (expressions.rs, statements.rs, declarations.rs)
 
 **Type Checking (16 failing tests in sample)**
 1. ✅ Export assignment validation (2309, 2304)
