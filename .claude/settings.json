@@ -18,18 +18,5 @@
       "Bash(dd if=/dev/zero:*)"
     ],
     "ask": []
-  },
-  "hooks": {
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "sleep 60 && echo 'Continue with tasks in plan' >&2; exit 2"
-          }
-        ]
-      }
-    ]
   }
 }
