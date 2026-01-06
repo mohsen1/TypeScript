@@ -72,13 +72,13 @@ fn test_object_subtyping() {
 
     // { x: number }
     let obj_x = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
 
     // { x: number, y: string }
     let obj_xy = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ]);
 
     // Object with more properties is subtype
@@ -188,13 +188,13 @@ fn test_ref_to_object_resolution() {
 
     // Create an object type: { x: number }
     let obj_x = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
 
     // Create a Ref that resolves to { x: number, y: string }
     let obj_xy = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ]);
 
     let ref_type = interner.reference(SymbolRef(100));
@@ -482,6 +482,7 @@ fn test_number_index_signature_numeric_property() {
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
+            is_method: false,
         },
     ]);
 
@@ -515,6 +516,7 @@ fn test_number_index_signature_type_mismatch() {
             type_id: TypeId::NUMBER,
             optional: false,
             readonly: false,
+            is_method: false,
         },
     ]);
 
@@ -548,18 +550,21 @@ fn test_number_index_signature_multiple_numeric_props() {
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
+            is_method: false,
         },
         PropertyInfo {
             name: interner.intern_string("1"),
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
+            is_method: false,
         },
         PropertyInfo {
             name: interner.intern_string("2"),
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
+            is_method: false,
         },
     ]);
 
@@ -593,12 +598,14 @@ fn test_number_and_string_index_signatures() {
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
+            is_method: false,
         },
         PropertyInfo {
             name: interner.intern_string("foo"),
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
+            is_method: false,
         },
     ]);
 

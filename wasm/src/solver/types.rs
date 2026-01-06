@@ -213,6 +213,7 @@ pub struct PropertyInfo {
     pub type_id: TypeId,
     pub optional: bool,
     pub readonly: bool,
+    pub is_method: bool,
 }
 
 /// Index signature information for object types

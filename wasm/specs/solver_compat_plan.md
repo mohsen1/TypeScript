@@ -94,6 +94,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Treat optional properties as `T | undefined` by default (exactOptionalPropertyTypes off)
 - [x] Tests for optional property assignability and index signature interactions
 
+### Phase 11: Method Bivariance
+- [x] Mark method signatures and apply bivariant parameter checks regardless of strictFunctionTypes
+- [x] Tests for method vs function property variance
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

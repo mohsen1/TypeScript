@@ -1127,12 +1127,10 @@ impl Project {
             let Some(export) = arena.get_export_decl(stmt_node) else { continue; };
 
             if export.is_default_export {
-                if self.default_export_matches(file, export.export_clause, export_name) {
-                    matches.push(ExportMatch {
-                        kind: ImportCandidateKind::Default,
-                        is_type_only: export.is_type_only,
-                    });
-                }
+                matches.push(ExportMatch {
+                    kind: ImportCandidateKind::Default,
+                    is_type_only: export.is_type_only,
+                });
                 continue;
             }
 
@@ -1154,6 +1152,12 @@ impl Project {
                             spec.property_name
                         };
                         let Some(export_text) = arena.get_identifier_text(export_ident) else { continue; };
+                        if export_text == "default" {
+                            matches.push(ExportMatch {
+                                kind: ImportCandidateKind::Default,
+                                is_type_only: export.is_type_only || spec.is_type_only,
+                            });
+                        }
                         if export_text != export_name {
                             continue;
                         }
@@ -1216,6 +1220,12 @@ impl Project {
                         spec.property_name
                     };
                     let Some(export_text) = arena.get_identifier_text(export_ident) else { continue; };
+                    if export_text == "default" {
+                        matches.push(ExportMatch {
+                            kind: ImportCandidateKind::Default,
+                            is_type_only: export.is_type_only || spec.is_type_only,
+                        });
+                    }
                     if export_text != export_name {
                         continue;
                     }
@@ -1253,35 +1263,6 @@ impl Project {
         self.matching_exports_in_file(file_name, export_name, visited)
             .iter()
             .any(|export_match| matches!(export_match.kind, ImportCandidateKind::Named { .. }))
-    }
-
-    fn default_export_matches(
-        &self,
-        file: &ProjectFile,
-        export_clause: NodeIndex,
-        export_name: &str,
-    ) -> bool {
-        if export_clause.is_none() {
-            return false;
-        }
-
-        let arena = file.arena();
-        let Some(node) = arena.get(export_clause) else { return false; };
-
-        match node.kind {
-            k if k == SyntaxKind::Identifier as u16 => arena
-                .get_identifier_text(export_clause)
-                .map_or(false, |name| name == export_name),
-            k if k == syntax_kind_ext::FUNCTION_DECLARATION => arena
-                .get_function(node)
-                .and_then(|func| arena.get_identifier_text(func.name))
-                .map_or(false, |name| name == export_name),
-            k if k == syntax_kind_ext::CLASS_DECLARATION => arena
-                .get_class(node)
-                .and_then(|class| arena.get_identifier_text(class.name))
-                .map_or(false, |name| name == export_name),
-            _ => false,
-        }
     }
 
     fn identifier_at_range(&self, file: &ProjectFile, range: Range) -> Option<String> {

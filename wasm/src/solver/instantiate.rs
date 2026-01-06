@@ -212,6 +212,7 @@ impl<'a> TypeInstantiator<'a> {
                         type_id: self.instantiate(p.type_id),
                         optional: p.optional,
                         readonly: p.readonly,
+                        is_method: p.is_method,
                     })
                     .collect();
                 self.interner.object(instantiated)
@@ -225,6 +226,7 @@ impl<'a> TypeInstantiator<'a> {
                         type_id: self.instantiate(p.type_id),
                         optional: p.optional,
                         readonly: p.readonly,
+                        is_method: p.is_method,
                     })
                     .collect();
                 let instantiated_string_idx = shape.string_index.as_ref().map(|idx| IndexSignature {
@@ -288,6 +290,7 @@ impl<'a> TypeInstantiator<'a> {
                         type_id: self.instantiate(p.type_id),
                         optional: p.optional,
                         readonly: p.readonly,
+                        is_method: p.is_method,
                     })
                     .collect();
 

@@ -1067,8 +1067,8 @@ fn test_contextual_typing_for_object_properties() {
     use std::sync::Arc;
 
     let obj_type = types.object(vec![
-        PropertyInfo { name: types.intern_string("name"), type_id: TypeId::STRING, optional: false, readonly: false },
-        PropertyInfo { name: types.intern_string("age"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: types.intern_string("name"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: types.intern_string("age"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
 
     // Create contextual context
@@ -1090,7 +1090,7 @@ fn test_strict_null_checks_property_access() {
 
     // Create object type: { x: number }
     let obj_type = types.object(vec![
-        PropertyInfo { name: types.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: types.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
 
     // Create union type: { x: number } | null
@@ -1121,7 +1121,7 @@ fn test_strict_null_checks_undefined_type() {
 
     // Create object type: { y: string }
     let obj_type = types.object(vec![
-        PropertyInfo { name: types.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: types.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ]);
 
     // Create union type: { y: string } | undefined
@@ -1150,7 +1150,7 @@ fn test_strict_null_checks_both_null_and_undefined() {
 
     // Create object type: { z: boolean }
     let obj_type = types.object(vec![
-        PropertyInfo { name: types.intern_string("z"), type_id: TypeId::BOOLEAN, optional: false, readonly: false },
+        PropertyInfo { name: types.intern_string("z"), type_id: TypeId::BOOLEAN, optional: false, readonly: false, is_method: false },
     ]);
 
     // Create union type: { z: boolean } | null | undefined
@@ -1187,7 +1187,7 @@ fn test_strict_null_checks_non_nullable_success() {
 
     // Create object type: { x: number }
     let obj_type = types.object(vec![
-        PropertyInfo { name: types.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: types.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
 
     let evaluator = PropertyAccessEvaluator::new(&types);

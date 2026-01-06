@@ -745,7 +745,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     // Property exists, check type compatibility
                     let source_type = self.optional_property_type(sp);
                     let target_type = self.optional_property_type(t_prop);
-                    if !self.check_subtype(source_type, target_type).is_true() {
+                    if !self
+                        .check_subtype_with_method_variance(source_type, target_type, t_prop.is_method)
+                        .is_true()
+                    {
                         return SubtypeResult::False;
                     }
                 }
@@ -882,6 +885,38 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::True;
         }
         self.check_subtype(source_return, target_return)
+    }
+
+    fn check_subtype_with_method_variance(
+        &mut self,
+        source: TypeId,
+        target: TypeId,
+        allow_bivariant: bool,
+    ) -> SubtypeResult {
+        if !allow_bivariant {
+            return self.check_subtype(source, target);
+        }
+        let prev = self.strict_function_types;
+        self.strict_function_types = false;
+        let result = self.check_subtype(source, target);
+        self.strict_function_types = prev;
+        result
+    }
+
+    fn explain_failure_with_method_variance(
+        &mut self,
+        source: TypeId,
+        target: TypeId,
+        allow_bivariant: bool,
+    ) -> Option<SubtypeFailureReason> {
+        if !allow_bivariant {
+            return self.explain_failure(source, target);
+        }
+        let prev = self.strict_function_types;
+        self.strict_function_types = false;
+        let result = self.explain_failure(source, target);
+        self.strict_function_types = prev;
+        result
     }
 
     fn optional_property_type(&self, prop: &PropertyInfo) -> TypeId {
@@ -1432,9 +1467,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     // Check property type compatibility
                     let source_type = self.optional_property_type(sp);
                     let target_type = self.optional_property_type(t_prop);
-                    if !self.check_subtype(source_type, target_type).is_true() {
+                    if !self
+                        .check_subtype_with_method_variance(source_type, target_type, t_prop.is_method)
+                        .is_true()
+                    {
                         // Recursively explain the nested failure
-                        let nested = self.explain_failure(source_type, target_type);
+                        let nested =
+                            self.explain_failure_with_method_variance(source_type, target_type, t_prop.is_method);
                         let prop_name_str = self.interner.resolve_atom(t_prop.name);
                         return Some(SubtypeFailureReason::PropertyTypeMismatch {
                             property_name: std::sync::Arc::from(prop_name_str.as_str()),
