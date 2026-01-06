@@ -14,15 +14,17 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 Our focus is to make wasm emitter complete
 
 - ⏳ Split `emit_node` into modules - structure ready, splitting deferred until needed
-- ⏳ CommonJS exports - **IN PROGRESS** (~11 tests)
+- ✅ CommonJS exports - **COMPLETED**
   - ✅ Added `__esModule` marker (correctly excludes `export =` cases)
   - ✅ Added enum and namespace support to export collection
   - ✅ Fixed `exports.X = void 0;` initialization emission
     - Root cause: Parser wraps exports in EXPORT_DECLARATION nodes
     - collect_export_names now checks export_clause field
-  - ⬜ **REMAINING**: Suppress `exports.X = X;` when file has `export =`
-    - Currently emits both `exports.C = void 0;` AND `exports.C = C;`
-    - Should only emit initialization when `export =` present
+  - ✅ Suppress `exports.X = X;` when file has `export =`
+    - Added has_export_assignment flag to ModuleTransformState
+    - Detect and set flag in emit_source_file
+    - Check flag in emit_export_declaration_commonjs and declaration emitters
+    - Now correctly emits only initialization when `export =` present
 - ⬜ Comment preservation in emit - ~3 tests
 - ⬜ Parse error tolerance (some tests skipped) - ~2 tests
 - ... add more tasks (Ask Gemini when needed)
