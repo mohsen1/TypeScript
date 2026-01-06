@@ -1434,7 +1434,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
 
         // Check parameter count
-        if source.params.len() > target.params.len() {
+        let target_has_rest = target.params.last().map_or(false, |p| p.rest);
+        let source_has_rest = source.params.last().map_or(false, |p| p.rest);
+        if source.params.len() > target.params.len() && !target_has_rest {
             return Some(SubtypeFailureReason::TooManyParameters {
                 source_count: source.params.len(),
                 target_count: target.params.len(),
@@ -1442,14 +1444,59 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
 
         // Check parameter types
-        for (i, s_param) in source.params.iter().enumerate() {
-            if let Some(t_param) = target.params.get(i) {
-                // Check parameter compatibility (contravariant in strict mode, bivariant in legacy)
-                if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
+        let target_fixed_count = if target_has_rest {
+            target.params.len().saturating_sub(1)
+        } else {
+            target.params.len()
+        };
+        let source_fixed_count = if source_has_rest {
+            source.params.len().saturating_sub(1)
+        } else {
+            source.params.len()
+        };
+        let fixed_compare_count = std::cmp::min(source_fixed_count, target_fixed_count);
+        for i in 0..fixed_compare_count {
+            let s_param = &source.params[i];
+            let t_param = &target.params[i];
+            // Check parameter compatibility (contravariant in strict mode, bivariant in legacy)
+            if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
+                return Some(SubtypeFailureReason::ParameterTypeMismatch {
+                    param_index: i,
+                    source_param: s_param.type_id,
+                    target_param: t_param.type_id,
+                });
+            }
+        }
+
+        if target_has_rest {
+            let rest_param = target.params.last().unwrap();
+            let rest_elem_type = self.get_array_element_type(rest_param.type_id);
+            let rest_is_top = self.allow_bivariant_rest
+                && (rest_elem_type == TypeId::ANY || rest_elem_type == TypeId::UNKNOWN);
+
+            if rest_is_top {
+                return None;
+            }
+
+            for i in target_fixed_count..source_fixed_count {
+                let s_param = &source.params[i];
+                if !self.are_parameters_compatible(s_param.type_id, rest_elem_type) {
                     return Some(SubtypeFailureReason::ParameterTypeMismatch {
                         param_index: i,
                         source_param: s_param.type_id,
-                        target_param: t_param.type_id,
+                        target_param: rest_elem_type,
+                    });
+                }
+            }
+
+            if source_has_rest {
+                let s_rest_param = source.params.last().unwrap();
+                let s_rest_elem = self.get_array_element_type(s_rest_param.type_id);
+                if !self.are_parameters_compatible(s_rest_elem, rest_elem_type) {
+                    return Some(SubtypeFailureReason::ParameterTypeMismatch {
+                        param_index: source_fixed_count,
+                        source_param: s_rest_elem,
+                        target_param: rest_elem_type,
                     });
                 }
             }

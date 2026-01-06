@@ -392,3 +392,89 @@ fn test_rest_any_still_checks_return_type() {
 
     assert!(!checker.is_assignable(source, target));
 }
+
+#[test]
+fn test_explain_failure_skips_rest_unknown() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    checker.set_strict_function_types(true);
+
+    let rest_unknown = interner.array(TypeId::UNKNOWN);
+    let target = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: rest_unknown,
+            optional: false,
+            rest: true,
+        }],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let source = interner.function(FunctionShape {
+        params: vec![
+            ParamInfo {
+                name: None,
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: None,
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+        ],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    assert!(checker.explain_failure(source, target).is_none());
+}
+
+#[test]
+fn test_explain_failure_reports_rest_mismatch() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let rest_number = interner.array(TypeId::NUMBER);
+    let target = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: rest_number,
+            optional: false,
+            rest: true,
+        }],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let source = interner.function(FunctionShape {
+        params: vec![
+            ParamInfo {
+                name: None,
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: None,
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+        ],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    assert!(matches!(
+        checker.explain_failure(source, target),
+        Some(SubtypeFailureReason::ParameterTypeMismatch { .. })
+    ));
+}

@@ -266,6 +266,38 @@ fn parse_type_literal(source: &str) -> (ThinNodeArena, crate::parser::base::Node
     panic!("Could not find type literal in parsed AST");
 }
 
+/// Helper to parse interface declarations by name.
+fn parse_interface_declarations(source: &str, name: &str) -> (ThinNodeArena, Vec<NodeIndex>) {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        source.to_string(),
+    );
+    let _root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let arena = std::mem::take(&mut parser.arena);
+    let mut declarations = Vec::new();
+    for i in 0..arena.len() {
+        let idx = crate::parser::base::NodeIndex(i as u32);
+        if let Some(node) = arena.get(idx) {
+            if node.kind == syntax_kind_ext::INTERFACE_DECLARATION {
+                if let Some(interface) = arena.get_interface(node) {
+                    if let Some(name_node) = arena.get(interface.name) {
+                        if let Some(ident) = arena.get_identifier(name_node) {
+                            if ident.escaped_text == name {
+                                declarations.push(idx);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    assert!(!declarations.is_empty(), "Could not find interface '{}'", name);
+    (arena, declarations)
+}
+
 #[test]
 fn test_lower_function_type_with_type_parameter() {
     // Parse: type F = <T>(x: T) => T
@@ -866,5 +898,93 @@ fn test_lower_type_literal_index_signature() {
             assert_eq!(string_index.value_type, TypeId::NUMBER);
         }
         _ => panic!("Expected ObjectWithIndex type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_interface_merges_properties() {
+    let source = "interface Foo { a: string; } interface Foo { b?: number; }";
+    let (arena, declarations) = parse_interface_declarations(source, "Foo");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_interface_declarations(&declarations);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Object(properties) => {
+            let mut found_a = None;
+            let mut found_b = None;
+            for prop in &properties {
+                match interner.resolve_atom(prop.name).as_str() {
+                    "a" => found_a = Some(prop),
+                    "b" => found_b = Some(prop),
+                    _ => {}
+                }
+            }
+
+            let a = found_a.expect("Expected property a");
+            let b = found_b.expect("Expected property b");
+            assert_eq!(a.type_id, TypeId::STRING);
+            assert!(!a.optional);
+            assert_eq!(b.type_id, TypeId::NUMBER);
+            assert!(b.optional);
+        }
+        _ => panic!("Expected Object type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_interface_conflicting_property_types() {
+    let source = "interface Foo { a: string; } interface Foo { a: number; }";
+    let (arena, declarations) = parse_interface_declarations(source, "Foo");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_interface_declarations(&declarations);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Object(properties) => {
+            let prop = properties
+                .iter()
+                .find(|prop| interner.resolve_atom(prop.name) == "a")
+                .expect("Expected property a");
+            assert_eq!(prop.type_id, TypeId::ERROR);
+        }
+        _ => panic!("Expected Object type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_interface_method_overload_accumulates() {
+    let source = "interface Foo { bar(x: string): number; } interface Foo { bar(x: number): string; }";
+    let (arena, declarations) = parse_interface_declarations(source, "Foo");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_interface_declarations(&declarations);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Object(properties) => {
+            let prop = properties
+                .iter()
+                .find(|prop| interner.resolve_atom(prop.name) == "bar")
+                .expect("Expected property bar");
+            let prop_key = interner.lookup(prop.type_id).expect("Type should exist");
+            match prop_key {
+                TypeKey::Callable(callable) => {
+                    assert_eq!(callable.call_signatures.len(), 2);
+                    let mut combos: Vec<(TypeId, TypeId)> = callable.call_signatures.iter()
+                        .map(|sig| (sig.params[0].type_id, sig.return_type))
+                        .collect();
+                    combos.sort_by_key(|(param, _)| param.0);
+                    assert_eq!(
+                        combos,
+                        vec![(TypeId::NUMBER, TypeId::STRING), (TypeId::STRING, TypeId::NUMBER)]
+                    );
+                }
+                _ => panic!("Expected Callable type, got {:?}", prop_key),
+            }
+        }
+        _ => panic!("Expected Object type, got {:?}", key),
     }
 }

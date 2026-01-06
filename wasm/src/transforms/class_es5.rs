@@ -1330,6 +1330,24 @@ impl<'a> ClassES5Emitter<'a> {
             k if k == syntax_kind_ext::WHILE_STATEMENT => {
                 self.emit_while_statement(stmt_idx);
             }
+            k if k == syntax_kind_ext::DO_STATEMENT => {
+                self.emit_do_statement(stmt_idx);
+            }
+            k if k == syntax_kind_ext::SWITCH_STATEMENT => {
+                self.emit_switch_statement(stmt_idx);
+            }
+            k if k == syntax_kind_ext::CASE_CLAUSE => {
+                self.emit_case_clause(stmt_idx);
+            }
+            k if k == syntax_kind_ext::DEFAULT_CLAUSE => {
+                self.emit_default_clause(stmt_idx);
+            }
+            k if k == syntax_kind_ext::BREAK_STATEMENT => {
+                self.emit_break_statement(stmt_idx);
+            }
+            k if k == syntax_kind_ext::CONTINUE_STATEMENT => {
+                self.emit_continue_statement(stmt_idx);
+            }
             k if k == syntax_kind_ext::THROW_STATEMENT => {
                 self.emit_throw_statement(stmt_idx);
             }
@@ -1568,6 +1586,113 @@ impl<'a> ClassES5Emitter<'a> {
         self.emit_expression(while_stmt.condition);
         self.write(") ");
         self.emit_statement(while_stmt.statement);
+    }
+
+    fn emit_do_statement(&mut self, stmt_idx: NodeIndex) {
+        let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
+        let Some(loop_stmt) = self.arena.get_loop(stmt_node) else { return };
+
+        self.write("do ");
+        self.emit_statement(loop_stmt.statement);
+        self.write(" while (");
+        self.emit_expression(loop_stmt.condition);
+        self.write(");");
+    }
+
+    fn emit_switch_statement(&mut self, stmt_idx: NodeIndex) {
+        let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
+        let Some(switch_stmt) = self.arena.get_switch(stmt_node) else { return };
+
+        self.write("switch (");
+        self.emit_expression(switch_stmt.expression);
+        self.write(") {");
+        self.write_line();
+        self.increase_indent();
+
+        if let Some(case_block_node) = self.arena.get(switch_stmt.case_block) {
+            if let Some(case_block) = self.arena.blocks.get(case_block_node.data_index as usize) {
+                for &clause_idx in &case_block.statements.nodes {
+                    self.write_indent();
+                    if let Some(clause_node) = self.arena.get(clause_idx) {
+                        if clause_node.kind == syntax_kind_ext::CASE_CLAUSE {
+                            self.emit_case_clause(clause_idx);
+                        } else if clause_node.kind == syntax_kind_ext::DEFAULT_CLAUSE {
+                            self.emit_default_clause(clause_idx);
+                        }
+                    }
+                }
+            }
+        }
+
+        self.decrease_indent();
+        self.write_indent();
+        self.write("}");
+    }
+
+    fn emit_case_clause(&mut self, stmt_idx: NodeIndex) {
+        let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
+        let Some(case_clause) = self.arena.get_case_clause(stmt_node) else { return };
+
+        self.write("case ");
+        self.emit_expression(case_clause.expression);
+        self.write(":");
+        self.write_line();
+        self.increase_indent();
+
+        for &case_stmt_idx in &case_clause.statements.nodes {
+            self.write_indent();
+            self.emit_statement(case_stmt_idx);
+            self.write_line();
+        }
+
+        self.decrease_indent();
+    }
+
+    fn emit_default_clause(&mut self, stmt_idx: NodeIndex) {
+        let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
+        let Some(case_clause) = self.arena.get_case_clause(stmt_node) else { return };
+
+        self.write("default:");
+        self.write_line();
+        self.increase_indent();
+
+        for &case_stmt_idx in &case_clause.statements.nodes {
+            self.write_indent();
+            self.emit_statement(case_stmt_idx);
+            self.write_line();
+        }
+
+        self.decrease_indent();
+    }
+
+    fn emit_break_statement(&mut self, stmt_idx: NodeIndex) {
+        self.emit_jump_statement(stmt_idx, "break");
+    }
+
+    fn emit_continue_statement(&mut self, stmt_idx: NodeIndex) {
+        self.emit_jump_statement(stmt_idx, "continue");
+    }
+
+    fn emit_jump_statement(&mut self, stmt_idx: NodeIndex, keyword: &str) {
+        self.write(keyword);
+        if let Some(label) = self.get_jump_label(stmt_idx) {
+            self.write(" ");
+            self.write(&label);
+        }
+        self.write(";");
+    }
+
+    fn get_jump_label(&self, stmt_idx: NodeIndex) -> Option<String> {
+        let Some(node) = self.arena.get(stmt_idx) else { return None };
+        if !node.has_data() {
+            return None;
+        }
+        let jump = self.arena.jump_data.get(node.data_index as usize)?;
+        if jump.label.is_none() {
+            None
+        } else {
+            Some(self.get_identifier_text(jump.label))
+        }
     }
     
     fn emit_try_statement(&mut self, stmt_idx: NodeIndex) {

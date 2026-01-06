@@ -10,6 +10,7 @@
 //! - Extract Variable (selection-based refactoring)
 //! - Organize Imports (sort-only)
 //! - Remove Unused Import (diagnostic-based quick fix)
+//! - Add Missing Property (diagnostic-based quick fix, local declarations)
 //!
 //! Future features:
 //! - Remove Unused Declarations (diagnostic-based quick fix)
@@ -125,9 +126,11 @@ impl<'a> CodeActionProvider<'a> {
                 if let Some(action) = self.unused_import_quickfix(diag) {
                     actions.push(action);
                 }
+                if let Some(action) = self.missing_property_quickfix(diag) {
+                    actions.push(action);
+                }
             }
         }
-        // TODO: Add Missing Property (2339)
         // TODO: Add Missing Import (2304)
 
         // Source Actions (file-level)
@@ -174,6 +177,69 @@ impl<'a> CodeActionProvider<'a> {
             kind: CodeActionKind::QuickFix,
             edit: Some(WorkspaceEdit { changes }),
             is_preferred: true,
+        })
+    }
+
+    fn missing_property_quickfix(&self, diag: &LspDiagnostic) -> Option<CodeAction> {
+        let code = diag.code?;
+        if code != crate::checker::types::diagnostics::diagnostic_codes::PROPERTY_DOES_NOT_EXIST_ON_TYPE {
+            return None;
+        }
+
+        let start_offset = self.line_map.position_to_offset(diag.range.start, self.source)?;
+        let node_idx = find_node_at_offset(self.arena, start_offset);
+        if node_idx.is_none() {
+            return None;
+        }
+
+        let info = self.property_access_info(node_idx)?;
+        let target_node = self.arena.get(info.target)?;
+
+        let (edits, title) = if target_node.kind == SyntaxKind::ThisKeyword as u16 {
+            let edits = self.class_property_edits(info.access_node, &info.property_name)?;
+            let title = format!("Add property '{}' to class", info.property_name);
+            (edits, title)
+        } else if target_node.kind == SyntaxKind::Identifier as u16 {
+            let symbol_id = self.binder.resolve_identifier(self.arena, info.target)?;
+            let symbol = self.binder.symbols.get(symbol_id)?;
+            let mut result = None;
+
+            for &decl_idx in &symbol.declarations {
+                let decl_node = self.arena.get(decl_idx)?;
+                if decl_node.kind != syntax_kind_ext::VARIABLE_DECLARATION {
+                    continue;
+                }
+
+                let decl = self.arena.get_variable_declaration(decl_node)?;
+                if decl.initializer.is_none() {
+                    continue;
+                }
+
+                let init_node = self.arena.get(decl.initializer)?;
+                if init_node.kind != syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                    continue;
+                }
+
+                let literal = self.arena.get_literal_expr(init_node)?;
+                let edits = self.object_literal_property_edits(init_node, literal, &info.property_name)?;
+                let title = format!("Add property '{}' to object literal", info.property_name);
+                result = Some((edits, title));
+                break;
+            }
+
+            result?
+        } else {
+            return None;
+        };
+
+        let mut changes = std::collections::HashMap::new();
+        changes.insert(self.file_name.clone(), edits);
+
+        Some(CodeAction {
+            title,
+            kind: CodeActionKind::QuickFix,
+            edit: Some(WorkspaceEdit { changes }),
+            is_preferred: false,
         })
     }
 
@@ -568,6 +634,210 @@ impl<'a> CodeActionProvider<'a> {
         (Range::new(start_pos, end_pos), trailing)
     }
 
+    fn property_access_info(&self, node_idx: NodeIndex) -> Option<PropertyAccessInfo> {
+        let mut current = node_idx;
+        while !current.is_none() {
+            let node = self.arena.get(current)?;
+            if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+                let access = self.arena.get_access_expr(node)?;
+                let name_node = self.arena.get(access.name_or_argument)?;
+                if name_node.kind != SyntaxKind::Identifier as u16 {
+                    return None;
+                }
+                let property_name = self.arena.get_identifier_text(access.name_or_argument)?.to_string();
+                return Some(PropertyAccessInfo {
+                    access_node: current,
+                    target: access.expression,
+                    property_name,
+                });
+            }
+            current = self.arena.get_extended(current)?.parent;
+        }
+
+        None
+    }
+
+    fn object_literal_property_edits(
+        &self,
+        object_node: &crate::parser::thin_node::ThinNode,
+        literal: &crate::parser::thin_node::LiteralExprData,
+        property_name: &str,
+    ) -> Option<Vec<TextEdit>> {
+        let close_offset = self.find_closing_brace_offset(object_node)?;
+        let open_pos = self.line_map.offset_to_position(object_node.pos, self.source);
+        let close_pos = self.line_map.offset_to_position(close_offset, self.source);
+        let is_single_line = open_pos.line == close_pos.line;
+
+        let mut edits = Vec::new();
+        let elements = &literal.elements.nodes;
+
+        if is_single_line {
+            let mut insert_offset = close_offset;
+            while insert_offset > object_node.pos {
+                let idx = (insert_offset - 1) as usize;
+                let ch = *self.source.as_bytes().get(idx)?;
+                if !ch.is_ascii_whitespace() {
+                    break;
+                }
+                insert_offset -= 1;
+            }
+            let had_trailing_ws = insert_offset != close_offset;
+            let trailing_space = if had_trailing_ws { "" } else { " " };
+            let prefix = if elements.is_empty() { " " } else { ", " };
+            let new_text = format!("{}{}: undefined{}", prefix, property_name, trailing_space);
+            let insert_pos = self.line_map.offset_to_position(insert_offset, self.source);
+            edits.push(TextEdit {
+                range: Range::new(insert_pos, insert_pos),
+                new_text,
+            });
+            return Some(edits);
+        }
+
+        let close_line_start = self.line_map.line_start(close_pos.line as usize)?;
+        let close_indent = self.indent_at_offset(close_line_start);
+        let prop_indent = if let Some(&first) = elements.first() {
+            let first_node = self.arena.get(first)?;
+            self.indent_at_offset(first_node.pos)
+        } else {
+            let indent_unit = self.indent_unit_from(&close_indent);
+            format!("{}{}", close_indent, indent_unit)
+        };
+
+        if let Some(&last) = elements.last() {
+            let last_node = self.arena.get(last)?;
+            let between = self.source.get(last_node.end as usize..close_offset as usize)?;
+            let trimmed = between.trim_start();
+            if trimmed.contains("//") || trimmed.contains("/*") {
+                return None;
+            }
+            let had_trailing_comma = trimmed.starts_with(',');
+            if !had_trailing_comma {
+                let last_pos = self.line_map.offset_to_position(last_node.end, self.source);
+                edits.push(TextEdit {
+                    range: Range::new(last_pos, last_pos),
+                    new_text: ",".to_string(),
+                });
+            }
+
+            let mut line = String::new();
+            line.push_str(&prop_indent);
+            line.push_str(property_name);
+            line.push_str(": undefined");
+            if had_trailing_comma {
+                line.push(',');
+            }
+            line.push('\n');
+
+            let insert_pos = self.line_map.offset_to_position(close_line_start, self.source);
+            edits.push(TextEdit {
+                range: Range::new(insert_pos, insert_pos),
+                new_text: line,
+            });
+            return Some(edits);
+        }
+
+        let mut line = String::new();
+        line.push_str(&prop_indent);
+        line.push_str(property_name);
+        line.push_str(": undefined\n");
+        let insert_pos = self.line_map.offset_to_position(close_line_start, self.source);
+        edits.push(TextEdit {
+            range: Range::new(insert_pos, insert_pos),
+            new_text: line,
+        });
+
+        Some(edits)
+    }
+
+    fn class_property_edits(&self, node_idx: NodeIndex, property_name: &str) -> Option<Vec<TextEdit>> {
+        let class_idx = self.find_enclosing_class(node_idx)?;
+        let class_node = self.arena.get(class_idx)?;
+        let class_data = self.arena.get_class(class_node)?;
+
+        let close_offset = self.find_closing_brace_offset(class_node)?;
+        let open_pos = self.line_map.offset_to_position(class_node.pos, self.source);
+        let close_pos = self.line_map.offset_to_position(close_offset, self.source);
+        let is_single_line = open_pos.line == close_pos.line;
+
+        let mut edits = Vec::new();
+        if is_single_line {
+            let mut insert_offset = close_offset;
+            while insert_offset > class_node.pos {
+                let idx = (insert_offset - 1) as usize;
+                let ch = *self.source.as_bytes().get(idx)?;
+                if !ch.is_ascii_whitespace() {
+                    break;
+                }
+                insert_offset -= 1;
+            }
+            let had_trailing_ws = insert_offset != close_offset;
+            let trailing_space = if had_trailing_ws { "" } else { " " };
+            let new_text = format!(" {}: any;{}", property_name, trailing_space);
+            let insert_pos = self.line_map.offset_to_position(insert_offset, self.source);
+            edits.push(TextEdit {
+                range: Range::new(insert_pos, insert_pos),
+                new_text,
+            });
+            return Some(edits);
+        }
+
+        let close_line_start = self.line_map.line_start(close_pos.line as usize)?;
+        let close_indent = self.indent_at_offset(close_line_start);
+        let prop_indent = if let Some(&first) = class_data.members.nodes.first() {
+            let first_node = self.arena.get(first)?;
+            self.indent_at_offset(first_node.pos)
+        } else {
+            let indent_unit = self.indent_unit_from(&close_indent);
+            format!("{}{}", close_indent, indent_unit)
+        };
+
+        let mut line = String::new();
+        line.push_str(&prop_indent);
+        line.push_str(property_name);
+        line.push_str(": any;\n");
+
+        let insert_pos = self.line_map.offset_to_position(close_line_start, self.source);
+        edits.push(TextEdit {
+            range: Range::new(insert_pos, insert_pos),
+            new_text: line,
+        });
+
+        Some(edits)
+    }
+
+    fn find_enclosing_class(&self, node_idx: NodeIndex) -> Option<NodeIndex> {
+        let mut current = node_idx;
+        while !current.is_none() {
+            let node = self.arena.get(current)?;
+            if node.kind == syntax_kind_ext::CLASS_DECLARATION
+                || node.kind == syntax_kind_ext::CLASS_EXPRESSION
+            {
+                return Some(current);
+            }
+            current = self.arena.get_extended(current)?.parent;
+        }
+        None
+    }
+
+    fn find_closing_brace_offset(&self, node: &crate::parser::thin_node::ThinNode) -> Option<u32> {
+        let slice = self.source.get(node.pos as usize..node.end as usize)?;
+        let rel = slice.rfind('}')?;
+        Some(node.pos + rel as u32)
+    }
+
+    fn indent_at_offset(&self, offset: u32) -> String {
+        let pos = self.line_map.offset_to_position(offset, self.source);
+        self.get_indentation_at_position(&Position::new(pos.line, 0))
+    }
+
+    fn indent_unit_from(&self, base_indent: &str) -> &str {
+        if base_indent.contains('\t') {
+            "\t"
+        } else {
+            "  "
+        }
+    }
+
     /// Extract the selected expression to a new variable.
     ///
     /// Example: Selecting `foo.bar.baz` produces:
@@ -791,6 +1061,13 @@ struct NamedImportSpec {
     import_name: String,
     local_name: String,
     is_type_only: bool,
+}
+
+#[derive(Clone, Debug)]
+struct PropertyAccessInfo {
+    access_node: NodeIndex,
+    target: NodeIndex,
+    property_name: String,
 }
 
 #[derive(Clone, Debug)]
