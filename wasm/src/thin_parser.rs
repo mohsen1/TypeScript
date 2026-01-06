@@ -6378,14 +6378,11 @@ impl ThinParserState {
         if self.parse_optional(SyntaxKind::DotDotDotToken) {
             let element_type = self.parse_type();
             let end_pos = self.token_end();
-            return self.arena.add_type_operator(
+            return self.arena.add_wrapped_type(
                 syntax_kind_ext::REST_TYPE,
                 start_pos,
                 end_pos,
-                crate::parser::thin_node::TypeOperatorData {
-                    operator: SyntaxKind::DotDotDotToken as u16,
-                    type_node: element_type,
-                },
+                crate::parser::thin_node::WrappedTypeData { type_node: element_type },
             );
         }
 
@@ -6420,14 +6417,11 @@ impl ThinParserState {
         // Check for optional marker: T?
         if self.parse_optional(SyntaxKind::QuestionToken) {
             let end_pos = self.token_end();
-            return self.arena.add_type_operator(
+            return self.arena.add_wrapped_type(
                 syntax_kind_ext::OPTIONAL_TYPE,
                 start_pos,
                 end_pos,
-                crate::parser::thin_node::TypeOperatorData {
-                    operator: SyntaxKind::QuestionToken as u16,
-                    type_node,
-                },
+                crate::parser::thin_node::WrappedTypeData { type_node },
             );
         }
 
