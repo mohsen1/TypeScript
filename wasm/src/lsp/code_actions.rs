@@ -311,12 +311,12 @@ impl<'a> CodeActionProvider<'a> {
             if candidate.local_name != missing_name {
                 continue;
             }
-            let Some(edit) = self.build_import_edit(root, candidate) else {
+            let Some(edits) = self.build_import_edit(root, candidate) else {
                 continue;
             };
 
             let mut changes = std::collections::HashMap::new();
-            changes.insert(self.file_name.clone(), vec![edit]);
+            changes.insert(self.file_name.clone(), edits);
 
             let title = format!(
                 "Import '{}' from '{}'",
@@ -737,7 +737,13 @@ impl<'a> CodeActionProvider<'a> {
         self.arena.get_identifier_text(node_idx).map(|text| text.to_string())
     }
 
-    fn build_import_edit(&self, root: NodeIndex, candidate: &ImportCandidate) -> Option<TextEdit> {
+    fn build_import_edit(&self, root: NodeIndex, candidate: &ImportCandidate) -> Option<Vec<TextEdit>> {
+        match self.try_merge_named_import(root, candidate) {
+            MergeNamedImport::Edits(edits) => return Some(edits),
+            MergeNamedImport::AlreadyImported => return None,
+            MergeNamedImport::NoMatch => {}
+        }
+
         let (insert_pos, needs_newline) = self.import_insertion_point(root)?;
         let mut new_text = String::new();
         if needs_newline {
@@ -772,10 +778,263 @@ impl<'a> CodeActionProvider<'a> {
         new_text.push_str(&candidate.module_specifier);
         new_text.push_str("\";\n");
 
-        Some(TextEdit {
+        Some(vec![TextEdit {
             range: Range::new(insert_pos, insert_pos),
             new_text,
-        })
+        }])
+    }
+
+    fn try_merge_named_import(&self, root: NodeIndex, candidate: &ImportCandidate) -> MergeNamedImport {
+        let ImportCandidateKind::Named { .. } = &candidate.kind else {
+            return MergeNamedImport::NoMatch;
+        };
+
+        let Some(root_node) = self.arena.get(root) else {
+            return MergeNamedImport::NoMatch;
+        };
+        let Some(source_file) = self.arena.get_source_file(root_node) else {
+            return MergeNamedImport::NoMatch;
+        };
+
+        let mut default_target = None;
+
+        for &stmt_idx in &source_file.statements.nodes {
+            let Some(stmt_node) = self.arena.get(stmt_idx) else { continue; };
+            if stmt_node.kind != syntax_kind_ext::IMPORT_DECLARATION {
+                continue;
+            }
+
+            let Some(import_decl) = self.arena.get_import_decl(stmt_node) else { continue; };
+            if import_decl.import_clause.is_none() {
+                continue;
+            }
+
+            let Some(module_text) = self.arena.get_literal_text(import_decl.module_specifier) else {
+                continue;
+            };
+            if module_text != candidate.module_specifier {
+                continue;
+            }
+
+            let Some(clause_node) = self.arena.get(import_decl.import_clause) else { continue; };
+            let Some(clause) = self.arena.get_import_clause(clause_node) else { continue; };
+            if clause.is_type_only && !candidate.is_type_only {
+                continue;
+            }
+
+            if !clause.named_bindings.is_none() {
+                let bindings_idx = clause.named_bindings;
+                let Some(bindings_node) = self.arena.get(bindings_idx) else { continue; };
+                if bindings_node.kind == SyntaxKind::Identifier as u16 {
+                    continue;
+                }
+
+                if let Some(named) = self.arena.get_named_imports(bindings_node) {
+                    if self.named_imports_has_local_name(named, &candidate.local_name) {
+                        return MergeNamedImport::AlreadyImported;
+                    }
+                    let Some(spec_text) = self.named_import_spec_text(candidate, clause.is_type_only) else {
+                        return MergeNamedImport::NoMatch;
+                    };
+                    if let Some(edits) = self.build_named_import_insertion_edits(bindings_idx, named, &spec_text) {
+                        return MergeNamedImport::Edits(edits);
+                    }
+                    return MergeNamedImport::NoMatch;
+                }
+            } else {
+                default_target = Some(stmt_idx);
+            }
+        }
+
+        if let Some(import_idx) = default_target {
+            if let Some(edit) = self.build_default_import_named_edit(import_idx, candidate) {
+                return MergeNamedImport::Edits(vec![edit]);
+            }
+        }
+
+        MergeNamedImport::NoMatch
+    }
+
+    fn named_imports_has_local_name(
+        &self,
+        named: &crate::parser::thin_node::NamedImportsData,
+        local_name: &str,
+    ) -> bool {
+        for &spec_idx in &named.elements.nodes {
+            let Some(spec_node) = self.arena.get(spec_idx) else { continue; };
+            let Some(spec) = self.arena.get_specifier(spec_node) else { continue; };
+            let local_ident = if !spec.name.is_none() {
+                spec.name
+            } else {
+                spec.property_name
+            };
+            if let Some(name) = self.arena.get_identifier_text(local_ident) {
+                if name == local_name {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    fn named_import_spec_text(
+        &self,
+        candidate: &ImportCandidate,
+        clause_is_type_only: bool,
+    ) -> Option<String> {
+        let ImportCandidateKind::Named { export_name } = &candidate.kind else {
+            return None;
+        };
+
+        let mut text = String::new();
+        if candidate.is_type_only && !clause_is_type_only {
+            text.push_str("type ");
+        }
+        if export_name == &candidate.local_name {
+            text.push_str(export_name);
+        } else {
+            text.push_str(&format!("{} as {}", export_name, candidate.local_name));
+        }
+
+        Some(text)
+    }
+
+    fn build_named_import_insertion_edits(
+        &self,
+        named_idx: NodeIndex,
+        named: &crate::parser::thin_node::NamedImportsData,
+        spec_text: &str,
+    ) -> Option<Vec<TextEdit>> {
+        let named_node = self.arena.get(named_idx)?;
+        let close_offset = self.find_closing_brace_offset(named_node)?;
+        let open_pos = self.line_map.offset_to_position(named_node.pos, self.source);
+        let close_pos = self.line_map.offset_to_position(close_offset, self.source);
+        let is_single_line = open_pos.line == close_pos.line;
+        let elements = &named.elements.nodes;
+
+        if is_single_line {
+            let mut insert_offset = close_offset;
+            while insert_offset > named_node.pos {
+                let idx = (insert_offset - 1) as usize;
+                let ch = *self.source.as_bytes().get(idx)?;
+                if !ch.is_ascii_whitespace() {
+                    break;
+                }
+                insert_offset -= 1;
+            }
+            let had_trailing_ws = insert_offset != close_offset;
+            let trailing_space = if had_trailing_ws { "" } else { " " };
+            let prefix = if elements.is_empty() { " " } else { ", " };
+            let new_text = format!("{}{}{}", prefix, spec_text, trailing_space);
+            let insert_pos = self.line_map.offset_to_position(insert_offset, self.source);
+            return Some(vec![TextEdit {
+                range: Range::new(insert_pos, insert_pos),
+                new_text,
+            }]);
+        }
+
+        let close_line_start = self.line_map.line_start(close_pos.line as usize)?;
+        let close_indent = self.indent_at_offset(close_line_start);
+        let spec_indent = if let Some(&first) = elements.first() {
+            let first_node = self.arena.get(first)?;
+            self.indent_at_offset(first_node.pos)
+        } else {
+            let indent_unit = self.indent_unit_from(&close_indent);
+            format!("{}{}", close_indent, indent_unit)
+        };
+
+        if let Some(&last) = elements.last() {
+            let last_node = self.arena.get(last)?;
+            let between = self.source.get(last_node.end as usize..close_offset as usize)?;
+            let trimmed = between.trim_start();
+            if trimmed.contains("//") || trimmed.contains("/*") {
+                return None;
+            }
+            let had_trailing_comma = trimmed.starts_with(',');
+            let mut edits = Vec::new();
+            if !had_trailing_comma {
+                let last_pos = self.line_map.offset_to_position(last_node.end, self.source);
+                edits.push(TextEdit {
+                    range: Range::new(last_pos, last_pos),
+                    new_text: ",".to_string(),
+                });
+            }
+
+            let mut line = String::new();
+            line.push_str(&spec_indent);
+            line.push_str(spec_text);
+            if had_trailing_comma {
+                line.push(',');
+            }
+            line.push('\n');
+
+            let insert_pos = self.line_map.offset_to_position(close_line_start, self.source);
+            edits.push(TextEdit {
+                range: Range::new(insert_pos, insert_pos),
+                new_text: line,
+            });
+            return Some(edits);
+        }
+
+        let mut line = String::new();
+        line.push_str(&spec_indent);
+        line.push_str(spec_text);
+        line.push('\n');
+        let insert_pos = self.line_map.offset_to_position(close_line_start, self.source);
+        Some(vec![TextEdit {
+            range: Range::new(insert_pos, insert_pos),
+            new_text: line,
+        }])
+    }
+
+    fn build_default_import_named_edit(
+        &self,
+        import_idx: NodeIndex,
+        candidate: &ImportCandidate,
+    ) -> Option<TextEdit> {
+        let ImportCandidateKind::Named { .. } = &candidate.kind else {
+            return None;
+        };
+        let import_node = self.arena.get(import_idx)?;
+        let import_data = self.arena.get_import_decl(import_node)?;
+        if import_data.import_clause.is_none() {
+            return None;
+        }
+
+        let clause_node = self.arena.get(import_data.import_clause)?;
+        let clause = self.arena.get_import_clause(clause_node)?;
+        if clause.name.is_none() || !clause.named_bindings.is_none() {
+            return None;
+        }
+        if clause.is_type_only && !candidate.is_type_only {
+            return None;
+        }
+
+        let default_name = self.arena.get_identifier_text(clause.name)?.to_string();
+        let spec_text = self.named_import_spec_text(candidate, clause.is_type_only)?;
+
+        let module_node = self.arena.get(import_data.module_specifier)?;
+        let module_text = self
+            .source
+            .get(module_node.pos as usize..module_node.end as usize)?
+            .to_string();
+
+        let (range, trailing) = self.import_decl_range(import_node);
+        let mut new_text = String::new();
+        new_text.push_str("import ");
+        if clause.is_type_only {
+            new_text.push_str("type ");
+        }
+        new_text.push_str(&default_name);
+        new_text.push_str(", { ");
+        new_text.push_str(&spec_text);
+        new_text.push_str(" } from ");
+        new_text.push_str(&module_text);
+        new_text.push(';');
+        new_text.push_str(&trailing);
+
+        Some(TextEdit { range, new_text })
     }
 
     fn import_insertion_point(&self, root: NodeIndex) -> Option<(Position, bool)> {
@@ -1243,6 +1502,13 @@ enum ImportRemoval {
     Default { name: String },
     Namespace { name: String },
     Named { specifier: NodeIndex, name: String },
+}
+
+#[derive(Clone, Debug)]
+enum MergeNamedImport {
+    Edits(Vec<TextEdit>),
+    AlreadyImported,
+    NoMatch,
 }
 
 impl ImportRemoval {

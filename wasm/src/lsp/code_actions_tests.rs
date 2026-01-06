@@ -665,6 +665,165 @@ fn test_quickfix_add_missing_import_after_existing_import() {
 }
 
 #[test]
+fn test_quickfix_add_missing_import_merge_named_same_module() {
+    let source = "import { bar } from \"./foo\";\nfoo();\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "foo");
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Error),
+        code: Some(CANNOT_FIND_NAME),
+        source: None,
+        message: "Cannot find name 'foo'.".to_string(),
+        related_information: None,
+    };
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: vec![ImportCandidate::named(
+                "./foo".to_string(),
+                "foo".to_string(),
+                "foo".to_string(),
+            )],
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    let updated = apply_text_edits(source, &line_map, edits);
+    assert_eq!(updated, "import { bar, foo } from \"./foo\";\nfoo();\n");
+}
+
+#[test]
+fn test_quickfix_add_missing_import_merge_named_multiline() {
+    let source = "import {\n  bar\n} from \"./foo\";\nfoo();\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "foo");
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Error),
+        code: Some(CANNOT_FIND_NAME),
+        source: None,
+        message: "Cannot find name 'foo'.".to_string(),
+        related_information: None,
+    };
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: vec![ImportCandidate::named(
+                "./foo".to_string(),
+                "foo".to_string(),
+                "foo".to_string(),
+            )],
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    let updated = apply_text_edits(source, &line_map, edits);
+    assert_eq!(
+        updated,
+        "import {\n  bar,\n  foo\n} from \"./foo\";\nfoo();\n"
+    );
+}
+
+#[test]
+fn test_quickfix_add_missing_import_merge_named_with_default() {
+    let source = "import Foo from \"./foo\";\nbar();\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "bar");
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Error),
+        code: Some(CANNOT_FIND_NAME),
+        source: None,
+        message: "Cannot find name 'bar'.".to_string(),
+        related_information: None,
+    };
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: vec![ImportCandidate::named(
+                "./foo".to_string(),
+                "bar".to_string(),
+                "bar".to_string(),
+            )],
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    let updated = apply_text_edits(source, &line_map, edits);
+    assert_eq!(updated, "import Foo, { bar } from \"./foo\";\nbar();\n");
+}
+
+#[test]
 fn test_quickfix_add_missing_import_default() {
     let source = "Foo();\n";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
