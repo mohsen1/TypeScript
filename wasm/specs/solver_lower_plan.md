@@ -9,7 +9,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
 **Independence:** MEDIUM - Needs stable TypeKey definitions from Track A. Heavy AST interaction.
 
 ## Current Status
-🟡 **In Progress** - Declaration space separation complete; comprehensive tests expanded; continuing with additional polish.
+🟡 **In Progress** - Declaration space separation complete; comprehensive tests expanded; typeof value queries supported.
 
 ## Tasks
 
@@ -98,6 +98,8 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Lowering full source file
   - [x] Test: Cross-module type references
   - [x] Test: Circular type references (handle gracefully)
+  - [x] Test: typeof value references in interfaces (qualified and unqualified)
+- [x] Parser: fix interface member parsing to track progress by token position (avoid skipping consecutive identifiers)
 
 ## Architecture Notes
 - All strings MUST go through interner.intern_string() -> Atom

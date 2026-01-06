@@ -2420,9 +2420,10 @@ impl ThinParserState {
     fn parse_type_members(&mut self) -> NodeList {
         let mut members = Vec::new();
 
-        while !self.is_token(SyntaxKind::CloseBraceToken) &&
-              !self.is_token(SyntaxKind::EndOfFileToken) {
-            let start_token = self.token();
+        while !self.is_token(SyntaxKind::CloseBraceToken)
+            && !self.is_token(SyntaxKind::EndOfFileToken)
+        {
+            let start_pos = self.token_pos();
             let member = self.parse_type_member();
             if !member.is_none() {
                 members.push(member);
@@ -2433,7 +2434,7 @@ impl ThinParserState {
             self.parse_optional(SyntaxKind::CommaToken);
 
             // If we didn't make progress, skip the current token to avoid infinite loop
-            if self.token() == start_token && !self.is_token(SyntaxKind::CloseBraceToken) {
+            if self.token_pos() == start_pos && !self.is_token(SyntaxKind::CloseBraceToken) {
                 self.next_token();
             }
         }
