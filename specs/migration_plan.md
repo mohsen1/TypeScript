@@ -30,13 +30,14 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Array method support in PropertyAccessEvaluator (map, filter, etc. no longer report 2339)
 
 ## Checker Refactoring (see specs/REFACTOR_CHECKER.md)
-- 🔄 Split ThinCheckerState into Context + specialized Checkers (expr, stmt, decl)
+- ✅ Split ThinCheckerState into Context + specialized Checkers (expr, stmt, decl)
   - ✅ Created `checker/context.rs` with CheckerContext struct
   - ✅ Refactored ThinCheckerState to wrap CheckerContext
   - ✅ Created `checker/expr.rs` with ExpressionChecker struct
-  - ⬜ Create statements.rs, declarations.rs
-- ⬜ Move expression type computation to solver/operations.rs
-- ⬜ Use NodeView API instead of raw arena lookups
+  - ✅ Created `checker/statements.rs` with StatementChecker struct
+  - ✅ Created `checker/declarations.rs` with DeclarationChecker struct
+- 🔄 Move expression type computation to solver/operations.rs (incremental)
+- 🔄 Use NodeView API instead of raw arena lookups (incremental)
 - ⬜ Deprecate checker/types in favor of solver/types
 
 ## Code Cleanup
