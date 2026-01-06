@@ -26,6 +26,8 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Error 2511: abstract union type detection (type_contains_abstract_class)
 - ✅ TypeQuery symbol resolution for abstract class detection through type aliases
 - ✅ Union type resolution for abstract class detection (get_type_from_union_type)
+- ✅ Error 2729: property used before initialization (this.X in initializers)
+- ✅ Array method support in PropertyAccessEvaluator (map, filter, etc. no longer report 2339)
 
 ## Checker Refactoring (see specs/REFACTOR_CHECKER.md)
 - 🔄 Split ThinCheckerState into Context + specialized Checkers (expr, stmt, decl)
@@ -85,8 +87,8 @@ see SESSION_LOG.md -- always amended with each session's work
 ### Current Status (12,408 tests)
 | Baseline | Compiler (100 sample) | Conformance | Crash Rate |
 |----------|----------------------|-------------|------------|
-| .errors.txt | **79.2%** (61/77 subset) | 33.8% (1,741/5,157) | 0.05% |
-| .js emit | **59.2%** (45/76 subset) | ~3% | 0.05% |
+| .errors.txt | **80.5%** (62/77 subset) | 33.8% (1,741/5,157) | 0.05% |
+| .js emit | **60.5%** (46/76 subset) | ~3% | 0.05% |
 
 ### Work Process
 
