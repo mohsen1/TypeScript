@@ -334,6 +334,74 @@ impl<'a> ScopeWalker<'a> {
                     if let Some(res) = f(self, span.literal) { return Some(res); }
                 }
             }
+            k if k == syntax_kind_ext::JSX_ELEMENT => {
+                if let Some(element) = self.arena.get_jsx_element(node) {
+                    if let Some(res) = f(self, element.opening_element) { return Some(res); }
+                    for &child in &element.children.nodes {
+                        if let Some(res) = f(self, child) { return Some(res); }
+                    }
+                    if let Some(res) = f(self, element.closing_element) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::JSX_SELF_CLOSING_ELEMENT
+                || k == syntax_kind_ext::JSX_OPENING_ELEMENT => {
+                if let Some(opening) = self.arena.get_jsx_opening(node) {
+                    if let Some(res) = f(self, opening.tag_name) { return Some(res); }
+                    if let Some(ref type_args) = opening.type_arguments {
+                        for &arg in &type_args.nodes {
+                            if let Some(res) = f(self, arg) { return Some(res); }
+                        }
+                    }
+                    if let Some(res) = f(self, opening.attributes) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::JSX_CLOSING_ELEMENT => {
+                if let Some(closing) = self.arena.get_jsx_closing(node) {
+                    if let Some(res) = f(self, closing.tag_name) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::JSX_FRAGMENT => {
+                if let Some(fragment) = self.arena.get_jsx_fragment(node) {
+                    if let Some(res) = f(self, fragment.opening_fragment) { return Some(res); }
+                    for &child in &fragment.children.nodes {
+                        if let Some(res) = f(self, child) { return Some(res); }
+                    }
+                    if let Some(res) = f(self, fragment.closing_fragment) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::JSX_ATTRIBUTES => {
+                if let Some(attrs) = self.arena.get_jsx_attributes(node) {
+                    for &prop in &attrs.properties.nodes {
+                        if let Some(res) = f(self, prop) { return Some(res); }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::JSX_ATTRIBUTE => {
+                if let Some(attr) = self.arena.get_jsx_attribute(node) {
+                    if let Some(res) = f(self, attr.name) { return Some(res); }
+                    if !attr.initializer.is_none() {
+                        if let Some(res) = f(self, attr.initializer) { return Some(res); }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::JSX_SPREAD_ATTRIBUTE => {
+                if let Some(spread) = self.arena.get_jsx_spread_attribute(node) {
+                    if let Some(res) = f(self, spread.expression) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::JSX_EXPRESSION => {
+                if let Some(expr) = self.arena.get_jsx_expression(node) {
+                    if !expr.expression.is_none() {
+                        if let Some(res) = f(self, expr.expression) { return Some(res); }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::JSX_NAMESPACED_NAME => {
+                if let Some(ns) = self.arena.get_jsx_namespaced_name(node) {
+                    if let Some(res) = f(self, ns.namespace) { return Some(res); }
+                    if let Some(res) = f(self, ns.name) { return Some(res); }
+                }
+            }
             k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION || k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION => {
                 if let Some(unary) = self.arena.get_unary_expr(node) {
                     if let Some(res) = f(self, unary.operand) { return Some(res); }
