@@ -16,10 +16,16 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 Note:
 **Further baseline improvement requires checker/binder track** (type-checking capabilities).
 
-## What's Next?
+
+## Tasks (current focus)
+
+Pick the most doable and impactful
+
 1. Integrate LoweringPass into public API (lib.rs exports) [done]
 2. Implement remaining directive handlers (arrow, async, modules) [partial: arrow/async done; AMD/UMD/System wrappers added]
 3. Deprecate old API, make transforms required [partial: emit/emitModern now use two-phase pipeline; LoweringPass handles CommonJS auto-detect]
+
+
 4. Expand transform system to more node types
 5. Implement System/AMD/UMD module formats (if needed) [done]
 6. Public API integration (export LoweringPass) [done - covered by #1]
@@ -29,6 +35,7 @@ Note:
 10. Class ES5 transform: emit try/throw statements and parenthesized expressions [done]
 11. CommonJS export star (export * from) support [done]
 12. CommonJS export names: handle binding patterns in destructuring exports [done]
+13. Class ES5 transform: destructured parameters emit assignments [done]
 
 
 ## Quick Reference

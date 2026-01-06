@@ -1,7 +1,7 @@
 //! TypeScript compatibility layer for assignability rules.
 
 use crate::solver::intern::TypeInterner;
-use crate::solver::subtype::{NoopResolver, SubtypeChecker, TypeResolver};
+use crate::solver::subtype::{NoopResolver, SubtypeChecker, SubtypeFailureReason, TypeResolver};
 use crate::solver::types::TypeId;
 use rustc_hash::FxHashMap;
 
@@ -35,6 +35,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
     }
 
     /// Configure strict function parameter checking.
+    /// See https://github.com/microsoft/TypeScript/issues/18654.
     pub fn set_strict_function_types(&mut self, strict: bool) {
         if self.strict_function_types != strict {
             self.strict_function_types = strict;
@@ -52,8 +53,10 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         let result = if source == target {
             true
         } else if source == TypeId::ANY || target == TypeId::ANY {
+            // `any` is the JS escape hatch (top + bottom). See https://github.com/microsoft/TypeScript/issues/10715.
             true
         } else if target == TypeId::UNKNOWN {
+            // `unknown` is top but not assignable to non-top types. See https://github.com/microsoft/TypeScript/issues/10715.
             true
         } else if source == TypeId::UNKNOWN {
             false
@@ -65,6 +68,13 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
 
         self.cache.insert(key, result);
         result
+    }
+
+    /// Explain why `source` is not assignable to `target` using TS compatibility rules.
+    pub fn explain_failure(&mut self, source: TypeId, target: TypeId) -> Option<SubtypeFailureReason> {
+        self.subtype.strict_function_types = self.strict_function_types;
+        self.subtype.allow_void_return = true;
+        self.subtype.explain_failure(source, target)
     }
 }
 

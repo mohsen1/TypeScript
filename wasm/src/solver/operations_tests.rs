@@ -1,7 +1,6 @@
 //! Tests for type operations.
 
 use super::*;
-use crate::solver::types::*;
 use crate::solver::intern::TypeInterner;
 use crate::solver::subtype::SubtypeChecker;
 
@@ -186,8 +185,6 @@ fn test_binary_op_logical() {
 
 #[test]
 fn test_call_generic_function_identity() {
-    use std::sync::Arc;
-
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
     let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
@@ -223,8 +220,6 @@ fn test_call_generic_function_identity() {
 
 #[test]
 fn test_call_generic_function_with_string() {
-    use std::sync::Arc;
-
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
     let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
@@ -260,8 +255,6 @@ fn test_call_generic_function_with_string() {
 
 #[test]
 fn test_call_generic_array_function() {
-    use std::sync::Arc;
-
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
     let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
@@ -457,4 +450,162 @@ fn test_infer_generic_constructor_instantiation() {
     let result = infer_generic_function(&interner, &mut subtype, &ctor, &[TypeId::NUMBER]);
     let expected = interner.application(box_base, vec![TypeId::NUMBER]);
     assert_eq!(result, expected);
+}
+
+#[test]
+fn test_infer_generic_application_param() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let promise_base = interner.reference(SymbolRef(77));
+    let promise_t = interner.application(promise_base, vec![t_type]);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: promise_t,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    };
+
+    let arg = interner.application(promise_base, vec![TypeId::NUMBER]);
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[arg]);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_infer_generic_object_property() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let boxed_t = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: t_type,
+        optional: false,
+        readonly: false,
+    }]);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("boxed")),
+            type_id: boxed_t,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    };
+
+    let arg = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+    }]);
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[arg]);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_infer_generic_tuple_element() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let tuple_t = interner.tuple(vec![
+        TupleElement { type_id: t_type, name: None, optional: false, rest: false },
+        TupleElement { type_id: t_type, name: None, optional: false, rest: false },
+    ]);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("pair")),
+            type_id: tuple_t,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    };
+
+    let tuple_arg = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[tuple_arg]);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_infer_generic_index_signature() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let indexed_t = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: t_type,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("bag")),
+            type_id: indexed_t,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    };
+
+    let indexed_number = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[indexed_number]);
+    assert_eq!(result, TypeId::NUMBER);
 }
