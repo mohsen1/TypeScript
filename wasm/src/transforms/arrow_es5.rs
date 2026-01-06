@@ -7,6 +7,11 @@
 //! const greet = (name) => {
 //!     console.log("Hello " + name);
 //! };
+//! const obj = {
+//!     method() {
+//!         const arrow = () => this.x;  // `this` capture needed
+//!     }
+//! };
 //! ```
 //!
 //! Becomes:
@@ -16,10 +21,16 @@
 //! var greet = function (name) {
 //!     console.log("Hello " + name);
 //! };
+//! var obj = {
+//!     method: function () {
+//!         var _this = this;
+//!         var arrow = function () { return _this.x; };
+//!     }
+//! };
 //! ```
 
-use crate::parser::thin_node::{ThinNode, ThinNodeArena, FunctionData};
-use crate::parser::{NodeIndex, NodeList};
+use crate::parser::thin_node::ThinNodeArena;
+use crate::parser::NodeIndex;
 use crate::parser::syntax_kind_ext;
 
 /// Checks if a node or its descendants contain `this` references

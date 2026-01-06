@@ -15,13 +15,13 @@ We have time. No deadlines. Do it right.
 2. **Measure before optimizing** - run benchmarks, not guesses
 3. **Review at milestones** - use Gemini for architecture decisions, not just bug hunting
 
-**Avoid:**
-- Micro-optimizations that save nanoseconds (iterator tricks, inline hints)
-- Porting TypeScript patterns that don't fit Rust's ownership model
-- Adding features before the architecture is solid
 
-## 📋 The Plan
+## The Plan
 **`specs/migration_plan.md`** is the single source of truth. Phase 0 (Performance) comes BEFORE completing remaining phases.
+
+## The Architecture
+
+**`specs/WASM_ARCHITECTURE.md`**. This is the guide for how we do things
 
 ## 🔁 WORK LOOP
 
@@ -39,22 +39,7 @@ LOOP:
      - Run: node scripts/ask-gemini.mjs --review wasm/src/[modified_file].rs
      - Address any issues found
   8. Final commit with review feedback addressed
-```
-
-⚠️ **IMPORTANT**: Always consult Gemini BEFORE and AFTER each significant task. This catches design issues early and ensures code quality.
-
-## 📊 When to Use Gemini Reviews
-
-**DO review with Gemini:**
-- After completing a major component (parser, checker, emitter)
-- Before starting architectural changes (ThinNode migration)
-- When stuck on a design decision
-- After fixing a batch of issues
-
-**DON'T review with Gemini:**
-- Every single commit (too noisy)
-- Simple bug fixes
-- Documentation updates
+`
 
 ## 🛠️ Commands
 
@@ -91,28 +76,11 @@ node scripts/verifyChecker.mjs
 ## 📁 Key Locations
 
 - `wasm/src/` - All Rust code
+- `specs/WASM_ARCHITECTURE.md` - The main architecture. **always read**
 - `specs/migration_plan.md` - THE PLAN
-- `specs/gemini_review_*.md` - Review findings to address
 - `specs/SOLVER.md` - very important guide for solver
 
-## 🏗️ Checker-Solver Architecture
 
-**"Check Fast, Explain Slow"**: The checker (`thin_checker.rs`) traverses AST and calls solver. The solver (`wasm/src/solver/`) owns all type logic. When errors occur, use `solver.explain_failure()` to get detailed diagnostics instead of re-inspecting types in the checker.
-
-
-
-## Reference: typescript-go Submodule
-
-The `typescript-go/` directory contains a submodule with a native Go port of the TypeScript compiler and language server. **Feel free to explore and reference this codebase** for understanding alternative implementations or comparing approaches, but **do not modify any files within the `typescript-go/` directory**.
-
-This submodule is read-only reference material for:
-- Understanding how compiler features are implemented in Go
-- Comparing type checking strategies
-- Seeing alternative approaches to parsing and binding
-
-When working on TypeScript compiler features, you may find it helpful to look at the corresponding Go implementation in `typescript-go/internal/` for inspiration or clarification.
-
-You can take a look at `specs/TYPESCRIPT_GO_ARCHITECTURE.md` for an overview
 ## ✅ Commit Format
 ```
 [wasm] <component>: <description>
@@ -128,5 +96,11 @@ Commit frequently and atomically
 4. **Measure impact** - add benchmarks for perf claims
 5. **Update the plan** - mark tasks complete, add new discoveries
 6. IMPORTANT: **Separate test files** - `foo.rs` and `foo_tests.rs` or `tests/foo.rs` even in Rust files. if you see a file that has source and test in the same file move tests to separate file as a top priority
-7. **Gemini at milestones** - not every commit, but every major component. or when it is a big task and makes sense to get some help
+7. **Gemini is your friend** - Gemini can unlock you when things are hard to debug, not sure about path to take. it can guide you how to start a work or review. make sure you use this help
 
+
+
+⚠️ **CRITICAL: For each task, ALWAYS:**
+1. **BEFORE**: `node scripts/ask-gemini.mjs "How should I implement [task]?"` - get guidance
+2. **IMPLEMENT**: Write code, run tests. add tests
+3. **AFTER**: `node scripts/ask-gemini.mjs --review wasm/src/[file].rs` - get review

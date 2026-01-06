@@ -30,6 +30,17 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Arrow function `this` capture (`var _this = this;`) for base and derived classes
 - ✅ Destructuring transform (`let { x } = obj;` → `var _a = obj, x = _a.x;`)
 
+## Emitter Architecture Refactor (complete)
+- ✅ Created `SourceWriter` abstraction for output generation with source map tracking
+- ✅ Created `EmitContext` for transform-specific state management
+- ✅ Refactored `ThinPrinter` to use `SourceWriter` (decouples output from AST traversal)
+- ✅ UTF-16 column counting for correct source map positions
+- ✅ Refactored `ThinPrinter` to use `EmitContext` for all transform state
+- ✅ Separated arrow function ES5/native emit paths
+- ✅ Converted `thin_emitter.rs` to directory module (`thin_emitter/mod.rs`)
+- ✅ Marked fields/methods `pub(super)` for future submodule splitting
+- ⏳ Split `emit_node` into modules - structure ready, splitting deferred until needed
+
 ## Emitter TODOs (for JS baseline 80%+)
 - ⬜ CommonJS exports (`"use strict"`, `module.exports`, `exports.X`) - ~11 tests
 - ⬜ Comment preservation in emit - ~3 tests
@@ -46,6 +57,10 @@ see SESSION_LOG.md -- always amended with each session's work
 
 **Goal**: 100% match on TypeScript's test baselines.
 
+**We are focused on emitter in this work tree**
+
+
+
 ### Current Status (sample: first 100 compiler tests)
 | Baseline | Pass Rate | Notes |
 |----------|-----------|-------|
@@ -60,6 +75,15 @@ see SESSION_LOG.md -- always amended with each session's work
 3. **AFTER**: `node scripts/ask-gemini.mjs --review wasm/src/[file].rs` - get review
 
 This catches design issues early and ensures consistent code quality.
+
+
+
+
+#### Priority 0
+
+1. ⚠️ **CRITICAL First address `specs/EMITTER_REFACTOR.md`
+2. Use the new emitter architecture in the existing emitter code
+
 
 ### Next Steps
 

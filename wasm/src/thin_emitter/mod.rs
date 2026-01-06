@@ -8,21 +8,235 @@
 //! - Uses ThinNodeArena for AST access (16-byte nodes, 13x cache improvement)
 //! - Dispatches based on ThinNode.kind (u16)
 //! - Uses accessor methods to get typed node data
+//!
+//! # Module Organization
+//!
+//! The emitter is organized as a directory module:
+//! - `mod.rs` - Core ThinPrinter struct, dispatch logic, and emit methods
+//! - Future: emit methods can be split into expressions.rs, statements.rs, declarations.rs
+//!
+//! Note: pub(super) fields and methods allow future submodules to access ThinPrinter internals.
 
 // Allow dead code for emitter infrastructure methods that will be used in future phases
 #![allow(dead_code)]
-//!
-//! # Status
-//!
-//! This is an initial implementation with core emit methods.
-//! More emit methods will be added as needed.
 
+use crate::emit_context::EmitContext;
 use crate::parser::{NodeIndex, NodeList};
 use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
+use crate::source_writer::SourceWriter;
 use crate::transforms::class_es5::ClassES5Emitter;
 use crate::transforms::arrow_es5::contains_this_reference;
+
+// =============================================================================
+// Comment Utilities
+// =============================================================================
+
+/// Represents a comment range in the source text.
+#[derive(Debug, Clone, Copy)]
+pub struct CommentRange {
+    pub pos: u32,
+    pub end: u32,
+    pub kind: CommentKind,
+    pub has_trailing_newline: bool,
+}
+
+/// Kind of comment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CommentKind {
+    SingleLine,  // // comment
+    MultiLine,   // /* comment */
+}
+
+/// Check if a character is a line break.
+fn is_line_break(ch: char) -> bool {
+    ch == '\n' || ch == '\r' || ch == '\u{2028}' || ch == '\u{2029}'
+}
+
+/// Check if a character is whitespace (but not a line break).
+fn is_whitespace_single_line(ch: char) -> bool {
+    ch == ' ' || ch == '\t' || ch == '\u{000B}' || ch == '\u{000C}'
+}
+
+/// Get trailing comments starting at a position in the source text.
+/// Trailing comments are comments that appear on the same line after a token,
+/// before a newline.
+pub fn get_trailing_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
+    let mut comments = Vec::new();
+    let bytes = text.as_bytes();
+    let len = bytes.len();
+    let mut i = pos;
+
+    // Scan for trailing comments (on the same line, before newline)
+    while i < len {
+        let ch = bytes[i] as char;
+
+        // Skip whitespace (but not newlines)
+        if is_whitespace_single_line(ch) {
+            i += 1;
+            continue;
+        }
+
+        // Stop at newline - trailing comments end here
+        if is_line_break(ch) {
+            break;
+        }
+
+        // Check for comment start
+        if ch == '/' && i + 1 < len {
+            let next_ch = bytes[i + 1] as char;
+
+            if next_ch == '/' {
+                // Single-line comment: // ...
+                let start = i;
+                i += 2;
+                while i < len && !is_line_break(bytes[i] as char) {
+                    i += 1;
+                }
+                comments.push(CommentRange {
+                    pos: start as u32,
+                    end: i as u32,
+                    kind: CommentKind::SingleLine,
+                    has_trailing_newline: i < len && is_line_break(bytes[i] as char),
+                });
+                continue;
+            } else if next_ch == '*' {
+                // Multi-line comment: /* ... */
+                let start = i;
+                i += 2;
+                let mut has_newline = false;
+                while i + 1 < len {
+                    if bytes[i] as char == '*' && bytes[i + 1] as char == '/' {
+                        i += 2;
+                        break;
+                    }
+                    if is_line_break(bytes[i] as char) {
+                        has_newline = true;
+                    }
+                    i += 1;
+                }
+                // For trailing comments, we stop after the first multi-line comment
+                // if it spans multiple lines
+                comments.push(CommentRange {
+                    pos: start as u32,
+                    end: i as u32,
+                    kind: CommentKind::MultiLine,
+                    has_trailing_newline: has_newline,
+                });
+                if has_newline {
+                    break;
+                }
+                continue;
+            }
+        }
+
+        // Non-whitespace, non-comment character - stop scanning
+        break;
+    }
+
+    comments
+}
+
+/// Get leading comments before a position in the source text.
+/// Leading comments are comments that appear before a token,
+/// potentially on preceding lines.
+pub fn get_leading_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
+    let mut comments = Vec::new();
+    let bytes = text.as_bytes();
+    let mut i = pos;
+
+    // Skip shebang at the start of file
+    if i == 0 && bytes.len() >= 2 && bytes[0] == b'#' && bytes[1] == b'!' {
+        while i < bytes.len() && !is_line_break(bytes[i] as char) {
+            i += 1;
+        }
+    }
+
+    // Scan for leading comments
+    let mut pending: Option<CommentRange> = None;
+
+    while i < bytes.len() {
+        let ch = bytes[i] as char;
+
+        // Skip whitespace
+        if is_whitespace_single_line(ch) {
+            i += 1;
+            continue;
+        }
+
+        // Handle newlines - they mark comment boundaries
+        if is_line_break(ch) {
+            i += 1;
+            // Skip \r\n as a single newline
+            if ch == '\r' && i < bytes.len() && bytes[i] == b'\n' {
+                i += 1;
+            }
+            if let Some(mut p) = pending.take() {
+                p.has_trailing_newline = true;
+                comments.push(p);
+            }
+            continue;
+        }
+
+        // Check for comment start
+        if ch == '/' && i + 1 < bytes.len() {
+            let next_ch = bytes[i + 1] as char;
+
+            if next_ch == '/' {
+                // Emit any pending comment first
+                if let Some(p) = pending.take() {
+                    comments.push(p);
+                }
+                // Single-line comment
+                let start = i;
+                i += 2;
+                while i < bytes.len() && !is_line_break(bytes[i] as char) {
+                    i += 1;
+                }
+                pending = Some(CommentRange {
+                    pos: start as u32,
+                    end: i as u32,
+                    kind: CommentKind::SingleLine,
+                    has_trailing_newline: false,
+                });
+                continue;
+            } else if next_ch == '*' {
+                // Emit any pending comment first
+                if let Some(p) = pending.take() {
+                    comments.push(p);
+                }
+                // Multi-line comment
+                let start = i;
+                i += 2;
+                while i + 1 < bytes.len() {
+                    if bytes[i] == b'*' && bytes[i + 1] == b'/' {
+                        i += 2;
+                        break;
+                    }
+                    i += 1;
+                }
+                pending = Some(CommentRange {
+                    pos: start as u32,
+                    end: i as u32,
+                    kind: CommentKind::MultiLine,
+                    has_trailing_newline: false,
+                });
+                continue;
+            }
+        }
+
+        // Non-whitespace, non-comment - we're done
+        break;
+    }
+
+    // Emit final pending comment
+    if let Some(p) = pending {
+        comments.push(p);
+    }
+
+    comments
+}
 
 // =============================================================================
 // Emitter Options
@@ -108,49 +322,21 @@ impl Default for PrinterOptions {
 // =============================================================================
 
 /// Printer that works with ThinNodeArena.
+///
+/// Uses SourceWriter for output generation (enables source map support).
+/// Uses EmitContext for transform-specific state management.
 pub struct ThinPrinter<'a> {
     /// The ThinNodeArena containing the AST.
-    arena: &'a ThinNodeArena,
+    pub(super) arena: &'a ThinNodeArena,
 
-    /// Output buffer
-    output: String,
+    /// Source writer for output generation and source map tracking
+    pub(super) writer: SourceWriter,
 
-    /// Current indentation level
-    indent_level: u32,
-
-    /// Indentation string (e.g., "  " or "\t")
-    indent_str: String,
-
-    /// New line string
-    new_line: String,
-
-    /// Printer options
-    options: PrinterOptions,
-
-    /// Whether we're at the start of a line
-    at_line_start: bool,
-
-    /// Current output line (0-indexed)
-    output_line: u32,
-
-    /// Current output column (0-indexed)
-    output_column: u32,
-
-    /// Whether to emit ES5 (classes→IIFEs, arrows→functions)
-    target_es5: bool,
+    /// Emit context holding options and transform state
+    pub(super) ctx: EmitContext,
 
     /// Source text for detecting single-line constructs
-    source_text: Option<&'a str>,
-
-    /// Stack of scopes that need `this` capture (for arrow functions)
-    /// When > 0, emit `_this` instead of `this` inside arrow function bodies
-    this_capture_depth: u32,
-
-    /// Whether we've already emitted `var _this = this;` in the current scope
-    this_captured_in_scope: bool,
-
-    /// Counter for temporary variables (_a, _b, _c, etc.)
-    temp_var_counter: u32,
+    pub(super) source_text: Option<&'a str>,
 }
 
 impl<'a> ThinPrinter<'a> {
@@ -161,45 +347,38 @@ impl<'a> ThinPrinter<'a> {
 
     /// Create a new ThinPrinter with options.
     pub fn with_options(arena: &'a ThinNodeArena, options: PrinterOptions) -> Self {
-        let new_line = match options.new_line {
-            NewLineKind::LineFeed => "\n".to_string(),
-            NewLineKind::CarriageReturnLineFeed => "\r\n".to_string(),
-        };
+        let mut writer = SourceWriter::new();
+        writer.set_new_line_kind(options.new_line);
+
+        // Create EmitContext with ES5 targeting by default for baseline compatibility
+        let mut ctx = EmitContext::with_options(options);
+        ctx.target_es5 = true;
+
         ThinPrinter {
             arena,
-            output: String::with_capacity(1024),
-            indent_level: 0,
-            indent_str: "    ".to_string(),
-            new_line,
-            options,
-            at_line_start: true,
-            output_line: 0,
-            output_column: 0,
-            target_es5: true, // Default to ES5 for baseline compatibility
+            writer,
+            ctx,
             source_text: None,
-            this_capture_depth: 0,
-            this_captured_in_scope: false,
-            temp_var_counter: 0,
         }
     }
 
     /// Create a new ThinPrinter targeting ES5.
     pub fn new_es5(arena: &'a ThinNodeArena) -> Self {
         let mut printer = Self::new(arena);
-        printer.target_es5 = true;
+        printer.ctx.target_es5 = true;
         printer
     }
 
     /// Create a new ThinPrinter targeting ES6+.
     pub fn new_es6(arena: &'a ThinNodeArena) -> Self {
         let mut printer = Self::new(arena);
-        printer.target_es5 = false;
+        printer.ctx.target_es5 = false;
         printer
     }
-    
+
     /// Set whether to target ES5 (classes→IIFEs, arrows→functions).
     pub fn set_target_es5(&mut self, es5: bool) {
-        self.target_es5 = es5;
+        self.ctx.target_es5 = es5;
     }
 
     /// Set the source text (for detecting single-line constructs).
@@ -230,88 +409,104 @@ impl<'a> ThinPrinter<'a> {
 
     /// Get the output.
     pub fn get_output(&self) -> &str {
-        &self.output
+        self.writer.get_output()
     }
 
     /// Take the output.
     pub fn take_output(self) -> String {
-        self.output
+        self.writer.take_output()
     }
 
     // =========================================================================
-    // Output Helpers
+    // Comment Emission Helpers
+    // =========================================================================
+
+    /// Emit trailing comments after a node's end position.
+    /// Note: In TypeScript's AST, node.end often includes trailing trivia (including comments).
+    /// We clamp the position to valid bounds and scan from there.
+    fn emit_trailing_comments(&mut self, end_pos: u32) {
+        if self.ctx.options.remove_comments {
+            return;
+        }
+
+        let Some(text) = self.source_text else {
+            return;
+        };
+
+        // Clamp position to valid range
+        let pos = std::cmp::min(end_pos as usize, text.len());
+        let comments = get_trailing_comment_ranges(text, pos);
+        for comment in comments {
+            // Add space before trailing comment
+            self.write_space();
+            // Emit the comment text
+            let comment_text = &text[comment.pos as usize..comment.end as usize];
+            self.write(comment_text);
+        }
+    }
+
+    /// Emit leading comments before a node's start position.
+    fn emit_leading_comments(&mut self, pos: u32) {
+        if self.ctx.options.remove_comments {
+            return;
+        }
+
+        let Some(text) = self.source_text else {
+            return;
+        };
+
+        let comments = get_leading_comment_ranges(text, pos as usize);
+        for comment in comments {
+            let comment_text = &text[comment.pos as usize..comment.end as usize];
+            self.write(comment_text);
+            if comment.has_trailing_newline {
+                self.write_line();
+            } else if comment.kind == CommentKind::MultiLine {
+                self.write_space();
+            }
+        }
+    }
+
+    // =========================================================================
+    // Output Helpers (delegate to SourceWriter)
+    // pub(super) for access from submodules (expressions, statements, declarations)
     // =========================================================================
 
     /// Write text to output.
-    fn write(&mut self, text: &str) {
-        if self.at_line_start && self.indent_level > 0 {
-            for _ in 0..self.indent_level {
-                self.output.push_str(&self.indent_str);
-                self.output_column += self.indent_str.len() as u32;
-            }
-            self.at_line_start = false;
-        }
-
-        for ch in text.chars() {
-            if ch == '\n' {
-                self.output_line += 1;
-                self.output_column = 0;
-            } else {
-                self.output_column += 1;
-            }
-        }
-        self.output.push_str(text);
+    pub(super) fn write(&mut self, text: &str) {
+        self.writer.write(text);
     }
 
     /// Write a single character.
-    fn write_char(&mut self, ch: char) {
-        if self.at_line_start && self.indent_level > 0 {
-            for _ in 0..self.indent_level {
-                self.output.push_str(&self.indent_str);
-                self.output_column += self.indent_str.len() as u32;
-            }
-            self.at_line_start = false;
-        }
-
-        if ch == '\n' {
-            self.output_line += 1;
-            self.output_column = 0;
-        } else {
-            self.output_column += 1;
-        }
-        self.output.push(ch);
+    pub(super) fn write_char(&mut self, ch: char) {
+        self.writer.write_char(ch);
     }
 
     /// Write a newline.
-    fn write_line(&mut self) {
-        self.output.push_str(&self.new_line);
-        self.output_line += 1;
-        self.output_column = 0;
-        self.at_line_start = true;
+    pub(super) fn write_line(&mut self) {
+        self.writer.write_line();
     }
 
     /// Write a space.
-    fn write_space(&mut self) {
-        self.write(" ");
+    pub(super) fn write_space(&mut self) {
+        self.writer.write_space();
     }
 
     /// Write a semicolon (respecting options).
-    fn write_semicolon(&mut self) {
-        if !self.options.omit_trailing_semicolon {
+    pub(super) fn write_semicolon(&mut self) {
+        if !self.ctx.options.omit_trailing_semicolon {
             self.write(";");
         }
     }
 
     /// Increase indentation.
-    fn increase_indent(&mut self) {
-        self.indent_level += 1;
+    pub(super) fn increase_indent(&mut self) {
+        self.writer.increase_indent();
     }
 
     /// Decrease indentation.
-    fn decrease_indent(&mut self) {
-        if self.indent_level > 0 {
-            self.indent_level -= 1;
-        }
+    pub(super) fn decrease_indent(&mut self) {
+        self.writer.decrease_indent();
     }
 
     // =========================================================================
@@ -750,7 +945,7 @@ impl<'a> ThinPrinter<'a> {
             // Other tokens and keywords - emit their text
             k if k == SyntaxKind::ThisKeyword as u16 => {
                 // In ES5 mode inside an arrow function body, use _this instead of this
-                if self.target_es5 && self.this_capture_depth > 0 {
+                if self.ctx.target_es5 && self.ctx.arrow_state.this_capture_depth > 0 {
                     self.write("_this")
                 } else {
                     self.write("this")
@@ -793,7 +988,7 @@ impl<'a> ThinPrinter<'a> {
 
     fn emit_string_literal(&mut self, node: &ThinNode) {
         if let Some(lit) = self.arena.get_literal(node) {
-            let quote = if self.options.single_quote { '\'' } else { '"' };
+            let quote = if self.ctx.options.single_quote { '\'' } else { '"' };
             self.write_char(quote);
             self.emit_escaped_string(&lit.text, quote);
             self.write_char(quote);
@@ -998,38 +1193,44 @@ impl<'a> ThinPrinter<'a> {
         };
 
         // Transform arrow function to regular function for ES5
-        if self.target_es5 {
-            // Check if arrow body uses `this` - if so, we need _this capture
-            let body_uses_this = !func.body.is_none()
-                && contains_this_reference(self.arena, func.body);
+        if self.ctx.target_es5 {
+            self.emit_arrow_function_es5(node, func);
+        } else {
+            self.emit_arrow_function_native(func);
+        }
+    }
 
-            // Track that we're inside an arrow function body with `this`
-            if body_uses_this {
-                self.this_capture_depth += 1;
-            }
+    /// Emit ES5-compatible function expression for arrow function
+    /// Arrow: (x) => x + 1  →  function (x) { return x + 1; }
+    fn emit_arrow_function_es5(&mut self, _node: &ThinNode, func: &crate::parser::thin_node::FunctionData) {
+        // Check if arrow body uses `this` - if so, we need _this capture
+        let body_uses_this = !func.body.is_none()
+            && contains_this_reference(self.arena, func.body);
 
-            if func.is_async {
-                self.write("async ");
-            }
+        // Track that we're inside an arrow function body with `this`
+        if body_uses_this {
+            self.ctx.arrow_state.this_capture_depth += 1;
+        }
 
-            self.write("function (");
-            self.emit_function_parameters_js(&func.parameters.nodes);
-            self.write(") ");
+        if func.is_async {
+            self.write("async ");
+        }
 
-            // If body is not a block (concise arrow), wrap with return
-            let body_node = self.arena.get(func.body);
-            let is_block = body_node.map(|n| n.kind == syntax_kind_ext::BLOCK).unwrap_or(false);
+        self.write("function (");
+        self.emit_function_parameters_js(&func.parameters.nodes);
+        self.write(") ");
 
-            if is_block {
-                // Check if it's a simple single-return block
-                if let Some(block_node) = self.arena.get(func.body) {
-                    if let Some(block) = self.arena.get_block(block_node) {
-                        if block.statements.nodes.len() == 1
-                            && self.is_simple_return_statement(block.statements.nodes[0]) {
-                            self.emit_single_line_block(func.body);
-                        } else {
-                            self.emit(func.body);
-                        }
+        // If body is not a block (concise arrow), wrap with return
+        let body_node = self.arena.get(func.body);
+        let is_block = body_node.map(|n| n.kind == syntax_kind_ext::BLOCK).unwrap_or(false);
+
+        if is_block {
+            // Check if it's a simple single-return block
+            if let Some(block_node) = self.arena.get(func.body) {
+                if let Some(block) = self.arena.get_block(block_node) {
+                    if block.statements.nodes.len() == 1
+                        && self.is_simple_return_statement(block.statements.nodes[0]) {
+                        self.emit_single_line_block(func.body);
                     } else {
                         self.emit(func.body);
                     }
@@ -1037,19 +1238,23 @@ impl<'a> ThinPrinter<'a> {
                     self.emit(func.body);
                 }
             } else {
-                // Concise body: (x) => x + 1  →  function (x) { return x + 1; }
-                self.write("{ return ");
                 self.emit(func.body);
-                self.write("; }");
             }
-
-            // Restore this capture depth
-            if body_uses_this {
-                self.this_capture_depth -= 1;
-            }
-            return;
+        } else {
+            // Concise body: (x) => x + 1  →  function (x) { return x + 1; }
+            self.write("{ return ");
+            self.emit(func.body);
+            self.write("; }");
         }
 
+        // Restore this capture depth
+        if body_uses_this {
+            self.ctx.arrow_state.this_capture_depth -= 1;
+        }
+    }
+
+    /// Emit native ES6+ arrow function syntax
+    fn emit_arrow_function_native(&mut self, func: &crate::parser::thin_node::FunctionData) {
         if func.is_async {
             self.write("async ");
         }
@@ -1259,6 +1464,8 @@ impl<'a> ThinPrinter<'a> {
                 self.write_line();
                 self.write("}");
             }
+            // Emit trailing comments after the block's closing brace
+            self.emit_trailing_comments(node.end);
             return;
         }
 
@@ -1267,16 +1474,18 @@ impl<'a> ThinPrinter<'a> {
         self.increase_indent();
 
         for &stmt_idx in &block.statements.nodes {
-            let before_len = self.output.len();
+            let before_len = self.writer.len();
             self.emit(stmt_idx);
             // Only add newline if something was actually emitted
-            if self.output.len() > before_len {
+            if self.writer.len() > before_len {
                 self.write_line();
             }
         }
 
         self.decrease_indent();
         self.write("}");
+        // Emit trailing comments after the block's closing brace
+        self.emit_trailing_comments(node.end);
     }
 
     fn emit_variable_statement(&mut self, node: &ThinNode) {
@@ -1305,7 +1514,7 @@ impl<'a> ThinPrinter<'a> {
 
         // Emit keyword based on node flags - for ES5, always use "var"
         let flags = node.flags as u32;
-        let keyword = if self.target_es5 {
+        let keyword = if self.ctx.target_es5 {
             "var"
         } else if flags & crate::parser::node_flags::CONST != 0 {
             "const"
@@ -1318,7 +1527,7 @@ impl<'a> ThinPrinter<'a> {
         self.write(" ");
 
         // For ES5, check if any declaration uses destructuring
-        if self.target_es5 {
+        if self.ctx.target_es5 {
             let mut first = true;
             for &decl_idx in &decl_list.declarations.nodes {
                 let Some(decl_node) = self.arena.get(decl_idx) else { continue };
@@ -1454,6 +1663,45 @@ impl<'a> ThinPrinter<'a> {
 
         self.emit(expr_stmt.expression);
         self.write_semicolon();
+
+        // Emit trailing comments: find the position after the semicolon
+        // We scan backwards from the expression end to find the semicolon.
+        if let Some(text) = self.source_text {
+            // Find the semicolon by scanning backwards from the statement end
+            let bytes = text.as_bytes();
+            let stmt_end = std::cmp::min(node.end as usize, bytes.len());
+
+            // Scan backwards to find the semicolon
+            let mut semi_pos = None;
+            let mut i = stmt_end;
+            while i > 0 {
+                i -= 1;
+                let ch = bytes[i] as char;
+                if ch == ';' {
+                    semi_pos = Some(i + 1); // Position after semicolon
+                    break;
+                } else if ch == '\n' || ch == '\r' {
+                    // Stop at newline if no semicolon found (ASI case)
+                    break;
+                } else if ch == ' ' || ch == '\t' || ch == '/' {
+                    // Skip whitespace and potential comment start (scanning backwards)
+                    continue;
+                } else {
+                    // Some other character
+                    continue;
+                }
+            }
+
+            // Emit trailing comments from after the semicolon
+            if let Some(pos) = semi_pos {
+                let comments = get_trailing_comment_ranges(text, pos);
+                for comment in comments {
+                    self.write_space();
+                    let comment_text = &text[comment.pos as usize..comment.end as usize];
+                    self.write(comment_text);
+                }
+            }
+        }
     }
 
     fn emit_if_statement(&mut self, node: &ThinNode) {
@@ -1558,9 +1806,9 @@ impl<'a> ThinPrinter<'a> {
         }
 
         // Use ES5 IIFE transform when targeting ES5
-        if self.target_es5 {
+        if self.ctx.target_es5 {
             let mut es5_emitter = ClassES5Emitter::new(self.arena);
-            es5_emitter.set_indent_level(self.indent_level);
+            es5_emitter.set_indent_level(self.writer.indent_level());
             if let Some(source_text) = self.source_text {
                 es5_emitter.set_source_text(source_text);
             }
@@ -2215,7 +2463,7 @@ impl<'a> ThinPrinter<'a> {
     }
 
     fn emit_module_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
-        if self.target_es5 {
+        if self.ctx.target_es5 {
             // Use ES5 namespace transform: namespace → IIFE pattern
             let mut ns_emitter = crate::transforms::namespace_es5::NamespaceES5Emitter::new(self.arena);
             let output = ns_emitter.emit_namespace(idx);
@@ -2661,15 +2909,15 @@ impl<'a> ThinPrinter<'a> {
         };
 
         // Check if any class extends another - if so, emit __extends helper
-        if self.target_es5 && self.needs_extends_helper(&source.statements) {
+        if self.ctx.target_es5 && self.needs_extends_helper(&source.statements) {
             self.emit_extends_helper();
         }
 
         for &stmt_idx in &source.statements.nodes {
-            let before_len = self.output.len();
+            let before_len = self.writer.len();
             self.emit(stmt_idx);
             // Only add newline if something was actually emitted
-            if self.output.len() > before_len {
+            if self.writer.len() > before_len {
                 self.write_line();
             }
         }
@@ -2903,8 +3151,8 @@ impl<'a> ThinPrinter<'a> {
 
     /// Get the next temporary variable name (_a, _b, _c, etc.)
     fn get_temp_var_name(&mut self) -> String {
-        let name = format!("_{}", (b'a' + (self.temp_var_counter % 26) as u8) as char);
-        self.temp_var_counter += 1;
+        let name = format!("_{}", (b'a' + (self.ctx.destructuring_state.temp_var_counter % 26) as u8) as char);
+        self.ctx.destructuring_state.temp_var_counter += 1;
         name
     }
 
@@ -2961,3 +3209,27 @@ fn get_operator_text(op: u16) -> &'static str {
     }
 }
 
+
+#[cfg(test)]
+mod comment_tests {
+    use super::*;
+
+    #[test]
+    fn test_trailing_comments_parsing() {
+        let text = "constructor(public p3:any) {} // OK";
+        //                                       ^
+        //                                       position 29 (after the closing brace)
+        let comments = get_trailing_comment_ranges(text, 29);
+        assert_eq!(comments.len(), 1);
+        assert_eq!(&text[comments[0].pos as usize..comments[0].end as usize], "// OK");
+    }
+
+    #[test]
+    fn test_trailing_comments_with_space() {
+        let text = "} // OK\n";
+        let comments = get_trailing_comment_ranges(text, 1); // after }
+        assert_eq!(comments.len(), 1);
+        assert_eq!(&text[comments[0].pos as usize..comments[0].end as usize], "// OK");
+    }
+
+}
