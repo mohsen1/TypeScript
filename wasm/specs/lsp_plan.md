@@ -19,9 +19,9 @@ src/lsp/ (New), src/thin_binder.rs
 
 Our focus is to make wasm Language Service Protocol (LSP) complete
 
-- [ ] **Code Action: Organize Imports** (Sort-only first)
-- [ ] **Diagnostic Integration**: Surface Checker errors in LSP
-- [ ] **Multi-File Context**: Create `Project` struct to hold multiple source files
+- [x] **Code Action: Organize Imports** (Sort-only first)
+- [x] **Diagnostic Integration**: Surface Checker errors in LSP
+- [x] **Multi-File Context**: Create `Project` struct to hold multiple source files
 
 #### Remaining Optimizations
    - All major LSP performance optimizations complete!

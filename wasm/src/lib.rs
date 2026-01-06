@@ -131,6 +131,7 @@ use crate::lsp::{
     DocumentSymbolProvider, RenameProvider, SemanticTokensProvider, CodeActionProvider,
     CodeActionContext,
 };
+use crate::lsp::diagnostics::convert_diagnostic;
 
 /// High-performance parser using ThinNode architecture (16 bytes/node).
 /// This is the optimized path for Phase 8 test suite evaluation.
@@ -354,8 +355,9 @@ impl ThinParser {
         let binder = self.binder.as_ref().unwrap();
         let line_map = self.line_map.as_ref().unwrap();
         let file_name = self.parser.get_file_name().to_string();
+        let source_text = self.parser.get_source_text();
 
-        let provider = GoToDefinition::new(self.parser.get_arena(), binder, line_map, file_name);
+        let provider = GoToDefinition::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
         let pos = Position::new(line, character);
 
         let result = provider.get_definition(root, pos);
@@ -372,8 +374,9 @@ impl ThinParser {
         let binder = self.binder.as_ref().unwrap();
         let line_map = self.line_map.as_ref().unwrap();
         let file_name = self.parser.get_file_name().to_string();
+        let source_text = self.parser.get_source_text();
 
-        let provider = FindReferences::new(self.parser.get_arena(), binder, line_map, file_name);
+        let provider = FindReferences::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
         let pos = Position::new(line, character);
 
         let result = provider.find_references(root, pos);
@@ -389,8 +392,9 @@ impl ThinParser {
         let root = self.source_file_idx.unwrap();
         let binder = self.binder.as_ref().unwrap();
         let line_map = self.line_map.as_ref().unwrap();
+        let source_text = self.parser.get_source_text();
 
-        let provider = Completions::new(self.parser.get_arena(), binder, line_map);
+        let provider = Completions::new(self.parser.get_arena(), binder, line_map, source_text);
         let pos = Position::new(line, character);
 
         let result = provider.get_completions(root, pos);
@@ -457,8 +461,9 @@ impl ThinParser {
 
         let root = self.source_file_idx.unwrap();
         let line_map = self.line_map.as_ref().unwrap();
+        let source_text = self.parser.get_source_text();
 
-        let provider = DocumentSymbolProvider::new(self.parser.get_arena(), line_map);
+        let provider = DocumentSymbolProvider::new(self.parser.get_arena(), line_map, source_text);
 
         let result = provider.get_document_symbols(root);
         Ok(serde_wasm_bindgen::to_value(&result)?)
@@ -473,8 +478,9 @@ impl ThinParser {
         let root = self.source_file_idx.unwrap();
         let binder = self.binder.as_ref().unwrap();
         let line_map = self.line_map.as_ref().unwrap();
+        let source_text = self.parser.get_source_text();
 
-        let mut provider = SemanticTokensProvider::new(self.parser.get_arena(), binder, line_map);
+        let mut provider = SemanticTokensProvider::new(self.parser.get_arena(), binder, line_map, source_text);
 
         Ok(provider.get_semantic_tokens(root))
     }
@@ -488,8 +494,9 @@ impl ThinParser {
         let binder = self.binder.as_ref().unwrap();
         let line_map = self.line_map.as_ref().unwrap();
         let file_name = self.parser.get_file_name().to_string();
+        let source_text = self.parser.get_source_text();
 
-        let provider = RenameProvider::new(self.parser.get_arena(), binder, line_map, file_name);
+        let provider = RenameProvider::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
         let pos = Position::new(line, character);
 
         let result = provider.prepare_rename(pos);
@@ -506,8 +513,9 @@ impl ThinParser {
         let binder = self.binder.as_ref().unwrap();
         let line_map = self.line_map.as_ref().unwrap();
         let file_name = self.parser.get_file_name().to_string();
+        let source_text = self.parser.get_source_text();
 
-        let provider = RenameProvider::new(self.parser.get_arena(), binder, line_map, file_name);
+        let provider = RenameProvider::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
         let pos = Position::new(line, character);
 
         match provider.provide_rename_edits(root, pos, new_name) {
@@ -542,12 +550,55 @@ impl ThinParser {
         );
 
         let context = CodeActionContext {
-            diagnostics: Vec::new(), // TODO: Pass diagnostics from checker
+            diagnostics: Vec::new(),
             only: None,
         };
 
         let result = provider.provide_code_actions(root, range, context);
         Ok(serde_wasm_bindgen::to_value(&result)?)
+    }
+
+    /// Diagnostics: Get checker diagnostics in LSP format.
+    #[wasm_bindgen(js_name = getLspDiagnostics)]
+    pub fn get_lsp_diagnostics(&mut self) -> Result<JsValue, JsValue> {
+        self.ensure_bound()?;
+        self.ensure_line_map();
+
+        let root = self.source_file_idx.unwrap();
+        let binder = self.binder.as_ref().unwrap();
+        let line_map = self.line_map.as_ref().unwrap();
+        let file_name = self.parser.get_file_name().to_string();
+        let source_text = self.parser.get_source_text();
+
+        let mut checker = if let Some(cache) = self.type_cache.take() {
+            ThinCheckerState::with_cache(
+                self.parser.get_arena(),
+                binder,
+                &self.type_interner,
+                file_name.clone(),
+                cache,
+            )
+        } else {
+            ThinCheckerState::new(
+                self.parser.get_arena(),
+                binder,
+                &self.type_interner,
+                file_name.clone(),
+            )
+        };
+
+        checker.check_source_file(root);
+
+        let lsp_diagnostics: Vec<_> = checker
+            .ctx
+            .diagnostics
+            .iter()
+            .map(|diag| convert_diagnostic(diag, line_map, source_text))
+            .collect();
+
+        self.type_cache = Some(checker.extract_cache());
+
+        Ok(serde_wasm_bindgen::to_value(&lsp_diagnostics)?)
     }
 }
 

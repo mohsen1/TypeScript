@@ -22,6 +22,7 @@ pub struct FindReferences<'a> {
     binder: &'a ThinBinderState,
     line_map: &'a LineMap,
     file_name: String,
+    source_text: &'a str,
 }
 
 impl<'a> FindReferences<'a> {
@@ -31,12 +32,14 @@ impl<'a> FindReferences<'a> {
         binder: &'a ThinBinderState,
         line_map: &'a LineMap,
         file_name: String,
+        source_text: &'a str,
     ) -> Self {
         Self {
             arena,
             binder,
             line_map,
             file_name,
+            source_text,
         }
     }
 
@@ -48,7 +51,7 @@ impl<'a> FindReferences<'a> {
     /// Returns None if no symbol is found at the position.
     pub fn find_references(&self, root: NodeIndex, position: Position) -> Option<Vec<Location>> {
         // 1. Convert position to byte offset
-        let offset = self.line_map.position_to_offset(position);
+        let offset = self.line_map.position_to_offset(position, self.source_text)?;
 
         // 2. Find the most specific node at this offset
         let node_idx = find_node_at_offset(self.arena, offset);
@@ -77,8 +80,8 @@ impl<'a> FindReferences<'a> {
             .iter()
             .filter_map(|&idx| {
                 let node = self.arena.get(idx)?;
-                let start_pos = self.line_map.offset_to_position(node.pos);
-                let end_pos = self.line_map.offset_to_position(node.end);
+                let start_pos = self.line_map.offset_to_position(node.pos, self.source_text);
+                let end_pos = self.line_map.offset_to_position(node.end, self.source_text);
 
                 Some(Location {
                     file_path: self.file_name.clone(),
@@ -123,8 +126,8 @@ impl<'a> FindReferences<'a> {
             .iter()
             .filter_map(|&idx| {
                 let node = self.arena.get(idx)?;
-                let start_pos = self.line_map.offset_to_position(node.pos);
-                let end_pos = self.line_map.offset_to_position(node.end);
+                let start_pos = self.line_map.offset_to_position(node.pos, self.source_text);
+                let end_pos = self.line_map.offset_to_position(node.end, self.source_text);
 
                 Some(Location {
                     file_path: self.file_name.clone(),
@@ -142,7 +145,7 @@ impl<'a> FindReferences<'a> {
 
     /// Find only usages (excluding declarations) for the symbol at the given position.
     pub fn find_usages_only(&self, root: NodeIndex, position: Position) -> Option<Vec<Location>> {
-        let offset = self.line_map.position_to_offset(position);
+        let offset = self.line_map.position_to_offset(position, self.source_text)?;
         let node_idx = find_node_at_offset(self.arena, offset);
         if node_idx.is_none() {
             return None;
@@ -159,8 +162,8 @@ impl<'a> FindReferences<'a> {
             .iter()
             .filter_map(|&idx| {
                 let node = self.arena.get(idx)?;
-                let start_pos = self.line_map.offset_to_position(node.pos);
-                let end_pos = self.line_map.offset_to_position(node.end);
+                let start_pos = self.line_map.offset_to_position(node.pos, self.source_text);
+                let end_pos = self.line_map.offset_to_position(node.end, self.source_text);
 
                 Some(Location {
                     file_path: self.file_name.clone(),
@@ -201,7 +204,7 @@ mod references_tests {
         // Position at the first 'x' in "x + x" (line 1, column 0)
         let position = Position::new(1, 0);
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string());
+        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
         assert!(references.is_some(), "Should find references for x");
@@ -227,7 +230,7 @@ mod references_tests {
         // Position outside any identifier
         let position = Position::new(0, 11); // At the semicolon
 
-        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string());
+        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let references = find_refs.find_references(root, position);
 
         // Should not find references
