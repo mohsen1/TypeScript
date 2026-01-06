@@ -29,6 +29,7 @@ Note:
 10. Class ES5 transform: emit try/throw statements and parenthesized expressions [done]
 11. CommonJS export star (export * from) support [done]
 12. CommonJS export names: handle binding patterns in destructuring exports [done]
+13. Class ES5 transform: destructured parameters emit assignments [done]
 
 
 ## Quick Reference

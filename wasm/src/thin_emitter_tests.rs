@@ -100,6 +100,28 @@ fn test_thin_emit_class_extends_es6() {
 }
 
 #[test]
+fn test_thin_emit_class_method_destructured_param_es5() {
+    let source = "class Foo { method({ x }) { return x; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_a)"),
+        "Expected temp parameter in ES5 output: {}",
+        output
+    );
+    assert!(
+        output.contains("var x = _a.x"),
+        "Expected destructuring assignment in ES5 output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_arrow_function() {
     let source = "let f = (x) => x * 2";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
