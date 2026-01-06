@@ -1408,19 +1408,28 @@ impl Project {
             if joined.extension().is_some() {
                 candidates.push(path_to_string(&joined));
             } else {
-                candidates.push(path_to_string(&joined.with_extension("ts")));
-                candidates.push(path_to_string(&joined.join("index.ts")));
+                for ext in TS_EXTENSION_CANDIDATES {
+                    candidates.push(path_to_string(&joined.with_extension(ext)));
+                }
+                for ext in TS_EXTENSION_CANDIDATES {
+                    candidates.push(path_to_string(&joined.join("index").with_extension(ext)));
+                }
             }
         } else {
             candidates.push(module_specifier.to_string());
-            if !module_specifier.ends_with(".ts") {
-                candidates.push(format!("{}.ts", module_specifier));
+            if Path::new(module_specifier).extension().is_none() {
+                for ext in TS_EXTENSION_CANDIDATES {
+                    candidates.push(format!("{}.{}", module_specifier, ext));
+                }
             }
         }
 
         candidates
     }
 }
+
+const TS_EXTENSION_CANDIDATES: [&str; 7] = ["ts", "tsx", "d.ts", "mts", "cts", "d.mts", "d.cts"];
+const TS_EXTENSION_SUFFIXES: [&str; 7] = [".d.ts", ".d.mts", ".d.cts", ".ts", ".tsx", ".mts", ".cts"];
 
 fn normalize_path(path: &Path) -> PathBuf {
     let mut normalized = PathBuf::new();
@@ -1441,18 +1450,26 @@ fn normalize_path(path: &Path) -> PathBuf {
 }
 
 fn strip_ts_extension(path: &Path) -> PathBuf {
-    if path.extension().is_some_and(|ext| ext == "ts") {
-        let mut base = PathBuf::new();
-        if let Some(parent) = path.parent() {
-            base.push(parent);
+    let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+        return path.to_path_buf();
+    };
+
+    for suffix in TS_EXTENSION_SUFFIXES {
+        if file_name.ends_with(suffix) {
+            let base_name = &file_name[..file_name.len() - suffix.len()];
+            if base_name.is_empty() {
+                return path.to_path_buf();
+            }
+            let mut base = PathBuf::new();
+            if let Some(parent) = path.parent() {
+                base.push(parent);
+            }
+            base.push(base_name);
+            return base;
         }
-        if let Some(stem) = path.file_stem() {
-            base.push(stem);
-        }
-        base
-    } else {
-        path.to_path_buf()
     }
+
+    path.to_path_buf()
 }
 
 fn relative_path(from: &Path, to: &Path) -> PathBuf {
