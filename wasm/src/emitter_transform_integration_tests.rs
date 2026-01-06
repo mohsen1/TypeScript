@@ -313,6 +313,65 @@ fn test_two_phase_emission_commonjs_multi_export_vars() {
 }
 
 #[test]
+fn test_two_phase_emission_commonjs_auto_detect_exports() {
+    let source = "export const x = 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.auto_detect_module = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate CommonJS export transforms via auto-detect"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_auto_detect_module(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("exports.x = x;"),
+        "CommonJS auto-detect should export x"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_commonjs_export_assignment_suppresses_named_exports() {
+    let source = "export = foo;\nexport const x = 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.auto_detect_module = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_auto_detect_module(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("module.exports = foo;"),
+        "CommonJS export assignment should emit module.exports"
+    );
+    assert!(
+        !output.contains("exports.x = x;"),
+        "Named exports should be suppressed when export assignment is present"
+    );
+}
+
+#[test]
 fn test_transform_directive_composability() {
     // This test verifies that the architecture supports composable transforms
     // For now, we just verify that the TransformContext can be created and passed around

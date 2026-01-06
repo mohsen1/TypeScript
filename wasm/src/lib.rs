@@ -336,13 +336,13 @@ impl ThinParser {
     #[wasm_bindgen(js_name = emit)]
     pub fn emit(&self) -> String {
         if let Some(root_idx) = self.source_file_idx {
-            let mut printer = ThinPrinter::new(self.parser.get_arena());
-            printer.set_target_es5(true); // Match TypeScript baselines
-            // Detect if file is a module and apply CommonJS transform
-            printer.set_auto_detect_module(true);
-            printer.set_source_text(self.parser.get_source_text());
-            printer.emit(root_idx);
-            printer.get_output().to_string()
+            let mut options = PrinterOptions::default();
+            options.target = ScriptTarget::ES5;
+
+            let mut ctx = EmitContext::with_options(options);
+            ctx.auto_detect_module = true;
+
+            self.emit_with_context(root_idx, ctx)
         } else {
             String::new()
         }
@@ -352,13 +352,30 @@ impl ThinParser {
     #[wasm_bindgen(js_name = emitModern)]
     pub fn emit_modern(&self) -> String {
         if let Some(root_idx) = self.source_file_idx {
-            // Use new_es6 to avoid downleveling to ES5
-            let mut printer = ThinPrinter::new_es6(self.parser.get_arena());
-            printer.emit(root_idx);
-            printer.get_output().to_string()
+            let mut options = PrinterOptions::default();
+            options.target = ScriptTarget::ES2015;
+
+            let ctx = EmitContext::with_options(options);
+
+            self.emit_with_context(root_idx, ctx)
         } else {
             String::new()
         }
+    }
+
+    fn emit_with_context(&self, root_idx: parser::NodeIndex, ctx: EmitContext) -> String {
+        let transforms = LoweringPass::new(self.parser.get_arena(), &ctx).run(root_idx);
+
+        let mut printer = ThinPrinter::with_transforms_and_options(
+            self.parser.get_arena(),
+            transforms,
+            ctx.options.clone(),
+        );
+        printer.set_target_es5(ctx.target_es5);
+        printer.set_auto_detect_module(ctx.auto_detect_module);
+        printer.set_source_text(self.parser.get_source_text());
+        printer.emit(root_idx);
+        printer.get_output().to_string()
     }
 
     /// Generate transform directives based on compiler options.

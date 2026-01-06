@@ -53,6 +53,8 @@ pub struct LoweringPass<'a> {
     arena: &'a ThinNodeArena,
     ctx: &'a EmitContext,
     transforms: TransformContext,
+    commonjs_mode: bool,
+    has_export_assignment: bool,
 }
 
 impl<'a> LoweringPass<'a> {
@@ -62,11 +64,14 @@ impl<'a> LoweringPass<'a> {
             arena,
             ctx,
             transforms: TransformContext::new(),
+            commonjs_mode: false,
+            has_export_assignment: false,
         }
     }
 
     /// Run the lowering pass on a source file and return the transform context
     pub fn run(mut self, source_file: NodeIndex) -> TransformContext {
+        self.init_module_state(source_file);
         self.visit(source_file);
         self.maybe_wrap_module(source_file);
         self.transforms
@@ -104,7 +109,8 @@ impl<'a> LoweringPass<'a> {
             }
             k if k == syntax_kind_ext::BLOCK || k == syntax_kind_ext::CASE_BLOCK => {
                 if let Some(block) = self.get_block_like(node) {
-                    for &stmt in &block.statements.nodes {
+                    let statements = block.statements.nodes.clone();
+                    for stmt in statements {
                         self.visit(stmt);
                     }
                 }
@@ -437,8 +443,8 @@ impl<'a> LoweringPass<'a> {
 
         // Check if this class needs export wrapping (CommonJS)
         let is_exported =
-            self.ctx.is_commonjs() && self.has_export_modifier(&class.modifiers)
-                && !self.ctx.module_state.has_export_assignment;
+            self.is_commonjs() && self.has_export_modifier(&class.modifiers)
+                && !self.has_export_assignment;
 
         let is_default = self.has_default_modifier(&class.modifiers);
 
@@ -498,8 +504,8 @@ impl<'a> LoweringPass<'a> {
         }
 
         let is_exported =
-            self.ctx.is_commonjs() && self.has_export_modifier(&func.modifiers)
-                && !self.ctx.module_state.has_export_assignment;
+            self.is_commonjs() && self.has_export_modifier(&func.modifiers)
+                && !self.has_export_assignment;
         let is_default = self.has_default_modifier(&func.modifiers);
 
         let func_name = if !func.name.is_none() {
@@ -573,9 +579,9 @@ impl<'a> LoweringPass<'a> {
             return;
         };
 
-        if self.ctx.is_commonjs()
+        if self.is_commonjs()
             && self.has_export_modifier(&var_stmt.modifiers)
-            && !self.ctx.module_state.has_export_assignment
+            && !self.has_export_assignment
         {
             let export_names = self.collect_variable_names(&var_stmt.declarations);
             if !export_names.is_empty() {
@@ -620,6 +626,28 @@ impl<'a> LoweringPass<'a> {
     // =========================================================================
     // Helper Methods
     // =========================================================================
+
+    fn init_module_state(&mut self, source_file: NodeIndex) {
+        let Some(node) = self.arena.get(source_file) else {
+            return;
+        };
+        let Some(source) = self.arena.get_source_file(node) else {
+            return;
+        };
+
+        self.has_export_assignment = self.contains_export_assignment(&source.statements);
+        self.commonjs_mode = if self.ctx.is_commonjs() {
+            true
+        } else if self.ctx.auto_detect_module {
+            self.file_is_module(&source.statements)
+        } else {
+            false
+        };
+    }
+
+    fn is_commonjs(&self) -> bool {
+        self.commonjs_mode
+    }
 
     /// Check if a modifier list contains the 'declare' keyword
     fn has_declare_modifier(&self, modifiers: &Option<NodeList>) -> bool {
@@ -836,6 +864,17 @@ impl<'a> LoweringPass<'a> {
                         }
                     }
                     _ => {}
+                }
+            }
+        }
+        false
+    }
+
+    fn contains_export_assignment(&self, statements: &NodeList) -> bool {
+        for &stmt_idx in &statements.nodes {
+            if let Some(node) = self.arena.get(stmt_idx) {
+                if node.kind == syntax_kind_ext::EXPORT_ASSIGNMENT {
+                    return true;
                 }
             }
         }
