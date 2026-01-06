@@ -133,15 +133,22 @@ impl<'a> ClassES5Emitter<'a> {
             })
             .collect();
 
-        // Find constructor in members
+        // Find constructor implementation (the one with a body)
+        // Skip declaration-only constructors (overload signatures)
         let mut found_constructor = false;
 
         for &member_idx in &class_data.members.nodes {
             let Some(member_node) = self.arena.get(member_idx) else { continue };
 
             if member_node.kind == syntax_kind_ext::CONSTRUCTOR {
-                found_constructor = true;
                 let Some(ctor_data) = self.arena.get_constructor(member_node) else { continue };
+
+                // Only emit the constructor implementation (with a body), not overload signatures
+                if ctor_data.body.is_none() {
+                    continue;
+                }
+
+                found_constructor = true;
 
                 self.write_indent();
                 self.write("function ");
@@ -155,10 +162,11 @@ impl<'a> ClassES5Emitter<'a> {
                 // Emit instance property initializers at the start of constructor
                 self.emit_instance_property_initializers(&instance_props);
 
+                // Emit parameter properties (public p, private p, etc.)
+                self.emit_parameter_properties(&ctor_data.parameters);
+
                 // Emit constructor body
-                if !ctor_data.body.is_none() {
-                    self.emit_block_contents(ctor_data.body);
-                }
+                self.emit_block_contents(ctor_data.body);
 
                 self.decrease_indent();
                 self.write_indent();
@@ -206,7 +214,52 @@ impl<'a> ClassES5Emitter<'a> {
             self.write_line();
         }
     }
-    
+
+    /// Emit parameter properties as this.param = param;
+    /// For constructor parameters with public, private, protected, or readonly modifiers
+    fn emit_parameter_properties(&mut self, params: &NodeList) {
+        for &param_idx in &params.nodes {
+            let Some(param_node) = self.arena.get(param_idx) else { continue };
+            let Some(param) = self.arena.get_parameter(param_node) else { continue };
+
+            // Check for modifiers that trigger property creation
+            if self.has_parameter_property_modifier(&param.modifiers) {
+                let name = self.get_identifier_text(param.name);
+
+                if !name.is_empty() {
+                    self.write_indent();
+                    self.write("this.");
+                    self.write(&name);
+                    self.write(" = ");
+                    self.write(&name);
+                    self.write(";");
+                    self.write_line();
+                }
+            }
+        }
+    }
+
+    /// Check if parameter has a modifier that makes it a property (public, private, protected, readonly)
+    fn has_parameter_property_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        let Some(mods) = modifiers else {
+            return false;
+        };
+        for &mod_idx in &mods.nodes {
+            let Some(mod_node) = self.arena.get(mod_idx) else { continue };
+            match mod_node.kind {
+                k if k == SyntaxKind::PublicKeyword as u16
+                    || k == SyntaxKind::PrivateKeyword as u16
+                    || k == SyntaxKind::ProtectedKeyword as u16
+                    || k == SyntaxKind::ReadonlyKeyword as u16 =>
+                {
+                    return true;
+                }
+                _ => {}
+            }
+        }
+        false
+    }
+
     fn emit_methods(&mut self, class_name: &str, class_data: &ClassData) {
         for &member_idx in &class_data.members.nodes {
             let Some(member_node) = self.arena.get(member_idx) else { continue };
