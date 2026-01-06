@@ -118,6 +118,10 @@ pub struct Symbol {
     pub parent: SymbolId,
     /// Unique ID for this symbol
     pub id: SymbolId,
+    /// Exported members for modules/namespaces
+    pub exports: Option<Box<SymbolTable>>,
+    /// Members for classes/interfaces
+    pub members: Option<Box<SymbolTable>>,
 }
 
 impl Symbol {
@@ -130,6 +134,8 @@ impl Symbol {
             value_declaration: NodeIndex::NONE,
             parent: SymbolId::NONE,
             id,
+            exports: None,
+            members: None,
         }
     }
 

@@ -669,3 +669,82 @@ fn test_strict_function_variance() {
     // Now unsafe assignment should pass (legacy behavior)
     assert!(checker.is_subtype_of(string_arg_fn, union_arg_fn));
 }
+#[test]
+fn test_function_fixed_to_rest_subtyping() {
+    use std::sync::Arc;
+
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // Source: (name: string, mixed: any, arg: any) => any
+    let source = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(Arc::from("name")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(Arc::from("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo { name: Some(Arc::from("arg")), type_id: TypeId::ANY, optional: false, rest: false },
+        ],
+        return_type: TypeId::ANY,
+        is_constructor: false,
+    });
+
+    // Target: (name: string, mixed: any, ...args: any[]) => any
+    let any_array = interner.array(TypeId::ANY);
+    let target = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(Arc::from("name")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(Arc::from("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo { name: Some(Arc::from("args")), type_id: any_array, optional: false, rest: true },
+        ],
+        return_type: TypeId::ANY,
+        is_constructor: false,
+    });
+
+    // Function with fixed params should be subtype of function with rest params
+    // This matches TypeScript behavior
+    assert!(checker.is_subtype_of(source, target), "Function with 3 fixed params should be subtype of function with 2 fixed + rest params");
+}
+
+#[test]
+fn test_function_rest_tuple_to_rest_array_subtyping() {
+    use std::sync::Arc;
+
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // Source: (name: string, mixed: any, ...args: [any]) => any
+    let tuple_one_any = interner.tuple(vec![TupleElement {
+        type_id: TypeId::ANY,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let source = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(Arc::from("name")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(Arc::from("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo { name: Some(Arc::from("args")), type_id: tuple_one_any, optional: false, rest: true },
+        ],
+        return_type: TypeId::ANY,
+        is_constructor: false,
+    });
+
+    // Target: (name: string, mixed: any, ...args: any[]) => any
+    let any_array = interner.array(TypeId::ANY);
+    let target = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(Arc::from("name")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(Arc::from("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo { name: Some(Arc::from("args")), type_id: any_array, optional: false, rest: true },
+        ],
+        return_type: TypeId::ANY,
+        is_constructor: false,
+    });
+
+    // Function with rest tuple should be subtype of function with rest array
+    // (name, mixed, ...args: [any]) should be assignable to (name, mixed, ...args: any[])
+    assert!(checker.is_subtype_of(source, target), "Function with rest tuple [any] should be subtype of function with rest array any[]");
+}
