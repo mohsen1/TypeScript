@@ -17,7 +17,7 @@
 //! }
 //! ```
 
-use std::sync::Arc;
+use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::TypeDatabase;
 
@@ -28,7 +28,7 @@ use crate::solver::TypeInterner;
 #[derive(Clone, Debug)]
 pub struct DiscriminantInfo {
     /// The name of the discriminant property
-    pub property_name: Arc<str>,
+    pub property_name: Atom,
     /// Map from literal value to the union member type
     pub variants: Vec<(TypeId, TypeId)>, // (literal_type, member_type)
 }
@@ -59,22 +59,19 @@ impl<'a> NarrowingContext<'a> {
         }
 
         // Collect all property names from all members
-        let mut all_properties: Vec<Arc<str>> = Vec::new();
-        let mut member_props: Vec<Vec<(Arc<str>, TypeId)>> = Vec::new();
+        let mut all_properties: Vec<Atom> = Vec::new();
+        let mut member_props: Vec<Vec<(Atom, TypeId)>> = Vec::new();
 
         for &member in &members {
             if let Some(TypeKey::Object(props)) = self.interner.lookup(member) {
-                let props_vec: Vec<(Arc<str>, TypeId)> = props.iter()
-                    .map(|p| {
-                        let name_str = self.interner.resolve_atom(p.name);
-                        (Arc::from(name_str.as_str()), p.type_id)
-                    })
+                let props_vec: Vec<(Atom, TypeId)> = props.iter()
+                    .map(|p| (p.name, p.type_id))
                     .collect();
 
                 // Track all property names
                 for (name, _) in &props_vec {
                     if !all_properties.contains(name) {
-                        all_properties.push(name.clone());
+                        all_properties.push(*name);
                     }
                 }
                 member_props.push(props_vec);
@@ -139,13 +136,13 @@ impl<'a> NarrowingContext<'a> {
     pub fn narrow_by_discriminant(
         &self,
         union_type: TypeId,
-        property_name: &str,
+        property_name: Atom,
         literal_value: TypeId,
     ) -> TypeId {
         let discriminants = self.find_discriminants(union_type);
 
         for disc in &discriminants {
-            if disc.property_name.as_ref() == property_name {
+            if disc.property_name == property_name {
                 // Find the variant matching this literal
                 for (lit, member) in &disc.variants {
                     if *lit == literal_value {
@@ -165,7 +162,7 @@ impl<'a> NarrowingContext<'a> {
     pub fn narrow_by_excluding_discriminant(
         &self,
         union_type: TypeId,
-        property_name: &str,
+        property_name: Atom,
         excluded_value: TypeId,
     ) -> TypeId {
         let members = match self.interner.lookup(union_type) {
@@ -178,7 +175,7 @@ impl<'a> NarrowingContext<'a> {
         for &member in &members {
             if let Some(TypeKey::Object(props)) = self.interner.lookup(member) {
                 let prop_type = props.iter()
-                    .find(|p| self.interner.resolve_atom(p.name) == property_name)
+                    .find(|p| p.name == property_name)
                     .map(|p| p.type_id);
 
                 match prop_type {
@@ -363,7 +360,7 @@ pub fn find_discriminants(interner: &dyn TypeDatabase, union_type: TypeId) -> Ve
 pub fn narrow_by_discriminant(
     interner: &dyn TypeDatabase,
     union_type: TypeId,
-    property_name: &str,
+    property_name: Atom,
     literal_value: TypeId,
 ) -> TypeId {
     let ctx = NarrowingContext::new(interner);

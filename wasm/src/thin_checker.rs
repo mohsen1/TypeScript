@@ -2042,7 +2042,7 @@ impl<'a> ThinCheckerState<'a> {
     ///
     /// Example: `action.type === "add"` narrows `{ type: "add" } | { type: "remove" }`
     /// to `{ type: "add" }`.
-    pub fn narrow_by_discriminant(&self, union_type: TypeId, property_name: &str, literal_value: TypeId) -> TypeId {
+    pub fn narrow_by_discriminant(&self, union_type: TypeId, property_name: Atom, literal_value: TypeId) -> TypeId {
         use crate::solver::NarrowingContext;
         let ctx = NarrowingContext::new(self.ctx.types);
         ctx.narrow_by_discriminant(union_type, property_name, literal_value)
@@ -2051,7 +2051,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Narrow a discriminated union by excluding a discriminant value.
     ///
     /// Example: `action.type !== "add"` narrows the union to exclude the "add" variant.
-    pub fn narrow_by_excluding_discriminant(&self, union_type: TypeId, property_name: &str, excluded_value: TypeId) -> TypeId {
+    pub fn narrow_by_excluding_discriminant(&self, union_type: TypeId, property_name: Atom, excluded_value: TypeId) -> TypeId {
         use crate::solver::NarrowingContext;
         let ctx = NarrowingContext::new(self.ctx.types);
         ctx.narrow_by_excluding_discriminant(union_type, property_name, excluded_value)
