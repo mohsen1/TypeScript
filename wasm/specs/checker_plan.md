@@ -42,10 +42,12 @@ Our focus is to make wasm checker complete
     - Consider making strictFunctionTypes the default
 - ⬜ Remove unused ref_cache field (MINOR from Gemini review)
     - Currently marked #[allow(dead_code)], not implemented
-- ⬜ Fix tuple to array subtyping for rest elements (BLOCKER from Gemini review)
-    - Currently fails: `[number, ...string[]]` should be assignable to `string[]`
-    - Rest elements have Array type, need to unwrap before comparing to scalar
-    - Fix: get_array_element_type on rest elements before subtype check
+- ✅ Fix tuple to array subtyping for rest elements (BLOCKER - COMPLETED)
+    - Fixed: Rest elements now properly unwrapped before comparison
+    - `[string, ...string[]]` is now assignable to `string[]`
+    - Uses get_array_element_type to unwrap rest array type
+    - Added 4 comprehensive test cases
+    - All 602 tests pass
 - ⬜ Fix number index signature check (CRITICAL from Gemini review)
     - check_object_to_indexed ignores number_index signature
     - Numeric property names (e.g., `{ 0: "val" }`) must validate against `[x: number]: T`

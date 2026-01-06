@@ -383,3 +383,87 @@ fn test_tuple_subtyping_rest_to_rest() {
     // Both have rest, same types -> should succeed
     assert!(checker.is_subtype_of(source, target));
 }
+
+#[test]
+fn test_tuple_to_array_with_rest() {
+    // BLOCKER fix: [number, ...string[]] IS assignable to string[]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+
+    // [number, ...string[]]
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    // string[]
+    let target = string_array;
+
+    // This should FAIL because first element is number, not string
+    assert!(!checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_tuple_to_array_all_matching_with_rest() {
+    // [string, ...string[]] IS assignable to string[]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+
+    // [string, ...string[]]
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    // string[]
+    let target = string_array;
+
+    // This should SUCCEED - all elements (including rest) are strings
+    assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_tuple_to_array_no_rest() {
+    // [string, string] IS assignable to string[]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+
+    // [string, string]
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    // string[]
+    let target = string_array;
+
+    // This should SUCCEED - all fixed elements are strings
+    assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_tuple_to_array_mixed_types() {
+    // [number, string] is NOT assignable to string[]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+
+    // [number, string]
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    // string[]
+    let target = string_array;
+
+    // This should FAIL - first element is number, not string
+    assert!(!checker.is_subtype_of(source, target));
+}
