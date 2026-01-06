@@ -81,6 +81,9 @@ pub mod transforms;
 // Query-based Structural Solver (Phase 7.5)
 pub mod solver;
 
+// LSP (Language Server Protocol) support
+pub mod lsp;
+
 // =============================================================================
 // Scanner Factory Function
 // =============================================================================
