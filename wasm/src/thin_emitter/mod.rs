@@ -2018,6 +2018,14 @@ impl<'a> ThinPrinter<'a> {
     // =========================================================================
 
     fn emit_import_declaration(&mut self, node: &ThinNode) {
+        if self.ctx.is_commonjs() {
+            self.emit_import_declaration_commonjs(node);
+        } else {
+            self.emit_import_declaration_es6(node);
+        }
+    }
+
+    fn emit_import_declaration_es6(&mut self, node: &ThinNode) {
         let Some(import) = self.arena.get_import_decl(node) else {
             return;
         };
@@ -2031,6 +2039,48 @@ impl<'a> ThinPrinter<'a> {
 
         self.emit(import.module_specifier);
         self.write_semicolon();
+    }
+
+    fn emit_import_declaration_commonjs(&mut self, node: &ThinNode) {
+        use crate::transforms::module_commonjs;
+
+        let Some(import) = self.arena.get_import_decl(node) else {
+            return;
+        };
+
+        // Skip type-only imports in CommonJS
+        if import.import_clause.is_none() {
+            return; // Side-effect import: import "module"; -> skip or emit require
+        }
+
+        // Get module specifier and generate var name
+        let module_spec = if let Some(spec_node) = self.arena.get(import.module_specifier) {
+            if let Some(lit) = self.arena.get_literal(spec_node) {
+                lit.text.clone()
+            } else {
+                return;
+            }
+        } else {
+            return;
+        };
+
+        // Generate module var name: "./foo" -> "foo_1"
+        let module_var = format!("{}_1", module_commonjs::sanitize_module_name(&module_spec));
+
+        // Emit: var module_1 = require("module");
+        self.write("var ");
+        self.write(&module_var);
+        self.write(" = require(\"");
+        self.write(&module_spec);
+        self.write("\");");
+        self.write_line();
+
+        // Emit bindings
+        let bindings = module_commonjs::get_import_bindings(self.arena, node, &module_var);
+        for binding in bindings {
+            self.write(&binding);
+            self.write_line();
+        }
     }
 
     fn emit_import_clause(&mut self, node: &ThinNode) {
@@ -2078,6 +2128,14 @@ impl<'a> ThinPrinter<'a> {
     }
 
     fn emit_export_declaration(&mut self, node: &ThinNode) {
+        if self.ctx.is_commonjs() {
+            self.emit_export_declaration_commonjs(node);
+        } else {
+            self.emit_export_declaration_es6(node);
+        }
+    }
+
+    fn emit_export_declaration_es6(&mut self, node: &ThinNode) {
         let Some(export) = self.arena.get_export_decl(node) else {
             return;
         };
@@ -2096,6 +2154,84 @@ impl<'a> ThinPrinter<'a> {
         }
 
         self.write_semicolon();
+    }
+
+    fn emit_export_declaration_commonjs(&mut self, node: &ThinNode) {
+        use crate::transforms::module_commonjs;
+
+        let Some(export) = self.arena.get_export_decl(node) else {
+            return;
+        };
+
+        // Re-export from another module: export { x } from "module";
+        if !export.module_specifier.is_none() {
+            let module_spec = if let Some(spec_node) = self.arena.get(export.module_specifier) {
+                if let Some(lit) = self.arena.get_literal(spec_node) {
+                    lit.text.clone()
+                } else {
+                    return;
+                }
+            } else {
+                return;
+            };
+
+            let module_var = format!("{}_1", module_commonjs::sanitize_module_name(&module_spec));
+
+            // First emit the require
+            self.write("var ");
+            self.write(&module_var);
+            self.write(" = require(\"");
+            self.write(&module_spec);
+            self.write("\");");
+            self.write_line();
+
+            // Then emit Object.defineProperty for each export
+            if let Some(clause_node) = self.arena.get(export.export_clause) {
+                if let Some(named_exports) = self.arena.get_named_imports(clause_node) {
+                    for &spec_idx in &named_exports.elements.nodes {
+                        if let Some(spec_node) = self.arena.get(spec_idx) {
+                            if let Some(spec) = self.arena.get_specifier(spec_node) {
+                                // Get export name and import name
+                                let export_name = self.get_identifier_text_idx(spec.name);
+                                let import_name = if !spec.property_name.is_none() {
+                                    self.get_identifier_text_idx(spec.property_name)
+                                } else {
+                                    export_name.clone()
+                                };
+
+                                // Object.defineProperty(exports, "name", { enumerable: true, get: function () { return mod.name; } });
+                                self.write("Object.defineProperty(exports, \"");
+                                self.write(&export_name);
+                                self.write("\", { enumerable: true, get: function () { return ");
+                                self.write(&module_var);
+                                self.write(".");
+                                self.write(&import_name);
+                                self.write("; } });");
+                                self.write_line();
+                            }
+                        }
+                    }
+                }
+            } else {
+                // export * from "module" - need __exportStar helper
+                // TODO: implement export star
+            }
+        } else {
+            // Local re-export: export { x, y } - these are handled at declaration time
+            // Skip for now as the exports.x = x is emitted with the declaration
+        }
+    }
+
+    /// Get identifier text from a node index
+    fn get_identifier_text_idx(&self, idx: NodeIndex) -> String {
+        if let Some(node) = self.arena.get(idx) {
+            if node.kind == SyntaxKind::Identifier as u16 {
+                if let Some(id) = self.arena.get_identifier(node) {
+                    return id.escaped_text.clone();
+                }
+            }
+        }
+        String::new()
     }
 
     fn emit_named_exports(&mut self, node: &ThinNode) {
@@ -2908,6 +3044,11 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
+        // CommonJS preamble
+        if self.ctx.is_commonjs() {
+            self.emit_commonjs_preamble(&source.statements);
+        }
+
         // Check if any class extends another - if so, emit __extends helper
         if self.ctx.target_es5 && self.needs_extends_helper(&source.statements) {
             self.emit_extends_helper();
@@ -2920,6 +3061,34 @@ impl<'a> ThinPrinter<'a> {
             if self.writer.len() > before_len {
                 self.write_line();
             }
+        }
+    }
+
+    /// Emit CommonJS module preamble
+    fn emit_commonjs_preamble(&mut self, statements: &NodeList) {
+        use crate::transforms::module_commonjs;
+
+        // "use strict";
+        self.write("\"use strict\";");
+        self.write_line();
+
+        // Object.defineProperty(exports, "__esModule", { value: true });
+        self.write("Object.defineProperty(exports, \"__esModule\", { value: true });");
+        self.write_line();
+
+        // Collect and emit exports initialization
+        let export_names = module_commonjs::collect_export_names(self.arena, &statements.nodes);
+        if !export_names.is_empty() {
+            // exports.a = exports.b = void 0;
+            for (i, name) in export_names.iter().enumerate() {
+                if i > 0 {
+                    self.write(" = ");
+                }
+                self.write("exports.");
+                self.write(name);
+            }
+            self.write(" = void 0;");
+            self.write_line();
         }
     }
 

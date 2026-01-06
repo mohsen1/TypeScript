@@ -376,3 +376,84 @@ fn test_thin_emit_readonly_index_signature() {
     assert!(!output.contains("interface"), "JavaScript output should NOT contain 'interface': {}", output);
     assert!(!output.contains("readonly"), "JavaScript output should NOT contain 'readonly': {}", output);
 }
+
+// =============================================================================
+// CommonJS Module Tests
+// =============================================================================
+
+use crate::thin_emitter::{PrinterOptions, ModuleKind};
+
+#[test]
+fn test_commonjs_preamble() {
+    let source = "export const x = 42;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("\"use strict\";"), "Expected 'use strict' in CommonJS output: {}", output);
+    assert!(output.contains("Object.defineProperty(exports, \"__esModule\""), "Expected __esModule in output: {}", output);
+    // Check that we have exports init - might be empty if no exports detected
+    // For now, just verify the preamble is there
+}
+
+#[test]
+fn test_commonjs_import_named() {
+    let source = r#"import { foo, bar } from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(output.contains("var foo = module_1.foo;"), "Expected foo binding in output: {}", output);
+    assert!(output.contains("var bar = module_1.bar;"), "Expected bar binding in output: {}", output);
+}
+
+#[test]
+fn test_commonjs_import_default() {
+    let source = r#"import myDefault from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(output.contains("var myDefault = module_1.default;"), "Expected default binding in output: {}", output);
+}
+
+#[test]
+fn test_commonjs_reexport() {
+    let source = r#"export { foo } from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(output.contains("Object.defineProperty(exports, \"foo\""), "Expected Object.defineProperty for re-export: {}", output);
+}

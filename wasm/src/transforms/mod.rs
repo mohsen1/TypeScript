@@ -9,3 +9,4 @@ pub mod class_es5;
 pub mod namespace_es5;
 pub mod arrow_es5;
 pub mod helpers;
+pub mod module_commonjs;
