@@ -57,6 +57,12 @@ Our focus is to make wasm checker complete
     - Added 2 test cases for var redeclaration at file level
     - All 625 tests: 623 passed (2 pre-existing failures unrelated to this fix)
     - Addresses critical issue identified by Gemini code review
+- ✅ Fix readonly property assignment check (error 2540) (COMPLETED)
+    - Fixed bug in get_class_name_from_expression that caused early return
+    - The method now falls through to check file_locals when get_class_name_from_type returns None
+    - Allows proper detection of readonly property assignments on class instances
+    - Test test_abstractPropertyNegative_errors now passes
+    - All 625 tests pass
 - ⬜ Various missing error codes (see test failures)
 - ✅ Fix tuple subtyping logic (CRITICAL - COMPLETED)
     - Fixed: Now properly rejects `[number, string]` as subtype of `[number]`

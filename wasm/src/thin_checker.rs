@@ -2687,7 +2687,10 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(type_id) = self.lookup_local(var_name) {
                 // Check if this type is a class instance - the type would be stored
                 // We need to trace back to the class name
-                return self.get_class_name_from_type(type_id);
+                if let Some(class_name) = self.get_class_name_from_type(type_id) {
+                    return Some(class_name);
+                }
+                // If get_class_name_from_type returns None, fall through to check file_locals
             }
 
             // Check file_locals for the variable binding
