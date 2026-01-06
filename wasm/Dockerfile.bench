@@ -1,7 +1,7 @@
 # Dockerfile for running Rust benchmarks safely
 # Based on the test Dockerfile but optimized for benchmarking
 
-FROM rust:1.82-slim
+FROM rustlang/rust:nightly-slim
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
@@ -11,12 +11,6 @@ RUN apt-get update && apt-get install -y \
 
 # Set working directory
 WORKDIR /workspace/wasm
-
-# Pre-download dependencies (cache layer)
-COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && echo "fn main() {}" > src/lib.rs && \
-    cargo fetch && \
-    rm -rf src
 
 # Default command
 CMD ["cargo", "bench", "--color=always"]
