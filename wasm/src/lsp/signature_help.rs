@@ -146,84 +146,41 @@ impl<'a> SignatureHelpProvider<'a> {
     /// Determine active parameter by scanning for commas, respecting nesting.
     /// This is more robust than AST analysis for incomplete code.
     fn determine_active_parameter(&self, call_idx: NodeIndex, data: &CallExprData, cursor_offset: u32) -> u32 {
-        let call_node = self.arena.get(call_idx).unwrap();
+        // Use AST-based approach instead of token scanning to handle edge cases:
+        // - Generic type arguments with angle brackets: Set<string, number>
+        // - Nested calls: foo(bar(x, y), z)
+        // - Complex expressions with comparison operators: a < b
 
-        // Start scanning after type arguments if present, otherwise after expression
-        let start_pos = if let Some(ref type_args) = data.type_arguments {
-            type_args.end as usize
-        } else if let Some(expr) = self.arena.get(data.expression) {
-            expr.end as usize
-        } else {
-            call_node.pos as usize
+        // If there are no arguments, return 0
+        let Some(ref args) = data.arguments else {
+            return 0;
         };
 
-        // TODO: Performance - ScannerState::new clones the entire source text
-        // Consider refactoring ScannerState to use &str or reusing ThinParser logic
-        let mut scanner = ScannerState::new(self.source_text.to_string(), true);
-        scanner.reset_token_state(start_pos);
-
-        // 1. Find the opening parenthesis of the call
-        let mut open_paren_pos = 0;
-        loop {
-            let token = scanner.scan();
-            if token == SyntaxKind::EndOfFileToken { break; }
-            if token == SyntaxKind::OpenParenToken {
-                open_paren_pos = scanner.get_token_end();
-                break;
-            }
-            // If we pass the cursor before finding '(', we are not in the args
-            if scanner.get_token_start() >= cursor_offset as usize { return 0; }
-        }
-
-        if open_paren_pos == 0 {
+        // Check if cursor is before the first argument
+        if args.nodes.is_empty() {
             return 0;
         }
 
-        // 2. Scan arguments counting commas at top level (depth 0)
-        let mut comma_count = 0;
-        let mut depth = 0;
+        // Find which argument contains or precedes the cursor
+        for (index, &arg_idx) in args.nodes.iter().enumerate() {
+            let Some(arg_node) = self.arena.get(arg_idx) else {
+                continue;
+            };
 
-        // Reset to just after the opening paren
-        scanner.reset_token_state(open_paren_pos);
-
-        loop {
-            let token = scanner.scan();
-            let token_start = scanner.get_token_start();
-
-            // Stop if we reach the cursor
-            if token_start >= cursor_offset as usize {
-                break;
+            // If cursor is before this argument's start, we're between args
+            // Return the index of the previous argument (or 0 for the first gap)
+            if cursor_offset < arg_node.pos {
+                return index.max(1) as u32 - 1;
             }
 
-            if token == SyntaxKind::EndOfFileToken { break; }
-
-            match token {
-                SyntaxKind::OpenParenToken |
-                SyntaxKind::OpenBracketToken |
-                SyntaxKind::OpenBraceToken => {
-                    depth += 1;
-                }
-                SyntaxKind::CloseParenToken |
-                SyntaxKind::CloseBracketToken |
-                SyntaxKind::CloseBraceToken => {
-                    if depth > 0 {
-                        depth -= 1;
-                    } else if token == SyntaxKind::CloseParenToken {
-                        // Closing paren of the function call
-                        return comma_count;
-                    }
-                }
-                SyntaxKind::CommaToken => {
-                    // Only count commas at depth 0 (top-level commas in the call)
-                    if depth == 0 {
-                        comma_count += 1;
-                    }
-                }
-                _ => {}
+            // If cursor is within this argument's range, return this index
+            if cursor_offset >= arg_node.pos && cursor_offset <= arg_node.end {
+                return index as u32;
             }
         }
 
-        comma_count
+        // Cursor is after all arguments - return the last argument index
+        (args.nodes.len().saturating_sub(1)) as u32
     }
 
     /// Extract signature information from a TypeId.
@@ -425,6 +382,53 @@ mod signature_help_tests {
 
         if let Some(h) = help {
             assert_eq!(h.active_parameter, 0, "Should be on first parameter");
+        }
+    }
+
+    #[test]
+    fn test_signature_help_between_arguments() {
+        // Test edge case: cursor between arguments (after comma, before next arg)
+        // function process(a: any, b: number, c: string): void {}
+        // process(1, |2, 3);
+        //          ^ cursor here should be on parameter 1
+        let source = "function process(a: any, b: number, c: string): void {}\nprocess(1, 2, 3);";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let interner = TypeInterner::new();
+        let line_map = LineMap::build(source);
+
+        let provider = SignatureHelpProvider::new(
+            parser.get_arena(),
+            &binder,
+            &line_map,
+            &interner,
+            source,
+            "test.ts".to_string()
+        );
+
+        // Test cursor at first argument
+        let pos1 = Position::new(1, 8); // At "1"
+        let help1 = provider.get_signature_help(root, pos1);
+        if let Some(h) = help1 {
+            assert_eq!(h.active_parameter, 0, "Should be on first parameter");
+        }
+
+        // Test cursor at second argument
+        let pos2 = Position::new(1, 11); // At "2"
+        let help2 = provider.get_signature_help(root, pos2);
+        if let Some(h) = help2 {
+            assert_eq!(h.active_parameter, 1, "Should be on second parameter");
+        }
+
+        // Test cursor at third argument
+        let pos3 = Position::new(1, 14); // At "3"
+        let help3 = provider.get_signature_help(root, pos3);
+        if let Some(h) = help3 {
+            assert_eq!(h.active_parameter, 2, "Should be on third parameter");
         }
     }
 }

@@ -329,6 +329,20 @@ All 644 tests pass! ✅ (2 ignored)
    - Results: All 683 tests passing ✅
    - **Impact:** Significantly improves accuracy of all LSP features (go-to-definition, find-references, hover, etc.)
 
+14. **Signature Help Parameter Detection Fix** (2026-01-06)
+   - **CRITICAL FIX:** Replaced token-based comma counting with AST-based approach
+   - Old approach: Scanned tokens counting commas at depth 0 (failed with generic types `<>`)
+   - **Edge case:** `process(new Set<string, number>(), 1)` - comma in generic args incorrectly counted
+   - New approach: Directly checks which argument node contains cursor position
+   - Benefits:
+     - Handles generic type arguments correctly (angle brackets not tracked as depth)
+     - Works with nested calls: `foo(bar(x, y), z)`
+     - Handles complex expressions with comparison operators: `a < b`
+     - More robust for incomplete code during typing
+   - Added test: `test_signature_help_between_arguments` validates multi-argument detection
+   - Results: All 684 tests passing ✅
+   - **Impact:** Signature help now works correctly in all scenarios
+
 #### Next Steps
 
 1. **Continue Parser Fixes** (MEDIUM PRIORITY)
@@ -340,10 +354,9 @@ All 644 tests pass! ✅ (2 ignored)
    - Add more refactoring actions (extract function, inline variable, etc.)
    - Integrate with diagnostics for quick fixes
 
-2. **Fix Signature Help Edge Cases**
-   - Debug multi-argument cursor position detection
-   - Add JSDoc documentation extraction for parameters
-   - Optimize ScannerState to use &str instead of cloning source
+3. **Performance Optimizations**
+   - Cache comment ranges in ThinParser (avoid O(N) scan on every hover)
+   - Refactor ScannerState to use &str instead of cloning source
 
 3. **Add More LSP Features**
    - Code actions (complete implementation)
