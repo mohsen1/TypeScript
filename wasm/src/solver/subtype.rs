@@ -216,6 +216,15 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
     /// Inner subtype check (after cycle detection)
     fn check_subtype_inner(&mut self, source: TypeId, target: TypeId) -> SubtypeResult {
+        // Evaluate meta-types (conditionals, index access, etc.) before comparing
+        let source_eval = self.evaluate_type(source);
+        let target_eval = self.evaluate_type(target);
+
+        // If evaluation changed anything, recurse with the simplified types
+        if source_eval != source || target_eval != target {
+            return self.check_subtype(source_eval, target_eval);
+        }
+
         // Look up the type keys
         let source_key = match self.interner.lookup(source) {
             Some(k) => k,
@@ -688,28 +697,82 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::False;
         }
 
-        // Parameters are contravariant (but TypeScript uses bivariance for methods)
-        // For now, we use covariance for simplicity
-        // Source can have fewer parameters (callback compatibility)
-        if source.params.len() > target.params.len() {
+        // Check if target has a rest parameter
+        let target_has_rest = target.params.last().map_or(false, |p| p.rest);
+        let source_has_rest = source.params.last().map_or(false, |p| p.rest);
+
+        // Count non-rest parameters
+        let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
+        let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
+
+        // If target doesn't have a rest parameter, source can't have more params than target
+        if !target_has_rest && source.params.len() > target.params.len() {
             return SubtypeResult::False;
         }
 
-        for (i, s_param) in source.params.iter().enumerate() {
-            if let Some(t_param) = target.params.get(i) {
-                // Bivariant: either direction works
-                if !self.check_subtype(s_param.type_id, t_param.type_id).is_true()
-                    && !self.check_subtype(t_param.type_id, s_param.type_id).is_true()
+        // Compare fixed parameters
+        let fixed_compare_count = std::cmp::min(source_fixed_count, target_fixed_count);
+        for i in 0..fixed_compare_count {
+            let s_param = &source.params[i];
+            let t_param = &target.params[i];
+            // Bivariant: either direction works
+            if !self.check_subtype(s_param.type_id, t_param.type_id).is_true()
+                && !self.check_subtype(t_param.type_id, s_param.type_id).is_true()
+            {
+                return SubtypeResult::False;
+            }
+        }
+
+        // If target has rest parameter, check source's extra params against the rest type
+        if target_has_rest {
+            let rest_param = target.params.last().unwrap();
+            // Get the element type of the rest array
+            let rest_elem_type = self.get_array_element_type(rest_param.type_id);
+
+            // Check source params that exceed target's fixed count against rest type
+            for i in target_fixed_count..source_fixed_count {
+                let s_param = &source.params[i];
+                // Bivariant check against rest element type
+                if !self.check_subtype(s_param.type_id, rest_elem_type).is_true()
+                    && !self.check_subtype(rest_elem_type, s_param.type_id).is_true()
+                {
+                    return SubtypeResult::False;
+                }
+            }
+
+            // If source also has a rest param, check it against target's rest
+            if source_has_rest {
+                let s_rest_param = source.params.last().unwrap();
+                let s_rest_elem = self.get_array_element_type(s_rest_param.type_id);
+                if !self.check_subtype(s_rest_elem, rest_elem_type).is_true()
+                    && !self.check_subtype(rest_elem_type, s_rest_elem).is_true()
                 {
                     return SubtypeResult::False;
                 }
             }
         }
 
-        // Check rest parameters
-        // TODO: Handle rest parameter compatibility
-
         SubtypeResult::True
+    }
+
+    /// Get the element type of an array type, or return the type itself for any[]
+    fn get_array_element_type(&self, type_id: TypeId) -> TypeId {
+        if type_id == TypeId::ANY {
+            return TypeId::ANY;
+        }
+        match self.interner.lookup(type_id) {
+            Some(TypeKey::Array(elem)) => elem,
+            // For any[], the type itself is assignable from anything
+            _ => type_id,
+        }
+    }
+
+    /// Evaluate a meta-type (conditional, index access, mapped, etc.) to its concrete form.
+    /// Uses TypeEvaluator to reduce types like `T extends U ? X : Y` to either X or Y.
+    fn evaluate_type(&self, type_id: TypeId) -> TypeId {
+        use crate::solver::evaluate::TypeEvaluator;
+        let evaluator = TypeEvaluator::with_resolver(self.interner, self.resolver);
+        evaluator.evaluate(type_id)
     }
 
     /// Check callable subtyping (overloaded signatures)
@@ -757,16 +820,51 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::False;
         }
 
-        // Source can have fewer parameters (callback compatibility)
-        if source.params.len() > target.params.len() {
+        // Check if target has a rest parameter
+        let target_has_rest = target.params.last().map_or(false, |p| p.rest);
+        let source_has_rest = source.params.last().map_or(false, |p| p.rest);
+
+        // Count non-rest parameters
+        let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
+        let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
+
+        // If target doesn't have a rest parameter, source can't have more params than target
+        if !target_has_rest && source.params.len() > target.params.len() {
             return SubtypeResult::False;
         }
 
-        for (i, s_param) in source.params.iter().enumerate() {
-            if let Some(t_param) = target.params.get(i) {
-                // Bivariant: either direction works (TypeScript behavior)
-                if !self.check_subtype(s_param.type_id, t_param.type_id).is_true()
-                    && !self.check_subtype(t_param.type_id, s_param.type_id).is_true()
+        // Compare fixed parameters
+        let fixed_compare_count = std::cmp::min(source_fixed_count, target_fixed_count);
+        for i in 0..fixed_compare_count {
+            let s_param = &source.params[i];
+            let t_param = &target.params[i];
+            // Bivariant: either direction works
+            if !self.check_subtype(s_param.type_id, t_param.type_id).is_true()
+                && !self.check_subtype(t_param.type_id, s_param.type_id).is_true()
+            {
+                return SubtypeResult::False;
+            }
+        }
+
+        // If target has rest parameter, check source's extra params against the rest type
+        if target_has_rest {
+            let rest_param = target.params.last().unwrap();
+            let rest_elem_type = self.get_array_element_type(rest_param.type_id);
+
+            for i in target_fixed_count..source_fixed_count {
+                let s_param = &source.params[i];
+                if !self.check_subtype(s_param.type_id, rest_elem_type).is_true()
+                    && !self.check_subtype(rest_elem_type, s_param.type_id).is_true()
+                {
+                    return SubtypeResult::False;
+                }
+            }
+
+            if source_has_rest {
+                let s_rest_param = source.params.last().unwrap();
+                let s_rest_elem = self.get_array_element_type(s_rest_param.type_id);
+                if !self.check_subtype(s_rest_elem, rest_elem_type).is_true()
+                    && !self.check_subtype(rest_elem_type, s_rest_elem).is_true()
                 {
                     return SubtypeResult::False;
                 }
@@ -783,16 +881,51 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::False;
         }
 
-        // Source can have fewer parameters
-        if source.params.len() > target.params.len() {
+        // Check if target has a rest parameter
+        let target_has_rest = target.params.last().map_or(false, |p| p.rest);
+        let source_has_rest = source.params.last().map_or(false, |p| p.rest);
+
+        // Count non-rest parameters
+        let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
+        let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
+
+        // If target doesn't have a rest parameter, source can't have more params than target
+        if !target_has_rest && source.params.len() > target.params.len() {
             return SubtypeResult::False;
         }
 
-        for (i, s_param) in source.params.iter().enumerate() {
-            if let Some(t_param) = target.params.get(i) {
-                // Bivariant
-                if !self.check_subtype(s_param.type_id, t_param.type_id).is_true()
-                    && !self.check_subtype(t_param.type_id, s_param.type_id).is_true()
+        // Compare fixed parameters
+        let fixed_compare_count = std::cmp::min(source_fixed_count, target_fixed_count);
+        for i in 0..fixed_compare_count {
+            let s_param = &source.params[i];
+            let t_param = &target.params[i];
+            // Bivariant
+            if !self.check_subtype(s_param.type_id, t_param.type_id).is_true()
+                && !self.check_subtype(t_param.type_id, s_param.type_id).is_true()
+            {
+                return SubtypeResult::False;
+            }
+        }
+
+        // If target has rest parameter, check source's extra params against the rest type
+        if target_has_rest {
+            let rest_param = target.params.last().unwrap();
+            let rest_elem_type = self.get_array_element_type(rest_param.type_id);
+
+            for i in target_fixed_count..source_fixed_count {
+                let s_param = &source.params[i];
+                if !self.check_subtype(s_param.type_id, rest_elem_type).is_true()
+                    && !self.check_subtype(rest_elem_type, s_param.type_id).is_true()
+                {
+                    return SubtypeResult::False;
+                }
+            }
+
+            if source_has_rest {
+                let s_rest_param = source.params.last().unwrap();
+                let s_rest_elem = self.get_array_element_type(s_rest_param.type_id);
+                if !self.check_subtype(s_rest_elem, rest_elem_type).is_true()
+                    && !self.check_subtype(rest_elem_type, s_rest_elem).is_true()
                 {
                     return SubtypeResult::False;
                 }
@@ -809,16 +942,51 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::False;
         }
 
-        // Source can have fewer parameters
-        if source.params.len() > target.params.len() {
+        // Check if target has a rest parameter
+        let target_has_rest = target.params.last().map_or(false, |p| p.rest);
+        let source_has_rest = source.params.last().map_or(false, |p| p.rest);
+
+        // Count non-rest parameters
+        let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
+        let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
+
+        // If target doesn't have a rest parameter, source can't have more params than target
+        if !target_has_rest && source.params.len() > target.params.len() {
             return SubtypeResult::False;
         }
 
-        for (i, s_param) in source.params.iter().enumerate() {
-            if let Some(t_param) = target.params.get(i) {
-                // Bivariant
-                if !self.check_subtype(s_param.type_id, t_param.type_id).is_true()
-                    && !self.check_subtype(t_param.type_id, s_param.type_id).is_true()
+        // Compare fixed parameters
+        let fixed_compare_count = std::cmp::min(source_fixed_count, target_fixed_count);
+        for i in 0..fixed_compare_count {
+            let s_param = &source.params[i];
+            let t_param = &target.params[i];
+            // Bivariant
+            if !self.check_subtype(s_param.type_id, t_param.type_id).is_true()
+                && !self.check_subtype(t_param.type_id, s_param.type_id).is_true()
+            {
+                return SubtypeResult::False;
+            }
+        }
+
+        // If target has rest parameter, check source's extra params against the rest type
+        if target_has_rest {
+            let rest_param = target.params.last().unwrap();
+            let rest_elem_type = self.get_array_element_type(rest_param.type_id);
+
+            for i in target_fixed_count..source_fixed_count {
+                let s_param = &source.params[i];
+                if !self.check_subtype(s_param.type_id, rest_elem_type).is_true()
+                    && !self.check_subtype(rest_elem_type, s_param.type_id).is_true()
+                {
+                    return SubtypeResult::False;
+                }
+            }
+
+            if source_has_rest {
+                let s_rest_param = source.params.last().unwrap();
+                let s_rest_elem = self.get_array_element_type(s_rest_param.type_id);
+                if !self.check_subtype(s_rest_elem, rest_elem_type).is_true()
+                    && !self.check_subtype(rest_elem_type, s_rest_elem).is_true()
                 {
                     return SubtypeResult::False;
                 }

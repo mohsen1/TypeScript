@@ -221,3 +221,49 @@ fn test_unresolved_ref_behavior() {
     // Unresolved ref to something else should be false
     assert!(!checker.is_subtype_of(ref_type, TypeId::STRING));
 }
+
+#[test]
+fn test_function_rest_parameter_subtyping() {
+    use std::sync::Arc;
+
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // Create any[] type for rest parameter
+    let any_array = interner.array(TypeId::ANY);
+
+    // (a: string, b: any, c: any) => any - 3 fixed params
+    let fixed_params = FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(Arc::from("a")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(Arc::from("b")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo { name: Some(Arc::from("c")), type_id: TypeId::ANY, optional: false, rest: false },
+        ],
+        return_type: TypeId::ANY,
+        is_constructor: false,
+    };
+    let fixed_fn = interner.function(fixed_params);
+
+    // (a: string, b: any, ...args: any[]) => any - 2 fixed + rest
+    let rest_params = FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(Arc::from("a")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(Arc::from("b")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo { name: Some(Arc::from("args")), type_id: any_array, optional: false, rest: true },
+        ],
+        return_type: TypeId::ANY,
+        is_constructor: false,
+    };
+    let rest_fn = interner.function(rest_params);
+
+    // Function with 3 fixed params IS assignable to function with 2 fixed + rest
+    // Because (a, b, c) can be called as (a, b, ...args) where args = [c]
+    assert!(checker.is_subtype_of(fixed_fn, rest_fn));
+
+    // Function with rest is NOT assignable to function with fixed params
+    // (because rest can accept 0 or more args, but fixed expects exactly 3)
+    // This depends on semantics - TypeScript actually allows this in some cases
+    // For now, test the basic case
+}
