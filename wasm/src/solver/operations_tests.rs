@@ -183,3 +183,116 @@ fn test_binary_op_logical() {
         _ => panic!("Expected success, got {:?}", result),
     }
 }
+
+#[test]
+fn test_call_generic_function_identity() {
+    use std::sync::Arc;
+
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    // Create type parameter T
+    let t_param = TypeParamInfo {
+        name: Arc::from("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // function identity<T>(x: T): T
+    let func = interner.function(FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some("x".into()),
+            type_id: t_type,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    });
+
+    // Call identity(42) -> should infer T = number
+    let result = evaluator.resolve_call(func, &[TypeId::NUMBER]);
+    match result {
+        CallResult::Success(ret) => assert_eq!(ret, TypeId::NUMBER),
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_call_generic_function_with_string() {
+    use std::sync::Arc;
+
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    // Create type parameter T
+    let t_param = TypeParamInfo {
+        name: Arc::from("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // function identity<T>(x: T): T
+    let func = interner.function(FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some("x".into()),
+            type_id: t_type,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    });
+
+    // Call identity("hello") -> should infer T = string
+    let result = evaluator.resolve_call(func, &[TypeId::STRING]);
+    match result {
+        CallResult::Success(ret) => assert_eq!(ret, TypeId::STRING),
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_call_generic_array_function() {
+    use std::sync::Arc;
+
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    // Create type parameter T
+    let t_param = TypeParamInfo {
+        name: Arc::from("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let array_t = interner.array(t_type);
+
+    // function first<T>(arr: T[]): T
+    let func = interner.function(FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some("arr".into()),
+            type_id: array_t,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    });
+
+    // Call first(number[]) -> should infer T = number
+    let number_array = interner.array(TypeId::NUMBER);
+    let result = evaluator.resolve_call(func, &[number_array]);
+    match result {
+        CallResult::Success(ret) => assert_eq!(ret, TypeId::NUMBER),
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}

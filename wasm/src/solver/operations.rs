@@ -22,6 +22,10 @@ use crate::solver::types::*;
 use crate::solver::intern::TypeInterner;
 use crate::solver::subtype::SubtypeChecker;
 use crate::solver::diagnostics::PendingDiagnostic;
+use crate::solver::infer::InferenceContext;
+use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
+use std::collections::HashMap;
+use std::sync::Arc;
 
 // =============================================================================
 // Function Call Resolution
@@ -88,6 +92,11 @@ impl<'a> CallEvaluator<'a> {
 
     /// Resolve a call to a simple function type.
     fn resolve_function_call(&mut self, func: &FunctionShape, arg_types: &[TypeId]) -> CallResult {
+        // Handle generic functions
+        if !func.type_params.is_empty() {
+            return self.resolve_generic_call(func, arg_types);
+        }
+
         // Check argument count
         let min_args = func.params.iter().filter(|p| !p.optional).count();
         let max_args = if func.params.iter().any(|p| p.rest) {
@@ -142,6 +151,124 @@ impl<'a> CallEvaluator<'a> {
         }
 
         CallResult::Success(func.return_type)
+    }
+
+    /// Resolve a call to a generic function by inferring type arguments.
+    fn resolve_generic_call(&mut self, func: &FunctionShape, arg_types: &[TypeId]) -> CallResult {
+        let mut infer_ctx = InferenceContext::new(self.interner);
+        let mut substitution = TypeSubstitution::new();
+        let mut var_map: HashMap<TypeId, crate::solver::infer::InferenceVar> = HashMap::new();
+
+        // 1. Create inference variables and placeholders for each type parameter
+        for tp in &func.type_params {
+            let var = infer_ctx.fresh_type_param(tp.name.clone());
+
+            // Create a unique placeholder type for this inference variable
+            // We use a TypeParameter with a special name to track it during constraint collection
+            let placeholder_key = TypeKey::TypeParameter(TypeParamInfo {
+                name: Arc::from(format!("__infer_{}", var.0)),
+                constraint: tp.constraint,
+                default: None,
+            });
+            let placeholder_id = self.interner.intern(placeholder_key);
+
+            substitution.insert(tp.name.clone(), placeholder_id);
+            var_map.insert(placeholder_id, var);
+        }
+
+        // 2. Instantiate parameters with placeholders
+        let instantiated_params: Vec<ParamInfo> = func.params.iter().map(|p| {
+            ParamInfo {
+                name: p.name.clone(),
+                type_id: instantiate_type(self.interner, p.type_id, &substitution),
+                optional: p.optional,
+                rest: p.rest,
+            }
+        }).collect();
+
+        // 3. Collect constraints from arguments
+        for (i, &arg_type) in arg_types.iter().enumerate() {
+            if i >= instantiated_params.len() && !instantiated_params.last().map_or(false, |p| p.rest) {
+                break;
+            }
+
+            let param_idx = if i >= instantiated_params.len() { instantiated_params.len() - 1 } else { i };
+            let param = &instantiated_params[param_idx];
+
+            let target_type = if param.rest {
+                match self.interner.lookup(param.type_id) {
+                    Some(TypeKey::Array(elem)) => elem,
+                    _ => param.type_id,
+                }
+            } else {
+                param.type_id
+            };
+
+            // arg_type <: target_type
+            self.constrain_types(&mut infer_ctx, &var_map, arg_type, target_type);
+        }
+
+        // 4. Resolve inference variables
+        match infer_ctx.resolve_all_with_constraints() {
+            Ok(resolved_params) => {
+                // Build final substitution
+                let mut final_subst = TypeSubstitution::new();
+                for (name, ty) in resolved_params {
+                    final_subst.insert(name, ty);
+                }
+
+                // Instantiate return type
+                let return_type = instantiate_type(self.interner, func.return_type, &final_subst);
+                CallResult::Success(return_type)
+            },
+            Err(_) => {
+                // Inference failed - return any (could be more specific error)
+                CallResult::Success(TypeId::ANY)
+            }
+        }
+    }
+
+    /// Structural walker to collect constraints: source <: target
+    fn constrain_types(
+        &self,
+        ctx: &mut InferenceContext,
+        var_map: &HashMap<TypeId, crate::solver::infer::InferenceVar>,
+        source: TypeId,
+        target: TypeId
+    ) {
+        if source == target { return; }
+
+        // If target is an inference placeholder, add lower bound: source <: var
+        if let Some(&var) = var_map.get(&target) {
+            ctx.add_lower_bound(var, source);
+            return;
+        }
+
+        // If source is an inference placeholder, add upper bound: var <: target
+        if let Some(&var) = var_map.get(&source) {
+            ctx.add_upper_bound(var, target);
+            return;
+        }
+
+        // Recurse structurally
+        let source_key = self.interner.lookup(source);
+        let target_key = self.interner.lookup(target);
+
+        match (source_key, target_key) {
+            (Some(TypeKey::Array(s_elem)), Some(TypeKey::Array(t_elem))) => {
+                self.constrain_types(ctx, var_map, s_elem, t_elem);
+            }
+            (Some(TypeKey::Function(ref s_fn)), Some(TypeKey::Function(ref t_fn))) => {
+                // Contravariant parameters: target_param <: source_param
+                for (s_p, t_p) in s_fn.params.iter().zip(t_fn.params.iter()) {
+                    self.constrain_types(ctx, var_map, t_p.type_id, s_p.type_id);
+                }
+                // Covariant return: source_return <: target_return
+                self.constrain_types(ctx, var_map, s_fn.return_type, t_fn.return_type);
+            }
+            // TODO: Add support for Objects, Unions, Promises, etc.
+            _ => {}
+        }
     }
 
     /// Resolve a call to a callable type (with overloads).
@@ -204,9 +331,14 @@ pub enum PropertyAccessResult {
         property_name: String,
     },
 
-    /// Type is possibly null or undefined
+    /// Type is possibly null or undefined.
+    /// Contains the type of the property from non-nullable members (if any),
+    /// and the specific nullable type causing the error.
     PossiblyNullOrUndefined {
-        type_id: TypeId,
+        /// Type from valid non-nullable members (for recovery/optional chaining)
+        property_type: Option<TypeId>,
+        /// The nullable type causing the issue: NULL, UNDEFINED, or union of both
+        cause: TypeId,
     },
 
     /// Type is unknown
@@ -235,7 +367,10 @@ impl<'a> PropertyAccessEvaluator<'a> {
         }
 
         if obj_type == TypeId::NULL || obj_type == TypeId::UNDEFINED {
-            return PropertyAccessResult::PossiblyNullOrUndefined { type_id: obj_type };
+            return PropertyAccessResult::PossiblyNullOrUndefined {
+                property_type: None,
+                cause: obj_type,
+            };
         }
 
         // Look up the type key
@@ -281,12 +416,26 @@ impl<'a> PropertyAccessEvaluator<'a> {
             }
 
             TypeKey::Union(ref members) => {
-                // Property access on union: must exist on ALL members
-                let mut result_types = Vec::new();
+                // Property access on union: partition into nullable and non-nullable members
+                let mut valid_results = Vec::new();
+                let mut nullable_causes = Vec::new();
 
                 for &member in members {
+                    // Check for null/undefined directly
+                    if member == TypeId::NULL || member == TypeId::UNDEFINED {
+                        nullable_causes.push(member);
+                        continue;
+                    }
+
                     match self.resolve_property_access(member, prop_name) {
-                        PropertyAccessResult::Success(t) => result_types.push(t),
+                        PropertyAccessResult::Success(t) => valid_results.push(t),
+                        PropertyAccessResult::PossiblyNullOrUndefined { property_type, cause } => {
+                            if let Some(t) = property_type {
+                                valid_results.push(t);
+                            }
+                            nullable_causes.push(cause);
+                        }
+                        // If any non-nullable member is missing the property, it's a PropertyNotFound error
                         _ => return PropertyAccessResult::PropertyNotFound {
                             type_id: obj_type,
                             property_name: prop_name.to_string(),
@@ -294,8 +443,30 @@ impl<'a> PropertyAccessEvaluator<'a> {
                     }
                 }
 
+                // If there are nullable causes, return PossiblyNullOrUndefined
+                if !nullable_causes.is_empty() {
+                    let cause = if nullable_causes.len() == 1 {
+                        nullable_causes[0]
+                    } else {
+                        self.interner.union(nullable_causes)
+                    };
+
+                    let property_type = if valid_results.is_empty() {
+                        None
+                    } else if valid_results.len() == 1 {
+                        Some(valid_results[0])
+                    } else {
+                        Some(self.interner.union(valid_results))
+                    };
+
+                    return PropertyAccessResult::PossiblyNullOrUndefined {
+                        property_type,
+                        cause,
+                    };
+                }
+
                 // Union of all result types
-                PropertyAccessResult::Success(self.interner.union(result_types))
+                PropertyAccessResult::Success(self.interner.union(valid_results))
             }
 
             TypeKey::Intersection(ref members) => {

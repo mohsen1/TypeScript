@@ -938,3 +938,204 @@ c.ro = "error: lhs of assignment can't be readonly";
     assert!(codes.contains(&1253), "Should have error 1253 for abstract in non-abstract class");
     assert!(codes.contains(&2540), "Should have error 2540 for readonly assignment");
 }
+
+#[test]
+fn test_contextual_typing_for_function_parameters() {
+    use crate::solver::ContextualTypeContext;
+
+    // Test that ContextualTypeContext can extract parameter types from function types
+    let types = TypeInterner::new();
+
+    // Create a function type: (x: string, y: number) => boolean
+    use crate::solver::{FunctionShape, ParamInfo};
+    use std::sync::Arc;
+
+    let func_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(Arc::from("x")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(Arc::from("y")), type_id: TypeId::NUMBER, optional: false, rest: false },
+        ],
+        return_type: TypeId::BOOLEAN,
+        is_constructor: false,
+    };
+
+    let func_type = types.function(func_shape);
+
+    // Create contextual context
+    let ctx = ContextualTypeContext::with_expected(&types, func_type);
+
+    // Test parameter type extraction
+    assert_eq!(ctx.get_parameter_type(0), Some(TypeId::STRING));
+    assert_eq!(ctx.get_parameter_type(1), Some(TypeId::NUMBER));
+    assert_eq!(ctx.get_parameter_type(2), None); // Out of bounds
+
+    // Test return type extraction
+    assert_eq!(ctx.get_return_type(), Some(TypeId::BOOLEAN));
+}
+
+#[test]
+fn test_contextual_typing_for_object_properties() {
+    use crate::solver::ContextualTypeContext;
+
+    // Test that ContextualTypeContext can extract property types from object types
+    let types = TypeInterner::new();
+
+    // Create an object type: { name: string, age: number }
+    use crate::solver::PropertyInfo;
+    use std::sync::Arc;
+
+    let obj_type = types.object(vec![
+        PropertyInfo { name: Arc::from("name"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: Arc::from("age"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+    ]);
+
+    // Create contextual context
+    let ctx = ContextualTypeContext::with_expected(&types, obj_type);
+
+    // Test property type extraction
+    assert_eq!(ctx.get_property_type("name"), Some(TypeId::STRING));
+    assert_eq!(ctx.get_property_type("age"), Some(TypeId::NUMBER));
+    assert_eq!(ctx.get_property_type("unknown"), None);
+}
+
+#[test]
+fn test_strict_null_checks_property_access() {
+    use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult, PropertyInfo};
+    use std::sync::Arc;
+
+    // Test property access on nullable types
+    let types = TypeInterner::new();
+
+    // Create object type: { x: number }
+    let obj_type = types.object(vec![
+        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+    ]);
+
+    // Create union type: { x: number } | null
+    let nullable_obj = types.union(vec![obj_type, TypeId::NULL]);
+
+    let evaluator = PropertyAccessEvaluator::new(&types);
+
+    // Access property on nullable type should return PossiblyNullOrUndefined
+    let result = evaluator.resolve_property_access(nullable_obj, "x");
+    match result {
+        PropertyAccessResult::PossiblyNullOrUndefined { property_type, cause } => {
+            // Should have property_type = number
+            assert_eq!(property_type, Some(TypeId::NUMBER));
+            // Cause should be null
+            assert_eq!(cause, TypeId::NULL);
+        }
+        _ => panic!("Expected PossiblyNullOrUndefined, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_strict_null_checks_undefined_type() {
+    use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult, PropertyInfo};
+    use std::sync::Arc;
+
+    // Test property access on possibly undefined types
+    let types = TypeInterner::new();
+
+    // Create object type: { y: string }
+    let obj_type = types.object(vec![
+        PropertyInfo { name: Arc::from("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+    ]);
+
+    // Create union type: { y: string } | undefined
+    let possibly_undefined = types.union(vec![obj_type, TypeId::UNDEFINED]);
+
+    let evaluator = PropertyAccessEvaluator::new(&types);
+
+    // Access property on possibly undefined type
+    let result = evaluator.resolve_property_access(possibly_undefined, "y");
+    match result {
+        PropertyAccessResult::PossiblyNullOrUndefined { property_type, cause } => {
+            assert_eq!(property_type, Some(TypeId::STRING));
+            assert_eq!(cause, TypeId::UNDEFINED);
+        }
+        _ => panic!("Expected PossiblyNullOrUndefined, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_strict_null_checks_both_null_and_undefined() {
+    use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult, PropertyInfo, TypeKey};
+    use std::sync::Arc;
+
+    // Test property access on type that is both null and undefined
+    let types = TypeInterner::new();
+
+    // Create object type: { z: boolean }
+    let obj_type = types.object(vec![
+        PropertyInfo { name: Arc::from("z"), type_id: TypeId::BOOLEAN, optional: false, readonly: false },
+    ]);
+
+    // Create union type: { z: boolean } | null | undefined
+    let nullable_undefined = types.union(vec![obj_type, TypeId::NULL, TypeId::UNDEFINED]);
+
+    let evaluator = PropertyAccessEvaluator::new(&types);
+
+    // Access property on possibly null or undefined type
+    let result = evaluator.resolve_property_access(nullable_undefined, "z");
+    match result {
+        PropertyAccessResult::PossiblyNullOrUndefined { property_type, cause } => {
+            assert_eq!(property_type, Some(TypeId::BOOLEAN));
+            // Cause should be a union of null | undefined
+            let cause_key = types.lookup(cause);
+            match cause_key {
+                Some(TypeKey::Union(members)) => {
+                    assert!(members.contains(&TypeId::NULL), "Cause should contain null");
+                    assert!(members.contains(&TypeId::UNDEFINED), "Cause should contain undefined");
+                }
+                _ => panic!("Expected cause to be union of null | undefined"),
+            }
+        }
+        _ => panic!("Expected PossiblyNullOrUndefined, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_strict_null_checks_non_nullable_success() {
+    use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult, PropertyInfo};
+    use std::sync::Arc;
+
+    // Test that non-nullable types succeed normally
+    let types = TypeInterner::new();
+
+    // Create object type: { x: number }
+    let obj_type = types.object(vec![
+        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+    ]);
+
+    let evaluator = PropertyAccessEvaluator::new(&types);
+
+    // Access property on non-nullable type should succeed
+    let result = evaluator.resolve_property_access(obj_type, "x");
+    match result {
+        PropertyAccessResult::Success(prop_type) => {
+            assert_eq!(prop_type, TypeId::NUMBER);
+        }
+        _ => panic!("Expected Success, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_strict_null_checks_null_only() {
+    use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
+
+    // Test accessing property directly on null type
+    let types = TypeInterner::new();
+
+    let evaluator = PropertyAccessEvaluator::new(&types);
+
+    let result = evaluator.resolve_property_access(TypeId::NULL, "anything");
+    match result {
+        PropertyAccessResult::PossiblyNullOrUndefined { property_type, cause } => {
+            assert_eq!(property_type, None);
+            assert_eq!(cause, TypeId::NULL);
+        }
+        _ => panic!("Expected PossiblyNullOrUndefined, got {:?}", result),
+    }
+}

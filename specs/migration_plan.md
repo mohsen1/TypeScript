@@ -33,6 +33,9 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Error 2540: cannot assign to readonly property (via AST-level modifier check)
 - ✅ Error 2430: interface incorrectly extends interface (method signature compatibility)
 - ✅ Control Flow Analysis infrastructure (flow graph, FlowAnalyzer, typeof/null narrowing)
+- ✅ Contextual typing for call arguments (infer parameter types from expected function type)
+- ✅ Generic type inference in CallEvaluator (infer type arguments from argument types)
+- ✅ Strict null checks (TS2531/TS2532) with optional chaining support
 
 ## Checker Refactoring (see specs/REFACTOR_CHECKER.md)
 - ✅ Split ThinCheckerState into Context + specialized Checkers (expr, stmt, decl)
