@@ -66,12 +66,23 @@ Our focus is to make wasm checker complete
 - 🔄 Implement namespace member checking (error 2694) (IN PROGRESS)
     - ✅ Added exports/members fields to Symbol struct
     - ✅ Updated ThinBinder to persist symbol tables when exiting module/class scopes
-    - ✅ Implemented qualified name resolution (A.B syntax)
+    - ✅ Implemented qualified name resolution (A.B syntax) in checker
     - ✅ Added error reporting for TS2694
     - ✅ Added get_qualified_name getter to ThinNodeArena
-    - ⏳ TODO: Debug namespace export capture (exports not being populated correctly)
+    - ✅ FIXED CRITICAL BUG: MODULE_BLOCK nodes were using get_block() instead of get_module_block()
+        - This caused namespace bodies to never be bound, leaving exports empty
+        - Changed bind_node to use arena.get_module_block() for MODULE_BLOCK nodes
+        - Handle Option<NodeList> in ModuleBlockData.statements
+        - All namespace declarations now properly bind their contents
+    - ✅ Added test_namespace_binding_debug to verify exports are captured
+    - ⏳ TODO: Fix export filtering - currently exporting ALL members, not just those with `export` modifier
+        - Need to check for export modifiers when binding declarations inside modules
+        - Only add to exports table if declaration has export modifier
+    - ⏳ TODO: Debug why checker test produces no diagnostics for qualified name errors
+        - Infrastructure is in place but not triggering
+        - Need to verify parser creates QUALIFIED_NAME nodes for foo.Bar syntax
     - ⏳ TODO: Handle import aliases (`import x = ns.member`)
-    - All 627 tests pass
+    - All 628 tests pass
 - ⬜ Various missing error codes (see test failures)
 - ✅ Fix tuple subtyping logic (CRITICAL - COMPLETED)
     - Fixed: Now properly rejects `[number, string]` as subtype of `[number]`
