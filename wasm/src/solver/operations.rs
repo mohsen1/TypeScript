@@ -18,6 +18,7 @@
 //! - Reused across different checkers
 //! - Optimized independently
 
+use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::TypeDatabase;
 use crate::solver::subtype::SubtypeChecker;
@@ -504,6 +505,15 @@ impl<'a> PropertyAccessEvaluator<'a> {
         obj_type: TypeId,
         prop_name: &str,
     ) -> PropertyAccessResult {
+        self.resolve_property_access_inner(obj_type, prop_name, None)
+    }
+
+    fn resolve_property_access_inner(
+        &self,
+        obj_type: TypeId,
+        prop_name: &str,
+        prop_atom: Option<Atom>,
+    ) -> PropertyAccessResult {
         // Handle intrinsic types first
         if obj_type == TypeId::UNKNOWN {
             return PropertyAccessResult::IsUnknown;
@@ -532,9 +542,10 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
         match key {
             TypeKey::Object(ref props) => {
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
                 // Search for the property
                 for prop in props {
-                    if self.interner.resolve_atom(prop.name) == prop_name {
+                    if prop.name == prop_atom {
                         return PropertyAccessResult::Success {
                             type_id: prop.type_id,
                             from_index_signature: false,
@@ -548,9 +559,10 @@ impl<'a> PropertyAccessEvaluator<'a> {
             }
 
             TypeKey::ObjectWithIndex(ref shape) => {
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
                 // Check named properties first (explicit properties take precedence)
                 for prop in &shape.properties {
-                    if self.interner.resolve_atom(prop.name) == prop_name {
+                    if prop.name == prop_atom {
                         return PropertyAccessResult::Success {
                             type_id: prop.type_id,
                             from_index_signature: false,
@@ -574,6 +586,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
             TypeKey::Union(ref members) => {
                 // Property access on union: partition into nullable and non-nullable members
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
                 let mut valid_results = Vec::new();
                 let mut nullable_causes = Vec::new();
                 let mut any_from_index = false;  // Track if any member used index signature
@@ -585,7 +598,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
                         continue;
                     }
 
-                    match self.resolve_property_access(member, prop_name) {
+                    match self.resolve_property_access_inner(member, prop_name, Some(prop_atom)) {
                         PropertyAccessResult::Success { type_id, from_index_signature } => {
                             valid_results.push(type_id);
                             if from_index_signature {
@@ -637,8 +650,11 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
             TypeKey::Intersection(ref members) => {
                 // Property access on intersection: check each member
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
                 for &member in members {
-                    if let PropertyAccessResult::Success { type_id, from_index_signature } = self.resolve_property_access(member, prop_name) {
+                    if let PropertyAccessResult::Success { type_id, from_index_signature } =
+                        self.resolve_property_access_inner(member, prop_name, Some(prop_atom))
+                    {
                         return PropertyAccessResult::Success { type_id, from_index_signature };
                     }
                 }
