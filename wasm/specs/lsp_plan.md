@@ -41,7 +41,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Implement project-wide find references (named/default imports)
    - [x] Namespace import member references (`import * as ns`)
    - [x] Re-export chains for named + export * (`export { foo } from`, `export * from`)
-   - [ ] Namespace re-exports (`export * as ns`) member mapping
+   - [x] Namespace re-exports (`export * as ns`) member mapping
 
 #### Testing
 

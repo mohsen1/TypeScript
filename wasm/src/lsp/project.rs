@@ -30,6 +30,12 @@ struct ImportTarget {
     kind: ImportKind,
 }
 
+struct NamespaceReexportTarget {
+    file: String,
+    namespace: String,
+    member: String,
+}
+
 /// Parsed file state used by LSP features.
 pub struct ProjectFile {
     file_name: String,
@@ -587,13 +593,80 @@ impl Project {
         bindings
     }
 
+    fn named_import_local_names(&self, file: &ProjectFile, target_file: &str, export_name: &str) -> Vec<String> {
+        let mut locals = Vec::new();
+        let arena = file.arena();
+
+        let Some(root_node) = arena.get(file.root()) else { return locals; };
+        let Some(source_file) = arena.get_source_file(root_node) else { return locals; };
+
+        for &stmt_idx in &source_file.statements.nodes {
+            let Some(stmt_node) = arena.get(stmt_idx) else { continue; };
+            if stmt_node.kind != syntax_kind_ext::IMPORT_DECLARATION
+                && stmt_node.kind != syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
+                continue;
+            }
+
+            let Some(import) = arena.get_import_decl(stmt_node) else { continue; };
+            let Some(module_specifier) = arena.get_literal_text(import.module_specifier) else { continue; };
+            let Some(resolved) = self.resolve_module_specifier(file.file_name(), module_specifier) else { continue; };
+            if resolved != target_file {
+                continue;
+            }
+
+            if import.import_clause.is_none() {
+                continue;
+            }
+
+            let Some(clause_node) = arena.get(import.import_clause) else { continue; };
+            let Some(clause) = arena.get_import_clause(clause_node) else { continue; };
+
+            if clause.named_bindings.is_none() {
+                continue;
+            }
+
+            let Some(bindings_node) = arena.get(clause.named_bindings) else { continue; };
+            if bindings_node.kind == SyntaxKind::Identifier as u16 {
+                continue;
+            }
+
+            let Some(named) = arena.get_named_imports(bindings_node) else { continue; };
+
+            for &spec_idx in &named.elements.nodes {
+                let Some(spec_node) = arena.get(spec_idx) else { continue; };
+                let Some(spec) = arena.get_specifier(spec_node) else { continue; };
+
+                let export_ident = if !spec.property_name.is_none() {
+                    spec.property_name
+                } else {
+                    spec.name
+                };
+                let Some(export_text) = arena.get_identifier_text(export_ident) else { continue; };
+                if export_text != export_name {
+                    continue;
+                }
+
+                let local_ident = if !spec.name.is_none() {
+                    spec.name
+                } else {
+                    spec.property_name
+                };
+                let Some(local_text) = arena.get_identifier_text(local_ident) else { continue; };
+                locals.push(local_text.to_string());
+            }
+        }
+
+        locals
+    }
+
     fn reexport_targets_for(
         &self,
         source_file: &str,
         export_name: &str,
         refs: &mut Vec<Location>,
-    ) -> Vec<(String, String)> {
+    ) -> (Vec<(String, String)>, Vec<NamespaceReexportTarget>) {
         let mut targets = Vec::new();
+        let mut namespace_targets = Vec::new();
 
         for (file_name, file) in &self.files {
             let arena = file.arena();
@@ -628,6 +701,15 @@ impl Project {
 
                 let Some(clause_node) = arena.get(export.export_clause) else { continue; };
                 if clause_node.kind != syntax_kind_ext::NAMED_EXPORTS {
+                    if clause_node.kind == SyntaxKind::Identifier as u16 {
+                        if let Some(ns_name) = arena.get_identifier_text(export.export_clause) {
+                            namespace_targets.push(NamespaceReexportTarget {
+                                file: file_name.clone(),
+                                namespace: ns_name.to_string(),
+                                member: export_name.to_string(),
+                            });
+                        }
+                    }
                     continue;
                 }
 
@@ -662,7 +744,7 @@ impl Project {
             }
         }
 
-        targets
+        (targets, namespace_targets)
     }
 
     fn namespace_import_names(&self, file: &ProjectFile, target_file: &str) -> Vec<String> {
@@ -800,6 +882,7 @@ impl Project {
         let mut expanded_targets = Vec::new();
         let mut pending = cross_targets;
         let mut seen_targets: FxHashSet<(String, String)> = FxHashSet::default();
+        let mut namespace_targets = Vec::new();
 
         while let Some((def_file, export_name)) = pending.pop() {
             if !seen_targets.insert((def_file.clone(), export_name.clone())) {
@@ -808,9 +891,11 @@ impl Project {
             expanded_targets.push((def_file.clone(), export_name.clone()));
 
             let mut reexport_refs = Vec::new();
-            let reexports = self.reexport_targets_for(&def_file, &export_name, &mut reexport_refs);
+            let (reexports, reexport_namespaces) =
+                self.reexport_targets_for(&def_file, &export_name, &mut reexport_refs);
             locations.extend(reexport_refs);
             pending.extend(reexports);
+            namespace_targets.extend(reexport_namespaces);
         }
 
         for (def_file, export_name) in expanded_targets {
@@ -833,6 +918,28 @@ impl Project {
 
                 for namespace_name in self.namespace_import_names(other_file, &def_file) {
                     self.collect_namespace_member_locations(other_file, &namespace_name, &export_name, &mut locations);
+                }
+            }
+        }
+
+        let mut seen_namespace_targets: FxHashSet<(String, String, String)> = FxHashSet::default();
+        for target in namespace_targets {
+            if !seen_namespace_targets.insert((
+                target.file.clone(),
+                target.namespace.clone(),
+                target.member.clone(),
+            )) {
+                continue;
+            }
+
+            for (other_name, other_file) in &self.files {
+                if other_name == &target.file {
+                    continue;
+                }
+
+                let local_names = self.named_import_local_names(other_file, &target.file, &target.namespace);
+                for local_name in local_names {
+                    self.collect_namespace_member_locations(other_file, &local_name, &target.member, &mut locations);
                 }
             }
         }
