@@ -410,6 +410,11 @@ impl<'a> ThinCheckerState<'a> {
                 self.get_type_from_array_type(idx)
             }
 
+            // Function type (e.g., () => number, (x: string) => void)
+            k if k == syntax_kind_ext::FUNCTION_TYPE => {
+                self.get_type_from_function_type(idx)
+            }
+
             // Default case
             _ => TypeId::ANY,
         }
@@ -521,6 +526,73 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         self.types.array(TypeId::ANY)
+    }
+
+    /// Get type from a function type node (e.g., () => number, (x: string) => void).
+    fn get_type_from_function_type(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::{FunctionShape, ParamInfo};
+        use std::sync::Arc;
+
+        let Some(node) = self.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        let Some(func_type) = self.arena.get_function_type(node) else {
+            return TypeId::ANY;
+        };
+
+        // Build parameter info
+        let mut params = Vec::new();
+        for &param_idx in &func_type.parameters.nodes {
+            if let Some(param_node) = self.arena.get(param_idx) {
+                if let Some(param) = self.arena.get_parameter(param_node) {
+                    // Get parameter name
+                    let name: Option<Arc<str>> = if let Some(name_node) = self.arena.get(param.name) {
+                        if let Some(name_data) = self.arena.get_identifier(name_node) {
+                            Some(Arc::from(name_data.escaped_text.as_str()))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    // Get parameter type
+                    let type_id = if !param.type_annotation.is_none() {
+                        self.get_type_of_node(param.type_annotation)
+                    } else {
+                        TypeId::ANY
+                    };
+
+                    let optional = param.question_token || !param.initializer.is_none();
+                    let rest = param.dot_dot_dot_token;
+
+                    params.push(ParamInfo {
+                        name,
+                        type_id,
+                        optional,
+                        rest,
+                    });
+                }
+            }
+        }
+
+        // Get return type
+        let return_type = if !func_type.type_annotation.is_none() {
+            self.get_type_of_node(func_type.type_annotation)
+        } else {
+            TypeId::ANY
+        };
+
+        // Create function type
+        let shape = FunctionShape {
+            type_params: Vec::new(), // TODO: Handle type parameters
+            params,
+            return_type,
+            is_constructor: false,
+        };
+
+        self.types.function(shape)
     }
 
     // =========================================================================

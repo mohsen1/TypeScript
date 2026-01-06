@@ -196,7 +196,7 @@ impl ThinParser {
         }
 
         if let (Some(root_idx), Some(binder)) = (self.source_file_idx, &self.binder) {
-            let file_name = format!("test.ts");
+            let file_name = self.parser.get_file_name().to_string();
             let mut checker = ThinCheckerState::new(
                 self.parser.get_arena(),
                 binder,
@@ -230,7 +230,7 @@ impl ThinParser {
     #[wasm_bindgen(js_name = getTypeOfNode)]
     pub fn get_type_of_node(&mut self, node_idx: u32) -> String {
         if let (Some(_), Some(binder)) = (self.source_file_idx, &self.binder) {
-            let file_name = format!("test.ts");
+            let file_name = self.parser.get_file_name().to_string();
             let mut checker = ThinCheckerState::new(
                 self.parser.get_arena(),
                 binder,

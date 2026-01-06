@@ -7411,6 +7411,11 @@ impl ThinParserState {
         self.arena.len()
     }
 
+    /// Get the file name
+    pub fn get_file_name(&self) -> &str {
+        &self.file_name
+    }
+
     // =========================================================================
     // JSX Parsing
     // =========================================================================

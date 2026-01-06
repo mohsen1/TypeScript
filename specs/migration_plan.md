@@ -34,7 +34,7 @@ see SESSION_LOG.md -- always amended with each session's work
 ### Current Status (12,408 tests)
 | Baseline | Compiler | Conformance | Crash Rate |
 |----------|----------|-------------|------------|
-| .errors.txt | 74.0% (57/77 subset) | 33.8% (1,741/5,157) | 0.05% |
+| .errors.txt | 75.3% (58/77 subset) | 33.8% (1,741/5,157) | 0.05% |
 | .js emit | 36.8% (28/76 subset) | ~3% | 0.05% |
 
 ### Work Process
@@ -51,7 +51,7 @@ This catches design issues early and ensures consistent code quality.
 **Type Checking (25 failing tests)**
 1. ✅ Export assignment validation (2309, 2304)
 2. ✅ Setter parameter validation (1052, 1053)
-3. ✅ Return type validation (2355) - function must return a value (basic types)
+3. ✅ Return type validation (2355) - function must return a value (basic types, function types)
 4. ✅ Abstract class instantiation (2511) - basic case (union types need more work)
 5. ✅ Static member access from instance (2662) - `foo` → "Did you mean 'C.foo'?"
 6. ✅ Abstract property in constructor (2715) - `this.abstractProp` in ctor
