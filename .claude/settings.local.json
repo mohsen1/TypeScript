@@ -5,11 +5,7 @@
         "hooks": [
           {
             "type": "command",
-<<<<<<< HEAD
-            "command": "tmux send-keys -t ts.0 'Continue with the plan' && sleep 1 && tmux send-keys -t ts.0 Enter"
-=======
-            "command": "sleep 1 && tmux send-keys -t ts.1 'Continue with the plan' && sleep 1 && tmux send-keys -t ts.1 Enter"
->>>>>>> origin/rust
+            "command": "tmux send-keys -t ts.1 'Continue with the plan' && sleep 1 && tmux send-keys -t ts.1 Enter"
           }
         ]
       }
