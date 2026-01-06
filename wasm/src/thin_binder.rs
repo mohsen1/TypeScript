@@ -386,6 +386,11 @@ impl ThinBinderState {
                 self.bind_import_declaration(arena, node, idx);
             }
 
+            // Import equals declaration (import x = ns.member)
+            k if k == syntax_kind_ext::IMPORT_EQUALS_DECLARATION => {
+                self.bind_import_equals_declaration(arena, node, idx);
+            }
+
             // Export declarations - bind the exported declaration
             k if k == syntax_kind_ext::EXPORT_DECLARATION => {
                 self.bind_export_declaration(arena, node, idx);
@@ -1000,6 +1005,29 @@ impl ThinBinderState {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    /// Bind import equals declaration: import x = ns.member or import x = require("...")
+    fn bind_import_equals_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
+        if let Some(import) = arena.get_import_decl(node) {
+            // import_clause holds the alias name (e.g., 'x' in 'import x = ...')
+            if let Some(name) = self.get_identifier_name(arena, import.import_clause) {
+                // Check if exported (for export import x = ns.member)
+                let is_exported = self.has_export_modifier(arena, &import.modifiers);
+
+                // Create symbol with ALIAS flag
+                let sym_id = self.symbols.alloc(symbol_flags::ALIAS, name.to_string());
+
+                if let Some(sym) = self.symbols.get_mut(sym_id) {
+                    sym.declarations.push(idx);
+                    sym.value_declaration = idx;
+                    sym.is_exported = is_exported;
+                }
+
+                self.current_scope.set(name.to_string(), sym_id);
+                self.node_symbols.insert(idx.0, sym_id);
             }
         }
     }

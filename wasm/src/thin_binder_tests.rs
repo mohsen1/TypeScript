@@ -219,3 +219,35 @@ namespace foo {
     // Should have exactly 2 exports
     assert_eq!(exports.len(), 2, "foo should have exactly 2 exports");
 }
+
+#[test]
+fn test_import_alias_binding() {
+    use crate::thin_parser::ThinParserState;
+    use crate::thin_binder::ThinBinderState;
+    use crate::binder::symbol_flags;
+
+    let source = r#"
+namespace NS {
+    export class C {}
+}
+import Alias = NS.C;
+var x: Alias;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    // Check that 'Alias' was bound as an ALIAS symbol
+    let alias_sym_id = binder.file_locals.get("Alias").expect("'Alias' should be in file_locals");
+    let alias_symbol = binder.get_symbol(alias_sym_id).expect("Alias symbol should exist");
+
+    // Verify it has the ALIAS flag
+    assert_eq!(alias_symbol.flags & symbol_flags::ALIAS, symbol_flags::ALIAS, "Alias should have ALIAS flag");
+
+    // Verify it has a declaration
+    assert!(!alias_symbol.declarations.is_empty(), "Alias should have declarations");
+}

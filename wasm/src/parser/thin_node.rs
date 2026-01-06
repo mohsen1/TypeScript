@@ -2372,11 +2372,11 @@ impl ThinNodeArena {
         }
     }
 
-    /// Get import declaration data.
+    /// Get import declaration data (handles both IMPORT_DECLARATION and IMPORT_EQUALS_DECLARATION).
     #[inline]
     pub fn get_import_decl(&self, node: &ThinNode) -> Option<&ImportDeclData> {
-        use super::syntax_kind_ext::IMPORT_DECLARATION;
-        if node.has_data() && node.kind == IMPORT_DECLARATION {
+        use super::syntax_kind_ext::{IMPORT_DECLARATION, IMPORT_EQUALS_DECLARATION};
+        if node.has_data() && (node.kind == IMPORT_DECLARATION || node.kind == IMPORT_EQUALS_DECLARATION) {
             self.import_decls.get(node.data_index as usize)
         } else {
             None

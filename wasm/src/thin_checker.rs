@@ -310,6 +310,11 @@ impl<'a> ThinCheckerState<'a> {
                 self.get_type_from_type_query(idx)
             }
 
+            // Qualified name (A.B.C) - resolve namespace member access
+            k if k == syntax_kind_ext::QUALIFIED_NAME => {
+                self.resolve_qualified_name(idx)
+            }
+
             // Default case
             _ => TypeId::ANY,
         }
@@ -1067,6 +1072,25 @@ impl<'a> ThinCheckerState<'a> {
                             return lowering.lower_type(param.type_annotation);
                         }
                     }
+                }
+            }
+            return TypeId::ANY;
+        }
+
+        // Alias - resolve the aliased type (import x = ns.member or ES6 imports)
+        if flags & symbol_flags::ALIAS != 0 {
+            if !value_decl.is_none() {
+                if let Some(node) = self.ctx.arena.get(value_decl) {
+                    // Handle Import Equals Declaration (import x = ns.member)
+                    if node.kind == syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
+                        if let Some(import) = self.ctx.arena.get_import_decl(node) {
+                            // module_specifier holds the reference (e.g., 'ns.member' or require("..."))
+                            // Resolve it to get the aliased type
+                            return self.get_type_of_node(import.module_specifier);
+                        }
+                    }
+                    // Handle ES6 named imports - these are already handled by IMPORT_DECLARATION
+                    // but fall through to ANY for now as they need module resolution
                 }
             }
             return TypeId::ANY;

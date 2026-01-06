@@ -148,8 +148,15 @@ Our focus is to make wasm checker complete
         - This allows resolve_qualified_name() to access exports table and validate members
         - Existing validation logic in resolve_qualified_name() now triggers correctly
         - test_namespace_member_not_found now passes (reports TS2694 for missing exports)
-    - ⏳ TODO: Handle import aliases (`import x = ns.member`)
-    - All 681 tests pass
+    - ✅ FIXED: Import alias support (`import Alias = NS.Member`)
+        - Added bind_import_equals_declaration() in thin_binder.rs to create ALIAS symbols
+        - Updated get_import_decl() to handle both IMPORT_DECLARATION and IMPORT_EQUALS_DECLARATION
+        - Added ALIAS type resolution in compute_type_of_symbol() (thin_checker.rs:1075-1092)
+        - Added QUALIFIED_NAME case in compute_type_of_node() to trigger validation (thin_checker.rs:314-316)
+        - Import aliases now properly resolve qualified names and validate namespace member access
+        - Added 3 comprehensive test cases (binder, type resolution, non-exported member access)
+        - All tests verify: alias binding, type resolution through qualified names, TS2694 for non-exported members
+    - All 684 tests pass
 - ⬜ Various missing error codes (see test failures)
 - ✅ Fix tuple subtyping logic (CRITICAL - COMPLETED)
     - Fixed: Now properly rejects `[number, string]` as subtype of `[number]`

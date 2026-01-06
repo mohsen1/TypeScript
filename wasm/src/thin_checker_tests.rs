@@ -1689,3 +1689,65 @@ var p: foo.NotExist;
     // Should produce error 2694: Namespace 'foo' has no exported member 'NotExist'
     assert!(codes.contains(&2694), "Expected error 2694 for namespace member not found, got: {:?}", codes);
 }
+
+#[test]
+fn test_import_alias_type_resolution() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace NS {
+    export class Exported {}
+    class NotExported {}
+}
+import Alias = NS.Exported;
+var x: Alias;
+var y: NS.Exported;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let diags = &checker.ctx.diagnostics;
+    let codes: Vec<u32> = diags.iter().map(|d| d.code).collect();
+
+    // Should produce no errors - both x: Alias and y: NS.Exported should resolve correctly
+    assert!(codes.is_empty(), "Expected no errors for import alias type resolution, got: {:?}", codes);
+}
+
+#[test]
+fn test_import_alias_non_exported_member() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace NS {
+    export class Exported {}
+    class NotExported {}
+}
+import Alias = NS.NotExported;
+var x: Alias;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let diags = &checker.ctx.diagnostics;
+    let codes: Vec<u32> = diags.iter().map(|d| d.code).collect();
+
+    // Should produce error 2694: Namespace 'NS' has no exported member 'NotExported'
+    // This error occurs when the alias is used (var x: Alias), which triggers type resolution
+    assert!(codes.contains(&2694), "Expected error 2694 for import alias of non-exported member, got: {:?}", codes);
+}
