@@ -984,7 +984,7 @@ impl<'a> ThinCheckerState<'a> {
     ///
     /// Uses TypeLowering to bridge symbol declarations to solver types.
     fn compute_type_of_symbol(&mut self, sym_id: SymbolId) -> TypeId {
-        use crate::solver::TypeLowering;
+        use crate::solver::{TypeLowering, TypeKey, SymbolRef};
 
         let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
             return TypeId::ANY;
@@ -992,6 +992,14 @@ impl<'a> ThinCheckerState<'a> {
 
         let flags = symbol.flags;
         let value_decl = symbol.value_declaration;
+
+        // Namespace / Module
+        // Return a Ref type so resolve_qualified_name can access the symbol's exports
+        if flags & (symbol_flags::NAMESPACE_MODULE | symbol_flags::VALUE_MODULE) != 0 {
+            // Note: We use the symbol ID directly.
+            // For merged declarations, this ID points to the unified symbol in the binder.
+            return self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)));
+        }
 
         // Function - build function type from declaration
         if flags & symbol_flags::FUNCTION != 0 {

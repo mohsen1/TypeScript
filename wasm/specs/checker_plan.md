@@ -122,7 +122,7 @@ Our focus is to make wasm checker complete
     - Allows proper detection of readonly property assignments on class instances
     - Test test_abstractPropertyNegative_errors now passes
     - All 625 tests pass
-- 🔄 Implement namespace member checking (error 2694) (IN PROGRESS)
+- ✅ Implement namespace member checking (error 2694) (COMPLETED)
     - ✅ Added exports/members fields to Symbol struct
     - ✅ Updated ThinBinder to persist symbol tables when exiting module/class scopes
     - ✅ Implemented qualified name resolution (A.B syntax) in checker
@@ -134,21 +134,22 @@ Our focus is to make wasm checker complete
         - Handle Option<NodeList> in ModuleBlockData.statements
         - All namespace declarations now properly bind their contents
     - ✅ FIXED: Export filtering - now correctly filtering exports to only include members with `export` modifier
-        - Added `is_exported: bool` field to Symbol struct (binder.rs)
-        - Added has_export_modifier() helper to check for ExportKeyword in modifiers
-        - Updated all bind_* methods to set is_exported flag
-        - Updated exit_scope() to filter exports by is_exported flag
+        - Added `is_exported: bool` field to Symbol struct (binder.rs:125)
+        - Added has_export_modifier() helper to check for ExportKeyword in modifiers (thin_binder.rs:504)
+        - Added is_node_exported() to handle VariableDeclaration tree walking (thin_binder.rs:520)
+        - Updated all bind_* methods to set is_exported flag before allocation
+        - Updated exit_scope() to filter exports by is_exported flag (thin_binder.rs:596-604)
         - CRITICAL FIX: Parser wraps exported declarations in ExportDeclaration nodes instead of attaching modifiers
-        - Added mark_exported_symbols() helper to handle parser's structure
-        - Updated bind_export_declaration() to call mark_exported_symbols() after binding
+        - Added mark_exported_symbols() helper to handle parser's structure (thin_binder.rs:1010)
+        - Updated bind_export_declaration() to call mark_exported_symbols() after binding (thin_binder.rs:1084)
         - test_namespace_binding_debug now verifies ONLY exported members are in exports table
-        - All 629 tests pass (except test_namespace_member_not_found which needs checker logic)
-    - ⏳ TODO: Implement checker logic to validate qualified name access and report TS2694
-        - Binder correctly filters exports, but checker doesn't validate access yet
-        - test_namespace_member_not_found expects TS2694 but gets no diagnostics
-        - Need to implement qualified name checking in checker that looks up member in exports table
+    - ✅ FIXED: Checker validation - now properly validates namespace member access
+        - Updated compute_type_of_symbol() to return TypeKey::Ref for namespace symbols (thin_checker.rs:998-1001)
+        - This allows resolve_qualified_name() to access exports table and validate members
+        - Existing validation logic in resolve_qualified_name() now triggers correctly
+        - test_namespace_member_not_found now passes (reports TS2694 for missing exports)
     - ⏳ TODO: Handle import aliases (`import x = ns.member`)
-    - All 629 tests pass
+    - All 681 tests pass
 - ⬜ Various missing error codes (see test failures)
 - ✅ Fix tuple subtyping logic (CRITICAL - COMPLETED)
     - Fixed: Now properly rejects `[number, string]` as subtype of `[number]`
