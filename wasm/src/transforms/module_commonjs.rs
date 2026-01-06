@@ -37,6 +37,52 @@ pub fn emit_commonjs_preamble(writer: &mut impl std::fmt::Write) -> std::fmt::Re
     Ok(())
 }
 
+/// Helper function to collect export name from a single declaration node
+fn collect_export_name_from_declaration(arena: &ThinNodeArena, decl_node: &ThinNode, exports: &mut Vec<String>) {
+    match decl_node.kind {
+        k if k == syntax_kind_ext::CLASS_DECLARATION => {
+            if let Some(class) = arena.get_class(decl_node) {
+                if let Some(name) = get_identifier_text(arena, class.name) {
+                    exports.push(name);
+                }
+            }
+        }
+        k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+            if let Some(func) = arena.get_function(decl_node) {
+                if let Some(name) = get_identifier_text(arena, func.name) {
+                    exports.push(name);
+                }
+            }
+        }
+        k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+            if let Some(var_stmt) = arena.get_variable(decl_node) {
+                for &decl_idx in &var_stmt.declarations.nodes {
+                    if let Some(name) = get_declaration_name(arena, decl_idx) {
+                        exports.push(name);
+                    }
+                }
+            }
+        }
+        k if k == syntax_kind_ext::ENUM_DECLARATION => {
+            if let Some(enum_decl) = arena.get_enum(decl_node) {
+                if let Some(name) = get_identifier_text(arena, enum_decl.name) {
+                    exports.push(name);
+                }
+            }
+        }
+        k if k == syntax_kind_ext::MODULE_DECLARATION => {
+            if let Some(module) = arena.get_module(decl_node) {
+                if let Some(name) = get_identifier_text(arena, module.name) {
+                    exports.push(name);
+                }
+            }
+        }
+        _ => {
+            // Interface, Type Alias, etc. don't need runtime exports
+        }
+    }
+}
+
 /// Collect all export names from a source file for the exports initialization
 ///
 /// Returns a list of exported names (e.g., ["foo", "bar"])
@@ -47,6 +93,16 @@ pub fn collect_export_names(arena: &ThinNodeArena, statements: &[NodeIndex]) -> 
         let Some(node) = arena.get(stmt_idx) else { continue };
 
         match node.kind {
+            // export class C {} / export function f() {} / etc.
+            // These are wrapped in EXPORT_DECLARATION nodes
+            k if k == syntax_kind_ext::EXPORT_DECLARATION => {
+                if let Some(export_decl) = arena.get_export_decl(node) {
+                    // The actual declaration (class, function, etc.) is in export_clause
+                    if let Some(decl_node) = arena.get(export_decl.export_clause) {
+                        collect_export_name_from_declaration(arena, decl_node, &mut exports);
+                    }
+                }
+            }
             // export const foo = ...
             // export let bar = ...
             // export var baz = ...
@@ -385,5 +441,55 @@ mod tests {
         assert!(result.contains("Object.defineProperty"));
         assert!(result.contains("\"foo\""));
         assert!(result.contains("module_1.foo"));
+    }
+
+    #[test]
+    fn test_collect_export_names_with_parsed_ast() {
+        use crate::thin_parser::ThinParserState;
+        use crate::parser::syntax_kind_ext;
+
+        let source = "export class C {}";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+            panic!("Failed to get source file");
+        };
+
+        // Debug: print the statements
+        eprintln!("Source file has {} statements", source_file.statements.nodes.len());
+        for (i, &stmt_idx) in source_file.statements.nodes.iter().enumerate() {
+            if let Some(node) = parser.arena.get(stmt_idx) {
+                eprintln!("Statement {}: kind = {} (ClassDecl = {})",
+                    i, node.kind, syntax_kind_ext::CLASS_DECLARATION);
+
+                if node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                    if let Some(class) = parser.arena.get_class(node) {
+                        eprintln!("  Found class, modifiers: {:?}", class.modifiers);
+                        if let Some(modifiers) = &class.modifiers {
+                            eprintln!("  Modifiers count: {}", modifiers.nodes.len());
+                            for &mod_idx in &modifiers.nodes {
+                                if let Some(mod_node) = parser.arena.get(mod_idx) {
+                                    eprintln!("    Modifier kind: {} (Export = {})",
+                                        mod_node.kind, SyntaxKind::ExportKeyword as u16);
+                                }
+                            }
+                        }
+                        if let Some(name_node) = parser.arena.get(class.name) {
+                            if let Some(ident) = parser.arena.get_identifier(name_node) {
+                                eprintln!("  Class name: {}", ident.escaped_text);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+        eprintln!("Collected export names: {:?}", export_names);
+
+        assert!(!export_names.is_empty(), "Expected to find exported class name");
+        assert_eq!(export_names, vec!["C"], "Expected to find class name 'C' in exports");
     }
 }
