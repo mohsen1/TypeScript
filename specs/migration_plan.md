@@ -15,11 +15,11 @@ see SESSION_LOG.md -- always amended with each session's work
 
 **Goal**: 100% match on TypeScript's test baselines.
 
-### Current Status (100-file samples)
+### Current Status (1000-file samples)
 | Baseline | Compiler | Conformance | Crash Rate |
 |----------|----------|-------------|------------|
-| .errors.txt | **77.9%** (60/77) | 23.3% (21/90) | 0% |
-| .js emit | **60.5%** (46/76) | 17.0% (15/88) | 0% |
+| .errors.txt | **44.2%** (387/875) | 28.3% (250/882) | 0.1% |
+| .js emit | **16.3%** (136/835) | 10.1% (78/774) | 0% |
 
 ### Work Process
 
@@ -27,6 +27,27 @@ see SESSION_LOG.md -- always amended with each session's work
 1. **BEFORE**: `node scripts/ask-gemini.mjs "How should I implement [task]?"` - get guidance
 2. **IMPLEMENT**: Write code, run tests, add tests
 3. **AFTER**: `node scripts/ask-gemini.mjs --review wasm/src/[file].rs` - get review
+
+---
+
+## 🚀 HIGH-IMPACT EMITTER FIXES (Ask Gemini before each!)
+
+These fixes improve JS emit baseline:
+
+1. ✅ **Enable CommonJS auto-detect in lib.rs** - Module transforms now trigger for files with imports/exports
+   - Added `set_auto_detect_module(true)` in `emit()`
+   - CommonJS mode auto-detects based on import/export statements
+
+2. ⬜ **Fix `export default` expression emit** - Missing default exports
+   - Handle expression case in `emit_export_declaration_commonjs`
+   - Pattern: `export default 42;` → `exports.default = 42;`
+
+3. ✅ **Hook up EXPORT_ASSIGNMENT** - `export = x` now works
+   - Added dispatch case for kind 278 in emit_node
+   - Pattern: `export = foo;` → `module.exports = foo;`
+
+4. ⬜ **ES5 computed property transform** - `{ [k]: v }` is ES6
+   - Emit as: `(_a = {}, _a[k] = v, _a)`
 
 ---
 

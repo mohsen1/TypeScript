@@ -252,12 +252,14 @@ impl ThinParser {
         }
     }
 
-    /// Emit the source file as JavaScript (ES5 target to match TypeScript baselines).
+    /// Emit the source file as JavaScript (ES5 target, auto-detect CommonJS for modules).
     #[wasm_bindgen(js_name = emit)]
     pub fn emit(&self) -> String {
         if let Some(root_idx) = self.source_file_idx {
             let mut printer = ThinPrinter::new(self.parser.get_arena());
             printer.set_target_es5(true); // Match TypeScript baselines
+            // Detect if file is a module and apply CommonJS transform
+            printer.set_auto_detect_module(true);
             printer.set_source_text(self.parser.get_source_text());
             printer.emit(root_idx);
             printer.get_output().to_string()

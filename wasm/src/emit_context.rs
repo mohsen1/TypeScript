@@ -188,6 +188,9 @@ pub struct EmitContext {
 
     /// Private fields transformation state (#field → WeakMap)
     pub private_field_state: PrivateFieldState,
+
+    /// Auto-detect module mode: if true, detect imports/exports and apply CommonJS
+    pub auto_detect_module: bool,
 }
 
 impl EmitContext {
@@ -212,6 +215,7 @@ impl EmitContext {
             module_state: ModuleTransformState::default(),
             block_scope_state: BlockScopeState::default(),
             private_field_state: PrivateFieldState::default(),
+            auto_detect_module: false,
         }
     }
 

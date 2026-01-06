@@ -416,9 +416,9 @@ fn test_commonjs_preamble() {
 
     let output = printer.get_output();
     assert!(output.contains("\"use strict\";"), "Expected 'use strict' in CommonJS output: {}", output);
-    assert!(output.contains("Object.defineProperty(exports, \"__esModule\""), "Expected __esModule in output: {}", output);
-    // Check that we have exports init - might be empty if no exports detected
-    // For now, just verify the preamble is there
+    // TypeScript doesn't emit __esModule in its baseline format, so we don't either
+    // Just verify the preamble is there with exports init
+    assert!(output.contains("exports.x"), "Expected exports.x in CommonJS output: {}", output);
 }
 
 #[test]

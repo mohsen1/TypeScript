@@ -381,6 +381,18 @@ impl<'a> ThinPrinter<'a> {
         self.ctx.target_es5 = es5;
     }
 
+    /// Set the module kind (CommonJS, ESM, etc.).
+    pub fn set_module_kind(&mut self, kind: ModuleKind) {
+        self.ctx.options.module = kind;
+    }
+
+    /// Set auto-detect module mode. When enabled, the emitter will detect if
+    /// the source file contains import/export statements and apply CommonJS
+    /// transforms automatically.
+    pub fn set_auto_detect_module(&mut self, enabled: bool) {
+        self.ctx.auto_detect_module = enabled;
+    }
+
     /// Set the source text (for detecting single-line constructs).
     pub fn set_source_text(&mut self, text: &'a str) {
         self.source_text = Some(text);
@@ -816,6 +828,9 @@ impl<'a> ThinPrinter<'a> {
             }
             k if k == syntax_kind_ext::EXPORT_SPECIFIER => {
                 self.emit_export_specifier(node);
+            }
+            k if k == syntax_kind_ext::EXPORT_ASSIGNMENT => {
+                self.emit_export_assignment(node);
             }
 
             // Additional statements
@@ -2504,6 +2519,31 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
+    /// Emit export assignment (export = expr or export default expr)
+    fn emit_export_assignment(&mut self, node: &ThinNode) {
+        let Some(export_assign) = self.arena.get_export_assignment(node) else {
+            return;
+        };
+
+        if self.ctx.is_commonjs() {
+            // CommonJS: export = expr → module.exports = expr;
+            //           export default expr → exports.default = expr;
+            if export_assign.is_export_equals {
+                self.write("module.exports = ");
+            } else {
+                self.write("exports.default = ");
+            }
+            self.emit(export_assign.expression);
+            self.write_semicolon();
+        } else {
+            // ES6: export = expr (not valid ES6, but emit as export default)
+            //      export default expr → export default expr;
+            self.write("export default ");
+            self.emit(export_assign.expression);
+            self.write_semicolon();
+        }
+    }
+
     /// Collect variable names from a VARIABLE_STATEMENT node
     fn collect_variable_names_from_node(&self, node: &ThinNode) -> Vec<String> {
         let mut names = Vec::new();
@@ -3391,6 +3431,11 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
+        // Auto-detect module: if enabled and file has imports/exports, switch to CommonJS
+        if self.ctx.auto_detect_module && self.file_is_module(&source.statements) {
+            self.ctx.options.module = ModuleKind::CommonJS;
+        }
+
         // CommonJS preamble
         if self.ctx.is_commonjs() {
             self.emit_commonjs_preamble(&source.statements);
@@ -3411,6 +3456,64 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
+    /// Check if a file is a module (has import/export statements)
+    fn file_is_module(&self, statements: &NodeList) -> bool {
+        for &stmt_idx in &statements.nodes {
+            if let Some(node) = self.arena.get(stmt_idx) {
+                match node.kind {
+                    k if k == syntax_kind_ext::IMPORT_DECLARATION => return true,
+                    k if k == syntax_kind_ext::EXPORT_DECLARATION => return true,
+                    k if k == syntax_kind_ext::EXPORT_ASSIGNMENT => return true,
+                    // Check for export modifier on declarations
+                    k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+                        if let Some(var_stmt) = self.arena.get_variable(node) {
+                            if self.has_export_modifier(&var_stmt.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                        if let Some(func) = self.arena.get_function(node) {
+                            if self.has_export_modifier(&func.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                        if let Some(class) = self.arena.get_class(node) {
+                            if self.has_export_modifier(&class.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::ENUM_DECLARATION => {
+                        if let Some(enum_decl) = self.arena.get_enum(node) {
+                            if self.has_export_modifier(&enum_decl.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
+                        if let Some(iface) = self.arena.get_interface(node) {
+                            if self.has_export_modifier(&iface.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                        if let Some(type_alias) = self.arena.get_type_alias(node) {
+                            if self.has_export_modifier(&type_alias.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        false
+    }
+
     /// Emit CommonJS module preamble
     fn emit_commonjs_preamble(&mut self, statements: &NodeList) {
         use crate::transforms::module_commonjs;
@@ -3419,11 +3522,8 @@ impl<'a> ThinPrinter<'a> {
         self.write("\"use strict\";");
         self.write_line();
 
-        // Object.defineProperty(exports, "__esModule", { value: true });
-        self.write("Object.defineProperty(exports, \"__esModule\", { value: true });");
-        self.write_line();
-
         // Collect and emit exports initialization
+        // TypeScript emits: exports.C = void 0; (NOT Object.defineProperty)
         let export_names = module_commonjs::collect_export_names(self.arena, &statements.nodes);
         if !export_names.is_empty() {
             // exports.a = exports.b = void 0;
