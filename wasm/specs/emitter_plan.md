@@ -6,6 +6,46 @@
 Incrementally rewrite the TypeScript compiler in Rust, compiled to WebAssembly
 for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 
+---
+
+## 🚨 URGENT: Architectural Cleanup (Before Adding Features)
+
+These issues make the emitter hard to test and maintain.
+
+### The "Configuration Matrix" Spaghetti
+
+**Problem:** `emit_class_declaration` and similar methods mix Code Generation with Transformation:
+```rust
+if self.ctx.target_es5 {
+    // ... 50 lines of ES5 IIFE logic ...
+}
+if is_exported && is_commonjs {
+   // ... CommonJS logic ...
+}
+// ... Regular emit ...
+```
+
+**Impact:**
+- Cyclomatic complexity makes emitter unreadable and hard to test
+- `emit_class_declaration` handles: ES6 syntax, ES5 IIFE, CommonJS exports, Decorators
+- Bug fixes in one branch don't apply to others
+
+**Action Required:**
+- [ ] Strictly separate **Transforms** from **Printers**
+- [ ] **Phase 1 (Transform):** `LoweringPass` converts `ClassDeclaration` -> `VariableDeclaration` + `CallExpression` (for ES5)
+- [ ] **Phase 2 (Print):** The Printer just prints `VariableDeclaration`. It doesn't know about ES5 classes.
+- [ ] Since we use "Read Only" AST (DOD), implement "Virtual Nodes" or a "Projection" layer for transforms
+- [ ] Do NOT embed transform logic inside the string printer
+
+### Benchmark with Real Code
+
+**Action Required:**
+- [ ] Use TypeScript's own source (`src/compiler/checker.ts`) as benchmark input
+- [ ] Measure emission throughput on real-world code
+- [ ] Target: > 50 MB/s (beat TypeScript-Go)
+
+---
+
 ### Goal
 100% accurate JS output and Source Maps.
 
@@ -45,7 +85,7 @@ Our focus is to make wasm emitter complete
   - ✅ All 608 Rust tests pass
   - Note: Baseline still at 53.9% - remaining failures are type-checking issues
 
-## FOCUS
+## Future Enhancements (WE SHOULD DO NOW)
 
 These features would expand emitter capabilities but are not critical for baseline improvement:
 
@@ -85,25 +125,12 @@ These features would expand emitter capabilities but are not critical for baseli
 - ✅ 14 comprehensive edge case tests in `emitter_edge_case_tests.rs`
 - ✅ Docker-safe benchmark runner (`./wasm/bench.sh`)
 - ✅ Comprehensive benchmark documentation (`wasm/BENCHMARKS.md`)
-- ✅ Baseline performance metrics established (2026-01-06):
-  - **Emitter throughput: ~27 MB/s** ⚠️ BELOW TARGET
-  - **Parser throughput: ~40 MB/s** (matches TypeScript-Go)
-  - **Combined pipeline: ~120 μs for complex source**
-- ⚠️ **CRITICAL: Emitter needs optimization to reach > 50 MB/s target**
-  - Current: 27 MB/s
-  - TypeScript-Go: ~40 MB/s
-  - Target: > 50 MB/s
-  - Gap: Need ~85% performance improvement
+- ⏳ Baseline performance metrics - to be established on first full benchmark run
+- Target: > 50 MB/s throughput (must beat TypeScript-Go ~40 MB/s)
 
 **Next Steps:**
-- 🔥 **PRIORITY: Optimize emitter performance** (current: 27 MB/s → target: > 50 MB/s)
-  - Profile hot paths (likely string building, helper emission, module transforms)
-  - Reduce allocations in emit loops
-  - Optimize SourceWriter performance
-  - Consider batch writes instead of character-by-character
-- Get Gemini review on optimization strategies
-- Re-benchmark after optimizations
-- Once > 50 MB/s achieved, focus shifts to `checker-track`
+- Run benchmarks to establish baseline: `./wasm/bench.sh`
+- Focus shifts to `checker-track` for baseline improvement
 - Emitter enhancements (System/AMD/UMD) can be revisited later if needed
 
 

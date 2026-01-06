@@ -177,3 +177,32 @@ fn test_thin_binder_exported_const() {
     assert!(binder.file_locals.has("x"), "Exported const 'x' should be in file_locals");
     assert!(binder.file_locals.has("y"), "Exported const 'y' should be in file_locals");
 }
+#[test]
+fn test_namespace_binding_debug() {
+    use crate::thin_parser::ThinParserState;
+    use crate::thin_binder::ThinBinderState;
+
+    let source = r#"
+namespace foo {
+    export class Provide {}
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    // Check if 'foo' was bound
+    let foo_sym_id = binder.file_locals.get("foo").expect("'foo' should be in file_locals");
+    let foo_symbol = binder.get_symbol(foo_sym_id).expect("foo symbol should exist");
+
+    // Check if exports were captured
+    assert!(foo_symbol.exports.is_some(), "foo should have exports");
+
+    // Check if Provide is in exports
+    let exports = foo_symbol.exports.as_ref().unwrap();
+    assert!(exports.get("Provide").is_some(), "Provide should be in foo's exports");
+}

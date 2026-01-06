@@ -328,6 +328,13 @@ impl<'a> ThinCheckerState<'a> {
 
         let type_name_idx = type_ref.type_name;
 
+        // Check if type_name is a qualified name (A.B)
+        if let Some(name_node) = self.ctx.arena.get(type_name_idx) {
+            if name_node.kind == syntax_kind_ext::QUALIFIED_NAME {
+                return self.resolve_qualified_name(type_name_idx);
+            }
+        }
+
         // Get the identifier for the type name
         if let Some(name_node) = self.ctx.arena.get(type_name_idx) {
             if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
@@ -377,6 +384,96 @@ impl<'a> ThinCheckerState<'a> {
                     }
                 }
             }
+        }
+
+        TypeId::ANY
+    }
+
+    /// Resolve a qualified name (A.B) to a type.
+    /// Returns the type of the rightmost member, or reports TS2694 if not found.
+    fn resolve_qualified_name(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        let Some(qn) = self.ctx.arena.get_qualified_name(node) else {
+            return TypeId::ANY;
+        };
+
+        // Resolve the left side (could be Identifier or another QualifiedName)
+        let left_type = if let Some(left_node) = self.ctx.arena.get(qn.left) {
+            if left_node.kind == syntax_kind_ext::QUALIFIED_NAME {
+                self.resolve_qualified_name(qn.left)
+            } else if left_node.kind == SyntaxKind::Identifier as u16 {
+                // Resolve identifier as a type reference
+                self.get_type_from_type_reference_by_name(qn.left)
+            } else {
+                TypeId::ANY
+            }
+        } else {
+            TypeId::ANY
+        };
+
+        if left_type == TypeId::ANY || left_type == TypeId::ERROR {
+            return TypeId::ANY;
+        }
+
+        // Get the right side name (B in A.B)
+        let right_name = if let Some(right_node) = self.ctx.arena.get(qn.right) {
+            if let Some(id) = self.ctx.arena.get_identifier(right_node) {
+                id.escaped_text.clone()
+            } else {
+                return TypeId::ANY;
+            }
+        } else {
+            return TypeId::ANY;
+        };
+
+        // Look up the member in the left side's exports
+        if let Some(crate::solver::TypeKey::Ref(crate::solver::SymbolRef(sym_id))) = self.ctx.types.lookup(left_type) {
+            if let Some(symbol) = self.ctx.binder.get_symbol(crate::binder::SymbolId(sym_id)) {
+                // Check exports table
+                if let Some(ref exports) = symbol.exports {
+                    if let Some(member_sym_id) = exports.get(&right_name) {
+                        return self.get_type_of_symbol(member_sym_id);
+                    }
+                }
+
+                // Not found - report TS2694
+                self.error_namespace_no_export(&symbol.escaped_name, &right_name, qn.right);
+                return TypeId::ERROR;
+            }
+        }
+
+        // Left side wasn't a reference to a namespace/module
+        TypeId::ANY
+    }
+
+    /// Helper to resolve an identifier as a type reference (for qualified name left sides).
+    fn get_type_from_type_reference_by_name(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        if let Some(ident) = self.ctx.arena.get_identifier(node) {
+            let name = &ident.escaped_text;
+
+            // Check local scopes
+            if let Some(type_id) = self.lookup_local(name) {
+                return type_id;
+            }
+            // Check file locals
+            if let Some(sym_id) = self.ctx.binder.file_locals.get(name) {
+                return self.get_type_of_symbol(sym_id);
+            }
+            // Check all symbols
+            if let Some(sym_id) = self.ctx.binder.get_symbols().find_by_name(name) {
+                return self.get_type_of_symbol(sym_id);
+            }
+
+            // Not found
+            self.error_cannot_find_name_at(name, idx);
+            return TypeId::ERROR;
         }
 
         TypeId::ANY
@@ -741,10 +838,12 @@ impl<'a> ThinCheckerState<'a> {
         match name.as_str() {
             "undefined" => TypeId::UNDEFINED,
             "NaN" | "Infinity" => TypeId::NUMBER,
+            // Symbol constructor - synthesize proper type for call signature validation
+            "Symbol" => self.get_symbol_constructor_type(),
             // Global objects that are always available
             "console" | "Math" | "JSON" | "Object" | "Array" | "String"
             | "Number" | "Boolean" | "Date" | "RegExp" | "Error" | "Promise"
-            | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Symbol" | "Proxy"
+            | "Map" | "Set" | "WeakMap" | "WeakSet" | "WeakRef" | "Proxy"
             | "Reflect" | "globalThis" | "window" | "document"
             | "FinalizationRegistry" | "BigInt" | "ArrayBuffer" | "SharedArrayBuffer"
             | "DataView" | "Int8Array" | "Uint8Array" | "Uint8ClampedArray"
@@ -776,6 +875,40 @@ impl<'a> ThinCheckerState<'a> {
                 TypeId::ERROR
             }
         }
+    }
+
+    /// Synthesize the Symbol constructor type.
+    ///
+    /// Returns a callable type with signature: `Symbol(description?: string | number): symbol`
+    /// Note: Symbol cannot be constructed with `new`, so no construct signatures.
+    fn get_symbol_constructor_type(&self) -> TypeId {
+        use crate::solver::{CallSignature, CallableShape, ParamInfo};
+        use std::sync::Arc;
+
+        // Parameter: description?: string | number
+        let description_param_type = self.ctx.types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+        let description_param = ParamInfo {
+            name: Some(Arc::from("description")),
+            type_id: description_param_type,
+            optional: true,
+            rest: false,
+        };
+
+        // Call signature: (description?: string | number) => symbol
+        let call_sig = CallSignature {
+            type_params: vec![],
+            params: vec![description_param],
+            return_type: TypeId::SYMBOL,
+        };
+
+        // Callable shape (no construct signatures - can't use `new Symbol()`)
+        let shape = CallableShape {
+            call_signatures: vec![call_sig],
+            construct_signatures: vec![],
+            properties: vec![], // Could add Symbol.for, Symbol.keyFor, etc. later
+        };
+
+        self.ctx.types.callable(shape)
     }
 
     /// Apply control flow narrowing to a type at a specific identifier usage.
@@ -1248,7 +1381,21 @@ impl<'a> ThinCheckerState<'a> {
             let result = evaluator.resolve_property_access(object_type, property_name);
 
             match result {
-                PropertyAccessResult::Success(prop_type) => prop_type,
+                PropertyAccessResult::Success { type_id: prop_type, from_index_signature } => {
+                    // Check for error 4111: property access from index signature
+                    if from_index_signature {
+                        use crate::checker::types::diagnostics::diagnostic_codes;
+                        self.error_at_node(
+                            access.name_or_argument,
+                            &format!(
+                                "Property '{}' comes from an index signature, so it must be accessed with ['{}'].",
+                                property_name, property_name
+                            ),
+                            diagnostic_codes::PROPERTY_ACCESS_FROM_INDEX_SIGNATURE,
+                        );
+                    }
+                    prop_type
+                }
 
                 PropertyAccessResult::PropertyNotFound { .. } => {
                     self.error_property_not_exist_at(property_name, object_type, idx);
@@ -2043,6 +2190,35 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Report error 2403: Subsequent variable declarations must have the same type.
+    pub fn error_subsequent_variable_declaration(
+        &mut self,
+        name: &str,
+        prev_type: TypeId,
+        current_type: TypeId,
+        idx: NodeIndex,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        if let Some(loc) = self.get_source_location(idx) {
+            let prev_type_str = self.format_type(prev_type);
+            let current_type_str = self.format_type(current_type);
+            let message = format!(
+                "Subsequent variable declarations must have the same type. Variable '{}' must be of type '{}', but here has type '{}'.",
+                name, prev_type_str, current_type_str
+            );
+            self.ctx.diagnostics.push(Diagnostic {
+                code: diagnostic_codes::SUBSEQUENT_VARIABLE_DECLARATIONS_MUST_HAVE_SAME_TYPE,
+                category: DiagnosticCategory::Error,
+                message_text: message,
+                file: self.ctx.file_name.clone(),
+                start: loc.start,
+                length: loc.length(),
+                related_information: Vec::new(),
+            });
+        }
+    }
+
     /// Report error 2715: Abstract property 'X' in class 'C' cannot be accessed in the constructor.
     pub fn error_abstract_property_in_constructor(
         &mut self,
@@ -2132,6 +2308,22 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Report TS2694: Namespace has no exported member.
+    pub fn error_namespace_no_export(&mut self, namespace_name: &str, member_name: &str, idx: NodeIndex) {
+        if let Some(loc) = self.get_source_location(idx) {
+            let message = format!("Namespace '{}' has no exported member '{}'.", namespace_name, member_name);
+            self.ctx.diagnostics.push(Diagnostic {
+                code: 2694,
+                category: DiagnosticCategory::Error,
+                message_text: message,
+                start: loc.start,
+                length: loc.length(),
+                file: self.ctx.file_name.clone(),
+                related_information: Vec::new(),
+            });
+        }
+    }
+
     /// Create a diagnostic collector for batch error reporting.
     pub fn create_diagnostic_collector(&self) -> crate::solver::DiagnosticCollector<'_> {
         crate::solver::DiagnosticCollector::new(&self.ctx.types, self.ctx.file_name.as_str())
@@ -2162,6 +2354,10 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         if let Some(sf) = self.ctx.arena.get_source_file(node) {
+            // Push file-level scope for top-level variables
+            // This enables variable redeclaration checking (TS2403) and type tracking
+            self.push_local_scope();
+
             // Type check each top-level statement
             for &stmt_idx in &sf.statements.nodes {
                 self.check_statement(stmt_idx);
@@ -2172,6 +2368,9 @@ impl<'a> ThinCheckerState<'a> {
 
             // Check for export assignment with other exports (2309)
             self.check_export_assignment(&sf.statements.nodes);
+
+            // Pop file-level scope
+            self.pop_local_scope();
         }
     }
 
@@ -2385,6 +2584,10 @@ impl<'a> ThinCheckerState<'a> {
                 // No action needed
             }
             syntax_kind_ext::MODULE_DECLARATION => {
+                // Check module declaration (errors 5061, 2819, etc.)
+                let mut checker = crate::checker::declarations::DeclarationChecker::new(&mut self.ctx);
+                checker.check_module_declaration(stmt_idx);
+
                 // Check module body for function overload implementations
                 if let Some(module) = self.ctx.arena.get_module(node) {
                     if !module.body.is_none() {
@@ -2486,6 +2689,18 @@ impl<'a> ThinCheckerState<'a> {
             declared_type
         };
 
+        // Check for variable redeclaration in the current scope (TS2403)
+        // Note: This applies specifically to 'var' merging where types must match.
+        // let/const duplicates are caught earlier by the binder (TS2451).
+        if let Some(ref name) = var_name {
+            if let Some(prev_type) = self.ctx.lookup_local_in_current_scope(name) {
+                // Types must be identical for subsequent declarations
+                if !self.are_types_identical(final_type, prev_type) {
+                    self.error_subsequent_variable_declaration(name, prev_type, final_type, decl_idx);
+                }
+            }
+        }
+
         // Add variable to local scope (if we're inside a function/method)
         if let Some(name) = var_name {
             self.add_local(name, final_type);
@@ -2585,7 +2800,10 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(type_id) = self.lookup_local(var_name) {
                 // Check if this type is a class instance - the type would be stored
                 // We need to trace back to the class name
-                return self.get_class_name_from_type(type_id);
+                if let Some(class_name) = self.get_class_name_from_type(type_id) {
+                    return Some(class_name);
+                }
+                // If get_class_name_from_type returns None, fall through to check file_locals
             }
 
             // Check file_locals for the variable binding
@@ -2822,9 +3040,42 @@ impl<'a> ThinCheckerState<'a> {
         let is_abstract_class = self.has_abstract_modifier(&class.modifiers);
 
         // Check for abstract members in non-abstract class (error 1253)
-        if !is_abstract_class {
-            for &member_idx in &class.members.nodes {
-                if let Some(member_node) = self.ctx.arena.get(member_idx) {
+        // and private identifiers in ambient classes (error 2819)
+        for &member_idx in &class.members.nodes {
+            if let Some(member_node) = self.ctx.arena.get(member_idx) {
+                // TS2819: Check for private identifiers in ambient classes
+                if is_declared {
+                    let member_name_idx = match member_node.kind {
+                        syntax_kind_ext::PROPERTY_DECLARATION => {
+                            self.ctx.arena.get_property_decl(member_node).map(|p| p.name)
+                        }
+                        syntax_kind_ext::METHOD_DECLARATION => {
+                            self.ctx.arena.get_method_decl(member_node).map(|m| m.name)
+                        }
+                        syntax_kind_ext::GET_ACCESSOR | syntax_kind_ext::SET_ACCESSOR => {
+                            self.ctx.arena.get_accessor(member_node).map(|a| a.name)
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(name_idx) = member_name_idx {
+                        if !name_idx.is_none() {
+                            if let Some(name_node) = self.ctx.arena.get(name_idx) {
+                                if name_node.kind == crate::scanner::SyntaxKind::PrivateIdentifier as u16 {
+                                    use crate::checker::types::diagnostics::diagnostic_messages;
+                                    self.error_at_node(
+                                        name_idx,
+                                        diagnostic_messages::PRIVATE_IDENTIFIER_IN_AMBIENT_CONTEXT,
+                                        diagnostic_codes::PRIVATE_IDENTIFIER_IN_AMBIENT_CONTEXT,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Check for abstract members in non-abstract class
+                if !is_abstract_class {
                     let member_has_abstract = match member_node.kind {
                         syntax_kind_ext::PROPERTY_DECLARATION => {
                             if let Some(prop) = self.ctx.arena.get_property_decl(member_node) {
