@@ -130,3 +130,9 @@ Commit frequently and atomically
 6. IMPORTANT: **Separate test files** - `foo.rs` and `foo_tests.rs` or `tests/foo.rs` even in Rust files. if you see a file that has source and test in the same file move tests to separate file as a top priority
 7. **Gemini at milestones** - not every commit, but every major component. or when it is a big task and makes sense to get some help
 
+
+
+⚠️ **CRITICAL: For each task, ALWAYS:**
+1. **BEFORE**: `node scripts/ask-gemini.mjs "How should I implement [task]?"` - get guidance
+2. **IMPLEMENT**: Write code, run tests. add tests
+3. **AFTER**: `node scripts/ask-gemini.mjs --review wasm/src/[file].rs` - get review
