@@ -16,6 +16,11 @@ Development sessions for the TypeScript → Rust/WASM migration.
   - TS1183: Accessor body checks in ambient contexts
   - TS1248: Const keyword on class members
   - Callable interface type lowering
+  - TS2511: Abstract union type detection (`type_contains_abstract_class`)
+- **Added specs/REFACTOR_CHECKER.md** - checker architecture recommendations
+  - Split ThinCheckerState into Context + specialized Checkers
+  - Move expression type computation to solver
+  - Use NodeView API, consolidate types
 - **Current Baseline**: 79.2% errors (61/77), 59.2% JS emit (45/76)
 - **534 tests passing**
 
