@@ -383,48 +383,14 @@ function runYek(tokens, dirs) {
 async function askGeminiStream(apiKey, codebaseContext, question, systemPrompt = null) {
   const url = `${GEMINI_API_URL}/${GEMINI_MODEL}:streamGenerateContent?alt=sse`;
 
+  // Read architecture doc dynamically
+  const architectureDoc = fs.readFileSync(path.join(REPO_ROOT, "wasm/specs/WASM_ARCHITECTURE.md"), "utf8");
+
   const defaultSystemPrompt = `You are an expert systems engineer working on **tsc-rust**: a high-performance Rust/WASM port of the TypeScript compiler designed to beat TypeScript-Go in speed.
 
 ## Project Architecture
 
-**The Rust compiler in \`wasm/src/\` uses these performance innovations:**
-
-1. **ThinNode (16 bytes/node)** — 13x cache improvement over TypeScript's 208-byte nodes
-   \`\`\`rust
-   #[repr(C)]
-   pub struct ThinNode { kind: u16, flags: u16, pos: u32, end: u32, data_index: u32 }
-   \`\`\`
-
-2. **TypeId Interning** — Types are 4-byte integers with O(1) equality. Same structure = same TypeId.
-
-3. **Semantic Structural Solver** — Types are *sets of values* (not AST comparisons):
-   - Subtyping = Set inclusion: \`S <: T ⟺ S ⊆ T\`
-   - Union = OR: \`A | B\` = values in A *or* B
-   - Intersection = AND: \`A & B\` = values in A *and* B
-   - Coinduction for recursive types (cycle detection → provisionally true)
-
-4. **String Interning (Atom)** — All identifiers are u32 handles, O(1) comparison.
-
-5. **Parallel Parsing (Rayon)** — Files parsed independently, then merged.
-
-## Current Status (Phase 8 — Baseline Compatibility)
-
-| Baseline | Pass Rate | Goal |
-|----------|-----------|------|
-| .errors.txt | ~38% | 100% |
-| .js emit | ~3% | 100% |
-
-**Top emit gaps:** Modules (33%), let/const (4%), arrow functions (3%), class fields (7%)
-**Top missing error codes:** TS2322 (type not assignable), TS2339 (property doesn't exist), TS2304 (cannot find name)
-
-## Key Files
-
-- \`wasm/src/thin_parser.rs\` — 16-byte node parser
-- \`wasm/src/thin_binder.rs\` — Symbol table construction  
-- \`wasm/src/thin_checker.rs\` — Type checking orchestration
-- \`wasm/src/solver/\` — Semantic type solver (TypeId, TypeKey, unification)
-- \`wasm/src/thin_emitter.rs\` — ES5/ES6 JavaScript emit
-- \`src/compiler/checker.ts\` — TypeScript reference (35,000+ lines)
+${architectureDoc}
 
 ## When Answering
 
@@ -511,48 +477,14 @@ ${question}
 async function askGemini(apiKey, codebaseContext, question, systemPrompt = null) {
   const url = `${GEMINI_API_URL}/${GEMINI_MODEL}:generateContent`;
 
+  // Read architecture doc dynamically
+  const architectureDoc = fs.readFileSync(path.join(REPO_ROOT, "wasm/specs/WASM_ARCHITECTURE.md"), "utf8");
+
   const defaultSystemPrompt = `You are an expert systems engineer working on **tsc-rust**: a high-performance Rust/WASM port of the TypeScript compiler designed to beat TypeScript-Go in speed.
 
 ## Project Architecture
 
-**The Rust compiler in \`wasm/src/\` uses these performance innovations:**
-
-1. **ThinNode (16 bytes/node)** — 13x cache improvement over TypeScript's 208-byte nodes
-   \`\`\`rust
-   #[repr(C)]
-   pub struct ThinNode { kind: u16, flags: u16, pos: u32, end: u32, data_index: u32 }
-   \`\`\`
-
-2. **TypeId Interning** — Types are 4-byte integers with O(1) equality. Same structure = same TypeId.
-
-3. **Semantic Structural Solver** — Types are *sets of values* (not AST comparisons):
-   - Subtyping = Set inclusion: \`S <: T ⟺ S ⊆ T\`
-   - Union = OR: \`A | B\` = values in A *or* B
-   - Intersection = AND: \`A & B\` = values in A *and* B
-   - Coinduction for recursive types (cycle detection → provisionally true)
-
-4. **String Interning (Atom)** — All identifiers are u32 handles, O(1) comparison.
-
-5. **Parallel Parsing (Rayon)** — Files parsed independently, then merged.
-
-## Current Status (Phase 8 — Baseline Compatibility)
-
-| Baseline | Pass Rate | Goal |
-|----------|-----------|------|
-| .errors.txt | ~38% | 100% |
-| .js emit | ~3% | 100% |
-
-**Top emit gaps:** Modules (33%), let/const (4%), arrow functions (3%), class fields (7%)
-**Top missing error codes:** TS2322 (type not assignable), TS2339 (property doesn't exist), TS2304 (cannot find name)
-
-## Key Files
-
-- \`wasm/src/thin_parser.rs\` — 16-byte node parser
-- \`wasm/src/thin_binder.rs\` — Symbol table construction  
-- \`wasm/src/thin_checker.rs\` — Type checking orchestration
-- \`wasm/src/solver/\` — Semantic type solver (TypeId, TypeKey, unification)
-- \`wasm/src/thin_emitter.rs\` — ES5/ES6 JavaScript emit
-- \`src/compiler/checker.ts\` — TypeScript reference (35,000+ lines)
+${architectureDoc}
 
 ## When Answering
 
