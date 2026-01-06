@@ -343,8 +343,54 @@ impl<'a> PropertyAccessEvaluator<'a> {
     /// Resolve properties on array type.
     fn resolve_array_property(&self, array_type: TypeId, prop_name: &str) -> PropertyAccessResult {
         match prop_name {
+            // Array properties
             "length" => PropertyAccessResult::Success(TypeId::NUMBER),
-            // Add more array properties as needed
+
+            // Array methods that return arrays
+            "concat" | "filter" | "flat" | "flatMap" | "map" | "reverse" |
+            "slice" | "sort" | "splice" | "toReversed" | "toSorted" |
+            "toSpliced" | "with" => {
+                // These return array-related types; for now, return ANY as placeholder
+                // Full type inference would require understanding the callback return type
+                PropertyAccessResult::Success(TypeId::ANY)
+            }
+
+            // Array methods that return specific types
+            "at" | "find" | "findLast" | "pop" | "shift" => {
+                // Returns element type or undefined; use ANY as placeholder
+                PropertyAccessResult::Success(TypeId::ANY)
+            }
+
+            "every" | "includes" | "some" => {
+                // Returns boolean
+                PropertyAccessResult::Success(TypeId::BOOLEAN)
+            }
+
+            "findIndex" | "findLastIndex" | "indexOf" | "lastIndexOf" | "push" | "unshift" => {
+                // Returns number
+                PropertyAccessResult::Success(TypeId::NUMBER)
+            }
+
+            "forEach" | "copyWithin" | "fill" => {
+                // forEach returns undefined, copyWithin/fill return this
+                PropertyAccessResult::Success(TypeId::UNDEFINED)
+            }
+
+            "join" | "toLocaleString" | "toString" => {
+                // Returns string
+                PropertyAccessResult::Success(TypeId::STRING)
+            }
+
+            "entries" | "keys" | "values" => {
+                // Returns iterator; use ANY as placeholder
+                PropertyAccessResult::Success(TypeId::ANY)
+            }
+
+            "reduce" | "reduceRight" => {
+                // Returns the accumulator type; use ANY as placeholder
+                PropertyAccessResult::Success(TypeId::ANY)
+            }
+
             _ => PropertyAccessResult::PropertyNotFound {
                 type_id: array_type,
                 property_name: prop_name.to_string(),
