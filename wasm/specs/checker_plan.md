@@ -37,9 +37,15 @@ Our focus is to make wasm checker complete
     - Handles rest element matching correctly (rest to rest, fixed to rest)
     - Added 5 comprehensive test cases for edge cases
     - All 598 tests pass
-- ⬜ Fix function parameter variance (MAJOR from Gemini review)
-    - Currently bivariant (legacy mode), should be contravariant (strict mode)
-    - Consider making strictFunctionTypes the default
+- ✅ Fix function parameter variance (MAJOR - COMPLETED)
+    - Implemented contravariant parameter checking (strict/sound behavior)
+    - Added `strict_function_types: bool` field (default: true)
+    - Created `are_parameters_compatible` helper method
+    - Updated all function/call signature checking methods
+    - Strict mode: target <: source (contravariant, sound)
+    - Legacy mode: target <: source OR source <: target (bivariant, unsound)
+    - Added comprehensive test for both modes
+    - All 607 tests pass (no existing tests broken!)
 - ✅ Remove unused ref_cache field (MINOR - COMPLETED)
     - Removed unused field from SubtypeChecker struct
     - Removed from both constructors (new and with_resolver)

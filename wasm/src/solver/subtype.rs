@@ -109,6 +109,9 @@ pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
     in_progress: HashSet<(TypeId, TypeId)>,
     /// Current recursion depth (for stack overflow prevention)
     depth: u32,
+    /// Whether to use strict function types (contravariant parameters).
+    /// Default: true (sound, correct behavior)
+    pub strict_function_types: bool,
 }
 
 impl<'a> SubtypeChecker<'a, NoopResolver> {
@@ -120,6 +123,7 @@ impl<'a> SubtypeChecker<'a, NoopResolver> {
             resolver: &NOOP,
             in_progress: HashSet::new(),
             depth: 0,
+            strict_function_types: true, // Default to strict (sound) behavior
         }
     }
 }
@@ -132,6 +136,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             resolver,
             in_progress: HashSet::new(),
             depth: 0,
+            strict_function_types: true,
         }
     }
 
@@ -754,6 +759,28 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         SubtypeResult::True
     }
 
+    /// Check if parameter types are compatible based on variance settings.
+    ///
+    /// In strict mode (contravariant): target_type <: source_type
+    /// In legacy mode (bivariant): target_type <: source_type OR source_type <: target_type
+    fn are_parameters_compatible(&mut self, source_type: TypeId, target_type: TypeId) -> bool {
+        // Contravariant check: Target <: Source
+        // Example: (x: Animal) => void <: (x: Cat) => void
+        // Because Cat <: Animal (target <: source)
+        let is_contravariant = self.check_subtype(target_type, source_type).is_true();
+
+        if self.strict_function_types {
+            is_contravariant
+        } else {
+            // Bivariant: either direction works (Unsound, Legacy TS behavior)
+            if is_contravariant {
+                return true;
+            }
+            // Covariant check: Source <: Target
+            self.check_subtype(source_type, target_type).is_true()
+        }
+    }
+
     /// Check function subtyping
     fn check_function_subtype(&mut self, source: &FunctionShape, target: &FunctionShape) -> SubtypeResult {
         // Constructor vs non-constructor
@@ -784,10 +811,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         for i in 0..fixed_compare_count {
             let s_param = &source.params[i];
             let t_param = &target.params[i];
-            // Bivariant: either direction works
-            if !self.check_subtype(s_param.type_id, t_param.type_id).is_true()
-                && !self.check_subtype(t_param.type_id, s_param.type_id).is_true()
-            {
+            // Check parameter compatibility (contravariant in strict mode, bivariant in legacy)
+            if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
                 return SubtypeResult::False;
             }
         }
@@ -801,10 +826,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             // Check source params that exceed target's fixed count against rest type
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
-                // Bivariant check against rest element type
-                if !self.check_subtype(s_param.type_id, rest_elem_type).is_true()
-                    && !self.check_subtype(rest_elem_type, s_param.type_id).is_true()
-                {
+                // Check parameter compatibility against rest element type
+                if !self.are_parameters_compatible(s_param.type_id, rest_elem_type) {
                     return SubtypeResult::False;
                 }
             }
@@ -813,9 +836,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             if source_has_rest {
                 let s_rest_param = source.params.last().unwrap();
                 let s_rest_elem = self.get_array_element_type(s_rest_param.type_id);
-                if !self.check_subtype(s_rest_elem, rest_elem_type).is_true()
-                    && !self.check_subtype(rest_elem_type, s_rest_elem).is_true()
-                {
+                // Check rest-to-rest parameter compatibility
+                if !self.are_parameters_compatible(s_rest_elem, rest_elem_type) {
                     return SubtypeResult::False;
                 }
             }
@@ -907,10 +929,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         for i in 0..fixed_compare_count {
             let s_param = &source.params[i];
             let t_param = &target.params[i];
-            // Bivariant: either direction works
-            if !self.check_subtype(s_param.type_id, t_param.type_id).is_true()
-                && !self.check_subtype(t_param.type_id, s_param.type_id).is_true()
-            {
+            // Check parameter compatibility (contravariant in strict mode, bivariant in legacy)
+            if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
                 return SubtypeResult::False;
             }
         }
@@ -932,9 +952,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             if source_has_rest {
                 let s_rest_param = source.params.last().unwrap();
                 let s_rest_elem = self.get_array_element_type(s_rest_param.type_id);
-                if !self.check_subtype(s_rest_elem, rest_elem_type).is_true()
-                    && !self.check_subtype(rest_elem_type, s_rest_elem).is_true()
-                {
+                // Check rest-to-rest parameter compatibility
+                if !self.are_parameters_compatible(s_rest_elem, rest_elem_type) {
                     return SubtypeResult::False;
                 }
             }
@@ -968,10 +987,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         for i in 0..fixed_compare_count {
             let s_param = &source.params[i];
             let t_param = &target.params[i];
-            // Bivariant
-            if !self.check_subtype(s_param.type_id, t_param.type_id).is_true()
-                && !self.check_subtype(t_param.type_id, s_param.type_id).is_true()
-            {
+            // Check parameter compatibility (contravariant in strict mode, bivariant in legacy)
+            if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
                 return SubtypeResult::False;
             }
         }
@@ -993,9 +1010,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             if source_has_rest {
                 let s_rest_param = source.params.last().unwrap();
                 let s_rest_elem = self.get_array_element_type(s_rest_param.type_id);
-                if !self.check_subtype(s_rest_elem, rest_elem_type).is_true()
-                    && !self.check_subtype(rest_elem_type, s_rest_elem).is_true()
-                {
+                // Check rest-to-rest parameter compatibility
+                if !self.are_parameters_compatible(s_rest_elem, rest_elem_type) {
                     return SubtypeResult::False;
                 }
             }
@@ -1029,10 +1045,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         for i in 0..fixed_compare_count {
             let s_param = &source.params[i];
             let t_param = &target.params[i];
-            // Bivariant
-            if !self.check_subtype(s_param.type_id, t_param.type_id).is_true()
-                && !self.check_subtype(t_param.type_id, s_param.type_id).is_true()
-            {
+            // Check parameter compatibility (contravariant in strict mode, bivariant in legacy)
+            if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
                 return SubtypeResult::False;
             }
         }
@@ -1054,9 +1068,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             if source_has_rest {
                 let s_rest_param = source.params.last().unwrap();
                 let s_rest_elem = self.get_array_element_type(s_rest_param.type_id);
-                if !self.check_subtype(s_rest_elem, rest_elem_type).is_true()
-                    && !self.check_subtype(rest_elem_type, s_rest_elem).is_true()
-                {
+                // Check rest-to-rest parameter compatibility
+                if !self.are_parameters_compatible(s_rest_elem, rest_elem_type) {
                     return SubtypeResult::False;
                 }
             }
@@ -1376,10 +1389,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // Check parameter types
         for (i, s_param) in source.params.iter().enumerate() {
             if let Some(t_param) = target.params.get(i) {
-                // Bivariant check
-                if !self.check_subtype(s_param.type_id, t_param.type_id).is_true()
-                    && !self.check_subtype(t_param.type_id, s_param.type_id).is_true()
-                {
+                // Check parameter compatibility (contravariant in strict mode, bivariant in legacy)
+                if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
                     return Some(SubtypeFailureReason::ParameterTypeMismatch {
                         param_index: i,
                         source_param: s_param.type_id,

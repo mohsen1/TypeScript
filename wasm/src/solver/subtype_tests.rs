@@ -621,3 +621,51 @@ fn test_number_and_string_index_signatures() {
     // This should SUCCEED - "0" satisfies number index, both satisfy string index
     assert!(checker.is_subtype_of(source, target));
 }
+
+#[test]
+fn test_strict_function_variance() {
+    use std::sync::Arc;
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    // Ensure strict mode is on (default)
+    assert_eq!(checker.strict_function_types, true);
+
+    // (x: string | number) => void
+    let union_arg_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(Arc::from("x")),
+            type_id: interner.union(vec![TypeId::STRING, TypeId::NUMBER]),
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::VOID,
+        is_constructor: false,
+    });
+
+    // (x: string) => void
+    let string_arg_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(Arc::from("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::VOID,
+        is_constructor: false,
+    });
+
+    // 1. Safe assignment: (string | number) => void  <:  (string) => void
+    // Target param (string) <: Source param (string | number) -> OK (contravariant)
+    assert!(checker.is_subtype_of(union_arg_fn, string_arg_fn));
+
+    // 2. Unsafe assignment: (string) => void  <:  (string | number) => void
+    // Target param (string | number) <: Source param (string) -> FAIL (would be unsound)
+    assert!(!checker.is_subtype_of(string_arg_fn, union_arg_fn));
+
+    // 3. Disable strict mode (Bivariant)
+    checker.strict_function_types = false;
+    // Now unsafe assignment should pass (legacy behavior)
+    assert!(checker.is_subtype_of(string_arg_fn, union_arg_fn));
+}
