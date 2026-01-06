@@ -10,3 +10,5 @@ pub mod namespace_es5;
 pub mod arrow_es5;
 pub mod helpers;
 pub mod module_commonjs;
+pub mod block_scoping_es5;
+pub mod private_fields_es5;

@@ -1366,6 +1366,16 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
+        let is_exported = self.ctx.is_commonjs() && self.has_export_modifier(&func.modifiers);
+        let is_default = self.has_default_modifier(&func.modifiers);
+
+        // Get function name for export
+        let func_name = if !func.name.is_none() {
+            self.get_identifier_text_idx(func.name)
+        } else {
+            String::new()
+        };
+
         if func.is_async {
             self.write("async ");
         }
@@ -1391,6 +1401,20 @@ impl<'a> ThinPrinter<'a> {
 
         self.write_space();
         self.emit(func.body);
+
+        // CommonJS: emit exports.funcName = funcName; after the function
+        if is_exported && !func_name.is_empty() {
+            self.write_line();
+            if is_default {
+                self.write("exports.default = ");
+            } else {
+                self.write("exports.");
+                self.write(&func_name);
+                self.write(" = ");
+            }
+            self.write(&func_name);
+            self.write(";");
+        }
     }
 
     /// Emit function parameters for JavaScript (no types)
@@ -1498,12 +1522,75 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
+        let is_exported = self.ctx.is_commonjs() && self.has_export_modifier(&var_stmt.modifiers);
+        let is_default = self.has_default_modifier(&var_stmt.modifiers);
+
+        // Collect declaration names for export assignment
+        let export_names: Vec<String> = if is_exported {
+            self.collect_variable_names(&var_stmt.declarations)
+        } else {
+            Vec::new()
+        };
+
         // VariableStatement.declarations contains a VARIABLE_DECLARATION_LIST
         // Emit the declaration list (which handles the let/const/var keyword)
         for &decl_list_idx in &var_stmt.declarations.nodes {
             self.emit(decl_list_idx);
         }
         self.write_semicolon();
+
+        // CommonJS: emit exports.X = X; after the declaration
+        if is_exported && !export_names.is_empty() {
+            self.write_line();
+            if is_default && export_names.len() == 1 {
+                // export default const x = ... -> exports.default = x;
+                self.write("exports.default = ");
+                self.write(&export_names[0]);
+                self.write(";");
+            } else {
+                // export const x = ..., y = ...; -> exports.x = x; exports.y = y;
+                for name in &export_names {
+                    self.write("exports.");
+                    self.write(name);
+                    self.write(" = ");
+                    self.write(name);
+                    self.write(";");
+                    self.write_line();
+                }
+            }
+        }
+    }
+
+    /// Collect variable names from a declaration list for CommonJS export
+    fn collect_variable_names(&self, declarations: &NodeList) -> Vec<String> {
+        let mut names = Vec::new();
+        for &decl_list_idx in &declarations.nodes {
+            let Some(decl_list_node) = self.arena.get(decl_list_idx) else { continue };
+            let Some(decl_list) = self.arena.get_variable(decl_list_node) else { continue };
+
+            for &decl_idx in &decl_list.declarations.nodes {
+                let Some(decl_node) = self.arena.get(decl_idx) else { continue };
+                let Some(decl) = self.arena.get_variable_declaration(decl_node) else { continue };
+
+                // Get the name - for simple identifiers
+                if let Some(name) = self.get_binding_name(decl.name) {
+                    names.push(name);
+                }
+            }
+        }
+        names
+    }
+
+    /// Get the name from a binding pattern or identifier
+    fn get_binding_name(&self, name_idx: NodeIndex) -> Option<String> {
+        let node = self.arena.get(name_idx)?;
+        if node.kind == SyntaxKind::Identifier as u16 {
+            let id = self.arena.get_identifier(node)?;
+            Some(id.escaped_text.clone())
+        } else {
+            // TODO: handle binding patterns (destructuring)
+            None
+        }
     }
 
     fn emit_variable_declaration_list(&mut self, node: &ThinNode) {
@@ -1805,6 +1892,16 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
+        let is_exported = self.ctx.is_commonjs() && self.has_export_modifier(&class.modifiers);
+        let is_default = self.has_default_modifier(&class.modifiers);
+
+        // Get class name for export
+        let class_name = if !class.name.is_none() {
+            self.get_identifier_text_idx(class.name)
+        } else {
+            String::new()
+        };
+
         // Use ES5 IIFE transform when targeting ES5
         if self.ctx.target_es5 {
             let mut es5_emitter = ClassES5Emitter::new(self.arena);
@@ -1814,15 +1911,36 @@ impl<'a> ThinPrinter<'a> {
             }
             let es5_output = es5_emitter.emit_class(idx);
             self.write(&es5_output);
+
+            // CommonJS: emit exports.ClassName = ClassName; after the ES5 class
+            if is_exported && !class_name.is_empty() {
+                self.write_line();
+                if is_default {
+                    self.write("exports.default = ");
+                } else {
+                    self.write("exports.");
+                    self.write(&class_name);
+                    self.write(" = ");
+                }
+                self.write(&class_name);
+                self.write(";");
+            }
             return;
         }
 
-        // Emit modifiers (including decorators)
+        // Emit modifiers (including decorators) - skip export/default for CommonJS
         if let Some(ref modifiers) = class.modifiers {
             for &mod_idx in &modifiers.nodes {
-                self.emit(mod_idx);
-                // Add space or newline after decorator
                 if let Some(mod_node) = self.arena.get(mod_idx) {
+                    // Skip export/default modifiers in CommonJS mode
+                    if self.ctx.is_commonjs() {
+                        if mod_node.kind == SyntaxKind::ExportKeyword as u16 ||
+                           mod_node.kind == SyntaxKind::DefaultKeyword as u16 {
+                            continue;
+                        }
+                    }
+                    self.emit(mod_idx);
+                    // Add space or newline after decorator
                     if mod_node.kind == syntax_kind_ext::DECORATOR {
                         self.write_line();
                     } else {
@@ -1852,6 +1970,20 @@ impl<'a> ThinPrinter<'a> {
 
         self.decrease_indent();
         self.write("}");
+
+        // CommonJS: emit exports.ClassName = ClassName; after the class
+        if is_exported && !class_name.is_empty() {
+            self.write_line();
+            if is_default {
+                self.write("exports.default = ");
+            } else {
+                self.write("exports.");
+                self.write(&class_name);
+                self.write(" = ");
+            }
+            self.write(&class_name);
+            self.write(";");
+        }
     }
 
     // =========================================================================
@@ -2216,9 +2348,130 @@ impl<'a> ThinPrinter<'a> {
                 // export * from "module" - need __exportStar helper
                 // TODO: implement export star
             }
+            return;
+        }
+
+        // Check if export_clause contains a declaration (export const x, export function f, etc.)
+        if let Some(clause_node) = self.arena.get(export.export_clause) {
+            match clause_node.kind {
+                // export const/let/var x = ...
+                k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+                    // Collect export names before emitting
+                    let export_names = self.collect_variable_names_from_node(clause_node);
+
+                    // Emit the variable declaration
+                    self.emit_variable_statement(clause_node);
+                    self.write_line();
+
+                    // Emit exports.x = x; for each name
+                    for name in &export_names {
+                        self.write("exports.");
+                        self.write(name);
+                        self.write(" = ");
+                        self.write(name);
+                        self.write(";");
+                        self.write_line();
+                    }
+                }
+                // export function f() {}
+                k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                    // Emit the function declaration
+                    self.emit_function_declaration(clause_node, export.export_clause);
+                    self.write_line();
+
+                    // Get function name and emit export
+                    if let Some(func) = self.arena.get_function(clause_node) {
+                        if let Some(name) = self.get_identifier_text_opt(func.name) {
+                            self.write("exports.");
+                            self.write(&name);
+                            self.write(" = ");
+                            self.write(&name);
+                            self.write(";");
+                            self.write_line();
+                        }
+                    }
+                }
+                // export class C {}
+                k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                    // Emit the class declaration
+                    self.emit_class_declaration(clause_node, export.export_clause);
+                    self.write_line();
+
+                    // Get class name and emit export
+                    if let Some(class) = self.arena.get_class(clause_node) {
+                        if let Some(name) = self.get_identifier_text_opt(class.name) {
+                            self.write("exports.");
+                            self.write(&name);
+                            self.write(" = ");
+                            self.write(&name);
+                            self.write(";");
+                            self.write_line();
+                        }
+                    }
+                }
+                // export { x, y } - local re-export without module specifier
+                k if k == syntax_kind_ext::NAMED_EXPORTS => {
+                    // Emit exports.x = x; for each name
+                    if let Some(named_exports) = self.arena.get_named_imports(clause_node) {
+                        for &spec_idx in &named_exports.elements.nodes {
+                            if let Some(spec_node) = self.arena.get(spec_idx) {
+                                if let Some(spec) = self.arena.get_specifier(spec_node) {
+                                    let export_name = self.get_identifier_text_idx(spec.name);
+                                    let local_name = if !spec.property_name.is_none() {
+                                        self.get_identifier_text_idx(spec.property_name)
+                                    } else {
+                                        export_name.clone()
+                                    };
+
+                                    self.write("exports.");
+                                    self.write(&export_name);
+                                    self.write(" = ");
+                                    self.write(&local_name);
+                                    self.write(";");
+                                    self.write_line();
+                                }
+                            }
+                        }
+                    }
+                }
+                // Other declarations (interface, type alias) - skip for CommonJS
+                _ => {}
+            }
+        }
+    }
+
+    /// Collect variable names from a VARIABLE_STATEMENT node
+    fn collect_variable_names_from_node(&self, node: &ThinNode) -> Vec<String> {
+        let mut names = Vec::new();
+        if let Some(var_stmt) = self.arena.get_variable(node) {
+            // VARIABLE_STATEMENT has declarations containing VARIABLE_DECLARATION_LIST
+            for &decl_list_idx in &var_stmt.declarations.nodes {
+                if let Some(decl_list_node) = self.arena.get(decl_list_idx) {
+                    // VARIABLE_DECLARATION_LIST has declarations containing VARIABLE_DECLARATION
+                    if let Some(decl_list) = self.arena.get_variable(decl_list_node) {
+                        for &decl_idx in &decl_list.declarations.nodes {
+                            if let Some(decl_node) = self.arena.get(decl_idx) {
+                                if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
+                                    if let Some(name) = self.get_binding_name(decl.name) {
+                                        names.push(name);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        names
+    }
+
+    /// Get identifier text from optional node index
+    fn get_identifier_text_opt(&self, idx: NodeIndex) -> Option<String> {
+        let node = self.arena.get(idx)?;
+        if node.kind == SyntaxKind::Identifier as u16 {
+            self.arena.get_identifier(node).map(|id| id.escaped_text.clone())
         } else {
-            // Local re-export: export { x, y } - these are handled at declaration time
-            // Skip for now as the exports.x = x is emitted with the declaration
+            None
         }
     }
 
@@ -2686,10 +2939,25 @@ impl<'a> ThinPrinter<'a> {
 
     /// Check if modifiers include the `declare` keyword
     fn has_declare_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        self.has_modifier(modifiers, SyntaxKind::DeclareKeyword as u16)
+    }
+
+    /// Check if modifiers include the `export` keyword
+    fn has_export_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        self.has_modifier(modifiers, SyntaxKind::ExportKeyword as u16)
+    }
+
+    /// Check if modifiers include the `default` keyword
+    fn has_default_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        self.has_modifier(modifiers, SyntaxKind::DefaultKeyword as u16)
+    }
+
+    /// Check if modifiers include a specific keyword
+    fn has_modifier(&self, modifiers: &Option<NodeList>, kind: u16) -> bool {
         if let Some(mods) = modifiers {
             for &mod_idx in &mods.nodes {
                 if let Some(mod_node) = self.arena.get(mod_idx) {
-                    if mod_node.kind == SyntaxKind::DeclareKeyword as u16 {
+                    if mod_node.kind == kind {
                         return true;
                     }
                 }

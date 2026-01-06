@@ -51,6 +51,8 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Declare variable skip (`declare const foo: number;` → empty)
 - ✅ Arrow function `this` capture (`var _this = this;`) for base and derived classes
 - ✅ Destructuring transform (`let { x } = obj;` → `var _a = obj, x = _a.x;`)
+- ✅ Block scoping infrastructure (`BlockScopeState` for let/const → var)
+- ✅ Private fields transform (`#field` → WeakMap pattern with helpers)
 
 ## Emitter Architecture Refactor (complete)
 - ✅ Created `SourceWriter` abstraction for output generation with source map tracking
@@ -83,8 +85,8 @@ see SESSION_LOG.md -- always amended with each session's work
 ### Current Status (12,408 tests)
 | Baseline | Compiler (100 sample) | Conformance | Crash Rate |
 |----------|----------------------|-------------|------------|
-| .errors.txt | **79.2%** (61/77 subset) | 33.8% (1,741/5,157) | 0.05% |
-| .js emit | **59.2%** (45/76 subset) | ~3% | 0.05% |
+| .errors.txt | **77.9%** (60/77 subset) | 33.8% (1,741/5,157) | 0.05% |
+| .js emit | **60.5%** (46/76 subset) | ~3% | 0.05% |
 
 ### Work Process
 
@@ -104,14 +106,14 @@ This catches design issues early and ensures consistent code quality.
 1. ✅ CommonJS preamble (`"use strict"`, `__esModule`)
 2. ✅ ES module imports → `require()` transform
 3. ✅ Re-exports → `Object.defineProperty`
-4. ⬜ Export declarations → `exports.X = X;`
+4. ✅ Export declarations → `exports.X = X;` (export const/function/class)
 
 **Priority 2: Block Scoping (4% of failing tests)**
-5. ⬜ `let`/`const` → `var` for ES5 (temporal dead zone handling)
+5. ✅ `let`/`const` → `var` for ES5 (BlockScopeState for variable tracking)
 
 **Priority 3: Class Features (7% of failing tests)**
-5. ⬜ Static fields initialization
-6. ⬜ Private fields (`#`) transform
+5. ✅ Static fields initialization (already implemented)
+6. ✅ Private fields (`#`) transform (WeakMap pattern, helpers)
 
 **Priority 4: Namespace & Enums (5% of failing tests)**
 7. ⬜ Namespace IIFE improvements

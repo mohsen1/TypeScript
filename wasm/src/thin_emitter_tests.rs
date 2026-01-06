@@ -457,3 +457,59 @@ fn test_commonjs_reexport() {
     assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
     assert!(output.contains("Object.defineProperty(exports, \"foo\""), "Expected Object.defineProperty for re-export: {}", output);
 }
+
+#[test]
+fn test_commonjs_export_const() {
+    let source = "export const x = 42;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("var x = 42;"), "Expected 'var x = 42;' in CommonJS output: {}", output);
+    assert!(output.contains("exports.x = x;"), "Expected 'exports.x = x;' in CommonJS output: {}", output);
+}
+
+#[test]
+fn test_commonjs_export_function() {
+    let source = "export function add(a, b) { return a + b; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("function add"), "Expected 'function add' in CommonJS output: {}", output);
+    assert!(output.contains("exports.add = add;"), "Expected 'exports.add = add;' in CommonJS output: {}", output);
+}
+
+#[test]
+fn test_commonjs_export_class() {
+    let source = "export class Foo { }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    // ES5 emits class as IIFE, so check for var Foo
+    assert!(output.contains("var Foo") || output.contains("class Foo"),
+            "Expected class Foo definition in CommonJS output: {}", output);
+    assert!(output.contains("exports.Foo = Foo;"), "Expected 'exports.Foo = Foo;' in CommonJS output: {}", output);
+}
