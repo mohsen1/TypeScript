@@ -12,13 +12,28 @@ see SESSION_LOG.md -- always amended with each session's work
 # ✅ COMPLETED
 
 - **Phase 0-5**: Scanner, Parser, Binder, Solver (~77,000 LOC, 1041 tests)
-- **Phase 6**: Emitter (ES5 transforms, source maps, .d.ts) - 31% JS baseline
+- **Phase 6**: Emitter (ES5 transforms, source maps, .d.ts) - **59.2% JS baseline**
 - **Phase 7**: Language Service (60%) - go-to-def, find refs, completions
 
+## Recent Emitter Improvements
+- ✅ Fixed baseline comparison script to extract JS portion correctly
+- ✅ Instance property initializers → `this.x = value;` in constructor
+- ✅ Distinguish `implements` vs `extends` in heritage clauses
+- ✅ Parameter properties (`public x, private y`) → `this.x = x; this.y = y;`
+- ✅ Constructor overloads: only emit implementation, skip signatures
+- ✅ Single-line empty block detection (preserve `{ }` vs `{\n}`)
+- ✅ Class extends: emit base class name, _super parameter, derived constructor with _super.apply
+- ✅ Combined getter/setter pairs into single `Object.defineProperty` calls
+- ✅ Skip abstract accessors in emit
+- ✅ Source order emit for methods/accessors
+- ✅ Declare variable skip (`declare const foo: number;` → empty)
+- ✅ Arrow function `this` capture (`var _this = this;`) for base and derived classes
+- ✅ Destructuring transform (`let { x } = obj;` → `var _a = obj, x = _a.x;`)
+
 ## Emitter TODOs (for JS baseline 80%+)
-- ⬜ Class inheritance (`__extends` helper for `extends`)
-- ⬜ CommonJS exports (`module.exports`, `exports.X`)
-- ⬜ Parse error tolerance (13 tests skipped)
+- ⬜ CommonJS exports (`"use strict"`, `module.exports`, `exports.X`) - ~11 tests
+- ⬜ Comment preservation in emit - ~3 tests
+- ⬜ Parse error tolerance (some tests skipped) - ~2 tests
 
 ## Language Service TODOs (40% remaining)
 - ⬜ Formatting engine
@@ -32,10 +47,10 @@ see SESSION_LOG.md -- always amended with each session's work
 **Goal**: 100% match on TypeScript's test baselines.
 
 ### Current Status (12,408 tests)
-| Baseline | Compiler | Conformance | Crash Rate |
-|----------|----------|-------------|------------|
+| Baseline | Compiler (100 sample) | Conformance | Crash Rate |
+|----------|----------------------|-------------|------------|
 | .errors.txt | 77.9% (60/77 subset) | 33.8% (1,741/5,157) | 0.05% |
-| .js emit | 36.8% (28/76 subset) | ~3% | 0.05% |
+| .js emit | **59.2%** (45/76) | ~3% | 0.05% |
 
 ### Work Process
 

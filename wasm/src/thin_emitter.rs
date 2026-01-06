@@ -22,6 +22,7 @@ use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::transforms::class_es5::ClassES5Emitter;
+use crate::transforms::arrow_es5::contains_this_reference;
 
 // =============================================================================
 // Emitter Options
@@ -137,6 +138,19 @@ pub struct ThinPrinter<'a> {
 
     /// Whether to emit ES5 (classes→IIFEs, arrows→functions)
     target_es5: bool,
+
+    /// Source text for detecting single-line constructs
+    source_text: Option<&'a str>,
+
+    /// Stack of scopes that need `this` capture (for arrow functions)
+    /// When > 0, emit `_this` instead of `this` inside arrow function bodies
+    this_capture_depth: u32,
+
+    /// Whether we've already emitted `var _this = this;` in the current scope
+    this_captured_in_scope: bool,
+
+    /// Counter for temporary variables (_a, _b, _c, etc.)
+    temp_var_counter: u32,
 }
 
 impl<'a> ThinPrinter<'a> {
@@ -162,6 +176,10 @@ impl<'a> ThinPrinter<'a> {
             output_line: 0,
             output_column: 0,
             target_es5: true, // Default to ES5 for baseline compatibility
+            source_text: None,
+            this_capture_depth: 0,
+            this_captured_in_scope: false,
+            temp_var_counter: 0,
         }
     }
 
@@ -182,6 +200,32 @@ impl<'a> ThinPrinter<'a> {
     /// Set whether to target ES5 (classes→IIFEs, arrows→functions).
     pub fn set_target_es5(&mut self, es5: bool) {
         self.target_es5 = es5;
+    }
+
+    /// Set the source text (for detecting single-line constructs).
+    pub fn set_source_text(&mut self, text: &'a str) {
+        self.source_text = Some(text);
+    }
+
+    /// Check if a node spans a single line in the source.
+    /// For blocks like `{ }`, we look for the closing `}` and check if there's a newline
+    /// between the opening `{` and the first `}`.
+    fn is_single_line(&self, node: &ThinNode) -> bool {
+        if let Some(text) = self.source_text {
+            let start = node.pos as usize;
+            if start < text.len() {
+                // Find the first closing brace after the opening
+                // For a block, the source starts with `{` and we want to find the matching `}`
+                let slice = &text[start..];
+                if let Some(close_idx) = slice.find('}') {
+                    // Check if there's a newline between `{` and `}`
+                    let inner = &slice[..close_idx + 1];
+                    return !inner.contains('\n');
+                }
+            }
+        }
+        // Default to multi-line if we can't determine
+        false
     }
 
     /// Get the output.
@@ -704,8 +748,27 @@ impl<'a> ThinPrinter<'a> {
             }
 
             // Other tokens and keywords - emit their text
-            k if k == SyntaxKind::ThisKeyword as u16 => self.write("this"),
+            k if k == SyntaxKind::ThisKeyword as u16 => {
+                // In ES5 mode inside an arrow function body, use _this instead of this
+                if self.target_es5 && self.this_capture_depth > 0 {
+                    self.write("_this")
+                } else {
+                    self.write("this")
+                }
+            }
             k if k == SyntaxKind::SuperKeyword as u16 => self.write("super"),
+
+            // Binding patterns (for destructuring)
+            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN => {
+                // When emitting as-is (non-ES5 or for parameters), just emit the pattern
+                self.emit_object_binding_pattern(node);
+            }
+            k if k == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
+                self.emit_array_binding_pattern(node);
+            }
+            k if k == syntax_kind_ext::BINDING_ELEMENT => {
+                self.emit_binding_element(node);
+            }
 
             // Default: do nothing (or handle other cases as needed)
             _ => {}
@@ -936,23 +999,32 @@ impl<'a> ThinPrinter<'a> {
 
         // Transform arrow function to regular function for ES5
         if self.target_es5 {
+            // Check if arrow body uses `this` - if so, we need _this capture
+            let body_uses_this = !func.body.is_none()
+                && contains_this_reference(self.arena, func.body);
+
+            // Track that we're inside an arrow function body with `this`
+            if body_uses_this {
+                self.this_capture_depth += 1;
+            }
+
             if func.is_async {
                 self.write("async ");
             }
-            
+
             self.write("function (");
             self.emit_function_parameters_js(&func.parameters.nodes);
             self.write(") ");
-            
+
             // If body is not a block (concise arrow), wrap with return
             let body_node = self.arena.get(func.body);
             let is_block = body_node.map(|n| n.kind == syntax_kind_ext::BLOCK).unwrap_or(false);
-            
+
             if is_block {
                 // Check if it's a simple single-return block
                 if let Some(block_node) = self.arena.get(func.body) {
                     if let Some(block) = self.arena.get_block(block_node) {
-                        if block.statements.nodes.len() == 1 
+                        if block.statements.nodes.len() == 1
                             && self.is_simple_return_statement(block.statements.nodes[0]) {
                             self.emit_single_line_block(func.body);
                         } else {
@@ -969,6 +1041,11 @@ impl<'a> ThinPrinter<'a> {
                 self.write("{ return ");
                 self.emit(func.body);
                 self.write("; }");
+            }
+
+            // Restore this capture depth
+            if body_uses_this {
+                self.this_capture_depth -= 1;
             }
             return;
         }
@@ -1073,6 +1150,11 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
+        // Skip ambient declarations (declare function)
+        if self.has_declare_modifier(&func.modifiers) {
+            return;
+        }
+
         // For JavaScript emit: skip declaration-only functions (no body)
         // These are just type information in TypeScript
         if func.body.is_none() {
@@ -1166,9 +1248,17 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Empty blocks: emit as "{ }" on same line for ES5 compatibility
+        // Empty blocks: preserve original format (single-line vs multi-line)
         if block.statements.nodes.is_empty() {
-            self.write("{ }");
+            if self.is_single_line(node) {
+                // Single-line empty block: { }
+                self.write("{ }");
+            } else {
+                // Multi-line empty block: {\n}
+                self.write("{");
+                self.write_line();
+                self.write("}");
+            }
             return;
         }
 
@@ -1177,8 +1267,12 @@ impl<'a> ThinPrinter<'a> {
         self.increase_indent();
 
         for &stmt_idx in &block.statements.nodes {
+            let before_len = self.output.len();
             self.emit(stmt_idx);
-            self.write_line();
+            // Only add newline if something was actually emitted
+            if self.output.len() > before_len {
+                self.write_line();
+            }
         }
 
         self.decrease_indent();
@@ -1189,6 +1283,11 @@ impl<'a> ThinPrinter<'a> {
         let Some(var_stmt) = self.arena.get_variable(node) else {
             return;
         };
+
+        // Skip ambient declarations (declare var/let/const)
+        if self.has_declare_modifier(&var_stmt.modifiers) {
+            return;
+        }
 
         // VariableStatement.declarations contains a VARIABLE_DECLARATION_LIST
         // Emit the declaration list (which handles the let/const/var keyword)
@@ -1204,9 +1303,11 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Emit keyword based on node flags
+        // Emit keyword based on node flags - for ES5, always use "var"
         let flags = node.flags as u32;
-        let keyword = if flags & crate::parser::node_flags::CONST != 0 {
+        let keyword = if self.target_es5 {
+            "var"
+        } else if flags & crate::parser::node_flags::CONST != 0 {
             "const"
         } else if flags & crate::parser::node_flags::LET != 0 {
             "let"
@@ -1216,7 +1317,28 @@ impl<'a> ThinPrinter<'a> {
         self.write(keyword);
         self.write(" ");
 
-        self.emit_comma_separated(&decl_list.declarations.nodes);
+        // For ES5, check if any declaration uses destructuring
+        if self.target_es5 {
+            let mut first = true;
+            for &decl_idx in &decl_list.declarations.nodes {
+                let Some(decl_node) = self.arena.get(decl_idx) else { continue };
+                let Some(decl) = self.arena.get_variable_declaration(decl_node) else { continue };
+
+                if self.is_binding_pattern(decl.name) && !decl.initializer.is_none() {
+                    // ES5 destructuring transform
+                    self.emit_es5_destructuring(decl_idx, &mut first);
+                } else {
+                    // Normal variable declaration
+                    if !first {
+                        self.write(", ");
+                    }
+                    first = false;
+                    self.emit(decl_idx);
+                }
+            }
+        } else {
+            self.emit_comma_separated(&decl_list.declarations.nodes);
+        }
     }
 
     fn emit_variable_declaration(&mut self, node: &ThinNode) {
@@ -1232,6 +1354,97 @@ impl<'a> ThinPrinter<'a> {
             self.write(" = ");
             self.emit(decl.initializer);
         }
+    }
+
+    /// Emit ES5 destructuring: { x, y } = obj → _a = obj, x = _a.x, y = _a.y
+    fn emit_es5_destructuring(&mut self, decl_idx: NodeIndex, first: &mut bool) {
+        let Some(decl_node) = self.arena.get(decl_idx) else { return };
+        let Some(decl) = self.arena.get_variable_declaration(decl_node) else { return };
+        let Some(pattern_node) = self.arena.get(decl.name) else { return };
+
+        // Get temp variable name
+        let temp_name = self.get_temp_var_name();
+
+        // Emit temp variable assignment: _a = initializer
+        if !*first {
+            self.write(", ");
+        }
+        *first = false;
+        self.write(&temp_name);
+        self.write(" = ");
+        self.emit(decl.initializer);
+
+        // Now emit each binding element
+        if pattern_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN {
+            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                for &elem_idx in &pattern.elements.nodes {
+                    self.emit_es5_binding_element(elem_idx, &temp_name);
+                }
+            }
+        } else if pattern_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN {
+            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                for (i, &elem_idx) in pattern.elements.nodes.iter().enumerate() {
+                    self.emit_es5_array_binding_element(elem_idx, &temp_name, i);
+                }
+            }
+        }
+    }
+
+    /// Emit a single binding element for ES5 object destructuring
+    fn emit_es5_binding_element(&mut self, elem_idx: NodeIndex, temp_name: &str) {
+        let Some(elem_node) = self.arena.get(elem_idx) else { return };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+
+        // Get the property name (or use the binding name if no propertyName)
+        let prop_name = if !elem.property_name.is_none() {
+            self.get_identifier_text(elem.property_name)
+        } else {
+            self.get_identifier_text(elem.name)
+        };
+
+        // Get the binding name
+        let binding_name = self.get_identifier_text(elem.name);
+
+        if prop_name.is_empty() || binding_name.is_empty() {
+            return;
+        }
+
+        // Emit: , bindingName = temp.propName
+        self.write(", ");
+        self.write(&binding_name);
+        self.write(" = ");
+        self.write(temp_name);
+        self.write(".");
+        self.write(&prop_name);
+    }
+
+    /// Emit a single binding element for ES5 array destructuring
+    fn emit_es5_array_binding_element(&mut self, elem_idx: NodeIndex, temp_name: &str, index: usize) {
+        let Some(elem_node) = self.arena.get(elem_idx) else { return };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+
+        let binding_name = self.get_identifier_text(elem.name);
+        if binding_name.is_empty() {
+            return;
+        }
+
+        // Emit: , bindingName = temp[index]
+        self.write(", ");
+        self.write(&binding_name);
+        self.write(" = ");
+        self.write(temp_name);
+        self.write("[");
+        self.write(&index.to_string());
+        self.write("]");
+    }
+
+    /// Get identifier text from a node index
+    fn get_identifier_text(&self, idx: NodeIndex) -> String {
+        let Some(node) = self.arena.get(idx) else { return String::new() };
+        if let Some(ident) = self.arena.get_identifier(node) {
+            return ident.escaped_text.clone();
+        }
+        String::new()
     }
 
     fn emit_expression_statement(&mut self, node: &ThinNode) {
@@ -1335,17 +1548,26 @@ impl<'a> ThinPrinter<'a> {
     // =========================================================================
 
     fn emit_class_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
+        let Some(class) = self.arena.get_class(node) else {
+            return;
+        };
+
+        // Skip ambient declarations (declare class)
+        if self.has_declare_modifier(&class.modifiers) {
+            return;
+        }
+
         // Use ES5 IIFE transform when targeting ES5
         if self.target_es5 {
             let mut es5_emitter = ClassES5Emitter::new(self.arena);
+            es5_emitter.set_indent_level(self.indent_level);
+            if let Some(source_text) = self.source_text {
+                es5_emitter.set_source_text(source_text);
+            }
             let es5_output = es5_emitter.emit_class(idx);
             self.write(&es5_output);
             return;
         }
-        
-        let Some(class) = self.arena.get_class(node) else {
-            return;
-        };
 
         // Emit modifiers (including decorators)
         if let Some(ref modifiers) = class.modifiers {
@@ -2075,6 +2297,24 @@ impl<'a> ThinPrinter<'a> {
     }
 
     // =========================================================================
+    // Modifier Helpers
+    // =========================================================================
+
+    /// Check if modifiers include the `declare` keyword
+    fn has_declare_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::DeclareKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    // =========================================================================
     // Class Members
     // =========================================================================
 
@@ -2212,14 +2452,14 @@ impl<'a> ThinPrinter<'a> {
         self.emit(accessor.name);
         self.write("()");
 
-        if !accessor.type_annotation.is_none() {
-            self.write(": ");
-            self.emit(accessor.type_annotation);
-        }
+        // Skip type annotation for JS emit
 
         if !accessor.body.is_none() {
             self.write(" ");
             self.emit(accessor.body);
+        } else {
+            // For JS emit, add empty body for accessors without body
+            self.write(" { }");
         }
     }
 
@@ -2240,6 +2480,9 @@ impl<'a> ThinPrinter<'a> {
         if !accessor.body.is_none() {
             self.write(" ");
             self.emit(accessor.body);
+        } else {
+            // For JS emit, add empty body for accessors without body
+            self.write(" { }");
         }
     }
 
@@ -2417,10 +2660,261 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        for &stmt_idx in &source.statements.nodes {
-            self.emit(stmt_idx);
-            self.write_line();
+        // Check if any class extends another - if so, emit __extends helper
+        if self.target_es5 && self.needs_extends_helper(&source.statements) {
+            self.emit_extends_helper();
         }
+
+        for &stmt_idx in &source.statements.nodes {
+            let before_len = self.output.len();
+            self.emit(stmt_idx);
+            // Only add newline if something was actually emitted
+            if self.output.len() > before_len {
+                self.write_line();
+            }
+        }
+    }
+
+    /// Check if any class in the statements (recursively) extends another class
+    fn needs_extends_helper(&self, statements: &NodeList) -> bool {
+        for &stmt_idx in &statements.nodes {
+            if self.statement_needs_extends(stmt_idx) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Check if a statement contains a class that extends another (recursive)
+    fn statement_needs_extends(&self, stmt_idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(stmt_idx) else {
+            return false;
+        };
+
+        match node.kind {
+            // Class declaration
+            k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                if let Some(class_data) = self.arena.get_class(node) {
+                    if self.class_has_extends(&class_data.heritage_clauses) {
+                        return true;
+                    }
+                }
+                false
+            }
+            // Expression statement - might contain IIFE with class
+            k if k == syntax_kind_ext::EXPRESSION_STATEMENT => {
+                if let Some(expr_stmt) = self.arena.get_expression_statement(node) {
+                    self.expression_needs_extends(expr_stmt.expression)
+                } else {
+                    false
+                }
+            }
+            // Block - recurse into statements
+            k if k == syntax_kind_ext::BLOCK => {
+                if let Some(block) = self.arena.get_block(node) {
+                    self.needs_extends_helper(&block.statements)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if an expression contains a class that extends another (recursive)
+    fn expression_needs_extends(&self, expr_idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(expr_idx) else {
+            return false;
+        };
+
+        match node.kind {
+            // Call expression - check arguments and the called function
+            k if k == syntax_kind_ext::CALL_EXPRESSION => {
+                if let Some(call) = self.arena.get_call_expr(node) {
+                    // Check the function being called
+                    if self.expression_needs_extends(call.expression) {
+                        return true;
+                    }
+                    // Check arguments
+                    if let Some(ref args) = call.arguments {
+                        for &arg_idx in &args.nodes {
+                            if self.expression_needs_extends(arg_idx) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                false
+            }
+            // Parenthesized expression
+            k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
+                if let Some(paren) = self.arena.get_parenthesized(node) {
+                    self.expression_needs_extends(paren.expression)
+                } else {
+                    false
+                }
+            }
+            // Arrow function - check body
+            k if k == syntax_kind_ext::ARROW_FUNCTION => {
+                if let Some(func) = self.arena.get_function(node) {
+                    self.statement_needs_extends(func.body)
+                } else {
+                    false
+                }
+            }
+            // Function expression - check body
+            k if k == syntax_kind_ext::FUNCTION_EXPRESSION => {
+                if let Some(func) = self.arena.get_function(node) {
+                    self.statement_needs_extends(func.body)
+                } else {
+                    false
+                }
+            }
+            // Class expression
+            k if k == syntax_kind_ext::CLASS_EXPRESSION => {
+                if let Some(class_data) = self.arena.get_class(node) {
+                    self.class_has_extends(&class_data.heritage_clauses)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if a class has an extends clause
+    fn class_has_extends(&self, heritage_clauses: &Option<NodeList>) -> bool {
+        let Some(clauses) = heritage_clauses else {
+            return false;
+        };
+        for &clause_idx in &clauses.nodes {
+            let Some(clause_node) = self.arena.get(clause_idx) else {
+                continue;
+            };
+            let Some(heritage_data) = self.arena.get_heritage(clause_node) else {
+                continue;
+            };
+            if heritage_data.token == SyntaxKind::ExtendsKeyword as u16 {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Emit the __extends helper function
+    fn emit_extends_helper(&mut self) {
+        // TypeScript's ES5 __extends helper
+        self.write("var __extends = (this && this.__extends) || (function () {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write("var extendStatics = function (d, b) {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write("extendStatics = Object.setPrototypeOf ||");
+        self.write_line();
+        self.write("    ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||");
+        self.write_line();
+        self.write("    function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };");
+        self.write_line();
+        self.write("return extendStatics(d, b);");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("};");
+        self.write_line();
+
+        self.write("return function (d, b) {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write("if (typeof b !== \"function\" && b !== null)");
+        self.write_line();
+        self.write("    throw new TypeError(\"Class extends value \" + String(b) + \" is not a constructor or null\");");
+        self.write_line();
+        self.write("extendStatics(d, b);");
+        self.write_line();
+        self.write("function __() { this.constructor = d; }");
+        self.write_line();
+        self.write("d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("};");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("})();");
+        self.write_line();
+    }
+
+    // =========================================================================
+    // Binding Patterns (Destructuring)
+    // =========================================================================
+
+    /// Emit an object binding pattern: { x, y }
+    fn emit_object_binding_pattern(&mut self, node: &ThinNode) {
+        let Some(pattern) = self.arena.get_binding_pattern(node) else {
+            return;
+        };
+
+        self.write("{ ");
+        self.emit_comma_separated(&pattern.elements.nodes);
+        self.write(" }");
+    }
+
+    /// Emit an array binding pattern: [x, y]
+    fn emit_array_binding_pattern(&mut self, node: &ThinNode) {
+        let Some(pattern) = self.arena.get_binding_pattern(node) else {
+            return;
+        };
+
+        self.write("[");
+        self.emit_comma_separated(&pattern.elements.nodes);
+        self.write("]");
+    }
+
+    /// Emit a binding element: x or x = default or propertyName: x
+    fn emit_binding_element(&mut self, node: &ThinNode) {
+        let Some(elem) = self.arena.get_binding_element(node) else {
+            return;
+        };
+
+        // Rest element: ...x
+        if elem.dot_dot_dot_token {
+            self.write("...");
+        }
+
+        // propertyName: name  or just name
+        if !elem.property_name.is_none() {
+            self.emit(elem.property_name);
+            self.write(": ");
+        }
+
+        self.emit(elem.name);
+
+        // Default value: = expr
+        if !elem.initializer.is_none() {
+            self.write(" = ");
+            self.emit(elem.initializer);
+        }
+    }
+
+    /// Get the next temporary variable name (_a, _b, _c, etc.)
+    fn get_temp_var_name(&mut self) -> String {
+        let name = format!("_{}", (b'a' + (self.temp_var_counter % 26) as u8) as char);
+        self.temp_var_counter += 1;
+        name
+    }
+
+    /// Check if a node is a binding pattern
+    fn is_binding_pattern(&self, idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(idx) else {
+            return false;
+        };
+        node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+            || node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
     }
 }
 

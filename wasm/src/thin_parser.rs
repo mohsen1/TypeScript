@@ -849,7 +849,16 @@ impl ThinParserState {
 
     /// Parse variable statement (var/let/const)
     fn parse_variable_statement(&mut self) -> NodeIndex {
-        let start_pos = self.token_pos();
+        self.parse_variable_statement_with_modifiers(None, None)
+    }
+
+    /// Parse variable statement with optional start position and modifiers (for declare statements)
+    fn parse_variable_statement_with_modifiers(
+        &mut self,
+        override_start_pos: Option<u32>,
+        modifiers: Option<NodeList>,
+    ) -> NodeIndex {
+        let start_pos = override_start_pos.unwrap_or_else(|| self.token_pos());
         let declaration_list = self.parse_variable_declaration_list();
         self.parse_semicolon();
         let end_pos = self.token_end();
@@ -859,7 +868,7 @@ impl ThinParserState {
             start_pos,
             end_pos,
             VariableData {
-                modifiers: None,
+                modifiers,
                 declarations: self.make_node_list(vec![declaration_list]),
             },
         )
@@ -2887,13 +2896,17 @@ impl ThinParserState {
             SyntaxKind::ModuleKeyword => self.parse_module_declaration(),
             SyntaxKind::GlobalKeyword => self.parse_module_declaration(),
             SyntaxKind::VarKeyword |
-            SyntaxKind::LetKeyword => self.parse_variable_statement(),
+            SyntaxKind::LetKeyword => {
+                let modifiers = self.make_node_list(vec![declare_modifier]);
+                self.parse_variable_statement_with_modifiers(Some(start_pos), Some(modifiers))
+            }
             SyntaxKind::ConstKeyword => {
                 // declare const enum or declare const variable
                 if self.look_ahead_is_const_enum() {
                     self.parse_const_enum_declaration()
                 } else {
-                    self.parse_variable_statement()
+                    let modifiers = self.make_node_list(vec![declare_modifier]);
+                    self.parse_variable_statement_with_modifiers(Some(start_pos), Some(modifiers))
                 }
             }
             SyntaxKind::AsyncKeyword => {
@@ -7414,6 +7427,11 @@ impl ThinParserState {
     /// Get the file name
     pub fn get_file_name(&self) -> &str {
         &self.file_name
+    }
+
+    /// Get the source text
+    pub fn get_source_text(&self) -> &str {
+        &self.source_text
     }
 
     // =========================================================================

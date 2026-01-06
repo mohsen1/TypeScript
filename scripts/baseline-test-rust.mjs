@@ -65,6 +65,45 @@ function parseExpectedErrors(content) {
 }
 
 /**
+ * Extract the JS emit portion from a baseline file.
+ * Baseline files have format:
+ *   //// [tests/cases/...] ////
+ *   //// [filename.ts] ////
+ *   <source>
+ *   //// [filename.js] ////
+ *   <emitted js>
+ */
+function extractJsFromBaseline(baselineContent, testName) {
+    const lines = baselineContent.split('\n');
+    const jsMarkerRegex = /^\/\/\/\/\s*\[([^\]]+\.js)\]\s*$/;
+
+    let inJsSection = false;
+    let jsLines = [];
+
+    for (const line of lines) {
+        const markerMatch = line.match(jsMarkerRegex);
+
+        if (markerMatch) {
+            // Found a .js marker, start capturing
+            inJsSection = true;
+            jsLines = [];
+            continue;
+        }
+
+        // Check if we hit another marker (like .d.ts) which ends the JS section
+        if (inJsSection && line.startsWith('//// [')) {
+            break;
+        }
+
+        if (inJsSection) {
+            jsLines.push(line);
+        }
+    }
+
+    return jsLines.join('\n');
+}
+
+/**
  * Compare error code arrays.
  */
 function compareErrorCodes(expected, actual) {
@@ -335,13 +374,9 @@ for (const file of files) {
     if (existsSync(jsBaseline)) {
         stats.jsBaseline.total++;
         const baselineContent = readFileSync(jsBaseline, 'utf-8');
+        const expectedJs = extractJsFromBaseline(baselineContent, testName);
 
-        // Extract just the JS output section from the baseline file
-        // Baseline format: //// [source.ts] ... source ... //// [output.js] ... js output
-        const jsOutputMatch = baselineContent.split(/\/\/\/\/ \[[^\]]+\.js\]/);
-        const expectedJs = jsOutputMatch.length > 1 ? jsOutputMatch[jsOutputMatch.length - 1] : '';
-
-        if (result.emittedJs) {
+        if (result.emittedJs !== undefined) {
             const normalizeJs = (s) => s.replace(/\r\n/g, '\n').trim();
             const expectedNorm = normalizeJs(expectedJs);
             const actualNorm = normalizeJs(result.emittedJs);
@@ -350,9 +385,24 @@ for (const file of files) {
                 stats.jsBaseline.pass++;
             } else {
                 stats.jsBaseline.fail++;
+                if (!showSummaryOnly) {
+                    failures.push({
+                        file: testName,
+                        type: 'js',
+                        expected: expectedNorm.substring(0, 200),
+                        actual: actualNorm.substring(0, 200)
+                    });
+                }
             }
         } else {
             stats.jsBaseline.fail++;
+            if (!showSummaryOnly) {
+                failures.push({
+                    file: testName,
+                    type: 'js-missing',
+                    expected: expectedJs.substring(0, 200)
+                });
+            }
         }
     } else {
         stats.jsBaseline.noBaseline++;
@@ -404,6 +454,21 @@ if (!showSummaryOnly && failures.length > 0) {
                 console.log(`  ${f.file}: unexpected errors ${f.actual.join(', ')}`);
             } else {
                 console.log(`  ${f.file}: missing=${f.missing.join(',')} extra=${f.extra.join(',')}`);
+            }
+        });
+        console.log('');
+    }
+
+    const jsFailures = failures.filter(f => f.type === 'js' || f.type === 'js-missing');
+    if (jsFailures.length > 0) {
+        console.log(`JS emit mismatches (${jsFailures.length}):`);
+        jsFailures.slice(0, 10).forEach(f => {
+            if (f.type === 'js-missing') {
+                console.log(`  ${f.file}: no emit output`);
+            } else {
+                console.log(`  ${f.file}:`);
+                console.log(`    expected: ${f.expected.replace(/\n/g, '\\n').substring(0, 80)}...`);
+                console.log(`    actual:   ${f.actual.replace(/\n/g, '\\n').substring(0, 80)}...`);
             }
         });
     }

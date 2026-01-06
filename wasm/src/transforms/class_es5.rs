@@ -27,12 +27,18 @@ use crate::parser::thin_node::{ThinNode, ThinNodeArena, FunctionData, ClassData,
 use crate::parser::{NodeIndex, NodeList};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
+use crate::transforms::arrow_es5::contains_this_reference;
 
 /// ES5 class emitter - emits ES5 IIFE pattern for classes
 pub struct ClassES5Emitter<'a> {
     arena: &'a ThinNodeArena,
     output: String,
     indent_level: u32,
+    source_text: Option<&'a str>,
+    /// Whether we're emitting inside a scope that uses _this capture
+    use_this_capture: bool,
+    /// Counter for temporary variables (_a, _b, _c, etc.)
+    temp_var_counter: u32,
 }
 
 impl<'a> ClassES5Emitter<'a> {
@@ -41,7 +47,20 @@ impl<'a> ClassES5Emitter<'a> {
             arena,
             output: String::with_capacity(4096),
             indent_level: 0,
+            source_text: None,
+            use_this_capture: false,
+            temp_var_counter: 0,
         }
+    }
+
+    /// Set the initial indentation level (to match the parent context)
+    pub fn set_indent_level(&mut self, level: u32) {
+        self.indent_level = level;
+    }
+
+    /// Set the source text (for single-line block detection)
+    pub fn set_source_text(&mut self, source_text: &'a str) {
+        self.source_text = Some(source_text);
     }
 
     pub fn emit_class(&mut self, class_idx: NodeIndex) -> String {
@@ -57,12 +76,11 @@ impl<'a> ClassES5Emitter<'a> {
         
         // Get class name
         let class_name = self.get_identifier_text(class_data.name);
-        
-        // Check for extends clause
-        let has_extends = class_data.heritage_clauses.as_ref()
-            .map(|h| !h.nodes.is_empty())
-            .unwrap_or(false);
-        
+
+        // Check for extends clause and get base class name
+        let base_class_name = self.get_extends_class_name(&class_data.heritage_clauses);
+        let has_extends = base_class_name.is_some();
+
         // var ClassName = /** @class */ (function (_super) {
         self.write("var ");
         self.write(&class_name);
@@ -73,7 +91,7 @@ impl<'a> ClassES5Emitter<'a> {
         self.write(") {");
         self.write_line();
         self.increase_indent();
-        
+
         // __extends(ClassName, _super);
         if has_extends {
             self.write_indent();
@@ -82,48 +100,76 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(", _super);");
             self.write_line();
         }
-        
+
         // Constructor function
-        self.emit_constructor(&class_name, class_data);
-        
+        self.emit_constructor(&class_name, class_data, has_extends);
+
         // Prototype methods
         self.emit_methods(&class_name, class_data);
-        
+
         // Static members
         self.emit_static_members(&class_name, class_data);
-        
+
         // return ClassName;
         self.write_indent();
         self.write("return ");
         self.write(&class_name);
         self.write(";");
         self.write_line();
-        
+
         self.decrease_indent();
+        self.write_indent();
         self.write("}(");
-        
+
         // Pass base class if extends
-        if has_extends {
-            // TODO: Emit base class when heritage API is available
-            self.write("_super");
+        if let Some(ref base_name) = base_class_name {
+            self.write(base_name);
         }
-        
+
         self.write("));");
-        
+
         std::mem::take(&mut self.output)
     }
     
-    fn emit_constructor(&mut self, class_name: &str, class_data: &ClassData) {
-        // Find constructor in members
+    fn emit_constructor(&mut self, class_name: &str, class_data: &ClassData, has_extends: bool) {
+        // Collect instance property initializers
+        let instance_props: Vec<NodeIndex> = class_data.members.nodes.iter()
+            .filter_map(|&member_idx| {
+                let member_node = self.arena.get(member_idx)?;
+                if member_node.kind != syntax_kind_ext::PROPERTY_DECLARATION {
+                    return None;
+                }
+                let prop_data = self.arena.get_property_decl(member_node)?;
+                // Skip static properties
+                if self.is_static(&prop_data.modifiers) {
+                    return None;
+                }
+                // Include if has initializer
+                if !prop_data.initializer.is_none() {
+                    Some(member_idx)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        // Find constructor implementation (the one with a body)
+        // Skip declaration-only constructors (overload signatures)
         let mut found_constructor = false;
-        
+
         for &member_idx in &class_data.members.nodes {
             let Some(member_node) = self.arena.get(member_idx) else { continue };
-            
+
             if member_node.kind == syntax_kind_ext::CONSTRUCTOR {
-                found_constructor = true;
                 let Some(ctor_data) = self.arena.get_constructor(member_node) else { continue };
-                
+
+                // Only emit the constructor implementation (with a body), not overload signatures
+                if ctor_data.body.is_none() {
+                    continue;
+                }
+
+                found_constructor = true;
+
                 self.write_indent();
                 self.write("function ");
                 self.write(class_name);
@@ -132,12 +178,29 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write(") {");
                 self.write_line();
                 self.increase_indent();
-                
-                // Emit constructor body
-                if !ctor_data.body.is_none() {
+
+                // For derived classes with explicit constructor:
+                // 1. Transform super(args) to var _this = _super.call(this, args) || this;
+                // 2. Use _this instead of this for property assignments
+                // 3. Add return _this; at the end
+                if has_extends {
+                    self.emit_derived_constructor_body(ctor_data.body, &ctor_data.parameters, &instance_props);
+                } else {
+                    // Non-derived class: check if we need _this capture for arrow functions
+                    let needs_capture = self.needs_this_capture(&instance_props);
+                    if needs_capture {
+                        self.write_indent();
+                        self.write("var _this = this;");
+                        self.write_line();
+                        // Note: use_this_capture is set per-arrow-function, not globally
+                    }
+
+                    // Emit instance props and parameter props first
+                    self.emit_instance_property_initializers(&instance_props);
+                    self.emit_parameter_properties(&ctor_data.parameters);
                     self.emit_block_contents(ctor_data.body);
                 }
-                
+
                 self.decrease_indent();
                 self.write_indent();
                 self.write("}");
@@ -145,47 +208,395 @@ impl<'a> ClassES5Emitter<'a> {
                 break;
             }
         }
-        
+
         // Default constructor if none found
         if !found_constructor {
             self.write_indent();
             self.write("function ");
             self.write(class_name);
-            self.write("() {");
+            self.write("(");
+
+            // For derived classes without explicit constructor, accept variable args
+            if has_extends {
+                // No explicit params needed since we'll use arguments
+            }
+
+            self.write(") {");
             self.write_line();
+            self.increase_indent();
+
+            // For derived classes with no instance properties, just return _super.apply directly
+            if has_extends && instance_props.is_empty() {
+                self.write_indent();
+                self.write("return _super !== null && _super.apply(this, arguments) || this;");
+                self.write_line();
+            } else if has_extends {
+                // For derived classes with instance props, use _this variable
+                self.write_indent();
+                self.write("var _this = _super !== null && _super.apply(this, arguments) || this;");
+                self.write_line();
+
+                // Emit instance property initializers
+                for &prop_idx in &instance_props {
+                    let Some(prop_node) = self.arena.get(prop_idx) else { continue };
+                    let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
+                    let name = self.get_identifier_text(prop_data.name);
+                    self.write_indent();
+                    self.write("_this.");
+                    self.write(&name);
+                    self.write(" = ");
+                    self.emit_expression(prop_data.initializer);
+                    self.write(";");
+                    self.write_line();
+                }
+
+                // Return _this
+                self.write_indent();
+                self.write("return _this;");
+                self.write_line();
+            } else {
+                // Non-derived class - just emit instance property initializers
+                for &prop_idx in &instance_props {
+                    let Some(prop_node) = self.arena.get(prop_idx) else { continue };
+                    let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
+                    let name = self.get_identifier_text(prop_data.name);
+                    self.write_indent();
+                    self.write("this.");
+                    self.write(&name);
+                    self.write(" = ");
+                    self.emit_expression(prop_data.initializer);
+                    self.write(";");
+                    self.write_line();
+                }
+            }
+
+            self.decrease_indent();
             self.write_indent();
             self.write("}");
             self.write_line();
         }
     }
-    
+
+    /// Check if any property initializers contain arrow functions that reference `this`
+    fn needs_this_capture(&self, props: &[NodeIndex]) -> bool {
+        for &prop_idx in props {
+            let Some(prop_node) = self.arena.get(prop_idx) else { continue };
+            let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
+
+            if !prop_data.initializer.is_none() {
+                // Check if initializer is an arrow function with `this` in body
+                let init_node = self.arena.get(prop_data.initializer);
+                if let Some(node) = init_node {
+                    if node.kind == syntax_kind_ext::ARROW_FUNCTION {
+                        if let Some(func) = self.arena.get_function(node) {
+                            if !func.body.is_none() && contains_this_reference(self.arena, func.body) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Emit instance property initializers as this.prop = value;
+    fn emit_instance_property_initializers(&mut self, props: &[NodeIndex]) {
+        for &prop_idx in props {
+            let Some(prop_node) = self.arena.get(prop_idx) else { continue };
+            let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
+
+            let prop_name = self.get_identifier_text(prop_data.name);
+
+            self.write_indent();
+            self.write("this.");
+            self.write(&prop_name);
+            self.write(" = ");
+            self.emit_expression(prop_data.initializer);
+            self.write(";");
+            self.write_line();
+        }
+    }
+
+    /// Emit parameter properties as this.param = param;
+    /// For constructor parameters with public, private, protected, or readonly modifiers
+    fn emit_parameter_properties(&mut self, params: &NodeList) {
+        for &param_idx in &params.nodes {
+            let Some(param_node) = self.arena.get(param_idx) else { continue };
+            let Some(param) = self.arena.get_parameter(param_node) else { continue };
+
+            // Check for modifiers that trigger property creation
+            if self.has_parameter_property_modifier(&param.modifiers) {
+                let name = self.get_identifier_text(param.name);
+
+                if !name.is_empty() {
+                    self.write_indent();
+                    self.write("this.");
+                    self.write(&name);
+                    self.write(" = ");
+                    self.write(&name);
+                    self.write(";");
+                    self.write_line();
+                }
+            }
+        }
+    }
+
+    /// Check if parameter has a modifier that makes it a property (public, private, protected, readonly)
+    fn has_parameter_property_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        let Some(mods) = modifiers else {
+            return false;
+        };
+        for &mod_idx in &mods.nodes {
+            let Some(mod_node) = self.arena.get(mod_idx) else { continue };
+            match mod_node.kind {
+                k if k == SyntaxKind::PublicKeyword as u16
+                    || k == SyntaxKind::PrivateKeyword as u16
+                    || k == SyntaxKind::ProtectedKeyword as u16
+                    || k == SyntaxKind::ReadonlyKeyword as u16 =>
+                {
+                    return true;
+                }
+                _ => {}
+            }
+        }
+        false
+    }
+
+    /// Emit derived class constructor body with super() transformation
+    /// - Transform super(args) to var _this = _super.call(this, args) || this;
+    /// - Use _this for parameter properties
+    /// - Add return _this; at the end
+    fn emit_derived_constructor_body(
+        &mut self,
+        body_idx: NodeIndex,
+        params: &NodeList,
+        instance_props: &[NodeIndex],
+    ) {
+        let Some(body_node) = self.arena.get(body_idx) else { return };
+        let Some(block) = self.arena.get_block(body_node) else { return };
+
+        // First, find and emit the super() call as _super.call(this, ...)
+        let mut found_super = false;
+        for &stmt_idx in &block.statements.nodes {
+            if self.is_super_call_statement(stmt_idx) {
+                self.emit_super_call_as_this_assignment(stmt_idx);
+                found_super = true;
+                break;
+            }
+        }
+
+        // Emit parameter properties using _this
+        for &param_idx in &params.nodes {
+            let Some(param_node) = self.arena.get(param_idx) else { continue };
+            let Some(param) = self.arena.get_parameter(param_node) else { continue };
+
+            if self.has_parameter_property_modifier(&param.modifiers) {
+                let name = self.get_identifier_text(param.name);
+                if !name.is_empty() {
+                    self.write_indent();
+                    self.write("_this.");
+                    self.write(&name);
+                    self.write(" = ");
+                    self.write(&name);
+                    self.write(";");
+                    self.write_line();
+                }
+            }
+        }
+
+        // Emit instance property initializers using _this
+        for &prop_idx in instance_props {
+            let Some(prop_node) = self.arena.get(prop_idx) else { continue };
+            let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
+
+            // Skip properties without initializers
+            if prop_data.initializer.is_none() {
+                continue;
+            }
+
+            let name = self.get_identifier_text(prop_data.name);
+            if name.is_empty() {
+                continue;
+            }
+
+            self.write_indent();
+            self.write("_this.");
+            self.write(&name);
+            self.write(" = ");
+
+            // Check if this initializer contains `this` that needs capture
+            let init_node = self.arena.get(prop_data.initializer);
+            let needs_capture = if let Some(node) = init_node {
+                if node.kind == syntax_kind_ext::ARROW_FUNCTION {
+                    if let Some(func) = self.arena.get_function(node) {
+                        !func.body.is_none() && contains_this_reference(self.arena, func.body)
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            // Emit the initializer, with _this capture if needed
+            let prev = self.use_this_capture;
+            if needs_capture {
+                self.use_this_capture = true;
+            }
+            self.emit_expression(prop_data.initializer);
+            self.use_this_capture = prev;
+
+            self.write(";");
+            self.write_line();
+        }
+
+        // Emit remaining statements (after super call), transforming this to _this
+        let mut past_super = false;
+        for &stmt_idx in &block.statements.nodes {
+            if !past_super && self.is_super_call_statement(stmt_idx) {
+                past_super = true;
+                continue; // Skip the super call, already emitted
+            }
+            if past_super {
+                self.write_indent();
+                self.emit_statement_with_this_transform(stmt_idx);
+                self.write_line();
+            }
+        }
+
+        // Add return _this;
+        if found_super {
+            self.write_indent();
+            self.write("return _this;");
+            self.write_line();
+        }
+    }
+
+    /// Check if a statement is a super() call expression
+    fn is_super_call_statement(&self, stmt_idx: NodeIndex) -> bool {
+        let Some(stmt_node) = self.arena.get(stmt_idx) else { return false };
+
+        if stmt_node.kind != syntax_kind_ext::EXPRESSION_STATEMENT {
+            return false;
+        }
+
+        let Some(expr_stmt) = self.arena.get_expression_statement(stmt_node) else { return false };
+        let Some(call_node) = self.arena.get(expr_stmt.expression) else { return false };
+
+        if call_node.kind != syntax_kind_ext::CALL_EXPRESSION {
+            return false;
+        }
+
+        let Some(call) = self.arena.get_call_expr(call_node) else { return false };
+        let Some(callee) = self.arena.get(call.expression) else { return false };
+
+        callee.kind == SyntaxKind::SuperKeyword as u16
+    }
+
+    /// Emit super(args) as var _this = _super.call(this, args) || this;
+    fn emit_super_call_as_this_assignment(&mut self, stmt_idx: NodeIndex) {
+        let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
+        let Some(expr_stmt) = self.arena.get_expression_statement(stmt_node) else { return };
+        let Some(call_node) = self.arena.get(expr_stmt.expression) else { return };
+        let Some(call) = self.arena.get_call_expr(call_node) else { return };
+
+        self.write_indent();
+        self.write("var _this = _super.call(this");
+
+        // Emit arguments
+        if let Some(ref args) = call.arguments {
+            for &arg_idx in &args.nodes {
+                self.write(", ");
+                self.emit_expression(arg_idx);
+            }
+        }
+
+        self.write(") || this;");
+        self.write_line();
+    }
+
+    /// Emit a statement, but transform `this` references to `_this`
+    fn emit_statement_with_this_transform(&mut self, stmt_idx: NodeIndex) {
+        // Enable this capture for the duration of emitting this statement
+        let prev = self.use_this_capture;
+        self.use_this_capture = true;
+        self.emit_statement(stmt_idx);
+        self.use_this_capture = prev;
+    }
+
     fn emit_methods(&mut self, class_name: &str, class_data: &ClassData) {
+        // First, collect accessors by name for combining getter/setter pairs
+        // We need to know which pairs exist so we emit them together
+        let mut accessor_map: std::collections::HashMap<String, (Option<NodeIndex>, Option<NodeIndex>, bool)> =
+            std::collections::HashMap::new();
+
         for &member_idx in &class_data.members.nodes {
             let Some(member_node) = self.arena.get(member_idx) else { continue };
-            
+
+            if member_node.kind == syntax_kind_ext::GET_ACCESSOR {
+                if let Some(accessor_data) = self.arena.get_accessor(member_node) {
+                    let is_static = self.is_static(&accessor_data.modifiers);
+                    // Skip static accessors (handled in emit_static_members)
+                    if is_static {
+                        continue;
+                    }
+                    // Skip abstract accessors (they have no body and shouldn't be emitted)
+                    if self.is_abstract(&accessor_data.modifiers) {
+                        continue;
+                    }
+                    let name = self.get_identifier_text(accessor_data.name);
+                    let entry = accessor_map.entry(name).or_insert((None, None, is_static));
+                    entry.0 = Some(member_idx);
+                }
+            } else if member_node.kind == syntax_kind_ext::SET_ACCESSOR {
+                if let Some(accessor_data) = self.arena.get_accessor(member_node) {
+                    let is_static = self.is_static(&accessor_data.modifiers);
+                    // Skip static accessors (handled in emit_static_members)
+                    if is_static {
+                        continue;
+                    }
+                    // Skip abstract accessors (they have no body and shouldn't be emitted)
+                    if self.is_abstract(&accessor_data.modifiers) {
+                        continue;
+                    }
+                    let name = self.get_identifier_text(accessor_data.name);
+                    let entry = accessor_map.entry(name).or_insert((None, None, is_static));
+                    entry.1 = Some(member_idx);
+                }
+            }
+        }
+
+        // Track which accessor names we've already emitted
+        let mut emitted_accessors: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        // Emit in source order - methods inline, accessors when we first encounter them
+        for &member_idx in &class_data.members.nodes {
+            let Some(member_node) = self.arena.get(member_idx) else { continue };
+
             if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
                 let Some(method_data) = self.arena.get_method_decl(member_node) else { continue };
-                
+
                 // Skip static methods (handled separately)
                 if self.is_static(&method_data.modifiers) {
                     continue;
                 }
-                
+
                 // Skip if no body (declaration only)
                 if method_data.body.is_none() {
                     continue;
                 }
-                
+
                 let use_bracket = !self.is_valid_identifier_name(method_data.name);
                 let method_name = if use_bracket {
                     self.get_computed_property_name(method_data.name)
                 } else {
                     self.get_identifier_text(method_data.name)
                 };
-                
+
                 // ClassName.prototype.methodName = function () { ... };
-                // or ClassName.prototype[1] = function () { ... };
-                // or ClassName.prototype["bar"] = function () { ... };
                 self.write_indent();
                 self.write(class_name);
                 self.write(".prototype");
@@ -200,7 +611,7 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write(" = function (");
                 self.emit_parameters(&method_data.parameters);
                 self.write(") ");
-                
+
                 // Check if body is empty - only empty bodies go on single line
                 let body_node = self.arena.get(method_data.body);
                 let is_empty_body = if let Some(block_node) = body_node {
@@ -212,7 +623,7 @@ impl<'a> ClassES5Emitter<'a> {
                 } else {
                     false
                 };
-                
+
                 if is_empty_body {
                     self.write("{ }");
                 } else {
@@ -224,88 +635,238 @@ impl<'a> ClassES5Emitter<'a> {
                     self.write_indent();
                     self.write("}");
                 }
-                
+
                 self.write(";");
                 self.write_line();
-            } else if member_node.kind == syntax_kind_ext::GET_ACCESSOR {
-                self.emit_accessor(class_name, member_idx, true);
-            } else if member_node.kind == syntax_kind_ext::SET_ACCESSOR {
-                self.emit_accessor(class_name, member_idx, false);
+            } else if member_node.kind == syntax_kind_ext::GET_ACCESSOR || member_node.kind == syntax_kind_ext::SET_ACCESSOR {
+                // Get accessor name and check if we've already emitted this pair
+                if let Some(accessor_data) = self.arena.get_accessor(member_node) {
+                    // Skip static/abstract (already filtered above, but double-check)
+                    if self.is_static(&accessor_data.modifiers) || self.is_abstract(&accessor_data.modifiers) {
+                        continue;
+                    }
+                    let name = self.get_identifier_text(accessor_data.name);
+                    if emitted_accessors.contains(&name) {
+                        continue;
+                    }
+                    // Emit this accessor pair now
+                    if let Some(&(getter_idx, setter_idx, is_static)) = accessor_map.get(&name) {
+                        self.emit_combined_accessor(class_name, &name, getter_idx, setter_idx, is_static);
+                        emitted_accessors.insert(name);
+                    }
+                }
             }
         }
     }
     
-    fn emit_accessor(&mut self, class_name: &str, accessor_idx: NodeIndex, is_getter: bool) {
-        let Some(accessor_node) = self.arena.get(accessor_idx) else { return };
-        let Some(accessor_data) = self.arena.get_accessor(accessor_node) else { return };
-        
-        // Skip static accessors
-        if self.is_static(&accessor_data.modifiers) {
-            return;
-        }
-        
-        let name = self.get_identifier_text(accessor_data.name);
-        
-        // Object.defineProperty(ClassName.prototype, "name", { get/set: function() { ... } });
+    /// Emit a combined Object.defineProperty for getter/setter pairs
+    fn emit_combined_accessor(
+        &mut self,
+        class_name: &str,
+        name: &str,
+        getter_idx: Option<NodeIndex>,
+        setter_idx: Option<NodeIndex>,
+        is_static: bool,
+    ) {
+        // Object.defineProperty(ClassName.prototype, "name", { get: ..., set: ..., ... })
         self.write_indent();
         self.write("Object.defineProperty(");
         self.write(class_name);
-        self.write(".prototype, \"");
-        self.write(&name);
+        if !is_static {
+            self.write(".prototype");
+        }
+        self.write(", \"");
+        self.write(name);
         self.write("\", {");
         self.write_line();
         self.increase_indent();
-        
-        self.write_indent();
-        if is_getter {
-            self.write("get: function () {");
-        } else {
-            self.write("set: function (");
-            self.emit_parameters(&accessor_data.parameters);
-            self.write(") {");
+
+        // Emit getter if present
+        if let Some(getter_idx) = getter_idx {
+            self.emit_accessor_function(getter_idx, true);
         }
-        self.write_line();
-        self.increase_indent();
-        
-        if !accessor_data.body.is_none() {
-            self.emit_block_contents(accessor_data.body);
+
+        // Emit setter if present
+        if let Some(setter_idx) = setter_idx {
+            self.emit_accessor_function(setter_idx, false);
         }
-        
-        self.decrease_indent();
-        self.write_indent();
-        self.write("},");
-        self.write_line();
-        
+
         self.write_indent();
         self.write("enumerable: false,");
         self.write_line();
         self.write_indent();
         self.write("configurable: true");
         self.write_line();
-        
+
         self.decrease_indent();
         self.write_indent();
         self.write("});");
         self.write_line();
     }
+
+    /// Emit just the function part of an accessor (get: function () {...}, or set: function (v) {...},)
+    fn emit_accessor_function(&mut self, accessor_idx: NodeIndex, is_getter: bool) {
+        let Some(accessor_node) = self.arena.get(accessor_idx) else { return };
+        let Some(accessor_data) = self.arena.get_accessor(accessor_node) else { return };
+
+        // Check if accessor body is empty
+        let (body_is_empty, body_is_single_line) = if !accessor_data.body.is_none() {
+            let body_node = self.arena.get(accessor_data.body);
+            let is_empty = body_node.map_or(true, |n| {
+                self.arena.get_block(n).map_or(true, |b| b.statements.nodes.is_empty())
+            });
+            let is_single_line = body_node.map_or(false, |n| self.is_single_line_block(n));
+            (is_empty, is_single_line)
+        } else {
+            (true, false)
+        };
+
+        self.write_indent();
+        if is_getter {
+            self.write("get: function () ");
+        } else {
+            self.write("set: function (");
+            self.emit_parameters(&accessor_data.parameters);
+            self.write(") ");
+        }
+
+        if body_is_empty {
+            // Inline empty body: { },
+            self.write("{ },");
+        } else if body_is_single_line {
+            // Single-line body: { return 1; },
+            self.write("{ ");
+            self.emit_block_contents_inline(accessor_data.body);
+            self.write(" },");
+        } else {
+            // Multi-line body
+            self.write("{");
+            self.write_line();
+            self.increase_indent();
+            self.emit_block_contents(accessor_data.body);
+            self.decrease_indent();
+            self.write_indent();
+            self.write("},");
+        }
+        self.write_line();
+    }
+
+    /// Check if a block was on a single line in the source
+    fn is_single_line_block(&self, block_node: &ThinNode) -> bool {
+        if let Some(source_text) = self.source_text {
+            let start = block_node.pos as usize;
+            let end = block_node.end as usize;
+            if start < end && end <= source_text.len() {
+                // The block end position may be incorrect, so find the matching }
+                // from the start position
+                let block_text = &source_text[start..end];
+                // Find the first } which closes the block
+                if let Some(close_brace_pos) = block_text.find('}') {
+                    let actual_block = &block_text[..=close_brace_pos];
+                    // A single-line block has no newlines between { and }
+                    !actual_block.contains('\n')
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+
+    /// Emit block contents inline (for single-line blocks)
+    fn emit_block_contents_inline(&mut self, body_idx: NodeIndex) {
+        let Some(body_node) = self.arena.get(body_idx) else { return };
+        let Some(block) = self.arena.get_block(body_node) else { return };
+
+        for (i, &stmt_idx) in block.statements.nodes.iter().enumerate() {
+            if i > 0 {
+                self.write(" ");
+            }
+            self.emit_statement_inline(stmt_idx);
+        }
+    }
+
+    /// Emit a statement inline (without newlines/indentation)
+    fn emit_statement_inline(&mut self, stmt_idx: NodeIndex) {
+        let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
+
+        if stmt_node.kind == syntax_kind_ext::RETURN_STATEMENT {
+            self.write("return");
+            if let Some(ret_data) = self.arena.get_return_statement(stmt_node) {
+                if !ret_data.expression.is_none() {
+                    self.write(" ");
+                    self.emit_expression(ret_data.expression);
+                }
+            }
+            self.write(";");
+        } else {
+            // Fallback: emit statement normally but it might not look right
+            self.emit_statement(stmt_idx);
+        }
+    }
+
+    fn emit_accessor(&mut self, class_name: &str, accessor_idx: NodeIndex, is_getter: bool) {
+        let Some(accessor_node) = self.arena.get(accessor_idx) else { return };
+        let Some(accessor_data) = self.arena.get_accessor(accessor_node) else { return };
+
+        let is_static = self.is_static(&accessor_data.modifiers);
+        let name = self.get_identifier_text(accessor_data.name);
+
+        // Use combined accessor for single getter or setter
+        if is_getter {
+            self.emit_combined_accessor(class_name, &name, Some(accessor_idx), None, is_static);
+        } else {
+            self.emit_combined_accessor(class_name, &name, None, Some(accessor_idx), is_static);
+        }
+    }
     
     fn emit_static_members(&mut self, class_name: &str, class_data: &ClassData) {
+        // First, collect static accessors by name for combining getter/setter pairs
+        let mut static_accessor_map: std::collections::HashMap<String, (Option<NodeIndex>, Option<NodeIndex>)> =
+            std::collections::HashMap::new();
+
         for &member_idx in &class_data.members.nodes {
             let Some(member_node) = self.arena.get(member_idx) else { continue };
-            
+
+            if member_node.kind == syntax_kind_ext::GET_ACCESSOR {
+                if let Some(accessor_data) = self.arena.get_accessor(member_node) {
+                    if self.is_static(&accessor_data.modifiers) {
+                        let name = self.get_identifier_text(accessor_data.name);
+                        let entry = static_accessor_map.entry(name).or_insert((None, None));
+                        entry.0 = Some(member_idx);
+                    }
+                }
+            } else if member_node.kind == syntax_kind_ext::SET_ACCESSOR {
+                if let Some(accessor_data) = self.arena.get_accessor(member_node) {
+                    if self.is_static(&accessor_data.modifiers) {
+                        let name = self.get_identifier_text(accessor_data.name);
+                        let entry = static_accessor_map.entry(name).or_insert((None, None));
+                        entry.1 = Some(member_idx);
+                    }
+                }
+            }
+        }
+
+        // Emit static methods and properties
+        for &member_idx in &class_data.members.nodes {
+            let Some(member_node) = self.arena.get(member_idx) else { continue };
+
             if member_node.kind == syntax_kind_ext::METHOD_DECLARATION {
                 let Some(method_data) = self.arena.get_method_decl(member_node) else { continue };
-                
+
                 if !self.is_static(&method_data.modifiers) {
                     continue;
                 }
-                
+
                 if method_data.body.is_none() {
                     continue;
                 }
-                
+
                 let method_name = self.get_identifier_text(method_data.name);
-                
+
                 // ClassName.staticMethod = function () { ... };
                 self.write_indent();
                 self.write(class_name);
@@ -316,26 +877,26 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write(") {");
                 self.write_line();
                 self.increase_indent();
-                
+
                 self.emit_block_contents(method_data.body);
-                
+
                 self.decrease_indent();
                 self.write_indent();
                 self.write("};");
                 self.write_line();
             } else if member_node.kind == syntax_kind_ext::PROPERTY_DECLARATION {
                 let Some(prop_data) = self.arena.get_property_decl(member_node) else { continue };
-                
+
                 if !self.is_static(&prop_data.modifiers) {
                     continue;
                 }
-                
+
                 if prop_data.initializer.is_none() {
                     continue;
                 }
-                
+
                 let prop_name = self.get_identifier_text(prop_data.name);
-                
+
                 // ClassName.staticProp = value;
                 self.write_indent();
                 self.write(class_name);
@@ -346,6 +907,11 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write(";");
                 self.write_line();
             }
+        }
+
+        // Emit combined static accessors
+        for (name, (getter_idx, setter_idx)) in static_accessor_map {
+            self.emit_combined_accessor(class_name, &name, getter_idx, setter_idx, true);
         }
     }
     
@@ -450,47 +1016,169 @@ impl<'a> ClassES5Emitter<'a> {
     fn emit_variable_statement(&mut self, stmt_idx: NodeIndex) {
         let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
         let Some(var_stmt) = self.arena.get_variable(stmt_node) else { return };
-        
+
         self.write("var ");
-        
+
         let mut first = true;
         for &decl_list_idx in &var_stmt.declarations.nodes {
             let Some(decl_list_node) = self.arena.get(decl_list_idx) else { continue };
-            
+
             if decl_list_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
                 if let Some(decl_list) = self.arena.get_variable(decl_list_node) {
                     for &decl_idx in &decl_list.declarations.nodes {
-                        if !first {
-                            self.write(", ");
-                        }
-                        first = false;
-                        self.emit_variable_declaration(decl_idx);
+                        self.emit_variable_declaration_with_first(decl_idx, &mut first);
                     }
                 }
             } else {
                 // Single declaration
-                if !first {
-                    self.write(", ");
-                }
-                first = false;
-                self.emit_variable_declaration(decl_list_idx);
+                self.emit_variable_declaration_with_first(decl_list_idx, &mut first);
             }
         }
         self.write(";");
     }
-    
+
+    fn emit_variable_declaration_with_first(&mut self, decl_idx: NodeIndex, first: &mut bool) {
+        let Some(decl_node) = self.arena.get(decl_idx) else { return };
+        let Some(decl) = self.arena.get_variable_declaration(decl_node) else { return };
+
+        // Check if this is a destructuring pattern
+        if self.is_binding_pattern(decl.name) && !decl.initializer.is_none() {
+            // ES5 destructuring transform
+            self.emit_es5_destructuring(decl_idx, first);
+        } else {
+            // Normal variable declaration
+            if !*first {
+                self.write(", ");
+            }
+            *first = false;
+            self.emit_binding_name(decl.name);
+
+            if !decl.initializer.is_none() {
+                self.write(" = ");
+                self.emit_expression(decl.initializer);
+            }
+        }
+    }
+
+    fn is_binding_pattern(&self, idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(idx) else {
+            return false;
+        };
+        node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+            || node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+    }
+
+    /// Emit ES5 destructuring: { x, y } = obj → _a = obj, x = _a.x, y = _a.y
+    fn emit_es5_destructuring(&mut self, decl_idx: NodeIndex, first: &mut bool) {
+        let Some(decl_node) = self.arena.get(decl_idx) else { return };
+        let Some(decl) = self.arena.get_variable_declaration(decl_node) else { return };
+        let Some(pattern_node) = self.arena.get(decl.name) else { return };
+
+        // Get temp variable name
+        let temp_name = self.get_temp_var_name();
+
+        // Emit temp variable assignment: _a = initializer
+        if !*first {
+            self.write(", ");
+        }
+        *first = false;
+        self.write(&temp_name);
+        self.write(" = ");
+        self.emit_expression(decl.initializer);
+
+        // Now emit each binding element
+        if pattern_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN {
+            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                for &elem_idx in &pattern.elements.nodes {
+                    self.emit_es5_binding_element(elem_idx, &temp_name);
+                }
+            }
+        } else if pattern_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN {
+            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                for (i, &elem_idx) in pattern.elements.nodes.iter().enumerate() {
+                    self.emit_es5_array_binding_element(elem_idx, &temp_name, i);
+                }
+            }
+        }
+    }
+
+    /// Emit a single binding element for ES5 object destructuring
+    fn emit_es5_binding_element(&mut self, elem_idx: NodeIndex, temp_name: &str) {
+        let Some(elem_node) = self.arena.get(elem_idx) else { return };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+
+        // Get the property name (or use the binding name if no propertyName)
+        let prop_name = if !elem.property_name.is_none() {
+            self.get_identifier_text_clone(elem.property_name)
+        } else {
+            self.get_identifier_text_clone(elem.name)
+        };
+
+        // Get the binding name
+        let binding_name = self.get_identifier_text_clone(elem.name);
+
+        if prop_name.is_empty() || binding_name.is_empty() {
+            return;
+        }
+
+        // Emit: , bindingName = temp.propName
+        self.write(", ");
+        self.write(&binding_name);
+        self.write(" = ");
+        self.write(temp_name);
+        self.write(".");
+        self.write(&prop_name);
+    }
+
+    /// Emit a single binding element for ES5 array destructuring
+    fn emit_es5_array_binding_element(&mut self, elem_idx: NodeIndex, temp_name: &str, index: usize) {
+        let Some(elem_node) = self.arena.get(elem_idx) else { return };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+
+        let binding_name = self.get_identifier_text_clone(elem.name);
+        if binding_name.is_empty() {
+            return;
+        }
+
+        // Emit: , bindingName = temp[index]
+        self.write(", ");
+        self.write(&binding_name);
+        self.write(" = ");
+        self.write(temp_name);
+        self.write("[");
+        self.write(&index.to_string());
+        self.write("]");
+    }
+
+    /// Get the next temporary variable name (_a, _b, _c, etc.)
+    fn get_temp_var_name(&mut self) -> String {
+        let name = format!("_{}", (b'a' + (self.temp_var_counter % 26) as u8) as char);
+        self.temp_var_counter += 1;
+        name
+    }
+
+    /// Get identifier text from a node index, returning an owned String
+    fn get_identifier_text_clone(&self, idx: NodeIndex) -> String {
+        let Some(node) = self.arena.get(idx) else { return String::new() };
+        if let Some(ident) = self.arena.get_identifier(node) {
+            return ident.escaped_text.clone();
+        }
+        String::new()
+    }
+
+    /// Emit a single variable declaration (for for-loop initializers, etc.)
     fn emit_variable_declaration(&mut self, decl_idx: NodeIndex) {
         let Some(decl_node) = self.arena.get(decl_idx) else { return };
         let Some(decl) = self.arena.get_variable_declaration(decl_node) else { return };
-        
+
         self.emit_binding_name(decl.name);
-        
+
         if !decl.initializer.is_none() {
             self.write(" = ");
             self.emit_expression(decl.initializer);
         }
     }
-    
+
     fn emit_if_statement(&mut self, stmt_idx: NodeIndex) {
         let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
         let Some(if_stmt) = self.arena.get_if_statement(stmt_node) else { return };
@@ -605,7 +1293,14 @@ impl<'a> ClassES5Emitter<'a> {
             k if k == SyntaxKind::TrueKeyword as u16 => self.write("true"),
             k if k == SyntaxKind::FalseKeyword as u16 => self.write("false"),
             k if k == SyntaxKind::NullKeyword as u16 => self.write("null"),
-            k if k == SyntaxKind::ThisKeyword as u16 => self.write("this"),
+            k if k == SyntaxKind::ThisKeyword as u16 => {
+                // Use _this when inside an arrow function that needs capture
+                if self.use_this_capture {
+                    self.write("_this")
+                } else {
+                    self.write("this")
+                }
+            }
             k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
                 if let Some(access) = self.arena.get_access_expr(expr_node) {
                     self.emit_expression(access.expression);
@@ -623,17 +1318,22 @@ impl<'a> ClassES5Emitter<'a> {
             }
             k if k == syntax_kind_ext::CALL_EXPRESSION => {
                 if let Some(call) = self.arena.get_call_expr(expr_node) {
-                    self.emit_expression(call.expression);
-                    self.write("(");
-                    if let Some(ref args) = call.arguments {
-                        let mut first = true;
-                        for &arg_idx in &args.nodes {
-                            if !first { self.write(", "); }
-                            first = false;
-                            self.emit_expression(arg_idx);
+                    // Check if this is super.method(args) - transform to _super.prototype.method.call(this, args)
+                    if self.is_super_method_call(call.expression) {
+                        self.emit_super_method_call(call.expression, &call.arguments);
+                    } else {
+                        self.emit_expression(call.expression);
+                        self.write("(");
+                        if let Some(ref args) = call.arguments {
+                            let mut first = true;
+                            for &arg_idx in &args.nodes {
+                                if !first { self.write(", "); }
+                                first = false;
+                                self.emit_expression(arg_idx);
+                            }
                         }
+                        self.write(")");
                     }
-                    self.write(")");
                 }
             }
             k if k == syntax_kind_ext::NEW_EXPRESSION => {
@@ -713,10 +1413,20 @@ impl<'a> ClassES5Emitter<'a> {
             k if k == syntax_kind_ext::ARROW_FUNCTION => {
                 // Transform arrow to function expression
                 if let Some(func) = self.arena.get_function(expr_node) {
+                    // Check if this arrow function body uses `this`
+                    let body_uses_this = !func.body.is_none()
+                        && contains_this_reference(self.arena, func.body);
+
+                    // Enable _this capture for the body if needed
+                    let prev_capture = self.use_this_capture;
+                    if body_uses_this {
+                        self.use_this_capture = true;
+                    }
+
                     self.write("function (");
                     self.emit_parameters(&func.parameters);
                     self.write(") ");
-                    
+
                     // Check if body is an expression or block
                     if let Some(body_node) = self.arena.get(func.body) {
                         if body_node.kind == syntax_kind_ext::BLOCK {
@@ -728,6 +1438,9 @@ impl<'a> ClassES5Emitter<'a> {
                             self.write("; }");
                         }
                     }
+
+                    // Restore previous capture state
+                    self.use_this_capture = prev_capture;
                 }
             }
             k if k == syntax_kind_ext::FUNCTION_EXPRESSION => {
@@ -917,26 +1630,118 @@ impl<'a> ClassES5Emitter<'a> {
         }
         false
     }
+
+    fn is_abstract(&self, modifiers: &Option<NodeList>) -> bool {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::AbstractKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if heritage clauses contain an `extends` clause (not just `implements`)
+    fn has_extends_clause(&self, heritage_clauses: &Option<NodeList>) -> bool {
+        self.get_extends_class_name(heritage_clauses).is_some()
+    }
+
+    /// Get the base class name from the extends clause
+    fn get_extends_class_name(&self, heritage_clauses: &Option<NodeList>) -> Option<String> {
+        let clauses = heritage_clauses.as_ref()?;
+
+        for &clause_idx in &clauses.nodes {
+            let clause_node = self.arena.get(clause_idx)?;
+            let heritage_data = self.arena.get_heritage(clause_node)?;
+
+            // Check if this is an extends clause (not implements)
+            if heritage_data.token != SyntaxKind::ExtendsKeyword as u16 {
+                continue;
+            }
+
+            // Get the first type in the extends clause (the base class)
+            let first_type_idx = heritage_data.types.nodes.first()?;
+            let type_node = self.arena.get(*first_type_idx)?;
+
+            // The type could be:
+            // 1. A simple identifier (B in `extends B`)
+            // 2. An ExpressionWithTypeArguments (B<T> in `extends B<T>`)
+            // 3. A PropertyAccessExpression (A.B in `extends A.B`)
+
+            // Try as simple identifier first
+            if let Some(ident) = self.arena.get_identifier(type_node) {
+                return Some(ident.escaped_text.clone());
+            }
+
+            // Try as ExpressionWithTypeArguments (for generics)
+            if let Some(expr_data) = self.arena.get_expr_type_args(type_node) {
+                return Some(self.get_identifier_text(expr_data.expression));
+            }
+
+            // For property access, just get the text (simplified - not handling A.B yet)
+        }
+        None
+    }
     
+    /// Check if expression is super.method (property access on super)
+    fn is_super_method_call(&self, expr_idx: NodeIndex) -> bool {
+        let Some(expr_node) = self.arena.get(expr_idx) else { return false };
+
+        if expr_node.kind != syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+            return false;
+        }
+
+        let Some(access) = self.arena.get_access_expr(expr_node) else { return false };
+        let Some(base_node) = self.arena.get(access.expression) else { return false };
+
+        base_node.kind == SyntaxKind::SuperKeyword as u16
+    }
+
+    /// Emit super.method(args) as _super.prototype.method.call(this, args)
+    fn emit_super_method_call(&mut self, callee_idx: NodeIndex, args: &Option<NodeList>) {
+        let Some(callee_node) = self.arena.get(callee_idx) else { return };
+        let Some(access) = self.arena.get_access_expr(callee_node) else { return };
+
+        // Get method name
+        let method_name = self.get_identifier_text(access.name_or_argument);
+
+        // Emit _super.prototype.method.call(this, args)
+        self.write("_super.prototype.");
+        self.write(&method_name);
+        self.write(".call(this");
+
+        if let Some(arg_list) = args {
+            for &arg_idx in &arg_list.nodes {
+                self.write(", ");
+                self.emit_expression(arg_idx);
+            }
+        }
+
+        self.write(")");
+    }
+
     // Helper methods
     fn write(&mut self, s: &str) {
         self.output.push_str(s);
     }
-    
+
     fn write_line(&mut self) {
         self.output.push('\n');
     }
-    
+
     fn write_indent(&mut self) {
         for _ in 0..self.indent_level {
             self.output.push_str("    ");
         }
     }
-    
+
     fn increase_indent(&mut self) {
         self.indent_level += 1;
     }
-    
+
     fn decrease_indent(&mut self) {
         if self.indent_level > 0 {
             self.indent_level -= 1;

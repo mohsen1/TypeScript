@@ -28,7 +28,8 @@ fn test_thin_emit_variable_declaration() {
     printer.emit(root);
 
     let output = printer.get_output();
-    assert!(output.contains("let"), "Expected 'let' in output: {}", output);
+    // ThinPrinter defaults to ES5 target, which emits 'var' instead of 'let'
+    assert!(output.contains("var"), "Expected 'var' in output: {}", output);
     assert!(output.contains("x"), "Expected 'x' in output: {}", output);
     assert!(output.contains("42"), "Expected '42' in output: {}", output);
 }
@@ -160,7 +161,8 @@ fn test_thin_pipeline_integration() {
     // JavaScript emit strips types, so "number" should NOT be in output
     assert!(!output.contains("number"), "JavaScript output should NOT contain 'number' (types are stripped): {}", output);
     assert!(output.contains("return"), "Output should contain 'return': {}", output);
-    assert!(output.contains("let"), "Output should contain 'let': {}", output);
+    // ThinPrinter defaults to ES5 target, which emits 'var' instead of 'let'
+    assert!(output.contains("var"), "Output should contain 'var': {}", output);
     assert!(output.contains("result"), "Output should contain 'result': {}", output);
 }
 
