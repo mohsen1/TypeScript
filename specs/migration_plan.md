@@ -15,6 +15,11 @@ see SESSION_LOG.md -- always amended with each session's work
 - **Phase 6**: Emitter (ES5 transforms, source maps, .d.ts) - **59.2% JS baseline**
 - **Phase 7**: Language Service (60%) - go-to-def, find refs, completions
 
+## Recent Checker Improvements
+- ✅ Callable interface type lowering (function-like interfaces)
+- ✅ Function type annotations for error 2355
+- ✅ Error 2676: accessor abstract consistency (get/set must both be abstract or both non-abstract)
+
 ## Recent Emitter Improvements
 - ✅ Fixed baseline comparison script to extract JS portion correctly
 - ✅ Instance property initializers → `this.x = value;` in constructor
