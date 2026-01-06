@@ -2818,7 +2818,25 @@ impl<'a> ThinPrinter<'a> {
             self.emit(class.name);
         }
 
-        // TODO: Emit heritage clause
+        if let Some(ref heritage_clauses) = class.heritage_clauses {
+            for &clause_idx in &heritage_clauses.nodes {
+                let Some(clause_node) = self.arena.get(clause_idx) else {
+                    continue;
+                };
+                let Some(heritage) = self.arena.get_heritage(clause_node) else {
+                    continue;
+                };
+                if heritage.token != SyntaxKind::ExtendsKeyword as u16 {
+                    continue;
+                }
+
+                if let Some(&extends_type) = heritage.types.nodes.first() {
+                    self.write(" extends ");
+                    self.emit_heritage_expression(extends_type);
+                }
+                break;
+            }
+        }
 
         self.write(" {");
         self.write_line();
@@ -2864,6 +2882,22 @@ impl<'a> ThinPrinter<'a> {
                 self.write(", ");
             }
             first = false;
+            self.emit(idx);
+        }
+    }
+
+    fn emit_heritage_expression(&mut self, idx: NodeIndex) {
+        if idx.is_none() {
+            return;
+        }
+
+        let Some(node) = self.arena.get(idx) else {
+            return;
+        };
+
+        if let Some(expr) = self.arena.get_expr_type_args(node) {
+            self.emit(expr.expression);
+        } else {
             self.emit(idx);
         }
     }

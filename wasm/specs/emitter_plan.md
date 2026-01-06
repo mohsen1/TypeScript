@@ -25,6 +25,7 @@ Note:
 6. Public API integration (export LoweringPass) [done - covered by #1]
 7. Deprecate inline transform logic (breaking change)
 8. More unit test if there are gaps [added parity tests; auto-detect/export-assignment coverage]
+9. Emit ES6 class heritage clauses (extends) [done]
 
 
 ## Quick Reference
