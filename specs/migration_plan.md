@@ -94,7 +94,7 @@ This catches design issues early and ensures consistent code quality.
 | Accessor errors | 6234, 18045 | 3 | Hints, ES5 target (1183 done) |
 | Abstract members | 2729, 2416, 2540 | 3 | Abstract property handling (2715 done) |
 
-### Emit TODOs (96.7% failing)
+### Emit TODOs (40.8% failing → target 80%+)
 | Feature | Tests | % | Notes |
 |---------|-------|---|-------|
 | **Modules** | 1,935 | 33% | `import`/`export` → CommonJS/ESM |
