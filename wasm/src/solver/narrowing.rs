@@ -62,7 +62,10 @@ impl<'a> NarrowingContext<'a> {
         for &member in &members {
             if let Some(TypeKey::Object(props)) = self.interner.lookup(member) {
                 let props_vec: Vec<(Arc<str>, TypeId)> = props.iter()
-                    .map(|p| (p.name.clone(), p.type_id))
+                    .map(|p| {
+                        let name_str = self.interner.resolve_atom(p.name);
+                        (Arc::from(name_str.as_str()), p.type_id)
+                    })
                     .collect();
 
                 // Track all property names
@@ -172,7 +175,7 @@ impl<'a> NarrowingContext<'a> {
         for &member in &members {
             if let Some(TypeKey::Object(props)) = self.interner.lookup(member) {
                 let prop_type = props.iter()
-                    .find(|p| p.name.as_ref() == property_name)
+                    .find(|p| self.interner.resolve_atom(p.name) == property_name)
                     .map(|p| p.type_id);
 
                 match prop_type {

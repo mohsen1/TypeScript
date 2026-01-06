@@ -424,7 +424,7 @@ impl<'a> TypeFormatter<'a> {
             TypeKey::Tuple(elements) => self.format_tuple(elements),
             TypeKey::Function(shape) => self.format_function(shape),
             TypeKey::Callable(shape) => self.format_callable(shape),
-            TypeKey::TypeParameter(info) => info.name.to_string(),
+            TypeKey::TypeParameter(info) => self.interner.resolve_atom(info.name),
             TypeKey::Ref(sym) => format!("Ref({})", sym.0),
             TypeKey::Conditional(cond) => self.format_conditional(cond),
             TypeKey::Mapped(mapped) => self.format_mapped(mapped),
@@ -436,7 +436,7 @@ impl<'a> TypeFormatter<'a> {
             TypeKey::KeyOf(operand) => format!("keyof {}", self.format(*operand)),
             TypeKey::ReadonlyType(inner) => format!("readonly {}", self.format(*inner)),
             TypeKey::UniqueSymbol(sym) => format!("unique symbol ({})", sym.0),
-            TypeKey::Infer(info) => format!("infer {}", info.name),
+            TypeKey::Infer(info) => format!("infer {}", self.interner.resolve_atom(info.name)),
             TypeKey::ThisType => "this".to_string(),
             TypeKey::Error => "error".to_string(),
         }
@@ -461,9 +461,9 @@ impl<'a> TypeFormatter<'a> {
 
     fn format_literal(&self, lit: &LiteralValue) -> String {
         match lit {
-            LiteralValue::String(s) => format!("\"{}\"", s),
+            LiteralValue::String(s) => format!("\"{}\"", self.interner.resolve_atom(*s)),
             LiteralValue::Number(n) => format!("{}", n.0),
-            LiteralValue::BigInt(b) => format!("{}n", b),
+            LiteralValue::BigInt(b) => format!("{}n", self.interner.resolve_atom(*b)),
             LiteralValue::Boolean(b) => if *b { "true" } else { "false" }.to_string(),
         }
     }
@@ -487,7 +487,8 @@ impl<'a> TypeFormatter<'a> {
     fn format_property(&mut self, prop: &PropertyInfo) -> String {
         let optional = if prop.optional { "?" } else { "" };
         let readonly = if prop.readonly { "readonly " } else { "" };
-        format!("{}{}{}: {}", readonly, prop.name, optional, self.format(prop.type_id))
+        let name = self.interner.resolve_atom(prop.name);
+        format!("{}{}{}: {}", readonly, name, optional, self.format(prop.type_id))
     }
 
     fn format_object_with_index(&mut self, shape: &ObjectShape) -> String {
@@ -531,7 +532,8 @@ impl<'a> TypeFormatter<'a> {
             .map(|e| {
                 let rest = if e.rest { "..." } else { "" };
                 let optional = if e.optional { "?" } else { "" };
-                if let Some(ref name) = e.name {
+                if let Some(name_atom) = e.name {
+                    let name = self.interner.resolve_atom(name_atom);
                     format!("{}{}: {}{}", name, optional, rest, self.format(e.type_id))
                 } else {
                     format!("{}{}{}", rest, self.format(e.type_id), optional)
@@ -544,7 +546,7 @@ impl<'a> TypeFormatter<'a> {
     fn format_function(&mut self, shape: &FunctionShape) -> String {
         let params: Vec<String> = shape.params.iter()
             .map(|p| {
-                let name = p.name.as_ref().map(|n| n.as_ref()).unwrap_or("_");
+                let name = p.name.map(|atom| self.interner.resolve_atom(atom)).unwrap_or_else(|| "_".to_string());
                 let optional = if p.optional { "?" } else { "" };
                 let rest = if p.rest { "..." } else { "" };
                 format!("{}{}{}: {}", rest, name, optional, self.format(p.type_id))
@@ -571,7 +573,7 @@ impl<'a> TypeFormatter<'a> {
     fn format_call_signature(&mut self, sig: &CallSignature, is_construct: bool) -> String {
         let params: Vec<String> = sig.params.iter()
             .map(|p| {
-                let name = p.name.as_ref().map(|n| n.as_ref()).unwrap_or("_");
+                let name = p.name.map(|atom| self.interner.resolve_atom(atom)).unwrap_or_else(|| "_".to_string());
                 format!("{}: {}", name, self.format(p.type_id))
             })
             .collect();
@@ -601,7 +603,7 @@ impl<'a> TypeFormatter<'a> {
         let mut result = String::from("`");
         for span in spans {
             match span {
-                TemplateSpan::Text(text) => result.push_str(text),
+                TemplateSpan::Text(text) => result.push_str(&self.interner.resolve_atom(*text)),
                 TemplateSpan::Type(type_id) => {
                     result.push_str("${");
                     result.push_str(&self.format(*type_id));

@@ -63,7 +63,7 @@ fn test_lower_function_type_with_type_parameter() {
         TypeKey::Function(shape) => {
             // Should have 1 type parameter named "T"
             assert_eq!(shape.type_params.len(), 1, "Expected 1 type parameter");
-            assert_eq!(shape.type_params[0].name.as_ref(), "T");
+            assert_eq!(interner.resolve_atom(shape.type_params[0].name).as_str(), "T");
             assert!(shape.type_params[0].constraint.is_none(), "T should have no constraint");
             assert!(shape.type_params[0].default.is_none(), "T should have no default");
         }
@@ -85,7 +85,7 @@ fn test_lower_function_type_with_constrained_type_parameter() {
     match key {
         TypeKey::Function(shape) => {
             assert_eq!(shape.type_params.len(), 1);
-            assert_eq!(shape.type_params[0].name.as_ref(), "T");
+            assert_eq!(interner.resolve_atom(shape.type_params[0].name).as_str(), "T");
             // Should have a constraint
             assert!(shape.type_params[0].constraint.is_some(), "T should have constraint");
             let constraint = shape.type_params[0].constraint.unwrap();
@@ -109,7 +109,7 @@ fn test_lower_function_type_with_default_type_parameter() {
     match key {
         TypeKey::Function(shape) => {
             assert_eq!(shape.type_params.len(), 1);
-            assert_eq!(shape.type_params[0].name.as_ref(), "T");
+            assert_eq!(interner.resolve_atom(shape.type_params[0].name).as_str(), "T");
             assert!(shape.type_params[0].constraint.is_none());
             // Should have a default
             assert!(shape.type_params[0].default.is_some(), "T should have default");
@@ -134,9 +134,9 @@ fn test_lower_function_type_with_multiple_type_parameters() {
     match key {
         TypeKey::Function(shape) => {
             assert_eq!(shape.type_params.len(), 3, "Expected 3 type parameters");
-            assert_eq!(shape.type_params[0].name.as_ref(), "T");
-            assert_eq!(shape.type_params[1].name.as_ref(), "U");
-            assert_eq!(shape.type_params[2].name.as_ref(), "V");
+            assert_eq!(interner.resolve_atom(shape.type_params[0].name).as_str(), "T");
+            assert_eq!(interner.resolve_atom(shape.type_params[1].name).as_str(), "U");
+            assert_eq!(interner.resolve_atom(shape.type_params[2].name).as_str(), "V");
         }
         _ => panic!("Expected Function type, got {:?}", key),
     }
@@ -156,7 +156,7 @@ fn test_lower_function_type_with_constraint_and_default() {
     match key {
         TypeKey::Function(shape) => {
             assert_eq!(shape.type_params.len(), 1);
-            assert_eq!(shape.type_params[0].name.as_ref(), "T");
+            assert_eq!(interner.resolve_atom(shape.type_params[0].name).as_str(), "T");
             // Should have both constraint and default
             assert!(shape.type_params[0].constraint.is_some(), "T should have constraint");
             assert!(shape.type_params[0].default.is_some(), "T should have default");

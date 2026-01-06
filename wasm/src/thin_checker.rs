@@ -23,6 +23,7 @@ use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeId, TypeInterner, ContextualTypeContext};
 use crate::checker::types::diagnostics::{Diagnostic, DiagnosticCategory};
 use crate::checker::{CheckerContext, EnclosingClassInfo, FlowAnalyzer};
+use crate::interner::Atom;
 
 // =============================================================================
 // ThinCheckerState
@@ -775,9 +776,9 @@ impl<'a> ThinCheckerState<'a> {
             let param_node = self.ctx.arena.get(param_idx)?;
             let param = self.ctx.arena.get_parameter(param_node)?;
 
-            let name: Option<Arc<str>> = if let Some(name_node) = self.ctx.arena.get(param.name) {
+            let name: Option<Atom> = if let Some(name_node) = self.ctx.arena.get(param.name) {
                 if let Some(name_data) = self.ctx.arena.get_identifier(name_node) {
-                    Some(Arc::from(name_data.escaped_text.as_str()))
+                    Some(self.ctx.types.intern_string(&name_data.escaped_text))
                 } else {
                     None
                 }
@@ -898,12 +899,11 @@ impl<'a> ThinCheckerState<'a> {
     /// Note: Symbol cannot be constructed with `new`, so no construct signatures.
     fn get_symbol_constructor_type(&self) -> TypeId {
         use crate::solver::{CallSignature, CallableShape, ParamInfo};
-        use std::sync::Arc;
 
         // Parameter: description?: string | number
         let description_param_type = self.ctx.types.union(vec![TypeId::STRING, TypeId::NUMBER]);
         let description_param = ParamInfo {
-            name: Some(Arc::from("description")),
+            name: Some(self.ctx.types.intern_string("description")),
             type_id: description_param_type,
             optional: true,
             rest: false,
@@ -1718,7 +1718,7 @@ impl<'a> ThinCheckerState<'a> {
                     self.ctx.contextual_type = prev_context;
 
                     properties.push(PropertyInfo {
-                        name: Arc::from(name.as_str()),
+                        name: self.ctx.types.intern_string(&name),
                         type_id: value_type,
                         optional: false,
                         readonly: false,
@@ -1730,7 +1730,7 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(ident) = self.ctx.arena.get_identifier(elem_node) {
                     let value_type = self.get_type_of_node(elem_idx);
                     properties.push(PropertyInfo {
-                        name: Arc::from(ident.escaped_text.as_str()),
+                        name: self.ctx.types.intern_string(&ident.escaped_text),
                         type_id: value_type,
                         optional: false,
                         readonly: false,
@@ -1752,7 +1752,7 @@ impl<'a> ThinCheckerState<'a> {
                     self.ctx.contextual_type = prev_context;
 
                     properties.push(PropertyInfo {
-                        name: Arc::from(name.as_str()),
+                        name: self.ctx.types.intern_string(&name),
                         type_id: method_type,
                         optional: false,
                         readonly: false,
@@ -1781,7 +1781,7 @@ impl<'a> ThinCheckerState<'a> {
                         TypeId::VOID
                     };
                     properties.push(PropertyInfo {
-                        name: Arc::from(name.as_str()),
+                        name: self.ctx.types.intern_string(&name),
                         type_id: accessor_type,
                         optional: false,
                         readonly: false,
@@ -2777,7 +2777,8 @@ impl<'a> ThinCheckerState<'a> {
         for source_prop in &source_props {
             let exists_in_target = target_props.iter().any(|p| p.name == source_prop.name);
             if !exists_in_target {
-                self.error_excess_property_at(&source_prop.name, target, idx);
+                let prop_name = self.ctx.types.resolve_atom(source_prop.name);
+                self.error_excess_property_at(&prop_name, target, idx);
             }
         }
         // Note: Missing property checks are handled by solver's explain_failure
@@ -2978,7 +2979,7 @@ impl<'a> ThinCheckerState<'a> {
         match self.ctx.types.lookup(type_id) {
             Some(TypeKey::Object(props)) => {
                 for prop in props.iter() {
-                    if prop.name.as_ref() == prop_name {
+                    if self.ctx.types.resolve_atom(prop.name) == prop_name {
                         return prop.readonly;
                     }
                 }
@@ -2986,7 +2987,7 @@ impl<'a> ThinCheckerState<'a> {
             }
             Some(TypeKey::ObjectWithIndex(shape)) => {
                 for prop in shape.properties.iter() {
-                    if prop.name.as_ref() == prop_name {
+                    if self.ctx.types.resolve_atom(prop.name) == prop_name {
                         return prop.readonly;
                     }
                 }

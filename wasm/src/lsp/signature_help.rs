@@ -251,7 +251,9 @@ impl<'a> SignatureHelpProvider<'a> {
                 label_parts.push(", ".to_string());
             }
 
-            let name = param.name.as_deref().unwrap_or("arg");
+            let name = param.name
+                .map(|atom| checker.ctx.types.resolve_atom(atom))
+                .unwrap_or_else(|| "arg".to_string());
             let type_str = checker.format_type(param.type_id);
             let optional = if param.optional { "?" } else { "" };
             let rest = if param.rest { "..." } else { "" };

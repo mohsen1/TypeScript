@@ -181,7 +181,7 @@ impl<'a> ContextualTypeContext<'a> {
         match key {
             TypeKey::Object(props) => {
                 for prop in &props {
-                    if prop.name.as_ref() == name {
+                    if self.interner.resolve_atom(prop.name) == name {
                         return Some(prop.type_id);
                     }
                 }

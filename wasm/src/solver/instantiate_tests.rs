@@ -18,13 +18,14 @@ fn test_substitution_basic() {
 
 #[test]
 fn test_substitution_from_args() {
+    let interner = TypeInterner::new();
     let type_params = vec![
-        TypeParamInfo { name: Arc::from("T"), constraint: None, default: None },
-        TypeParamInfo { name: Arc::from("U"), constraint: None, default: None },
+        TypeParamInfo { name: interner.intern_string("T"), constraint: None, default: None },
+        TypeParamInfo { name: interner.intern_string("U"), constraint: None, default: None },
     ];
     let type_args = vec![TypeId::STRING, TypeId::NUMBER];
 
-    let subst = TypeSubstitution::from_args(&type_params, &type_args);
+    let subst = TypeSubstitution::from_args(&interner, &type_params, &type_args);
 
     assert_eq!(subst.get("T"), Some(TypeId::STRING));
     assert_eq!(subst.get("U"), Some(TypeId::NUMBER));
@@ -37,7 +38,7 @@ fn test_instantiate_type_parameter() {
 
     // Create a type parameter T
     let type_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
-        name: Arc::from("T"),
+        name: interner.intern_string("T"),
         constraint: None,
         default: None,
     }));
@@ -60,7 +61,7 @@ fn test_instantiate_array() {
 
     // Create Array<T>
     let type_param_t = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
-        name: Arc::from("T"),
+        name: interner.intern_string("T"),
         constraint: None,
         default: None,
     }));
@@ -82,7 +83,7 @@ fn test_instantiate_union() {
 
     // Create T | null
     let type_param_t = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
-        name: Arc::from("T"),
+        name: interner.intern_string("T"),
         constraint: None,
         default: None,
     }));
@@ -104,13 +105,13 @@ fn test_instantiate_object() {
 
     // Create { value: T }
     let type_param_t = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
-        name: Arc::from("T"),
+        name: interner.intern_string("T"),
         constraint: None,
         default: None,
     }));
     let obj = interner.object(vec![
         PropertyInfo {
-            name: Arc::from("value"),
+            name: interner.intern_string("value"),
             type_id: type_param_t,
             optional: false,
             readonly: false,
@@ -125,7 +126,7 @@ fn test_instantiate_object() {
     // Result should be { value: number }
     let expected = interner.object(vec![
         PropertyInfo {
-            name: Arc::from("value"),
+            name: interner.intern_string("value"),
             type_id: TypeId::NUMBER,
             optional: false,
             readonly: false,
@@ -140,14 +141,14 @@ fn test_instantiate_function() {
 
     // Create (x: T) => T
     let type_param_t = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
-        name: Arc::from("T"),
+        name: interner.intern_string("T"),
         constraint: None,
         default: None,
     }));
     let func = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![ParamInfo {
-            name: Some(Arc::from("x")),
+            name: Some(interner.intern_string("x")),
             type_id: type_param_t,
             optional: false,
             rest: false,
@@ -165,7 +166,7 @@ fn test_instantiate_function() {
     let expected = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![ParamInfo {
-            name: Some(Arc::from("x")),
+            name: Some(interner.intern_string("x")),
             type_id: TypeId::STRING,
             optional: false,
             rest: false,
@@ -182,12 +183,12 @@ fn test_instantiate_tuple() {
 
     // Create [T, U]
     let type_param_t = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
-        name: Arc::from("T"),
+        name: interner.intern_string("T"),
         constraint: None,
         default: None,
     }));
     let type_param_u = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
-        name: Arc::from("U"),
+        name: interner.intern_string("U"),
         constraint: None,
         default: None,
     }));
@@ -216,7 +217,7 @@ fn test_instantiate_generic_convenience() {
 
     // Create Array<T>
     let type_param_t = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
-        name: Arc::from("T"),
+        name: interner.intern_string("T"),
         constraint: None,
         default: None,
     }));
@@ -224,7 +225,7 @@ fn test_instantiate_generic_convenience() {
 
     // Use convenience function
     let type_params = vec![
-        TypeParamInfo { name: Arc::from("T"), constraint: None, default: None },
+        TypeParamInfo { name: interner.intern_string("T"), constraint: None, default: None },
     ];
     let type_args = vec![TypeId::STRING];
 
@@ -241,7 +242,7 @@ fn test_instantiate_nested() {
 
     // Create Array<Array<T>>
     let type_param_t = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
-        name: Arc::from("T"),
+        name: interner.intern_string("T"),
         constraint: None,
         default: None,
     }));
@@ -280,7 +281,7 @@ fn test_instantiate_conditional() {
 
     // Create T extends string ? T : never
     let type_param_t = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
-        name: Arc::from("T"),
+        name: interner.intern_string("T"),
         constraint: None,
         default: None,
     }));

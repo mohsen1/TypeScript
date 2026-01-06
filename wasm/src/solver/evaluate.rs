@@ -188,7 +188,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         // If index is a literal string, look up the property directly
         if let Some(TypeKey::Literal(LiteralValue::String(name))) = self.interner.lookup(index_type) {
             for prop in props {
-                if prop.name.as_ref() == name.as_ref() {
+                if prop.name == name {
                     return prop.type_id;
                 }
             }
@@ -292,9 +292,13 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
         for key_name in key_literals {
             // Create substitution: type_param.name -> literal key type
-            let key_literal = self.interner.literal_string(&key_name);
+            // First intern the Atom as a literal string type
+            let key_literal = self.interner.intern(TypeKey::Literal(LiteralValue::String(key_name)));
+
+            // TypeSubstitution still uses Arc<str>, so resolve both the type param name and key
             let mut subst = TypeSubstitution::new();
-            subst.insert(mapped.type_param.name.clone(), key_literal);
+            let type_param_name = self.interner.resolve_atom(mapped.type_param.name);
+            subst.insert(std::sync::Arc::from(type_param_name.as_str()), key_literal);
 
             // Substitute into the template
             let property_type = instantiate_type(self.interner, mapped.template, &subst);
@@ -340,7 +344,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     return TypeId::NEVER;
                 }
                 let key_types: Vec<TypeId> = props.iter()
-                    .map(|p| self.interner.literal_string(&p.name))
+                    .map(|p| self.interner.intern(TypeKey::Literal(LiteralValue::String(p.name))))
                     .collect();
                 self.interner.union(key_types)
             }
@@ -409,7 +413,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     }
 
     /// Extract string literals from a type (for mapped type iteration)
-    fn extract_string_literals(&self, type_id: TypeId) -> Option<Vec<std::sync::Arc<str>>> {
+    fn extract_string_literals(&self, type_id: TypeId) -> Option<Vec<crate::interner::Atom>> {
         let key = self.interner.lookup(type_id)?;
 
         match key {

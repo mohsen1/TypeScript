@@ -31,8 +31,8 @@ fn test_contextual_function_parameter() {
     let handler = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(Arc::from("e")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(Arc::from("i")), type_id: TypeId::NUMBER, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("e")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("i")), type_id: TypeId::NUMBER, optional: false, rest: false },
         ],
         return_type: TypeId::VOID,
         is_constructor: false,
@@ -74,7 +74,7 @@ fn test_contextual_function_rest_parameter() {
     let fn_type = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(Arc::from("args")), type_id: number_array, optional: false, rest: true },
+            ParamInfo { name: Some(interner.intern_string("args")), type_id: number_array, optional: false, rest: true },
         ],
         return_type: TypeId::VOID,
         is_constructor: false,
@@ -131,8 +131,8 @@ fn test_contextual_property() {
 
     // { x: number, y: string }
     let obj = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: Arc::from("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false },
     ]);
 
     let ctx = ContextualTypeContext::with_expected(&interner, obj);
@@ -152,10 +152,10 @@ fn test_contextual_nested_property() {
 
     // { nested: { value: number } }
     let inner = interner.object(vec![
-        PropertyInfo { name: Arc::from("value"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("value"), type_id: TypeId::NUMBER, optional: false, readonly: false },
     ]);
     let outer = interner.object(vec![
-        PropertyInfo { name: Arc::from("nested"), type_id: inner, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("nested"), type_id: inner, optional: false, readonly: false },
     ]);
 
     let ctx = ContextualTypeContext::with_expected(&interner, outer);
@@ -187,7 +187,7 @@ fn test_contextual_for_parameter() {
     let fn_type = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(Arc::from("x")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
         ],
         return_type: TypeId::VOID,
         is_constructor: false,
@@ -252,7 +252,7 @@ fn test_contextual_union_function() {
     let fn1 = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(Arc::from("x")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
         ],
         return_type: TypeId::VOID,
         is_constructor: false,
@@ -260,7 +260,7 @@ fn test_contextual_union_function() {
     let fn2 = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(Arc::from("x")), type_id: TypeId::NUMBER, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::NUMBER, optional: false, rest: false },
         ],
         return_type: TypeId::VOID,
         is_constructor: false,

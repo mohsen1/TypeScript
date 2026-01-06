@@ -72,13 +72,13 @@ fn test_object_subtyping() {
 
     // { x: number }
     let obj_x = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
     ]);
 
     // { x: number, y: string }
     let obj_xy = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: Arc::from("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false },
     ]);
 
     // Object with more properties is subtype
@@ -188,13 +188,13 @@ fn test_ref_to_object_resolution() {
 
     // Create an object type: { x: number }
     let obj_x = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
     ]);
 
     // Create a Ref that resolves to { x: number, y: string }
     let obj_xy = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: Arc::from("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false },
     ]);
 
     let ref_type = interner.reference(SymbolRef(100));
@@ -236,9 +236,9 @@ fn test_function_rest_parameter_subtyping() {
     let fixed_params = FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(Arc::from("a")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(Arc::from("b")), type_id: TypeId::ANY, optional: false, rest: false },
-            ParamInfo { name: Some(Arc::from("c")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("a")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("b")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("c")), type_id: TypeId::ANY, optional: false, rest: false },
         ],
         return_type: TypeId::ANY,
         is_constructor: false,
@@ -249,9 +249,9 @@ fn test_function_rest_parameter_subtyping() {
     let rest_params = FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(Arc::from("a")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(Arc::from("b")), type_id: TypeId::ANY, optional: false, rest: false },
-            ParamInfo { name: Some(Arc::from("args")), type_id: any_array, optional: false, rest: true },
+            ParamInfo { name: Some(interner.intern_string("a")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("b")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("args")), type_id: any_array, optional: false, rest: true },
         ],
         return_type: TypeId::ANY,
         is_constructor: false,
@@ -478,7 +478,7 @@ fn test_number_index_signature_numeric_property() {
     // { 0: string }
     let source = interner.object(vec![
         PropertyInfo {
-            name: Arc::from("0"),
+            name: interner.intern_string("0"),
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
@@ -511,7 +511,7 @@ fn test_number_index_signature_type_mismatch() {
     // { 0: number }
     let source = interner.object(vec![
         PropertyInfo {
-            name: Arc::from("0"),
+            name: interner.intern_string("0"),
             type_id: TypeId::NUMBER,
             optional: false,
             readonly: false,
@@ -544,19 +544,19 @@ fn test_number_index_signature_multiple_numeric_props() {
     // { 0: string, 1: string, 2: string }
     let source = interner.object(vec![
         PropertyInfo {
-            name: Arc::from("0"),
+            name: interner.intern_string("0"),
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
         },
         PropertyInfo {
-            name: Arc::from("1"),
+            name: interner.intern_string("1"),
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
         },
         PropertyInfo {
-            name: Arc::from("2"),
+            name: interner.intern_string("2"),
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
@@ -589,13 +589,13 @@ fn test_number_and_string_index_signatures() {
     // { 0: string, foo: string }
     let source = interner.object(vec![
         PropertyInfo {
-            name: Arc::from("0"),
+            name: interner.intern_string("0"),
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
         },
         PropertyInfo {
-            name: Arc::from("foo"),
+            name: interner.intern_string("foo"),
             type_id: TypeId::STRING,
             optional: false,
             readonly: false,
@@ -634,7 +634,7 @@ fn test_strict_function_variance() {
     let union_arg_fn = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![ParamInfo {
-            name: Some(Arc::from("x")),
+            name: Some(interner.intern_string("x")),
             type_id: interner.union(vec![TypeId::STRING, TypeId::NUMBER]),
             optional: false,
             rest: false,
@@ -647,7 +647,7 @@ fn test_strict_function_variance() {
     let string_arg_fn = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![ParamInfo {
-            name: Some(Arc::from("x")),
+            name: Some(interner.intern_string("x")),
             type_id: TypeId::STRING,
             optional: false,
             rest: false,
@@ -680,9 +680,9 @@ fn test_function_fixed_to_rest_subtyping() {
     let source = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(Arc::from("name")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(Arc::from("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
-            ParamInfo { name: Some(Arc::from("arg")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("arg")), type_id: TypeId::ANY, optional: false, rest: false },
         ],
         return_type: TypeId::ANY,
         is_constructor: false,
@@ -693,9 +693,9 @@ fn test_function_fixed_to_rest_subtyping() {
     let target = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(Arc::from("name")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(Arc::from("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
-            ParamInfo { name: Some(Arc::from("args")), type_id: any_array, optional: false, rest: true },
+            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("args")), type_id: any_array, optional: false, rest: true },
         ],
         return_type: TypeId::ANY,
         is_constructor: false,
@@ -723,9 +723,9 @@ fn test_function_rest_tuple_to_rest_array_subtyping() {
     let source = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(Arc::from("name")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(Arc::from("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
-            ParamInfo { name: Some(Arc::from("args")), type_id: tuple_one_any, optional: false, rest: true },
+            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("args")), type_id: tuple_one_any, optional: false, rest: true },
         ],
         return_type: TypeId::ANY,
         is_constructor: false,
@@ -736,9 +736,9 @@ fn test_function_rest_tuple_to_rest_array_subtyping() {
     let target = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(Arc::from("name")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(Arc::from("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
-            ParamInfo { name: Some(Arc::from("args")), type_id: any_array, optional: false, rest: true },
+            ParamInfo { name: Some(interner.intern_string("name")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("mixed")), type_id: TypeId::ANY, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("args")), type_id: any_array, optional: false, rest: true },
         ],
         return_type: TypeId::ANY,
         is_constructor: false,

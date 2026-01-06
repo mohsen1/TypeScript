@@ -43,8 +43,8 @@ fn test_format_object_type() {
     let mut formatter = TypeFormatter::new(&interner);
 
     let obj = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: Arc::from("y"), type_id: TypeId::STRING, optional: true, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: true, readonly: false },
     ]);
 
     let formatted = formatter.format(obj);
@@ -82,7 +82,7 @@ fn test_format_function_type() {
     let func = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(Arc::from("x")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
         ],
         return_type: TypeId::NUMBER,
         is_constructor: false,
@@ -112,7 +112,7 @@ fn test_property_missing_diagnostic() {
 
     let obj1 = interner.object(vec![]);
     let obj2 = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
     ]);
 
     let diag = builder.property_missing("x", obj1, obj2);

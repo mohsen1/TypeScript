@@ -737,7 +737,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // Check properties against index signatures
         for prop in source {
             // Check if property name is numeric
-            let is_numeric = prop.name.parse::<f64>().is_ok();
+            let prop_name_str = self.interner.resolve_atom(prop.name);
+            let is_numeric = prop_name_str.parse::<f64>().is_ok();
 
             if is_numeric {
                 // Numeric properties must satisfy number index signature if present
@@ -1282,8 +1283,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 Some(sp) => {
                     // Check optional/required mismatch
                     if sp.optional && !t_prop.optional {
+                        let prop_name_str = self.interner.resolve_atom(t_prop.name);
                         return Some(SubtypeFailureReason::OptionalPropertyRequired {
-                            property_name: t_prop.name.clone(),
+                            property_name: std::sync::Arc::from(prop_name_str.as_str()),
                         });
                     }
 
@@ -1291,8 +1293,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     if !self.check_subtype(sp.type_id, t_prop.type_id).is_true() {
                         // Recursively explain the nested failure
                         let nested = self.explain_failure(sp.type_id, t_prop.type_id);
+                        let prop_name_str = self.interner.resolve_atom(t_prop.name);
                         return Some(SubtypeFailureReason::PropertyTypeMismatch {
-                            property_name: t_prop.name.clone(),
+                            property_name: std::sync::Arc::from(prop_name_str.as_str()),
                             source_property_type: sp.type_id,
                             target_property_type: t_prop.type_id,
                             nested_reason: nested.map(Box::new),
@@ -1302,8 +1305,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 None => {
                     // Required property is missing
                     if !t_prop.optional {
+                        let prop_name_str = self.interner.resolve_atom(t_prop.name);
                         return Some(SubtypeFailureReason::MissingProperty {
-                            property_name: t_prop.name.clone(),
+                            property_name: std::sync::Arc::from(prop_name_str.as_str()),
                             source_type: source,
                             target_type: target,
                         });

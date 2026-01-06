@@ -15,7 +15,7 @@ fn test_callable_same_signature() {
     let sig = CallSignature {
         type_params: vec![],
         params: vec![ParamInfo {
-            name: Some(Arc::from("x")),
+            name: Some(interner.intern_string("x")),
             type_id: TypeId::STRING,
             optional: false,
             rest: false,
@@ -46,7 +46,7 @@ fn test_callable_more_overloads() {
     let sig1 = CallSignature {
         type_params: vec![],
         params: vec![ParamInfo {
-            name: Some(Arc::from("x")),
+            name: Some(interner.intern_string("x")),
             type_id: TypeId::STRING,
             optional: false,
             rest: false,
@@ -57,7 +57,7 @@ fn test_callable_more_overloads() {
     let sig2 = CallSignature {
         type_params: vec![],
         params: vec![ParamInfo {
-            name: Some(Arc::from("x")),
+            name: Some(interner.intern_string("x")),
             type_id: TypeId::NUMBER,
             optional: false,
             rest: false,
@@ -88,7 +88,7 @@ fn test_callable_missing_overload() {
     let sig1 = CallSignature {
         type_params: vec![],
         params: vec![ParamInfo {
-            name: Some(Arc::from("x")),
+            name: Some(interner.intern_string("x")),
             type_id: TypeId::STRING,
             optional: false,
             rest: false,
@@ -99,7 +99,7 @@ fn test_callable_missing_overload() {
     let sig2 = CallSignature {
         type_params: vec![],
         params: vec![ParamInfo {
-            name: Some(Arc::from("x")),
+            name: Some(interner.intern_string("x")),
             type_id: TypeId::NUMBER,
             optional: false,
             rest: false,
@@ -128,7 +128,7 @@ fn test_callable_with_construct() {
 
     // { new(): Foo } <: { new(): Foo }
     let obj_type = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
     ]);
 
     let sig = CallSignature {
@@ -194,7 +194,7 @@ fn test_function_to_callable() {
     let fn_type = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![ParamInfo {
-            name: Some(Arc::from("x")),
+            name: Some(interner.intern_string("x")),
             type_id: TypeId::STRING,
             optional: false,
             rest: false,
@@ -207,7 +207,7 @@ fn test_function_to_callable() {
         call_signatures: vec![CallSignature {
             type_params: vec![],
             params: vec![ParamInfo {
-                name: Some(Arc::from("x")),
+                name: Some(interner.intern_string("x")),
                 type_id: TypeId::STRING,
                 optional: false,
                 rest: false,
@@ -231,7 +231,7 @@ fn test_callable_to_function() {
         call_signatures: vec![CallSignature {
             type_params: vec![],
             params: vec![ParamInfo {
-                name: Some(Arc::from("x")),
+                name: Some(interner.intern_string("x")),
                 type_id: TypeId::STRING,
                 optional: false,
                 rest: false,
@@ -245,7 +245,7 @@ fn test_callable_to_function() {
     let fn_type = interner.function(FunctionShape {
         type_params: vec![],
         params: vec![ParamInfo {
-            name: Some(Arc::from("x")),
+            name: Some(interner.intern_string("x")),
             type_id: TypeId::STRING,
             optional: false,
             rest: false,
@@ -270,7 +270,7 @@ fn test_callable_with_properties() {
         }],
         construct_signatures: vec![],
         properties: vec![
-            PropertyInfo { name: Arc::from("length"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+            PropertyInfo { name: interner.intern_string("length"), type_id: TypeId::NUMBER, optional: false, readonly: false },
         ],
     });
 
@@ -282,7 +282,7 @@ fn test_callable_with_properties() {
         }],
         construct_signatures: vec![],
         properties: vec![
-            PropertyInfo { name: Arc::from("length"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+            PropertyInfo { name: interner.intern_string("length"), type_id: TypeId::NUMBER, optional: false, readonly: false },
         ],
     });
 
@@ -312,7 +312,7 @@ fn test_callable_missing_property() {
         }],
         construct_signatures: vec![],
         properties: vec![
-            PropertyInfo { name: Arc::from("length"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+            PropertyInfo { name: interner.intern_string("length"), type_id: TypeId::NUMBER, optional: false, readonly: false },
         ],
     });
 

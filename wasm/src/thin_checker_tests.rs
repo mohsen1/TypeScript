@@ -953,8 +953,8 @@ fn test_contextual_typing_for_function_parameters() {
     let func_shape = FunctionShape {
         type_params: vec![],
         params: vec![
-            ParamInfo { name: Some(Arc::from("x")), type_id: TypeId::STRING, optional: false, rest: false },
-            ParamInfo { name: Some(Arc::from("y")), type_id: TypeId::NUMBER, optional: false, rest: false },
+            ParamInfo { name: Some(types.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
+            ParamInfo { name: Some(types.intern_string("y")), type_id: TypeId::NUMBER, optional: false, rest: false },
         ],
         return_type: TypeId::BOOLEAN,
         is_constructor: false,
@@ -986,8 +986,8 @@ fn test_contextual_typing_for_object_properties() {
     use std::sync::Arc;
 
     let obj_type = types.object(vec![
-        PropertyInfo { name: Arc::from("name"), type_id: TypeId::STRING, optional: false, readonly: false },
-        PropertyInfo { name: Arc::from("age"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: types.intern_string("name"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: types.intern_string("age"), type_id: TypeId::NUMBER, optional: false, readonly: false },
     ]);
 
     // Create contextual context
@@ -1009,7 +1009,7 @@ fn test_strict_null_checks_property_access() {
 
     // Create object type: { x: number }
     let obj_type = types.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: types.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
     ]);
 
     // Create union type: { x: number } | null
@@ -1040,7 +1040,7 @@ fn test_strict_null_checks_undefined_type() {
 
     // Create object type: { y: string }
     let obj_type = types.object(vec![
-        PropertyInfo { name: Arc::from("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: types.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false },
     ]);
 
     // Create union type: { y: string } | undefined
@@ -1069,7 +1069,7 @@ fn test_strict_null_checks_both_null_and_undefined() {
 
     // Create object type: { z: boolean }
     let obj_type = types.object(vec![
-        PropertyInfo { name: Arc::from("z"), type_id: TypeId::BOOLEAN, optional: false, readonly: false },
+        PropertyInfo { name: types.intern_string("z"), type_id: TypeId::BOOLEAN, optional: false, readonly: false },
     ]);
 
     // Create union type: { z: boolean } | null | undefined
@@ -1106,7 +1106,7 @@ fn test_strict_null_checks_non_nullable_success() {
 
     // Create object type: { x: number }
     let obj_type = types.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: types.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
     ]);
 
     let evaluator = PropertyAccessEvaluator::new(&types);

@@ -194,7 +194,7 @@ fn test_call_generic_function_identity() {
 
     // Create type parameter T
     let t_param = TypeParamInfo {
-        name: Arc::from("T"),
+        name: interner.intern_string("T"),
         constraint: None,
         default: None,
     };
@@ -231,7 +231,7 @@ fn test_call_generic_function_with_string() {
 
     // Create type parameter T
     let t_param = TypeParamInfo {
-        name: Arc::from("T"),
+        name: interner.intern_string("T"),
         constraint: None,
         default: None,
     };
@@ -268,7 +268,7 @@ fn test_call_generic_array_function() {
 
     // Create type parameter T
     let t_param = TypeParamInfo {
-        name: Arc::from("T"),
+        name: interner.intern_string("T"),
         constraint: None,
         default: None,
     };

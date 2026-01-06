@@ -161,18 +161,22 @@ impl<'a> CallEvaluator<'a> {
 
         // 1. Create inference variables and placeholders for each type parameter
         for tp in &func.type_params {
-            let var = infer_ctx.fresh_type_param(tp.name.clone());
+            // Resolve Atom to String for inference context (still uses Arc<str>)
+            let tp_name_str = self.interner.resolve_atom(tp.name);
+            let var = infer_ctx.fresh_type_param(std::sync::Arc::from(tp_name_str.as_str()));
 
             // Create a unique placeholder type for this inference variable
             // We use a TypeParameter with a special name to track it during constraint collection
+            let placeholder_name = format!("__infer_{}", var.0);
             let placeholder_key = TypeKey::TypeParameter(TypeParamInfo {
-                name: Arc::from(format!("__infer_{}", var.0)),
+                name: self.interner.intern_string(&placeholder_name),
                 constraint: tp.constraint,
                 default: None,
             });
             let placeholder_id = self.interner.intern(placeholder_key);
 
-            substitution.insert(tp.name.clone(), placeholder_id);
+            // TypeSubstitution still uses Arc<str>, so resolve the atom
+            substitution.insert(std::sync::Arc::from(self.interner.resolve_atom(tp.name).as_str()), placeholder_id);
             var_map.insert(placeholder_id, var);
         }
 
@@ -396,7 +400,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
             TypeKey::Object(ref props) => {
                 // Search for the property
                 for prop in props {
-                    if prop.name.as_ref() == prop_name {
+                    if self.interner.resolve_atom(prop.name) == prop_name {
                         return PropertyAccessResult::Success {
                             type_id: prop.type_id,
                             from_index_signature: false,
@@ -412,7 +416,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
             TypeKey::ObjectWithIndex(ref shape) => {
                 // Check named properties first (explicit properties take precedence)
                 for prop in &shape.properties {
-                    if prop.name.as_ref() == prop_name {
+                    if self.interner.resolve_atom(prop.name) == prop_name {
                         return PropertyAccessResult::Success {
                             type_id: prop.type_id,
                             from_index_signature: false,

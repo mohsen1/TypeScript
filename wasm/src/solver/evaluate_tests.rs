@@ -88,7 +88,7 @@ fn test_conditional_deferred_type_parameter() {
     // T extends string ? number : boolean
     // Should remain deferred when T is an unsubstituted type parameter
     let type_param_t = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
-        name: Arc::from("T"),
+        name: interner.intern_string("T"),
         constraint: None,
         default: None,
     }));
@@ -113,8 +113,8 @@ fn test_index_access_object_literal() {
 
     // { x: number, y: string }["x"] -> number
     let obj = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: Arc::from("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false },
     ]);
     let key_x = interner.literal_string("x");
 
@@ -128,8 +128,8 @@ fn test_index_access_object_string_key() {
 
     // { x: number, y: string }["y"] -> string
     let obj = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: Arc::from("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false },
     ]);
     let key_y = interner.literal_string("y");
 
@@ -143,7 +143,7 @@ fn test_index_access_object_missing_key() {
 
     // { x: number }["z"] -> undefined
     let obj = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
     ]);
     let key_z = interner.literal_string("z");
 
@@ -157,8 +157,8 @@ fn test_index_access_object_union_key() {
 
     // { x: number, y: string }["x" | "y"] -> number | string
     let obj = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: Arc::from("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false },
     ]);
     let key_x = interner.literal_string("x");
     let key_y = interner.literal_string("y");
@@ -268,7 +268,7 @@ fn test_evaluate_type_non_meta() {
     assert_eq!(evaluate_type(&interner, TypeId::NUMBER), TypeId::NUMBER);
 
     let obj = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
     ]);
     assert_eq!(evaluate_type(&interner, obj), obj);
 }
@@ -283,8 +283,8 @@ fn test_keyof_object() {
 
     // keyof { x: number, y: string } = "x" | "y"
     let obj = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: Arc::from("y"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false },
     ]);
 
     let result = evaluate_keyof(&interner, obj);
@@ -371,7 +371,7 @@ fn test_mapped_type_basic() {
 
     let mapped = MappedType {
         type_param: TypeParamInfo {
-            name: Arc::from("K"),
+            name: interner.intern_string("K"),
             constraint: None,
             default: None,
         },
@@ -385,8 +385,8 @@ fn test_mapped_type_basic() {
 
     // Result should be { x: number, y: number }
     let expected = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: Arc::from("y"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::NUMBER, optional: false, readonly: false },
     ]);
     assert_eq!(result, expected);
 }
@@ -401,7 +401,7 @@ fn test_mapped_type_single_key() {
 
     let mapped = MappedType {
         type_param: TypeParamInfo {
-            name: Arc::from("K"),
+            name: interner.intern_string("K"),
             constraint: None,
             default: None,
         },
@@ -414,7 +414,7 @@ fn test_mapped_type_single_key() {
     let result = evaluate_mapped(&interner, &mapped);
 
     let expected = interner.object(vec![
-        PropertyInfo { name: Arc::from("foo"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("foo"), type_id: TypeId::STRING, optional: false, readonly: false },
     ]);
     assert_eq!(result, expected);
 }
@@ -431,7 +431,7 @@ fn test_mapped_type_with_optional_modifier() {
 
     let mapped = MappedType {
         type_param: TypeParamInfo {
-            name: Arc::from("K"),
+            name: interner.intern_string("K"),
             constraint: None,
             default: None,
         },
@@ -445,8 +445,8 @@ fn test_mapped_type_with_optional_modifier() {
 
     // Result should be { x?: number, y?: number }
     let expected = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: true, readonly: false },
-        PropertyInfo { name: Arc::from("y"), type_id: TypeId::NUMBER, optional: true, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: true, readonly: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::NUMBER, optional: true, readonly: false },
     ]);
     assert_eq!(result, expected);
 }
@@ -461,7 +461,7 @@ fn test_mapped_type_with_readonly_modifier() {
 
     let mapped = MappedType {
         type_param: TypeParamInfo {
-            name: Arc::from("K"),
+            name: interner.intern_string("K"),
             constraint: None,
             default: None,
         },
@@ -474,7 +474,7 @@ fn test_mapped_type_with_readonly_modifier() {
     let result = evaluate_mapped(&interner, &mapped);
 
     let expected = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: TypeId::NUMBER, optional: false, readonly: true },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: true },
     ]);
     assert_eq!(result, expected);
 }
@@ -491,14 +491,14 @@ fn test_mapped_type_with_template_substitution() {
 
     // Template is the type parameter K itself
     let type_param_k = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
-        name: Arc::from("K"),
+        name: interner.intern_string("K"),
         constraint: None,
         default: None,
     }));
 
     let mapped = MappedType {
         type_param: TypeParamInfo {
-            name: Arc::from("K"),
+            name: interner.intern_string("K"),
             constraint: None,
             default: None,
         },
@@ -512,8 +512,8 @@ fn test_mapped_type_with_template_substitution() {
 
     // Result should be { x: "x", y: "y" }
     let expected = interner.object(vec![
-        PropertyInfo { name: Arc::from("x"), type_id: key_x, optional: false, readonly: false },
-        PropertyInfo { name: Arc::from("y"), type_id: key_y, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: key_x, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: key_y, optional: false, readonly: false },
     ]);
     assert_eq!(result, expected);
 }
@@ -525,14 +525,14 @@ fn test_mapped_type_deferred() {
     // { [K in T]: number } where T is a type parameter
     // Should remain as mapped type (deferred)
     let type_param_t = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
-        name: Arc::from("T"),
+        name: interner.intern_string("T"),
         constraint: None,
         default: None,
     }));
 
     let mapped = MappedType {
         type_param: TypeParamInfo {
-            name: Arc::from("K"),
+            name: interner.intern_string("K"),
             constraint: None,
             default: None,
         },
