@@ -314,6 +314,13 @@ impl<'a> TypeLowering<'a> {
             }
 
             // =========================================================================
+            // Qualified name (A.B)
+            // =========================================================================
+            k if k == syntax_kind_ext::QUALIFIED_NAME => {
+                self.lower_qualified_name_type(node_idx)
+            }
+
+            // =========================================================================
             // Identifier (simple type reference without type arguments)
             // =========================================================================
             k if k == SyntaxKind::Identifier as u16 => {
@@ -1132,6 +1139,14 @@ impl<'a> TypeLowering<'a> {
         } else {
             TypeId::ERROR
         }
+    }
+
+    /// Lower a qualified name type (A.B).
+    fn lower_qualified_name_type(&self, node_idx: NodeIndex) -> TypeId {
+        if let Some(symbol_id) = self.resolve_symbol(node_idx) {
+            return self.interner.reference(SymbolRef(symbol_id));
+        }
+        TypeId::ERROR
     }
 
     /// Lower an identifier as a type (simple type reference)

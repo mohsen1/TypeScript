@@ -333,14 +333,8 @@ impl ThinBinderState {
             if let Some(node) = arena.get(func_idx) {
                 if let Some(func) = arena.get_function(node) {
                     if let Some(name) = self.get_identifier_name(arena, func.name) {
-                        let sym_id = self.symbols.alloc(symbol_flags::FUNCTION, name.to_string());
-                        // Set the value_declaration to this function declaration node
-                        if let Some(sym) = self.symbols.get_mut(sym_id) {
-                            sym.value_declaration = func_idx;
-                            sym.declarations.push(func_idx);
-                        }
-                        self.current_scope.set(name.to_string(), sym_id);
-                        self.node_symbols.insert(func_idx.0, sym_id);
+                        let is_exported = self.has_export_modifier(arena, &func.modifiers);
+                        let sym_id = self.declare_symbol(name, symbol_flags::FUNCTION, func_idx, is_exported);
 
                         // Also add to persistent scope
                         self.declare_in_persistent_scope(name.to_string(), sym_id);
@@ -708,6 +702,79 @@ impl ThinBinderState {
         false
     }
 
+    /// Declare a symbol in the current scope, merging when allowed.
+    fn declare_symbol(&mut self, name: &str, flags: u32, declaration: NodeIndex, is_exported: bool) -> SymbolId {
+        if let Some(existing_id) = self.current_scope.get(name) {
+            let existing_flags = self.symbols.get(existing_id).map(|s| s.flags).unwrap_or(0);
+            let can_merge = Self::can_merge_flags(existing_flags, flags);
+
+            if let Some(sym) = self.symbols.get_mut(existing_id) {
+                if can_merge {
+                    sym.flags |= flags;
+                    if sym.value_declaration.is_none() && (flags & symbol_flags::VALUE) != 0 {
+                        sym.value_declaration = declaration;
+                    }
+                }
+
+                if !sym.declarations.contains(&declaration) {
+                    sym.declarations.push(declaration);
+                }
+                if is_exported {
+                    sym.is_exported = true;
+                }
+            }
+
+            self.node_symbols.insert(declaration.0, existing_id);
+            return existing_id;
+        }
+
+        let sym_id = self.symbols.alloc(flags, name.to_string());
+        if let Some(sym) = self.symbols.get_mut(sym_id) {
+            sym.declarations.push(declaration);
+            if sym.value_declaration.is_none() && (flags & symbol_flags::VALUE) != 0 {
+                sym.value_declaration = declaration;
+            }
+            sym.is_exported = is_exported;
+        }
+        self.current_scope.set(name.to_string(), sym_id);
+        self.node_symbols.insert(declaration.0, sym_id);
+        sym_id
+    }
+
+    /// Check if two symbol flag sets can be merged.
+    fn can_merge_flags(existing_flags: u32, new_flags: u32) -> bool {
+        if (existing_flags & symbol_flags::INTERFACE) != 0
+            && (new_flags & symbol_flags::INTERFACE) != 0
+        {
+            return true;
+        }
+
+        if (existing_flags & symbol_flags::MODULE) != 0
+            && (new_flags & symbol_flags::MODULE) != 0
+        {
+            return true;
+        }
+
+        if (existing_flags & symbol_flags::MODULE) != 0 {
+            if (new_flags & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::ENUM)) != 0 {
+                return true;
+            }
+        }
+        if (new_flags & symbol_flags::MODULE) != 0 {
+            if (existing_flags & (symbol_flags::CLASS | symbol_flags::FUNCTION | symbol_flags::ENUM)) != 0 {
+                return true;
+            }
+        }
+
+        if (existing_flags & symbol_flags::FUNCTION) != 0
+            && (new_flags & symbol_flags::FUNCTION) != 0
+        {
+            return true;
+        }
+
+        false
+    }
+
     // Scope management
 
     fn enter_scope(&mut self, kind: ContainerKind, node: NodeIndex) {
@@ -741,7 +808,13 @@ impl ThinBinderState {
 
                         // Persist filtered exports
                         if let Some(symbol) = self.symbols.get_mut(*sym_id) {
-                            symbol.exports = Some(Box::new(exports));
+                            if let Some(ref mut existing) = symbol.exports {
+                                for (name, &child_id) in exports.iter() {
+                                    existing.set(name.clone(), child_id);
+                                }
+                            } else {
+                                symbol.exports = Some(Box::new(exports));
+                            }
                         }
                     }
                 }
@@ -806,15 +879,7 @@ impl ThinBinderState {
                 // Check if exported BEFORE allocating symbol
                 let is_exported = self.is_node_exported(arena, idx);
 
-                let sym_id = self.symbols.alloc(flags, name.to_string());
-                // Set the value_declaration to this variable declaration node
-                if let Some(sym) = self.symbols.get_mut(sym_id) {
-                    sym.value_declaration = idx;
-                    sym.declarations.push(idx);
-                    sym.is_exported = is_exported;
-                }
-                self.current_scope.set(name.to_string(), sym_id);
-                self.node_symbols.insert(idx.0, sym_id);
+                self.declare_symbol(name, flags, idx, is_exported);
             }
         }
     }
@@ -823,21 +888,8 @@ impl ThinBinderState {
         if let Some(func) = arena.get_function(node) {
             // Function declaration creates a symbol in the current scope
             if let Some(name) = self.get_identifier_name(arena, func.name) {
-                // Check if already bound (hoisted)
-                if !self.current_scope.has(name) {
-                    // Check if exported BEFORE allocating symbol
-                    let is_exported = self.has_export_modifier(arena, &func.modifiers);
-
-                    let sym_id = self.symbols.alloc(symbol_flags::FUNCTION, name.to_string());
-                    // Set the value_declaration to this function declaration node
-                    if let Some(sym) = self.symbols.get_mut(sym_id) {
-                        sym.value_declaration = idx;
-                        sym.declarations.push(idx);
-                        sym.is_exported = is_exported;
-                    }
-                    self.current_scope.set(name.to_string(), sym_id);
-                    self.node_symbols.insert(idx.0, sym_id);
-                }
+                let is_exported = self.has_export_modifier(arena, &func.modifiers);
+                self.declare_symbol(name, symbol_flags::FUNCTION, idx, is_exported);
             }
 
             // Enter function scope and bind body
@@ -917,17 +969,7 @@ impl ThinBinderState {
                 // Check if exported BEFORE allocating symbol
                 let is_exported = self.has_export_modifier(arena, &class.modifiers);
 
-                let sym_id = self.symbols.alloc(flags, name.to_string());
-
-                // Add declaration info to the symbol
-                if let Some(sym) = self.symbols.get_mut(sym_id) {
-                    sym.declarations.push(idx);
-                    sym.value_declaration = idx;
-                    sym.is_exported = is_exported;
-                }
-
-                self.current_scope.set(name.to_string(), sym_id);
-                self.node_symbols.insert(idx.0, sym_id);
+                self.declare_symbol(name, flags, idx, is_exported);
             }
 
             // Enter class scope for members
@@ -992,17 +1034,7 @@ impl ThinBinderState {
                 // Check if exported BEFORE allocating symbol
                 let is_exported = self.has_export_modifier(arena, &iface.modifiers);
 
-                let sym_id = self.symbols.alloc(symbol_flags::INTERFACE, name.to_string());
-
-                // Add declaration info to the symbol
-                if let Some(sym) = self.symbols.get_mut(sym_id) {
-                    sym.declarations.push(idx);
-                    sym.value_declaration = idx;
-                    sym.is_exported = is_exported;
-                }
-
-                self.current_scope.set(name.to_string(), sym_id);
-                self.node_symbols.insert(idx.0, sym_id);
+                self.declare_symbol(name, symbol_flags::INTERFACE, idx, is_exported);
             }
         }
     }
@@ -1013,15 +1045,7 @@ impl ThinBinderState {
                 // Check if exported BEFORE allocating symbol
                 let is_exported = self.has_export_modifier(arena, &alias.modifiers);
 
-                let sym_id = self.symbols.alloc(symbol_flags::TYPE_ALIAS, name.to_string());
-                // Set the value_declaration to this type alias declaration node
-                if let Some(sym) = self.symbols.get_mut(sym_id) {
-                    sym.value_declaration = idx;
-                    sym.declarations.push(idx);
-                    sym.is_exported = is_exported;
-                }
-                self.current_scope.set(name.to_string(), sym_id);
-                self.node_symbols.insert(idx.0, sym_id);
+                self.declare_symbol(name, symbol_flags::TYPE_ALIAS, idx, is_exported);
             }
         }
     }
@@ -1032,17 +1056,7 @@ impl ThinBinderState {
                 // Check if exported BEFORE allocating symbol
                 let is_exported = self.has_export_modifier(arena, &enum_decl.modifiers);
 
-                let sym_id = self.symbols.alloc(symbol_flags::REGULAR_ENUM, name.to_string());
-
-                // Add declaration info to the symbol
-                if let Some(sym) = self.symbols.get_mut(sym_id) {
-                    sym.declarations.push(idx);
-                    sym.value_declaration = idx;
-                    sym.is_exported = is_exported;
-                }
-
-                self.current_scope.set(name.to_string(), sym_id);
-                self.node_symbols.insert(idx.0, sym_id);
+                self.declare_symbol(name, symbol_flags::REGULAR_ENUM, idx, is_exported);
             }
 
             // Bind enum members
@@ -1286,15 +1300,9 @@ impl ThinBinderState {
     fn bind_module_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
         if let Some(module) = arena.get_module(node) {
             if let Some(name) = self.get_identifier_name(arena, module.name) {
-                // Check if exported BEFORE allocating symbol
                 let is_exported = self.has_export_modifier(arena, &module.modifiers);
-
-                let sym_id = self.symbols.alloc(symbol_flags::VALUE_MODULE, name.to_string());
-                if let Some(sym) = self.symbols.get_mut(sym_id) {
-                    sym.is_exported = is_exported;
-                }
-                self.current_scope.set(name.to_string(), sym_id);
-                self.node_symbols.insert(idx.0, sym_id);
+                let flags = symbol_flags::VALUE_MODULE | symbol_flags::NAMESPACE_MODULE;
+                self.declare_symbol(name, flags, idx, is_exported);
             }
 
             // Enter module scope

@@ -1586,6 +1586,62 @@ type Alias = Outer.Inner;
 }
 
 #[test]
+fn test_checker_module_augmentation_merges_exports() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+namespace Outer {
+    export interface A { x: number; }
+}
+namespace Outer {
+    export interface B { y: string; }
+}
+type AliasA = Outer.A;
+type AliasB = Outer.B;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let alias_a_sym = binder.file_locals.get("AliasA").expect("AliasA should exist");
+    let alias_b_sym = binder.file_locals.get("AliasB").expect("AliasB should exist");
+
+    let alias_a_type = checker.get_type_of_symbol(alias_a_sym);
+    let alias_b_type = checker.get_type_of_symbol(alias_b_sym);
+
+    let alias_a_key = types.lookup(alias_a_type).expect("AliasA type should exist");
+    match alias_a_key {
+        TypeKey::Object(props) => {
+            let prop = props.iter()
+                .find(|prop| types.resolve_atom(prop.name) == "x")
+                .expect("Expected property x");
+            assert_eq!(prop.type_id, TypeId::NUMBER);
+        }
+        _ => panic!("Expected AliasA to resolve to Object type, got {:?}", alias_a_key),
+    }
+
+    let alias_b_key = types.lookup(alias_b_type).expect("AliasB type should exist");
+    match alias_b_key {
+        TypeKey::Object(props) => {
+            let prop = props.iter()
+                .find(|prop| types.resolve_atom(prop.name) == "y")
+                .expect("Expected property y");
+            assert_eq!(prop.type_id, TypeId::STRING);
+        }
+        _ => panic!("Expected AliasB to resolve to Object type, got {:?}", alias_b_key),
+    }
+}
+
+#[test]
 fn test_checker_circular_type_aliases() {
     use crate::thin_parser::ThinParserState;
 
