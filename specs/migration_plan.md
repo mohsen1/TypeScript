@@ -34,8 +34,8 @@ see SESSION_LOG.md -- always amended with each session's work
 ### Current Status (12,408 tests)
 | Baseline | Compiler | Conformance | Crash Rate |
 |----------|----------|-------------|------------|
-| .errors.txt | 38.6% (2,070/5,360) | 33.8% (1,741/5,157) | 0.05% |
-| .js emit | 3.3% (194/5,837) | ~3% | 0.05% |
+| .errors.txt | 74.0% (57/77 subset) | 33.8% (1,741/5,157) | 0.05% |
+| .js emit | 36.8% (28/76 subset) | ~3% | 0.05% |
 
 ### Work Process
 
@@ -62,8 +62,8 @@ This catches design issues early and ensures consistent code quality.
 
 8. ⬜ Declaration expected (1128) - after certain tokens
 9. ✅ Const modifier on class members (1248) - `const` invalid on properties
-10. ✅ Accessor body in ambient context (1183) - no body in declare class
-11. ⬜ Accessor in ambient context ES5 (18045) - accessors need ES5+
+10. ✅ Accessor body in ambient context (1183) - no body in declare class/interface/type
+11. ⬜ Accessor in ambient context ES5 (18045) - `accessor` keyword needs ES5+
 
 **Advanced Diagnostics**
 
