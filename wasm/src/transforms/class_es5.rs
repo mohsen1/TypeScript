@@ -30,6 +30,11 @@ use crate::scanner::SyntaxKind;
 use crate::transforms::arrow_es5::contains_this_reference;
 use crate::transforms::private_fields_es5::{PrivateFieldInfo, collect_private_fields, is_private_identifier};
 
+struct ParamDestructure {
+    temp_name: String,
+    pattern: NodeIndex,
+}
+
 /// ES5 class emitter - emits ES5 IIFE pattern for classes
 pub struct ClassES5Emitter<'a> {
     arena: &'a ThinNodeArena,
@@ -231,7 +236,7 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write("function ");
                 self.write(class_name);
                 self.write("(");
-                self.emit_parameters(&ctor_data.parameters);
+                let param_destructures = self.emit_parameters(&ctor_data.parameters);
                 self.write(") {");
                 self.write_line();
                 self.increase_indent();
@@ -241,7 +246,12 @@ impl<'a> ClassES5Emitter<'a> {
                 // 2. Use _this instead of this for property assignments
                 // 3. Add return _this; at the end
                 if has_extends {
-                    self.emit_derived_constructor_body(ctor_data.body, &ctor_data.parameters, &instance_props);
+                    self.emit_derived_constructor_body(
+                        ctor_data.body,
+                        &ctor_data.parameters,
+                        &instance_props,
+                        &param_destructures,
+                    );
                 } else {
                     // Non-derived class: check if we need _this capture for arrow functions
                     let needs_capture = self.needs_this_capture(&instance_props);
@@ -251,6 +261,8 @@ impl<'a> ClassES5Emitter<'a> {
                         self.write_line();
                         // Note: use_this_capture is set per-arrow-function, not globally
                     }
+
+                    self.emit_param_destructuring_prologue(&param_destructures);
 
                     // Emit private field initializations FIRST
                     self.emit_private_field_initializations(false);
@@ -563,6 +575,7 @@ impl<'a> ClassES5Emitter<'a> {
         body_idx: NodeIndex,
         params: &NodeList,
         instance_props: &[NodeIndex],
+        param_destructures: &[ParamDestructure],
     ) {
         let Some(body_node) = self.arena.get(body_idx) else { return };
         let Some(block) = self.arena.get_block(body_node) else { return };
@@ -576,6 +589,8 @@ impl<'a> ClassES5Emitter<'a> {
                 break;
             }
         }
+
+        self.emit_param_destructuring_prologue(param_destructures);
 
         // Emit parameter properties using _this
         for &param_idx in &params.nodes {
@@ -800,7 +815,7 @@ impl<'a> ClassES5Emitter<'a> {
                     self.write(&method_name);
                 }
                 self.write(" = function (");
-                self.emit_parameters(&method_data.parameters);
+                let param_destructures = self.emit_parameters(&method_data.parameters);
                 self.write(") ");
 
                 // Check if body is empty - only empty bodies go on single line
@@ -815,12 +830,13 @@ impl<'a> ClassES5Emitter<'a> {
                     false
                 };
 
-                if is_empty_body {
+                if is_empty_body && param_destructures.is_empty() {
                     self.write("{ }");
                 } else {
                     self.write("{");
                     self.write_line();
                     self.increase_indent();
+                    self.emit_param_destructuring_prologue(&param_destructures);
                     self.emit_block_contents(method_data.body);
                     self.decrease_indent();
                     self.write_indent();
@@ -913,18 +929,19 @@ impl<'a> ClassES5Emitter<'a> {
         };
 
         self.write_indent();
+        let mut param_destructures = Vec::new();
         if is_getter {
             self.write("get: function () ");
         } else {
             self.write("set: function (");
-            self.emit_parameters(&accessor_data.parameters);
+            param_destructures = self.emit_parameters(&accessor_data.parameters);
             self.write(") ");
         }
 
-        if body_is_empty {
+        if body_is_empty && param_destructures.is_empty() {
             // Inline empty body: { },
             self.write("{ },");
-        } else if body_is_single_line {
+        } else if body_is_single_line && param_destructures.is_empty() {
             // Single-line body: { return 1; },
             self.write("{ ");
             self.emit_block_contents_inline(accessor_data.body);
@@ -934,6 +951,7 @@ impl<'a> ClassES5Emitter<'a> {
             self.write("{");
             self.write_line();
             self.increase_indent();
+            self.emit_param_destructuring_prologue(&param_destructures);
             self.emit_block_contents(accessor_data.body);
             self.decrease_indent();
             self.write_indent();
@@ -1064,11 +1082,12 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write(".");
                 self.write(&method_name);
                 self.write(" = function (");
-                self.emit_parameters(&method_data.parameters);
+                let param_destructures = self.emit_parameters(&method_data.parameters);
                 self.write(") {");
                 self.write_line();
                 self.increase_indent();
 
+                self.emit_param_destructuring_prologue(&param_destructures);
                 self.emit_block_contents(method_data.body);
 
                 self.decrease_indent();
@@ -1106,23 +1125,146 @@ impl<'a> ClassES5Emitter<'a> {
         }
     }
     
-    fn emit_parameters(&mut self, params: &NodeList) {
+    fn emit_parameters(&mut self, params: &NodeList) -> Vec<ParamDestructure> {
+        let mut destructures = Vec::new();
         let mut first = true;
         for &param_idx in &params.nodes {
             if !first {
                 self.write(", ");
             }
             first = false;
-            
+
             if let Some(param_node) = self.arena.get(param_idx) {
                 if let Some(param_data) = self.arena.get_parameter(param_node) {
                     if param_data.dot_dot_dot_token {
                         // Rest parameter - we'd need to transform this for ES5
                         // For now, just emit the name
                     }
-                    self.emit_binding_name(param_data.name);
+                    if self.is_binding_pattern(param_data.name) {
+                        let temp_name = self.get_temp_var_name();
+                        self.write(&temp_name);
+                        destructures.push(ParamDestructure {
+                            temp_name,
+                            pattern: param_data.name,
+                        });
+                    } else {
+                        self.emit_binding_name(param_data.name);
+                    }
                 }
             }
+        }
+        destructures
+    }
+
+    fn emit_param_destructuring_prologue(&mut self, destructures: &[ParamDestructure]) {
+        let mut started = false;
+        for destructure in destructures {
+            self.emit_param_binding_assignments(destructure.pattern, &destructure.temp_name, &mut started);
+        }
+
+        if started {
+            self.write(";");
+            self.write_line();
+        }
+    }
+
+    fn emit_param_binding_assignments(
+        &mut self,
+        pattern_idx: NodeIndex,
+        temp_name: &str,
+        started: &mut bool,
+    ) {
+        let Some(pattern_node) = self.arena.get(pattern_idx) else { return };
+
+        match pattern_node.kind {
+            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN => {
+                if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                    for &elem_idx in &pattern.elements.nodes {
+                        self.emit_param_object_binding_element(elem_idx, temp_name, started);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
+                if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                    for (i, &elem_idx) in pattern.elements.nodes.iter().enumerate() {
+                        self.emit_param_array_binding_element(elem_idx, temp_name, i, started);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn emit_param_object_binding_element(
+        &mut self,
+        elem_idx: NodeIndex,
+        temp_name: &str,
+        started: &mut bool,
+    ) {
+        let Some(elem_node) = self.arena.get(elem_idx) else { return };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+
+        if elem.dot_dot_dot_token {
+            return;
+        }
+
+        let prop_name = if !elem.property_name.is_none() {
+            self.get_identifier_text(elem.property_name)
+        } else {
+            self.get_identifier_text(elem.name)
+        };
+        let binding_name = self.get_identifier_text(elem.name);
+
+        if prop_name.is_empty() || binding_name.is_empty() {
+            return;
+        }
+
+        self.emit_param_assignment_prefix(started);
+        self.write(&binding_name);
+        self.write(" = ");
+        self.write(temp_name);
+        self.write(".");
+        self.write(&prop_name);
+    }
+
+    fn emit_param_array_binding_element(
+        &mut self,
+        elem_idx: NodeIndex,
+        temp_name: &str,
+        index: usize,
+        started: &mut bool,
+    ) {
+        if elem_idx.is_none() {
+            return;
+        }
+        let Some(elem_node) = self.arena.get(elem_idx) else { return };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+
+        if elem.dot_dot_dot_token {
+            return;
+        }
+
+        let binding_name = self.get_identifier_text(elem.name);
+        if binding_name.is_empty() {
+            return;
+        }
+
+        self.emit_param_assignment_prefix(started);
+        self.write(&binding_name);
+        self.write(" = ");
+        self.write(temp_name);
+        self.write("[");
+        self.write(&index.to_string());
+        self.write("]");
+    }
+
+    fn emit_param_assignment_prefix(&mut self, started: &mut bool) {
+        if !*started {
+            self.write_indent();
+            self.write("var ");
+            *started = true;
+        } else {
+            self.write(", ");
         }
     }
     
@@ -1189,12 +1331,10 @@ impl<'a> ClassES5Emitter<'a> {
                 self.emit_while_statement(stmt_idx);
             }
             k if k == syntax_kind_ext::THROW_STATEMENT => {
-                // TODO: Implement throw statement when API available
-                self.write("throw /* TODO */;");
+                self.emit_throw_statement(stmt_idx);
             }
             k if k == syntax_kind_ext::TRY_STATEMENT => {
-                // TODO: Implement try statement
-                self.write("try { /* TODO */ }");
+                self.emit_try_statement(stmt_idx);
             }
             _ => {
                 // Fallback: emit expression if possible
@@ -1459,6 +1599,21 @@ impl<'a> ClassES5Emitter<'a> {
             self.emit_statement(try_stmt.finally_block);
         }
     }
+
+    fn emit_throw_statement(&mut self, stmt_idx: NodeIndex) {
+        let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
+        let Some(throw_data) = self.arena.get_return_statement(stmt_node) else {
+            self.write("throw;");
+            return;
+        };
+
+        self.write("throw");
+        if !throw_data.expression.is_none() {
+            self.write(" ");
+            self.emit_expression(throw_data.expression);
+        }
+        self.write(";");
+    }
     
     fn emit_expression(&mut self, expr_idx: NodeIndex) {
         let Some(expr_node) = self.arena.get(expr_idx) else { return };
@@ -1584,8 +1739,11 @@ impl<'a> ClassES5Emitter<'a> {
                 }
             }
             k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
-                // TODO: Implement parenthesized expression
-                self.write("(/* TODO */)");
+                if let Some(paren) = self.arena.get_parenthesized(expr_node) {
+                    self.write("(");
+                    self.emit_expression(paren.expression);
+                    self.write(")");
+                }
             }
             k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
                 if let Some(cond) = self.arena.get_conditional_expr(expr_node) {
@@ -1634,18 +1792,38 @@ impl<'a> ClassES5Emitter<'a> {
                     }
 
                     self.write("function (");
-                    self.emit_parameters(&func.parameters);
+                    let param_destructures = self.emit_parameters(&func.parameters);
                     self.write(") ");
 
                     // Check if body is an expression or block
                     if let Some(body_node) = self.arena.get(func.body) {
                         if body_node.kind == syntax_kind_ext::BLOCK {
-                            self.emit_statement(func.body);
+                            if param_destructures.is_empty() {
+                                self.emit_statement(func.body);
+                            } else {
+                                self.write("{");
+                                self.write_line();
+                                self.increase_indent();
+                                self.emit_param_destructuring_prologue(&param_destructures);
+                                self.emit_block_contents(func.body);
+                                self.decrease_indent();
+                                self.write_indent();
+                                self.write("}");
+                            }
                         } else {
                             // Expression body - wrap in return
-                            self.write("{ return ");
+                            self.write("{");
+                            self.write_line();
+                            self.increase_indent();
+                            self.emit_param_destructuring_prologue(&param_destructures);
+                            self.write_indent();
+                            self.write("return ");
                             self.emit_expression(func.body);
-                            self.write("; }");
+                            self.write(";");
+                            self.write_line();
+                            self.decrease_indent();
+                            self.write_indent();
+                            self.write("}");
                         }
                     }
 
@@ -1662,7 +1840,7 @@ impl<'a> ClassES5Emitter<'a> {
                     }
                     // Space before ( for TypeScript compatibility
                     self.write(" (");
-                    self.emit_parameters(&func.parameters);
+                    let param_destructures = self.emit_parameters(&func.parameters);
                     self.write(") ");
                     
                     // Check if body is a single return statement - emit on one line
@@ -1676,7 +1854,7 @@ impl<'a> ClassES5Emitter<'a> {
                         false
                     };
                     
-                    if is_simple_body {
+                    if is_simple_body && param_destructures.is_empty() {
                         // Single-line: { return expr; }
                         if let Some(block_node) = body_node {
                             if let Some(block) = self.arena.get_block(block_node) {
@@ -1688,7 +1866,14 @@ impl<'a> ClassES5Emitter<'a> {
                             }
                         }
                     } else {
-                        self.emit_statement(func.body);
+                        self.write("{");
+                        self.write_line();
+                        self.increase_indent();
+                        self.emit_param_destructuring_prologue(&param_destructures);
+                        self.emit_block_contents(func.body);
+                        self.decrease_indent();
+                        self.write_indent();
+                        self.write("}");
                     }
                 }
             }

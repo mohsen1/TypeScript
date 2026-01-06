@@ -14,10 +14,11 @@
 //!
 //! Note: Salsa integration is planned but requires nightly Rust features.
 //! For now, we use manual query caching.
-
+mod db;
 mod types;
 mod intern;
 mod lower;
+mod compat;
 mod subtype;
 mod infer;
 mod instantiate;
@@ -27,9 +28,11 @@ mod narrowing;
 mod diagnostics;
 mod operations;
 
+pub use db::*;
 pub use types::*;
 pub use intern::*;
 pub use lower::*;
+pub use compat::*;
 pub use subtype::*;
 pub use infer::*;
 pub use instantiate::*;

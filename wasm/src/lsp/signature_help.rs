@@ -84,7 +84,7 @@ impl<'a> SignatureHelpProvider<'a> {
         position: Position,
         type_cache: &mut Option<crate::checker::TypeCache>,
     ) -> Option<SignatureHelp> {
-        let offset = self.line_map.position_to_offset(position);
+        let offset = self.line_map.position_to_offset(position, self.source_text)?;
 
         // 1. Find the deepest node at the cursor
         let leaf_node = find_node_at_offset(self.arena, offset);

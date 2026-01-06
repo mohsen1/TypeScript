@@ -1103,9 +1103,12 @@ impl<'a> ThinCheckerState<'a> {
         if flags & symbol_flags::FUNCTION_SCOPED_VARIABLE != 0 {
             if !value_decl.is_none() {
                 if let Some(node) = self.ctx.arena.get(value_decl) {
-                    if let Some(param) = self.ctx.arena.get_parameter(node) {
+                        if let Some(param) = self.ctx.arena.get_parameter(node) {
                         if !param.type_annotation.is_none() {
-                            let lowering = TypeLowering::new(self.ctx.arena, &self.ctx.types);
+                            let resolver = |node_idx: NodeIndex| {
+                                self.ctx.binder.resolve_identifier(self.ctx.arena, node_idx).map(|id| id.0)
+                            };
+                            let lowering = TypeLowering::with_resolver(self.ctx.arena, self.ctx.types, &resolver);
                             return lowering.lower_type(param.type_annotation);
                         }
                     }
@@ -1189,7 +1192,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         // Use BinaryOpEvaluator to resolve the operation
-        let evaluator = BinaryOpEvaluator::new(&self.ctx.types);
+        let evaluator = BinaryOpEvaluator::new(self.ctx.types);
         let result = evaluator.evaluate(left_type, right_type, op_str);
 
         match result {
@@ -1263,13 +1266,25 @@ impl<'a> ThinCheckerState<'a> {
             let arg_type = self.get_type_of_node(arg_idx);
             arg_types.push(arg_type);
 
+            if let Some(expected) = expected_type {
+                if expected != TypeId::ANY && expected != TypeId::UNKNOWN {
+                    if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
+                        if arg_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                            self.check_object_literal_excess_properties(arg_type, expected, arg_idx);
+                        }
+                    }
+                }
+            }
+
             // Restore previous context
             self.ctx.contextual_type = prev_context;
         }
 
         // Use CallEvaluator to resolve the call
-        let mut subtype = SubtypeChecker::new(&self.ctx.types);
-        let mut evaluator = CallEvaluator::new(&self.ctx.types, &mut subtype);
+        let mut subtype = SubtypeChecker::new(self.ctx.types);
+        subtype.strict_function_types = false;
+        subtype.allow_void_return = true;
+        let mut evaluator = CallEvaluator::new(self.ctx.types, &mut subtype);
         let result = evaluator.resolve_call(callee_type, &arg_types);
 
         match result {
@@ -1446,7 +1461,7 @@ impl<'a> ThinCheckerState<'a> {
             let property_name = &ident.escaped_text;
 
             // Use PropertyAccessEvaluator to resolve the property access
-            let evaluator = PropertyAccessEvaluator::new(&self.ctx.types);
+            let evaluator = PropertyAccessEvaluator::new(self.ctx.types);
             let result = evaluator.resolve_property_access(object_type, property_name);
 
             match result {
@@ -1860,7 +1875,7 @@ impl<'a> ThinCheckerState<'a> {
 
 
     // =========================================================================
-    // Type Relations (uses solver::SubtypeChecker)
+    // Type Relations (uses solver::CompatChecker for assignability)
     // =========================================================================
 
     /// Check if `source` type is assignable to `target` type.
@@ -1868,9 +1883,9 @@ impl<'a> ThinCheckerState<'a> {
     /// Uses the solver's SubtypeChecker with coinductive cycle detection.
     /// Note: Does not resolve Ref types (use `is_assignable_to_with_resolution` for that).
     pub fn is_assignable_to(&self, source: TypeId, target: TypeId) -> bool {
-        use crate::solver::SubtypeChecker;
-        let mut checker = SubtypeChecker::new(&self.ctx.types);
-        checker.is_assignable_to(source, target)
+        use crate::solver::CompatChecker;
+        let mut checker = CompatChecker::new(self.ctx.types);
+        checker.is_assignable(source, target)
     }
 
     /// Check if `source` type is assignable to `target` type, resolving Ref types.
@@ -1882,9 +1897,9 @@ impl<'a> ThinCheckerState<'a> {
         target: TypeId,
         env: &crate::solver::TypeEnvironment,
     ) -> bool {
-        use crate::solver::SubtypeChecker;
-        let mut checker = SubtypeChecker::with_resolver(&self.ctx.types, env);
-        checker.is_assignable_to(source, target)
+        use crate::solver::CompatChecker;
+        let mut checker = CompatChecker::with_resolver(self.ctx.types, env);
+        checker.is_assignable(source, target)
     }
 
     /// Check if `source` type is a subtype of `target` type.
@@ -1892,7 +1907,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Stricter than assignability. Uses coinductive semantics for recursive types.
     pub fn is_subtype_of(&self, source: TypeId, target: TypeId) -> bool {
         use crate::solver::SubtypeChecker;
-        let mut checker = SubtypeChecker::new(&self.ctx.types);
+        let mut checker = SubtypeChecker::new(self.ctx.types);
         checker.is_subtype_of(source, target)
     }
 
@@ -1906,7 +1921,7 @@ impl<'a> ThinCheckerState<'a> {
         env: &crate::solver::TypeEnvironment,
     ) -> bool {
         use crate::solver::SubtypeChecker;
-        let mut checker = SubtypeChecker::with_resolver(&self.ctx.types, env);
+        let mut checker = SubtypeChecker::with_resolver(self.ctx.types, env);
         checker.is_subtype_of(source, target)
     }
 
@@ -1919,10 +1934,10 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check if a type is assignable to a union of types.
     pub fn is_assignable_to_union(&self, source: TypeId, targets: &[TypeId]) -> bool {
-        use crate::solver::SubtypeChecker;
-        let mut checker = SubtypeChecker::new(&self.ctx.types);
+        use crate::solver::CompatChecker;
+        let mut checker = CompatChecker::new(self.ctx.types);
         for &target in targets {
-            if checker.is_assignable_to(source, target) {
+            if checker.is_assignable(source, target) {
                 return true;
             }
         }
@@ -1982,7 +1997,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Example: `typeof x === "string"` narrows `string | number` to `string`.
     pub fn narrow_by_typeof(&self, source: TypeId, typeof_result: &str) -> TypeId {
         use crate::solver::NarrowingContext;
-        let ctx = NarrowingContext::new(&self.ctx.types);
+        let ctx = NarrowingContext::new(self.ctx.types);
         ctx.narrow_by_typeof(source, typeof_result)
     }
 
@@ -1991,7 +2006,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Example: `typeof x !== "string"` narrows `string | number` to `number`.
     pub fn narrow_by_typeof_negation(&self, source: TypeId, typeof_result: &str) -> TypeId {
         use crate::solver::NarrowingContext;
-        let ctx = NarrowingContext::new(&self.ctx.types);
+        let ctx = NarrowingContext::new(self.ctx.types);
 
         // Get the target type for this typeof result
         let target = match typeof_result {
@@ -2014,7 +2029,7 @@ impl<'a> ThinCheckerState<'a> {
     /// to `{ type: "add" }`.
     pub fn narrow_by_discriminant(&self, union_type: TypeId, property_name: &str, literal_value: TypeId) -> TypeId {
         use crate::solver::NarrowingContext;
-        let ctx = NarrowingContext::new(&self.ctx.types);
+        let ctx = NarrowingContext::new(self.ctx.types);
         ctx.narrow_by_discriminant(union_type, property_name, literal_value)
     }
 
@@ -2023,7 +2038,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Example: `action.type !== "add"` narrows the union to exclude the "add" variant.
     pub fn narrow_by_excluding_discriminant(&self, union_type: TypeId, property_name: &str, excluded_value: TypeId) -> TypeId {
         use crate::solver::NarrowingContext;
-        let ctx = NarrowingContext::new(&self.ctx.types);
+        let ctx = NarrowingContext::new(self.ctx.types);
         ctx.narrow_by_excluding_discriminant(union_type, property_name, excluded_value)
     }
 
@@ -2032,21 +2047,21 @@ impl<'a> ThinCheckerState<'a> {
     /// Returns information about properties that uniquely identify each union variant.
     pub fn find_discriminants(&self, union_type: TypeId) -> Vec<crate::solver::DiscriminantInfo> {
         use crate::solver::NarrowingContext;
-        let ctx = NarrowingContext::new(&self.ctx.types);
+        let ctx = NarrowingContext::new(self.ctx.types);
         ctx.find_discriminants(union_type)
     }
 
     /// Narrow a type to include only members assignable to target.
     pub fn narrow_to_type(&self, source: TypeId, target: TypeId) -> TypeId {
         use crate::solver::NarrowingContext;
-        let ctx = NarrowingContext::new(&self.ctx.types);
+        let ctx = NarrowingContext::new(self.ctx.types);
         ctx.narrow_to_type(source, target)
     }
 
     /// Narrow a type to exclude members assignable to target.
     pub fn narrow_excluding_type(&self, source: TypeId, excluded: TypeId) -> TypeId {
         use crate::solver::NarrowingContext;
-        let ctx = NarrowingContext::new(&self.ctx.types);
+        let ctx = NarrowingContext::new(self.ctx.types);
         ctx.narrow_excluding_type(source, excluded)
     }
 
@@ -2080,7 +2095,10 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Use TypeLowering which handles all type nodes
-        let lowering = TypeLowering::new(self.ctx.arena, &self.ctx.types);
+        let resolver = |node_idx: NodeIndex| {
+            self.ctx.binder.resolve_identifier(self.ctx.arena, node_idx).map(|id| id.0)
+        };
+        let lowering = TypeLowering::with_resolver(self.ctx.arena, self.ctx.types, &resolver);
         lowering.lower_type(idx)
     }
 
@@ -2111,7 +2129,7 @@ impl<'a> ThinCheckerState<'a> {
     ) {
         if let Some(loc) = self.get_source_location(idx) {
             let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
-                &self.ctx.types,
+                self.ctx.types,
                 self.ctx.file_name.as_str(),
             );
             let diag = builder.type_not_assignable(source, target, loc.start, loc.length());
@@ -2141,7 +2159,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         // Use the solver's explain API to get the detailed reason
-        let mut checker = SubtypeChecker::new(&self.ctx.types);
+        let mut checker = SubtypeChecker::new(self.ctx.types);
         let reason = checker.explain_failure(source, target);
 
         match reason {
@@ -2155,7 +2173,7 @@ impl<'a> ThinCheckerState<'a> {
                     ));
 
                 // Render the pending diagnostic to a TypeDiagnostic
-                let mut formatter = TypeFormatter::new(&self.ctx.types);
+                let mut formatter = TypeFormatter::new(self.ctx.types);
                 let type_diag = formatter.render(&pending);
 
                 // Convert to checker diagnostic and add
@@ -2179,7 +2197,7 @@ impl<'a> ThinCheckerState<'a> {
     ) {
         if let Some(loc) = self.get_source_location(idx) {
             let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
-                &self.ctx.types,
+                self.ctx.types,
                 self.ctx.file_name.as_str(),
             );
             let diag = builder.property_missing(prop_name, source, target, loc.start, loc.length());
@@ -2196,7 +2214,7 @@ impl<'a> ThinCheckerState<'a> {
     ) {
         if let Some(loc) = self.get_source_location(idx) {
             let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
-                &self.ctx.types,
+                self.ctx.types,
                 self.ctx.file_name.as_str(),
             );
             let diag = builder.property_not_exist(prop_name, type_id, loc.start, loc.length());
@@ -2213,7 +2231,7 @@ impl<'a> ThinCheckerState<'a> {
     ) {
         if let Some(loc) = self.get_source_location(idx) {
             let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
-                &self.ctx.types,
+                self.ctx.types,
                 self.ctx.file_name.as_str(),
             );
             let diag = builder.argument_not_assignable(arg_type, param_type, loc.start, loc.length());
@@ -2225,7 +2243,7 @@ impl<'a> ThinCheckerState<'a> {
     pub fn error_cannot_find_name_at(&mut self, name: &str, idx: NodeIndex) {
         if let Some(loc) = self.get_source_location(idx) {
             let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
-                &self.ctx.types,
+                self.ctx.types,
                 self.ctx.file_name.as_str(),
             );
             let diag = builder.cannot_find_name(name, loc.start, loc.length());
@@ -2333,7 +2351,7 @@ impl<'a> ThinCheckerState<'a> {
     ) {
         if let Some(loc) = self.get_source_location(idx) {
             let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
-                &self.ctx.types,
+                self.ctx.types,
                 self.ctx.file_name.as_str(),
             );
             let diag = builder.argument_count_mismatch(expected, got, loc.start, loc.length());
@@ -2345,7 +2363,7 @@ impl<'a> ThinCheckerState<'a> {
     pub fn error_not_callable_at(&mut self, type_id: TypeId, idx: NodeIndex) {
         if let Some(loc) = self.get_source_location(idx) {
             let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
-                &self.ctx.types,
+                self.ctx.types,
                 self.ctx.file_name.as_str(),
             );
             let diag = builder.not_callable(type_id, loc.start, loc.length());
@@ -2357,7 +2375,7 @@ impl<'a> ThinCheckerState<'a> {
     pub fn error_excess_property_at(&mut self, prop_name: &str, target: TypeId, idx: NodeIndex) {
         if let Some(loc) = self.get_source_location(idx) {
             let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
-                &self.ctx.types,
+                self.ctx.types,
                 self.ctx.file_name.as_str(),
             );
             let diag = builder.excess_property(prop_name, target, loc.start, loc.length());
@@ -2369,7 +2387,7 @@ impl<'a> ThinCheckerState<'a> {
     pub fn error_readonly_property_at(&mut self, prop_name: &str, idx: NodeIndex) {
         if let Some(loc) = self.get_source_location(idx) {
             let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
-                &self.ctx.types,
+                self.ctx.types,
                 self.ctx.file_name.as_str(),
             );
             let diag = builder.readonly_property(prop_name, loc.start, loc.length());
@@ -2395,7 +2413,7 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Create a diagnostic collector for batch error reporting.
     pub fn create_diagnostic_collector(&self) -> crate::solver::DiagnosticCollector<'_> {
-        crate::solver::DiagnosticCollector::new(&self.ctx.types, self.ctx.file_name.as_str())
+        crate::solver::DiagnosticCollector::new(self.ctx.types, self.ctx.file_name.as_str())
     }
 
     /// Merge diagnostics from a collector into the checker's diagnostics.
@@ -2407,7 +2425,7 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Format a type as a human-readable string using solver's TypeFormatter.
     pub fn format_type(&self, type_id: TypeId) -> String {
-        let mut formatter = crate::solver::TypeFormatter::new(&self.ctx.types);
+        let mut formatter = crate::solver::TypeFormatter::new(self.ctx.types);
         formatter.format(type_id)
     }
 
@@ -3073,6 +3091,14 @@ impl<'a> ThinCheckerState<'a> {
                 stmt_idx
             };
             self.error_type_not_assignable_with_reason_at(return_type, expected_type, error_node);
+        }
+
+        if expected_type != TypeId::ANY && expected_type != TypeId::UNKNOWN && !return_data.expression.is_none() {
+            if let Some(expr_node) = self.ctx.arena.get(return_data.expression) {
+                if expr_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                    self.check_object_literal_excess_properties(return_type, expected_type, return_data.expression);
+                }
+            }
         }
     }
 
@@ -3779,8 +3805,7 @@ impl<'a> ThinCheckerState<'a> {
                 }
 
                 // Check if getter return type is assignable to setter param type
-                let mut subtype_checker = crate::solver::SubtypeChecker::new(&self.ctx.types);
-                if !subtype_checker.is_assignable_to(getter_type, setter_type) {
+                if !self.is_assignable_to(getter_type, setter_type) {
                     // Get type strings for error message
                     let getter_type_str = self.format_type(getter_type);
                     let setter_type_str = self.format_type(setter_type);
@@ -4077,8 +4102,7 @@ impl<'a> ThinCheckerState<'a> {
                 }
 
                 // Check type compatibility - derived type must be assignable to base type
-                let mut subtype_checker = crate::solver::SubtypeChecker::new(&self.ctx.types);
-                if !subtype_checker.is_assignable_to(member_type, base_type) {
+                if !self.is_assignable_to(member_type, base_type) {
                     // Format type strings for error message
                     let member_type_str = self.format_type(member_type);
                     let base_type_str = self.format_type(base_type);
@@ -4268,8 +4292,7 @@ impl<'a> ThinCheckerState<'a> {
                         }
 
                         // Check type compatibility - derived type must be assignable to base type
-                        let mut subtype_checker = crate::solver::SubtypeChecker::new(&self.ctx.types);
-                        if !subtype_checker.is_assignable_to(member_type, base_type) {
+                        if !self.is_assignable_to(member_type, base_type) {
                             // Report error 2430 on the interface name (not the member)
                             let member_type_str = self.format_type(member_type);
                             let base_type_str = self.format_type(base_type);

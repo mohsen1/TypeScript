@@ -12,9 +12,12 @@
 //! - Supports distributivity for naked type parameters in unions
 
 use crate::solver::types::*;
-use crate::solver::intern::TypeInterner;
+use crate::solver::TypeDatabase;
 use crate::solver::subtype::{SubtypeChecker, TypeResolver, NoopResolver};
 use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
+
+#[cfg(test)]
+use crate::solver::TypeInterner;
 
 /// Result of conditional type evaluation
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -28,13 +31,13 @@ pub enum ConditionalResult {
 
 /// Type evaluator for meta-types.
 pub struct TypeEvaluator<'a, R: TypeResolver = NoopResolver> {
-    interner: &'a TypeInterner,
+    interner: &'a dyn TypeDatabase,
     resolver: &'a R,
 }
 
 impl<'a> TypeEvaluator<'a, NoopResolver> {
     /// Create a new evaluator without a resolver.
-    pub fn new(interner: &'a TypeInterner) -> TypeEvaluator<'a, NoopResolver> {
+    pub fn new(interner: &'a dyn TypeDatabase) -> TypeEvaluator<'a, NoopResolver> {
         static NOOP: NoopResolver = NoopResolver;
         TypeEvaluator {
             interner,
@@ -45,7 +48,7 @@ impl<'a> TypeEvaluator<'a, NoopResolver> {
 
 impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     /// Create a new evaluator with a custom resolver.
-    pub fn with_resolver(interner: &'a TypeInterner, resolver: &'a R) -> Self {
+    pub fn with_resolver(interner: &'a dyn TypeDatabase, resolver: &'a R) -> Self {
         TypeEvaluator { interner, resolver }
     }
 
@@ -440,7 +443,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
 /// Convenience function for evaluating conditional types
 pub fn evaluate_conditional(
-    interner: &TypeInterner,
+    interner: &dyn TypeDatabase,
     cond: &ConditionalType,
 ) -> TypeId {
     let evaluator = TypeEvaluator::new(interner);
@@ -449,7 +452,7 @@ pub fn evaluate_conditional(
 
 /// Convenience function for evaluating index access types
 pub fn evaluate_index_access(
-    interner: &TypeInterner,
+    interner: &dyn TypeDatabase,
     object_type: TypeId,
     index_type: TypeId,
 ) -> TypeId {
@@ -458,19 +461,19 @@ pub fn evaluate_index_access(
 }
 
 /// Convenience function for full type evaluation
-pub fn evaluate_type(interner: &TypeInterner, type_id: TypeId) -> TypeId {
+pub fn evaluate_type(interner: &dyn TypeDatabase, type_id: TypeId) -> TypeId {
     let evaluator = TypeEvaluator::new(interner);
     evaluator.evaluate(type_id)
 }
 
 /// Convenience function for evaluating mapped types
-pub fn evaluate_mapped(interner: &TypeInterner, mapped: &MappedType) -> TypeId {
+pub fn evaluate_mapped(interner: &dyn TypeDatabase, mapped: &MappedType) -> TypeId {
     let evaluator = TypeEvaluator::new(interner);
     evaluator.evaluate_mapped(mapped)
 }
 
 /// Convenience function for evaluating keyof types
-pub fn evaluate_keyof(interner: &TypeInterner, operand: TypeId) -> TypeId {
+pub fn evaluate_keyof(interner: &dyn TypeDatabase, operand: TypeId) -> TypeId {
     let evaluator = TypeEvaluator::new(interner);
     evaluator.evaluate_keyof(operand)
 }

@@ -78,6 +78,50 @@ fn test_thin_emit_class_declaration() {
 }
 
 #[test]
+fn test_thin_emit_class_extends_es6() {
+    let source = "class Derived extends Base<T> {}";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es6(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("class Derived extends Base"),
+        "Expected 'class Derived extends Base' in ES6 output: {}",
+        output
+    );
+    assert!(
+        !output.contains("<T>"),
+        "ES6 output should erase type arguments: {}",
+        output
+    );
+}
+
+#[test]
+fn test_thin_emit_class_method_destructured_param_es5() {
+    let source = "class Foo { method({ x }) { return x; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_a)"),
+        "Expected temp parameter in ES5 output: {}",
+        output
+    );
+    assert!(
+        output.contains("var x = _a.x"),
+        "Expected destructuring assignment in ES5 output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_arrow_function() {
     let source = "let f = (x) => x * 2";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -477,6 +521,24 @@ fn test_commonjs_reexport() {
 }
 
 #[test]
+fn test_commonjs_export_star() {
+    let source = r#"export * from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(output.contains("__exportStar("), "Expected __exportStar call in CommonJS output: {}", output);
+}
+
+#[test]
 fn test_commonjs_export_const() {
     let source = "export const x = 42;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -492,6 +554,37 @@ fn test_commonjs_export_const() {
     let output = printer.get_output();
     assert!(output.contains("var x = 42;"), "Expected 'var x = 42;' in CommonJS output: {}", output);
     assert!(output.contains("exports.x = x;"), "Expected 'exports.x = x;' in CommonJS output: {}", output);
+}
+
+#[test]
+fn test_commonjs_export_const_destructuring() {
+    let source = "export const { a, b: c } = obj;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("exports.a = exports.c = void 0;"),
+        "Expected CommonJS exports init for destructured names: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.a = a;"),
+        "Expected 'exports.a = a;' in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.c = c;"),
+        "Expected 'exports.c = c;' in CommonJS output: {}",
+        output
+    );
 }
 
 #[test]

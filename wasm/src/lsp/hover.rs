@@ -64,7 +64,7 @@ impl<'a> HoverProvider<'a> {
         type_cache: &mut Option<crate::checker::TypeCache>,
     ) -> Option<HoverInfo> {
         // 1. Find node at position
-        let offset = self.line_map.position_to_offset(position);
+        let offset = self.line_map.position_to_offset(position, self.source_text)?;
         let node_idx = find_node_at_offset(self.arena, offset);
 
         if node_idx.is_none() {
@@ -136,8 +136,8 @@ impl<'a> HoverProvider<'a> {
 
         // Calculate range for the hovered identifier
         let node = self.arena.get(node_idx)?;
-        let start = self.line_map.offset_to_position(node.pos);
-        let end = self.line_map.offset_to_position(node.end);
+            let start = self.line_map.offset_to_position(node.pos, self.source_text);
+            let end = self.line_map.offset_to_position(node.end, self.source_text);
 
         Some(HoverInfo {
             contents,
