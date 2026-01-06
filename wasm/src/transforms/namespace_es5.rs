@@ -20,6 +20,20 @@
 //!     foo.Provide = Provide;
 //! })(foo || (foo = {}));
 //! ```
+//!
+//! Also handles qualified names like `namespace A.B.C`:
+//! ```javascript
+//! var A;
+//! (function (A) {
+//!     var B;
+//!     (function (B) {
+//!         var C;
+//!         (function (C) {
+//!             // body
+//!         })(C = B.C || (B.C = {}));
+//!     })(B = A.B || (A.B = {}));
+//! })(A || (A = {}));
+//! ```
 
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::{NodeIndex, NodeList};
@@ -32,6 +46,7 @@ pub struct NamespaceES5Emitter<'a> {
     arena: &'a ThinNodeArena,
     output: String,
     indent_level: u32,
+    is_commonjs: bool,
 }
 
 impl<'a> NamespaceES5Emitter<'a> {
@@ -40,61 +55,158 @@ impl<'a> NamespaceES5Emitter<'a> {
             arena,
             output: String::with_capacity(4096),
             indent_level: 0,
+            is_commonjs: false,
+        }
+    }
+
+    /// Create a namespace emitter with CommonJS mode
+    pub fn with_commonjs(arena: &'a ThinNodeArena, is_commonjs: bool) -> Self {
+        NamespaceES5Emitter {
+            arena,
+            output: String::with_capacity(4096),
+            indent_level: 0,
+            is_commonjs,
         }
     }
 
     /// Emit a namespace declaration
     pub fn emit_namespace(&mut self, ns_idx: NodeIndex) -> String {
         self.output.clear();
-        
+
         let Some(ns_node) = self.arena.get(ns_idx) else {
             return String::new();
         };
-        
+
         let Some(ns_data) = self.arena.get_module(ns_node) else {
             return String::new();
         };
-        
-        let ns_name = self.get_identifier_text(ns_data.name);
-        
-        // var foo;
+
+        // Skip ambient namespaces (declare namespace)
+        if self.has_declare_modifier(&ns_data.modifiers) {
+            return String::new();
+        }
+
+        // Flatten name parts for qualified names (A.B.C)
+        let name_parts = self.flatten_module_name(ns_data.name);
+        if name_parts.is_empty() {
+            return String::new();
+        }
+
+        let is_exported = self.has_export_modifier(&ns_data.modifiers);
+        let root_name = &name_parts[0];
+
+        // var A;
         self.write("var ");
-        self.write(&ns_name);
+        self.write(root_name);
         self.write(";");
         self.write_line();
-        
-        // (function (foo) { ... })(foo || (foo = {}));
-        self.emit_namespace_iife(&ns_name, ns_data.body, false);
-        
+
+        // Recursive IIFE generation for qualified names
+        self.emit_nested_iifes(&name_parts, 0, ns_data.body, is_exported);
+
         std::mem::take(&mut self.output)
     }
-    
-    /// Emit namespace IIFE
-    /// `is_nested` is true for nested namespaces like `foo.bar`
-    fn emit_namespace_iife(&mut self, ns_name: &str, body_idx: NodeIndex, is_nested: bool) {
+
+    /// Flatten a module name into parts (handles both identifiers and qualified names)
+    /// e.g., `A.B.C` becomes `["A", "B", "C"]`
+    fn flatten_module_name(&self, name_idx: NodeIndex) -> Vec<String> {
+        let mut parts = Vec::new();
+        self.collect_name_parts(name_idx, &mut parts);
+        parts
+    }
+
+    /// Recursively collect name parts from qualified names
+    fn collect_name_parts(&self, idx: NodeIndex, parts: &mut Vec<String>) {
+        let Some(node) = self.arena.get(idx) else { return };
+
+        if node.kind == syntax_kind_ext::QUALIFIED_NAME {
+            // QualifiedName has left and right - need to access via data pool
+            if let Some(qn_data) = self.arena.qualified_names.get(node.data_index as usize) {
+                self.collect_name_parts(qn_data.left, parts);
+                self.collect_name_parts(qn_data.right, parts);
+            }
+        } else if node.kind == SyntaxKind::Identifier as u16 {
+            if let Some(ident) = self.arena.get_identifier(node) {
+                parts.push(ident.escaped_text.clone());
+            }
+        }
+    }
+
+    /// Emit nested IIFEs for qualified namespace names
+    fn emit_nested_iifes(&mut self, parts: &[String], index: usize, body_idx: NodeIndex, root_is_exported: bool) {
+        let current_name = &parts[index];
+        let is_last = index == parts.len() - 1;
+
+        // Open IIFE
+        self.write_indent();
         self.write("(function (");
-        self.write(ns_name);
+        self.write(current_name);
         self.write(") {");
         self.write_line();
         self.increase_indent();
-        
-        // Emit body contents
-        self.emit_namespace_body(ns_name, body_idx);
-        
+
+        if is_last {
+            // Inner-most body
+            self.emit_namespace_body(current_name, body_idx);
+        } else {
+            // Nested namespace part: var B;
+            let next_name = &parts[index + 1];
+            self.write_indent();
+            self.write("var ");
+            self.write(next_name);
+            self.write(";");
+            self.write_line();
+
+            // Recurse
+            self.emit_nested_iifes(parts, index + 1, body_idx, root_is_exported);
+        }
+
+        // Close IIFE
         self.decrease_indent();
         self.write_indent();
         self.write("})(");
-        self.write(ns_name);
-        self.write(" || (");
-        self.write(ns_name);
-        self.write(" = {}));");
+
+        // Argument logic
+        if index == 0 {
+            // Root argument
+            if root_is_exported && self.is_commonjs {
+                // A = exports.A || (exports.A = {})
+                self.write(current_name);
+                self.write(" = exports.");
+                self.write(current_name);
+                self.write(" || (exports.");
+                self.write(current_name);
+                self.write(" = {})");
+            } else {
+                // A || (A = {})
+                self.write(current_name);
+                self.write(" || (");
+                self.write(current_name);
+                self.write(" = {})");
+            }
+        } else {
+            // Nested argument: B = A.B || (A.B = {})
+            let parent_name = &parts[index - 1];
+            self.write(current_name);
+            self.write(" = ");
+            self.write(parent_name);
+            self.write(".");
+            self.write(current_name);
+            self.write(" || (");
+            self.write(parent_name);
+            self.write(".");
+            self.write(current_name);
+            self.write(" = {})");
+        }
+
+        self.write(");");
         self.write_line();
     }
-    
+
     /// Emit namespace body contents
     fn emit_namespace_body(&mut self, ns_name: &str, body_idx: NodeIndex) {
         let Some(body_node) = self.arena.get(body_idx) else { return };
-        
+
         // Check if it's a module block
         if let Some(block_data) = self.arena.get_module_block(body_node) {
             if let Some(ref stmts) = block_data.statements {
@@ -102,7 +214,24 @@ impl<'a> NamespaceES5Emitter<'a> {
                     self.emit_namespace_member(ns_name, stmt_idx);
                 }
             }
+        } else if body_node.kind == syntax_kind_ext::MODULE_DECLARATION {
+            // Nested module declaration (for `namespace A.B` where B is the body)
+            self.emit_nested_namespace(ns_name, body_idx);
         }
+    }
+
+    /// Check if modifiers contain the `declare` keyword
+    fn has_declare_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        let Some(mods) = modifiers else {
+            return false;
+        };
+        for &mod_idx in &mods.nodes {
+            let Some(mod_node) = self.arena.get(mod_idx) else { continue };
+            if mod_node.kind == SyntaxKind::DeclareKeyword as u16 {
+                return true;
+            }
+        }
+        false
     }
     
     /// Emit a namespace member and its export assignment if needed
@@ -493,80 +622,155 @@ impl<'a> NamespaceES5Emitter<'a> {
     fn emit_nested_namespace_exported(&mut self, parent_ns: &str, ns_idx: NodeIndex) {
         let Some(ns_node) = self.arena.get(ns_idx) else { return };
         let Some(ns_data) = self.arena.get_module(ns_node) else { return };
-        
-        let nested_name = self.get_identifier_text(ns_data.name);
-        
+
+        // Skip ambient nested namespaces
+        if self.has_declare_modifier(&ns_data.modifiers) {
+            return;
+        }
+
+        // Handle qualified names
+        let name_parts = self.flatten_module_name(ns_data.name);
+        if name_parts.is_empty() { return; }
+        let nested_name = &name_parts[0];
+
         // var bar;
         self.write_indent();
         self.write("var ");
-        self.write(&nested_name);
+        self.write(nested_name);
         self.write(";");
         self.write_line();
-        
-        // (function (bar) { ... })(bar = foo.bar || (foo.bar = {}));
-        self.write_indent();
-        self.write("(function (");
-        self.write(&nested_name);
-        self.write(") {");
-        self.write_line();
-        self.increase_indent();
-        
-        self.emit_namespace_body(&nested_name, ns_data.body);
-        
-        self.decrease_indent();
-        self.write_indent();
-        self.write("})(");
-        self.write(&nested_name);
-        self.write(" = ");
-        self.write(parent_ns);
-        self.write(".");
-        self.write(&nested_name);
-        self.write(" || (");
-        self.write(parent_ns);
-        self.write(".");
-        self.write(&nested_name);
-        self.write(" = {}));");
-        self.write_line();
+
+        // Emit nested IIFE with parent attachment
+        self.emit_nested_namespace_iife(parent_ns, &name_parts, 0, ns_data.body);
     }
-    
+
     /// Emit a nested namespace
     fn emit_nested_namespace(&mut self, parent_ns: &str, ns_idx: NodeIndex) {
         let Some(ns_node) = self.arena.get(ns_idx) else { return };
         let Some(ns_data) = self.arena.get_module(ns_node) else { return };
-        
-        let nested_name = self.get_identifier_text(ns_data.name);
+
+        // Skip ambient nested namespaces
+        if self.has_declare_modifier(&ns_data.modifiers) {
+            return;
+        }
+
+        // Handle qualified names
+        let name_parts = self.flatten_module_name(ns_data.name);
+        if name_parts.is_empty() { return; }
+        let nested_name = &name_parts[0];
         let is_exported = self.has_export_modifier(&ns_data.modifiers);
-        
+
         // var bar;
         self.write_indent();
         self.write("var ");
-        self.write(&nested_name);
+        self.write(nested_name);
         self.write(";");
         self.write_line();
-        
-        // (function (bar) { ... })(bar = foo.bar || (foo.bar = {}));
+
+        // If exported, attach to parent; otherwise local
+        if is_exported {
+            self.emit_nested_namespace_iife(parent_ns, &name_parts, 0, ns_data.body);
+        } else {
+            // Non-exported namespace stays local
+            self.emit_local_namespace_iife(&name_parts, 0, ns_data.body);
+        }
+    }
+
+    /// Emit IIFE for nested namespace attached to parent
+    fn emit_nested_namespace_iife(&mut self, parent_ns: &str, parts: &[String], index: usize, body_idx: NodeIndex) {
+        let current_name = &parts[index];
+        let is_last = index == parts.len() - 1;
+
         self.write_indent();
         self.write("(function (");
-        self.write(&nested_name);
+        self.write(current_name);
         self.write(") {");
         self.write_line();
         self.increase_indent();
-        
-        self.emit_namespace_body(&nested_name, ns_data.body);
-        
+
+        if is_last {
+            self.emit_namespace_body(current_name, body_idx);
+        } else {
+            // var NextPart;
+            let next_name = &parts[index + 1];
+            self.write_indent();
+            self.write("var ");
+            self.write(next_name);
+            self.write(";");
+            self.write_line();
+            // Recurse with current as parent
+            self.emit_nested_namespace_iife(current_name, parts, index + 1, body_idx);
+        }
+
         self.decrease_indent();
         self.write_indent();
         self.write("})(");
-        self.write(&nested_name);
+
+        // Argument: Name = Parent.Name || (Parent.Name = {})
+        let attach_parent = if index == 0 { parent_ns } else { &parts[index - 1] };
+        self.write(current_name);
         self.write(" = ");
-        self.write(parent_ns);
+        self.write(attach_parent);
         self.write(".");
-        self.write(&nested_name);
+        self.write(current_name);
         self.write(" || (");
-        self.write(parent_ns);
+        self.write(attach_parent);
         self.write(".");
-        self.write(&nested_name);
+        self.write(current_name);
         self.write(" = {}));");
+        self.write_line();
+    }
+
+    /// Emit IIFE for local (non-exported) nested namespace
+    fn emit_local_namespace_iife(&mut self, parts: &[String], index: usize, body_idx: NodeIndex) {
+        let current_name = &parts[index];
+        let is_last = index == parts.len() - 1;
+
+        self.write_indent();
+        self.write("(function (");
+        self.write(current_name);
+        self.write(") {");
+        self.write_line();
+        self.increase_indent();
+
+        if is_last {
+            self.emit_namespace_body(current_name, body_idx);
+        } else {
+            let next_name = &parts[index + 1];
+            self.write_indent();
+            self.write("var ");
+            self.write(next_name);
+            self.write(";");
+            self.write_line();
+            self.emit_local_namespace_iife(parts, index + 1, body_idx);
+        }
+
+        self.decrease_indent();
+        self.write_indent();
+        self.write("})(");
+
+        if index == 0 {
+            // Root: Name || (Name = {})
+            self.write(current_name);
+            self.write(" || (");
+            self.write(current_name);
+            self.write(" = {})");
+        } else {
+            // Nested: Name = Parent.Name || (Parent.Name = {})
+            let parent_name = &parts[index - 1];
+            self.write(current_name);
+            self.write(" = ");
+            self.write(parent_name);
+            self.write(".");
+            self.write(current_name);
+            self.write(" || (");
+            self.write(parent_name);
+            self.write(".");
+            self.write(current_name);
+            self.write(" = {})");
+        }
+
+        self.write(");");
         self.write_line();
     }
     
@@ -892,4 +1096,9 @@ mod tests {
         assert!(output.contains("function foo()"), "Should have function foo");
         assert!(output.contains("M.foo = foo;"), "Should export foo");
     }
+
+    // Note: test_declare_namespace_skipped is skipped because the parser
+    // currently doesn't attach the `declare` modifier to namespace nodes.
+    // This is a known parser limitation that should be fixed separately.
+    // The has_declare_modifier() check is still in place for when the parser is fixed.
 }
