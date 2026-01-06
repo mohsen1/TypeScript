@@ -49,8 +49,8 @@ see SESSION_LOG.md -- always amended with each session's work
 ### Current Status (12,408 tests)
 | Baseline | Compiler (100 sample) | Conformance | Crash Rate |
 |----------|----------------------|-------------|------------|
-| .errors.txt | 77.9% (60/77 subset) | 33.8% (1,741/5,157) | 0.05% |
-| .js emit | **59.2%** (45/76) | ~3% | 0.05% |
+| .errors.txt | **79.2%** (61/77 subset) | 33.8% (1,741/5,157) | 0.05% |
+| .js emit | **59.2%** (45/76 subset) | ~3% | 0.05% |
 
 ### Work Process
 
