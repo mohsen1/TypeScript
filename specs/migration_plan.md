@@ -19,10 +19,15 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Fixed baseline comparison script to extract JS portion correctly
 - ✅ Instance property initializers → `this.x = value;` in constructor
 - ✅ Distinguish `implements` vs `extends` in heritage clauses
+- ✅ Parameter properties (`public x, private y`) → `this.x = x; this.y = y;`
+- ✅ Constructor overloads: only emit implementation, skip signatures
+- ✅ Single-line empty block detection (preserve `{ }` vs `{\n}`)
+- ✅ Class extends: emit base class name, _super parameter, derived constructor with _super.apply
 
 ## Emitter TODOs (for JS baseline 80%+)
-- ⬜ Class inheritance - emit base class name (not just `_super`)
-- ⬜ CommonJS exports (`"use strict"`, `module.exports`, `exports.X`)
+- ⬜ CommonJS exports (`"use strict"`, `module.exports`, `exports.X`) - 35 tests
+- ⬜ `__extends` helper function declaration at file level - 7 tests
+- ⬜ `Object.defineProperty` for getters/setters
 - ⬜ Parse error tolerance (some tests skipped)
 
 ## Language Service TODOs (40% remaining)
@@ -38,7 +43,7 @@ see SESSION_LOG.md -- always amended with each session's work
 ### Current Status (sample: first 100 compiler tests)
 | Baseline | Pass Rate | Notes |
 |----------|-----------|-------|
-| .errors.txt | **63.6%** (49/77) | Focus area |
+| .errors.txt | **68.8%** (53/77) | +5% from rust merge improvements |
 | .js emit | **43.4%** (33/76) | ES5 IIFE, instance props, heritage, single-line blocks |
 
 ### Work Process
