@@ -64,7 +64,8 @@ see SESSION_LOG.md -- always amended with each session's work
 - ⏳ Split `emit_node` into modules - structure ready, splitting deferred until needed
 
 ## Emitter TODOs (for JS baseline 80%+)
-- ⬜ CommonJS exports (`"use strict"`, `module.exports`, `exports.X`) - ~11 tests
+- ✅ CommonJS module transform (preamble, imports→require, re-exports)
+- ⬜ CommonJS export declarations (`exports.X = X;` after declarations)
 - ⬜ Comment preservation in emit - ~3 tests
 - ⬜ Parse error tolerance (some tests skipped) - ~2 tests
 
@@ -100,12 +101,13 @@ This catches design issues early and ensures consistent code quality.
 ### Next Steps - Emitter Focus
 
 **Priority 1: Module System (33% of failing tests)**
-1. ⬜ CommonJS exports (`"use strict"`, `module.exports`, `exports.X`)
-2. ⬜ ES module imports/exports → CommonJS transform
-3. ⬜ Named exports and re-exports
+1. ✅ CommonJS preamble (`"use strict"`, `__esModule`)
+2. ✅ ES module imports → `require()` transform
+3. ✅ Re-exports → `Object.defineProperty`
+4. ⬜ Export declarations → `exports.X = X;`
 
 **Priority 2: Block Scoping (4% of failing tests)**
-4. ⬜ `let`/`const` → `var` for ES5 (temporal dead zone handling)
+5. ⬜ `let`/`const` → `var` for ES5 (temporal dead zone handling)
 
 **Priority 3: Class Features (7% of failing tests)**
 5. ⬜ Static fields initialization
