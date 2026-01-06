@@ -22,6 +22,7 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Error 1253: abstract members in non-abstract class
 - ✅ Accessor body checks in ambient contexts (1183)
 - ✅ Error 1248: const keyword on class members (moved from parser to checker)
+- ✅ Error 2322: accessor type compatibility (getter return ⊆ setter param)
 
 ## Code Cleanup
 - ✅ Deleted ~35k lines of dead code (old fat-node parser, emitter, checker, services)
@@ -136,7 +137,7 @@ This catches design issues early and ensures consistent code quality.
 | TS1128 | 35 | Declaration expected |
 
 ### Quick Wins
-- 🔄 TS2322/2345: Improve type assignability checks (accessor type compatibility in progress)
+- ✅ TS2322: Accessor type compatibility (getter return ⊆ setter param)
 - ⬜ TS2339: Property lookup on union/intersection types  
 - ⬜ TS2304: Module resolution, global declarations
 - ⬜ TS2300: Duplicate detection in binder
