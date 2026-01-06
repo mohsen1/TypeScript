@@ -134,9 +134,10 @@ These fixes improve JS emit baseline:
    - Added `set_auto_detect_module(true)` in `emit()`
    - CommonJS mode auto-detects based on import/export statements
 
-2. ⬜ **Fix `export default` expression emit** - Missing default exports
-   - Handle expression case in `emit_export_declaration_commonjs`
-   - Pattern: `export default 42;` → `exports.default = 42;`
+2. ✅ **Fix `export default` expression emit** - Default exports now work
+   - Added `is_default_export` field to ExportDeclData
+   - Expression: `export default 42;` → `exports.default = 42;`
+   - Function/Class: `export default function/class X` → `exports.default = X;`
 
 3. ✅ **Hook up EXPORT_ASSIGNMENT** - `export = x` now works
    - Added dispatch case for kind 278 in emit_node
