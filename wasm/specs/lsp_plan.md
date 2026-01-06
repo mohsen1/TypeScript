@@ -204,10 +204,34 @@ Following Gemini's guidance, implemented comprehensive AST traversal:
 
    **Gemini Review:** All issues fixed ✅
 
+10. **Semantic Tokens Feature** (2026-01-06)
+   - Added `semantic_tokens.rs` with semantic syntax highlighting support
+   - Provides token classification for better editor coloring/styling
+   - Token types: namespace, type, class, enum, interface, parameter, variable, property, function, method, etc.
+   - Token modifiers: declaration, static, abstract (bit flags)
+   - Delta-encoded format for efficiency (relative line/column positions)
+   - Traverses AST and classifies declarations using binder symbol information
+   - Tests: 4/4 passing ✅
+
+   **Implementation Details:**
+   - `SemanticTokenType` enum with 23 token types matching LSP standard
+   - `SemanticTokensBuilder` handles delta encoding (line/column relative to previous token)
+   - `SemanticTokensProvider` traverses AST in document order
+   - Extracts name identifiers from declaration nodes
+   - Maps symbol flags to token types (class, interface, function, variable, etc.)
+   - Adds modifiers based on symbol flags (static, abstract, declaration)
+   - Returns flat u32 array: [deltaLine, deltaStart, length, tokenType, modifiers, ...]
+
+   **Known Limitations:**
+   - Only highlights declarations (not usage sites)
+   - Full usage highlighting would require ScopeWalker integration (future enhancement)
+   - No async modifier (not tracked in symbol flags)
+   - Focuses on most common semantic highlighting needs
+
 #### Test Results
 
-All 640 tests pass! ✅ (2 ignored)
-- LSP-specific tests: 34/35 passing (1 ignored - multi-arg cursor detection)
+All 644 tests pass! ✅ (2 ignored)
+- LSP-specific tests: 38/39 passing (1 ignored - multi-arg cursor detection)
 - Position utilities: 3/3 passing
 - Resolver tests: 1/1 passing
 - Definition tests: 2/2 passing
@@ -217,6 +241,7 @@ All 640 tests pass! ✅ (2 ignored)
 - Signature Help tests: 2/3 passing (1 ignored - multi-arg cursor detection)
 - Document Symbols tests: 5/5 passing ✅
 - Rename tests: 6/6 passing ✅
+- Semantic Tokens tests: 4/4 passing ✅
 - Integration tests: 3/3 passing
 - Utils tests: 3/3 passing
 
