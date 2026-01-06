@@ -10,7 +10,7 @@ use crate::lsp::position::{Position, Range, LineMap};
 use crate::lsp::utils::find_node_at_offset;
 use crate::lsp::resolver::ScopeWalker;
 use crate::thin_checker::ThinCheckerState;
-use crate::comments::{get_comment_ranges, get_leading_comments, get_jsdoc_content, is_jsdoc_comment};
+use crate::comments::{get_comment_ranges, get_leading_comments, get_jsdoc_content, is_jsdoc_comment, get_leading_comments_from_cache};
 
 /// Information returned for a hover request.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -52,7 +52,17 @@ impl<'a> HoverProvider<'a> {
     }
 
     /// Get hover information at the given position.
-    pub fn get_hover(&self, root: NodeIndex, position: Position) -> Option<HoverInfo> {
+    ///
+    /// # Arguments
+    /// * `root` - The root node of the AST
+    /// * `position` - The cursor position
+    /// * `type_cache` - Mutable reference to the persistent type cache (for performance)
+    pub fn get_hover(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        type_cache: &mut Option<crate::checker::TypeCache>,
+    ) -> Option<HoverInfo> {
         // 1. Find node at position
         let offset = self.line_map.position_to_offset(position);
         let node_idx = find_node_at_offset(self.arena, offset);
@@ -68,16 +78,29 @@ impl<'a> HoverProvider<'a> {
         let symbol = self.binder.symbols.get(symbol_id)?;
 
         // 3. Compute Type Information
-        // We create a transient checker to compute the type of this specific symbol
-        let mut checker = ThinCheckerState::new(
-            self.arena,
-            self.binder,
-            self.interner,
-            self.file_name.clone()
-        );
+        // Use persistent cache if available for O(1) lookups on repeated queries
+        let mut checker = if let Some(cache) = type_cache.take() {
+            ThinCheckerState::with_cache(
+                self.arena,
+                self.binder,
+                self.interner,
+                self.file_name.clone(),
+                cache,
+            )
+        } else {
+            ThinCheckerState::new(
+                self.arena,
+                self.binder,
+                self.interner,
+                self.file_name.clone(),
+            )
+        };
 
         let type_id = checker.get_type_of_symbol(symbol_id);
         let type_string = checker.format_type(type_id);
+
+        // Extract and save the updated cache for future queries
+        *type_cache = Some(checker.extract_cache());
 
         // 4. Construct the signature string
         // e.g. "(variable) x: number" or "(function) foo(): void"
@@ -95,7 +118,7 @@ impl<'a> HoverProvider<'a> {
         };
 
         let documentation = if !decl_node_idx.is_none() {
-            self.get_documentation(decl_node_idx)
+            self.get_documentation(root, decl_node_idx)
         } else {
             String::new()
         };
@@ -123,15 +146,25 @@ impl<'a> HoverProvider<'a> {
     }
 
     /// Extract JSDoc comments preceding a node.
-    fn get_documentation(&self, node_idx: NodeIndex) -> String {
+    /// Uses cached comment ranges from SourceFileData for O(log N) performance
+    /// instead of O(N) rescanning on every hover.
+    fn get_documentation(&self, root: NodeIndex, node_idx: NodeIndex) -> String {
         let Some(node) = self.arena.get(node_idx) else { return String::new() };
 
-        // TODO: Cache comment ranges - this O(N) scan happens on every hover request
-        // Ideally, ThinParser should cache comments and pass them to LSP providers
-        let all_comments = get_comment_ranges(self.source_text);
+        // OPTIMIZATION: Use cached comments from SourceFileData instead of rescanning
+        let comments = if let Some(root_node) = self.arena.get(root) {
+            if let Some(sf_data) = self.arena.get_source_file(root_node) {
+                &sf_data.comments
+            } else {
+                // Fallback: if root is not a source file, rescan (shouldn't happen in LSP)
+                return String::new();
+            }
+        } else {
+            return String::new();
+        };
 
-        // Get comments before the node start position
-        let leading_comments = get_leading_comments(self.source_text, node.pos, &all_comments);
+        // Get comments immediately before the node start position
+        let leading_comments = get_leading_comments_from_cache(comments, node.pos, self.source_text);
 
         // Collect only the JSDoc comments immediately preceding the node
         // (not all JSDoc comments in the file up to this point)
@@ -208,7 +241,8 @@ mod hover_tests {
 
         // Hover over 'x' in the last line (line 2, column 0)
         let pos = Position::new(2, 0);
-        let info = provider.get_hover(root, pos);
+        let mut cache = None;
+        let info = provider.get_hover(root, pos, &mut cache);
 
         assert!(info.is_some(), "Should find hover info");
 
@@ -247,7 +281,8 @@ mod hover_tests {
 
         // Hover over semicolon (no symbol)
         let pos = Position::new(0, 13);
-        let info = provider.get_hover(root, pos);
+        let mut cache = None;
+        let info = provider.get_hover(root, pos, &mut cache);
 
         assert!(info.is_none(), "Should not find hover info at semicolon");
     }
@@ -275,7 +310,8 @@ mod hover_tests {
 
         // Hover over 'foo' in the call
         let pos = Position::new(1, 0);
-        let info = provider.get_hover(root, pos);
+        let mut cache = None;
+        let info = provider.get_hover(root, pos, &mut cache);
 
         assert!(info.is_some(), "Should find hover info for function");
 

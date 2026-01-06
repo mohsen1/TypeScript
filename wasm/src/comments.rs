@@ -4,8 +4,10 @@
 //! Comments are not part of the AST, so they must be extracted separately
 //! from the source text and associated with nodes for emission.
 
+use serde::Serialize;
+
 /// A range representing a comment in the source text.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct CommentRange {
     /// Start position (byte offset)
     pub pos: u32,
@@ -214,5 +216,63 @@ pub fn get_jsdoc_content(comment: &CommentRange, source: &str) -> String {
     } else {
         text.to_string()
     }
+}
+
+/// Get leading comments from cached comment ranges.
+///
+/// This is an optimized version that uses pre-computed comment ranges
+/// instead of rescanning the source. Returns comments that precede the
+/// given position.
+///
+/// # Arguments
+/// * `comments` - The cached comment ranges from SourceFileData
+/// * `pos` - The position to find leading comments for
+///
+/// # Returns
+/// Vector of comment ranges that appear before the given position.
+/// Comments are filtered to only include those immediately preceding
+/// the position (with at most one line of whitespace between).
+pub fn get_leading_comments_from_cache(comments: &[CommentRange], pos: u32, source: &str) -> Vec<CommentRange> {
+    if comments.is_empty() {
+        return Vec::new();
+    }
+
+    // Binary search to find the partition point where comments end at or before `pos`
+    // Comments are sorted by their start position, but we need ones that *end* before pos
+    let idx = comments.partition_point(|c| c.end <= pos);
+
+    if idx == 0 {
+        return Vec::new(); // No comments before this position
+    }
+
+    let mut result: Vec<CommentRange> = Vec::new();
+
+    // Iterate backwards from the last comment that ends at or before `pos`
+    // Stop when we encounter comments that are too far away (> 2 newlines)
+    for i in (0..idx).rev() {
+        let comment = &comments[i];
+
+        // Check if there's too much whitespace between comment and target position
+        // For the first comment, check against `pos`; for subsequent ones, check against previous comment
+        let check_pos = if result.is_empty() { pos } else { result.last().unwrap().pos };
+        let text_between = &source[comment.end as usize..check_pos as usize];
+        let newline_count = text_between.chars().filter(|&c| c == '\n').count();
+
+        // Allow up to 2 newlines (JSDoc pattern: /** comment */ \n function)
+        if newline_count > 2 {
+            break;
+        }
+
+        result.push(comment.clone());
+
+        // Stop after collecting adjacent comments
+        // (if we've collected some and hit a gap, that's the boundary)
+        if newline_count >= 1 && result.len() > 1 {
+            break;
+        }
+    }
+
+    result.reverse(); // Restore original order
+    result
 }
 

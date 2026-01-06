@@ -66,12 +66,8 @@ pub struct ThinParserState {
     current_token: SyntaxKind,
     /// List of parse diagnostics
     parse_diagnostics: Vec<ParseDiagnostic>,
-    /// The source text
-    source_text: String,
     /// Node count for assigning IDs
     node_count: u32,
-    /// Identifiers found during parsing
-    identifiers: Vec<String>,
     /// Recursion depth for stack overflow protection
     recursion_depth: u32,
 }
@@ -80,7 +76,9 @@ impl ThinParserState {
     /// Create a new ThinParser for the given source text.
     pub fn new(file_name: String, source_text: String) -> ThinParserState {
         let estimated_nodes = source_text.len() / 20; // Rough estimate
-        let scanner = ScannerState::new(source_text.clone(), true);
+        // Zero-copy: Pass source_text directly to scanner without cloning
+        // This eliminates the 2x memory overhead from duplicating the source
+        let scanner = ScannerState::new(source_text, true);
         ThinParserState {
             scanner,
             arena: ThinNodeArena::with_capacity(estimated_nodes),
@@ -88,9 +86,7 @@ impl ThinParserState {
             context_flags: 0,
             current_token: SyntaxKind::Unknown,
             parse_diagnostics: Vec::new(),
-            source_text,
             node_count: 0,
-            identifiers: Vec::new(),
             recursion_depth: 0,
         }
     }
@@ -431,6 +427,11 @@ impl ThinParserState {
         // Parse statements (using source file version that handles stray braces)
         let statements = self.parse_source_file_statements();
 
+        // Cache comment ranges once during parsing (O(N) scan, done only once)
+        // This avoids rescanning on every hover/documentation request
+        // Use scanner's source text (no duplicate allocation)
+        let comments = crate::comments::get_comment_ranges(self.scanner.source_text());
+
         // Create source file node
         let end_pos = self.token_end();
         let eof_token = self.arena.add_token(
@@ -443,13 +444,13 @@ impl ThinParserState {
             statements,
             end_of_file_token: eof_token,
             file_name: self.file_name.clone(),
-            text: self.source_text.clone(),
+            text: self.scanner.source_text().to_string(), // Clone only when storing in AST
             language_version: 99,
             language_variant: 0,
             script_kind: 3,
             is_declaration_file: false,
             has_no_default_lib: false,
-            identifiers: self.identifiers.clone(),
+            comments, // Cached comment ranges
             parent: NodeIndex::NONE,
             id: 0,
             modifier_flags: 0,
@@ -5048,7 +5049,6 @@ impl ThinParserState {
         let end_pos = self.token_end();
         // Use zero-copy accessor and clone only when storing
         let text = self.scanner.get_token_value_ref().to_string();
-        self.identifiers.push(text.clone());
         self.parse_expected(SyntaxKind::Identifier);
 
         self.arena.add_identifier(
@@ -5071,7 +5071,6 @@ impl ThinParserState {
         // Capture end position BEFORE consuming the token
         let end_pos = self.token_end();
         let text = self.scanner.get_token_value_ref().to_string();
-        self.identifiers.push(text.clone());
 
         if self.is_identifier_or_keyword() {
             self.next_token();
@@ -5097,7 +5096,6 @@ impl ThinParserState {
         // Capture end position BEFORE consuming the token
         let end_pos = self.token_end();
         let text = self.scanner.get_token_value_ref().to_string();
-        self.identifiers.push(text.clone());
         self.parse_expected(SyntaxKind::PrivateIdentifier);
 
         self.arena.add_identifier(
@@ -5893,7 +5891,6 @@ impl ThinParserState {
                 let start_pos = self.token_pos();
                 // Use zero-copy accessor
                 let text = self.scanner.get_token_value_ref().to_string();
-                self.identifiers.push(text.clone());
                 self.next_token(); // Accept any token as property name
                 let end_pos = self.token_end();
 
@@ -7419,7 +7416,6 @@ impl ThinParserState {
     fn parse_keyword_as_identifier(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
         let text = self.scanner.get_token_value_ref().to_string();
-        self.identifiers.push(text.clone());
         self.next_token();
         let end_pos = self.token_end();
 
@@ -7484,9 +7480,10 @@ impl ThinParserState {
         self.arena.len()
     }
 
-    /// Get the source text
+    /// Get the source text.
+    /// Delegates to the scanner which owns the source text.
     pub fn get_source_text(&self) -> &str {
-        &self.source_text
+        self.scanner.source_text()
     }
 
     /// Get the file name

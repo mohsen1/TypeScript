@@ -73,7 +73,17 @@ impl<'a> SignatureHelpProvider<'a> {
     }
 
     /// Get signature help at the given position.
-    pub fn get_signature_help(&self, root: NodeIndex, position: Position) -> Option<SignatureHelp> {
+    ///
+    /// # Arguments
+    /// * `root` - The root node of the AST
+    /// * `position` - The cursor position
+    /// * `type_cache` - Mutable reference to the persistent type cache (for performance)
+    pub fn get_signature_help(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        type_cache: &mut Option<crate::checker::TypeCache>,
+    ) -> Option<SignatureHelp> {
         let offset = self.line_map.position_to_offset(position);
 
         // 1. Find the deepest node at the cursor
@@ -89,18 +99,31 @@ impl<'a> SignatureHelpProvider<'a> {
         let mut walker = crate::lsp::resolver::ScopeWalker::new(self.arena, self.binder);
         let symbol_id = walker.resolve_node(root, call_expr.expression)?;
 
-        // 5. Create checker and get the type of the symbol
-        let mut checker = ThinCheckerState::new(
-            self.arena,
-            self.binder,
-            self.interner,
-            self.file_name.clone()
-        );
+        // 5. Create checker with persistent cache if available
+        let mut checker = if let Some(cache) = type_cache.take() {
+            ThinCheckerState::with_cache(
+                self.arena,
+                self.binder,
+                self.interner,
+                self.file_name.clone(),
+                cache,
+            )
+        } else {
+            ThinCheckerState::new(
+                self.arena,
+                self.binder,
+                self.interner,
+                self.file_name.clone(),
+            )
+        };
 
         let callee_type = checker.get_type_of_symbol(symbol_id);
 
         // 6. Extract signatures from the type
         let signatures = self.get_signatures_from_type(callee_type, &checker);
+
+        // Extract and save the updated cache for future queries
+        *type_cache = Some(checker.extract_cache());
 
         if signatures.is_empty() {
             return None;
@@ -313,7 +336,8 @@ mod signature_help_tests {
 
         // Position at the second argument '2' (line 1, column 7)
         let pos = Position::new(1, 7);
-        let help = provider.get_signature_help(root, pos);
+        let mut cache = None;
+        let help = provider.get_signature_help(root, pos, &mut cache);
 
         assert!(help.is_some(), "Should find signature help");
 
@@ -348,7 +372,8 @@ mod signature_help_tests {
 
         // Position not in a call
         let pos = Position::new(0, 5);
-        let help = provider.get_signature_help(root, pos);
+        let mut cache = None;
+        let help = provider.get_signature_help(root, pos, &mut cache);
 
         assert!(help.is_none(), "Should not find signature help outside call");
     }
@@ -378,7 +403,8 @@ mod signature_help_tests {
 
         // Position inside the call (line 1, column 4)
         let pos = Position::new(1, 4);
-        let help = provider.get_signature_help(root, pos);
+        let mut cache = None;
+        let help = provider.get_signature_help(root, pos, &mut cache);
 
         assert!(help.is_some(), "Should find signature help");
 
@@ -414,21 +440,22 @@ mod signature_help_tests {
 
         // Test cursor at first argument
         let pos1 = Position::new(1, 8); // At "1"
-        let help1 = provider.get_signature_help(root, pos1);
+        let mut cache = None;
+        let help1 = provider.get_signature_help(root, pos1, &mut cache);
         if let Some(h) = help1 {
             assert_eq!(h.active_parameter, 0, "Should be on first parameter");
         }
 
         // Test cursor at second argument
         let pos2 = Position::new(1, 11); // At "2"
-        let help2 = provider.get_signature_help(root, pos2);
+        let help2 = provider.get_signature_help(root, pos2, &mut cache);
         if let Some(h) = help2 {
             assert_eq!(h.active_parameter, 1, "Should be on second parameter");
         }
 
         // Test cursor at third argument
         let pos3 = Position::new(1, 14); // At "3"
-        let help3 = provider.get_signature_help(root, pos3);
+        let help3 = provider.get_signature_help(root, pos3, &mut cache);
         if let Some(h) = help3 {
             assert_eq!(h.active_parameter, 2, "Should be on third parameter");
         }

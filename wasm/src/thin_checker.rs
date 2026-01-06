@@ -67,6 +67,33 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Create a new ThinCheckerState with a persistent cache.
+    /// This allows reusing type checking results from previous queries.
+    ///
+    /// # Arguments
+    /// * `arena` - The AST node arena
+    /// * `binder` - The binder state with symbols
+    /// * `types` - The shared type interner
+    /// * `file_name` - The source file name
+    /// * `cache` - The persistent type cache from previous queries
+    pub fn with_cache(
+        arena: &'a ThinNodeArena,
+        binder: &'a ThinBinderState,
+        types: &'a TypeInterner,
+        file_name: String,
+        cache: crate::checker::TypeCache,
+    ) -> Self {
+        ThinCheckerState {
+            ctx: CheckerContext::with_cache(arena, binder, types, file_name, cache),
+        }
+    }
+
+    /// Extract the persistent cache from this checker.
+    /// This allows saving type checking results for future queries.
+    pub fn extract_cache(self) -> crate::checker::TypeCache {
+        self.ctx.extract_cache()
+    }
+
     // =========================================================================
     // Scope Management (delegated to CheckerContext)
     // =========================================================================
