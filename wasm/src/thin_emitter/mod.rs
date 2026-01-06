@@ -1350,6 +1350,9 @@ impl<'a> ThinPrinter<'a> {
             k if k == syntax_kind_ext::DEFAULT_CLAUSE => {
                 self.emit_default_clause(node);
             }
+            k if k == syntax_kind_ext::CASE_BLOCK => {
+                self.emit_case_block(node);
+            }
             k if k == syntax_kind_ext::BREAK_STATEMENT => {
                 self.emit_break_statement();
             }
@@ -3538,6 +3541,27 @@ impl<'a> ThinPrinter<'a> {
         self.write(") ");
         // case_block is a NodeIndex pointing to a CaseBlock node
         self.emit(switch.case_block);
+    }
+
+    fn emit_case_block(&mut self, node: &ThinNode) {
+        if !node.has_data() || node.kind != syntax_kind_ext::CASE_BLOCK {
+            return;
+        }
+        let Some(case_block) = self.arena.blocks.get(node.data_index as usize) else {
+            return;
+        };
+
+        self.write("{");
+        self.write_line();
+        self.increase_indent();
+
+        for &clause_idx in &case_block.statements.nodes {
+            self.emit(clause_idx);
+            self.write_line();
+        }
+
+        self.decrease_indent();
+        self.write("}");
     }
 
     fn emit_case_clause(&mut self, node: &ThinNode) {

@@ -786,3 +786,107 @@ fn test_infer_generic_default_depends_on_prior_param() {
     let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::NUMBER]);
     assert_eq!(result, TypeId::NUMBER);
 }
+
+#[test]
+fn test_infer_generic_constraint_fallback() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::NUMBER),
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: t_type,
+            optional: true,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    };
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[]);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_infer_generic_constraint_violation() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::STRING),
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: t_type,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    };
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::NUMBER]);
+    assert_eq!(result, TypeId::ANY);
+}
+
+#[test]
+fn test_infer_generic_constraint_depends_on_prior_param() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let u_param = TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: Some(t_type),
+        default: None,
+    };
+    let u_type = interner.intern(TypeKey::TypeParameter(u_param.clone()));
+
+    let func = FunctionShape {
+        type_params: vec![t_param, u_param],
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("first")),
+                type_id: t_type,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("second")),
+                type_id: u_type,
+                optional: false,
+                rest: false,
+            },
+        ],
+        return_type: u_type,
+        is_constructor: false,
+    };
+
+    let result = infer_generic_function(
+        &interner,
+        &mut subtype,
+        &func,
+        &[TypeId::STRING, TypeId::STRING],
+    );
+    assert_eq!(result, TypeId::STRING);
+}

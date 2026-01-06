@@ -65,6 +65,9 @@ Implement the mathematical engine for type inference and generic instantiation. 
   - [x] Test rest parameter inference: `(...args: T[])` with `number, string`
   - [x] Test default type params: `<T = string>(x?: T)` with no args
   - [x] Test default from prior param: `<T, U = T>(x: T)` with `number`
+  - [x] Test constraint fallback: `<T extends number>(x?: T)` with no args
+  - [x] Test constraint violation: `<T extends string>(x: T)` with `number`
+  - [x] Test constraint from prior param: `<T, U extends T>(x: T, y: U)` with `string`
 
 ### Phase 5: Structural Constraints
 - [x] Constrain Application args when bases match

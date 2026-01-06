@@ -38,6 +38,8 @@ Pick the most doable and impactful
 13. Class ES5 transform: destructured parameters emit assignments [done]
 14. Declaration emitter: emit heritage clauses (extends/implements) [done]
 15. Class ES5 transform: destructure for-loop initializers [done]
+16. Class ES5 transform: emit switch/break/continue/do statements [done]
+17. ThinEmitter: emit case blocks for switch statements [done]
 
 
 ## Quick Reference

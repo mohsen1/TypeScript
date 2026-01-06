@@ -64,6 +64,21 @@ fn test_thin_emit_if_statement() {
 }
 
 #[test]
+fn test_thin_emit_switch_statement() {
+    let source = "switch (x) { case 1: y(); break; default: z(); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("switch (x)"), "Expected switch in output: {}", output);
+    assert!(output.contains("case 1:"), "Expected case clause in output: {}", output);
+    assert!(output.contains("default:"), "Expected default clause in output: {}", output);
+}
+
+#[test]
 fn test_thin_emit_class_declaration() {
     let source = "class Foo { }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
