@@ -33,10 +33,10 @@ Loop:
   5. If pass → update *_plan.md, commit
   6. **CRITICAL: Sync with origin after EVERY task**
      - Run: `git add . && git commit -m "[wasm] your changes"`
-     - Run: `git push origin checker-track`
+     - Run: `git push origin HEAD` (pushes your current branch)
      - Run: `git fetch origin && git merge origin/rust`
      - Resolve any conflicts if they occur
-     - Run: `git push origin checker-track` (if there were merges)
+     - Run: `git push origin HEAD` (if there were merges)
      - This keeps all tracks in sync and prevents divergence
   7. Repeat
 `
@@ -85,7 +85,7 @@ Commit frequently and atomically
 
 ## 🚨 Rules
 
-1. **STAY ON YOUR TRACK** - You are on the **checker-track**. NEVER switch to emitter or lsp work. If your track's work is near perfect, PERFECT IT. Add more tests. Clean up todos. Verify architecture compliance. Polish what you have.
+1. **STAY ON YOUR TRACK** - NEVER switch tracks. If your track's work is near perfect, PERFECT IT. Add more tests. Clean up todos. Verify architecture compliance. Polish what you have.
 2. **Architecture in mind** - always keep in mind our big picture architecture
 3. **Never break the build** - tests must pass
 4. **ALWAYS use Docker for Rust** - ./wasm/test.sh only, NEVER raw cargo commands
