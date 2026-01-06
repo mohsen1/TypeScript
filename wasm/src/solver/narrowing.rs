@@ -19,7 +19,10 @@
 
 use std::sync::Arc;
 use crate::solver::types::*;
-use crate::solver::intern::TypeInterner;
+use crate::solver::TypeDatabase;
+
+#[cfg(test)]
+use crate::solver::TypeInterner;
 
 /// Result of finding discriminant properties in a union.
 #[derive(Clone, Debug)]
@@ -32,11 +35,11 @@ pub struct DiscriminantInfo {
 
 /// Narrowing context for type guards and control flow analysis.
 pub struct NarrowingContext<'a> {
-    interner: &'a TypeInterner,
+    interner: &'a dyn TypeDatabase,
 }
 
 impl<'a> NarrowingContext<'a> {
-    pub fn new(interner: &'a TypeInterner) -> Self {
+    pub fn new(interner: &'a dyn TypeDatabase) -> Self {
         NarrowingContext { interner }
     }
 
@@ -351,14 +354,14 @@ impl<'a> NarrowingContext<'a> {
 }
 
 /// Convenience function for finding discriminants.
-pub fn find_discriminants(interner: &TypeInterner, union_type: TypeId) -> Vec<DiscriminantInfo> {
+pub fn find_discriminants(interner: &dyn TypeDatabase, union_type: TypeId) -> Vec<DiscriminantInfo> {
     let ctx = NarrowingContext::new(interner);
     ctx.find_discriminants(union_type)
 }
 
 /// Convenience function for narrowing by discriminant.
 pub fn narrow_by_discriminant(
-    interner: &TypeInterner,
+    interner: &dyn TypeDatabase,
     union_type: TypeId,
     property_name: &str,
     literal_value: TypeId,
@@ -369,7 +372,7 @@ pub fn narrow_by_discriminant(
 
 /// Convenience function for typeof narrowing.
 pub fn narrow_by_typeof(
-    interner: &TypeInterner,
+    interner: &dyn TypeDatabase,
     source_type: TypeId,
     typeof_result: &str,
 ) -> TypeId {

@@ -10,19 +10,22 @@
 //! to infer types for parts of the expression that would otherwise be unknown.
 
 use crate::solver::types::*;
-use crate::solver::intern::TypeInterner;
+use crate::solver::TypeDatabase;
+
+#[cfg(test)]
+use crate::solver::TypeInterner;
 
 /// Context for contextual typing.
 /// Holds the expected type and provides methods to extract type information.
 pub struct ContextualTypeContext<'a> {
-    interner: &'a TypeInterner,
+    interner: &'a dyn TypeDatabase,
     /// The expected type (contextual type)
     expected: Option<TypeId>,
 }
 
 impl<'a> ContextualTypeContext<'a> {
     /// Create a new contextual type context.
-    pub fn new(interner: &'a TypeInterner) -> Self {
+    pub fn new(interner: &'a dyn TypeDatabase) -> Self {
         ContextualTypeContext {
             interner,
             expected: None,
@@ -30,7 +33,7 @@ impl<'a> ContextualTypeContext<'a> {
     }
 
     /// Create a context with an expected type.
-    pub fn with_expected(interner: &'a TypeInterner, expected: TypeId) -> Self {
+    pub fn with_expected(interner: &'a dyn TypeDatabase, expected: TypeId) -> Self {
         ContextualTypeContext {
             interner,
             expected: Some(expected),
@@ -279,7 +282,7 @@ impl<'a> ContextualTypeContext<'a> {
 /// If the expression type is compatible with the contextual type,
 /// returns the more specific type. Otherwise returns the expression type.
 pub fn apply_contextual_type(
-    _interner: &TypeInterner,
+    _interner: &dyn TypeDatabase,
     expr_type: TypeId,
     contextual_type: Option<TypeId>,
 ) -> TypeId {

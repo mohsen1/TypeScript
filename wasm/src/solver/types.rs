@@ -99,6 +99,9 @@ pub enum TypeKey {
     /// Uses SymbolId to break infinite recursion
     Ref(SymbolRef),
 
+    /// Generic type application (Base<Args>)
+    Application(TypeApplication),
+
     /// Conditional type (T extends U ? X : Y)
     Conditional(Box<ConditionalType>),
 
@@ -131,6 +134,13 @@ pub enum TypeKey {
 
     /// Error type for recovery
     Error,
+}
+
+/// Generic type application (Base<Args>)
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TypeApplication {
+    pub base: TypeId,
+    pub args: Vec<TypeId>,
 }
 
 /// Intrinsic type kinds
