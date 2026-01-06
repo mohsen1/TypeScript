@@ -29,7 +29,7 @@ pub use types::{
     EnumTypeInfo, TypeReference, Signature, IndexInfo,
 };
 pub use arena::TypeArena;
-pub use context::{CheckerContext, EnclosingClassInfo};
+pub use context::{CheckerContext, EnclosingClassInfo, TypeCache};
 pub use expr::ExpressionChecker;
 pub use statements::StatementChecker;
 pub use declarations::DeclarationChecker;

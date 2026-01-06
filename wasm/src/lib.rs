@@ -136,6 +136,9 @@ pub struct ThinParser {
     type_interner: TypeInterner,
     /// Line map for LSP position conversion (lazy initialized)
     line_map: Option<LineMap>,
+    /// Persistent cache for type checking results across LSP queries.
+    /// Invalidated when the file changes.
+    type_cache: Option<checker::TypeCache>,
 }
 
 #[wasm_bindgen]
@@ -149,6 +152,7 @@ impl ThinParser {
             binder: None,
             type_interner: TypeInterner::new(),
             line_map: None,
+            type_cache: None,
         }
     }
 
@@ -160,6 +164,7 @@ impl ThinParser {
         // Invalidate derived state on re-parse
         self.line_map = None;
         self.binder = None;
+        self.type_cache = None;  // Invalidate type cache when file changes
         idx.0
     }
 
@@ -406,7 +411,7 @@ impl ThinParser {
         );
         let pos = Position::new(line, character);
 
-        let result = provider.get_hover(root, pos);
+        let result = provider.get_hover(root, pos, &mut self.type_cache);
         Ok(serde_wasm_bindgen::to_value(&result)?)
     }
 
@@ -432,7 +437,7 @@ impl ThinParser {
         );
         let pos = Position::new(line, character);
 
-        let result = provider.get_signature_help(root, pos);
+        let result = provider.get_signature_help(root, pos, &mut self.type_cache);
         Ok(serde_wasm_bindgen::to_value(&result)?)
     }
 

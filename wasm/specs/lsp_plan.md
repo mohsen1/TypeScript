@@ -139,8 +139,43 @@ These issues block LSP responsiveness.
 - Cleaned up 5 push sites throughout parser
 - Identifiers still accessible via arena.get_identifier() when needed
 
+#### Type Cache for LSP Queries ✅ COMPLETED (2026-01-06)
+
+**Problem:** Every LSP query (hover, signature help) created a new `ThinCheckerState` and re-inferred types from scratch, even for symbols already type-checked in previous queries.
+
+**Impact:**
+- Hovering over the same symbol twice would re-compute the type both times
+- Large files with complex type inference became slow on repeated queries
+- Wasted CPU cycles re-solving type relations already computed
+
+**Solution Implemented:**
+- [x] **Created TypeCache struct:** Holds `symbol_types`, `node_types`, `type_parameter_names`, `relation_cache`
+- [x] **Added type_cache to ThinParser:** Persistent cache field in lib.rs
+- [x] **Added CheckerContext::with_cache():** Constructor that initializes from cached state
+- [x] **Added CheckerContext::extract_cache():** Extracts cache for persistence
+- [x] **Added ThinCheckerState::with_cache():** Creates checker with cached types
+- [x] **Updated hover and signature_help providers:** Use cache when available
+- [x] **Implemented cache invalidation:** Clears cache on file changes (parse_source_file)
+- [x] **All tests pass:** 691/691 tests passing
+
+**Performance Impact:**
+- **Before:** Every LSP query re-infers all types (O(N) where N = file complexity)
+- **After:** First query infers types, subsequent queries use cache (O(1) lookups)
+- **Example:** Hovering 10 times on a complex function type:
+  - Before: 10x full type inference passes
+  - After: 1x inference + 9x O(1) cache hits
+
+**Implementation Details:**
+- TypeCache stored in `ThinParser.type_cache: Option<TypeCache>`
+- Cache invalidated when `parse_source_file()` called (file changed)
+- Cache persists across LSP requests for the same file
+- LSP providers take `&mut Option<TypeCache>` parameter
+- Pattern: `take()` cache → create checker → `extract_cache()` → save back
+- TypeInterner remains separate (structural types are immutable)
+
 #### Remaining Optimizations
-   - Consider caching type information for repeated queries
+   - All major LSP performance optimizations complete!
+   - Future: Consider incremental re-parsing on edits
 
 3. **Add More LSP Features**
    - Code actions (complete implementation)

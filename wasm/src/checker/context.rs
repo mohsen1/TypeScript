@@ -28,6 +28,23 @@ pub struct EnclosingClassInfo {
     pub is_declared: bool,
 }
 
+/// Persistent cache for type checking results across LSP queries.
+/// This cache survives between LSP requests but is invalidated when the file changes.
+#[derive(Clone, Debug, Default)]
+pub struct TypeCache {
+    /// Cached types for symbols.
+    pub symbol_types: FxHashMap<SymbolId, TypeId>,
+
+    /// Cached types for nodes.
+    pub node_types: FxHashMap<u32, TypeId>,
+
+    /// Type parameter names for type_to_string.
+    pub type_parameter_names: FxHashMap<TypeId, String>,
+
+    /// Cache for type relation results (subtype checking).
+    pub relation_cache: FxHashMap<(TypeId, TypeId, u8), bool>,
+}
+
 /// Shared state for type checking.
 pub struct CheckerContext<'a> {
     /// The ThinNodeArena containing the AST.
@@ -126,6 +143,50 @@ impl<'a> CheckerContext<'a> {
             local_scope_stack: Vec::new(),
             return_type_stack: Vec::new(),
             enclosing_class: None,
+        }
+    }
+
+    /// Create a new CheckerContext with a persistent cache.
+    /// This allows reusing type checking results from previous queries.
+    pub fn with_cache(
+        arena: &'a ThinNodeArena,
+        binder: &'a ThinBinderState,
+        types: &'a TypeInterner,
+        file_name: String,
+        cache: TypeCache,
+    ) -> Self {
+        CheckerContext {
+            arena,
+            binder,
+            types,
+            file_name,
+            symbol_types: cache.symbol_types,
+            node_types: cache.node_types,
+            type_parameter_names: cache.type_parameter_names,
+            relation_cache: RefCell::new(cache.relation_cache),
+            diagnostics: Vec::new(),
+            symbol_resolution_stack: Vec::new(),
+            symbol_resolution_set: HashSet::new(),
+            node_resolution_stack: Vec::new(),
+            node_resolution_set: HashSet::new(),
+            type_parameter_scope: HashMap::new(),
+            contextual_type: None,
+            instantiation_depth: RefCell::new(0),
+            call_depth: RefCell::new(0),
+            local_scope_stack: Vec::new(),
+            return_type_stack: Vec::new(),
+            enclosing_class: None,
+        }
+    }
+
+    /// Extract the persistent cache from this context.
+    /// This allows saving type checking results for future queries.
+    pub fn extract_cache(self) -> TypeCache {
+        TypeCache {
+            symbol_types: self.symbol_types,
+            node_types: self.node_types,
+            type_parameter_names: self.type_parameter_names,
+            relation_cache: self.relation_cache.into_inner(),
         }
     }
 

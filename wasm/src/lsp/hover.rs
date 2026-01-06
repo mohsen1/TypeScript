@@ -52,7 +52,17 @@ impl<'a> HoverProvider<'a> {
     }
 
     /// Get hover information at the given position.
-    pub fn get_hover(&self, root: NodeIndex, position: Position) -> Option<HoverInfo> {
+    ///
+    /// # Arguments
+    /// * `root` - The root node of the AST
+    /// * `position` - The cursor position
+    /// * `type_cache` - Mutable reference to the persistent type cache (for performance)
+    pub fn get_hover(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        type_cache: &mut Option<crate::checker::TypeCache>,
+    ) -> Option<HoverInfo> {
         // 1. Find node at position
         let offset = self.line_map.position_to_offset(position);
         let node_idx = find_node_at_offset(self.arena, offset);
@@ -68,16 +78,29 @@ impl<'a> HoverProvider<'a> {
         let symbol = self.binder.symbols.get(symbol_id)?;
 
         // 3. Compute Type Information
-        // We create a transient checker to compute the type of this specific symbol
-        let mut checker = ThinCheckerState::new(
-            self.arena,
-            self.binder,
-            self.interner,
-            self.file_name.clone()
-        );
+        // Use persistent cache if available for O(1) lookups on repeated queries
+        let mut checker = if let Some(cache) = type_cache.take() {
+            ThinCheckerState::with_cache(
+                self.arena,
+                self.binder,
+                self.interner,
+                self.file_name.clone(),
+                cache,
+            )
+        } else {
+            ThinCheckerState::new(
+                self.arena,
+                self.binder,
+                self.interner,
+                self.file_name.clone(),
+            )
+        };
 
         let type_id = checker.get_type_of_symbol(symbol_id);
         let type_string = checker.format_type(type_id);
+
+        // Extract and save the updated cache for future queries
+        *type_cache = Some(checker.extract_cache());
 
         // 4. Construct the signature string
         // e.g. "(variable) x: number" or "(function) foo(): void"
@@ -218,7 +241,8 @@ mod hover_tests {
 
         // Hover over 'x' in the last line (line 2, column 0)
         let pos = Position::new(2, 0);
-        let info = provider.get_hover(root, pos);
+        let mut cache = None;
+        let info = provider.get_hover(root, pos, &mut cache);
 
         assert!(info.is_some(), "Should find hover info");
 
@@ -257,7 +281,8 @@ mod hover_tests {
 
         // Hover over semicolon (no symbol)
         let pos = Position::new(0, 13);
-        let info = provider.get_hover(root, pos);
+        let mut cache = None;
+        let info = provider.get_hover(root, pos, &mut cache);
 
         assert!(info.is_none(), "Should not find hover info at semicolon");
     }
@@ -285,7 +310,8 @@ mod hover_tests {
 
         // Hover over 'foo' in the call
         let pos = Position::new(1, 0);
-        let info = provider.get_hover(root, pos);
+        let mut cache = None;
+        let info = provider.get_hover(root, pos, &mut cache);
 
         assert!(info.is_some(), "Should find hover info for function");
 
