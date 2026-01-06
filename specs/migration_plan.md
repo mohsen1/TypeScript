@@ -104,47 +104,17 @@ This catches design issues early and ensures consistent code quality.
 
 1. ✅ Refactor ThinCheckerState to use CheckerContext (wraps `ctx: CheckerContext<'a>`)
 2. ✅ Create ExpressionChecker in checker/expr.rs
-3. 🔄 Move expression type computation to solver (incremental, as features are added)
-4. 🔄 Use NodeView API consistently (incremental, as code is touched)
-5. ⬜ Create specialized checker modules (statements.rs, declarations.rs)
+3. ✅ Create specialized checker modules (statements.rs, declarations.rs)
+4. 🔄 Move expression type computation to solver (incremental, as features are added)
+5. 🔄 Use NodeView API consistently (incremental, as code is touched)
 
-### Next Steps - Emitter Focus
+### Type Checker Errors - Recently Completed
+- ✅ Error 2416: Property not assignable to same property in base type
+- ✅ Error 2676: Accessor abstract consistency
+- ✅ Error 1253: Abstract in non-abstract class
+- ✅ Error 2355: Function type annotations
 
-**Priority 1: Module System (33% of failing tests)**
-1. ⬜ CommonJS exports (`"use strict"`, `module.exports`, `exports.X`)
-2. ⬜ ES module imports/exports → CommonJS transform
-3. ⬜ Named exports and re-exports
-
-**Priority 2: Block Scoping (4% of failing tests)**
-4. ⬜ `let`/`const` → `var` for ES5 (temporal dead zone handling)
-
-**Priority 3: Class Features (7% of failing tests)**
-5. ⬜ Static fields initialization
-6. ⬜ Private fields (`#`) transform
-
-**Priority 4: Namespace & Enums (5% of failing tests)**
-7. ⬜ Namespace IIFE improvements
-8. ⬜ Enum object emit
-
-**Priority 5: Async/Generators (4% of failing tests)**
-9. ⬜ `__awaiter` helper for async/await
-10. ⬜ `__generator` helper for generators
-
-### Emit TODOs (40.8% failing → target 80%+)
-| Feature | Tests | % | Notes |
-|---------|-------|---|-------|
-| **Modules** | 1,935 | 33% | `import`/`export` → CommonJS/ESM |
-| **let/const** | 205 | 4% | Block scoping → `var` for ES5 |
-| **Arrow functions** | 159 | 3% | `=>` → `function` for ES5 |
-| **Class fields** | 404 | 7% | Static fields, private `#` |
-| **Namespace** | 168 | 3% | IIFE wrapping |
-| **Enums** | 145 | 2% | Enum object emit |
-| **Decorators** | 98 | 2% | `__decorate` helper |
-| **Async/await** | 88 | 2% | `__awaiter` helper |
-| **for-of** | 39 | 1% | Iterator downlevel |
-| **Spread/rest** | 24 | <1% | `__spread`/`__rest` helpers |
-| **Generators** | 26 | <1% | `__generator` helper |
-
+THEN continue working on baseline type checker work
 ---
 
 # Phase 9: Finishing up all TODOs ⬜
