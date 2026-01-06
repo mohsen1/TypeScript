@@ -113,6 +113,7 @@ pub mod diagnostic_messages {
     pub const PROPERTY_HAS_NO_INITIALIZER: &str = "Property '{0}' has no initializer and is not definitely assigned in the constructor.";
     pub const CANNOT_ASSIGN_READONLY: &str = "Cannot assign to '{0}' because it is a read-only property.";
     pub const MEMBER_NOT_ACCESSIBLE: &str = "Property '{0}' is {1} and only accessible within class '{2}'.";
+    pub const PRIVATE_IDENTIFIER_IN_AMBIENT_CONTEXT: &str = "Private identifiers are not allowed in ambient contexts.";
 
     // Interface errors
     pub const INTERFACE_INCORRECTLY_EXTENDS: &str = "Interface '{0}' incorrectly extends interface '{1}'.";
@@ -129,6 +130,10 @@ pub mod diagnostic_messages {
     pub const TYPE_NOT_SATISFY_CONSTRAINT: &str = "Type '{0}' does not satisfy the constraint '{1}'.";
     pub const GENERIC_TYPE_REQUIRES_ARGS: &str = "Generic type '{0}' requires {1} type argument(s).";
     pub const TYPE_IS_NOT_GENERIC: &str = "Type '{0}' is not generic.";
+
+    // Module/ambient errors
+    pub const AMBIENT_MODULE_DECLARATION_CANNOT_SPECIFY_RELATIVE_MODULE_NAME: &str = "Ambient module declaration cannot specify relative module name.";
+    pub const MODULE_HAS_NO_EXPORTED_MEMBER: &str = "Module '{0}' has no exported member '{1}'.";
 }
 
 /// TypeScript diagnostic error codes.
@@ -198,6 +203,9 @@ pub mod diagnostic_codes {
     pub const FUNCTION_RETURN_TYPE_MISMATCH: u32 = 2322;
     pub const PARAMETER_PROPERTY_NOT_ALLOWED: u32 = 2369;  // A parameter property is only allowed in a constructor implementation.
 
+    // Variable declaration errors
+    pub const SUBSEQUENT_VARIABLE_DECLARATIONS_MUST_HAVE_SAME_TYPE: u32 = 2403;  // Subsequent variable declarations must have the same type
+
     // Null/undefined errors
     pub const OBJECT_IS_POSSIBLY_UNDEFINED: u32 = 2532;
     pub const OBJECT_IS_POSSIBLY_NULL: u32 = 2531;
@@ -230,6 +238,7 @@ pub mod diagnostic_codes {
     pub const STATIC_MEMBERS_CANNOT_REFERENCE_TYPE_PARAMETERS: u32 = 2302;
     pub const OVERRIDE_MEMBER_NOT_IN_BASE: u32 = 4114;  // This member cannot have an 'override' modifier because it is not declared in the base class
     pub const OVERRIDE_MEMBER_REQUIRED: u32 = 4113;  // This member must have an 'override' modifier because it overrides a member in the base class
+    pub const PRIVATE_IDENTIFIER_IN_AMBIENT_CONTEXT: u32 = 2819;  // Private identifiers are not allowed in ambient contexts.
 
     // Interface/type errors
     pub const INTERFACE_NAME_CANNOT_BE: u32 = 2427;  // Interface name cannot be '{0}'.
@@ -248,6 +257,7 @@ pub mod diagnostic_codes {
     pub const INDEX_SIGNATURE_MISSING: u32 = 2329;
     pub const NO_INDEX_SIGNATURE: u32 = 7053;
     pub const INDEX_SIGNATURE_PARAMETER_MUST_BE_STRING_OR_NUMBER: u32 = 1023;
+    pub const PROPERTY_ACCESS_FROM_INDEX_SIGNATURE: u32 = 4111;  // Property comes from an index signature, so it must be accessed with ['prop']
 
     // Switch/control flow
     pub const SWITCH_NOT_EXHAUSTIVE: u32 = 2761;
@@ -260,6 +270,7 @@ pub mod diagnostic_codes {
     pub const EXPORT_ASSIGNMENT_WITH_OTHER_EXPORTS: u32 = 2309;  // An export assignment cannot be used in a module with other exported elements.
     pub const HAS_NO_DEFAULT_EXPORT: u32 = 2613;
     pub const EXPORT_ASSIGNMENT_CANNOT_BE_USED: u32 = 2714;
+    pub const AMBIENT_MODULE_DECLARATION_CANNOT_SPECIFY_RELATIVE_MODULE_NAME: u32 = 5061;
 
     // Promise/async errors
     pub const AWAIT_OUTSIDE_ASYNC: u32 = 1308;

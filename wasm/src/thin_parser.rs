@@ -2893,8 +2893,8 @@ impl ThinParserState {
             SyntaxKind::TypeKeyword => self.parse_type_alias_declaration(),
             SyntaxKind::EnumKeyword => self.parse_enum_declaration(),
             SyntaxKind::NamespaceKeyword |
-            SyntaxKind::ModuleKeyword => self.parse_module_declaration(),
-            SyntaxKind::GlobalKeyword => self.parse_module_declaration(),
+            SyntaxKind::ModuleKeyword => self.parse_declare_module(start_pos, declare_modifier),
+            SyntaxKind::GlobalKeyword => self.parse_declare_module(start_pos, declare_modifier),
             SyntaxKind::VarKeyword |
             SyntaxKind::LetKeyword => {
                 let modifiers = self.make_node_list(vec![declare_modifier]);
@@ -2959,6 +2959,44 @@ impl ThinParserState {
             end_pos,
             crate::parser::thin_node::ModuleData {
                 modifiers: None,
+                name,
+                body,
+            },
+        )
+    }
+
+    /// Parse declare module: declare module "name" {}
+    fn parse_declare_module(&mut self, start_pos: u32, declare_modifier: NodeIndex) -> NodeIndex {
+        // Skip module/namespace/global keyword
+        let _is_global = self.is_token(SyntaxKind::GlobalKeyword);
+        self.next_token();
+
+        // Parse name - can be identifier or string literal
+        let name = if self.is_token(SyntaxKind::StringLiteral) {
+            self.parse_string_literal()
+        } else {
+            self.parse_module_name()
+        };
+
+        // Parse body
+        let body = if self.is_token(SyntaxKind::OpenBraceToken) {
+            self.parse_module_block()
+        } else if self.is_token(SyntaxKind::DotToken) {
+            // Nested module: module A.B.C { }
+            self.next_token();
+            self.parse_module_declaration()
+        } else {
+            NodeIndex::NONE
+        };
+
+        let end_pos = self.token_end();
+
+        self.arena.add_module(
+            syntax_kind_ext::MODULE_DECLARATION,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::ModuleData {
+                modifiers: Some(self.make_node_list(vec![declare_modifier])),
                 name,
                 body,
             },

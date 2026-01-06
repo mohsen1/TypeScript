@@ -175,6 +175,12 @@ impl<'a> CheckerContext<'a> {
         None
     }
 
+    /// Look up a local variable in the current (innermost) scope only.
+    /// This is used for redeclaration checking (TS2403).
+    pub fn lookup_local_in_current_scope(&self, name: &str) -> Option<TypeId> {
+        self.local_scope_stack.last()?.get(name).copied()
+    }
+
     /// Push an expected return type onto the stack.
     pub fn push_return_type(&mut self, return_type: TypeId) {
         self.return_type_stack.push(return_type);
@@ -188,5 +194,19 @@ impl<'a> CheckerContext<'a> {
     /// Get the current expected return type.
     pub fn current_return_type(&self) -> Option<TypeId> {
         self.return_type_stack.last().copied()
+    }
+
+    /// Check if a modifier list contains a specific modifier kind.
+    pub fn has_modifier(&self, modifiers: &Option<crate::parser::NodeList>, kind: u16) -> bool {
+        if let Some(mods) = modifiers {
+            for &idx in &mods.nodes {
+                if let Some(node) = self.arena.get(idx) {
+                    if node.kind == kind {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 }
