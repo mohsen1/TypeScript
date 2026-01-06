@@ -2441,10 +2441,159 @@ impl<'a> ThinCheckerState<'a> {
         // Get the type of the object being accessed
         let obj_type = self.get_type_of_node(access.expression);
 
-        // Check if the property is readonly in the object type
+        // Check if the property is readonly in the object type (solver types)
         if self.is_property_readonly(obj_type, &prop_name) {
-            self.error_readonly_property_at(&prop_name, expr_idx);
+            self.error_readonly_property_at(&prop_name, target_idx);
+            return;
         }
+
+        // Also check AST-level readonly on class properties
+        // Get the class name from the object expression (for `c.ro`, get the type of `c`)
+        if let Some(class_name) = self.get_class_name_from_expression(access.expression) {
+            if self.is_class_property_readonly(&class_name, &prop_name) {
+                self.error_readonly_property_at(&prop_name, target_idx);
+            }
+        }
+    }
+
+    /// Get the class name from an expression, if it's a class instance.
+    fn get_class_name_from_expression(&self, expr_idx: NodeIndex) -> Option<String> {
+        let Some(node) = self.ctx.arena.get(expr_idx) else {
+            return None;
+        };
+
+        // If it's a simple identifier, look up its type from the binder
+        if let Some(ident) = self.ctx.arena.get_identifier(node) {
+            let var_name = &ident.escaped_text;
+
+            // Look up the variable in local scopes
+            if let Some(type_id) = self.lookup_local(var_name) {
+                // Check if this type is a class instance - the type would be stored
+                // We need to trace back to the class name
+                return self.get_class_name_from_type(type_id);
+            }
+
+            // Check file_locals for the variable binding
+            if let Some(sym_id) = self.ctx.binder.file_locals.get(var_name) {
+                if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                    // Get the value declaration and check if it's a variable with new Class()
+                    if !symbol.value_declaration.is_none() {
+                        return self.get_class_name_from_var_decl(symbol.value_declaration);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Get the class name from a variable declaration that initializes to `new ClassName()`.
+    fn get_class_name_from_var_decl(&self, decl_idx: NodeIndex) -> Option<String> {
+        let Some(node) = self.ctx.arena.get(decl_idx) else {
+            return None;
+        };
+
+        let Some(var_decl) = self.ctx.arena.get_variable_declaration(node) else {
+            return None;
+        };
+
+        if var_decl.initializer.is_none() {
+            return None;
+        }
+
+        let Some(init_node) = self.ctx.arena.get(var_decl.initializer) else {
+            return None;
+        };
+
+        // Check if initializer is `new ClassName()`
+        if init_node.kind != syntax_kind_ext::NEW_EXPRESSION {
+            return None;
+        }
+
+        // Call and new expressions share CallExprData
+        let Some(new_expr) = self.ctx.arena.get_call_expr(init_node) else {
+            return None;
+        };
+
+        // Get the class name from the new expression
+        let Some(expr_node) = self.ctx.arena.get(new_expr.expression) else {
+            return None;
+        };
+
+        if let Some(ident) = self.ctx.arena.get_identifier(expr_node) {
+            return Some(ident.escaped_text.clone());
+        }
+
+        None
+    }
+
+    /// Get the class name from a TypeId if it represents a class instance.
+    fn get_class_name_from_type(&self, _type_id: TypeId) -> Option<String> {
+        // For now, we don't have class types in the solver, so return None
+        // This will be implemented when we add proper class types to the solver
+        None
+    }
+
+    /// Check if a property is readonly in a class declaration (by looking at AST).
+    fn is_class_property_readonly(&self, class_name: &str, prop_name: &str) -> bool {
+        use crate::scanner::SyntaxKind;
+
+        // Find the class declaration by name
+        if let Some(sym_id) = self.ctx.binder.file_locals.get(class_name) {
+            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                let decl_idx = if !symbol.value_declaration.is_none() {
+                    symbol.value_declaration
+                } else if let Some(&idx) = symbol.declarations.first() {
+                    idx
+                } else {
+                    return false;
+                };
+
+                let Some(node) = self.ctx.arena.get(decl_idx) else {
+                    return false;
+                };
+
+                let Some(class) = self.ctx.arena.get_class(node) else {
+                    return false;
+                };
+
+                // Find the property in the class members
+                for &member_idx in &class.members.nodes {
+                    let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                        continue;
+                    };
+
+                    if member_node.kind == syntax_kind_ext::PROPERTY_DECLARATION {
+                        if let Some(prop) = self.ctx.arena.get_property_decl(member_node) {
+                            // Get the property name
+                            if let Some(pname) = self.get_property_name(prop.name) {
+                                if pname == prop_name {
+                                    // Check if this property has readonly modifier
+                                    return self.has_readonly_modifier(&prop.modifiers);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Check if modifiers include the 'readonly' keyword.
+    fn has_readonly_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::ReadonlyKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 
     /// Check if a property is marked readonly in a type.

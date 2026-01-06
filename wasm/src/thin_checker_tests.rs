@@ -838,3 +838,41 @@ class C extends B {
     assert!(has_prop, "Error 2654 should mention missing 'prop'");
     assert!(has_m, "Error 2654 should mention missing 'm'");
 }
+
+#[test]
+fn test_readonly_property_assignment_2540() {
+    // Error 2540: Cannot assign to 'ro' because it is a read-only property.
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class C {
+    readonly ro: string = "readonly please";
+}
+let c = new C();
+c.ro = "error: lhs of assignment can't be readonly";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+
+    checker.check_source_file(root);
+
+    println!("Diagnostics:");
+    for diag in &checker.ctx.diagnostics {
+        println!("  TS{}: {}", diag.code, diag.message_text);
+    }
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have error 2540 for readonly property assignment
+    let count_2540 = codes.iter().filter(|&&c| c == 2540).count();
+    assert!(count_2540 >= 1,
+        "Expected at least 1 error 2540 for readonly property assignment, got {} in: {:?}", count_2540, codes);
+}
