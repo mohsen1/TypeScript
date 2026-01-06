@@ -1,7 +1,7 @@
 //! TypeScript compatibility layer for assignability rules.
 
 use crate::solver::intern::TypeInterner;
-use crate::solver::subtype::{NoopResolver, SubtypeChecker, TypeResolver};
+use crate::solver::subtype::{NoopResolver, SubtypeChecker, SubtypeFailureReason, TypeResolver};
 use crate::solver::types::TypeId;
 use rustc_hash::FxHashMap;
 
@@ -65,6 +65,13 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
 
         self.cache.insert(key, result);
         result
+    }
+
+    /// Explain why `source` is not assignable to `target` using TS compatibility rules.
+    pub fn explain_failure(&mut self, source: TypeId, target: TypeId) -> Option<SubtypeFailureReason> {
+        self.subtype.strict_function_types = self.strict_function_types;
+        self.subtype.allow_void_return = true;
+        self.subtype.explain_failure(source, target)
     }
 }
 
