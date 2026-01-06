@@ -14,16 +14,16 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 ## Tasks
 
 ### Phase 1: The Compatibility Layer (compat.rs)
-- [ ] Create `CompatChecker` struct
+- [x] Create `CompatChecker` struct
   - Wraps `SubtypeChecker` with TypeScript-specific rules
   - `is_assignable(source: TypeId, target: TypeId) -> bool`
-- [ ] Implement `any` escape hatch
+- [x] Implement `any` escape hatch
   - If source is `any` -> always return true
   - If target is `any` -> always return true (bivariance)
-- [ ] Implement `unknown` handling
+- [x] Implement `unknown` handling
   - `unknown` accepts anything (top type)
   - Only `unknown` and `any` assignable to `unknown`
-- [ ] Tests for any/unknown
+- [x] Tests for any/unknown
   - Test: `any` assignable to `string`
   - Test: `string` assignable to `any`
   - Test: `unknown` assignable to `any` but not `string`

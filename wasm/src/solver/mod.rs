@@ -18,6 +18,7 @@
 mod types;
 mod intern;
 mod lower;
+mod compat;
 mod subtype;
 mod infer;
 mod instantiate;
@@ -30,6 +31,7 @@ mod operations;
 pub use types::*;
 pub use intern::*;
 pub use lower::*;
+pub use compat::*;
 pub use subtype::*;
 pub use infer::*;
 pub use instantiate::*;
