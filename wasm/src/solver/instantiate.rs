@@ -71,6 +71,8 @@ pub struct TypeInstantiator<'a> {
     substitution: &'a TypeSubstitution,
     /// Track visited types to handle cycles
     visiting: HashMap<TypeId, TypeId>,
+    /// Type parameter names that are shadowed in the current scope.
+    shadowed: Vec<Atom>,
 }
 
 impl<'a> TypeInstantiator<'a> {
@@ -80,7 +82,12 @@ impl<'a> TypeInstantiator<'a> {
             interner,
             substitution,
             visiting: HashMap::new(),
+            shadowed: Vec::new(),
         }
+    }
+
+    fn is_shadowed(&self, name: Atom) -> bool {
+        self.shadowed.iter().any(|&shadowed| shadowed == name)
     }
 
     /// Apply the substitution to a type, returning the instantiated type.
@@ -114,23 +121,32 @@ impl<'a> TypeInstantiator<'a> {
 
     /// Instantiate a call signature.
     fn instantiate_call_signature(&mut self, sig: &CallSignature) -> CallSignature {
+        let shadowed_len = self.shadowed.len();
+        self.shadowed.extend(sig.type_params.iter().map(|tp| tp.name));
+
+        let type_params: Vec<TypeParamInfo> = sig.type_params.iter()
+            .map(|tp| TypeParamInfo {
+                name: tp.name,
+                constraint: tp.constraint.map(|c| self.instantiate(c)),
+                default: tp.default.map(|d| self.instantiate(d)),
+            })
+            .collect();
+        let params: Vec<ParamInfo> = sig.params.iter()
+            .map(|p| ParamInfo {
+                name: p.name.clone(),
+                type_id: self.instantiate(p.type_id),
+                optional: p.optional,
+                rest: p.rest,
+            })
+            .collect();
+        let return_type = self.instantiate(sig.return_type);
+
+        self.shadowed.truncate(shadowed_len);
+
         CallSignature {
-            type_params: sig.type_params.iter()
-                .map(|tp| TypeParamInfo {
-                    name: tp.name.clone(),
-                    constraint: tp.constraint.map(|c| self.instantiate(c)),
-                    default: tp.default.map(|d| self.instantiate(d)),
-                })
-                .collect(),
-            params: sig.params.iter()
-                .map(|p| ParamInfo {
-                    name: p.name.clone(),
-                    type_id: self.instantiate(p.type_id),
-                    optional: p.optional,
-                    rest: p.rest,
-                })
-                .collect(),
-            return_type: self.instantiate(sig.return_type),
+            type_params,
+            params,
+            return_type,
         }
     }
 
@@ -139,6 +155,9 @@ impl<'a> TypeInstantiator<'a> {
         match key {
             // Type parameters get substituted
             TypeKey::TypeParameter(info) => {
+                if self.is_shadowed(info.name) {
+                    return self.interner.intern(key.clone());
+                }
                 if let Some(substituted) = self.substitution.get(info.name) {
                     substituted
                 } else {
@@ -249,6 +268,16 @@ impl<'a> TypeInstantiator<'a> {
             // Function: instantiate params and return type
             // Note: Type params in the function create a new scope - don't substitute those
             TypeKey::Function(shape) => {
+                let shadowed_len = self.shadowed.len();
+                self.shadowed.extend(shape.type_params.iter().map(|tp| tp.name));
+
+                let instantiated_type_params: Vec<TypeParamInfo> = shape.type_params.iter()
+                    .map(|tp| TypeParamInfo {
+                        name: tp.name,
+                        constraint: tp.constraint.map(|c| self.instantiate(c)),
+                        default: tp.default.map(|d| self.instantiate(d)),
+                    })
+                    .collect();
                 let instantiated_params: Vec<ParamInfo> = shape.params.iter()
                     .map(|p| ParamInfo {
                         name: p.name.clone(),
@@ -259,21 +288,14 @@ impl<'a> TypeInstantiator<'a> {
                     .collect();
                 let instantiated_return = self.instantiate(shape.return_type);
 
-                // Type params that belong to this function should NOT be substituted
-                // They create a new scope - we keep them as-is
-                let instantiated_shape = FunctionShape {
-                    type_params: shape.type_params.iter()
-                        .map(|tp| TypeParamInfo {
-                            name: tp.name.clone(),
-                            constraint: tp.constraint.map(|c| self.instantiate(c)),
-                            default: tp.default.map(|d| self.instantiate(d)),
-                        })
-                        .collect(),
+                self.shadowed.truncate(shadowed_len);
+
+                self.interner.function(FunctionShape {
+                    type_params: instantiated_type_params,
                     params: instantiated_params,
                     return_type: instantiated_return,
                     is_constructor: shape.is_constructor,
-                };
-                self.interner.function(instantiated_shape)
+                })
             }
 
             // Callable: instantiate all signatures and properties
@@ -314,13 +336,23 @@ impl<'a> TypeInstantiator<'a> {
 
             // Mapped: instantiate constraint and template
             TypeKey::Mapped(mapped) => {
+                let shadowed_len = self.shadowed.len();
+                self.shadowed.push(mapped.type_param.name);
+
                 let instantiated = MappedType {
-                    type_param: mapped.type_param.clone(), // The iteration variable stays
+                    type_param: TypeParamInfo {
+                        name: mapped.type_param.name,
+                        constraint: mapped.type_param.constraint.map(|c| self.instantiate(c)),
+                        default: mapped.type_param.default.map(|d| self.instantiate(d)),
+                    },
                     constraint: self.instantiate(mapped.constraint),
                     template: self.instantiate(mapped.template),
                     readonly_modifier: mapped.readonly_modifier,
                     optional_modifier: mapped.optional_modifier,
                 };
+
+                self.shadowed.truncate(shadowed_len);
+
                 self.interner.intern(TypeKey::Mapped(Box::new(instantiated)))
             }
 
