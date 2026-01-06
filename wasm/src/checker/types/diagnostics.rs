@@ -114,6 +114,9 @@ pub mod diagnostic_messages {
     pub const CANNOT_ASSIGN_READONLY: &str = "Cannot assign to '{0}' because it is a read-only property.";
     pub const MEMBER_NOT_ACCESSIBLE: &str = "Property '{0}' is {1} and only accessible within class '{2}'.";
 
+    // Interface errors
+    pub const INTERFACE_INCORRECTLY_EXTENDS: &str = "Interface '{0}' incorrectly extends interface '{1}'.";
+
     // Enum errors
     pub const ENUM_MEMBER_MUST_HAVE_INITIALIZER: &str = "Enum member must have initializer.";
     pub const CONST_ENUM_MEMBER_INITIALIZER: &str = "In 'const' enum declarations member initializer must be constant expression.";
@@ -231,6 +234,7 @@ pub mod diagnostic_codes {
     // Interface/type errors
     pub const INTERFACE_NAME_CANNOT_BE: u32 = 2427;  // Interface name cannot be '{0}'.
     pub const INTERFACE_CAN_ONLY_EXTEND_INTERFACE: u32 = 2422;
+    pub const INTERFACE_INCORRECTLY_EXTENDS_INTERFACE: u32 = 2430;  // Interface '{0}' incorrectly extends interface '{1}'.
     pub const TYPE_ALIAS_CIRCULARLY_REFERENCES_ITSELF: u32 = 2456;
     pub const INTERFACE_DECLARES_CONFLICTING_MEMBER: u32 = 2320;
 

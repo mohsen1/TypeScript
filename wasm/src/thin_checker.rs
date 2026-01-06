@@ -2879,6 +2879,9 @@ impl<'a> ThinCheckerState<'a> {
             self.check_type_member_for_parameter_properties(member_idx);
         }
 
+        // Check that interface correctly extends base interfaces (error 2430)
+        self.check_interface_extension_compatibility(stmt_idx, &iface);
+
         self.pop_local_scope();
     }
 
@@ -3668,6 +3671,250 @@ impl<'a> ThinCheckerState<'a> {
                 break; // Found matching base member, no need to continue
             }
         }
+    }
+
+    /// Check that interface correctly extends its base interfaces (error 2430).
+    /// For each member in the derived interface, checks if the same member in a base interface
+    /// has an incompatible type.
+    fn check_interface_extension_compatibility(
+        &mut self,
+        _iface_idx: NodeIndex,
+        iface_data: &crate::parser::thin_node::InterfaceData,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        use crate::parser::syntax_kind_ext::{METHOD_SIGNATURE, PROPERTY_SIGNATURE};
+        use crate::scanner::SyntaxKind;
+
+        // Get heritage clauses (extends)
+        let Some(ref heritage_clauses) = iface_data.heritage_clauses else {
+            return;
+        };
+
+        // Get the derived interface name for the error message
+        let derived_name = if !iface_data.name.is_none() {
+            if let Some(name_node) = self.ctx.arena.get(iface_data.name) {
+                if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                    ident.escaped_text.clone()
+                } else {
+                    String::from("<anonymous>")
+                }
+            } else {
+                String::from("<anonymous>")
+            }
+        } else {
+            String::from("<anonymous>")
+        };
+
+        // Process each heritage clause (extends)
+        for &clause_idx in &heritage_clauses.nodes {
+            let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
+                continue;
+            };
+
+            let Some(heritage) = self.ctx.arena.get_heritage_clause(clause_node) else {
+                continue;
+            };
+
+            // Only check extends clauses
+            if heritage.token != SyntaxKind::ExtendsKeyword as u16 {
+                continue;
+            }
+
+            // Process each extended interface
+            for &type_idx in &heritage.types.nodes {
+                let Some(type_node) = self.ctx.arena.get(type_idx) else {
+                    continue;
+                };
+
+                // Get the base interface name and declaration
+                let expr_idx = if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
+                    expr_type_args.expression
+                } else {
+                    type_idx
+                };
+
+                let Some(expr_node) = self.ctx.arena.get(expr_idx) else {
+                    continue;
+                };
+
+                let Some(ident) = self.ctx.arena.get_identifier(expr_node) else {
+                    continue;
+                };
+
+                let base_name = ident.escaped_text.clone();
+
+                // Find the base interface declaration via symbol lookup
+                let base_iface_idx = if let Some(sym_id) = self.ctx.binder.file_locals.get(&base_name) {
+                    if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                        if !symbol.value_declaration.is_none() {
+                            Some(symbol.value_declaration)
+                        } else if let Some(&decl_idx) = symbol.declarations.first() {
+                            Some(decl_idx)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+
+                let Some(base_idx) = base_iface_idx else {
+                    continue;
+                };
+
+                let Some(base_node) = self.ctx.arena.get(base_idx) else {
+                    continue;
+                };
+
+                let Some(base_iface) = self.ctx.arena.get_interface(base_node) else {
+                    continue;
+                };
+
+                // Check each member in the derived interface against base members
+                for &member_idx in &iface_data.members.nodes {
+                    let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                        continue;
+                    };
+
+                    // Get member name and type
+                    let (member_name, member_type) = if member_node.kind == METHOD_SIGNATURE || member_node.kind == PROPERTY_SIGNATURE {
+                        if let Some(sig) = self.ctx.arena.get_signature(member_node) {
+                            if let Some(name_node) = self.ctx.arena.get(sig.name) {
+                                if let Some(id_data) = self.ctx.arena.get_identifier(name_node) {
+                                    let name = id_data.escaped_text.clone();
+                                    // Get the type of this member
+                                    let type_id = self.get_type_of_interface_member(member_idx);
+                                    (name, type_id)
+                                } else {
+                                    continue;
+                                }
+                            } else {
+                                continue;
+                            }
+                        } else {
+                            continue;
+                        }
+                    } else {
+                        continue;
+                    };
+
+                    // Look for matching member in base interface
+                    for &base_member_idx in &base_iface.members.nodes {
+                        let Some(base_member_node) = self.ctx.arena.get(base_member_idx) else {
+                            continue;
+                        };
+
+                        let (base_member_name, base_type) = if base_member_node.kind == METHOD_SIGNATURE || base_member_node.kind == PROPERTY_SIGNATURE {
+                            if let Some(sig) = self.ctx.arena.get_signature(base_member_node) {
+                                if let Some(name_node) = self.ctx.arena.get(sig.name) {
+                                    if let Some(id_data) = self.ctx.arena.get_identifier(name_node) {
+                                        let name = id_data.escaped_text.clone();
+                                        let type_id = self.get_type_of_interface_member(base_member_idx);
+                                        (name, type_id)
+                                    } else {
+                                        continue;
+                                    }
+                                } else {
+                                    continue;
+                                }
+                            } else {
+                                continue;
+                            }
+                        } else {
+                            continue;
+                        };
+
+                        // Check if names match
+                        if member_name != base_member_name {
+                            continue;
+                        }
+
+                        // Check type compatibility - derived type must be assignable to base type
+                        let mut subtype_checker = crate::solver::SubtypeChecker::new(&self.ctx.types);
+                        if !subtype_checker.is_assignable_to(member_type, base_type) {
+                            // Report error 2430 on the interface name (not the member)
+                            let member_type_str = self.format_type(member_type);
+                            let base_type_str = self.format_type(base_type);
+
+                            self.error_at_node(
+                                iface_data.name,
+                                &format!(
+                                    "Interface '{}' incorrectly extends interface '{}'.",
+                                    derived_name, base_name
+                                ),
+                                diagnostic_codes::INTERFACE_INCORRECTLY_EXTENDS_INTERFACE,
+                            );
+
+                            // Add sub-error for property incompatibility
+                            if let Some((pos, end)) = self.get_node_span(iface_data.name) {
+                                self.error(
+                                    pos,
+                                    end - pos,
+                                    format!("Types of property '{}' are incompatible.", member_name),
+                                    diagnostic_codes::INTERFACE_INCORRECTLY_EXTENDS_INTERFACE,
+                                );
+                                self.error(
+                                    pos,
+                                    end - pos,
+                                    format!(
+                                        "Type '{}' is not assignable to type '{}'.",
+                                        member_type_str, base_type_str
+                                    ),
+                                    diagnostic_codes::INTERFACE_INCORRECTLY_EXTENDS_INTERFACE,
+                                );
+                            }
+
+                            // Only report first incompatibility per base interface
+                            return;
+                        }
+
+                        break; // Found matching member, no need to continue
+                    }
+                }
+            }
+        }
+    }
+
+    /// Get the type of an interface member (method signature or property signature).
+    fn get_type_of_interface_member(&mut self, member_idx: NodeIndex) -> TypeId {
+        use crate::parser::syntax_kind_ext::{METHOD_SIGNATURE, PROPERTY_SIGNATURE};
+        use crate::solver::FunctionShape;
+
+        let Some(member_node) = self.ctx.arena.get(member_idx) else {
+            return TypeId::ANY;
+        };
+
+        if member_node.kind == METHOD_SIGNATURE {
+            // For method signatures, build a function type
+            if let Some(sig) = self.ctx.arena.get_signature(member_node) {
+                let params = self.extract_params_from_signature(sig);
+                let return_type = if !sig.type_annotation.is_none() {
+                    self.get_type_from_type_node(sig.type_annotation)
+                } else {
+                    TypeId::ANY
+                };
+
+                let shape = FunctionShape {
+                    type_params: Vec::new(),
+                    params,
+                    return_type,
+                    is_constructor: false,
+                };
+
+                return self.ctx.types.function(shape);
+            }
+        } else if member_node.kind == PROPERTY_SIGNATURE {
+            // For property signatures, get the type annotation
+            if let Some(sig) = self.ctx.arena.get_signature(member_node) {
+                if !sig.type_annotation.is_none() {
+                    return self.get_type_from_type_node(sig.type_annotation);
+                }
+            }
+        }
+
+        TypeId::ANY
     }
 
     /// Check that non-abstract class implements all abstract members from base class (error 2654).

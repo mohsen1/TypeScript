@@ -91,7 +91,7 @@ see SESSION_LOG.md -- always amended with each session's work
 ### Current Status (12,408 tests)
 | Baseline | Compiler (100 sample) | Conformance | Crash Rate |
 |----------|----------------------|-------------|------------|
-| .errors.txt | **80.5%** (62/77 subset) | 33.8% (1,741/5,157) | 0.05% |
+| .errors.txt | **81.8%** (63/77 subset) | 33.8% (1,741/5,157) | 0.05% |
 | .js emit | **60.5%** (46/76 subset) | ~3% | 0.05% |
 
 ### Work Process
@@ -113,6 +113,7 @@ This catches design issues early and ensures consistent code quality.
 5. 🔄 Use NodeView API consistently (incremental, as code is touched)
 
 ### Type Checker Errors - Recently Completed
+- ✅ Error 2430: Interface incorrectly extends interface (method signature compatibility)
 - ✅ Error 2416: Property not assignable to same property in base type
 - ✅ Error 2654: Non-abstract class missing implementations for abstract members
 - ✅ Error 2540: Cannot assign to readonly property
