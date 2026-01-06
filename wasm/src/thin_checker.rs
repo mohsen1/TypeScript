@@ -1239,6 +1239,35 @@ impl<'a> ThinCheckerState<'a> {
                     });
                 }
             }
+            // Accessor: { get foo() {} } or { set foo(v) {} }
+            else if let Some(accessor) = self.arena.get_accessor(elem_node) {
+                // Check for missing body - error 1005 at end of accessor
+                if accessor.body.is_none() {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    // Report at accessor.end - 1 (pointing to the closing paren)
+                    let end_pos = elem_node.end.saturating_sub(1);
+                    self.error_at_position(
+                        end_pos,
+                        1,
+                        "'{' expected.",
+                        diagnostic_codes::TOKEN_EXPECTED,
+                    );
+                }
+                if let Some(name) = self.get_property_name(accessor.name) {
+                    // For getter, infer return type; for setter, it's void
+                    let accessor_type = if elem_node.kind == syntax_kind_ext::GET_ACCESSOR {
+                        self.get_type_of_function(elem_idx)
+                    } else {
+                        TypeId::VOID
+                    };
+                    properties.push(PropertyInfo {
+                        name: Arc::from(name.as_str()),
+                        type_id: accessor_type,
+                        optional: false,
+                        readonly: false,
+                    });
+                }
+            }
             // Skip spread elements and computed properties for now
         }
 
@@ -1999,8 +2028,14 @@ impl<'a> ThinCheckerState<'a> {
                     }
                 }
             }
-            // Type declarations - just register them, no expression checking needed
-            syntax_kind_ext::TYPE_ALIAS_DECLARATION |
+            // Type alias declarations - check the type for accessor body and parameter property errors
+            syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                if let Some(type_alias) = self.arena.get_type_alias(node) {
+                    // Check the type for accessor bodies in ambient context and parameter properties
+                    self.check_type_for_parameter_properties(type_alias.type_node);
+                }
+            }
+            // Other type declarations - just register them, no expression checking needed
             syntax_kind_ext::ENUM_DECLARATION |
             syntax_kind_ext::IMPORT_DECLARATION |
             syntax_kind_ext::EMPTY_STATEMENT |
@@ -2573,6 +2608,21 @@ impl<'a> ThinCheckerState<'a> {
                 self.check_type_for_parameter_properties(sig.type_annotation);
             }
         }
+        // Check accessors in type literals/interfaces - cannot have body (error 1183)
+        else if node.kind == syntax_kind_ext::GET_ACCESSOR || node.kind == syntax_kind_ext::SET_ACCESSOR {
+            if let Some(accessor) = self.arena.get_accessor(node) {
+                // Accessors in type literals and interfaces cannot have implementations
+                if !accessor.body.is_none() {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    // Report error on the body
+                    self.error_at_node(
+                        accessor.body,
+                        "An implementation cannot be declared in ambient contexts.",
+                        diagnostic_codes::IMPLEMENTATION_CANNOT_BE_IN_AMBIENT_CONTEXT,
+                    );
+                }
+            }
+        }
     }
 
     /// Check that all method/constructor overload signatures have implementations.
@@ -2963,6 +3013,19 @@ impl<'a> ThinCheckerState<'a> {
                 related_information: Vec::new(),
             });
         }
+    }
+
+    /// Report an error at a specific position.
+    fn error_at_position(&mut self, start: u32, length: u32, message: &str, code: u32) {
+        self.diagnostics.push(Diagnostic {
+            file: self.file_name.clone(),
+            start,
+            length,
+            message_text: message.to_string(),
+            category: DiagnosticCategory::Error,
+            code,
+            related_information: Vec::new(),
+        });
     }
 
     /// Check a class member (property, method, constructor, accessor).

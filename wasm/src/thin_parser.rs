@@ -5636,6 +5636,8 @@ impl ThinParserState {
         let name = self.parse_property_name();
 
         self.parse_expected(SyntaxKind::OpenParenToken);
+        // Save end of ) for error reporting - get it BEFORE consuming the token
+        let close_paren_end = self.token_end();
         self.parse_expected(SyntaxKind::CloseParenToken);
 
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
@@ -5643,14 +5645,19 @@ impl ThinParserState {
         } else {
             NodeIndex::NONE
         };
+        // If there's a type annotation, use its end; otherwise use close paren end
+        let signature_end = if !type_annotation.is_none() { self.token_pos() } else { close_paren_end };
 
+        // Parse body if present. Missing body is reported in grammar check, not here.
+        // This matches TypeScript's behavior of allowing ASI and checking later.
         let body = if self.is_token(SyntaxKind::OpenBraceToken) {
             self.parse_block()
         } else {
             NodeIndex::NONE
         };
 
-        let end_pos = self.token_end();
+        // End position: use token_end for normal case, signature_end for missing body
+        let end_pos = if body.is_none() { signature_end } else { self.token_end() };
         self.arena.add_accessor(
             syntax_kind_ext::GET_ACCESSOR,
             start_pos,
@@ -5673,15 +5680,19 @@ impl ThinParserState {
 
         self.parse_expected(SyntaxKind::OpenParenToken);
         let parameters = self.parse_parameter_list();
+        // Save end of ) for error reporting - get it BEFORE consuming the token
+        let close_paren_end = self.token_end();
         self.parse_expected(SyntaxKind::CloseParenToken);
 
+        // Parse body if present. Missing body is reported in grammar check, not here.
         let body = if self.is_token(SyntaxKind::OpenBraceToken) {
             self.parse_block()
         } else {
             NodeIndex::NONE
         };
 
-        let end_pos = self.token_end();
+        // End position: use token_end for normal case, close_paren_end for missing body
+        let end_pos = if body.is_none() { close_paren_end } else { self.token_end() };
         self.arena.add_accessor(
             syntax_kind_ext::SET_ACCESSOR,
             start_pos,
