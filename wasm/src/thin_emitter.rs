@@ -1103,6 +1103,11 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
+        // Skip ambient declarations (declare function)
+        if self.has_declare_modifier(&func.modifiers) {
+            return;
+        }
+
         // For JavaScript emit: skip declaration-only functions (no body)
         // These are just type information in TypeScript
         if func.body.is_none() {
@@ -1231,6 +1236,11 @@ impl<'a> ThinPrinter<'a> {
         let Some(var_stmt) = self.arena.get_variable(node) else {
             return;
         };
+
+        // Skip ambient declarations (declare var/let/const)
+        if self.has_declare_modifier(&var_stmt.modifiers) {
+            return;
+        }
 
         // VariableStatement.declarations contains a VARIABLE_DECLARATION_LIST
         // Emit the declaration list (which handles the let/const/var keyword)
@@ -1377,17 +1387,23 @@ impl<'a> ThinPrinter<'a> {
     // =========================================================================
 
     fn emit_class_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
+        let Some(class) = self.arena.get_class(node) else {
+            return;
+        };
+
+        // Skip ambient declarations (declare class)
+        if self.has_declare_modifier(&class.modifiers) {
+            return;
+        }
+
         // Use ES5 IIFE transform when targeting ES5
         if self.target_es5 {
             let mut es5_emitter = ClassES5Emitter::new(self.arena);
+            es5_emitter.set_indent_level(self.indent_level);
             let es5_output = es5_emitter.emit_class(idx);
             self.write(&es5_output);
             return;
         }
-        
-        let Some(class) = self.arena.get_class(node) else {
-            return;
-        };
 
         // Emit modifiers (including decorators)
         if let Some(ref modifiers) = class.modifiers {
@@ -2117,6 +2133,24 @@ impl<'a> ThinPrinter<'a> {
     }
 
     // =========================================================================
+    // Modifier Helpers
+    // =========================================================================
+
+    /// Check if modifiers include the `declare` keyword
+    fn has_declare_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::DeclareKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    // =========================================================================
     // Class Members
     // =========================================================================
 
@@ -2254,14 +2288,14 @@ impl<'a> ThinPrinter<'a> {
         self.emit(accessor.name);
         self.write("()");
 
-        if !accessor.type_annotation.is_none() {
-            self.write(": ");
-            self.emit(accessor.type_annotation);
-        }
+        // Skip type annotation for JS emit
 
         if !accessor.body.is_none() {
             self.write(" ");
             self.emit(accessor.body);
+        } else {
+            // For JS emit, add empty body for accessors without body
+            self.write(" { }");
         }
     }
 
@@ -2282,6 +2316,9 @@ impl<'a> ThinPrinter<'a> {
         if !accessor.body.is_none() {
             self.write(" ");
             self.emit(accessor.body);
+        } else {
+            // For JS emit, add empty body for accessors without body
+            self.write(" { }");
         }
     }
 
@@ -2459,6 +2496,11 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
+        // Check if any class extends another - if so, emit __extends helper
+        if self.target_es5 && self.needs_extends_helper(&source.statements) {
+            self.emit_extends_helper();
+        }
+
         for &stmt_idx in &source.statements.nodes {
             let before_len = self.output.len();
             self.emit(stmt_idx);
@@ -2467,6 +2509,180 @@ impl<'a> ThinPrinter<'a> {
                 self.write_line();
             }
         }
+    }
+
+    /// Check if any class in the statements (recursively) extends another class
+    fn needs_extends_helper(&self, statements: &NodeList) -> bool {
+        for &stmt_idx in &statements.nodes {
+            if self.statement_needs_extends(stmt_idx) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Check if a statement contains a class that extends another (recursive)
+    fn statement_needs_extends(&self, stmt_idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(stmt_idx) else {
+            return false;
+        };
+
+        match node.kind {
+            // Class declaration
+            k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                if let Some(class_data) = self.arena.get_class(node) {
+                    if self.class_has_extends(&class_data.heritage_clauses) {
+                        return true;
+                    }
+                }
+                false
+            }
+            // Expression statement - might contain IIFE with class
+            k if k == syntax_kind_ext::EXPRESSION_STATEMENT => {
+                if let Some(expr_stmt) = self.arena.get_expression_statement(node) {
+                    self.expression_needs_extends(expr_stmt.expression)
+                } else {
+                    false
+                }
+            }
+            // Block - recurse into statements
+            k if k == syntax_kind_ext::BLOCK => {
+                if let Some(block) = self.arena.get_block(node) {
+                    self.needs_extends_helper(&block.statements)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if an expression contains a class that extends another (recursive)
+    fn expression_needs_extends(&self, expr_idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(expr_idx) else {
+            return false;
+        };
+
+        match node.kind {
+            // Call expression - check arguments and the called function
+            k if k == syntax_kind_ext::CALL_EXPRESSION => {
+                if let Some(call) = self.arena.get_call_expr(node) {
+                    // Check the function being called
+                    if self.expression_needs_extends(call.expression) {
+                        return true;
+                    }
+                    // Check arguments
+                    if let Some(ref args) = call.arguments {
+                        for &arg_idx in &args.nodes {
+                            if self.expression_needs_extends(arg_idx) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                false
+            }
+            // Parenthesized expression
+            k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
+                if let Some(paren) = self.arena.get_parenthesized(node) {
+                    self.expression_needs_extends(paren.expression)
+                } else {
+                    false
+                }
+            }
+            // Arrow function - check body
+            k if k == syntax_kind_ext::ARROW_FUNCTION => {
+                if let Some(func) = self.arena.get_function(node) {
+                    self.statement_needs_extends(func.body)
+                } else {
+                    false
+                }
+            }
+            // Function expression - check body
+            k if k == syntax_kind_ext::FUNCTION_EXPRESSION => {
+                if let Some(func) = self.arena.get_function(node) {
+                    self.statement_needs_extends(func.body)
+                } else {
+                    false
+                }
+            }
+            // Class expression
+            k if k == syntax_kind_ext::CLASS_EXPRESSION => {
+                if let Some(class_data) = self.arena.get_class(node) {
+                    self.class_has_extends(&class_data.heritage_clauses)
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    /// Check if a class has an extends clause
+    fn class_has_extends(&self, heritage_clauses: &Option<NodeList>) -> bool {
+        let Some(clauses) = heritage_clauses else {
+            return false;
+        };
+        for &clause_idx in &clauses.nodes {
+            let Some(clause_node) = self.arena.get(clause_idx) else {
+                continue;
+            };
+            let Some(heritage_data) = self.arena.get_heritage(clause_node) else {
+                continue;
+            };
+            if heritage_data.token == SyntaxKind::ExtendsKeyword as u16 {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Emit the __extends helper function
+    fn emit_extends_helper(&mut self) {
+        // TypeScript's ES5 __extends helper
+        self.write("var __extends = (this && this.__extends) || (function () {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write("var extendStatics = function (d, b) {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write("extendStatics = Object.setPrototypeOf ||");
+        self.write_line();
+        self.write("    ({ __proto__: [] } instanceof Array && function (d, b) { d.__proto__ = b; }) ||");
+        self.write_line();
+        self.write("    function (d, b) { for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p]; };");
+        self.write_line();
+        self.write("return extendStatics(d, b);");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("};");
+        self.write_line();
+
+        self.write("return function (d, b) {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write("if (typeof b !== \"function\" && b !== null)");
+        self.write_line();
+        self.write("    throw new TypeError(\"Class extends value \" + String(b) + \" is not a constructor or null\");");
+        self.write_line();
+        self.write("extendStatics(d, b);");
+        self.write_line();
+        self.write("function __() { this.constructor = d; }");
+        self.write_line();
+        self.write("d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("};");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("})();");
+        self.write_line();
     }
 }
 

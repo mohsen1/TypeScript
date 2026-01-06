@@ -44,6 +44,11 @@ impl<'a> ClassES5Emitter<'a> {
         }
     }
 
+    /// Set the initial indentation level (to match the parent context)
+    pub fn set_indent_level(&mut self, level: u32) {
+        self.indent_level = level;
+    }
+
     pub fn emit_class(&mut self, class_idx: NodeIndex) -> String {
         self.output.clear();
         
@@ -99,6 +104,7 @@ impl<'a> ClassES5Emitter<'a> {
         self.write_line();
 
         self.decrease_indent();
+        self.write_indent();
         self.write("}(");
 
         // Pass base class if extends
@@ -107,7 +113,7 @@ impl<'a> ClassES5Emitter<'a> {
         }
 
         self.write("));");
-        
+
         std::mem::take(&mut self.output)
     }
     
@@ -196,36 +202,49 @@ impl<'a> ClassES5Emitter<'a> {
             self.write_line();
             self.increase_indent();
 
-            // For derived classes, call super with arguments
-            if has_extends {
+            // For derived classes with no instance properties, just return _super.apply directly
+            if has_extends && instance_props.is_empty() {
+                self.write_indent();
+                self.write("return _super !== null && _super.apply(this, arguments) || this;");
+                self.write_line();
+            } else if has_extends {
+                // For derived classes with instance props, use _this variable
                 self.write_indent();
                 self.write("var _this = _super !== null && _super.apply(this, arguments) || this;");
                 self.write_line();
-            }
 
-            // Emit instance property initializers in default constructor
-            for &prop_idx in &instance_props {
-                let Some(prop_node) = self.arena.get(prop_idx) else { continue };
-                let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
-                let name = self.get_identifier_text(prop_data.name);
-                self.write_indent();
-                if has_extends {
+                // Emit instance property initializers
+                for &prop_idx in &instance_props {
+                    let Some(prop_node) = self.arena.get(prop_idx) else { continue };
+                    let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
+                    let name = self.get_identifier_text(prop_data.name);
+                    self.write_indent();
                     self.write("_this.");
-                } else {
-                    self.write("this.");
+                    self.write(&name);
+                    self.write(" = ");
+                    self.emit_expression(prop_data.initializer);
+                    self.write(";");
+                    self.write_line();
                 }
-                self.write(&name);
-                self.write(" = ");
-                self.emit_expression(prop_data.initializer);
-                self.write(";");
-                self.write_line();
-            }
 
-            // For derived classes, return _this
-            if has_extends {
+                // Return _this
                 self.write_indent();
                 self.write("return _this;");
                 self.write_line();
+            } else {
+                // Non-derived class - just emit instance property initializers
+                for &prop_idx in &instance_props {
+                    let Some(prop_node) = self.arena.get(prop_idx) else { continue };
+                    let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
+                    let name = self.get_identifier_text(prop_data.name);
+                    self.write_indent();
+                    self.write("this.");
+                    self.write(&name);
+                    self.write(" = ");
+                    self.emit_expression(prop_data.initializer);
+                    self.write(";");
+                    self.write_line();
+                }
             }
 
             self.decrease_indent();
@@ -377,19 +396,19 @@ impl<'a> ClassES5Emitter<'a> {
     fn emit_accessor(&mut self, class_name: &str, accessor_idx: NodeIndex, is_getter: bool) {
         let Some(accessor_node) = self.arena.get(accessor_idx) else { return };
         let Some(accessor_data) = self.arena.get_accessor(accessor_node) else { return };
-        
-        // Skip static accessors
-        if self.is_static(&accessor_data.modifiers) {
-            return;
-        }
-        
+
+        let is_static = self.is_static(&accessor_data.modifiers);
         let name = self.get_identifier_text(accessor_data.name);
-        
-        // Object.defineProperty(ClassName.prototype, "name", { get/set: function() { ... } });
+
+        // Object.defineProperty(ClassName.prototype, "name", ...) for instance
+        // Object.defineProperty(ClassName, "name", ...) for static
         self.write_indent();
         self.write("Object.defineProperty(");
         self.write(class_name);
-        self.write(".prototype, \"");
+        if !is_static {
+            self.write(".prototype");
+        }
+        self.write(", \"");
         self.write(&name);
         self.write("\", {");
         self.write_line();
