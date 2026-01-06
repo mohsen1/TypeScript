@@ -1272,6 +1272,8 @@ impl<'a> ThinCheckerState<'a> {
 
         // Use CallEvaluator to resolve the call
         let mut subtype = SubtypeChecker::new(self.ctx.types);
+        subtype.strict_function_types = false;
+        subtype.allow_void_return = true;
         let mut evaluator = CallEvaluator::new(self.ctx.types, &mut subtype);
         let result = evaluator.resolve_call(callee_type, &arg_types);
 
