@@ -940,7 +940,15 @@ impl ThinParserState {
             NodeIndex::NONE
         };
 
-        let end_pos = self.token_end();
+        // Calculate end position from the last component present (child node, not token)
+        let end_pos = if !initializer.is_none() {
+            self.arena.get(initializer).map(|n| n.end).unwrap_or(self.token_pos())
+        } else if !type_annotation.is_none() {
+            self.arena.get(type_annotation).map(|n| n.end).unwrap_or(self.token_pos())
+        } else {
+            self.arena.get(name).map(|n| n.end).unwrap_or(self.token_pos())
+        };
+
         self.arena.add_variable_declaration(
             syntax_kind_ext::VARIABLE_DECLARATION,
             start_pos,
@@ -3573,9 +3581,10 @@ impl ThinParserState {
         }
 
         let start_pos = self.token_pos();
+        // Capture end position BEFORE consuming the token
+        let end_pos = self.token_end();
         let text = self.scanner.get_token_value_ref().to_string();
         self.next_token();
-        let end_pos = self.token_end();
 
         self.arena.add_literal(
             SyntaxKind::StringLiteral as u16,
@@ -5035,11 +5044,12 @@ impl ThinParserState {
     /// Uses zero-copy accessor and only clones when storing
     fn parse_identifier(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        // Capture end position BEFORE consuming the token
+        let end_pos = self.token_end();
         // Use zero-copy accessor and clone only when storing
         let text = self.scanner.get_token_value_ref().to_string();
         self.identifiers.push(text.clone());
         self.parse_expected(SyntaxKind::Identifier);
-        let end_pos = self.token_end();
 
         self.arena.add_identifier(
             SyntaxKind::Identifier as u16,
@@ -5058,6 +5068,8 @@ impl ThinParserState {
     /// (e.g., class names, property names, function names)
     fn parse_identifier_name(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        // Capture end position BEFORE consuming the token
+        let end_pos = self.token_end();
         let text = self.scanner.get_token_value_ref().to_string();
         self.identifiers.push(text.clone());
 
@@ -5066,7 +5078,6 @@ impl ThinParserState {
         } else {
             self.error_identifier_expected();
         }
-        let end_pos = self.token_end();
 
         self.arena.add_identifier(
             SyntaxKind::Identifier as u16,
@@ -5083,10 +5094,11 @@ impl ThinParserState {
     /// Parse private identifier (#name)
     fn parse_private_identifier(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        // Capture end position BEFORE consuming the token
+        let end_pos = self.token_end();
         let text = self.scanner.get_token_value_ref().to_string();
         self.identifiers.push(text.clone());
         self.parse_expected(SyntaxKind::PrivateIdentifier);
-        let end_pos = self.token_end();
 
         self.arena.add_identifier(
             SyntaxKind::PrivateIdentifier as u16,
@@ -5263,12 +5275,13 @@ impl ThinParserState {
     /// Uses zero-copy accessor for parsing, clones only when storing
     fn parse_numeric_literal(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        // Capture end position BEFORE consuming the token
+        let end_pos = self.token_end();
         // Use zero-copy accessor for parsing
         let text_ref = self.scanner.get_token_value_ref();
         let value = text_ref.parse::<f64>().ok();
         let text = text_ref.to_string();
         self.next_token();
-        let end_pos = self.token_end();
 
         self.arena.add_literal(
             SyntaxKind::NumericLiteral as u16,
@@ -5281,9 +5294,10 @@ impl ThinParserState {
     /// Parse boolean literal
     fn parse_boolean_literal(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        // Capture end position BEFORE consuming the token
+        let end_pos = self.token_end();
         let kind = self.token();
         self.next_token();
-        let end_pos = self.token_end();
 
         self.arena.add_token(kind as u16, start_pos, end_pos)
     }
@@ -5291,8 +5305,9 @@ impl ThinParserState {
     /// Parse null literal
     fn parse_null_literal(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
-        self.next_token();
+        // Capture end position BEFORE consuming the token
         let end_pos = self.token_end();
+        self.next_token();
 
         self.arena.add_token(SyntaxKind::NullKeyword as u16, start_pos, end_pos)
     }
@@ -5300,8 +5315,9 @@ impl ThinParserState {
     /// Parse this expression
     fn parse_this_expression(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
-        self.next_token();
+        // Capture end position BEFORE consuming the token
         let end_pos = self.token_end();
+        self.next_token();
 
         self.arena.add_token(SyntaxKind::ThisKeyword as u16, start_pos, end_pos)
     }
@@ -5309,8 +5325,9 @@ impl ThinParserState {
     /// Parse super expression
     fn parse_super_expression(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
-        self.next_token();
+        // Capture end position BEFORE consuming the token
         let end_pos = self.token_end();
+        self.next_token();
 
         self.arena.add_token(SyntaxKind::SuperKeyword as u16, start_pos, end_pos)
     }
