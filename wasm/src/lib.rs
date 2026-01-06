@@ -215,7 +215,7 @@ impl ThinParser {
 
             let result = serde_json::json!({
                 "typeCount": self.type_interner.len(),
-                "diagnostics": checker.diagnostics.iter().map(|d| {
+                "diagnostics": checker.ctx.diagnostics.iter().map(|d| {
                     serde_json::json!({
                         "message_text": d.message_text.clone(),
                         "code": d.code,

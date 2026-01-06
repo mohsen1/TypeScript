@@ -551,7 +551,7 @@ pub fn check_functions_parallel(program: &MergedProgram) -> CheckResult {
             }
 
             // Collect diagnostics from checker
-            let diagnostics = std::mem::take(&mut checker.diagnostics);
+            let diagnostics = std::mem::take(&mut checker.ctx.diagnostics);
 
             FileCheckResult {
                 file_idx,

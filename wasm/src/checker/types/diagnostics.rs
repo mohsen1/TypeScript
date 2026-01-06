@@ -114,6 +114,9 @@ pub mod diagnostic_messages {
     pub const CANNOT_ASSIGN_READONLY: &str = "Cannot assign to '{0}' because it is a read-only property.";
     pub const MEMBER_NOT_ACCESSIBLE: &str = "Property '{0}' is {1} and only accessible within class '{2}'.";
 
+    // Interface errors
+    pub const INTERFACE_INCORRECTLY_EXTENDS: &str = "Interface '{0}' incorrectly extends interface '{1}'.";
+
     // Enum errors
     pub const ENUM_MEMBER_MUST_HAVE_INITIALIZER: &str = "Enum member must have initializer.";
     pub const CONST_ENUM_MEMBER_INITIALIZER: &str = "In 'const' enum declarations member initializer must be constant expression.";
@@ -207,15 +210,18 @@ pub mod diagnostic_codes {
     pub const CANNOT_CREATE_INSTANCE_OF_ABSTRACT_CLASS: u32 = 2511;  // Cannot create an instance of an abstract class.
     pub const CANNOT_FIND_NAME_DID_YOU_MEAN_STATIC: u32 = 2662;  // Cannot find name 'X'. Did you mean the static member 'C.X'?
     pub const ABSTRACT_PROPERTY_IN_CONSTRUCTOR: u32 = 2715;  // Abstract property 'X' in class 'C' cannot be accessed in the constructor.
+    pub const PROPERTY_USED_BEFORE_INITIALIZATION: u32 = 2729;  // Property '{0}' is used before its initialization.
     pub const SUPER_ONLY_IN_DERIVED_CLASS: u32 = 2335;
     pub const THIS_CANNOT_BE_REFERENCED: u32 = 2332;
     pub const PROPERTY_HAS_NO_INITIALIZER: u32 = 2564;
     pub const ABSTRACT_PROPERTY_IN_NON_ABSTRACT_CLASS: u32 = 2515;
     pub const ABSTRACT_MEMBER_IN_NON_ABSTRACT_CLASS: u32 = 2515;  // Same code for methods
+    pub const NON_ABSTRACT_CLASS_MISSING_IMPLEMENTATIONS: u32 = 2654;  // Non-abstract class '{0}' is missing implementations for the following members of '{1}': {2}.
     pub const CANNOT_ASSIGN_TO_READONLY_PROPERTY: u32 = 2540;
     pub const ACCESSORS_MUST_BOTH_BE_ABSTRACT_OR_NOT: u32 = 2676;  // Accessors must both be abstract or non-abstract.
     pub const CLASS_INCORRECTLY_IMPLEMENTS_INTERFACE: u32 = 2420;
     pub const CLASS_INCORRECTLY_EXTENDS_BASE_CLASS: u32 = 2415;
+    pub const PROPERTY_NOT_ASSIGNABLE_TO_SAME_IN_BASE: u32 = 2416;  // Property '{0}' in type '{1}' is not assignable to the same property in base type '{2}'.
     pub const MEMBER_IS_NOT_ACCESSIBLE: u32 = 2341;
     pub const PROPERTY_IS_PRIVATE: u32 = 2341;
     pub const PROPERTY_IS_PROTECTED: u32 = 2445;
@@ -228,6 +234,7 @@ pub mod diagnostic_codes {
     // Interface/type errors
     pub const INTERFACE_NAME_CANNOT_BE: u32 = 2427;  // Interface name cannot be '{0}'.
     pub const INTERFACE_CAN_ONLY_EXTEND_INTERFACE: u32 = 2422;
+    pub const INTERFACE_INCORRECTLY_EXTENDS_INTERFACE: u32 = 2430;  // Interface '{0}' incorrectly extends interface '{1}'.
     pub const TYPE_ALIAS_CIRCULARLY_REFERENCES_ITSELF: u32 = 2456;
     pub const INTERFACE_DECLARES_CONFLICTING_MEMBER: u32 = 2320;
 

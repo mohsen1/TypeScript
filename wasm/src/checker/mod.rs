@@ -3,7 +3,10 @@
 //! This module is organized into several submodules:
 //! - `types` - Type definitions (Type enum, flags, diagnostics)
 //! - `arena` - TypeArena for type allocation
-//! - `context` - CheckerContext for shared state (Phase 8 refactor)
+//! - `context` - CheckerContext for shared state
+//! - `expr` - Expression type checking
+//! - `statements` - Statement type checking
+//! - `declarations` - Declaration type checking
 //!
 //! Note: CheckerState has been replaced by ThinCheckerState in thin_checker.rs
 //! The types module is still used by both ThinChecker and Solver.
@@ -11,6 +14,9 @@
 pub mod types;
 pub mod arena;
 pub mod context;
+pub mod expr;
+pub mod statements;
+pub mod declarations;
 
 // Re-export key types
 pub use types::{
@@ -23,3 +29,6 @@ pub use types::{
 };
 pub use arena::TypeArena;
 pub use context::{CheckerContext, EnclosingClassInfo};
+pub use expr::ExpressionChecker;
+pub use statements::StatementChecker;
+pub use declarations::DeclarationChecker;

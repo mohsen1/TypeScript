@@ -598,6 +598,13 @@ impl ThinBinderState {
                 }
 
                 let sym_id = self.symbols.alloc(flags, name.to_string());
+
+                // Add declaration info to the symbol
+                if let Some(sym) = self.symbols.get_mut(sym_id) {
+                    sym.declarations.push(idx);
+                    sym.value_declaration = idx;
+                }
+
                 self.current_scope.set(name.to_string(), sym_id);
                 self.node_symbols.insert(idx.0, sym_id);
             }
@@ -662,6 +669,13 @@ impl ThinBinderState {
         if let Some(iface) = arena.get_interface(node) {
             if let Some(name) = self.get_identifier_name(arena, iface.name) {
                 let sym_id = self.symbols.alloc(symbol_flags::INTERFACE, name.to_string());
+
+                // Add declaration info to the symbol
+                if let Some(sym) = self.symbols.get_mut(sym_id) {
+                    sym.declarations.push(idx);
+                    sym.value_declaration = idx;
+                }
+
                 self.current_scope.set(name.to_string(), sym_id);
                 self.node_symbols.insert(idx.0, sym_id);
             }
@@ -672,6 +686,11 @@ impl ThinBinderState {
         if let Some(alias) = arena.get_type_alias(node) {
             if let Some(name) = self.get_identifier_name(arena, alias.name) {
                 let sym_id = self.symbols.alloc(symbol_flags::TYPE_ALIAS, name.to_string());
+                // Set the value_declaration to this type alias declaration node
+                if let Some(sym) = self.symbols.get_mut(sym_id) {
+                    sym.value_declaration = idx;
+                    sym.declarations.push(idx);
+                }
                 self.current_scope.set(name.to_string(), sym_id);
                 self.node_symbols.insert(idx.0, sym_id);
             }
@@ -682,6 +701,13 @@ impl ThinBinderState {
         if let Some(enum_decl) = arena.get_enum(node) {
             if let Some(name) = self.get_identifier_name(arena, enum_decl.name) {
                 let sym_id = self.symbols.alloc(symbol_flags::REGULAR_ENUM, name.to_string());
+
+                // Add declaration info to the symbol
+                if let Some(sym) = self.symbols.get_mut(sym_id) {
+                    sym.declarations.push(idx);
+                    sym.value_declaration = idx;
+                }
+
                 self.current_scope.set(name.to_string(), sym_id);
                 self.node_symbols.insert(idx.0, sym_id);
             }
