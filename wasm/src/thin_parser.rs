@@ -431,6 +431,10 @@ impl ThinParserState {
         // Parse statements (using source file version that handles stray braces)
         let statements = self.parse_source_file_statements();
 
+        // Cache comment ranges once during parsing (O(N) scan, done only once)
+        // This avoids rescanning on every hover/documentation request
+        let comments = crate::comments::get_comment_ranges(&self.source_text);
+
         // Create source file node
         let end_pos = self.token_end();
         let eof_token = self.arena.add_token(
@@ -450,6 +454,7 @@ impl ThinParserState {
             is_declaration_file: false,
             has_no_default_lib: false,
             identifiers: self.identifiers.clone(),
+            comments, // Cached comment ranges
             parent: NodeIndex::NONE,
             id: 0,
             modifier_flags: 0,
