@@ -1397,11 +1397,6 @@ fn test_symbol_property_not_found() {
 fn test_property_access_from_index_signature_4111() {
     use crate::thin_parser::ThinParserState;
 
-    // NOTE: This test currently doesn't work because interface type resolution
-    // to solver types isn't fully implemented yet. The error 4111 check is in place
-    // and will work once type lowering for interfaces is complete.
-    // For now, this test documents the expected behavior.
-
     let source = r#"
 interface StringMap {
     [key: string]: number;
@@ -1420,17 +1415,13 @@ const val = obj.someProperty;
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    // TODO: Enable this assertion once interface type lowering is implemented
-    // let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-    // assert!(codes.contains(&4111), "Expected error 4111 for property access from index signature, got: {:?}", codes);
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&4111), "Expected error 4111 for property access from index signature, got: {:?}", codes);
 }
 
 #[test]
 fn test_explicit_property_no_error_4111() {
     use crate::thin_parser::ThinParserState;
-
-    // NOTE: Disabled until interface type lowering is implemented
-    // This documents the expected behavior: explicit properties should NOT trigger error 4111
 
     let source = r#"
 interface MixedType {
@@ -1451,17 +1442,13 @@ const val = obj.explicitProp;
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    // TODO: Enable once type lowering works
-    // let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-    // assert!(!codes.contains(&4111), "Should not have error 4111 for explicit property");
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(!codes.contains(&4111), "Should not have error 4111 for explicit property");
 }
 
 #[test]
 fn test_union_with_index_signature_4111() {
     use crate::thin_parser::ThinParserState;
-
-    // NOTE: Disabled until type lowering is implemented
-    // This documents the expected behavior: unions with index signature members trigger error 4111
 
     let source = r#"
 type Mixed = { x: number } | { [key: string]: number };
@@ -1479,9 +1466,8 @@ const val = obj.x;
     let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
-    // TODO: Enable once type lowering works
-    // let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
-    // assert!(codes.contains(&4111), "Expected error 4111 for union with index signature member");
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&4111), "Expected error 4111 for union with index signature member");
 }
 
 #[test]

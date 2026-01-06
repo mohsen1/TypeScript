@@ -1059,6 +1059,17 @@ impl<'a> ThinCheckerState<'a> {
 
         // Interface - return interface type with call signatures
         if flags & symbol_flags::INTERFACE != 0 {
+            if !symbol.declarations.is_empty() {
+                let resolver = |node_idx: NodeIndex| {
+                    self.ctx.binder.resolve_identifier(self.ctx.arena, node_idx).and_then(|id| {
+                        self.ctx.binder.get_symbol(id)
+                            .filter(|symbol| (symbol.flags & symbol_flags::TYPE) != 0)
+                            .map(|_| id.0)
+                    })
+                };
+                let lowering = TypeLowering::with_resolver(self.ctx.arena, self.ctx.types, &resolver);
+                return lowering.lower_interface_declarations(&symbol.declarations);
+            }
             if !value_decl.is_none() {
                 return self.get_type_of_interface(value_decl);
             }
