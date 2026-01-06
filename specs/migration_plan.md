@@ -125,7 +125,7 @@ This catches design issues early and ensures consistent code quality.
 | TS1128 | 35 | Declaration expected |
 
 ### Quick Wins
-- ⬜ TS2322/2345: Improve type assignability checks
+- 🔄 TS2322/2345: Improve type assignability checks (accessor type compatibility in progress)
 - ⬜ TS2339: Property lookup on union/intersection types  
 - ⬜ TS2304: Module resolution, global declarations
 - ⬜ TS2300: Duplicate detection in binder
