@@ -369,10 +369,19 @@ fn collect_declaration_names(arena: &ThinNodeArena, decl_idx: NodeIndex, exports
     let Some(decl_node) = arena.get(decl_idx) else {
         return;
     };
-    let Some(decl) = arena.get_variable_declaration(decl_node) else {
+
+    if decl_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+        if let Some(decl_list) = arena.get_variable(decl_node) {
+            for &inner_decl_idx in &decl_list.declarations.nodes {
+                collect_declaration_names(arena, inner_decl_idx, exports);
+            }
+        }
         return;
-    };
-    collect_binding_names(arena, decl.name, exports);
+    }
+
+    if let Some(decl) = arena.get_variable_declaration(decl_node) {
+        collect_binding_names(arena, decl.name, exports);
+    }
 }
 
 fn collect_binding_names(arena: &ThinNodeArena, name_idx: NodeIndex, exports: &mut Vec<String>) {

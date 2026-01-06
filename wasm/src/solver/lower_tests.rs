@@ -555,6 +555,43 @@ fn test_lower_type_literal_object_properties() {
 }
 
 #[test]
+fn test_lower_type_literal_nested_object() {
+    let (arena, literal_idx) = parse_type_alias_type_node(
+        "type T = { config: { enabled: boolean; retries?: number }; };"
+    );
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Object(properties) => {
+            let config = properties.iter()
+                .find(|prop| interner.resolve_atom(prop.name) == "config")
+                .expect("Expected config property");
+
+            match interner.lookup(config.type_id) {
+                Some(TypeKey::Object(nested)) => {
+                    let enabled = nested.iter()
+                        .find(|prop| interner.resolve_atom(prop.name) == "enabled")
+                        .expect("Expected enabled property");
+                    assert_eq!(enabled.type_id, TypeId::BOOLEAN);
+                    assert!(!enabled.optional);
+
+                    let retries = nested.iter()
+                        .find(|prop| interner.resolve_atom(prop.name) == "retries")
+                        .expect("Expected retries property");
+                    assert_eq!(retries.type_id, TypeId::NUMBER);
+                    assert!(retries.optional);
+                }
+                other => panic!("Expected nested Object type, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Object type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_type_literal_call_signature() {
     let (arena, literal_idx) = parse_type_literal("type T = { (x: string): number; foo: string; };");
     let interner = TypeInterner::new();

@@ -9,7 +9,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
 **Independence:** MEDIUM - Needs stable TypeKey definitions from Track A. Heavy AST interaction.
 
 ## Current Status
-🟡 **In Progress** - Union/intersection normalization and object property lowering tests added.
+🟡 **In Progress** - Nested object lowering test added.
 
 ## Tasks
 
@@ -40,7 +40,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - `A & B` -> TypeKey::Intersection(Slice<TypeId>)
 - [ ] Tests for complex types
   - Test: Object type with multiple properties (done)
-  - Test: Nested objects
+  - Test: Nested objects (done)
   - Test: Union/intersection normalization (done)
   - Test: Tuple optional/rest/named elements (done)
 

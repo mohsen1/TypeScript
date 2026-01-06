@@ -51,13 +51,13 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
   - Test: `() => void` NOT assignable to `() => number`
 
 ### Phase 4: Index Signature Compatibility
-- [ ] Implement excess property checking
+- [x] Implement excess property checking
   - Object literals: strict (reject extra properties)
   - Non-literals: lenient (allow extra properties)
-- [ ] Implement index signature compatibility
+- [x] Implement index signature compatibility
   - `{ [key: string]: number }` accepts `{ a: number, b: number }`
   - But not `{ a: number, b: string }`
-- [ ] Tests for index signatures
+- [x] Tests for index signatures
   - Test: Index signature accepts conforming objects
   - Test: Excess property errors on literals
   - Test: Fresh vs non-fresh object types
