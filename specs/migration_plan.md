@@ -146,7 +146,7 @@ This catches design issues early and ensures consistent code quality.
 - ⬜ Own repo mohsen1/tsc-rust
 - ⬜ Upstream sync workflow (track `microsoft/TypeScript` releases)
 - ⬜ Compatibility test suite (run against TS test baselines on each release)
-- ⬜ Version alignment (match TS version numbers, e.g., `@mohsen1/typescript@5.7.0`)
+- ⬜ Version alignment (match TS version numbers, e.g., `tsc-rust@5.7.0`)
 - ⬜ CLI parity audit (`tsc --help` flags, exit codes, output format)
 - ⬜ API compatibility layer (programmatic API matches `typescript` npm)
 - ⬜ Packaging for npm (`@mohsen1/tsc-rust` or similar)

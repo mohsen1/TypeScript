@@ -161,6 +161,23 @@ impl ThinParserState {
         self.current_token as u16 >= SyntaxKind::Identifier as u16
     }
 
+    /// Check if current token can be a property name
+    /// Includes identifiers, keywords (as property names), string/numeric literals, computed properties
+    #[inline]
+    fn is_property_name(&self) -> bool {
+        match self.current_token {
+            SyntaxKind::Identifier
+            | SyntaxKind::StringLiteral
+            | SyntaxKind::NumericLiteral
+            | SyntaxKind::PrivateIdentifier
+            | SyntaxKind::OpenBracketToken // computed property name
+            | SyntaxKind::GetKeyword
+            | SyntaxKind::SetKeyword => true,
+            // Any keyword can be used as a property name
+            _ => self.is_identifier_or_keyword()
+        }
+    }
+
     /// Parse optional token, returns true if found
     pub fn parse_optional(&mut self, kind: SyntaxKind) -> bool {
         if self.is_token(kind) {
@@ -2029,13 +2046,8 @@ impl ThinParserState {
 
         // Handle methods and properties
         // For now, just parse name and check for ( for methods
-        let name = if self.is_token(SyntaxKind::Identifier) ||
-                     self.is_token(SyntaxKind::StringLiteral) ||
-                     self.is_token(SyntaxKind::NumericLiteral) ||
-                     self.is_token(SyntaxKind::PrivateIdentifier) ||
-                     self.is_token(SyntaxKind::GetKeyword) ||
-                     self.is_token(SyntaxKind::SetKeyword) ||
-                     self.is_token(SyntaxKind::OpenBracketToken) {
+        // Note: Many reserved keywords can be used as property names (const, class, etc.)
+        let name = if self.is_property_name() {
             self.parse_property_name()
         } else {
             // Report error for unknown token
