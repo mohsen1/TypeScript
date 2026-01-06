@@ -2756,6 +2756,21 @@ impl<'a> ThinCheckerState<'a> {
         false
     }
 
+    /// Check if modifiers include the 'static' keyword.
+    fn has_static_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::StaticKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
     /// Get the const modifier node from a list of modifiers, if present.
     /// Returns the NodeIndex of the const modifier for error reporting.
     fn get_const_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> Option<NodeIndex> {
@@ -3548,6 +3563,180 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Check for TS2729: Property is used before its initialization.
+    /// This checks if a property initializer references another property via `this.X`
+    /// where X is declared after the current property.
+    fn check_property_initialization_order(&mut self, current_prop_idx: NodeIndex, initializer_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        // Get class info to access member order
+        let Some(class_info) = self.ctx.enclosing_class.clone() else {
+            return;
+        };
+
+        // Find the position of the current property in the member list
+        let Some(current_pos) = class_info.member_nodes.iter().position(|&idx| idx == current_prop_idx) else {
+            return;
+        };
+
+        // Collect all `this.X` property accesses in the initializer
+        let accesses = self.collect_this_property_accesses(initializer_idx);
+
+        for (name, access_node_idx) in accesses {
+            // Find if this name refers to another property in the class
+            for (target_pos, &target_idx) in class_info.member_nodes.iter().enumerate() {
+                if let Some(member_name) = self.get_member_name(target_idx) {
+                    if member_name == name {
+                        // Check if target is declared after current property
+                        if target_pos > current_pos {
+                            // Check if target is an instance property (not static, not a method)
+                            if self.is_instance_property(target_idx) {
+                                self.error_at_node(
+                                    access_node_idx,
+                                    &format!("Property '{}' is used before its initialization.", name),
+                                    diagnostic_codes::PROPERTY_USED_BEFORE_INITIALIZATION,
+                                );
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Collect all `this.propertyName` accesses in an expression.
+    /// Stops at function boundaries where `this` context changes.
+    fn collect_this_property_accesses(&self, node_idx: NodeIndex) -> Vec<(String, NodeIndex)> {
+        let mut accesses = Vec::new();
+        self.collect_this_accesses_recursive(node_idx, &mut accesses);
+        accesses
+    }
+
+    /// Recursive helper to collect this.X accesses.
+    /// Uses the BinaryExprData structure which is used for property access in our arena.
+    fn collect_this_accesses_recursive(&self, node_idx: NodeIndex, accesses: &mut Vec<(String, NodeIndex)>) {
+        let Some(node) = self.ctx.arena.get(node_idx) else { return };
+
+        // Stop at function boundaries where `this` context changes
+        // (but not arrow functions, which preserve `this`)
+        if node.kind == syntax_kind_ext::FUNCTION_EXPRESSION ||
+           node.kind == syntax_kind_ext::FUNCTION_DECLARATION ||
+           node.kind == syntax_kind_ext::CLASS_EXPRESSION ||
+           node.kind == syntax_kind_ext::CLASS_DECLARATION {
+            return;
+        }
+
+        // Property access uses AccessExprData with expression and name_or_argument
+        if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+            if let Some(access) = self.ctx.arena.get_access_expr(node) {
+                // Check if the expression is `this`
+                if let Some(expr_node) = self.ctx.arena.get(access.expression) {
+                    if expr_node.kind == SyntaxKind::ThisKeyword as u16 {
+                        // Get the property name
+                        if let Some(name_node) = self.ctx.arena.get(access.name_or_argument) {
+                            if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                                accesses.push((ident.escaped_text.clone(), node_idx));
+                            }
+                        }
+                    } else {
+                        // Recurse into the expression part
+                        self.collect_this_accesses_recursive(access.expression, accesses);
+                    }
+                }
+            }
+            return;
+        }
+
+        // For other nodes, recurse into children based on node type
+        match node.kind {
+            k if k == syntax_kind_ext::BINARY_EXPRESSION => {
+                if let Some(binary) = self.ctx.arena.get_binary_expr(node) {
+                    self.collect_this_accesses_recursive(binary.left, accesses);
+                    self.collect_this_accesses_recursive(binary.right, accesses);
+                }
+            }
+            k if k == syntax_kind_ext::CALL_EXPRESSION => {
+                if let Some(call) = self.ctx.arena.get_call_expr(node) {
+                    self.collect_this_accesses_recursive(call.expression, accesses);
+                    if let Some(ref args) = call.arguments {
+                        for &arg in &args.nodes {
+                            self.collect_this_accesses_recursive(arg, accesses);
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
+                if let Some(paren) = self.ctx.arena.get_parenthesized(node) {
+                    self.collect_this_accesses_recursive(paren.expression, accesses);
+                }
+            }
+            k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
+                if let Some(cond) = self.ctx.arena.get_conditional_expr(node) {
+                    self.collect_this_accesses_recursive(cond.condition, accesses);
+                    self.collect_this_accesses_recursive(cond.when_true, accesses);
+                    self.collect_this_accesses_recursive(cond.when_false, accesses);
+                }
+            }
+            k if k == syntax_kind_ext::ARROW_FUNCTION => {
+                // Arrow functions preserve `this`, so continue recursing into body
+                if let Some(func) = self.ctx.arena.get_function(node) {
+                    if !func.body.is_none() {
+                        self.collect_this_accesses_recursive(func.body, accesses);
+                    }
+                }
+            }
+            _ => {
+                // For other expressions, we don't recurse further to keep it simple
+            }
+        }
+    }
+
+    /// Get the name of a class member (property or method).
+    fn get_member_name(&self, member_idx: NodeIndex) -> Option<String> {
+        let node = self.ctx.arena.get(member_idx)?;
+
+        match node.kind {
+            k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                let prop = self.ctx.arena.get_property_decl(node)?;
+                let name_node = self.ctx.arena.get(prop.name)?;
+                let ident = self.ctx.arena.get_identifier(name_node)?;
+                Some(ident.escaped_text.clone())
+            }
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                let method = self.ctx.arena.get_method_decl(node)?;
+                let name_node = self.ctx.arena.get(method.name)?;
+                let ident = self.ctx.arena.get_identifier(name_node)?;
+                Some(ident.escaped_text.clone())
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                let accessor = self.ctx.arena.get_accessor(node)?;
+                let name_node = self.ctx.arena.get(accessor.name)?;
+                let ident = self.ctx.arena.get_identifier(name_node)?;
+                Some(ident.escaped_text.clone())
+            }
+            _ => None,
+        }
+    }
+
+    /// Check if a class member is an instance property (not static, not a method/accessor).
+    fn is_instance_property(&self, member_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(member_idx) else {
+            return false;
+        };
+
+        if node.kind != syntax_kind_ext::PROPERTY_DECLARATION {
+            return false;
+        }
+
+        if let Some(prop) = self.ctx.arena.get_property_decl(node) {
+            // Check if it has a static modifier
+            return !self.has_static_modifier(&prop.modifiers);
+        }
+
+        false
+    }
+
     /// Check a property declaration.
     fn check_property_declaration(&mut self, member_idx: NodeIndex) {
         use crate::checker::types::diagnostics::diagnostic_codes;
@@ -3580,6 +3769,12 @@ impl<'a> ThinCheckerState<'a> {
         } else if !prop.initializer.is_none() {
             // Just check the initializer to catch errors within it
             self.get_type_of_node(prop.initializer);
+        }
+
+        // Error 2729: Property is used before its initialization
+        // Check if initializer references properties declared after this one
+        if !prop.initializer.is_none() && !self.has_static_modifier(&prop.modifiers) {
+            self.check_property_initialization_order(member_idx, prop.initializer);
         }
     }
 

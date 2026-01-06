@@ -701,3 +701,39 @@ new cls1();
     assert!(codes.contains(&2511),
         "Expected error 2511 for abstract class in union type instantiation, got: {:?}", codes);
 }
+
+#[test]
+fn test_property_used_before_initialization_2729() {
+    // Error 2729: Property is used before its initialization
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    x = this.a;  // Error: Property 'a' is used before its initialization
+    a = 1;
+}
+
+class NoError {
+    a = 1;
+    x = this.a;  // OK: 'a' is declared before 'x'
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have exactly one 2729 error (in class Foo)
+    let count_2729 = codes.iter().filter(|&&c| c == 2729).count();
+    assert_eq!(count_2729, 1,
+        "Expected exactly 1 error 2729 for property used before initialization, got {} in: {:?}", count_2729, codes);
+}
