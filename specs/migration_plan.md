@@ -85,12 +85,15 @@ This catches design issues early and ensures consistent code quality.
 
 ### Next Steps
 
+⚠️ **PRIORITY 0: Checker Architecture Cleanup**
 
-#### First thing first, priority 0: Clean up the spatting
+Before adding more features, clean up the checker architecture per `specs/REFACTOR_CHECKER.md`:
+1. Refactor ThinCheckerState to use CheckerContext
+2. Move expression type computation to solver
+3. Use NodeView API consistently
+4. This will make future type checking work easier
 
-see `specs/REFACTOR_CHECKER.md`. Write up a todo and clean up according to this plan
-
-**Type Checking (25 failing tests)**
+**Type Checking (16 failing tests in sample)**
 1. ✅ Export assignment validation (2309, 2304)
 2. ✅ Setter parameter validation (1052, 1053)
 3. ✅ Return type validation (2355) - function must return a value (basic types, function types)
@@ -151,11 +154,11 @@ see `specs/REFACTOR_CHECKER.md`. Write up a todo and clean up according to this 
 | TS7006 | 43 | Implicit any parameter |
 | TS1128 | 35 | Declaration expected |
 
-### Quick Wins
-- ✅ TS2322: Accessor type compatibility (getter return ⊆ setter param)
-- ⬜ TS2339: Property lookup on union/intersection types  
-- ⬜ TS2304: Module resolution, global declarations
-- ⬜ TS2300: Duplicate detection in binder
+### Quick Wins (after checker refactor)
+- ⬜ TS2322/2345: Type assignability checks (306 tests)
+- ⬜ TS2339: Property lookup on union/intersection types (138 tests)
+- ⬜ TS2304: Module resolution, global declarations (102 tests)
+- ⬜ TS2300: Duplicate detection in binder (96 tests)
 - ⬜ Modules: Start with `export {}` and named exports
 
 ---
