@@ -220,3 +220,175 @@ fn test_explain_failure_parameter_mismatch_strict() {
         Some(SubtypeFailureReason::ParameterTypeMismatch { param_index: 0, .. })
     ));
 }
+
+#[test]
+fn test_weak_type_rejects_no_common_properties() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let a = interner.intern_string("a");
+    let b = interner.intern_string("b");
+
+    let weak_target = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+    }]);
+
+    let source = interner.object(vec![PropertyInfo {
+        name: b,
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+    }]);
+
+    assert!(!checker.is_assignable(source, weak_target));
+    assert!(matches!(
+        checker.explain_failure(source, weak_target),
+        Some(SubtypeFailureReason::NoCommonProperties { .. })
+    ));
+}
+
+#[test]
+fn test_weak_type_allows_overlap() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let a = interner.intern_string("a");
+
+    let weak_target = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+    }]);
+
+    let source = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+    }]);
+
+    assert!(checker.is_assignable(source, weak_target));
+}
+
+#[test]
+fn test_weak_type_skips_empty_target() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let a = interner.intern_string("a");
+
+    let empty_target = interner.object(Vec::new());
+    let source = interner.object(vec![PropertyInfo {
+        name: a,
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+    }]);
+
+    assert!(checker.is_assignable(source, empty_target));
+}
+
+#[test]
+fn test_rest_any_bivariant_even_strict() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    checker.set_strict_function_types(true);
+
+    let rest_any = interner.array(TypeId::ANY);
+    let target = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: rest_any,
+            optional: false,
+            rest: true,
+        }],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let source = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    assert!(checker.is_assignable(source, target));
+}
+
+#[test]
+fn test_rest_unknown_bivariant_even_strict() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    checker.set_strict_function_types(true);
+
+    let rest_unknown = interner.array(TypeId::UNKNOWN);
+    let target = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: rest_unknown,
+            optional: false,
+            rest: true,
+        }],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let source = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    assert!(checker.is_assignable(source, target));
+}
+
+#[test]
+fn test_rest_any_still_checks_return_type() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let rest_any = interner.array(TypeId::ANY);
+    let target = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: rest_any,
+            optional: false,
+            rest: true,
+        }],
+        return_type: TypeId::NUMBER,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let source = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    assert!(!checker.is_assignable(source, target));
+}

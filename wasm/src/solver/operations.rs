@@ -177,12 +177,14 @@ impl<'a> CallEvaluator<'a> {
         let mut infer_ctx = InferenceContext::new(self.interner);
         let mut substitution = TypeSubstitution::new();
         let mut var_map: HashMap<TypeId, crate::solver::infer::InferenceVar> = HashMap::new();
+        let mut type_param_vars = Vec::with_capacity(func.type_params.len());
 
         // 1. Create inference variables and placeholders for each type parameter
         for tp in &func.type_params {
             // Resolve Atom to String for inference context (still uses Arc<str>)
             let tp_name_str = self.interner.resolve_atom(tp.name);
             let var = infer_ctx.fresh_type_param(std::sync::Arc::from(tp_name_str.as_str()));
+            type_param_vars.push(var);
 
             // Create a unique placeholder type for this inference variable
             // We use a TypeParameter with a special name to track it during constraint collection
@@ -232,23 +234,28 @@ impl<'a> CallEvaluator<'a> {
         }
 
         // 4. Resolve inference variables
-        match infer_ctx.resolve_all_with_constraints() {
-            Ok(resolved_params) => {
-                // Build final substitution
-                let mut final_subst = TypeSubstitution::new();
-                for (name, ty) in resolved_params {
-                    final_subst.insert(name, ty);
-                }
+        let mut final_subst = TypeSubstitution::new();
+        for (tp, &var) in func.type_params.iter().zip(type_param_vars.iter()) {
+            let mut ty = match infer_ctx.resolve_with_constraints(var) {
+                Ok(ty) => ty,
+                Err(_) => return CallResult::Success(TypeId::ANY),
+            };
 
-                // Instantiate return type
-                let return_type = instantiate_type(self.interner, func.return_type, &final_subst);
-                CallResult::Success(return_type)
-            },
-            Err(_) => {
-                // Inference failed - return any (could be more specific error)
-                CallResult::Success(TypeId::ANY)
+            let has_constraints = infer_ctx
+                .get_constraints(var)
+                .map_or(false, |c| !c.is_empty());
+            if !has_constraints && ty == TypeId::UNKNOWN {
+                if let Some(default) = tp.default {
+                    ty = instantiate_type(self.interner, default, &final_subst);
+                }
             }
+
+            let name_str = self.interner.resolve_atom(tp.name);
+            final_subst.insert(std::sync::Arc::from(name_str.as_str()), ty);
         }
+
+        let return_type = instantiate_type(self.interner, func.return_type, &final_subst);
+        CallResult::Success(return_type)
     }
 
     /// Structural walker to collect constraints: source <: target
@@ -277,7 +284,30 @@ impl<'a> CallEvaluator<'a> {
         let source_key = self.interner.lookup(source);
         let target_key = self.interner.lookup(target);
 
+        let is_nullish = |ty: TypeId| matches!(ty, TypeId::NULL | TypeId::UNDEFINED | TypeId::VOID);
+
         match (source_key, target_key) {
+            (Some(TypeKey::Union(ref s_members)), _) => {
+                for &member in s_members {
+                    self.constrain_types(ctx, var_map, member, target);
+                }
+            }
+            (_, Some(TypeKey::Intersection(ref t_members))) => {
+                for &member in t_members {
+                    self.constrain_types(ctx, var_map, source, member);
+                }
+            }
+            (_, Some(TypeKey::Union(ref t_members))) => {
+                let mut non_nullable = Vec::new();
+                for &member in t_members {
+                    if !is_nullish(member) {
+                        non_nullable.push(member);
+                    }
+                }
+                if non_nullable.len() == 1 {
+                    self.constrain_types(ctx, var_map, source, non_nullable[0]);
+                }
+            }
             (Some(TypeKey::Array(s_elem)), Some(TypeKey::Array(t_elem))) => {
                 self.constrain_types(ctx, var_map, s_elem, t_elem);
             }

@@ -131,6 +131,31 @@ fn test_two_phase_emission_es5_class_try_throw_parenthesized() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_for_destructuring() {
+    let source = "class Foo { method(obj) { for (var { x, y } = obj; ; ) { return x + y; } } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("for (var _a = obj, x = _a.x, y = _a.y;"),
+        "ES5 output should destructure for-loop initializer: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_backward_compatibility() {
     // Parse source
     let source = "class Foo {}";
