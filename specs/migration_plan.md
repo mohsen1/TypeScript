@@ -24,12 +24,14 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Error 1248: const keyword on class members (moved from parser to checker)
 - ✅ Error 2322: accessor type compatibility (getter return ⊆ setter param)
 - ✅ Error 2511: abstract union type detection (type_contains_abstract_class)
+- ✅ TypeQuery symbol resolution for abstract class detection through type aliases
 
 ## Checker Refactoring (see specs/REFACTOR_CHECKER.md)
 - 🔄 Split ThinCheckerState into Context + specialized Checkers (expr, stmt, decl)
   - ✅ Created `checker/context.rs` with CheckerContext struct
   - ✅ Refactored ThinCheckerState to wrap CheckerContext
-  - ⬜ Create expressions.rs, statements.rs, declarations.rs
+  - ✅ Created `checker/expr.rs` with ExpressionChecker struct
+  - ⬜ Create statements.rs, declarations.rs
 - ⬜ Move expression type computation to solver/operations.rs
 - ⬜ Use NodeView API instead of raw arena lookups
 - ⬜ Deprecate checker/types in favor of solver/types
@@ -89,9 +91,10 @@ This catches design issues early and ensures consistent code quality.
 
 Clean up the checker architecture per `specs/REFACTOR_CHECKER.md`:
 1. ✅ Refactor ThinCheckerState to use CheckerContext (wraps `ctx: CheckerContext<'a>`)
-2. 🔄 Move expression type computation to solver (incremental, as features are added)
-3. 🔄 Use NodeView API consistently (incremental, as code is touched)
-4. ⬜ Create specialized checker modules (expressions.rs, statements.rs, declarations.rs)
+2. ✅ Create ExpressionChecker in checker/expr.rs
+3. 🔄 Move expression type computation to solver (incremental, as features are added)
+4. 🔄 Use NodeView API consistently (incremental, as code is touched)
+5. ⬜ Create specialized checker modules (statements.rs, declarations.rs)
 
 **Type Checking (16 failing tests in sample)**
 1. ✅ Export assignment validation (2309, 2304)
