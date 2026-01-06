@@ -1107,6 +1107,46 @@ impl<'a> TypeLowering<'a> {
                     k if k == SyntaxKind::FalseKeyword as u16 => {
                         self.interner.literal_boolean(false)
                     }
+                    k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION => {
+                        if let Some(unary) = self.arena.get_unary_expr(literal_node) {
+                            let op = unary.operator;
+                            let Some(operand_node) = self.arena.get(unary.operand) else {
+                                return TypeId::ANY;
+                            };
+                            match operand_node.kind {
+                                k if k == SyntaxKind::NumericLiteral as u16 => {
+                                    if let Some(lit_data) = self.arena.get_literal(operand_node) {
+                                        if let Ok(n) = lit_data.text.parse::<f64>() {
+                                            let value = if op == SyntaxKind::MinusToken as u16 { -n } else { n };
+                                            self.interner.literal_number(value)
+                                        } else {
+                                            TypeId::NUMBER
+                                        }
+                                    } else {
+                                        TypeId::NUMBER
+                                    }
+                                }
+                                k if k == SyntaxKind::BigIntLiteral as u16 => {
+                                    if let Some(lit_data) = self.arena.get_literal(operand_node) {
+                                        let text = lit_data.text.strip_suffix('n').unwrap_or(&lit_data.text);
+                                        if op == SyntaxKind::MinusToken as u16 {
+                                            let mut value = String::with_capacity(text.len() + 1);
+                                            value.push('-');
+                                            value.push_str(text);
+                                            self.interner.literal_bigint(&value)
+                                        } else {
+                                            self.interner.literal_bigint(text)
+                                        }
+                                    } else {
+                                        TypeId::BIGINT
+                                    }
+                                }
+                                _ => TypeId::ANY,
+                            }
+                        } else {
+                            TypeId::ANY
+                        }
+                    }
                     _ => TypeId::ANY,
                 }
             } else {
