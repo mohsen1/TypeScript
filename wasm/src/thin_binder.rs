@@ -672,6 +672,11 @@ impl ThinBinderState {
         if let Some(alias) = arena.get_type_alias(node) {
             if let Some(name) = self.get_identifier_name(arena, alias.name) {
                 let sym_id = self.symbols.alloc(symbol_flags::TYPE_ALIAS, name.to_string());
+                // Set the value_declaration to this type alias declaration node
+                if let Some(sym) = self.symbols.get_mut(sym_id) {
+                    sym.value_declaration = idx;
+                    sym.declarations.push(idx);
+                }
                 self.current_scope.set(name.to_string(), sym_id);
                 self.node_symbols.insert(idx.0, sym_id);
             }

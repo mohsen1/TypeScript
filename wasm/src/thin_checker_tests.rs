@@ -641,3 +641,31 @@ fn test_accessor_type_compatibility_2322() {
         codes,
         checker.ctx.diagnostics.iter().map(|d| (d.code, d.message_text.clone())).collect::<Vec<_>>());
 }
+
+#[test]
+fn test_abstract_class_through_type_alias_2511() {
+    // Error 2511: Cannot create an instance of an abstract class - through type alias
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+abstract class AbstractA { a: string; }
+type Abstracts = typeof AbstractA;
+declare const cls2: Abstracts;
+new cls2();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2511),
+        "Expected error 2511 for abstract class instantiation through type alias, got: {:?}", codes);
+}

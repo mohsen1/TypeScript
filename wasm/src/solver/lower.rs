@@ -19,11 +19,40 @@ use crate::solver::intern::TypeInterner;
 pub struct TypeLowering<'a> {
     arena: &'a ThinNodeArena,
     interner: &'a TypeInterner,
+    /// Optional symbol resolver - resolves names to SymbolIds.
+    /// If provided, this enables correct abstract class detection.
+    resolver: Option<&'a dyn Fn(&str) -> Option<u32>>,
 }
 
 impl<'a> TypeLowering<'a> {
     pub fn new(arena: &'a ThinNodeArena, interner: &'a TypeInterner) -> Self {
-        TypeLowering { arena, interner }
+        TypeLowering { arena, interner, resolver: None }
+    }
+
+    /// Create a TypeLowering with a symbol resolver.
+    /// The resolver converts identifier names to actual SymbolIds from the binder.
+    pub fn with_resolver(
+        arena: &'a ThinNodeArena,
+        interner: &'a TypeInterner,
+        resolver: &'a dyn Fn(&str) -> Option<u32>,
+    ) -> Self {
+        TypeLowering { arena, interner, resolver: Some(resolver) }
+    }
+
+    /// Resolve a name to a symbol ID, falling back to hashing if no resolver provided.
+    fn resolve_symbol(&self, name: &str) -> u32 {
+        if let Some(resolver) = self.resolver {
+            if let Some(id) = resolver(name) {
+                return id;
+            }
+        }
+
+        // Fallback to hash
+        use std::hash::{Hash, Hasher};
+        use std::collections::hash_map::DefaultHasher;
+        let mut hasher = DefaultHasher::new();
+        name.hash(&mut hasher);
+        hasher.finish() as u32
     }
 
     /// Lower a type node to a TypeId.
@@ -609,12 +638,8 @@ impl<'a> TypeLowering<'a> {
             }
 
             // Create a reference for named types
-            // Use a simple hash as placeholder symbol ID
-            use std::hash::{Hash, Hasher};
-            use std::collections::hash_map::DefaultHasher;
-            let mut hasher = DefaultHasher::new();
-            name.hash(&mut hasher);
-            let symbol_id = hasher.finish() as u32;
+            // Use resolver if available, otherwise fall back to hash
+            let symbol_id = self.resolve_symbol(name);
             self.interner.reference(SymbolRef(symbol_id))
         } else {
             TypeId::ERROR
@@ -645,14 +670,10 @@ impl<'a> TypeLowering<'a> {
 
         if let Some(data) = self.arena.get_type_query(node) {
             // Create a symbol reference from the expression name
-            // For now, use a hash of the identifier name
+            // Use resolver if available for correct symbol ID lookup
             if let Some(expr_node) = self.arena.get(data.expr_name) {
                 if let Some(id_data) = self.arena.get_identifier(expr_node) {
-                    use std::hash::{Hash, Hasher};
-                    use std::collections::hash_map::DefaultHasher;
-                    let mut hasher = DefaultHasher::new();
-                    id_data.escaped_text.hash(&mut hasher);
-                    let symbol_id = hasher.finish() as u32;
+                    let symbol_id = self.resolve_symbol(&id_data.escaped_text);
                     return self.interner.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)));
                 }
             }

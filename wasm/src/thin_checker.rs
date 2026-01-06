@@ -305,6 +305,11 @@ impl<'a> ThinCheckerState<'a> {
                 self.get_type_from_function_type(idx)
             }
 
+            // Type query (typeof X) - returns the type of X
+            k if k == syntax_kind_ext::TYPE_QUERY => {
+                self.get_type_from_type_query(idx)
+            }
+
             // Default case
             _ => TypeId::ANY,
         }
@@ -401,6 +406,50 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         TypeId::ANY
+    }
+
+    /// Get type from a type query node (typeof X).
+    /// Creates a TypeQuery type with the actual SymbolId from the binder.
+    fn get_type_from_type_query(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::{TypeKey, SymbolRef};
+
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        let Some(type_query) = self.ctx.arena.get_type_query(node) else {
+            return TypeId::ANY;
+        };
+
+        // Get the identifier from expr_name
+        let Some(expr_node) = self.ctx.arena.get(type_query.expr_name) else {
+            return TypeId::ANY;
+        };
+
+        let Some(ident) = self.ctx.arena.get_identifier(expr_node) else {
+            return TypeId::ANY;
+        };
+
+        let name = &ident.escaped_text;
+
+        // Look up the symbol in the binder
+        if let Some(sym_id) = self.ctx.binder.file_locals.get(name) {
+            // Create TypeQuery with the actual SymbolId
+            return self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(sym_id.0)));
+        }
+
+        // Also check all symbols (for nested scopes)
+        if let Some(sym_id) = self.ctx.binder.get_symbols().find_by_name(name) {
+            return self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(sym_id.0)));
+        }
+
+        // Not found - fall back to hash (for forward compatibility)
+        use std::hash::{Hash, Hasher};
+        use std::collections::hash_map::DefaultHasher;
+        let mut hasher = DefaultHasher::new();
+        name.hash(&mut hasher);
+        let symbol_id = hasher.finish() as u32;
+        self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)))
     }
 
     /// Get type from an array type node (T[]).
@@ -790,15 +839,14 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         }
 
-        // Type alias - resolve using TypeLowering
+        // Type alias - resolve using checker's get_type_from_type_node to properly resolve symbols
         if flags & symbol_flags::TYPE_ALIAS != 0 {
             // Get the type node from the type alias declaration
             if !value_decl.is_none() {
                 if let Some(node) = self.ctx.arena.get(value_decl) {
                     if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
-                        // Lower the aliased type
-                        let lowering = TypeLowering::new(self.ctx.arena, &self.ctx.types);
-                        return lowering.lower_type(type_alias.type_node);
+                        // Use checker's type resolution which can resolve type references through binder
+                        return self.get_type_from_type_node(type_alias.type_node);
                     }
                 }
             }
@@ -1067,13 +1115,14 @@ impl<'a> ThinCheckerState<'a> {
 
         match type_key {
             // TypeQuery is `typeof ClassName` - check if the symbol is abstract
+            // Since get_type_from_type_query now uses real SymbolIds, we can directly look up
             TypeKey::TypeQuery(SymbolRef(sym_id)) => {
-                // Convert SymbolRef(u32) to SymbolId(u32)
                 if let Some(symbol) = self.ctx.binder.get_symbol(SymbolId(sym_id)) {
-                    symbol.flags & symbol_flags::ABSTRACT != 0
-                } else {
-                    false
+                    if symbol.flags & symbol_flags::ABSTRACT != 0 {
+                        return true;
+                    }
                 }
+                false
             }
             // Union type - check if ANY constituent is abstract
             TypeKey::Union(members) => {
@@ -1681,11 +1730,15 @@ impl<'a> ThinCheckerState<'a> {
     pub fn get_type_from_type_node(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::TypeLowering;
 
-        // First check if this is a type reference that needs validation
+        // First check if this is a type reference or type query that needs validation
         if let Some(node) = self.ctx.arena.get(idx) {
             if node.kind == syntax_kind_ext::TYPE_REFERENCE {
                 // Validate the type reference exists before lowering
                 return self.get_type_from_type_reference(idx);
+            }
+            if node.kind == syntax_kind_ext::TYPE_QUERY {
+                // Handle typeof X - need to resolve symbol properly
+                return self.get_type_from_type_query(idx);
             }
         }
 
