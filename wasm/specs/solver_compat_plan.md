@@ -29,13 +29,13 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
   - Test: `unknown` assignable to `any` but not `string`
 
 ### Phase 2: Function Bivariance
-- [ ] Implement function parameter bivariance (unsound but intentional)
+- [x] Implement function parameter bivariance (unsound but intentional)
   - `(x: string) => void` assignable to `(x: string | number) => void`
   - This is BACKWARDS from sound variance
-- [ ] Add strict mode flag
+- [x] Add strict mode flag
   - `strictFunctionTypes: false` -> bivariant (default TS behavior)
   - `strictFunctionTypes: true` -> contravariant (sound)
-- [ ] Tests for function variance
+- [x] Tests for function variance
   - Test: Bivariant mode allows `(Dog) => void` to `(Animal) => void`
   - Test: Strict mode rejects above
   - Test: Return types remain covariant
