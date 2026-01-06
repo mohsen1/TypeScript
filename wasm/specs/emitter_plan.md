@@ -45,7 +45,7 @@ Our focus is to make wasm emitter complete
   - ✅ All 608 Rust tests pass
   - Note: Baseline still at 53.9% - remaining failures are type-checking issues
 
-## Future Enhancements
+## FOCUS
 
 These features would expand emitter capabilities but are not critical for baseline improvement:
 
@@ -85,12 +85,25 @@ These features would expand emitter capabilities but are not critical for baseli
 - ✅ 14 comprehensive edge case tests in `emitter_edge_case_tests.rs`
 - ✅ Docker-safe benchmark runner (`./wasm/bench.sh`)
 - ✅ Comprehensive benchmark documentation (`wasm/BENCHMARKS.md`)
-- ⏳ Baseline performance metrics - to be established on first full benchmark run
-- Target: > 50 MB/s throughput (must beat TypeScript-Go ~40 MB/s)
+- ✅ Baseline performance metrics established (2026-01-06):
+  - **Emitter throughput: ~27 MB/s** ⚠️ BELOW TARGET
+  - **Parser throughput: ~40 MB/s** (matches TypeScript-Go)
+  - **Combined pipeline: ~120 μs for complex source**
+- ⚠️ **CRITICAL: Emitter needs optimization to reach > 50 MB/s target**
+  - Current: 27 MB/s
+  - TypeScript-Go: ~40 MB/s
+  - Target: > 50 MB/s
+  - Gap: Need ~85% performance improvement
 
 **Next Steps:**
-- Run benchmarks to establish baseline: `./wasm/bench.sh`
-- Focus shifts to `checker-track` for baseline improvement
+- 🔥 **PRIORITY: Optimize emitter performance** (current: 27 MB/s → target: > 50 MB/s)
+  - Profile hot paths (likely string building, helper emission, module transforms)
+  - Reduce allocations in emit loops
+  - Optimize SourceWriter performance
+  - Consider batch writes instead of character-by-character
+- Get Gemini review on optimization strategies
+- Re-benchmark after optimizations
+- Once > 50 MB/s achieved, focus shifts to `checker-track`
 - Emitter enhancements (System/AMD/UMD) can be revisited later if needed
 
 

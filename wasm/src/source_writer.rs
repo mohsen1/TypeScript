@@ -58,8 +58,14 @@ pub struct SourceWriter {
 impl SourceWriter {
     /// Create a new SourceWriter with default settings
     pub fn new() -> Self {
+        Self::with_capacity(1024)
+    }
+
+    /// Create a SourceWriter with pre-allocated capacity
+    /// This reduces allocations when the expected output size is known
+    pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            output: String::with_capacity(1024),
+            output: String::with_capacity(capacity),
             line: 0,
             column: 0,
             indent_level: 0,
@@ -256,6 +262,7 @@ impl SourceWriter {
     // =========================================================================
 
     /// Ensure indentation is written if we're at line start
+    #[inline(always)]
     fn ensure_indent(&mut self) {
         if self.at_line_start && self.indent_level > 0 {
             for _ in 0..self.indent_level {
@@ -270,17 +277,47 @@ impl SourceWriter {
 
     /// Raw write - updates position tracking, no indent handling
     /// Note: Column counting uses UTF-16 code units for source map compatibility
+    ///
+    /// Optimized using memchr for SIMD newline search and ASCII fast-path
     fn raw_write(&mut self, text: &str) {
-        for ch in text.chars() {
-            if ch == '\n' {
-                self.line += 1;
-                self.column = 0;
-            } else {
-                // UTF-16 code units: non-BMP characters (emojis etc.) count as 2
-                self.column += ch.len_utf16() as u32;
+        self.output.push_str(text);
+
+        let bytes = text.as_bytes();
+        let mut i = 0;
+
+        while i < bytes.len() {
+            match memchr::memchr(b'\n', &bytes[i..]) {
+                Some(offset) => {
+                    // Update column for text before newline
+                    let segment_end = i + offset;
+                    let segment = &text[i..segment_end];
+
+                    if segment.is_ascii() {
+                        // Fast path: ASCII strings have 1:1 byte-to-UTF16 mapping
+                        self.column += segment.len() as u32;
+                    } else {
+                        // Slow path: Count UTF-16 code units properly
+                        self.column += segment.chars().map(|c| c.len_utf16() as u32).sum::<u32>();
+                    }
+
+                    // Handle newline
+                    self.line += 1;
+                    self.column = 0;
+                    i = segment_end + 1;
+                }
+                None => {
+                    // No more newlines, just update column for remaining text
+                    let segment = &text[i..];
+
+                    if segment.is_ascii() {
+                        self.column += segment.len() as u32;
+                    } else {
+                        self.column += segment.chars().map(|c| c.len_utf16() as u32).sum::<u32>();
+                    }
+                    break;
+                }
             }
         }
-        self.output.push_str(text);
     }
 
     /// Raw write single char - updates position tracking
