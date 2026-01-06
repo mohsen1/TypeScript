@@ -1,6 +1,33 @@
 
 # WASM Compiler Architecture
 
+---
+
+## 🚨 URGENT: Critical Priorities Before Other Work
+
+These items MUST be addressed immediately before continuing other tasks.
+
+### 🚀 Track 1: Real-World Benchmarking (BLOCKING)
+
+**Problem:** Current benchmarks use synthetic load, which is misleading for architecture decisions.
+
+**Action Required:**
+- [ ] Add a **Real-World Benchmark** using TypeScript's own source code (`src/compiler/*.ts`)
+- [ ] Parse/Bind/Check the actual TypeScript compiler source files (e.g., `checker.ts` - ~50k lines)
+- [ ] This will reveal the true cost of `Arc<str>` vs `Atom` and cache locality issues
+- [ ] Measure: allocation pressure, L2 cache misses, parsing throughput
+
+**Why TypeScript's Source?** We're already in this repo. Use `src/compiler/checker.ts`, `src/compiler/types.ts`, `src/compiler/parser.ts` as benchmark inputs. These are massive, real-world TypeScript files that stress-test every component.
+
+```bash
+# Benchmark command (to be implemented)
+cargo bench --bench real_world -- --input ../src/compiler/checker.ts
+```
+
+**Target:** > 50 MB/s throughput (must beat TypeScript-Go ~40 MB/s)
+
+---
+
 ## Core Design & Parsing Infrastructure
 
 ### 1. Architectural Philosophy

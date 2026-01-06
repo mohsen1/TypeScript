@@ -32,11 +32,11 @@ const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 // Default configuration - only wasm directory (Rust migration focus)
 // Using 800k to stay safely under Gemini's 1M token limit (yek uses OpenAI tokenizer)
 const DEFAULT_TOKENS = "800k";
-const DEFAULT_DIRS = ["wasm/", "specs/"];
+const DEFAULT_DIRS = ["wasm/"];
 
 // Review mode configuration - maximize context for thorough reviews
 const REVIEW_TOKENS = "800k";
-const REVIEW_DIRS = ["wasm/", "specs/"];
+const REVIEW_DIRS = ["wasm/"];
 
 // Code review system prompt for Rust migration
 const CODE_REVIEW_PROMPT = `You are **RustReviewer**, an uncompromising senior systems engineer with 15+ years of experience in compiler development and Rust. You are reviewing code for the TypeScript-to-Rust migration project. Your reviews are **brutally honest**, **technically precise**, and **actionable**.
@@ -137,6 +137,72 @@ const colors = {
 
 function log(message, color = colors.reset) {
   console.error(`${color}${message}${colors.reset}`);
+}
+
+async function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function fetchWithRetry(url, options, maxRetries = 5) {
+  let lastError;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+
+      // If rate limited, retry with exponential backoff
+      if (response.status === 429) {
+        if (attempt === maxRetries) {
+          throw new Error(`Rate limited after ${maxRetries} retries`);
+        }
+
+        const retryAfter = response.headers.get('retry-after');
+        const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : Math.pow(2, attempt) * 1000;
+
+        log(`\n${colors.yellow}Rate limited. Waiting ${Math.round(waitTime/1000)}s before retry ${attempt + 1}/${maxRetries}...${colors.reset}`, colors.yellow);
+        await sleep(waitTime);
+        continue;
+      }
+
+      // If other error, try to get error message from response
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `Gemini API error (${response.status})`;
+
+        try {
+          const errorJson = JSON.parse(errorText);
+          if (errorJson.error?.message) {
+            errorMessage += `: ${errorJson.error.message}`;
+          }
+        } catch {
+          // If not JSON, use text response
+          if (errorText) {
+            errorMessage += `: ${errorText}`;
+          }
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      return response;
+    } catch (error) {
+      lastError = error;
+
+      // Only retry on network errors or rate limits
+      if (error.message.includes('Rate limited') || error.message.includes('fetch failed')) {
+        if (attempt < maxRetries) {
+          const waitTime = Math.pow(2, attempt) * 1000;
+          log(`\n${colors.yellow}Request failed. Retrying in ${Math.round(waitTime/1000)}s... (attempt ${attempt + 1}/${maxRetries})${colors.reset}`, colors.yellow);
+          await sleep(waitTime);
+          continue;
+        }
+      }
+
+      throw error;
+    }
+  }
+
+  throw lastError;
 }
 
 function loadEnvFile(filePath) {
@@ -397,7 +463,7 @@ ${question}
     },
   };
 
-  const response = await fetch(url, {
+  const response = await fetchWithRetry(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -405,11 +471,6 @@ ${question}
     },
     body: JSON.stringify(requestBody),
   });
-
-  if (!response.ok) {
-    await response.text();
-    throw new Error(`Gemini API error (${response.status}): An error occurred while processing the request.`);
-  }
 
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
@@ -530,7 +591,7 @@ ${question}
     },
   };
 
-  const response = await fetch(url, {
+  const response = await fetchWithRetry(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -538,11 +599,6 @@ ${question}
     },
     body: JSON.stringify(requestBody),
   });
-
-  if (!response.ok) {
-    await response.text();
-    throw new Error(`Gemini API error (${response.status}): An error occurred while processing the request.`);
-  }
 
   const data = await response.json();
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;

@@ -59,22 +59,31 @@ fn is_whitespace_single_line(ch: char) -> bool {
     ch == ' ' || ch == '\t' || ch == '\u{000B}' || ch == '\u{000C}'
 }
 
+/// UTF-8 safe helper to get the character at a byte position.
+/// Returns None if pos is out of bounds or not on a char boundary.
+fn char_at(text: &str, pos: usize) -> Option<char> {
+    if pos >= text.len() {
+        return None;
+    }
+    text[pos..].chars().next()
+}
+
 /// Get trailing comments starting at a position in the source text.
 /// Trailing comments are comments that appear on the same line after a token,
 /// before a newline.
 pub fn get_trailing_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
     let mut comments = Vec::new();
-    let bytes = text.as_bytes();
-    let len = bytes.len();
+    let len = text.len();
     let mut i = pos;
 
     // Scan for trailing comments (on the same line, before newline)
     while i < len {
-        let ch = bytes[i] as char;
+        let ch = char_at(text, i).unwrap_or('\0');
+        let char_len = ch.len_utf8();
 
         // Skip whitespace (but not newlines)
         if is_whitespace_single_line(ch) {
-            i += 1;
+            i += char_len;
             continue;
         }
 
@@ -83,38 +92,43 @@ pub fn get_trailing_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> 
             break;
         }
 
-        // Check for comment start
+        // Check for comment start (/ is ASCII, safe to check byte directly)
         if ch == '/' && i + 1 < len {
-            let next_ch = bytes[i + 1] as char;
+            let next_byte = text.as_bytes()[i + 1];
 
-            if next_ch == '/' {
+            if next_byte == b'/' {
                 // Single-line comment: // ...
                 let start = i;
                 i += 2;
-                while i < len && !is_line_break(bytes[i] as char) {
-                    i += 1;
+                while i < len {
+                    let c = char_at(text, i).unwrap_or('\0');
+                    if is_line_break(c) {
+                        break;
+                    }
+                    i += c.len_utf8();
                 }
                 comments.push(CommentRange {
                     pos: start as u32,
                     end: i as u32,
                     kind: CommentKind::SingleLine,
-                    has_trailing_newline: i < len && is_line_break(bytes[i] as char),
+                    has_trailing_newline: i < len && is_line_break(char_at(text, i).unwrap_or('\0')),
                 });
                 continue;
-            } else if next_ch == '*' {
+            } else if next_byte == b'*' {
                 // Multi-line comment: /* ... */
                 let start = i;
                 i += 2;
                 let mut has_newline = false;
                 while i + 1 < len {
-                    if bytes[i] as char == '*' && bytes[i + 1] as char == '/' {
+                    let c = char_at(text, i).unwrap_or('\0');
+                    if c == '*' && text.as_bytes()[i + 1] == b'/' {
                         i += 2;
                         break;
                     }
-                    if is_line_break(bytes[i] as char) {
+                    if is_line_break(c) {
                         has_newline = true;
                     }
-                    i += 1;
+                    i += c.len_utf8();
                 }
                 // For trailing comments, we stop after the first multi-line comment
                 // if it spans multiple lines
@@ -143,33 +157,38 @@ pub fn get_trailing_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> 
 /// potentially on preceding lines.
 pub fn get_leading_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
     let mut comments = Vec::new();
-    let bytes = text.as_bytes();
+    let len = text.len();
     let mut i = pos;
 
     // Skip shebang at the start of file
-    if i == 0 && bytes.len() >= 2 && bytes[0] == b'#' && bytes[1] == b'!' {
-        while i < bytes.len() && !is_line_break(bytes[i] as char) {
-            i += 1;
+    if i == 0 && len >= 2 && text.as_bytes()[0] == b'#' && text.as_bytes()[1] == b'!' {
+        while i < len {
+            let c = char_at(text, i).unwrap_or('\0');
+            if is_line_break(c) {
+                break;
+            }
+            i += c.len_utf8();
         }
     }
 
     // Scan for leading comments
     let mut pending: Option<CommentRange> = None;
 
-    while i < bytes.len() {
-        let ch = bytes[i] as char;
+    while i < len {
+        let ch = char_at(text, i).unwrap_or('\0');
+        let char_len = ch.len_utf8();
 
         // Skip whitespace
         if is_whitespace_single_line(ch) {
-            i += 1;
+            i += char_len;
             continue;
         }
 
         // Handle newlines - they mark comment boundaries
         if is_line_break(ch) {
-            i += 1;
+            i += char_len;
             // Skip \r\n as a single newline
-            if ch == '\r' && i < bytes.len() && bytes[i] == b'\n' {
+            if ch == '\r' && i < len && text.as_bytes()[i] == b'\n' {
                 i += 1;
             }
             if let Some(mut p) = pending.take() {
@@ -179,11 +198,11 @@ pub fn get_leading_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
             continue;
         }
 
-        // Check for comment start
-        if ch == '/' && i + 1 < bytes.len() {
-            let next_ch = bytes[i + 1] as char;
+        // Check for comment start (/ is ASCII, safe to check byte directly)
+        if ch == '/' && i + 1 < len {
+            let next_byte = text.as_bytes()[i + 1];
 
-            if next_ch == '/' {
+            if next_byte == b'/' {
                 // Emit any pending comment first
                 if let Some(p) = pending.take() {
                     comments.push(p);
@@ -191,8 +210,12 @@ pub fn get_leading_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
                 // Single-line comment
                 let start = i;
                 i += 2;
-                while i < bytes.len() && !is_line_break(bytes[i] as char) {
-                    i += 1;
+                while i < len {
+                    let c = char_at(text, i).unwrap_or('\0');
+                    if is_line_break(c) {
+                        break;
+                    }
+                    i += c.len_utf8();
                 }
                 pending = Some(CommentRange {
                     pos: start as u32,
@@ -201,7 +224,7 @@ pub fn get_leading_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
                     has_trailing_newline: false,
                 });
                 continue;
-            } else if next_ch == '*' {
+            } else if next_byte == b'*' {
                 // Emit any pending comment first
                 if let Some(p) = pending.take() {
                     comments.push(p);
@@ -209,12 +232,13 @@ pub fn get_leading_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
                 // Multi-line comment
                 let start = i;
                 i += 2;
-                while i + 1 < bytes.len() {
-                    if bytes[i] == b'*' && bytes[i + 1] == b'/' {
+                while i + 1 < len {
+                    if text.as_bytes()[i] == b'*' && text.as_bytes()[i + 1] == b'/' {
                         i += 2;
                         break;
                     }
-                    i += 1;
+                    let c = char_at(text, i).unwrap_or('\0');
+                    i += c.len_utf8();
                 }
                 pending = Some(CommentRange {
                     pos: start as u32,
@@ -337,6 +361,9 @@ pub struct ThinPrinter<'a> {
 
     /// Source text for detecting single-line constructs
     pub(super) source_text: Option<&'a str>,
+
+    /// Last processed position in source text for comment gap detection
+    pub(super) last_processed_pos: u32,
 }
 
 impl<'a> ThinPrinter<'a> {
@@ -359,6 +386,7 @@ impl<'a> ThinPrinter<'a> {
             writer,
             ctx,
             source_text: None,
+            last_processed_pos: 0,
         }
     }
 
@@ -479,6 +507,89 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
+    /// Emit comments in the gap between last_processed_pos and the given position.
+    /// This handles comments that appear between AST nodes.
+    fn emit_comments_in_gap(&mut self, up_to_pos: u32) {
+        if self.ctx.options.remove_comments {
+            return;
+        }
+
+        let Some(text) = self.source_text else {
+            return;
+        };
+
+        // Scan for comments between last_processed_pos and up_to_pos
+        let start = self.last_processed_pos as usize;
+        let end = std::cmp::min(up_to_pos as usize, text.len());
+
+        if start >= end {
+            return;
+        }
+
+        // Scan the gap for comments
+        let gap_text = &text[start..end];
+        let bytes = gap_text.as_bytes();
+        let len = bytes.len();
+        let mut pos = 0;
+
+        while pos < len {
+            let ch = bytes[pos];
+
+            // Skip whitespace
+            if ch == b' ' || ch == b'\t' || ch == b'\r' || ch == b'\n' {
+                pos += 1;
+                continue;
+            }
+
+            // Check for comment start
+            if ch == b'/' && pos + 1 < len {
+                let next = bytes[pos + 1];
+
+                if next == b'/' {
+                    // Single-line comment
+                    let comment_start = start + pos;
+                    let mut comment_end = pos + 2;
+                    while comment_end < len && bytes[comment_end] != b'\n' && bytes[comment_end] != b'\r' {
+                        comment_end += 1;
+                    }
+                    let comment_text = &text[comment_start..start + comment_end];
+                    self.write(comment_text);
+                    self.write_line();
+
+                    // Skip past the comment and newline
+                    pos = comment_end;
+                    if pos < len && bytes[pos] == b'\r' {
+                        pos += 1;
+                    }
+                    if pos < len && bytes[pos] == b'\n' {
+                        pos += 1;
+                    }
+                    continue;
+                } else if next == b'*' {
+                    // Multi-line comment
+                    let comment_start = start + pos;
+                    let mut comment_end = pos + 2;
+                    while comment_end + 1 < len {
+                        if bytes[comment_end] == b'*' && bytes[comment_end + 1] == b'/' {
+                            comment_end += 2;
+                            break;
+                        }
+                        comment_end += 1;
+                    }
+                    let comment_text = &text[comment_start..start + comment_end];
+                    self.write(comment_text);
+                    self.write_line();
+
+                    pos = comment_end;
+                    continue;
+                }
+            }
+
+            // Hit non-whitespace, non-comment content - stop scanning
+            break;
+        }
+    }
+
     // =========================================================================
     // Output Helpers (delegate to SourceWriter)
     // pub(super) for access from submodules (expressions, statements, declarations)
@@ -535,6 +646,30 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
+        self.emit_node(node, idx);
+    }
+
+    /// Emit a node in an expression context.
+    /// If the node is an error/unknown node, emits `void 0` for parse error tolerance.
+    pub fn emit_expression(&mut self, idx: NodeIndex) {
+        if idx.is_none() {
+            self.write("void 0");
+            return;
+        }
+
+        let Some(node) = self.arena.get(idx) else {
+            self.write("void 0");
+            return;
+        };
+
+        // Check if this is an error/unknown node
+        use crate::scanner::SyntaxKind;
+        if node.kind == SyntaxKind::Unknown as u16 {
+            self.write("void 0");
+            return;
+        }
+
+        // Otherwise, emit normally
         self.emit_node(node, idx);
     }
 
@@ -1422,7 +1557,7 @@ impl<'a> ThinPrinter<'a> {
 
         self.emit(prop.name);
         self.write(": ");
-        self.emit(prop.initializer);
+        self.emit_expression(prop.initializer);
     }
 
     fn emit_shorthand_property(&mut self, node: &ThinNode) {
@@ -1624,7 +1759,9 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        let is_exported = self.ctx.is_commonjs() && self.has_export_modifier(&func.modifiers);
+        let is_exported = self.ctx.is_commonjs()
+            && self.has_export_modifier(&func.modifiers)
+            && !self.ctx.module_state.has_export_assignment;
         let is_default = self.has_default_modifier(&func.modifiers);
 
         // Get function name for export
@@ -1786,7 +1923,7 @@ impl<'a> ThinPrinter<'a> {
 
         if !param.initializer.is_none() {
             self.write(" = ");
-            self.emit(param.initializer);
+            self.emit_expression(param.initializer);
         }
     }
 
@@ -1844,7 +1981,9 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        let is_exported = self.ctx.is_commonjs() && self.has_export_modifier(&var_stmt.modifiers);
+        let is_exported = self.ctx.is_commonjs()
+            && self.has_export_modifier(&var_stmt.modifiers)
+            && !self.ctx.module_state.has_export_assignment;
         let is_default = self.has_default_modifier(&var_stmt.modifiers);
 
         // Collect declaration names for export assignment
@@ -1970,7 +2109,7 @@ impl<'a> ThinPrinter<'a> {
 
         if !decl.initializer.is_none() {
             self.write(" = ");
-            self.emit(decl.initializer);
+            self.emit_expression(decl.initializer);
         }
     }
 
@@ -2195,7 +2334,7 @@ impl<'a> ThinPrinter<'a> {
         self.write("return");
         if !ret.expression.is_none() {
             self.write(" ");
-            self.emit(ret.expression);
+            self.emit_expression(ret.expression);
         }
         self.write_semicolon();
     }
@@ -2214,7 +2353,9 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        let is_exported = self.ctx.is_commonjs() && self.has_export_modifier(&class.modifiers);
+        let is_exported = self.ctx.is_commonjs()
+            && self.has_export_modifier(&class.modifiers)
+            && !self.ctx.module_state.has_export_assignment;
         let is_default = self.has_default_modifier(&class.modifiers);
 
         // Get class name for export
@@ -2685,14 +2826,16 @@ impl<'a> ThinPrinter<'a> {
                     self.emit_variable_statement(clause_node);
                     self.write_line();
 
-                    // Emit exports.x = x; for each name
-                    for name in &export_names {
-                        self.write("exports.");
-                        self.write(name);
-                        self.write(" = ");
-                        self.write(name);
-                        self.write(";");
-                        self.write_line();
+                    // Emit exports.x = x; for each name (unless file has export =)
+                    if !self.ctx.module_state.has_export_assignment {
+                        for name in &export_names {
+                            self.write("exports.");
+                            self.write(name);
+                            self.write(" = ");
+                            self.write(name);
+                            self.write(";");
+                            self.write_line();
+                        }
                     }
                 }
                 // export function f() {} or export default function f() {}
@@ -2701,19 +2844,21 @@ impl<'a> ThinPrinter<'a> {
                     self.emit_function_declaration(clause_node, export.export_clause);
                     self.write_line();
 
-                    // Get function name and emit export
-                    if let Some(func) = self.arena.get_function(clause_node) {
-                        if let Some(name) = self.get_identifier_text_opt(func.name) {
-                            if export.is_default_export {
-                                self.write("exports.default = ");
-                            } else {
-                                self.write("exports.");
+                    // Get function name and emit export (unless file has export =)
+                    if !self.ctx.module_state.has_export_assignment {
+                        if let Some(func) = self.arena.get_function(clause_node) {
+                            if let Some(name) = self.get_identifier_text_opt(func.name) {
+                                if export.is_default_export {
+                                    self.write("exports.default = ");
+                                } else {
+                                    self.write("exports.");
+                                    self.write(&name);
+                                    self.write(" = ");
+                                }
                                 self.write(&name);
-                                self.write(" = ");
+                                self.write(";");
+                                self.write_line();
                             }
-                            self.write(&name);
-                            self.write(";");
-                            self.write_line();
                         }
                     }
                 }
@@ -2723,19 +2868,21 @@ impl<'a> ThinPrinter<'a> {
                     self.emit_class_declaration(clause_node, export.export_clause);
                     self.write_line();
 
-                    // Get class name and emit export
-                    if let Some(class) = self.arena.get_class(clause_node) {
-                        if let Some(name) = self.get_identifier_text_opt(class.name) {
-                            if export.is_default_export {
-                                self.write("exports.default = ");
-                            } else {
-                                self.write("exports.");
+                    // Get class name and emit export (unless file has export =)
+                    if !self.ctx.module_state.has_export_assignment {
+                        if let Some(class) = self.arena.get_class(clause_node) {
+                            if let Some(name) = self.get_identifier_text_opt(class.name) {
+                                if export.is_default_export {
+                                    self.write("exports.default = ");
+                                } else {
+                                    self.write("exports.");
+                                    self.write(&name);
+                                    self.write(" = ");
+                                }
                                 self.write(&name);
-                                self.write(" = ");
+                                self.write(";");
+                                self.write_line();
                             }
-                            self.write(&name);
-                            self.write(";");
-                            self.write_line();
                         }
                     }
                 }
@@ -2792,13 +2939,13 @@ impl<'a> ThinPrinter<'a> {
             } else {
                 self.write("exports.default = ");
             }
-            self.emit(export_assign.expression);
+            self.emit_expression(export_assign.expression);
             self.write_semicolon();
         } else {
             // ES6: export = expr (not valid ES6, but emit as export default)
             //      export default expr → export default expr;
             self.write("export default ");
-            self.emit(export_assign.expression);
+            self.emit_expression(export_assign.expression);
             self.write_semicolon();
         }
     }
@@ -3643,7 +3790,7 @@ impl<'a> ThinPrinter<'a> {
         }
         if !unary.operand.is_none() {
             self.write(" ");
-            self.emit(unary.operand);
+            self.emit_expression(unary.operand);
         }
     }
 
@@ -3655,7 +3802,7 @@ impl<'a> ThinPrinter<'a> {
         };
 
         self.write("await ");
-        self.emit(unary.operand);
+        self.emit_expression(unary.operand);
     }
 
     fn emit_spread_element(&mut self, node: &ThinNode) {
@@ -3665,7 +3812,7 @@ impl<'a> ThinPrinter<'a> {
         };
 
         self.write("...");
-        self.emit(spread.expression);
+        self.emit_expression(spread.expression);
     }
 
     // =========================================================================
@@ -3695,17 +3842,130 @@ impl<'a> ThinPrinter<'a> {
             self.ctx.options.module = ModuleKind::CommonJS;
         }
 
-        // CommonJS preamble
+        // Detect export assignment (export =) to suppress other exports
+        if self.has_export_assignment(&source.statements) {
+            self.ctx.module_state.has_export_assignment = true;
+        }
+
+        // Extract and filter comments (strip compiler directives)
+        let all_comments = if !self.ctx.options.remove_comments {
+            if let Some(text) = self.source_text {
+                crate::comments::get_comment_ranges(text)
+                    .into_iter()
+                    .filter(|c| {
+                        // Filter out triple-slash directives (/// <reference ..., /// <amd ...)
+                        // TypeScript strips these from JS output
+                        let content = c.get_text(text);
+                        !content.starts_with("/// <reference") && !content.starts_with("/// <amd")
+                    })
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        };
+
+        let mut comment_idx = 0;
+
+        // CommonJS: Emit "use strict" FIRST (before comments and helpers)
         if self.ctx.is_commonjs() {
-            self.emit_commonjs_preamble(&source.statements);
+            self.write("\"use strict\";");
+            self.write_line();
         }
 
-        // Check if any class extends another - if so, emit __extends helper
+        // Emit header comments AFTER "use strict" but BEFORE helpers
+        let first_stmt_pos = source.statements.nodes.first()
+            .and_then(|&idx| self.arena.get(idx))
+            .map(|n| n.pos)
+            .unwrap_or(node.end);
+
+        if let Some(text) = self.source_text {
+            while comment_idx < all_comments.len() {
+                let comment = &all_comments[comment_idx];
+                if comment.end <= first_stmt_pos {
+                    let comment_text = comment.get_text(text);
+                    self.write(comment_text);
+                    if comment.has_trailing_new_line {
+                        self.write_line();
+                    }
+                    comment_idx += 1;
+                } else {
+                    break;
+                }
+            }
+        }
+
+        // Emit runtime helpers (must come BEFORE __esModule marker)
+        // Order: "use strict" → helpers → __esModule → exports init
+        let mut helpers = crate::transforms::helpers::HelpersNeeded::default();
+
+        // Detect CommonJS import/export helpers
+        if self.ctx.is_commonjs() {
+            self.detect_commonjs_helpers(&source.statements, &mut helpers);
+        }
+
+        // Detect ES5 class helpers
         if self.ctx.target_es5 && self.needs_extends_helper(&source.statements) {
-            self.emit_extends_helper();
+            helpers.extends = true;
         }
 
+        // Emit all needed helpers
+        let helpers_code = crate::transforms::helpers::emit_helpers(&helpers);
+        if !helpers_code.is_empty() {
+            self.write(&helpers_code);
+            // emit_helpers() already adds newlines, no need to add more
+        }
+
+        // CommonJS: Emit __esModule and exports initialization (AFTER helpers)
+        if self.ctx.is_commonjs() {
+            use crate::transforms::module_commonjs;
+
+            // Emit __esModule if this is an ES module
+            if self.should_emit_es_module_marker(&source.statements) {
+                self.write("Object.defineProperty(exports, \"__esModule\", { value: true });");
+                self.write_line();
+            }
+
+            // Collect and emit exports initialization
+            let export_names = module_commonjs::collect_export_names(self.arena, &source.statements.nodes);
+            if !export_names.is_empty() {
+                for (i, name) in export_names.iter().enumerate() {
+                    if i > 0 {
+                        self.write(" = ");
+                    }
+                    self.write("exports.");
+                    self.write(name);
+                }
+                self.write(" = void 0;");
+                self.write_line();
+            }
+        }
+
+        // Emit statements with their comments
         for &stmt_idx in &source.statements.nodes {
+            if let Some(stmt_node) = self.arena.get(stmt_idx) {
+                // Emit any comments that appear before this statement
+                if let Some(text) = self.source_text {
+                    while comment_idx < all_comments.len() {
+                        let comment = &all_comments[comment_idx];
+                        if comment.end <= stmt_node.pos {
+                            // This comment is before the statement, emit it
+                            let comment_text = comment.get_text(text);
+                            self.write(comment_text);
+                            // Only add newline if the comment has a trailing newline
+                            if comment.has_trailing_new_line {
+                                self.write_line();
+                            }
+                            comment_idx += 1;
+                        } else {
+                            // This comment is after the statement start, stop
+                            break;
+                        }
+                    }
+                }
+            }
+
             let before_len = self.writer.len();
             self.emit(stmt_idx);
             // Only add newline if something was actually emitted
@@ -3713,6 +3973,31 @@ impl<'a> ThinPrinter<'a> {
                 self.write_line();
             }
         }
+
+        // Emit remaining trailing comments at the end of file
+        if let Some(text) = self.source_text {
+            while comment_idx < all_comments.len() {
+                let comment = &all_comments[comment_idx];
+                let comment_text = comment.get_text(text);
+                self.write(comment_text);
+                if comment.has_trailing_new_line {
+                    self.write_line();
+                }
+                comment_idx += 1;
+            }
+        }
+    }
+
+    /// Check if the file contains an export assignment (export =)
+    fn has_export_assignment(&self, statements: &NodeList) -> bool {
+        for &stmt_idx in &statements.nodes {
+            if let Some(node) = self.arena.get(stmt_idx) {
+                if node.kind == syntax_kind_ext::EXPORT_ASSIGNMENT {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     /// Check if a file is a module (has import/export statements)
@@ -3766,6 +4051,90 @@ impl<'a> ThinPrinter<'a> {
                             }
                         }
                     }
+                    k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                        if let Some(module) = self.arena.get_module(node) {
+                            if self.has_export_modifier(&module.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if we should emit the __esModule marker.
+    /// Returns true if the file contains any ES6 module syntax (import/export),
+    /// excluding `export =` which is legacy CommonJS.
+    fn should_emit_es_module_marker(&self, statements: &NodeList) -> bool {
+        // First check: if file has export =, don't emit __esModule at all
+        for &stmt_idx in &statements.nodes {
+            if let Some(node) = self.arena.get(stmt_idx) {
+                if node.kind == syntax_kind_ext::EXPORT_ASSIGNMENT {
+                    return false;
+                }
+            }
+        }
+
+        // Second check: look for ES6 module syntax
+        for &stmt_idx in &statements.nodes {
+            if let Some(node) = self.arena.get(stmt_idx) {
+                match node.kind {
+                    k if k == syntax_kind_ext::IMPORT_DECLARATION => return true,
+                    k if k == syntax_kind_ext::EXPORT_DECLARATION => return true,
+                    // Note: EXPORT_ASSIGNMENT (export =) is excluded - it's CommonJS style
+                    // Check for export modifier on declarations
+                    k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+                        if let Some(var_stmt) = self.arena.get_variable(node) {
+                            if self.has_export_modifier(&var_stmt.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                        if let Some(func) = self.arena.get_function(node) {
+                            if self.has_export_modifier(&func.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                        if let Some(class) = self.arena.get_class(node) {
+                            if self.has_export_modifier(&class.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::ENUM_DECLARATION => {
+                        if let Some(enum_decl) = self.arena.get_enum(node) {
+                            if self.has_export_modifier(&enum_decl.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                        if let Some(module) = self.arena.get_module(node) {
+                            if self.has_export_modifier(&module.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
+                        if let Some(iface) = self.arena.get_interface(node) {
+                            if self.has_export_modifier(&iface.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                        if let Some(type_alias) = self.arena.get_type_alias(node) {
+                            if self.has_export_modifier(&type_alias.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
                     _ => {}
                 }
             }
@@ -3781,6 +4150,13 @@ impl<'a> ThinPrinter<'a> {
         self.write("\"use strict\";");
         self.write_line();
 
+        // Emit __esModule if this is an ES module (has imports or ES exports)
+        // Note: 'export =' is CommonJS style and doesn't get __esModule
+        if self.should_emit_es_module_marker(statements) {
+            self.write("Object.defineProperty(exports, \"__esModule\", { value: true });");
+            self.write_line();
+        }
+
         // Collect and emit exports initialization
         // TypeScript emits: exports.C = void 0; (NOT Object.defineProperty)
         let export_names = module_commonjs::collect_export_names(self.arena, &statements.nodes);
@@ -3795,6 +4171,44 @@ impl<'a> ThinPrinter<'a> {
             }
             self.write(" = void 0;");
             self.write_line();
+        }
+    }
+
+    /// Detect which CommonJS import/export helpers are needed for the file
+    fn detect_commonjs_helpers(&self, statements: &NodeList, helpers: &mut crate::transforms::helpers::HelpersNeeded) {
+        use crate::parser::syntax_kind_ext;
+
+        for &stmt_idx in &statements.nodes {
+            let Some(node) = self.arena.get(stmt_idx) else { continue };
+
+            match node.kind {
+                k if k == syntax_kind_ext::IMPORT_DECLARATION => {
+                    if let Some(import) = self.arena.get_import_decl(node) {
+                        // Check for: import * as ns from "mod"
+                        if let Some(clause_node) = self.arena.get(import.import_clause) {
+                            if let Some(clause) = self.arena.get_import_clause(clause_node) {
+                                if let Some(bindings_node) = self.arena.get(clause.named_bindings) {
+                                    // NAMESPACE_IMPORT = 275
+                                    if bindings_node.kind == syntax_kind_ext::NAMESPACE_IMPORT {
+                                        helpers.import_star = true;
+                                        helpers.create_binding = true; // __importStar depends on __createBinding
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::EXPORT_DECLARATION => {
+                    if let Some(export) = self.arena.get_export_decl(node) {
+                        // Check for: export * from "mod" (module_specifier present, no export_clause)
+                        if !export.module_specifier.is_none() && export.export_clause.is_none() {
+                            helpers.export_star = true;
+                            helpers.create_binding = true; // __exportStar depends on __createBinding
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
