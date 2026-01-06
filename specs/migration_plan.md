@@ -47,8 +47,10 @@ This catches design issues early and ensures consistent code quality.
 
 ### Next Steps
 
-#### First
+#### First thing first.
 The analysis identifies several modules that are effectively dead code. While some "old" components (like `checker/`, `binder.rs`, `parser_impl.rs`) are technically reachable via the legacy `createParser` API, other components have no public entry points in `lib.rs` or are disconnected from the execution graph.
+
+delete this section once done
 
 <details>
 ### Dead Code Report
@@ -125,10 +127,10 @@ To clean up the codebase, you can safely delete:
 ### Blockers Analysis (26 failing tests)
 | Category | Codes | Tests | Notes |
 |----------|-------|-------|-------|
-| Parser errors | 1005, 1068, 1128, 1248 | 6 | Error recovery gaps |
-| Type errors | 2339, 2355, 2511, 2662 | 12 | Property access, returns, abstract |
-| Accessor errors | 1183, 6234, 18045 | 4 | Ambient context, hints |
-| Abstract members | 2715, 2729, 2416, 2540 | 4 | Abstract property handling |
+| Parser errors | 1005, 1128 | 4 | Error recovery gaps (1068, 1248 done) |
+| Type errors | 2339, 2355, 2511 | 10 | Property access, returns, abstract (2662 done) |
+| Accessor errors | 6234, 18045 | 3 | Hints, ES5 target (1183 done) |
+| Abstract members | 2729, 2416, 2540 | 3 | Abstract property handling (2715 done) |
 
 ### Emit TODOs (96.7% failing)
 | Feature | Tests | % | Notes |
@@ -179,6 +181,9 @@ To clean up the codebase, you can safely delete:
 # Phase 10: Full Rust Mode ⬜
 
 - ⬜ Remove TypeScript fallbacks
+- ⬜ Delete old CheckerState (checker/state.rs) - use only ThinCheckerState
+- ⬜ Delete old ParserState (parser_impl.rs) - use only ThinParser
+- ⬜ Port Language Service to use ThinNode/ThinChecker APIs
 - ⬜ Performance benchmarks vs tsc and tsc-go
 - ⬜ Memory usage optimization
 
