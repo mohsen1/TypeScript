@@ -95,12 +95,12 @@ fn test_interner_object_sorting() {
 
     // Properties in different order should produce same TypeId
     let props1 = vec![
-        PropertyInfo { name: interner.intern_string("a"), type_id: TypeId::STRING, optional: false, readonly: false },
-        PropertyInfo { name: interner.intern_string("b"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("a"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("b"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ];
     let props2 = vec![
-        PropertyInfo { name: interner.intern_string("b"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: interner.intern_string("a"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("b"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("a"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ];
 
     let id1 = interner.object(props1);

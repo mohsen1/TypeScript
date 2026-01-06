@@ -104,6 +104,12 @@ pub enum TransformDirective {
         function_node: NodeIndex,
     },
 
+    /// ES5 For-Of: Transform to iterator loop with __values helper
+    ES5ForOf {
+        /// Original for-of statement node
+        for_of_node: NodeIndex,
+    },
+
     /// Module Wrapper: Wrap entire file for AMD/System/UMD
     ModuleWrapper {
         /// Module format (AMD, System, UMD)

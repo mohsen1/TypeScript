@@ -156,6 +156,46 @@ fn test_project_code_actions_missing_import_named() {
 }
 
 #[test]
+fn test_project_code_actions_missing_import_default_export() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "export default function bar() {}\n".to_string());
+    project.set_file("b.ts".to_string(), "foo();\n".to_string());
+
+    let file = project.file("b.ts").unwrap();
+    let source = file.source_text();
+    let line_map = file.line_map();
+    let start = source.find("foo").unwrap();
+    let range = Range::new(
+        line_map.offset_to_position(start as u32, source),
+        line_map.offset_to_position((start + 3) as u32, source),
+    );
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Error),
+        code: Some(crate::checker::types::diagnostics::diagnostic_codes::CANNOT_FIND_NAME),
+        source: None,
+        message: "Cannot find name 'foo'.".to_string(),
+        related_information: None,
+    };
+
+    let actions = project
+        .get_code_actions(
+            "b.ts",
+            Range::new(Position::new(0, 0), Position::new(0, 0)),
+            vec![diag],
+            Some(vec![CodeActionKind::QuickFix]),
+        )
+        .expect("Expected missing import quick fix");
+
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("b.ts").unwrap();
+    let updated = apply_text_edits(source, line_map, edits);
+    assert_eq!(updated, "import foo from \"./a\";\nfoo();\n");
+}
+
+#[test]
 fn test_project_code_actions_missing_import_tsx() {
     let mut project = Project::new();
 
@@ -193,6 +233,47 @@ fn test_project_code_actions_missing_import_tsx() {
     let edits = edit.changes.get("b.ts").unwrap();
     let updated = apply_text_edits(source, line_map, edits);
     assert_eq!(updated, "import { foo } from \"./a\";\nfoo();\n");
+}
+
+#[test]
+fn test_project_code_actions_missing_import_default_reexport() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "export default function bar() {}\n".to_string());
+    project.set_file("index.ts".to_string(), "export { default } from \"./a\";\n".to_string());
+    project.set_file("b.ts".to_string(), "foo();\n".to_string());
+
+    let file = project.file("b.ts").unwrap();
+    let source = file.source_text();
+    let line_map = file.line_map();
+    let start = source.find("foo").unwrap();
+    let range = Range::new(
+        line_map.offset_to_position(start as u32, source),
+        line_map.offset_to_position((start + 3) as u32, source),
+    );
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Error),
+        code: Some(crate::checker::types::diagnostics::diagnostic_codes::CANNOT_FIND_NAME),
+        source: None,
+        message: "Cannot find name 'foo'.".to_string(),
+        related_information: None,
+    };
+
+    let actions = project
+        .get_code_actions(
+            "b.ts",
+            Range::new(Position::new(0, 0), Position::new(0, 0)),
+            vec![diag],
+            Some(vec![CodeActionKind::QuickFix]),
+        )
+        .expect("Expected missing import quick fix");
+
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("b.ts").unwrap();
+    let updated = apply_text_edits(source, line_map, edits);
+    assert_eq!(updated, "import foo from \"./index\";\nfoo();\n");
 }
 
 #[test]
