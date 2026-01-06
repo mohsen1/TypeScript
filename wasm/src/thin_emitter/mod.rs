@@ -2546,6 +2546,35 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
+    fn emit_es5_destructuring_from_value(&mut self, pattern_idx: NodeIndex, result_name: &str, first: &mut bool) {
+        let Some(pattern_node) = self.arena.get(pattern_idx) else { return };
+
+        let temp_name = self.get_temp_var_name();
+
+        if !*first {
+            self.write(", ");
+        }
+        *first = false;
+        self.write(&temp_name);
+        self.write(" = ");
+        self.write(result_name);
+        self.write(".value");
+
+        if pattern_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN {
+            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                for &elem_idx in &pattern.elements.nodes {
+                    self.emit_es5_binding_element(elem_idx, &temp_name);
+                }
+            }
+        } else if pattern_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN {
+            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                for (i, &elem_idx) in pattern.elements.nodes.iter().enumerate() {
+                    self.emit_es5_array_binding_element(elem_idx, &temp_name, i);
+                }
+            }
+        }
+    }
+
     /// Emit a single binding element for ES5 object destructuring
     fn emit_es5_binding_element(&mut self, elem_idx: NodeIndex, temp_name: &str) {
         let Some(elem_node) = self.arena.get(elem_idx) else { return };
@@ -2711,6 +2740,11 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
+        if self.ctx.target_es5 && !for_in_of.await_modifier {
+            self.emit_for_of_statement_es5(for_in_of);
+            return;
+        }
+
         self.write("for ");
         if for_in_of.await_modifier {
             self.write("await ");
@@ -2721,6 +2755,83 @@ impl<'a> ThinPrinter<'a> {
         self.emit(for_in_of.expression);
         self.write(") ");
         self.emit(for_in_of.statement);
+    }
+
+    fn emit_for_of_statement_es5(&mut self, for_in_of: &crate::parser::thin_node::ForInOfData) {
+        let iterator_name = self.get_temp_var_name();
+        let result_name = self.get_temp_var_name();
+
+        self.write("for (var ");
+        self.write(&iterator_name);
+        self.write(" = __values(");
+        self.emit_expression(for_in_of.expression);
+        self.write("), ");
+        self.write(&result_name);
+        self.write(" = ");
+        self.write(&iterator_name);
+        self.write(".next(); !");
+        self.write(&result_name);
+        self.write(".done; ");
+        self.write(&result_name);
+        self.write(" = ");
+        self.write(&iterator_name);
+        self.write(".next()) ");
+
+        self.write("{");
+        self.write_line();
+        self.increase_indent();
+        self.emit_for_of_value_binding_es5(for_in_of.initializer, &result_name);
+        self.write_line();
+        self.emit(for_in_of.statement);
+        self.write_line();
+        self.decrease_indent();
+        self.write("}");
+    }
+
+    fn emit_for_of_value_binding_es5(&mut self, initializer: NodeIndex, result_name: &str) {
+        if initializer.is_none() {
+            return;
+        }
+
+        let Some(init_node) = self.arena.get(initializer) else {
+            return;
+        };
+
+        if init_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+            self.write("var ");
+            if let Some(decl_list) = self.arena.get_variable(init_node) {
+                let mut first = true;
+                for &decl_idx in &decl_list.declarations.nodes {
+                    self.emit_for_of_declaration_value_es5(decl_idx, result_name, &mut first);
+                }
+            }
+            self.write_semicolon();
+        } else {
+            self.emit_expression(initializer);
+            self.write(" = ");
+            self.write(result_name);
+            self.write(".value");
+            self.write_semicolon();
+        }
+    }
+
+    fn emit_for_of_declaration_value_es5(&mut self, decl_idx: NodeIndex, result_name: &str, first: &mut bool) {
+        let Some(decl_node) = self.arena.get(decl_idx) else { return };
+        let Some(decl) = self.arena.get_variable_declaration(decl_node) else { return };
+
+        if self.is_binding_pattern(decl.name) {
+            self.emit_es5_destructuring_from_value(decl.name, result_name, first);
+            return;
+        }
+
+        if !*first {
+            self.write(", ");
+        }
+        *first = false;
+        self.emit(decl.name);
+        self.write(" = ");
+        self.write(result_name);
+        self.write(".value");
     }
 
     fn emit_return_statement(&mut self, node: &ThinNode) {
@@ -4388,6 +4499,10 @@ impl<'a> ThinPrinter<'a> {
             helpers.extends = true;
         }
 
+        if self.ctx.target_es5 && self.needs_values_helper() {
+            helpers.values = true;
+        }
+
         // Emit all needed helpers
         let helpers_code = crate::transforms::helpers::emit_helpers(&helpers);
         if !helpers_code.is_empty() {
@@ -4698,6 +4813,13 @@ impl<'a> ThinPrinter<'a> {
             }
         }
         false
+    }
+
+    fn needs_values_helper(&self) -> bool {
+        self.arena
+            .nodes
+            .iter()
+            .any(|node| node.kind == syntax_kind_ext::FOR_OF_STATEMENT)
     }
 
     /// Check if a statement contains a class that extends another (recursive)

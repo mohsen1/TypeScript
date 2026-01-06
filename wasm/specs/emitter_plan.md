@@ -42,6 +42,7 @@ Pick the most doable and impactful
 17. ThinEmitter: emit case blocks for switch statements [done]
 18. Class ES5 transform: emit for-in/for-of statements [done]
 19. Class ES5 transform: emit binding patterns in declarations [done]
+20. ES5 emit: downlevel for-of loops with __values helper [done]
 
 
 ## Quick Reference
