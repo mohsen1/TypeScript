@@ -161,6 +161,23 @@ impl ThinParserState {
         self.current_token as u16 >= SyntaxKind::Identifier as u16
     }
 
+    /// Check if current token can be a property name
+    /// Includes identifiers, keywords (as property names), string/numeric literals, computed properties
+    #[inline]
+    fn is_property_name(&self) -> bool {
+        match self.current_token {
+            SyntaxKind::Identifier
+            | SyntaxKind::StringLiteral
+            | SyntaxKind::NumericLiteral
+            | SyntaxKind::PrivateIdentifier
+            | SyntaxKind::OpenBracketToken // computed property name
+            | SyntaxKind::GetKeyword
+            | SyntaxKind::SetKeyword => true,
+            // Any keyword can be used as a property name
+            _ => self.is_identifier_or_keyword()
+        }
+    }
+
     /// Parse optional token, returns true if found
     pub fn parse_optional(&mut self, kind: SyntaxKind) -> bool {
         if self.is_token(kind) {
@@ -411,8 +428,8 @@ impl ThinParserState {
         // Initialize scanner
         self.next_token();
 
-        // Parse statements
-        let statements = self.parse_statements();
+        // Parse statements (using source file version that handles stray braces)
+        let statements = self.parse_source_file_statements();
 
         // Create source file node
         let end_pos = self.token_end();
@@ -440,7 +457,39 @@ impl ThinParserState {
         })
     }
 
-    /// Parse list of statements
+    /// Parse list of statements for a source file (top-level).
+    /// Reports error 1128 for unexpected closing braces.
+    fn parse_source_file_statements(&mut self) -> NodeList {
+        let mut statements = Vec::new();
+
+        while !self.is_token(SyntaxKind::EndOfFileToken) {
+            // If we see a closing brace at the top level, report error 1128
+            if self.is_token(SyntaxKind::CloseBraceToken) {
+                use crate::checker::types::diagnostics::diagnostic_codes;
+                self.parse_error_at_current_token(
+                    "Declaration or statement expected.",
+                    diagnostic_codes::DECLARATION_OR_STATEMENT_EXPECTED,
+                );
+                self.next_token();
+                continue;
+            }
+
+            let stmt = self.parse_statement();
+            if !stmt.is_none() {
+                statements.push(stmt);
+            }
+
+            // Safety: break on unexpected tokens to avoid infinite loop
+            if self.is_token(SyntaxKind::Unknown) {
+                break;
+            }
+        }
+
+        self.make_node_list(statements)
+    }
+
+    /// Parse list of statements (for blocks, function bodies, etc.).
+    /// Stops at closing brace without error (closing brace is expected).
     fn parse_statements(&mut self) -> NodeList {
         let mut statements = Vec::new();
 
@@ -1791,8 +1840,18 @@ impl ThinParserState {
                     self.arena.create_modifier(SyntaxKind::AccessorKeyword, start_pos)
                 }
                 // Handle const as a modifier - error is reported by checker (1248)
+                // But only if not followed by line break (ASI would make it a property name)
                 SyntaxKind::ConstKeyword => {
+                    // Look ahead: if there's a line break after const, treat as property name not modifier
+                    let snapshot = self.scanner.save_state();
+                    let saved_token = self.current_token;
                     self.next_token();
+                    if self.scanner.has_preceding_line_break() {
+                        // Restore and break - const is a property name
+                        self.scanner.restore_state(snapshot);
+                        self.current_token = saved_token;
+                        break;
+                    }
                     self.arena.create_modifier(SyntaxKind::ConstKeyword, start_pos)
                 }
                 // Handle 'var' - error: Variable declaration not allowed at this location
@@ -1953,13 +2012,16 @@ impl ThinParserState {
         }
 
         // Check for 'var' at start of class member - error 1068
+        // This is a common mistake - user tried to use 'var' inside a class
         if self.is_token(SyntaxKind::VarKeyword) {
             self.parse_error_at_current_token(
                 "Unexpected token. A constructor, method, accessor, or property was expected.",
                 diagnostic_codes::UNEXPECTED_TOKEN_CLASS_MEMBER
             );
-            // Continue parsing to recover - skip var and try to parse rest
+            // Skip 'var' and return NONE - don't try to parse the rest as a class member
+            // This matches TypeScript's behavior of exiting class body parsing early
             self.next_token();
+            return NodeIndex::NONE;
         }
 
         // Parse modifiers (static, public, private, protected, readonly, abstract, override)
@@ -1993,13 +2055,8 @@ impl ThinParserState {
 
         // Handle methods and properties
         // For now, just parse name and check for ( for methods
-        let name = if self.is_token(SyntaxKind::Identifier) ||
-                     self.is_token(SyntaxKind::StringLiteral) ||
-                     self.is_token(SyntaxKind::NumericLiteral) ||
-                     self.is_token(SyntaxKind::PrivateIdentifier) ||
-                     self.is_token(SyntaxKind::GetKeyword) ||
-                     self.is_token(SyntaxKind::SetKeyword) ||
-                     self.is_token(SyntaxKind::OpenBracketToken) {
+        // Note: Many reserved keywords can be used as property names (const, class, etc.)
+        let name = if self.is_property_name() {
             self.parse_property_name()
         } else {
             // Report error for unknown token
@@ -5592,6 +5649,8 @@ impl ThinParserState {
         let name = self.parse_property_name();
 
         self.parse_expected(SyntaxKind::OpenParenToken);
+        // Save end of ) for error reporting - get it BEFORE consuming the token
+        let close_paren_end = self.token_end();
         self.parse_expected(SyntaxKind::CloseParenToken);
 
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
@@ -5599,14 +5658,19 @@ impl ThinParserState {
         } else {
             NodeIndex::NONE
         };
+        // If there's a type annotation, use its end; otherwise use close paren end
+        let signature_end = if !type_annotation.is_none() { self.token_pos() } else { close_paren_end };
 
+        // Parse body if present. Missing body is reported in grammar check, not here.
+        // This matches TypeScript's behavior of allowing ASI and checking later.
         let body = if self.is_token(SyntaxKind::OpenBraceToken) {
             self.parse_block()
         } else {
             NodeIndex::NONE
         };
 
-        let end_pos = self.token_end();
+        // End position: use token_end for normal case, signature_end for missing body
+        let end_pos = if body.is_none() { signature_end } else { self.token_end() };
         self.arena.add_accessor(
             syntax_kind_ext::GET_ACCESSOR,
             start_pos,
@@ -5629,15 +5693,19 @@ impl ThinParserState {
 
         self.parse_expected(SyntaxKind::OpenParenToken);
         let parameters = self.parse_parameter_list();
+        // Save end of ) for error reporting - get it BEFORE consuming the token
+        let close_paren_end = self.token_end();
         self.parse_expected(SyntaxKind::CloseParenToken);
 
+        // Parse body if present. Missing body is reported in grammar check, not here.
         let body = if self.is_token(SyntaxKind::OpenBraceToken) {
             self.parse_block()
         } else {
             NodeIndex::NONE
         };
 
-        let end_pos = self.token_end();
+        // End position: use token_end for normal case, close_paren_end for missing body
+        let end_pos = if body.is_none() { close_paren_end } else { self.token_end() };
         self.arena.add_accessor(
             syntax_kind_ext::SET_ACCESSOR,
             start_pos,
@@ -7359,6 +7427,11 @@ impl ThinParserState {
     /// Get the source text
     pub fn get_source_text(&self) -> &str {
         &self.source_text
+    }
+
+    /// Get the file name
+    pub fn get_file_name(&self) -> &str {
+        &self.file_name
     }
 
     // =========================================================================

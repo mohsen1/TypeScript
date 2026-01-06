@@ -410,6 +410,11 @@ impl<'a> ThinCheckerState<'a> {
                 self.get_type_from_array_type(idx)
             }
 
+            // Function type (e.g., () => number, (x: string) => void)
+            k if k == syntax_kind_ext::FUNCTION_TYPE => {
+                self.get_type_from_function_type(idx)
+            }
+
             // Default case
             _ => TypeId::ANY,
         }
@@ -521,6 +526,234 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         self.types.array(TypeId::ANY)
+    }
+
+    /// Get type from a function type node (e.g., () => number, (x: string) => void).
+    fn get_type_from_function_type(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::{FunctionShape, ParamInfo};
+        use std::sync::Arc;
+
+        let Some(node) = self.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        let Some(func_type) = self.arena.get_function_type(node) else {
+            return TypeId::ANY;
+        };
+
+        // Build parameter info
+        let mut params = Vec::new();
+        for &param_idx in &func_type.parameters.nodes {
+            if let Some(param_node) = self.arena.get(param_idx) {
+                if let Some(param) = self.arena.get_parameter(param_node) {
+                    // Get parameter name
+                    let name: Option<Arc<str>> = if let Some(name_node) = self.arena.get(param.name) {
+                        if let Some(name_data) = self.arena.get_identifier(name_node) {
+                            Some(Arc::from(name_data.escaped_text.as_str()))
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
+
+                    // Get parameter type
+                    let type_id = if !param.type_annotation.is_none() {
+                        self.get_type_of_node(param.type_annotation)
+                    } else {
+                        TypeId::ANY
+                    };
+
+                    let optional = param.question_token || !param.initializer.is_none();
+                    let rest = param.dot_dot_dot_token;
+
+                    params.push(ParamInfo {
+                        name,
+                        type_id,
+                        optional,
+                        rest,
+                    });
+                }
+            }
+        }
+
+        // Get return type
+        let return_type = if !func_type.type_annotation.is_none() {
+            self.get_type_of_node(func_type.type_annotation)
+        } else {
+            TypeId::ANY
+        };
+
+        // Create function type
+        let shape = FunctionShape {
+            type_params: Vec::new(), // TODO: Handle type parameters
+            params,
+            return_type,
+            is_constructor: false,
+        };
+
+        self.types.function(shape)
+    }
+
+    /// Get type of an interface declaration.
+    /// This extracts call signatures, construct signatures, and properties
+    /// to build a callable type if the interface has call signatures.
+    fn get_type_of_interface(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::{CallSignature as SolverCallSignature, CallableShape, PropertyInfo, TypeKey};
+        use crate::parser::syntax_kind_ext::{CALL_SIGNATURE, CONSTRUCT_SIGNATURE, PROPERTY_SIGNATURE, METHOD_SIGNATURE, HERITAGE_CLAUSE, EXPRESSION_WITH_TYPE_ARGUMENTS};
+        use std::sync::Arc;
+
+        let Some(node) = self.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        let Some(interface) = self.arena.get_interface(node) else {
+            return TypeId::ANY;
+        };
+
+        let mut call_signatures: Vec<SolverCallSignature> = Vec::new();
+        let mut construct_signatures: Vec<SolverCallSignature> = Vec::new();
+        let mut properties: Vec<PropertyInfo> = Vec::new();
+
+        // First, collect signatures from base interfaces (heritage clauses)
+        if let Some(ref heritage_clauses) = interface.heritage_clauses {
+            for &clause_idx in &heritage_clauses.nodes {
+                let Some(clause_node) = self.arena.get(clause_idx) else {
+                    continue;
+                };
+
+                // Heritage clause contains a list of types (expression with type args)
+                if clause_node.kind == HERITAGE_CLAUSE {
+                    if let Some(heritage_data) = self.arena.get_heritage_clause(clause_node) {
+                        for &type_idx in &heritage_data.types.nodes {
+                            // Each type is an ExpressionWithTypeArguments
+                            let base_type = self.get_type_of_node(type_idx);
+
+                            // If the base type is callable, merge its signatures
+                            if let Some(TypeKey::Callable(base_shape)) = self.types.lookup(base_type) {
+                                call_signatures.extend(base_shape.call_signatures.iter().cloned());
+                                construct_signatures.extend(base_shape.construct_signatures.iter().cloned());
+                                properties.extend(base_shape.properties.iter().cloned());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Iterate over this interface's own members
+        for &member_idx in &interface.members.nodes {
+            let Some(member_node) = self.arena.get(member_idx) else {
+                continue;
+            };
+
+            if member_node.kind == CALL_SIGNATURE {
+                // Extract call signature
+                if let Some(sig) = self.arena.get_signature(member_node) {
+                    let params = self.extract_params_from_signature(sig);
+                    let return_type = if !sig.type_annotation.is_none() {
+                        self.get_type_of_node(sig.type_annotation)
+                    } else {
+                        TypeId::ANY
+                    };
+
+                    call_signatures.push(SolverCallSignature {
+                        type_params: Vec::new(), // TODO: Handle type parameters
+                        params,
+                        return_type,
+                    });
+                }
+            } else if member_node.kind == CONSTRUCT_SIGNATURE {
+                // Extract construct signature
+                if let Some(sig) = self.arena.get_signature(member_node) {
+                    let params = self.extract_params_from_signature(sig);
+                    let return_type = if !sig.type_annotation.is_none() {
+                        self.get_type_of_node(sig.type_annotation)
+                    } else {
+                        TypeId::ANY
+                    };
+
+                    construct_signatures.push(SolverCallSignature {
+                        type_params: Vec::new(),
+                        params,
+                        return_type,
+                    });
+                }
+            } else if member_node.kind == PROPERTY_SIGNATURE || member_node.kind == METHOD_SIGNATURE {
+                // Extract property
+                if let Some(sig) = self.arena.get_signature(member_node) {
+                    if let Some(name_node) = self.arena.get(sig.name) {
+                        if let Some(id_data) = self.arena.get_identifier(name_node) {
+                            let type_id = if !sig.type_annotation.is_none() {
+                                self.get_type_of_node(sig.type_annotation)
+                            } else {
+                                TypeId::ANY
+                            };
+
+                            properties.push(PropertyInfo {
+                                name: Arc::from(id_data.escaped_text.as_str()),
+                                type_id,
+                                optional: sig.question_token,
+                                readonly: false, // TODO: Check for readonly modifier
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // If we have call signatures, build a callable type
+        if !call_signatures.is_empty() || !construct_signatures.is_empty() {
+            let shape = CallableShape {
+                call_signatures,
+                construct_signatures,
+                properties,
+            };
+            return self.types.callable(shape);
+        }
+
+        // Otherwise, just return an object type with the properties
+        if !properties.is_empty() {
+            return self.types.object(properties);
+        }
+
+        TypeId::ANY
+    }
+
+    /// Helper to extract parameters from a SignatureData.
+    fn extract_params_from_signature(&mut self, sig: &crate::parser::thin_node::SignatureData) -> Vec<crate::solver::ParamInfo> {
+        use crate::solver::ParamInfo;
+        use std::sync::Arc;
+
+        let Some(ref params_list) = sig.parameters else {
+            return Vec::new();
+        };
+
+        params_list.nodes.iter().filter_map(|&param_idx| {
+            let param_node = self.arena.get(param_idx)?;
+            let param = self.arena.get_parameter(param_node)?;
+
+            let name: Option<Arc<str>> = if let Some(name_node) = self.arena.get(param.name) {
+                if let Some(name_data) = self.arena.get_identifier(name_node) {
+                    Some(Arc::from(name_data.escaped_text.as_str()))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let type_id = if !param.type_annotation.is_none() {
+                self.get_type_of_node(param.type_annotation)
+            } else {
+                TypeId::ANY
+            };
+
+            let optional = param.question_token || !param.initializer.is_none();
+            let rest = param.dot_dot_dot_token;
+
+            Some(ParamInfo { name, type_id, optional, rest })
+        }).collect()
     }
 
     // =========================================================================
@@ -659,10 +892,11 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         }
 
-        // Interface - return interface type from TypeLowering
+        // Interface - return interface type with call signatures
         if flags & symbol_flags::INTERFACE != 0 {
-            // For interfaces, we need to lower the interface body
-            // TODO: Implement interface type lowering
+            if !value_decl.is_none() {
+                return self.get_type_of_interface(value_decl);
+            }
             return TypeId::ANY;
         }
 
@@ -686,10 +920,10 @@ impl<'a> ThinCheckerState<'a> {
             if !value_decl.is_none() {
                 if let Some(node) = self.arena.get(value_decl) {
                     if let Some(var_decl) = self.arena.get_variable_declaration(node) {
-                        // First try type annotation
+                        // First try type annotation - use get_type_of_node to resolve type references
+                        // through the binder (for interfaces, classes, etc.)
                         if !var_decl.type_annotation.is_none() {
-                            let lowering = TypeLowering::new(self.arena, &self.types);
-                            return lowering.lower_type(var_decl.type_annotation);
+                            return self.get_type_of_node(var_decl.type_annotation);
                         }
                         // Fall back to inferring from initializer
                         if !var_decl.initializer.is_none() {
@@ -1234,6 +1468,35 @@ impl<'a> ThinCheckerState<'a> {
                     properties.push(PropertyInfo {
                         name: Arc::from(name.as_str()),
                         type_id: method_type,
+                        optional: false,
+                        readonly: false,
+                    });
+                }
+            }
+            // Accessor: { get foo() {} } or { set foo(v) {} }
+            else if let Some(accessor) = self.arena.get_accessor(elem_node) {
+                // Check for missing body - error 1005 at end of accessor
+                if accessor.body.is_none() {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    // Report at accessor.end - 1 (pointing to the closing paren)
+                    let end_pos = elem_node.end.saturating_sub(1);
+                    self.error_at_position(
+                        end_pos,
+                        1,
+                        "'{' expected.",
+                        diagnostic_codes::TOKEN_EXPECTED,
+                    );
+                }
+                if let Some(name) = self.get_property_name(accessor.name) {
+                    // For getter, infer return type; for setter, it's void
+                    let accessor_type = if elem_node.kind == syntax_kind_ext::GET_ACCESSOR {
+                        self.get_type_of_function(elem_idx)
+                    } else {
+                        TypeId::VOID
+                    };
+                    properties.push(PropertyInfo {
+                        name: Arc::from(name.as_str()),
+                        type_id: accessor_type,
                         optional: false,
                         readonly: false,
                     });
@@ -1999,8 +2262,14 @@ impl<'a> ThinCheckerState<'a> {
                     }
                 }
             }
-            // Type declarations - just register them, no expression checking needed
-            syntax_kind_ext::TYPE_ALIAS_DECLARATION |
+            // Type alias declarations - check the type for accessor body and parameter property errors
+            syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                if let Some(type_alias) = self.arena.get_type_alias(node) {
+                    // Check the type for accessor bodies in ambient context and parameter properties
+                    self.check_type_for_parameter_properties(type_alias.type_node);
+                }
+            }
+            // Other type declarations - just register them, no expression checking needed
             syntax_kind_ext::ENUM_DECLARATION |
             syntax_kind_ext::IMPORT_DECLARATION |
             syntax_kind_ext::EMPTY_STATEMENT |
@@ -2294,6 +2563,50 @@ impl<'a> ThinCheckerState<'a> {
         // Check if this is a declared class (ambient declaration)
         let is_declared = self.has_declare_modifier(&class.modifiers);
 
+        // Check if this class is abstract
+        let is_abstract_class = self.has_abstract_modifier(&class.modifiers);
+
+        // Check for abstract members in non-abstract class (error 1253)
+        if !is_abstract_class {
+            for &member_idx in &class.members.nodes {
+                if let Some(member_node) = self.arena.get(member_idx) {
+                    let member_has_abstract = match member_node.kind {
+                        syntax_kind_ext::PROPERTY_DECLARATION => {
+                            if let Some(prop) = self.arena.get_property_decl(member_node) {
+                                self.has_abstract_modifier(&prop.modifiers)
+                            } else {
+                                false
+                            }
+                        }
+                        syntax_kind_ext::METHOD_DECLARATION => {
+                            if let Some(method) = self.arena.get_method_decl(member_node) {
+                                self.has_abstract_modifier(&method.modifiers)
+                            } else {
+                                false
+                            }
+                        }
+                        syntax_kind_ext::GET_ACCESSOR | syntax_kind_ext::SET_ACCESSOR => {
+                            if let Some(accessor) = self.arena.get_accessor(member_node) {
+                                self.has_abstract_modifier(&accessor.modifiers)
+                            } else {
+                                false
+                            }
+                        }
+                        _ => false,
+                    };
+
+                    if member_has_abstract {
+                        // Report on the 'abstract' keyword
+                        self.error_at_node(
+                            member_idx,
+                            "Abstract properties can only appear within an abstract class.",
+                            diagnostic_codes::ABSTRACT_ONLY_IN_ABSTRACT_CLASS,
+                        );
+                    }
+                }
+            }
+        }
+
         // Push a scope for type parameters
         self.push_local_scope();
 
@@ -2349,6 +2662,10 @@ impl<'a> ThinCheckerState<'a> {
         if !is_declared {
             self.check_class_member_implementations(&class.members.nodes);
         }
+
+        // Check for accessor abstract consistency (error 2676)
+        // Getter and setter must both be abstract or both non-abstract
+        self.check_accessor_abstract_consistency(&class.members.nodes);
 
         // Restore previous enclosing class
         self.enclosing_class = prev_enclosing_class;
@@ -2573,6 +2890,21 @@ impl<'a> ThinCheckerState<'a> {
                 self.check_type_for_parameter_properties(sig.type_annotation);
             }
         }
+        // Check accessors in type literals/interfaces - cannot have body (error 1183)
+        else if node.kind == syntax_kind_ext::GET_ACCESSOR || node.kind == syntax_kind_ext::SET_ACCESSOR {
+            if let Some(accessor) = self.arena.get_accessor(node) {
+                // Accessors in type literals and interfaces cannot have implementations
+                if !accessor.body.is_none() {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    // Report error on the body
+                    self.error_at_node(
+                        accessor.body,
+                        "An implementation cannot be declared in ambient contexts.",
+                        diagnostic_codes::IMPLEMENTATION_CANNOT_BE_IN_AMBIENT_CONTEXT,
+                    );
+                }
+            }
+        }
     }
 
     /// Check that all method/constructor overload signatures have implementations.
@@ -2684,6 +3016,65 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         (false, None)
+    }
+
+    /// Check that accessor pairs (get/set) have consistent abstract modifiers.
+    /// Reports error TS2676 if one is abstract and the other is not.
+    fn check_accessor_abstract_consistency(&mut self, members: &[NodeIndex]) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        use std::collections::HashMap;
+
+        // Collect getters and setters by name
+        #[derive(Default)]
+        struct AccessorPair {
+            getter: Option<(NodeIndex, bool)>,  // (node_idx, is_abstract)
+            setter: Option<(NodeIndex, bool)>,
+        }
+
+        let mut accessors: HashMap<String, AccessorPair> = HashMap::new();
+
+        for &member_idx in members {
+            let Some(node) = self.arena.get(member_idx) else {
+                continue;
+            };
+
+            if node.kind == syntax_kind_ext::GET_ACCESSOR || node.kind == syntax_kind_ext::SET_ACCESSOR {
+                if let Some(accessor) = self.arena.get_accessor(node) {
+                    let is_abstract = self.has_abstract_modifier(&accessor.modifiers);
+
+                    // Get accessor name
+                    if let Some(name) = self.get_property_name(accessor.name) {
+                        let pair = accessors.entry(name).or_default();
+                        if node.kind == syntax_kind_ext::GET_ACCESSOR {
+                            pair.getter = Some((member_idx, is_abstract));
+                        } else {
+                            pair.setter = Some((member_idx, is_abstract));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check for abstract mismatch
+        for (_, pair) in accessors {
+            if let (Some((getter_idx, getter_abstract)), Some((setter_idx, setter_abstract))) =
+                (pair.getter, pair.setter)
+            {
+                if getter_abstract != setter_abstract {
+                    // Report error on both accessors
+                    self.error_at_node(
+                        getter_idx,
+                        "Accessors must both be abstract or non-abstract.",
+                        diagnostic_codes::ACCESSORS_MUST_BOTH_BE_ABSTRACT_OR_NOT,
+                    );
+                    self.error_at_node(
+                        setter_idx,
+                        "Accessors must both be abstract or non-abstract.",
+                        diagnostic_codes::ACCESSORS_MUST_BOTH_BE_ABSTRACT_OR_NOT,
+                    );
+                }
+            }
+        }
     }
 
     /// Get the name of a method declaration.
@@ -2963,6 +3354,19 @@ impl<'a> ThinCheckerState<'a> {
                 related_information: Vec::new(),
             });
         }
+    }
+
+    /// Report an error at a specific position.
+    fn error_at_position(&mut self, start: u32, length: u32, message: &str, code: u32) {
+        self.diagnostics.push(Diagnostic {
+            file: self.file_name.clone(),
+            start,
+            length,
+            message_text: message.to_string(),
+            category: DiagnosticCategory::Error,
+            code,
+            related_information: Vec::new(),
+        });
     }
 
     /// Check a class member (property, method, constructor, accessor).

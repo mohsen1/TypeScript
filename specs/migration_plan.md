@@ -38,6 +38,7 @@ see SESSION_LOG.md -- always amended with each session's work
 ## Language Service TODOs (40% remaining)
 - ⬜ Formatting engine
 - ⬜ Code fixes/refactorings
+- ⬜ Incremental Builds
 
 ---
 
@@ -49,7 +50,7 @@ see SESSION_LOG.md -- always amended with each session's work
 | Baseline | Pass Rate | Notes |
 |----------|-----------|-------|
 | .errors.txt | **68.8%** (53/77) | +5% from rust merge improvements |
-| .js emit | **59.2%** (45/76) | Skip abstract accessors, emit in source order |
+| .js emit | **59.2%** (45/76) | Arrow function _this, destructuring transform |
 
 ### Work Process
 
@@ -61,38 +62,6 @@ see SESSION_LOG.md -- always amended with each session's work
 This catches design issues early and ensures consistent code quality.
 
 ### Next Steps
-
-✅ **Dead code cleanup complete** - Deleted ~35k lines of legacy fat-node code (parser_impl.rs, emitter.rs, checker/state.rs, services/, old transforms).
-
-**Type Checking (25 failing tests)**
-1. ✅ Export assignment validation (2309, 2304)
-2. ✅ Setter parameter validation (1052, 1053)
-3. ✅ Return type validation (2355) - function must return a value (basic types)
-4. ✅ Abstract class instantiation (2511) - basic case (union types need more work)
-5. ✅ Static member access from instance (2662) - `foo` → "Did you mean 'C.foo'?"
-6. ✅ Abstract property in constructor (2715) - `this.abstractProp` in ctor
-7. ⬜ Property used before initialization (2729) - needs dataflow analysis
-8. ⬜ Accessor return type inference (7023) - implicit any in getter
-
-**Parser Semantic Errors**
-
-8. ⬜ Declaration expected (1128) - after certain tokens
-9. ✅ Const modifier on class members (1248) - `const` invalid on properties
-10. ✅ Accessor body in ambient context (1183) - no body in declare class
-11. ⬜ Accessor in ambient context ES5 (18045) - accessors need ES5+
-
-**Advanced Diagnostics**
-
-12. ⬜ RelatedInformation - point to definition sites for context
-13. ⬜ Accessor diagnostic hints (6234) - "did you mean to call it?"
-
-### Blockers Analysis (26 failing tests)
-| Category | Codes | Tests | Notes |
-|----------|-------|-------|-------|
-| Parser errors | 1005, 1128 | 4 | Error recovery gaps (1068, 1248 done) |
-| Type errors | 2339, 2355, 2511 | 10 | Property access, returns, abstract (2662 done) |
-| Accessor errors | 6234, 18045 | 3 | Hints, ES5 target (1183 done) |
-| Abstract members | 2729, 2416, 2540 | 3 | Abstract property handling (2715 done) |
 
 ### Emit TODOs (96.7% failing)
 | Feature | Tests | % | Notes |
@@ -134,9 +103,10 @@ This catches design issues early and ensures consistent code quality.
 ---
 
 # Phase 9: Finishing up all TODOs ⬜
-
 - ⬜ 100% baseline in all aspects
 - ⬜ all todos left from previous phases
+- ⬜ Benchmarking: Create a benchmark suite (e.g., parsing a large library like three.js or typescript itself) to measure actual throughput (MB/s).
+- ⬜ Incremental Builds: The ThinNode architecture allows for efficient incremental reparsing, but the "diffing" logic isn't visible yet.
 - ⬜ todos in code
 - ⬜ missing unit tests and test coverage. aim for near 100% coverage of rust code
 
@@ -158,12 +128,13 @@ This catches design issues early and ensures consistent code quality.
 - **API/CLI**: Match tsc behavior; extra flags allowed (e.g., `--wasm-threads`)
 
 ## TODOs
+- ⬜ Own repo mohsen1/tsc-rust
 - ⬜ Upstream sync workflow (track `microsoft/TypeScript` releases)
 - ⬜ Compatibility test suite (run against TS test baselines on each release)
-- ⬜ Version alignment (match TS version numbers, e.g., `@mohsen1/typescript@5.7.0`)
+- ⬜ Version alignment (match TS version numbers, e.g., `tsc-rust@5.7.0`)
 - ⬜ CLI parity audit (`tsc --help` flags, exit codes, output format)
 - ⬜ API compatibility layer (programmatic API matches `typescript` npm)
-- ⬜ Packaging for npm (`@aspect/tsc-rust` or similar)
+- ⬜ Packaging for npm (`@mohsen1/tsc-rust` or similar)
 - ⬜ Packaging for cargo (`tsc-rust` crate)
 - ⬜ Pre-built WASM binaries for major platforms
 - ⬜ CI/CD release pipeline (GitHub Actions)

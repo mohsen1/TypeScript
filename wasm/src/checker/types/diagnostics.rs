@@ -159,6 +159,7 @@ pub mod diagnostic_codes {
     pub const IMPLEMENTATION_CANNOT_BE_IN_AMBIENT_CONTEXT: u32 = 1183;  // An implementation cannot be declared in ambient contexts.
     pub const MODIFIERS_NOT_ALLOWED_HERE: u32 = 1184;
     pub const CONST_MODIFIER_CANNOT_APPEAR_ON_A_CLASS_ELEMENT: u32 = 1248;  // 'const' modifier cannot appear on a class element.
+    pub const ABSTRACT_ONLY_IN_ABSTRACT_CLASS: u32 = 1253;  // 'abstract' modifier can only appear on a class, method, or property declaration.
     pub const UNEXPECTED_TOKEN_CLASS_MEMBER: u32 = 1068;  // Unexpected token. A constructor, method, accessor, or property was expected.
     pub const DECLARATION_OR_STATEMENT_EXPECTED: u32 = 1128;  // Declaration or statement expected.
     pub const VAR_DECLARATION_NOT_ALLOWED: u32 = 1440;  // Variable declaration not allowed at this location.
@@ -212,6 +213,7 @@ pub mod diagnostic_codes {
     pub const ABSTRACT_PROPERTY_IN_NON_ABSTRACT_CLASS: u32 = 2515;
     pub const ABSTRACT_MEMBER_IN_NON_ABSTRACT_CLASS: u32 = 2515;  // Same code for methods
     pub const CANNOT_ASSIGN_TO_READONLY_PROPERTY: u32 = 2540;
+    pub const ACCESSORS_MUST_BOTH_BE_ABSTRACT_OR_NOT: u32 = 2676;  // Accessors must both be abstract or non-abstract.
     pub const CLASS_INCORRECTLY_IMPLEMENTS_INTERFACE: u32 = 2420;
     pub const CLASS_INCORRECTLY_EXTENDS_BASE_CLASS: u32 = 2415;
     pub const MEMBER_IS_NOT_ACCESSIBLE: u32 = 2341;
@@ -290,6 +292,9 @@ pub mod diagnostic_codes {
 
     // Conditional type errors
     pub const INFER_CAN_ONLY_BE_USED_IN_EXTENDS_CLAUSE: u32 = 1338;
+
+    // Target version errors (18xxx)
+    pub const ACCESSOR_MODIFIER_ONLY_ES2015_PLUS: u32 = 18045;  // Properties with the 'accessor' modifier are only available when targeting ECMAScript 2015 and higher.
 
     // =========================================================================
     // Warning codes (4xxx - 6xxx)
