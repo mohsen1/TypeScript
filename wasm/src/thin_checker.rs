@@ -22,7 +22,7 @@ use crate::binder::{SymbolId, symbol_flags};
 use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeId, TypeInterner};
 use crate::checker::types::diagnostics::{Diagnostic, DiagnosticCategory};
-use crate::checker::{CheckerContext, EnclosingClassInfo};
+use crate::checker::{CheckerContext, EnclosingClassInfo, FlowAnalyzer};
 
 // =============================================================================
 // ThinCheckerState
@@ -700,7 +700,7 @@ impl<'a> ThinCheckerState<'a> {
     // Type Resolution - Specific Node Types
     // =========================================================================
 
-    /// Get type of identifier.
+    /// Get type of identifier, with control flow analysis for narrowing.
     fn get_type_of_identifier(&mut self, idx: NodeIndex) -> TypeId {
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
@@ -712,9 +712,10 @@ impl<'a> ThinCheckerState<'a> {
 
         let name = &ident.escaped_text;
 
-        // Check local scopes first
-        if let Some(type_id) = self.lookup_local(name) {
-            return type_id;
+        // Check local scopes first to get the declared type
+        if let Some(declared_type) = self.lookup_local(name) {
+            // Apply control flow analysis to narrow the type
+            return self.apply_flow_narrowing(idx, declared_type);
         }
 
         // Check file locals
@@ -775,6 +776,47 @@ impl<'a> ThinCheckerState<'a> {
                 TypeId::ERROR
             }
         }
+    }
+
+    /// Apply control flow narrowing to a type at a specific identifier usage.
+    ///
+    /// This walks backwards through the control flow graph to determine what
+    /// type guards (typeof, null checks, etc.) have been applied.
+    fn apply_flow_narrowing(&self, idx: NodeIndex, declared_type: TypeId) -> TypeId {
+        // Get the flow node for this identifier usage
+        let flow_node = match self.ctx.binder.get_node_flow(idx) {
+            Some(flow) => flow,
+            None => return declared_type, // No flow info - use declared type
+        };
+
+        // Skip narrowing for non-union types (nothing to narrow)
+        // Also skip for primitives that can't be narrowed further
+        if !self.is_narrowable_type(declared_type) {
+            return declared_type;
+        }
+
+        // Create a flow analyzer and apply narrowing
+        let analyzer = FlowAnalyzer::new(
+            self.ctx.arena,
+            self.ctx.binder,
+            self.ctx.types,
+        );
+
+        analyzer.get_flow_type(idx, declared_type, flow_node)
+    }
+
+    /// Check if a type can be narrowed (unions, nullable types, etc.)
+    fn is_narrowable_type(&self, type_id: TypeId) -> bool {
+        use crate::solver::TypeKey;
+
+        // Check if it's a union type
+        if let Some(TypeKey::Union(_)) = self.ctx.types.lookup(type_id) {
+            return true;
+        }
+
+        // Could also check for types that include null/undefined
+        // For now, only narrow unions
+        false
     }
 
     /// Get type of a symbol.
