@@ -47,8 +47,6 @@ This catches design issues early and ensures consistent code quality.
 
 ### Next Steps
 
-✅ **Dead code cleanup complete** - Deleted ~35k lines of legacy fat-node code (parser_impl.rs, emitter.rs, checker/state.rs, services/, old transforms).
-
 **Type Checking (25 failing tests)**
 1. ✅ Export assignment validation (2309, 2304)
 2. ✅ Setter parameter validation (1052, 1053)
@@ -119,9 +117,10 @@ This catches design issues early and ensures consistent code quality.
 ---
 
 # Phase 9: Finishing up all TODOs ⬜
-
 - ⬜ 100% baseline in all aspects
 - ⬜ all todos left from previous phases
+- ⬜ Benchmarking: Create a benchmark suite (e.g., parsing a large library like three.js or typescript itself) to measure actual throughput (MB/s).
+- ⬜ Incremental Builds: The ThinNode architecture allows for efficient incremental reparsing, but the "diffing" logic isn't visible yet.
 - ⬜ todos in code
 - ⬜ missing unit tests and test coverage. aim for near 100% coverage of rust code
 

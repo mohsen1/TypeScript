@@ -411,8 +411,8 @@ impl ThinParserState {
         // Initialize scanner
         self.next_token();
 
-        // Parse statements
-        let statements = self.parse_statements();
+        // Parse statements (using source file version that handles stray braces)
+        let statements = self.parse_source_file_statements();
 
         // Create source file node
         let end_pos = self.token_end();
@@ -440,7 +440,39 @@ impl ThinParserState {
         })
     }
 
-    /// Parse list of statements
+    /// Parse list of statements for a source file (top-level).
+    /// Reports error 1128 for unexpected closing braces.
+    fn parse_source_file_statements(&mut self) -> NodeList {
+        let mut statements = Vec::new();
+
+        while !self.is_token(SyntaxKind::EndOfFileToken) {
+            // If we see a closing brace at the top level, report error 1128
+            if self.is_token(SyntaxKind::CloseBraceToken) {
+                use crate::checker::types::diagnostics::diagnostic_codes;
+                self.parse_error_at_current_token(
+                    "Declaration or statement expected.",
+                    diagnostic_codes::DECLARATION_OR_STATEMENT_EXPECTED,
+                );
+                self.next_token();
+                continue;
+            }
+
+            let stmt = self.parse_statement();
+            if !stmt.is_none() {
+                statements.push(stmt);
+            }
+
+            // Safety: break on unexpected tokens to avoid infinite loop
+            if self.is_token(SyntaxKind::Unknown) {
+                break;
+            }
+        }
+
+        self.make_node_list(statements)
+    }
+
+    /// Parse list of statements (for blocks, function bodies, etc.).
+    /// Stops at closing brace without error (closing brace is expected).
     fn parse_statements(&mut self) -> NodeList {
         let mut statements = Vec::new();
 
@@ -1944,13 +1976,16 @@ impl ThinParserState {
         }
 
         // Check for 'var' at start of class member - error 1068
+        // This is a common mistake - user tried to use 'var' inside a class
         if self.is_token(SyntaxKind::VarKeyword) {
             self.parse_error_at_current_token(
                 "Unexpected token. A constructor, method, accessor, or property was expected.",
                 diagnostic_codes::UNEXPECTED_TOKEN_CLASS_MEMBER
             );
-            // Continue parsing to recover - skip var and try to parse rest
+            // Skip 'var' and return NONE - don't try to parse the rest as a class member
+            // This matches TypeScript's behavior of exiting class body parsing early
             self.next_token();
+            return NodeIndex::NONE;
         }
 
         // Parse modifiers (static, public, private, protected, readonly, abstract, override)
