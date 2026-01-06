@@ -1106,7 +1106,6 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type of new expression.
     fn get_type_of_new_expression(&mut self, idx: NodeIndex) -> TypeId {
         use crate::checker::types::diagnostics::diagnostic_codes;
-
         let Some(node) = self.arena.get(idx) else {
             return TypeId::ANY;
         };
@@ -1147,12 +1146,55 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // Get the type of the constructor
-        let _constructor_type = self.get_type_of_node(new_expr.expression);
+        // Get the type of the constructor expression
+        let constructor_type = self.get_type_of_node(new_expr.expression);
+
+        // Check if the constructor type contains any abstract classes (for union types)
+        // e.g., `new cls()` where `cls: typeof AbstractA | typeof AbstractB`
+        if self.type_contains_abstract_class(constructor_type) {
+            self.error_at_node(
+                idx,
+                "Cannot create an instance of an abstract class.",
+                diagnostic_codes::CANNOT_CREATE_INSTANCE_OF_ABSTRACT_CLASS,
+            );
+            return TypeId::ERROR;
+        }
 
         // For now, return any for new expressions
         // TODO: Extract instance type from constructor
         TypeId::ANY
+    }
+
+    /// Check if a type contains any abstract class constructors.
+    /// This handles union types like `typeof AbstractA | typeof ConcreteB`.
+    fn type_contains_abstract_class(&self, type_id: TypeId) -> bool {
+        use crate::solver::{TypeKey, SymbolRef};
+        use crate::binder::SymbolId;
+
+        let Some(type_key) = self.types.lookup(type_id) else {
+            return false;
+        };
+
+        match type_key {
+            // TypeQuery is `typeof ClassName` - check if the symbol is abstract
+            TypeKey::TypeQuery(SymbolRef(sym_id)) => {
+                // Convert SymbolRef(u32) to SymbolId(u32)
+                if let Some(symbol) = self.binder.get_symbol(SymbolId(sym_id)) {
+                    symbol.flags & symbol_flags::ABSTRACT != 0
+                } else {
+                    false
+                }
+            }
+            // Union type - check if ANY constituent is abstract
+            TypeKey::Union(members) => {
+                members.iter().any(|&member| self.type_contains_abstract_class(member))
+            }
+            // Intersection type - check if ANY constituent is abstract
+            TypeKey::Intersection(members) => {
+                members.iter().any(|&member| self.type_contains_abstract_class(member))
+            }
+            _ => false,
+        }
     }
 
     /// Get type of property access expression.
@@ -2667,6 +2709,10 @@ impl<'a> ThinCheckerState<'a> {
         // Getter and setter must both be abstract or both non-abstract
         self.check_accessor_abstract_consistency(&class.members.nodes);
 
+        // Check for getter/setter type compatibility (error 2322)
+        // Getter return type must be assignable to setter parameter type
+        self.check_accessor_type_compatibility(&class.members.nodes);
+
         // Restore previous enclosing class
         self.enclosing_class = prev_enclosing_class;
 
@@ -3075,6 +3121,164 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
         }
+    }
+
+    /// Check that accessor pairs (get/set) have compatible types.
+    /// The getter return type must be assignable to the setter parameter type.
+    /// Reports error TS2322 on the return statement of the getter if types mismatch.
+    fn check_accessor_type_compatibility(&mut self, members: &[NodeIndex]) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        use std::collections::HashMap;
+
+        // Collect getter return types and setter parameter types
+        struct AccessorTypeInfo {
+            getter: Option<(NodeIndex, TypeId, NodeIndex)>,  // (accessor_idx, return_type, body_or_return_pos)
+            setter: Option<(NodeIndex, TypeId)>,  // (accessor_idx, param_type)
+        }
+
+        let mut accessors: HashMap<String, AccessorTypeInfo> = HashMap::new();
+
+        for &member_idx in members {
+            let Some(node) = self.arena.get(member_idx) else {
+                continue;
+            };
+
+            if node.kind == syntax_kind_ext::GET_ACCESSOR {
+                if let Some(accessor) = self.arena.get_accessor(node) {
+                    if let Some(name) = self.get_property_name(accessor.name) {
+                        // Get the return type - check explicit annotation first
+                        let return_type = if !accessor.type_annotation.is_none() {
+                            self.get_type_of_node(accessor.type_annotation)
+                        } else {
+                            // Infer from return statements in body
+                            self.infer_getter_return_type(accessor.body)
+                        };
+
+                        // Find the position of the return statement for error reporting
+                        let error_pos = self.find_return_statement_pos(accessor.body)
+                            .unwrap_or(member_idx);
+
+                        let info = accessors.entry(name).or_insert_with(|| AccessorTypeInfo {
+                            getter: None,
+                            setter: None,
+                        });
+                        info.getter = Some((member_idx, return_type, error_pos));
+                    }
+                }
+            } else if node.kind == syntax_kind_ext::SET_ACCESSOR {
+                if let Some(accessor) = self.arena.get_accessor(node) {
+                    if let Some(name) = self.get_property_name(accessor.name) {
+                        // Get the parameter type from the setter's first parameter
+                        let param_type = if let Some(&first_param_idx) = accessor.parameters.nodes.first() {
+                            if let Some(param_node) = self.arena.get(first_param_idx) {
+                                if let Some(param) = self.arena.get_parameter(param_node) {
+                                    if !param.type_annotation.is_none() {
+                                        self.get_type_of_node(param.type_annotation)
+                                    } else {
+                                        TypeId::ANY
+                                    }
+                                } else {
+                                    TypeId::ANY
+                                }
+                            } else {
+                                TypeId::ANY
+                            }
+                        } else {
+                            TypeId::ANY
+                        };
+
+                        let info = accessors.entry(name).or_insert_with(|| AccessorTypeInfo {
+                            getter: None,
+                            setter: None,
+                        });
+                        info.setter = Some((member_idx, param_type));
+                    }
+                }
+            }
+        }
+
+        // Check type compatibility for each accessor pair
+        for (_, info) in accessors {
+            if let (Some((_getter_idx, getter_type, error_pos)), Some((_setter_idx, setter_type))) =
+                (info.getter, info.setter)
+            {
+                // Skip if either type is ANY (no meaningful check)
+                if getter_type == TypeId::ANY || setter_type == TypeId::ANY {
+                    continue;
+                }
+
+                // Check if getter return type is assignable to setter param type
+                let mut subtype_checker = crate::solver::SubtypeChecker::new(&self.types);
+                if !subtype_checker.is_assignable_to(getter_type, setter_type) {
+                    // Get type strings for error message
+                    let getter_type_str = self.format_type(getter_type);
+                    let setter_type_str = self.format_type(setter_type);
+
+                    self.error_at_node(
+                        error_pos,
+                        &format!("Type '{}' is not assignable to type '{}'.", getter_type_str, setter_type_str),
+                        diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE,
+                    );
+                }
+            }
+        }
+    }
+
+    /// Infer the return type of a getter from its body.
+    fn infer_getter_return_type(&mut self, body_idx: NodeIndex) -> TypeId {
+        if body_idx.is_none() {
+            return TypeId::ANY;
+        }
+
+        let Some(body_node) = self.arena.get(body_idx) else {
+            return TypeId::ANY;
+        };
+
+        // If it's a block, look for return statements
+        if body_node.kind == syntax_kind_ext::BLOCK {
+            if let Some(block) = self.arena.get_block(body_node) {
+                for &stmt_idx in &block.statements.nodes {
+                    if let Some(stmt_node) = self.arena.get(stmt_idx) {
+                        if stmt_node.kind == syntax_kind_ext::RETURN_STATEMENT {
+                            if let Some(ret) = self.arena.get_return_statement(stmt_node) {
+                                if !ret.expression.is_none() {
+                                    return self.get_type_of_node(ret.expression);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        TypeId::ANY
+    }
+
+    /// Find the position of the first return statement's expression in a body.
+    fn find_return_statement_pos(&self, body_idx: NodeIndex) -> Option<NodeIndex> {
+        if body_idx.is_none() {
+            return None;
+        }
+
+        let body_node = self.arena.get(body_idx)?;
+
+        if body_node.kind == syntax_kind_ext::BLOCK {
+            if let Some(block) = self.arena.get_block(body_node) {
+                for &stmt_idx in &block.statements.nodes {
+                    if let Some(stmt_node) = self.arena.get(stmt_idx) {
+                        if stmt_node.kind == syntax_kind_ext::RETURN_STATEMENT {
+                            if let Some(ret) = self.arena.get_return_statement(stmt_node) {
+                                if !ret.expression.is_none() {
+                                    return Some(ret.expression);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        None
     }
 
     /// Get the name of a method declaration.

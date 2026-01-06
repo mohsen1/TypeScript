@@ -15,6 +15,28 @@ see SESSION_LOG.md -- always amended with each session's work
 - **Phase 6**: Emitter (ES5 transforms, source maps, .d.ts) - **59.2% JS baseline**
 - **Phase 7**: Language Service (60%) - go-to-def, find refs, completions
 
+## Recent Checker Improvements
+- ✅ Callable interface type lowering (function-like interfaces)
+- ✅ Function type annotations for error 2355
+- ✅ Error 2676: accessor abstract consistency (get/set must both be abstract or both non-abstract)
+- ✅ Error 1253: abstract members in non-abstract class
+- ✅ Accessor body checks in ambient contexts (1183)
+- ✅ Error 1248: const keyword on class members (moved from parser to checker)
+- ✅ Error 2322: accessor type compatibility (getter return ⊆ setter param)
+- ✅ Error 2511: abstract union type detection (type_contains_abstract_class)
+
+## Checker Refactoring (see specs/REFACTOR_CHECKER.md)
+- 🔄 Split ThinCheckerState into Context + specialized Checkers (expr, stmt, decl)
+  - ✅ Created `checker/context.rs` with CheckerContext struct
+  - ⬜ Refactor ThinCheckerState to use CheckerContext
+  - ⬜ Create expressions.rs, statements.rs, declarations.rs
+- ⬜ Move expression type computation to solver/operations.rs
+- ⬜ Use NodeView API instead of raw arena lookups
+- ⬜ Deprecate checker/types in favor of solver/types
+
+## Code Cleanup
+- ✅ Deleted ~35k lines of dead code (old fat-node parser, emitter, checker, services)
+
 ## Recent Emitter Improvements
 - ✅ Fixed baseline comparison script to extract JS portion correctly
 - ✅ Instance property initializers → `this.x = value;` in constructor
@@ -57,15 +79,11 @@ see SESSION_LOG.md -- always amended with each session's work
 
 **Goal**: 100% match on TypeScript's test baselines.
 
-**We are focused on emitter in this work tree**
-
-
-
-### Current Status (sample: first 100 compiler tests)
-| Baseline | Pass Rate | Notes |
-|----------|-----------|-------|
-| .errors.txt | **68.8%** (53/77) | +5% from rust merge improvements |
-| .js emit | **59.2%** (45/76) | Arrow function _this, destructuring transform |
+### Current Status (12,408 tests)
+| Baseline | Compiler (100 sample) | Conformance | Crash Rate |
+|----------|----------------------|-------------|------------|
+| .errors.txt | **79.2%** (61/77 subset) | 33.8% (1,741/5,157) | 0.05% |
+| .js emit | **59.2%** (45/76 subset) | ~3% | 0.05% |
 
 ### Work Process
 
@@ -79,15 +97,29 @@ This catches design issues early and ensures consistent code quality.
 
 
 
-#### Priority 0
+### Next Steps - Emitter Focus
 
-1. ⚠️ **CRITICAL First address `specs/EMITTER_REFACTOR.md`
-2. Use the new emitter architecture in the existing emitter code
+**Priority 1: Module System (33% of failing tests)**
+1. ⬜ CommonJS exports (`"use strict"`, `module.exports`, `exports.X`)
+2. ⬜ ES module imports/exports → CommonJS transform
+3. ⬜ Named exports and re-exports
 
+**Priority 2: Block Scoping (4% of failing tests)**
+4. ⬜ `let`/`const` → `var` for ES5 (temporal dead zone handling)
 
-### Next Steps
+**Priority 3: Class Features (7% of failing tests)**
+5. ⬜ Static fields initialization
+6. ⬜ Private fields (`#`) transform
 
-### Emit TODOs (96.7% failing)
+**Priority 4: Namespace & Enums (5% of failing tests)**
+7. ⬜ Namespace IIFE improvements
+8. ⬜ Enum object emit
+
+**Priority 5: Async/Generators (4% of failing tests)**
+9. ⬜ `__awaiter` helper for async/await
+10. ⬜ `__generator` helper for generators
+
+### Emit TODOs (40.8% failing → target 80%+)
 | Feature | Tests | % | Notes |
 |---------|-------|---|-------|
 | **Modules** | 1,935 | 33% | `import`/`export` → CommonJS/ESM |
@@ -101,28 +133,6 @@ This catches design issues early and ensures consistent code quality.
 | **for-of** | 39 | 1% | Iterator downlevel |
 | **Spread/rest** | 24 | <1% | `__spread`/`__rest` helpers |
 | **Generators** | 26 | <1% | `__generator` helper |
-
-### Type Checking TODOs (top missing codes)
-| Code | Count | Description |
-|------|-------|-------------|
-| TS5107 | 323 | Option requires value |
-| TS2322 | 306 | Type not assignable |
-| TS2339 | 138 | Property does not exist |
-| TS6133 | 123 | Declared but never used |
-| TS2304 | 102 | Cannot find name |
-| TS2345 | 100 | Argument type mismatch |
-| TS2300 | 96 | Duplicate identifier |
-| TS2307 | 58 | Cannot find module |
-| TS2741 | 47 | Missing property |
-| TS7006 | 43 | Implicit any parameter |
-| TS1128 | 35 | Declaration expected |
-
-### Quick Wins
-- ⬜ TS2322/2345: Improve type assignability checks
-- ⬜ TS2339: Property lookup on union/intersection types  
-- ⬜ TS2304: Module resolution, global declarations
-- ⬜ TS2300: Duplicate detection in binder
-- ⬜ Modules: Start with `export {}` and named exports
 
 ---
 
