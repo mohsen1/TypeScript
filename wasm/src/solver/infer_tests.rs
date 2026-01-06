@@ -85,6 +85,23 @@ fn test_inference_unify_vars_conflict() {
     ));
 }
 
+#[test]
+fn test_inference_occurs_check() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var_t = ctx.fresh_type_param(Arc::from("T"));
+    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    }));
+    let array_t = interner.array(t_type);
+
+    let result = ctx.unify_var_type(var_t, array_t);
+    assert!(matches!(result, Err(InferenceError::OccursCheck { .. })));
+}
+
 // =============================================================================
 // Constraint Collection Tests
 // =============================================================================

@@ -21,7 +21,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [ ] Add tests for basic unification
   - [x] Test: `unify(T, number)` then resolve T -> number
   - [x] Test: `unify(T, U)` then `unify(U, string)` -> both resolve to string
-  - [ ] Test: Circular unification detection (occurs-check)
+  - [x] Test: Circular unification detection (occurs-check)
 
 ### Phase 2: Generic Instantiation
 - [ ] Implement `instantiate_generic(type: TypeId, args: &[TypeId]) -> TypeId`

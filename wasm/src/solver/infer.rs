@@ -11,7 +11,9 @@
 //! - Efficient unification with path compression
 
 use ena::unify::{InPlaceUnificationTable, UnifyKey, UnifyValue, NoError};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
+use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::intern::TypeInterner;
 
@@ -61,6 +63,11 @@ pub enum InferenceError {
     Conflict(TypeId, TypeId),
     /// Inference variable was not resolved
     Unresolved(InferenceVar),
+    /// Circular unification detected (occurs-check)
+    OccursCheck {
+        var: InferenceVar,
+        ty: TypeId,
+    },
     /// Lower bound is not subtype of upper bound
     BoundsViolation {
         var: InferenceVar,
@@ -125,8 +132,10 @@ pub struct InferenceContext<'a> {
     table: InPlaceUnificationTable<InferenceVar>,
     /// Map from type parameter names to inference variables
     type_params: Vec<(Arc<str>, InferenceVar)>,
+    /// Map from inference vars to interned names for occurs-checks
+    type_param_atoms: HashMap<u32, Atom>,
     /// Constraints for each inference variable
-    constraints: std::collections::HashMap<u32, ConstraintSet>,
+    constraints: HashMap<u32, ConstraintSet>,
 }
 
 impl<'a> InferenceContext<'a> {
@@ -135,7 +144,8 @@ impl<'a> InferenceContext<'a> {
             interner,
             table: InPlaceUnificationTable::new(),
             type_params: Vec::new(),
-            constraints: std::collections::HashMap::new(),
+            type_param_atoms: HashMap::new(),
+            constraints: HashMap::new(),
         }
     }
 
@@ -147,7 +157,9 @@ impl<'a> InferenceContext<'a> {
     /// Create an inference variable for a type parameter
     pub fn fresh_type_param(&mut self, name: Arc<str>) -> InferenceVar {
         let var = self.fresh_var();
+        let atom = self.interner.intern_string(name.as_ref());
         self.type_params.push((name, var));
+        self.type_param_atoms.insert(var.0, atom);
         var
     }
 
@@ -167,6 +179,10 @@ impl<'a> InferenceContext<'a> {
     pub fn unify_var_type(&mut self, var: InferenceVar, ty: TypeId) -> Result<(), InferenceError> {
         // Get the root variable
         let root = self.table.find(var);
+
+        if self.occurs_in(root, ty) {
+            return Err(InferenceError::OccursCheck { var: root, ty });
+        }
 
         // Check current value
         match self.table.probe_value(root).0 {
@@ -243,6 +259,119 @@ impl<'a> InferenceContext<'a> {
         }
 
         false
+    }
+
+    fn occurs_in(&mut self, var: InferenceVar, ty: TypeId) -> bool {
+        let root = self.table.find(var);
+        if self.type_param_atoms.is_empty() {
+            return false;
+        }
+
+        let mut visited = HashSet::new();
+        for (&var_id, &atom) in &self.type_param_atoms {
+            if self.table.find(InferenceVar(var_id)) == root {
+                if self.type_contains_param(ty, atom, &mut visited) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn type_contains_param(&self, ty: TypeId, target: Atom, visited: &mut HashSet<TypeId>) -> bool {
+        if !visited.insert(ty) {
+            return false;
+        }
+
+        let key = match self.interner.lookup(ty) {
+            Some(key) => key,
+            None => return false,
+        };
+
+        match key {
+            TypeKey::TypeParameter(info) => info.name == target,
+            TypeKey::Array(elem) => self.type_contains_param(elem, target, visited),
+            TypeKey::Tuple(elements) => elements.iter().any(|e| self.type_contains_param(e.type_id, target, visited)),
+            TypeKey::Union(members) | TypeKey::Intersection(members) => {
+                members.iter().any(|&member| self.type_contains_param(member, target, visited))
+            }
+            TypeKey::Object(props) => props.iter().any(|p| self.type_contains_param(p.type_id, target, visited)),
+            TypeKey::ObjectWithIndex(shape) => {
+                shape.properties.iter().any(|p| self.type_contains_param(p.type_id, target, visited))
+                    || shape.string_index.as_ref().is_some_and(|idx| {
+                        self.type_contains_param(idx.key_type, target, visited)
+                            || self.type_contains_param(idx.value_type, target, visited)
+                    })
+                    || shape.number_index.as_ref().is_some_and(|idx| {
+                        self.type_contains_param(idx.key_type, target, visited)
+                            || self.type_contains_param(idx.value_type, target, visited)
+                    })
+            }
+            TypeKey::Function(shape) => {
+                if shape.type_params.iter().any(|tp| tp.name == target) {
+                    return false;
+                }
+                shape.params.iter().any(|p| self.type_contains_param(p.type_id, target, visited))
+                    || self.type_contains_param(shape.return_type, target, visited)
+            }
+            TypeKey::Callable(shape) => {
+                let in_call = shape.call_signatures.iter().any(|sig| {
+                    if sig.type_params.iter().any(|tp| tp.name == target) {
+                        false
+                    } else {
+                        sig.params.iter().any(|p| self.type_contains_param(p.type_id, target, visited))
+                            || self.type_contains_param(sig.return_type, target, visited)
+                    }
+                });
+                if in_call {
+                    return true;
+                }
+                let in_construct = shape.construct_signatures.iter().any(|sig| {
+                    if sig.type_params.iter().any(|tp| tp.name == target) {
+                        false
+                    } else {
+                        sig.params.iter().any(|p| self.type_contains_param(p.type_id, target, visited))
+                            || self.type_contains_param(sig.return_type, target, visited)
+                    }
+                });
+                if in_construct {
+                    return true;
+                }
+                shape.properties.iter().any(|p| self.type_contains_param(p.type_id, target, visited))
+            }
+            TypeKey::Conditional(cond) => {
+                self.type_contains_param(cond.check_type, target, visited)
+                    || self.type_contains_param(cond.extends_type, target, visited)
+                    || self.type_contains_param(cond.true_type, target, visited)
+                    || self.type_contains_param(cond.false_type, target, visited)
+            }
+            TypeKey::Mapped(mapped) => {
+                if mapped.type_param.name == target {
+                    return false;
+                }
+                self.type_contains_param(mapped.constraint, target, visited)
+                    || self.type_contains_param(mapped.template, target, visited)
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                self.type_contains_param(obj, target, visited)
+                    || self.type_contains_param(idx, target, visited)
+            }
+            TypeKey::KeyOf(operand) | TypeKey::ReadonlyType(operand) => {
+                self.type_contains_param(operand, target, visited)
+            }
+            TypeKey::TemplateLiteral(spans) => spans.iter().any(|span| match span {
+                TemplateSpan::Text(_) => false,
+                TemplateSpan::Type(inner) => self.type_contains_param(*inner, target, visited),
+            }),
+            TypeKey::Infer(info) => info.name == target,
+            TypeKey::Intrinsic(_)
+            | TypeKey::Literal(_)
+            | TypeKey::Ref(_)
+            | TypeKey::TypeQuery(_)
+            | TypeKey::UniqueSymbol(_)
+            | TypeKey::ThisType
+            | TypeKey::Error => false,
+        }
     }
 
     /// Resolve all type parameters to concrete types
@@ -352,6 +481,10 @@ impl<'a> InferenceContext<'a> {
                     upper,
                 });
             }
+        }
+
+        if self.occurs_in(root, result) {
+            return Err(InferenceError::OccursCheck { var: root, ty: result });
         }
 
         // Store the result
