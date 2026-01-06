@@ -9,7 +9,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
 **Independence:** MEDIUM - Needs stable TypeKey definitions from Track A. Heavy AST interaction.
 
 ## Current Status
-🟡 **In Progress** - Interface merging wired into checker type resolution; Phase 6 lowering tests added; module augmentation supported; BigInt literal test blocked by parser.
+🟡 **In Progress** - Interface merging wired into checker type resolution; Phase 6 lowering tests added; module augmentation supported; BigInt literal test added.
 
 ## Tasks
 
@@ -25,7 +25,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - Test: `number` annotation -> Intrinsic(Number)
   - Test: `"hello"` -> Literal with correct Atom
   - Test: Verify deduplication (same type -> same TypeId)
-  - [ ] Add BigInt literal type test once `123n` parses in type position
+  - [x] Add BigInt literal type test once `123n` parses in type position
 
 ### Phase 2: Complex Type Structures
 - [x] Implement object type lowering
