@@ -2657,6 +2657,17 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get heritage clause data.
+    #[inline]
+    pub fn get_heritage_clause(&self, node: &ThinNode) -> Option<&HeritageData> {
+        use super::syntax_kind_ext::HERITAGE_CLAUSE;
+        if node.has_data() && node.kind == HERITAGE_CLAUSE {
+            self.heritage_clauses.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Get composite type data (union or intersection).
     #[inline]
     pub fn get_composite_type(&self, node: &ThinNode) -> Option<&CompositeTypeData> {

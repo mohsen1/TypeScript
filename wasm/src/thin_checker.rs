@@ -595,6 +595,167 @@ impl<'a> ThinCheckerState<'a> {
         self.types.function(shape)
     }
 
+    /// Get type of an interface declaration.
+    /// This extracts call signatures, construct signatures, and properties
+    /// to build a callable type if the interface has call signatures.
+    fn get_type_of_interface(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::{CallSignature as SolverCallSignature, CallableShape, PropertyInfo, TypeKey};
+        use crate::parser::syntax_kind_ext::{CALL_SIGNATURE, CONSTRUCT_SIGNATURE, PROPERTY_SIGNATURE, METHOD_SIGNATURE, HERITAGE_CLAUSE, EXPRESSION_WITH_TYPE_ARGUMENTS};
+        use std::sync::Arc;
+
+        let Some(node) = self.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        let Some(interface) = self.arena.get_interface(node) else {
+            return TypeId::ANY;
+        };
+
+        let mut call_signatures: Vec<SolverCallSignature> = Vec::new();
+        let mut construct_signatures: Vec<SolverCallSignature> = Vec::new();
+        let mut properties: Vec<PropertyInfo> = Vec::new();
+
+        // First, collect signatures from base interfaces (heritage clauses)
+        if let Some(ref heritage_clauses) = interface.heritage_clauses {
+            for &clause_idx in &heritage_clauses.nodes {
+                let Some(clause_node) = self.arena.get(clause_idx) else {
+                    continue;
+                };
+
+                // Heritage clause contains a list of types (expression with type args)
+                if clause_node.kind == HERITAGE_CLAUSE {
+                    if let Some(heritage_data) = self.arena.get_heritage_clause(clause_node) {
+                        for &type_idx in &heritage_data.types.nodes {
+                            // Each type is an ExpressionWithTypeArguments
+                            let base_type = self.get_type_of_node(type_idx);
+
+                            // If the base type is callable, merge its signatures
+                            if let Some(TypeKey::Callable(base_shape)) = self.types.lookup(base_type) {
+                                call_signatures.extend(base_shape.call_signatures.iter().cloned());
+                                construct_signatures.extend(base_shape.construct_signatures.iter().cloned());
+                                properties.extend(base_shape.properties.iter().cloned());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Iterate over this interface's own members
+        for &member_idx in &interface.members.nodes {
+            let Some(member_node) = self.arena.get(member_idx) else {
+                continue;
+            };
+
+            if member_node.kind == CALL_SIGNATURE {
+                // Extract call signature
+                if let Some(sig) = self.arena.get_signature(member_node) {
+                    let params = self.extract_params_from_signature(sig);
+                    let return_type = if !sig.type_annotation.is_none() {
+                        self.get_type_of_node(sig.type_annotation)
+                    } else {
+                        TypeId::ANY
+                    };
+
+                    call_signatures.push(SolverCallSignature {
+                        type_params: Vec::new(), // TODO: Handle type parameters
+                        params,
+                        return_type,
+                    });
+                }
+            } else if member_node.kind == CONSTRUCT_SIGNATURE {
+                // Extract construct signature
+                if let Some(sig) = self.arena.get_signature(member_node) {
+                    let params = self.extract_params_from_signature(sig);
+                    let return_type = if !sig.type_annotation.is_none() {
+                        self.get_type_of_node(sig.type_annotation)
+                    } else {
+                        TypeId::ANY
+                    };
+
+                    construct_signatures.push(SolverCallSignature {
+                        type_params: Vec::new(),
+                        params,
+                        return_type,
+                    });
+                }
+            } else if member_node.kind == PROPERTY_SIGNATURE || member_node.kind == METHOD_SIGNATURE {
+                // Extract property
+                if let Some(sig) = self.arena.get_signature(member_node) {
+                    if let Some(name_node) = self.arena.get(sig.name) {
+                        if let Some(id_data) = self.arena.get_identifier(name_node) {
+                            let type_id = if !sig.type_annotation.is_none() {
+                                self.get_type_of_node(sig.type_annotation)
+                            } else {
+                                TypeId::ANY
+                            };
+
+                            properties.push(PropertyInfo {
+                                name: Arc::from(id_data.escaped_text.as_str()),
+                                type_id,
+                                optional: sig.question_token,
+                                readonly: false, // TODO: Check for readonly modifier
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        // If we have call signatures, build a callable type
+        if !call_signatures.is_empty() || !construct_signatures.is_empty() {
+            let shape = CallableShape {
+                call_signatures,
+                construct_signatures,
+                properties,
+            };
+            return self.types.callable(shape);
+        }
+
+        // Otherwise, just return an object type with the properties
+        if !properties.is_empty() {
+            return self.types.object(properties);
+        }
+
+        TypeId::ANY
+    }
+
+    /// Helper to extract parameters from a SignatureData.
+    fn extract_params_from_signature(&mut self, sig: &crate::parser::thin_node::SignatureData) -> Vec<crate::solver::ParamInfo> {
+        use crate::solver::ParamInfo;
+        use std::sync::Arc;
+
+        let Some(ref params_list) = sig.parameters else {
+            return Vec::new();
+        };
+
+        params_list.nodes.iter().filter_map(|&param_idx| {
+            let param_node = self.arena.get(param_idx)?;
+            let param = self.arena.get_parameter(param_node)?;
+
+            let name: Option<Arc<str>> = if let Some(name_node) = self.arena.get(param.name) {
+                if let Some(name_data) = self.arena.get_identifier(name_node) {
+                    Some(Arc::from(name_data.escaped_text.as_str()))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let type_id = if !param.type_annotation.is_none() {
+                self.get_type_of_node(param.type_annotation)
+            } else {
+                TypeId::ANY
+            };
+
+            let optional = param.question_token || !param.initializer.is_none();
+            let rest = param.dot_dot_dot_token;
+
+            Some(ParamInfo { name, type_id, optional, rest })
+        }).collect()
+    }
+
     // =========================================================================
     // Type Resolution - Specific Node Types
     // =========================================================================
@@ -731,10 +892,11 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         }
 
-        // Interface - return interface type from TypeLowering
+        // Interface - return interface type with call signatures
         if flags & symbol_flags::INTERFACE != 0 {
-            // For interfaces, we need to lower the interface body
-            // TODO: Implement interface type lowering
+            if !value_decl.is_none() {
+                return self.get_type_of_interface(value_decl);
+            }
             return TypeId::ANY;
         }
 
@@ -758,10 +920,10 @@ impl<'a> ThinCheckerState<'a> {
             if !value_decl.is_none() {
                 if let Some(node) = self.arena.get(value_decl) {
                     if let Some(var_decl) = self.arena.get_variable_declaration(node) {
-                        // First try type annotation
+                        // First try type annotation - use get_type_of_node to resolve type references
+                        // through the binder (for interfaces, classes, etc.)
                         if !var_decl.type_annotation.is_none() {
-                            let lowering = TypeLowering::new(self.arena, &self.types);
-                            return lowering.lower_type(var_decl.type_annotation);
+                            return self.get_type_of_node(var_decl.type_annotation);
                         }
                         // Fall back to inferring from initializer
                         if !var_decl.initializer.is_none() {
