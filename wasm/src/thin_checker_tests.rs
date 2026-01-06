@@ -1380,12 +1380,13 @@ fn test_symbol_property_not_found() {
     // Test accessing non-existent property on symbol type
     let types = TypeInterner::new();
     let evaluator = PropertyAccessEvaluator::new(&types);
+    let name_atom = types.intern_string("nonexistent");
 
     let result = evaluator.resolve_property_access(TypeId::SYMBOL, "nonexistent");
     match result {
         PropertyAccessResult::PropertyNotFound { type_id, property_name } => {
             assert_eq!(type_id, TypeId::SYMBOL);
-            assert_eq!(property_name, "nonexistent");
+            assert_eq!(property_name, name_atom);
         }
         _ => panic!("Expected PropertyNotFound for unknown property, got: {:?}", result),
     }
