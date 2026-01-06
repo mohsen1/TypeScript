@@ -311,3 +311,49 @@ fn test_quickfix_remove_unused_default_import() {
     assert_eq!(edits.len(), 1);
     assert_eq!(edits[0].new_text, "import { bar } from \"mod\";\n");
 }
+
+#[test]
+fn test_quickfix_preserves_type_only_named_import() {
+    let source = "import { type Foo, Bar } from \"mod\";\nlet x: Foo;\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "Bar");
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Warning),
+        code: Some(UNUSED_IMPORT),
+        source: None,
+        message: "unused import".to_string(),
+        related_information: None,
+    };
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    assert_eq!(edits.len(), 1);
+    assert_eq!(edits[0].new_text, "import { type Foo } from \"mod\";\n");
+}
