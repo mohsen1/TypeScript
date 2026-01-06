@@ -2922,6 +2922,28 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get binding pattern data (ObjectBindingPattern or ArrayBindingPattern).
+    #[inline]
+    pub fn get_binding_pattern(&self, node: &ThinNode) -> Option<&BindingPatternData> {
+        use super::syntax_kind_ext::{OBJECT_BINDING_PATTERN, ARRAY_BINDING_PATTERN};
+        if node.has_data() && (node.kind == OBJECT_BINDING_PATTERN || node.kind == ARRAY_BINDING_PATTERN) {
+            self.binding_patterns.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get binding element data.
+    #[inline]
+    pub fn get_binding_element(&self, node: &ThinNode) -> Option<&BindingElementData> {
+        use super::syntax_kind_ext::BINDING_ELEMENT;
+        if node.has_data() && node.kind == BINDING_ELEMENT {
+            self.binding_elements.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Number of nodes in the arena
     pub fn len(&self) -> usize {
         self.nodes.len()

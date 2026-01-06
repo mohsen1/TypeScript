@@ -148,6 +148,9 @@ pub struct ThinPrinter<'a> {
 
     /// Whether we've already emitted `var _this = this;` in the current scope
     this_captured_in_scope: bool,
+
+    /// Counter for temporary variables (_a, _b, _c, etc.)
+    temp_var_counter: u32,
 }
 
 impl<'a> ThinPrinter<'a> {
@@ -176,6 +179,7 @@ impl<'a> ThinPrinter<'a> {
             source_text: None,
             this_capture_depth: 0,
             this_captured_in_scope: false,
+            temp_var_counter: 0,
         }
     }
 
@@ -754,6 +758,18 @@ impl<'a> ThinPrinter<'a> {
             }
             k if k == SyntaxKind::SuperKeyword as u16 => self.write("super"),
 
+            // Binding patterns (for destructuring)
+            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN => {
+                // When emitting as-is (non-ES5 or for parameters), just emit the pattern
+                self.emit_object_binding_pattern(node);
+            }
+            k if k == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
+                self.emit_array_binding_pattern(node);
+            }
+            k if k == syntax_kind_ext::BINDING_ELEMENT => {
+                self.emit_binding_element(node);
+            }
+
             // Default: do nothing (or handle other cases as needed)
             _ => {}
         }
@@ -1287,9 +1303,11 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Emit keyword based on node flags
+        // Emit keyword based on node flags - for ES5, always use "var"
         let flags = node.flags as u32;
-        let keyword = if flags & crate::parser::node_flags::CONST != 0 {
+        let keyword = if self.target_es5 {
+            "var"
+        } else if flags & crate::parser::node_flags::CONST != 0 {
             "const"
         } else if flags & crate::parser::node_flags::LET != 0 {
             "let"
@@ -1299,7 +1317,28 @@ impl<'a> ThinPrinter<'a> {
         self.write(keyword);
         self.write(" ");
 
-        self.emit_comma_separated(&decl_list.declarations.nodes);
+        // For ES5, check if any declaration uses destructuring
+        if self.target_es5 {
+            let mut first = true;
+            for &decl_idx in &decl_list.declarations.nodes {
+                let Some(decl_node) = self.arena.get(decl_idx) else { continue };
+                let Some(decl) = self.arena.get_variable_declaration(decl_node) else { continue };
+
+                if self.is_binding_pattern(decl.name) && !decl.initializer.is_none() {
+                    // ES5 destructuring transform
+                    self.emit_es5_destructuring(decl_idx, &mut first);
+                } else {
+                    // Normal variable declaration
+                    if !first {
+                        self.write(", ");
+                    }
+                    first = false;
+                    self.emit(decl_idx);
+                }
+            }
+        } else {
+            self.emit_comma_separated(&decl_list.declarations.nodes);
+        }
     }
 
     fn emit_variable_declaration(&mut self, node: &ThinNode) {
@@ -1315,6 +1354,97 @@ impl<'a> ThinPrinter<'a> {
             self.write(" = ");
             self.emit(decl.initializer);
         }
+    }
+
+    /// Emit ES5 destructuring: { x, y } = obj → _a = obj, x = _a.x, y = _a.y
+    fn emit_es5_destructuring(&mut self, decl_idx: NodeIndex, first: &mut bool) {
+        let Some(decl_node) = self.arena.get(decl_idx) else { return };
+        let Some(decl) = self.arena.get_variable_declaration(decl_node) else { return };
+        let Some(pattern_node) = self.arena.get(decl.name) else { return };
+
+        // Get temp variable name
+        let temp_name = self.get_temp_var_name();
+
+        // Emit temp variable assignment: _a = initializer
+        if !*first {
+            self.write(", ");
+        }
+        *first = false;
+        self.write(&temp_name);
+        self.write(" = ");
+        self.emit(decl.initializer);
+
+        // Now emit each binding element
+        if pattern_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN {
+            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                for &elem_idx in &pattern.elements.nodes {
+                    self.emit_es5_binding_element(elem_idx, &temp_name);
+                }
+            }
+        } else if pattern_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN {
+            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                for (i, &elem_idx) in pattern.elements.nodes.iter().enumerate() {
+                    self.emit_es5_array_binding_element(elem_idx, &temp_name, i);
+                }
+            }
+        }
+    }
+
+    /// Emit a single binding element for ES5 object destructuring
+    fn emit_es5_binding_element(&mut self, elem_idx: NodeIndex, temp_name: &str) {
+        let Some(elem_node) = self.arena.get(elem_idx) else { return };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+
+        // Get the property name (or use the binding name if no propertyName)
+        let prop_name = if !elem.property_name.is_none() {
+            self.get_identifier_text(elem.property_name)
+        } else {
+            self.get_identifier_text(elem.name)
+        };
+
+        // Get the binding name
+        let binding_name = self.get_identifier_text(elem.name);
+
+        if prop_name.is_empty() || binding_name.is_empty() {
+            return;
+        }
+
+        // Emit: , bindingName = temp.propName
+        self.write(", ");
+        self.write(&binding_name);
+        self.write(" = ");
+        self.write(temp_name);
+        self.write(".");
+        self.write(&prop_name);
+    }
+
+    /// Emit a single binding element for ES5 array destructuring
+    fn emit_es5_array_binding_element(&mut self, elem_idx: NodeIndex, temp_name: &str, index: usize) {
+        let Some(elem_node) = self.arena.get(elem_idx) else { return };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+
+        let binding_name = self.get_identifier_text(elem.name);
+        if binding_name.is_empty() {
+            return;
+        }
+
+        // Emit: , bindingName = temp[index]
+        self.write(", ");
+        self.write(&binding_name);
+        self.write(" = ");
+        self.write(temp_name);
+        self.write("[");
+        self.write(&index.to_string());
+        self.write("]");
+    }
+
+    /// Get identifier text from a node index
+    fn get_identifier_text(&self, idx: NodeIndex) -> String {
+        let Some(node) = self.arena.get(idx) else { return String::new() };
+        if let Some(ident) = self.arena.get_identifier(node) {
+            return ident.escaped_text.clone();
+        }
+        String::new()
     }
 
     fn emit_expression_statement(&mut self, node: &ThinNode) {
@@ -2717,6 +2847,74 @@ impl<'a> ThinPrinter<'a> {
         self.decrease_indent();
         self.write("})();");
         self.write_line();
+    }
+
+    // =========================================================================
+    // Binding Patterns (Destructuring)
+    // =========================================================================
+
+    /// Emit an object binding pattern: { x, y }
+    fn emit_object_binding_pattern(&mut self, node: &ThinNode) {
+        let Some(pattern) = self.arena.get_binding_pattern(node) else {
+            return;
+        };
+
+        self.write("{ ");
+        self.emit_comma_separated(&pattern.elements.nodes);
+        self.write(" }");
+    }
+
+    /// Emit an array binding pattern: [x, y]
+    fn emit_array_binding_pattern(&mut self, node: &ThinNode) {
+        let Some(pattern) = self.arena.get_binding_pattern(node) else {
+            return;
+        };
+
+        self.write("[");
+        self.emit_comma_separated(&pattern.elements.nodes);
+        self.write("]");
+    }
+
+    /// Emit a binding element: x or x = default or propertyName: x
+    fn emit_binding_element(&mut self, node: &ThinNode) {
+        let Some(elem) = self.arena.get_binding_element(node) else {
+            return;
+        };
+
+        // Rest element: ...x
+        if elem.dot_dot_dot_token {
+            self.write("...");
+        }
+
+        // propertyName: name  or just name
+        if !elem.property_name.is_none() {
+            self.emit(elem.property_name);
+            self.write(": ");
+        }
+
+        self.emit(elem.name);
+
+        // Default value: = expr
+        if !elem.initializer.is_none() {
+            self.write(" = ");
+            self.emit(elem.initializer);
+        }
+    }
+
+    /// Get the next temporary variable name (_a, _b, _c, etc.)
+    fn get_temp_var_name(&mut self) -> String {
+        let name = format!("_{}", (b'a' + (self.temp_var_counter % 26) as u8) as char);
+        self.temp_var_counter += 1;
+        name
+    }
+
+    /// Check if a node is a binding pattern
+    fn is_binding_pattern(&self, idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(idx) else {
+            return false;
+        };
+        node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+            || node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
     }
 }
 

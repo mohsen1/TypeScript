@@ -37,6 +37,8 @@ pub struct ClassES5Emitter<'a> {
     source_text: Option<&'a str>,
     /// Whether we're emitting inside a scope that uses _this capture
     use_this_capture: bool,
+    /// Counter for temporary variables (_a, _b, _c, etc.)
+    temp_var_counter: u32,
 }
 
 impl<'a> ClassES5Emitter<'a> {
@@ -47,6 +49,7 @@ impl<'a> ClassES5Emitter<'a> {
             indent_level: 0,
             source_text: None,
             use_this_capture: false,
+            temp_var_counter: 0,
         }
     }
 
@@ -1013,47 +1016,169 @@ impl<'a> ClassES5Emitter<'a> {
     fn emit_variable_statement(&mut self, stmt_idx: NodeIndex) {
         let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
         let Some(var_stmt) = self.arena.get_variable(stmt_node) else { return };
-        
+
         self.write("var ");
-        
+
         let mut first = true;
         for &decl_list_idx in &var_stmt.declarations.nodes {
             let Some(decl_list_node) = self.arena.get(decl_list_idx) else { continue };
-            
+
             if decl_list_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
                 if let Some(decl_list) = self.arena.get_variable(decl_list_node) {
                     for &decl_idx in &decl_list.declarations.nodes {
-                        if !first {
-                            self.write(", ");
-                        }
-                        first = false;
-                        self.emit_variable_declaration(decl_idx);
+                        self.emit_variable_declaration_with_first(decl_idx, &mut first);
                     }
                 }
             } else {
                 // Single declaration
-                if !first {
-                    self.write(", ");
-                }
-                first = false;
-                self.emit_variable_declaration(decl_list_idx);
+                self.emit_variable_declaration_with_first(decl_list_idx, &mut first);
             }
         }
         self.write(";");
     }
-    
+
+    fn emit_variable_declaration_with_first(&mut self, decl_idx: NodeIndex, first: &mut bool) {
+        let Some(decl_node) = self.arena.get(decl_idx) else { return };
+        let Some(decl) = self.arena.get_variable_declaration(decl_node) else { return };
+
+        // Check if this is a destructuring pattern
+        if self.is_binding_pattern(decl.name) && !decl.initializer.is_none() {
+            // ES5 destructuring transform
+            self.emit_es5_destructuring(decl_idx, first);
+        } else {
+            // Normal variable declaration
+            if !*first {
+                self.write(", ");
+            }
+            *first = false;
+            self.emit_binding_name(decl.name);
+
+            if !decl.initializer.is_none() {
+                self.write(" = ");
+                self.emit_expression(decl.initializer);
+            }
+        }
+    }
+
+    fn is_binding_pattern(&self, idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(idx) else {
+            return false;
+        };
+        node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+            || node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+    }
+
+    /// Emit ES5 destructuring: { x, y } = obj → _a = obj, x = _a.x, y = _a.y
+    fn emit_es5_destructuring(&mut self, decl_idx: NodeIndex, first: &mut bool) {
+        let Some(decl_node) = self.arena.get(decl_idx) else { return };
+        let Some(decl) = self.arena.get_variable_declaration(decl_node) else { return };
+        let Some(pattern_node) = self.arena.get(decl.name) else { return };
+
+        // Get temp variable name
+        let temp_name = self.get_temp_var_name();
+
+        // Emit temp variable assignment: _a = initializer
+        if !*first {
+            self.write(", ");
+        }
+        *first = false;
+        self.write(&temp_name);
+        self.write(" = ");
+        self.emit_expression(decl.initializer);
+
+        // Now emit each binding element
+        if pattern_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN {
+            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                for &elem_idx in &pattern.elements.nodes {
+                    self.emit_es5_binding_element(elem_idx, &temp_name);
+                }
+            }
+        } else if pattern_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN {
+            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                for (i, &elem_idx) in pattern.elements.nodes.iter().enumerate() {
+                    self.emit_es5_array_binding_element(elem_idx, &temp_name, i);
+                }
+            }
+        }
+    }
+
+    /// Emit a single binding element for ES5 object destructuring
+    fn emit_es5_binding_element(&mut self, elem_idx: NodeIndex, temp_name: &str) {
+        let Some(elem_node) = self.arena.get(elem_idx) else { return };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+
+        // Get the property name (or use the binding name if no propertyName)
+        let prop_name = if !elem.property_name.is_none() {
+            self.get_identifier_text_clone(elem.property_name)
+        } else {
+            self.get_identifier_text_clone(elem.name)
+        };
+
+        // Get the binding name
+        let binding_name = self.get_identifier_text_clone(elem.name);
+
+        if prop_name.is_empty() || binding_name.is_empty() {
+            return;
+        }
+
+        // Emit: , bindingName = temp.propName
+        self.write(", ");
+        self.write(&binding_name);
+        self.write(" = ");
+        self.write(temp_name);
+        self.write(".");
+        self.write(&prop_name);
+    }
+
+    /// Emit a single binding element for ES5 array destructuring
+    fn emit_es5_array_binding_element(&mut self, elem_idx: NodeIndex, temp_name: &str, index: usize) {
+        let Some(elem_node) = self.arena.get(elem_idx) else { return };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+
+        let binding_name = self.get_identifier_text_clone(elem.name);
+        if binding_name.is_empty() {
+            return;
+        }
+
+        // Emit: , bindingName = temp[index]
+        self.write(", ");
+        self.write(&binding_name);
+        self.write(" = ");
+        self.write(temp_name);
+        self.write("[");
+        self.write(&index.to_string());
+        self.write("]");
+    }
+
+    /// Get the next temporary variable name (_a, _b, _c, etc.)
+    fn get_temp_var_name(&mut self) -> String {
+        let name = format!("_{}", (b'a' + (self.temp_var_counter % 26) as u8) as char);
+        self.temp_var_counter += 1;
+        name
+    }
+
+    /// Get identifier text from a node index, returning an owned String
+    fn get_identifier_text_clone(&self, idx: NodeIndex) -> String {
+        let Some(node) = self.arena.get(idx) else { return String::new() };
+        if let Some(ident) = self.arena.get_identifier(node) {
+            return ident.escaped_text.clone();
+        }
+        String::new()
+    }
+
+    /// Emit a single variable declaration (for for-loop initializers, etc.)
     fn emit_variable_declaration(&mut self, decl_idx: NodeIndex) {
         let Some(decl_node) = self.arena.get(decl_idx) else { return };
         let Some(decl) = self.arena.get_variable_declaration(decl_node) else { return };
-        
+
         self.emit_binding_name(decl.name);
-        
+
         if !decl.initializer.is_none() {
             self.write(" = ");
             self.emit_expression(decl.initializer);
         }
     }
-    
+
     fn emit_if_statement(&mut self, stmt_idx: NodeIndex) {
         let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
         let Some(if_stmt) = self.arena.get_if_statement(stmt_node) else { return };
