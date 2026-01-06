@@ -625,6 +625,30 @@ impl<'a> ThinPrinter<'a> {
         self.emit_node(node, idx);
     }
 
+    /// Emit a node in an expression context.
+    /// If the node is an error/unknown node, emits `void 0` for parse error tolerance.
+    pub fn emit_expression(&mut self, idx: NodeIndex) {
+        if idx.is_none() {
+            self.write("void 0");
+            return;
+        }
+
+        let Some(node) = self.arena.get(idx) else {
+            self.write("void 0");
+            return;
+        };
+
+        // Check if this is an error/unknown node
+        use crate::scanner::SyntaxKind;
+        if node.kind == SyntaxKind::Unknown as u16 {
+            self.write("void 0");
+            return;
+        }
+
+        // Otherwise, emit normally
+        self.emit_node(node, idx);
+    }
+
     /// Emit a node.
     fn emit_node(&mut self, node: &ThinNode, idx: NodeIndex) {
         let kind = node.kind;
@@ -1509,7 +1533,7 @@ impl<'a> ThinPrinter<'a> {
 
         self.emit(prop.name);
         self.write(": ");
-        self.emit(prop.initializer);
+        self.emit_expression(prop.initializer);
     }
 
     fn emit_shorthand_property(&mut self, node: &ThinNode) {
@@ -1875,7 +1899,7 @@ impl<'a> ThinPrinter<'a> {
 
         if !param.initializer.is_none() {
             self.write(" = ");
-            self.emit(param.initializer);
+            self.emit_expression(param.initializer);
         }
     }
 
@@ -2061,7 +2085,7 @@ impl<'a> ThinPrinter<'a> {
 
         if !decl.initializer.is_none() {
             self.write(" = ");
-            self.emit(decl.initializer);
+            self.emit_expression(decl.initializer);
         }
     }
 
@@ -2286,7 +2310,7 @@ impl<'a> ThinPrinter<'a> {
         self.write("return");
         if !ret.expression.is_none() {
             self.write(" ");
-            self.emit(ret.expression);
+            self.emit_expression(ret.expression);
         }
         self.write_semicolon();
     }
@@ -2891,13 +2915,13 @@ impl<'a> ThinPrinter<'a> {
             } else {
                 self.write("exports.default = ");
             }
-            self.emit(export_assign.expression);
+            self.emit_expression(export_assign.expression);
             self.write_semicolon();
         } else {
             // ES6: export = expr (not valid ES6, but emit as export default)
             //      export default expr → export default expr;
             self.write("export default ");
-            self.emit(export_assign.expression);
+            self.emit_expression(export_assign.expression);
             self.write_semicolon();
         }
     }
@@ -3742,7 +3766,7 @@ impl<'a> ThinPrinter<'a> {
         }
         if !unary.operand.is_none() {
             self.write(" ");
-            self.emit(unary.operand);
+            self.emit_expression(unary.operand);
         }
     }
 
@@ -3754,7 +3778,7 @@ impl<'a> ThinPrinter<'a> {
         };
 
         self.write("await ");
-        self.emit(unary.operand);
+        self.emit_expression(unary.operand);
     }
 
     fn emit_spread_element(&mut self, node: &ThinNode) {
@@ -3764,7 +3788,7 @@ impl<'a> ThinPrinter<'a> {
         };
 
         self.write("...");
-        self.emit(spread.expression);
+        self.emit_expression(spread.expression);
     }
 
     // =========================================================================

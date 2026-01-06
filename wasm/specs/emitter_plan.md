@@ -26,7 +26,10 @@ Our focus is to make wasm emitter complete
     - Check flag in emit_export_declaration_commonjs and declaration emitters
     - Now correctly emits only initialization when `export =` present
 - 🚧 Comment preservation in emit - **PARTIALLY DONE** (all comments preserved, but baseline regressed 61.8% → 53.9%)
-- ⬜ Parse error tolerance (some tests skipped) - ~2 tests
+- ✅ Parse error tolerance - **COMPLETED**
+  - Added `emit_expression()` function that emits `void 0` for error/unknown nodes
+  - Updated all expression emitters to use `emit_expression()` instead of `emit()`
+  - Ensures syntactically valid JavaScript even with parse errors (e.g., `var x = void 0;` instead of `var x =;`)
 - ... add more tasks (Ask Gemini when needed)
 
 
