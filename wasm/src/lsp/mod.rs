@@ -5,7 +5,8 @@
 //! - Find References
 //! - Completions
 //! - Hover
-//! - (Future: Signature Help, Rename, etc.)
+//! - Signature Help
+//! - (Future: Rename, Semantic Tokens, etc.)
 //!
 //! Architecture:
 //! - Position utilities for line/column <-> offset conversion
@@ -19,6 +20,7 @@ pub mod definition;
 pub mod references;
 pub mod completions;
 pub mod hover;
+pub mod signature_help;
 
 #[cfg(test)]
 mod tests;
@@ -27,4 +29,5 @@ pub use definition::GoToDefinition;
 pub use references::FindReferences;
 pub use completions::{Completions, CompletionItem, CompletionItemKind};
 pub use hover::{HoverProvider, HoverInfo};
+pub use signature_help::{SignatureHelpProvider, SignatureHelp, SignatureInformation, ParameterInformation};
 pub use position::{Position, Location, SourceLocation, Range};
