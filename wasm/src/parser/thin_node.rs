@@ -2778,6 +2778,17 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get expression with type arguments data (e.g., `extends Base<T>`).
+    #[inline]
+    pub fn get_expr_type_args(&self, node: &ThinNode) -> Option<&ExprWithTypeArgsData> {
+        use super::syntax_kind_ext::EXPRESSION_WITH_TYPE_ARGUMENTS;
+        if node.has_data() && node.kind == EXPRESSION_WITH_TYPE_ARGUMENTS {
+            self.expr_with_type_args.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Get type query data (typeof in type position).
     #[inline]
     pub fn get_type_query(&self, node: &ThinNode) -> Option<&TypeQueryData> {

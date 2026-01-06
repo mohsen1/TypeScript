@@ -137,6 +137,9 @@ pub struct ThinPrinter<'a> {
 
     /// Whether to emit ES5 (classes→IIFEs, arrows→functions)
     target_es5: bool,
+
+    /// Source text for detecting single-line constructs
+    source_text: Option<&'a str>,
 }
 
 impl<'a> ThinPrinter<'a> {
@@ -162,6 +165,7 @@ impl<'a> ThinPrinter<'a> {
             output_line: 0,
             output_column: 0,
             target_es5: true, // Default to ES5 for baseline compatibility
+            source_text: None,
         }
     }
 
@@ -182,6 +186,32 @@ impl<'a> ThinPrinter<'a> {
     /// Set whether to target ES5 (classes→IIFEs, arrows→functions).
     pub fn set_target_es5(&mut self, es5: bool) {
         self.target_es5 = es5;
+    }
+
+    /// Set the source text (for detecting single-line constructs).
+    pub fn set_source_text(&mut self, text: &'a str) {
+        self.source_text = Some(text);
+    }
+
+    /// Check if a node spans a single line in the source.
+    /// For blocks like `{ }`, we look for the closing `}` and check if there's a newline
+    /// between the opening `{` and the first `}`.
+    fn is_single_line(&self, node: &ThinNode) -> bool {
+        if let Some(text) = self.source_text {
+            let start = node.pos as usize;
+            if start < text.len() {
+                // Find the first closing brace after the opening
+                // For a block, the source starts with `{` and we want to find the matching `}`
+                let slice = &text[start..];
+                if let Some(close_idx) = slice.find('}') {
+                    // Check if there's a newline between `{` and `}`
+                    let inner = &slice[..close_idx + 1];
+                    return !inner.contains('\n');
+                }
+            }
+        }
+        // Default to multi-line if we can't determine
+        false
     }
 
     /// Get the output.
@@ -1166,9 +1196,17 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Empty blocks: emit as "{ }" on same line for ES5 compatibility
+        // Empty blocks: preserve original format (single-line vs multi-line)
         if block.statements.nodes.is_empty() {
-            self.write("{ }");
+            if self.is_single_line(node) {
+                // Single-line empty block: { }
+                self.write("{ }");
+            } else {
+                // Multi-line empty block: {\n}
+                self.write("{");
+                self.write_line();
+                self.write("}");
+            }
             return;
         }
 
@@ -1177,8 +1215,12 @@ impl<'a> ThinPrinter<'a> {
         self.increase_indent();
 
         for &stmt_idx in &block.statements.nodes {
+            let before_len = self.output.len();
             self.emit(stmt_idx);
-            self.write_line();
+            // Only add newline if something was actually emitted
+            if self.output.len() > before_len {
+                self.write_line();
+            }
         }
 
         self.decrease_indent();
@@ -2418,8 +2460,12 @@ impl<'a> ThinPrinter<'a> {
         };
 
         for &stmt_idx in &source.statements.nodes {
+            let before_len = self.output.len();
             self.emit(stmt_idx);
-            self.write_line();
+            // Only add newline if something was actually emitted
+            if self.output.len() > before_len {
+                self.write_line();
+            }
         }
     }
 }

@@ -7343,6 +7343,11 @@ impl ThinParserState {
         self.arena.len()
     }
 
+    /// Get the source text
+    pub fn get_source_text(&self) -> &str {
+        &self.source_text
+    }
+
     // =========================================================================
     // JSX Parsing
     // =========================================================================

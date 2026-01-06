@@ -252,6 +252,7 @@ impl ThinParser {
         if let Some(root_idx) = self.source_file_idx {
             let mut printer = ThinPrinter::new(self.parser.get_arena());
             printer.set_target_es5(true); // Match TypeScript baselines
+            printer.set_source_text(self.parser.get_source_text());
             printer.emit(root_idx);
             printer.get_output().to_string()
         } else {

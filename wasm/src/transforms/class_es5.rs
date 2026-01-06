@@ -57,10 +57,11 @@ impl<'a> ClassES5Emitter<'a> {
         
         // Get class name
         let class_name = self.get_identifier_text(class_data.name);
-        
-        // Check for extends clause (not implements)
-        let has_extends = self.has_extends_clause(&class_data.heritage_clauses);
-        
+
+        // Check for extends clause and get base class name
+        let base_class_name = self.get_extends_class_name(&class_data.heritage_clauses);
+        let has_extends = base_class_name.is_some();
+
         // var ClassName = /** @class */ (function (_super) {
         self.write("var ");
         self.write(&class_name);
@@ -71,7 +72,7 @@ impl<'a> ClassES5Emitter<'a> {
         self.write(") {");
         self.write_line();
         self.increase_indent();
-        
+
         // __extends(ClassName, _super);
         if has_extends {
             self.write_indent();
@@ -80,38 +81,37 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(", _super);");
             self.write_line();
         }
-        
+
         // Constructor function
-        self.emit_constructor(&class_name, class_data);
-        
+        self.emit_constructor(&class_name, class_data, has_extends);
+
         // Prototype methods
         self.emit_methods(&class_name, class_data);
-        
+
         // Static members
         self.emit_static_members(&class_name, class_data);
-        
+
         // return ClassName;
         self.write_indent();
         self.write("return ");
         self.write(&class_name);
         self.write(";");
         self.write_line();
-        
+
         self.decrease_indent();
         self.write("}(");
-        
+
         // Pass base class if extends
-        if has_extends {
-            // TODO: Emit base class when heritage API is available
-            self.write("_super");
+        if let Some(ref base_name) = base_class_name {
+            self.write(base_name);
         }
-        
+
         self.write("));");
         
         std::mem::take(&mut self.output)
     }
     
-    fn emit_constructor(&mut self, class_name: &str, class_data: &ClassData) {
+    fn emit_constructor(&mut self, class_name: &str, class_data: &ClassData, has_extends: bool) {
         // Collect instance property initializers
         let instance_props: Vec<NodeIndex> = class_data.members.nodes.iter()
             .filter_map(|&member_idx| {
@@ -159,6 +159,10 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write_line();
                 self.increase_indent();
 
+                // For derived classes, need to handle _super.apply
+                // For now, emit instance props and parameter props first
+                // TODO: Handle super() call properly
+
                 // Emit instance property initializers at the start of constructor
                 self.emit_instance_property_initializers(&instance_props);
 
@@ -181,16 +185,50 @@ impl<'a> ClassES5Emitter<'a> {
             self.write_indent();
             self.write("function ");
             self.write(class_name);
-            self.write("() {");
-            self.write_line();
+            self.write("(");
 
-            // Emit instance property initializers in default constructor
-            if !instance_props.is_empty() {
-                self.increase_indent();
-                self.emit_instance_property_initializers(&instance_props);
-                self.decrease_indent();
+            // For derived classes without explicit constructor, accept variable args
+            if has_extends {
+                // No explicit params needed since we'll use arguments
             }
 
+            self.write(") {");
+            self.write_line();
+            self.increase_indent();
+
+            // For derived classes, call super with arguments
+            if has_extends {
+                self.write_indent();
+                self.write("var _this = _super !== null && _super.apply(this, arguments) || this;");
+                self.write_line();
+            }
+
+            // Emit instance property initializers in default constructor
+            for &prop_idx in &instance_props {
+                let Some(prop_node) = self.arena.get(prop_idx) else { continue };
+                let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
+                let name = self.get_identifier_text(prop_data.name);
+                self.write_indent();
+                if has_extends {
+                    self.write("_this.");
+                } else {
+                    self.write("this.");
+                }
+                self.write(&name);
+                self.write(" = ");
+                self.emit_expression(prop_data.initializer);
+                self.write(";");
+                self.write_line();
+            }
+
+            // For derived classes, return _this
+            if has_extends {
+                self.write_indent();
+                self.write("return _this;");
+                self.write_line();
+            }
+
+            self.decrease_indent();
             self.write_indent();
             self.write("}");
             self.write_line();
@@ -1021,20 +1059,44 @@ impl<'a> ClassES5Emitter<'a> {
 
     /// Check if heritage clauses contain an `extends` clause (not just `implements`)
     fn has_extends_clause(&self, heritage_clauses: &Option<NodeList>) -> bool {
-        let Some(clauses) = heritage_clauses else {
-            return false;
-        };
+        self.get_extends_class_name(heritage_clauses).is_some()
+    }
+
+    /// Get the base class name from the extends clause
+    fn get_extends_class_name(&self, heritage_clauses: &Option<NodeList>) -> Option<String> {
+        let clauses = heritage_clauses.as_ref()?;
 
         for &clause_idx in &clauses.nodes {
-            let Some(clause_node) = self.arena.get(clause_idx) else { continue };
-            let Some(heritage_data) = self.arena.get_heritage(clause_node) else { continue };
+            let clause_node = self.arena.get(clause_idx)?;
+            let heritage_data = self.arena.get_heritage(clause_node)?;
 
             // Check if this is an extends clause (not implements)
-            if heritage_data.token == SyntaxKind::ExtendsKeyword as u16 {
-                return true;
+            if heritage_data.token != SyntaxKind::ExtendsKeyword as u16 {
+                continue;
             }
+
+            // Get the first type in the extends clause (the base class)
+            let first_type_idx = heritage_data.types.nodes.first()?;
+            let type_node = self.arena.get(*first_type_idx)?;
+
+            // The type could be:
+            // 1. A simple identifier (B in `extends B`)
+            // 2. An ExpressionWithTypeArguments (B<T> in `extends B<T>`)
+            // 3. A PropertyAccessExpression (A.B in `extends A.B`)
+
+            // Try as simple identifier first
+            if let Some(ident) = self.arena.get_identifier(type_node) {
+                return Some(ident.escaped_text.clone());
+            }
+
+            // Try as ExpressionWithTypeArguments (for generics)
+            if let Some(expr_data) = self.arena.get_expr_type_args(type_node) {
+                return Some(self.get_identifier_text(expr_data.expression));
+            }
+
+            // For property access, just get the text (simplified - not handling A.B yet)
         }
-        false
+        None
     }
     
     // Helper methods
