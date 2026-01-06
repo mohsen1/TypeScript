@@ -6,13 +6,25 @@
 Incrementally rewrite the TypeScript compiler in Rust, compiled to WebAssembly
 for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 
----
 
-## 🚨 URGENT: Critical Architectural Fixes (MUST DO FIRST)
+# Files
+
+src/solver/, src/thin_checker.rs, src/checker/ (legacy removal).
+
+# Goal
+
+Pass tests/cases/compiler.
+
+## Tasks
+
+Our focus is to make wasm checker complete
+
+
+### 🚨 URGENT: Critical Architectural Fixes (MUST DO FIRST)
 
 These issues block incremental compilation and fast LSP queries.
 
-### The "Transient Scope" Trap (Checker State)
+#### The "Transient Scope" Trap (Checker State)
 
 **Problem:** The checker manually manages scope stacks inside checker logic:
 ```rust
@@ -34,7 +46,7 @@ pub fn add_local(&mut self, name: String, ...) { ... }
 - [ ] Or ensure Binder resolved all identifiers to `SymbolId`s before Checker runs
 - [ ] Checker asks: *"What is the symbol for 'x' at node 123?"* - not "what's on my stack"
 
-### TypeKey Refactor (Shared with Solver)
+#### TypeKey Refactor (Shared with Solver)
 
 **Problem:** See SOLVER.md - `Arc<str>` in type keys destroys performance.
 
@@ -62,134 +74,10 @@ pub trait TypeDatabase {
 - [ ] All solver/checker components accept `&dyn TypeDatabase`
 - [ ] **Benefits:** automatic memoization, incremental recomputation, cycle detection
 
----
-
-# Files
-
-src/solver/, src/thin_checker.rs, src/checker/ (legacy removal).
-
-# Goal
-
-Pass tests/cases/compiler.
-
-## Tasks
-
-Our focus is to make wasm checker complete
-
-- ✅ Fix the Solver Stack Overflow Risk (COMPLETED)
-    Added depth tracking to SubtypeChecker:
-    - Added `depth: u32` field to struct
-    - Initialize to 0 in both constructors
-    - Check `depth > 100` after fast paths, return Provisional
-    - Increment before recursion, decrement after
-    - All tests pass (593/593)
 - 🔄 Move expression type computation to solver/operations.rs (incremental)
 - 🔄 Use NodeView API instead of raw arena lookups (incremental)
 - ⬜ Deprecate checker/types in favor of solver/types
-- ✅ Symbol type checking (errors 2403, 2554) (COMPLETED)
-    - Synthesized Symbol constructor type with call signature: `Symbol(description?: string | number): symbol`
-    - Implemented variable redeclaration checking (TS2403) for same-scope var declarations
-    - Added Symbol property access handling (description, toString, valueOf)
-    - Added 7 comprehensive test cases
-    - All 614 tests pass
-- ✅ Property access from index signature (error 4111) (COMPLETED)
-    - Modified PropertyAccessResult to track whether property was resolved via index signature
-    - Updated all property resolution paths to propagate from_index_signature flag
-    - Implemented error check in get_type_of_property_access for dot notation access
-    - Flag is contagious across union members (TypeScript strict behavior)
-    - Added 4 comprehensive test cases (1 active solver-level test, 3 integration tests documented but disabled until interface type lowering is implemented)
-    - All 614 tests pass
-- ✅ Ambient module patterns (errors 5061, 2819) (COMPLETED)
-    - Implemented TS5061: Ambient module declaration cannot specify relative module name
-    - Implemented TS2819: Private identifiers not allowed in ambient classes
-    - Fixed parser bug: parse_ambient_declaration now creates parse_declare_module with declare modifier
-    - Added has_modifier helper to CheckerContext for checking modifier presence
-    - Added comprehensive checks in DeclarationChecker for module declarations
-    - Added checks in ThinCheckerState for private identifiers in ambient classes
-    - Added 5 comprehensive test cases
-    - All 623 tests pass
-    - Note: TS2305 (Module has no exported member) not yet implemented - requires module resolution system
-- ✅ Fix critical bug: Missing top-level scope (CRITICAL - COMPLETED)
-    - Fixed: check_source_file now pushes/pops a file-level scope
-    - Enables top-level variable redeclaration checking (TS2403)
-    - Enables type tracking for top-level variables in flow analysis
-    - Added 2 test cases for var redeclaration at file level
-    - All 625 tests: 623 passed (2 pre-existing failures unrelated to this fix)
-    - Addresses critical issue identified by Gemini code review
-- ✅ Fix readonly property assignment check (error 2540) (COMPLETED)
-    - Fixed bug in get_class_name_from_expression that caused early return
-    - The method now falls through to check file_locals when get_class_name_from_type returns None
-    - Allows proper detection of readonly property assignments on class instances
-    - Test test_abstractPropertyNegative_errors now passes
-    - All 625 tests pass
-- ✅ Implement namespace member checking (error 2694) (COMPLETED)
-    - ✅ Added exports/members fields to Symbol struct
-    - ✅ Updated ThinBinder to persist symbol tables when exiting module/class scopes
-    - ✅ Implemented qualified name resolution (A.B syntax) in checker
-    - ✅ Added error reporting for TS2694
-    - ✅ Added get_qualified_name getter to ThinNodeArena
-    - ✅ FIXED CRITICAL BUG: MODULE_BLOCK nodes were using get_block() instead of get_module_block()
-        - This caused namespace bodies to never be bound, leaving exports empty
-        - Changed bind_node to use arena.get_module_block() for MODULE_BLOCK nodes
-        - Handle Option<NodeList> in ModuleBlockData.statements
-        - All namespace declarations now properly bind their contents
-    - ✅ FIXED: Export filtering - now correctly filtering exports to only include members with `export` modifier
-        - Added `is_exported: bool` field to Symbol struct (binder.rs:125)
-        - Added has_export_modifier() helper to check for ExportKeyword in modifiers (thin_binder.rs:504)
-        - Added is_node_exported() to handle VariableDeclaration tree walking (thin_binder.rs:520)
-        - Updated all bind_* methods to set is_exported flag before allocation
-        - Updated exit_scope() to filter exports by is_exported flag (thin_binder.rs:596-604)
-        - CRITICAL FIX: Parser wraps exported declarations in ExportDeclaration nodes instead of attaching modifiers
-        - Added mark_exported_symbols() helper to handle parser's structure (thin_binder.rs:1010)
-        - Updated bind_export_declaration() to call mark_exported_symbols() after binding (thin_binder.rs:1084)
-        - test_namespace_binding_debug now verifies ONLY exported members are in exports table
-    - ✅ FIXED: Checker validation - now properly validates namespace member access
-        - Updated compute_type_of_symbol() to return TypeKey::Ref for namespace symbols (thin_checker.rs:998-1001)
-        - This allows resolve_qualified_name() to access exports table and validate members
-        - Existing validation logic in resolve_qualified_name() now triggers correctly
-        - test_namespace_member_not_found now passes (reports TS2694 for missing exports)
-    - ✅ FIXED: Import alias support (`import Alias = NS.Member`)
-        - Added bind_import_equals_declaration() in thin_binder.rs to create ALIAS symbols
-        - Updated get_import_decl() to handle both IMPORT_DECLARATION and IMPORT_EQUALS_DECLARATION
-        - Added ALIAS type resolution in compute_type_of_symbol() (thin_checker.rs:1075-1092)
-        - Added QUALIFIED_NAME case in compute_type_of_node() to trigger validation (thin_checker.rs:314-316)
-        - Import aliases now properly resolve qualified names and validate namespace member access
-        - Added 3 comprehensive test cases (binder, type resolution, non-exported member access)
-        - All tests verify: alias binding, type resolution through qualified names, TS2694 for non-exported members
-    - All 684 tests pass
 - ⬜ Various missing error codes (see test failures)
-- ✅ Fix tuple subtyping logic (CRITICAL - COMPLETED)
-    - Fixed: Now properly rejects `[number, string]` as subtype of `[number]`
-    - Checks if target has rest element before allowing extra source elements
-    - Handles rest element matching correctly (rest to rest, fixed to rest)
-    - Added 5 comprehensive test cases for edge cases
-    - All 598 tests pass
-- ✅ Fix function parameter variance (MAJOR - COMPLETED)
-    - Implemented contravariant parameter checking (strict/sound behavior)
-    - Added `strict_function_types: bool` field (default: true)
-    - Created `are_parameters_compatible` helper method
-    - Updated all function/call signature checking methods
-    - Strict mode: target <: source (contravariant, sound)
-    - Legacy mode: target <: source OR source <: target (bivariant, unsound)
-    - Added comprehensive test for both modes
-    - All 607 tests pass (no existing tests broken!)
-- ✅ Remove unused ref_cache field (MINOR - COMPLETED)
-    - Removed unused field from SubtypeChecker struct
-    - Removed from both constructors (new and with_resolver)
-    - All 606 tests still pass
-- ✅ Fix tuple to array subtyping for rest elements (BLOCKER - COMPLETED)
-    - Fixed: Rest elements now properly unwrapped before comparison
-    - `[string, ...string[]]` is now assignable to `string[]`
-    - Uses get_array_element_type to unwrap rest array type
-    - Added 4 comprehensive test cases
-    - All 602 tests pass
-- ✅ Fix number index signature check (CRITICAL - COMPLETED)
-    - Fixed: check_object_to_indexed now validates numeric properties
-    - Parses property names with `parse::<f64>()` to detect numeric keys
-    - Numeric properties validated against `number_index` signature
-    - All properties still validated against `string_index` (TypeScript semantics)
-    - Added 4 comprehensive test cases
-    - All 606 tests pass
 - ... add more tasks (Ask Gemini when needed)
 
 
