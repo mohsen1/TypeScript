@@ -1986,7 +1986,11 @@ impl ThinParserState {
                      self.is_token(SyntaxKind::OpenBracketToken) {
             self.parse_property_name()
         } else {
-            // Skip unknown token
+            // Report error for unknown token
+            self.parse_error_at_current_token(
+                "Unexpected token. A constructor, method, accessor, or property was expected.",
+                diagnostic_codes::UNEXPECTED_TOKEN_CLASS_MEMBER
+            );
             self.next_token();
             return NodeIndex::NONE;
         };

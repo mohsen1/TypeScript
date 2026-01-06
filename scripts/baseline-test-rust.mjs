@@ -236,7 +236,7 @@ function processFile(filePath, source, testName) {
             emittedJs = '';
         }
 
-        parser.free();
+        try { parser.free(); } catch (e) { /* ignore free errors */ }
 
         return {
             success: true,
@@ -244,7 +244,7 @@ function processFile(filePath, source, testName) {
             emittedJs
         };
     } catch (e) {
-        parser.free && parser.free();
+        try { parser.free && parser.free(); } catch (e2) { /* ignore */ }
         return {
             success: false,
             error: e.message
