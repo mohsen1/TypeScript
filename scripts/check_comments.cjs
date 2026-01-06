@@ -3,7 +3,10 @@ const path = require('path');
 const { createThinParser } = require('../wasm/pkg/wasm.js');
 
 const basePath = 'tests/baselines/reference';
-const tests = ['ParameterList7', 'abstractClassUnionInstantiation', 'abstractPropertyInConstructor', 'ClassDeclaration26'];
+
+// Get all test names that have .js files
+const allJsFiles = fs.readdirSync(basePath).filter(f => f.endsWith('.js') && !f.includes('.symbols.'));
+const tests = allJsFiles.map(f => f.replace('.js', '')).slice(0, 50);  // First 50 tests
 
 console.log('Starting check...');
 

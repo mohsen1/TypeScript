@@ -28,9 +28,9 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Source order emit for methods/accessors
 - ✅ Declare variable skip (`declare const foo: number;` → empty)
 - ✅ Arrow function `this` capture (`var _this = this;`) for base and derived classes
+- ✅ Destructuring transform (`let { x } = obj;` → `var _a = obj, x = _a.x;`)
 
 ## Emitter TODOs (for JS baseline 80%+)
-- ⬜ Destructuring transform (`let { x } = obj;` → `var x = obj.x;`) - ~3 tests
 - ⬜ CommonJS exports (`"use strict"`, `module.exports`, `exports.X`) - ~11 tests
 - ⬜ Comment preservation in emit - ~3 tests
 - ⬜ Parse error tolerance (some tests skipped) - ~2 tests
