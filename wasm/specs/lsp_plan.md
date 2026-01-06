@@ -152,10 +152,34 @@ Following Gemini's guidance, implemented comprehensive AST traversal:
 
    **Gemini Review:** All critical issues fixed (nesting depth tracking, type arguments handling) ✅
 
+8. **Document Symbols Feature** (2026-01-06)
+   - Added `document_symbols.rs` with `DocumentSymbol`, `SymbolKind`, and `DocumentSymbolProvider` types
+   - Provides outline/structure view of TypeScript files
+   - Hierarchical symbol tree showing all declarations
+   - Supports all major symbol types:
+     - Functions, classes, interfaces, type aliases, enums
+     - Variables (const, let, var distinction)
+     - Class members (methods, properties, constructors, accessors)
+     - Namespaces/modules
+     - Enum members
+   - Properly handles nested symbols (e.g., methods inside classes, nested functions)
+   - Distinguishes between full range (entire definition) and selection range (just the identifier)
+   - Tests: 5/5 passing ✅
+
+   **Implementation Details:**
+   - Recursively traverses AST using `collect_symbols`
+   - Uses `LineMap` to convert AST offsets to LSP positions
+   - Handles export declarations by unwrapping to find inner declarations
+   - Supports numeric and string literal names (for computed properties, enum members)
+   - Constructors show nested functions/classes as children
+   - Accessors (getters/setters) displayed as properties
+
+   **Gemini Review:** All issues fixed ✅
+
 #### Test Results
 
-All 629 tests pass! ✅ (2 ignored)
-- LSP-specific tests: 23/24 passing (1 ignored - multi-arg cursor detection)
+All 634 tests pass! ✅ (2 ignored)
+- LSP-specific tests: 28/29 passing (1 ignored - multi-arg cursor detection)
 - Position utilities: 3/3 passing
 - Resolver tests: 1/1 passing
 - Definition tests: 2/2 passing
@@ -163,6 +187,7 @@ All 629 tests pass! ✅ (2 ignored)
 - Completions tests: 3/3 passing ✅
 - Hover tests: 3/3 passing
 - Signature Help tests: 2/3 passing (1 ignored - multi-arg cursor detection)
+- Document Symbols tests: 5/5 passing ✅
 - Integration tests: 3/3 passing
 - Utils tests: 3/3 passing
 

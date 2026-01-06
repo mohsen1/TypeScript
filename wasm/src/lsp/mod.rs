@@ -6,6 +6,7 @@
 //! - Completions
 //! - Hover
 //! - Signature Help
+//! - Document Symbols
 //! - (Future: Rename, Semantic Tokens, etc.)
 //!
 //! Architecture:
@@ -21,6 +22,7 @@ pub mod references;
 pub mod completions;
 pub mod hover;
 pub mod signature_help;
+pub mod document_symbols;
 
 #[cfg(test)]
 mod tests;
@@ -30,4 +32,5 @@ pub use references::FindReferences;
 pub use completions::{Completions, CompletionItem, CompletionItemKind};
 pub use hover::{HoverProvider, HoverInfo};
 pub use signature_help::{SignatureHelpProvider, SignatureHelp, SignatureInformation, ParameterInformation};
+pub use document_symbols::{DocumentSymbolProvider, DocumentSymbol, SymbolKind};
 pub use position::{Position, Location, SourceLocation, Range};
