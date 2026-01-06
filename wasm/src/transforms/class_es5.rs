@@ -1273,8 +1273,90 @@ impl<'a> ClassES5Emitter<'a> {
         
         if let Some(ident) = self.arena.get_identifier(name_node) {
             self.write(&ident.escaped_text);
+            return;
         }
-        // TODO: Handle destructuring patterns
+
+        match name_node.kind {
+            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN => {
+                self.emit_object_binding_pattern(name_node);
+            }
+            k if k == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
+                self.emit_array_binding_pattern(name_node);
+            }
+            _ => {}
+        }
+    }
+
+    fn emit_object_binding_pattern(&mut self, pattern_node: &ThinNode) {
+        let Some(pattern) = self.arena.get_binding_pattern(pattern_node) else { return };
+
+        self.write("{ ");
+        let mut first = true;
+        for &elem_idx in &pattern.elements.nodes {
+            if !first {
+                self.write(", ");
+            }
+            first = false;
+            if elem_idx.is_none() {
+                continue;
+            }
+            self.emit_binding_element(elem_idx);
+        }
+        self.write(" }");
+    }
+
+    fn emit_array_binding_pattern(&mut self, pattern_node: &ThinNode) {
+        let Some(pattern) = self.arena.get_binding_pattern(pattern_node) else { return };
+
+        self.write("[");
+        let mut first = true;
+        for &elem_idx in &pattern.elements.nodes {
+            if !first {
+                self.write(", ");
+            }
+            first = false;
+            if elem_idx.is_none() {
+                continue;
+            }
+            self.emit_binding_element(elem_idx);
+        }
+        self.write("]");
+    }
+
+    fn emit_binding_element(&mut self, elem_idx: NodeIndex) {
+        let Some(elem_node) = self.arena.get(elem_idx) else { return };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+
+        if elem.dot_dot_dot_token {
+            self.write("...");
+        }
+
+        if !elem.property_name.is_none() {
+            self.emit_binding_property_name(elem.property_name);
+            self.write(": ");
+        }
+
+        self.emit_binding_name(elem.name);
+
+        if !elem.initializer.is_none() {
+            self.write(" = ");
+            self.emit_expression(elem.initializer);
+        }
+    }
+
+    fn emit_binding_property_name(&mut self, name_idx: NodeIndex) {
+        let Some(name_node) = self.arena.get(name_idx) else { return };
+
+        if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+            if let Some(computed) = self.arena.get_computed_property(name_node) {
+                self.write("[");
+                self.emit_expression(computed.expression);
+                self.write("]");
+            }
+            return;
+        }
+
+        self.emit_expression(name_idx);
     }
     
     fn emit_block_contents(&mut self, block_idx: NodeIndex) {
@@ -1326,6 +1408,12 @@ impl<'a> ClassES5Emitter<'a> {
             }
             k if k == syntax_kind_ext::FOR_STATEMENT => {
                 self.emit_for_statement(stmt_idx);
+            }
+            k if k == syntax_kind_ext::FOR_IN_STATEMENT => {
+                self.emit_for_in_statement(stmt_idx);
+            }
+            k if k == syntax_kind_ext::FOR_OF_STATEMENT => {
+                self.emit_for_of_statement(stmt_idx);
             }
             k if k == syntax_kind_ext::WHILE_STATEMENT => {
                 self.emit_while_statement(stmt_idx);
@@ -1576,6 +1664,53 @@ impl<'a> ClassES5Emitter<'a> {
         }
         self.write(") ");
         self.emit_statement(for_stmt.statement);
+    }
+
+    fn emit_for_in_statement(&mut self, stmt_idx: NodeIndex) {
+        let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
+        let Some(for_in_of) = self.arena.get_for_in_of(stmt_node) else { return };
+
+        self.write("for (");
+        self.emit_for_in_of_initializer(for_in_of.initializer);
+        self.write(" in ");
+        self.emit_expression(for_in_of.expression);
+        self.write(") ");
+        self.emit_statement(for_in_of.statement);
+    }
+
+    fn emit_for_of_statement(&mut self, stmt_idx: NodeIndex) {
+        let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
+        let Some(for_in_of) = self.arena.get_for_in_of(stmt_node) else { return };
+
+        self.write("for ");
+        if for_in_of.await_modifier {
+            self.write("await ");
+        }
+        self.write("(");
+        self.emit_for_in_of_initializer(for_in_of.initializer);
+        self.write(" of ");
+        self.emit_expression(for_in_of.expression);
+        self.write(") ");
+        self.emit_statement(for_in_of.statement);
+    }
+
+    fn emit_for_in_of_initializer(&mut self, initializer: NodeIndex) {
+        if initializer.is_none() {
+            return;
+        }
+
+        let Some(init_node) = self.arena.get(initializer) else { return };
+        if init_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+            self.write("var ");
+            if let Some(decl_list) = self.arena.get_variable(init_node) {
+                let mut first = true;
+                for &decl_idx in &decl_list.declarations.nodes {
+                    self.emit_variable_declaration_with_first(decl_idx, &mut first);
+                }
+            }
+        } else {
+            self.emit_expression(initializer);
+        }
     }
     
     fn emit_while_statement(&mut self, stmt_idx: NodeIndex) {
