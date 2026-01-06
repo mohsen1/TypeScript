@@ -55,6 +55,17 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Arrow function `this` capture (`var _this = this;`) for base and derived classes
 - ✅ Destructuring transform (`let { x } = obj;` → `var _a = obj, x = _a.x;`)
 
+## Emitter Architecture Refactor (complete)
+- ✅ Created `SourceWriter` abstraction for output generation with source map tracking
+- ✅ Created `EmitContext` for transform-specific state management
+- ✅ Refactored `ThinPrinter` to use `SourceWriter` (decouples output from AST traversal)
+- ✅ UTF-16 column counting for correct source map positions
+- ✅ Refactored `ThinPrinter` to use `EmitContext` for all transform state
+- ✅ Separated arrow function ES5/native emit paths
+- ✅ Converted `thin_emitter.rs` to directory module (`thin_emitter/mod.rs`)
+- ✅ Marked fields/methods `pub(super)` for future submodule splitting
+- ⏳ Split `emit_node` into modules - structure ready, splitting deferred until needed
+
 ## Emitter TODOs (for JS baseline 80%+)
 - ⬜ CommonJS exports (`"use strict"`, `module.exports`, `exports.X`) - ~11 tests
 - ⬜ Comment preservation in emit - ~3 tests
@@ -86,47 +97,36 @@ see SESSION_LOG.md -- always amended with each session's work
 
 This catches design issues early and ensures consistent code quality.
 
-### Next Steps
 
-⚠️ **PRIORITY 0: Checker Architecture Cleanup** (Partially Complete)
+### Checker Architecture Cleanup (see specs/REFACTOR_CHECKER.md)
 
-Clean up the checker architecture per `specs/REFACTOR_CHECKER.md`:
 1. ✅ Refactor ThinCheckerState to use CheckerContext (wraps `ctx: CheckerContext<'a>`)
 2. ✅ Create ExpressionChecker in checker/expr.rs
 3. 🔄 Move expression type computation to solver (incremental, as features are added)
 4. 🔄 Use NodeView API consistently (incremental, as code is touched)
 5. ⬜ Create specialized checker modules (statements.rs, declarations.rs)
 
-**Type Checking (16 failing tests in sample)**
-1. ✅ Export assignment validation (2309, 2304)
-2. ✅ Setter parameter validation (1052, 1053)
-3. ✅ Return type validation (2355) - function must return a value (basic types, function types)
-4. ✅ Abstract class instantiation (2511) - basic case (union types need more work)
-5. ✅ Static member access from instance (2662) - `foo` → "Did you mean 'C.foo'?"
-6. ✅ Abstract property in constructor (2715) - `this.abstractProp` in ctor
-7. ⬜ Property used before initialization (2729) - needs dataflow analysis
-8. ⬜ Accessor return type inference (7023) - implicit any in getter
+### Next Steps - Emitter Focus
 
-**Parser Semantic Errors**
+**Priority 1: Module System (33% of failing tests)**
+1. ⬜ CommonJS exports (`"use strict"`, `module.exports`, `exports.X`)
+2. ⬜ ES module imports/exports → CommonJS transform
+3. ⬜ Named exports and re-exports
 
-8. ⬜ Declaration expected (1128) - after certain tokens
-9. ✅ Const modifier on class members (1248) - `const` invalid on properties
-10. ✅ Accessor body in ambient context (1183) - no body in declare class/interface/type
-11. ✅ Abstract in non-abstract class (1253) - abstract members need abstract class
-12. ⬜ Accessor in ambient context ES5 (18045) - `accessor` keyword needs ES5+
+**Priority 2: Block Scoping (4% of failing tests)**
+4. ⬜ `let`/`const` → `var` for ES5 (temporal dead zone handling)
 
-**Advanced Diagnostics**
+**Priority 3: Class Features (7% of failing tests)**
+5. ⬜ Static fields initialization
+6. ⬜ Private fields (`#`) transform
 
-13. ⬜ RelatedInformation - point to definition sites for context
-14. ⬜ Accessor diagnostic hints (6234) - "did you mean to call it?"
+**Priority 4: Namespace & Enums (5% of failing tests)**
+7. ⬜ Namespace IIFE improvements
+8. ⬜ Enum object emit
 
-### Blockers Analysis (26 failing tests)
-| Category | Codes | Tests | Notes |
-|----------|-------|-------|-------|
-| Parser errors | 1005, 1128 | 4 | Error recovery gaps (1068, 1248 done) |
-| Type errors | 2339, 2355, 2511 | 10 | Property access, returns, abstract (2662 done) |
-| Accessor errors | 6234, 18045 | 3 | Hints, ES5 target (1183 done) |
-| Abstract members | 2729, 2416, 2540 | 3 | Abstract property handling (2715 done) |
+**Priority 5: Async/Generators (4% of failing tests)**
+9. ⬜ `__awaiter` helper for async/await
+10. ⬜ `__generator` helper for generators
 
 ### Emit TODOs (40.8% failing → target 80%+)
 | Feature | Tests | % | Notes |
@@ -142,28 +142,6 @@ Clean up the checker architecture per `specs/REFACTOR_CHECKER.md`:
 | **for-of** | 39 | 1% | Iterator downlevel |
 | **Spread/rest** | 24 | <1% | `__spread`/`__rest` helpers |
 | **Generators** | 26 | <1% | `__generator` helper |
-
-### Type Checking TODOs (top missing codes)
-| Code | Count | Description |
-|------|-------|-------------|
-| TS5107 | 323 | Option requires value |
-| TS2322 | 306 | Type not assignable |
-| TS2339 | 138 | Property does not exist |
-| TS6133 | 123 | Declared but never used |
-| TS2304 | 102 | Cannot find name |
-| TS2345 | 100 | Argument type mismatch |
-| TS2300 | 96 | Duplicate identifier |
-| TS2307 | 58 | Cannot find module |
-| TS2741 | 47 | Missing property |
-| TS7006 | 43 | Implicit any parameter |
-| TS1128 | 35 | Declaration expected |
-
-### Quick Wins (after checker refactor)
-- ⬜ TS2322/2345: Type assignability checks (306 tests)
-- ⬜ TS2339: Property lookup on union/intersection types (138 tests)
-- ⬜ TS2304: Module resolution, global declarations (102 tests)
-- ⬜ TS2300: Duplicate detection in binder (96 tests)
-- ⬜ Modules: Start with `export {}` and named exports
 
 ---
 

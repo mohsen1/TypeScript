@@ -64,6 +64,12 @@ pub mod source_map;
 #[cfg(test)]
 mod source_map_tests;
 
+// SourceWriter - Abstraction for emitter output with source map tracking
+pub mod source_writer;
+
+// EmitContext - Transform state management for the emitter
+pub mod emit_context;
+
 // Declaration file emitter (Phase 6.4)
 pub mod declaration_emitter;
 #[cfg(test)]

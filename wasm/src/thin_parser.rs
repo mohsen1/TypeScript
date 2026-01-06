@@ -7424,14 +7424,14 @@ impl ThinParserState {
         self.arena.len()
     }
 
-    /// Get the file name
-    pub fn get_file_name(&self) -> &str {
-        &self.file_name
-    }
-
     /// Get the source text
     pub fn get_source_text(&self) -> &str {
         &self.source_text
+    }
+
+    /// Get the file name
+    pub fn get_file_name(&self) -> &str {
+        &self.file_name
     }
 
     // =========================================================================

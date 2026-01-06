@@ -63,6 +63,24 @@ impl<'a> ClassES5Emitter<'a> {
         self.source_text = Some(source_text);
     }
 
+    /// Emit trailing comments after a position in the source text
+    fn emit_trailing_comments(&mut self, end_pos: u32) {
+        use crate::thin_emitter::get_trailing_comment_ranges;
+
+        let Some(text) = self.source_text else {
+            return;
+        };
+
+        let comments = get_trailing_comment_ranges(text, end_pos as usize);
+        for comment in comments {
+            // Add space before trailing comment
+            self.output.push(' ');
+            // Emit the comment text
+            let comment_text = &text[comment.pos as usize..comment.end as usize];
+            self.output.push_str(comment_text);
+        }
+    }
+
     pub fn emit_class(&mut self, class_idx: NodeIndex) -> String {
         self.output.clear();
         
@@ -204,6 +222,28 @@ impl<'a> ClassES5Emitter<'a> {
                 self.decrease_indent();
                 self.write_indent();
                 self.write("}");
+
+                // Emit trailing comments from the original constructor body
+                if let Some(body_node) = self.arena.get(ctor_data.body) {
+                    // In TypeScript, node.end may include trailing trivia.
+                    // We need to find the actual closing brace position.
+                    // The block starts with '{' and ends with '}'.
+                    // For an empty block {}, find the closing brace after the opening.
+                    if let Some(text) = self.source_text {
+                        let pos = body_node.pos as usize;
+                        let end = std::cmp::min(body_node.end as usize, text.len());
+                        // Search only within the block's span
+                        if let Some(slice) = text.get(pos..end) {
+                            // Skip the opening brace and find the matching closing brace
+                            // For simple blocks, find the first }
+                            if let Some(close_idx) = slice.find('}') {
+                                let actual_end = pos + close_idx + 1;
+                                self.emit_trailing_comments(actual_end as u32);
+                            }
+                        }
+                    }
+                }
+
                 self.write_line();
                 break;
             }

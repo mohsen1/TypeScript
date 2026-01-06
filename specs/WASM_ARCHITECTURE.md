@@ -1,193 +1,226 @@
-# TypeScript-WASM Architecture
 
-> **Rust/WASM Port of the TypeScript Compiler**
+# WASM Compiler Architecture
 
-Native Rust port targeting WebAssembly, optimized for **cache efficiency** and **parallelism**.
+## Core Design & Parsing Infrastructure
 
----
+### 1. Architectural Philosophy
+This compiler is designed specifically for **WebAssembly (WASM)** execution environments. Unlike traditional CLI compilers, it operates under unique constraints:
+*   **Memory Latency:** WASM linear memory access can be slower than native heap access.
+*   **Boundary Costs:** Crossing the JS-WASM boundary is expensive.
+*   **Single-Threaded Context:** While Rayon is supported, the primary use case is often a single-threaded generic worker or main thread.
 
-## Key Metrics
+Therefore, the architecture follows **Data-Oriented Design (DOD)** principles rather than Object-Oriented Design. We prioritize **Cache Locality** and **Struct-of-Arrays (SoA)** layouts over pointer-chasing.
 
-| Component | Lines | Tests | Status |
-|-----------|-------|-------|--------|
-| Scanner | ~2,500 | 22 | ✅ Complete |
-| Parser (ThinParser) | ~5,100 | 160+ | ✅ Complete |
-| Binder (ThinBinder) | ~900 | 26+ | ✅ Complete |
-| Type Checker + Solver | ~29,300 | 670+ | ✅ 99% |
-| Emitter | ~5,100 | 92+ | ✅ 75% |
-| Language Service | ~2,000 | 5 | 🟡 60% |
-| **Total** | **~74,350** | **1006** | |
+### 2. The Data Pipeline
+The compilation process is a linear pipeline transforming source text into artifacts without intermediate object allocation overhead.
 
----
-
-## Architecture
-
-```
-Source Text
-    ↓
-Scanner (scanner_impl.rs) → Tokens
-    ↓
-ThinParser (thin_parser.rs) → ThinNodeArena (16 bytes/node)
-    ↓
-ThinBinder (thin_binder.rs) → SymbolArena + SymbolTable
-    ↓
-ThinChecker + Solver → TypeId (O(1) equality)
-    ↓
-ThinEmitter → JavaScript + Source Maps + .d.ts
+```mermaid
+graph LR
+    A[Source Text] -->|Zero-Copy| B(Scanner)
+    B -->|Tokens| C(ThinParser)
+    C -->|Indices| D[ThinNodeArena]
+    D --> E(Binder)
+    E -->|SymbolTable| F(Solver/Checker)
+    D & F --> G(Emitter)
+    G --> H[JavaScript Output]
 ```
 
-### Parallelism (Rayon)
+### 3. Memory Architecture: The "ThinNode" System
 
-```
-Files → par_iter() → Parse each file (independent arenas)
-                   → Bind each file (local symbols)
-                   → Sequential symbol merge → MergedProgram
-                   → Type check
-```
+The core innovation of this compiler is the **ThinNode** representation. In traditional compilers (like `tsc` or `swc`), an AST node is a large struct or enum variant allocated on the heap, often exceeding 200 bytes. This ruins CPU cache locality.
 
----
-
-## Performance Innovations
-
-### ThinNode (13x Cache Improvement)
+#### 3.1. The 16-Byte Header
+Every AST node is represented by a fixed-size, 16-byte header stored contiguously in a `Vec<ThinNode>`.
 
 ```rust
-// Old: 208 bytes per node (0.31 nodes/cache-line)
-pub enum Node { ... }
-
-// New: 16 bytes per node (4 nodes/cache-line)
 #[repr(C)]
 pub struct ThinNode {
     pub kind: u16,        // SyntaxKind
-    pub flags: u16,       // NodeFlags
-    pub pos: u32,         // Start position
+    pub flags: u16,       // NodeFlags (Contextual info)
+    pub pos: u32,         // Start position (u32 is sufficient for 4GB source files)
     pub end: u32,         // End position
-    pub data_index: u32,  // Index into typed pool
+    pub data_index: u32,  // Pointer to typed data pool (u32::MAX if none)
 }
 ```
 
-### Typed Data Pools
+**Benefits:**
+*   **Cache Density:** We fit **4 nodes per 64-byte CPU cache line**.
+*   **Traversal Speed:** Scanning the AST structure without reading specific data is incredibly fast.
+*   **Relocatability:** Nodes are referenced by `NodeIndex` (u32), not pointers. The entire AST can be serialized by just dumping the memory buffer.
+
+#### 3.2. Typed Data Pools
+Node-specific data (identifiers names, binary operators, function bodies) is stripped from the node and stored in separate, typed vectors called **Data Pools**.
+
+| Node Category | Storage Pool | Data Layout (Example) |
+| :--- | :--- | :--- |
+| `Identifier` | `arena.identifiers` | `{ escaped_text: String }` |
+| `BinaryExpression` | `arena.binary_exprs` | `{ left: NodeIndex, op: u16, right: NodeIndex }` |
+| `Function` | `arena.functions` | `{ name: NodeIndex, params: NodeList, body: NodeIndex, ... }` |
+| `IfStatement` | `arena.if_statements` | `{ expr: NodeIndex, then: NodeIndex, else: NodeIndex }` |
+
+This effectively implements an **Entity Component System (ECS)** for the AST.
+
+### 4. String Handling & Interning
+Strings are the enemy of performance in WASM. To mitigate allocation costs:
+
+1.  **Scanner Zero-Copy:** The scanner operates on a `&str` slice of the source. It does not allocate new strings for tokens unless requested.
+2.  **Atom Interning:** Identifiers and Keywords are interned into a global `Interner`.
+    *   Instead of passing `String`, we pass `Atom` (u32).
+    *    Comparisons are `O(1)` integer comparisons.
+    *   Memory usage is deduplicated.
+
+### 5. The Parser Implementation
+The parser (`thin_parser.rs`) is a recursive descent parser that constructs the `ThinNodeArena`.
+
+*   **No Result<T, E>:** The parser never panics or returns `Result`. It recovers from errors immediately by creating "Missing" nodes or skipping tokens, pushing error data to a separate `diagnostics` vector.
+*   **Lookahead:** Uses `Scanner::save_state()` and `restore_state()` for efficient, unlimited lookahead when grammar is ambiguous (e.g., distinguishing arrow functions from parenthesized groups).
+*   **Incremental Ready:** Because nodes are indices, future incremental parsing can potentially reuse chunks of the indices array.
+
+
+
+## Semantic Analysis (Binder, Solver, Checker)
+
+### 1. The Binder: Scope & Symbol Management
+The Binder (`thin_binder.rs`) is the first pass after parsing. Its sole responsibility is **Name Resolution**. It does not calculate types.
+
+#### 1.1. Symbol Architecture
+*   **SymbolArena:** All symbols are allocated in a contiguous `Vec<Symbol>`.
+*   **SymbolId:** A lightweight `u32` handle.
+*   **Node-to-Symbol Map:** A sparse map (`FxHashMap<NodeIndex, SymbolId>`) links declaration nodes to their symbols.
+
+#### 1.2. Scoping Strategy
+The Binder performs a single-pass walk of the AST to build the scope tree:
+1.  **Scope Container:** Maintains a `ScopeChain` of active `SymbolTable`s.
+2.  **Hoisting:** Pre-scans blocks to hoist `var` and `function` declarations before binding statements.
+3.  **Flow Analysis:** Simultaneously builds a `ControlFlowGraph` (using `FlowNodeArena`) for later reachability and definite assignment analysis.
+
+### 2. The Solver: Structural Type Engine
+The Solver (`solver/`) is the "brain" of the compiler. Unlike traditional compilers that mix AST traversal with type logic, the Solver is a **pure type system engine**.
+
+#### 2.1. Structural Interning
+TypeScript uses a structural type system. To make this performant in WASM, we use **Type Interning**.
+*   **TypeKey:** Describes the *structure* of a type (e.g., `Union([A, B])`, `Object({ x: Number })`).
+*   **TypeInterner:** Maps `TypeKey` -> `TypeId` (u32).
+*   **Deduping:** Identical structures (e.g., `{ x: number }` declared in two different places) map to the exact same `TypeId`.
+*   **O(1) Equality:** Checking if `TypeA == TypeB` is just an integer comparison.
+
+#### 2.2. The Logic Layers
+The Solver is stratified into distinct logic layers:
+
+| Layer | Component | Responsibility |
+| :--- | :--- | :--- |
+| **I/O** | `TypeResolver` / `Lowering` | Converts AST Nodes (`NodeIndex`) into `TypeIds`. |
+| **Relations** | `SubtypeChecker` | Determines if `T1 <: T2`. Uses **Coinductive** logic to handle recursive types without infinite loops. |
+| **Inference** | `InferenceContext` | Uses **Union-Find** (via `ena`) to solve generic constraints (`T extends U`). |
+| **Operations** | `CallEvaluator` / `BinaryOp` | Pure logic functions: `(Type, Type, Op) -> ResultType`. |
+
+#### 2.3. Lazy Diagnostics ("Check Fast, Explain Slow")
+Type checking happens in hot loops. Formatting error strings is expensive.
+1.  **Fast Path:** The solver returns simple Booleans or Enums (e.g., `Assignable`, `NotAssignable`).
+2.  **Slow Path:** Only if a check fails, we invoke `explain_failure`. This reconstructs the failure chain (e.g., "Property 'x' is missing") and generates a `PendingDiagnostic` with raw data arguments. String formatting happens only at the very end of compilation.
+
+### 3. The Checker: The Orchestrator
+The Checker (`check/` module) acts as the **Facade** that connects the AST (Parser) to the Type System (Solver). It is refactored from a monolithic state machine into specialized handlers.
+
+#### 3.1. Architecture
+The Checker follows the **Visitor Pattern**, traversing the AST and validating rules.
+
+```mermaid
+sequenceDiagram
+    participant AST as ThinParser
+    participant Check as Checker
+    participant Solv as Solver
+    
+    Check->>AST: Visit BinaryExpr(1 + "2")
+    Check->>Solv: Lower(1) -> Number
+    Check->>Solv: Lower("2") -> String
+    Check->>Solv: EvaluateOp(Number, String, Add)
+    Solv-->>Check: Result: String
+    Check->>AST: Cache Type(BinaryExpr) = String
+```
+
+#### 3.2. Responsibilities
+*   **Expression Checking:** delegates to `Solver::evaluate`.
+*   **Statement Checking:** Validates return statements against function signatures, checks control flow (unreachable code).
+*   **Declaration Checking:** Validates implementation matches overloads, interface adherence.
+
+### 4. Integration Summary
+*   **Parser** creates `ThinNodes`.
+*   **Binder** attaches `SymbolIds` to Nodes.
+*   **Checker** asks **Solver** to compute `TypeIds` based on Nodes + Symbols.
+*   **Solver** performs the math.
+
+This separation allows unit testing the Solver logic (e.g., "Is `string | number` assignable to `string`?") without needing to parse a full source file.
+
+## mission & Code Generation
+
+### 1. The Emitter: Single-Pass Transpilation
+The Emitter (`thin_emitter.rs`) converts the `ThinNode` AST into JavaScript source code. Unlike compilers that perform multiple AST-to-AST transformation passes (like Babel or SWC), this compiler performs **Print-Time Transformation**.
+
+#### 1.1. Design Philosophy
+*   **Zero Intermediate Allocations:** We do not generate a "High Level IR" or a "Low Level IR". We translate directly from the Read-Only Source AST to the Output String Buffer.
+*   **Context-Aware Output:** The emitter maintains a state stack (`EmitContext`) to handle contextual syntax differences (e.g., `await` is only valid inside `async` functions).
+
+### 2. The Writer Abstraction
+To solve the complexity of generating Source Maps while transforming code, raw string buffering is wrapped in a `SourceWriter` abstraction.
 
 ```rust
-pub struct ThinNodeArena {
-    pub nodes: Vec<ThinNode>,           // Headers only
-    pub identifiers: Vec<IdentifierData>,
-    pub binary_exprs: Vec<BinaryExprData>,
-    pub functions: Vec<FunctionData>,
-    // ... 60+ typed pools
+pub struct SourceWriter {
+    buffer: String,
+    source_map: SourceMapGenerator,
+    current_line: u32,
+    current_col: u32,
+}
+
+impl SourceWriter {
+    /// Writes text associated with a specific AST node.
+    /// Automatically generates a mapping entry.
+    pub fn write_node(&mut self, text: &str, node: &ThinNode) {
+        self.source_map.add_mapping(self.current_line, self.current_col, node.pos);
+        self.raw_write(text);
+    }
+
+    /// Writes syntax glue (keywords, parens) that doesn't map to source.
+    pub fn write(&mut self, text: &str) { ... }
 }
 ```
 
-### String Interning
+### 3. Transformations (Downleveling)
+Since we don't mutate the AST, transformations are handled by delegating control to specialized **Transform Emitters**.
 
-```rust
-pub struct Interner {
-    map: FxHashMap<String, Atom>,  // O(1) lookup
-    strings: Vec<String>,           // O(1) retrieval
-}
-// Comparison is integer comparison: Atom(u32)
-```
+#### 3.1. Strategy: Delegation
+When the main loop encounters a node that requires transformation (e.g., `ArrowFunction` when target is ES5), it hands control to a specific module.
 
-### Type Interning (Solver)
+*   **Native Emit:** `ArrowFunction` -> `(a) => a + 1`
+*   **ES5 Transform:** `ArrowES5Emitter::emit` -> `function(a) { return a + 1; }`
 
-```rust
-pub struct TypeId(pub u32);  // 4 bytes, O(1) equality
-// Same structure = same TypeId (structural deduplication)
-```
+#### 3.2. Implemented Transforms
+The `transforms/` module contains isolated logic for complex rewrites:
+1.  **Class Decomposition:** Converts `class` to IIFE + Prototype assignment + `__extends`.
+2.  **Namespace Merging:** Converts `namespace` to IIFE closures.
+3.  **Arrow Functions:** Captures lexical `this` by injecting `var _this = this;` in the parent scope and rewriting body references.
 
----
+### 4. Source Maps
+Source maps are generated simultaneously with emission.
 
-## Directory Structure
+*   **VLQ Encoding:** Optimized, allocation-free VLQ encoder writes directly to the mapping string.
+*   **Granularity:**
+    *   **High-Fidelity:** Identifiers, Literals, and Call Expressions map 1:1.
+    *   **Low-Fidelity:** Complex transforms (like Class ES5) map the entire generated construct to the starting position of the original class node.
 
-```
-wasm/src/
-├── lib.rs              # WASM entry point
-├── scanner_impl.rs     # Tokenization
-├── thin_parser.rs      # AST generation (5,100 LOC)
-├── thin_binder.rs      # Symbol binding (900 LOC)
-├── thin_checker.rs     # Type checking orchestration
-├── thin_emitter.rs     # Code generation
-├── parallel.rs         # Multi-file processing
-├── interner.rs         # String deduplication
-├── parser/
-│   ├── thin_node.rs    # ThinNode definition
-│   └── ast/            # Node data structures
-├── checker/
-│   ├── types/          # Type definitions
-│   └── relations.rs    # Type compatibility
-├── solver/             # Pure type logic (5,800 LOC)
-│   ├── intern.rs       # TypeInterner
-│   ├── subtype.rs      # SubtypeChecker
-│   ├── infer.rs        # InferenceContext
-│   ├── lower.rs        # AST → TypeId
-│   ├── evaluate.rs     # Conditional/mapped types
-│   └── diagnostics.rs  # Lazy error formatting
-├── services/           # IDE features
-└── transforms/         # ES2015+ downleveling
-```
+### 5. Runtime Helpers (`tslib`)
+To keep output size small, repetitive logic is extracted into helpers.
+1.  **Tracking:** The `HelpersNeeded` struct tracks which features are used during the emit pass (e.g., `extends`, `__awaiter`).
+2.  **Injection:** At the end of emission, the required helpers are prepended to the output file (or imported if using external helpers).
 
----
+### 6. Summary of the Full Pipeline
 
-## Testing
+The complete lifecycle of a file through the WASM compiler:
 
-```bash
-# Run all tests (Docker required)
-./wasm/test.sh
+1.  **Scanner:** `Source String` -> `Tokens` (Zero-copy).
+2.  **Parser:** `Tokens` -> `ThinNodeArena` (16-byte structs).
+3.  **Binder:** `ThinNodeArena` -> `SymbolTable` & `ScopeChain`.
+4.  **Checker:** `Nodes` + `Symbols` -> `Solver` -> `Diagnostics`.
+5.  **Emitter:** `Nodes` + `TransformLogic` -> `SourceWriter` -> `Output JS` + `.map`.
 
-# TypeScript integration
-npx hereby runtests-parallel
-
-# Baseline comparison
-node scripts/baseline-test-rust.mjs
-```
-
----
-
-## WASM Exports
-
-```rust
-#[wasm_bindgen(js_name = createScanner)]
-pub fn create_scanner(text: String, skip_trivia: bool) -> ScannerState;
-
-#[wasm_bindgen(js_name = createParser)]
-pub fn create_parser(file_name: String, source_text: String) -> ParserState;
-```
-
-```typescript
-// Usage from JavaScript
-const parser = wasm.createParser("test.ts", "const x = 42;");
-const sourceFile = parser.parse_source_file();
-```
-
----
-
-## Dependencies
-
-```toml
-wasm-bindgen = "0.2"    # WASM-JS interop
-serde = "1.0"           # Serialization
-rustc-hash = "2.0"      # FxHashMap (fast hashing)
-rayon = "1.10"          # Parallel iteration
-ena = "0.14"            # Union-Find (type inference)
-```
-
----
-
-## vs TypeScript-Go
-
-| Aspect | TypeScript-Go | TypeScript-WASM |
-|--------|---------------|-----------------|
-| Node Size | ~120 bytes | 16 bytes |
-| Cache Locality | ~0.5 nodes/line | 4 nodes/line |
-| Strings | GC strings | Interned Atoms (u32) |
-| Memory | GC with pauses | Arenas (O(1) cleanup) |
-| Parallelism | Goroutines + mutex | Rayon (compile-time safety) |
-| Type Equality | Pointer comparison | TypeId (u32) interning |
-
----
-
-See also:
-- [migration_plan.md](migration_plan.md) - Current status and next steps
-- [SOLVER.md](SOLVER.md) - Type system mathematical foundations
-- [NEW_ENGINE.md](NEW_ENGINE.md) - Query-based architecture
-- [TS_UNSOUNDNESS_CATALOG.md](TS_UNSOUNDNESS_CATALOG.md) - Intentional unsoundness rules
+This architecture ensures that the compiler remains memory-efficient and cache-friendly, crucial for performance within the WebAssembly linear memory model.
