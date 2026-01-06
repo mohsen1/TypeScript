@@ -9,7 +9,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
 **Independence:** MEDIUM - Needs stable TypeKey definitions from Track A. Heavy AST interaction.
 
 ## Current Status
-🟡 **In Progress** - Phase 5 interface merging and declaration-space filtering added; BigInt literal test blocked by parser.
+🟡 **In Progress** - Interface merging wired into checker type resolution; 4111 tests enabled; BigInt literal test blocked by parser.
 
 ## Tasks
 
@@ -83,17 +83,20 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Method overloads accumulate
 
 ### Phase 6: Integration
-- [ ] Connect to binder
+- [x] Connect to binder
   - Binder provides SymbolId -> AST node mapping
   - Lower uses that to find type annotation nodes
-- [ ] Implement `get_type_of_symbol(symbol: SymbolId) -> TypeId`
+- [x] Implement `get_type_of_symbol(symbol: SymbolId) -> TypeId`
   - Check if already lowered (cache)
   - Otherwise, lower the symbol's type annotation
   - Store in cache for next lookup
 - [ ] Add comprehensive tests
-  - Test: Lowering full source file
-  - Test: Cross-module type references
-  - Test: Circular type references (handle gracefully)
+  - [x] Test: Interface index signature property access (4111)
+  - [x] Test: Explicit property bypasses 4111
+  - [x] Test: Union with index signature triggers 4111
+  - [ ] Test: Lowering full source file
+  - [ ] Test: Cross-module type references
+  - [ ] Test: Circular type references (handle gracefully)
 
 ## Architecture Notes
 - All strings MUST go through interner.intern_string() -> Atom
