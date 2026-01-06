@@ -42,6 +42,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Implement constraint system
   - [x] Lower/upper bounds tracked per inference var
   - [x] Constraints merged on var unification
+  - [x] Store constraints in Vec by var id to avoid HashMap overhead
 - [x] Implement `resolve_constraints() -> Result<(), Error>`
   - [x] Check for conflicts (upper bound not assignable to lower bound)
   - [x] Finalize inference variables to concrete types
