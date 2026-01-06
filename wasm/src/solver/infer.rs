@@ -13,7 +13,10 @@
 use ena::unify::{InPlaceUnificationTable, UnifyKey, UnifyValue, NoError};
 use std::sync::Arc;
 use crate::solver::types::*;
-use crate::solver::intern::TypeInterner;
+use crate::solver::TypeDatabase;
+
+#[cfg(test)]
+use crate::solver::TypeInterner;
 
 /// An inference variable representing an unknown type.
 /// These are created when instantiating generic functions.
@@ -111,7 +114,7 @@ impl ConstraintSet {
 
 /// Type inference context for a single function call or expression.
 pub struct InferenceContext<'a> {
-    interner: &'a TypeInterner,
+    interner: &'a dyn TypeDatabase,
     /// Unification table for inference variables
     table: InPlaceUnificationTable<InferenceVar>,
     /// Map from type parameter names to inference variables
@@ -121,7 +124,7 @@ pub struct InferenceContext<'a> {
 }
 
 impl<'a> InferenceContext<'a> {
-    pub fn new(interner: &'a TypeInterner) -> Self {
+    pub fn new(interner: &'a dyn TypeDatabase) -> Self {
         InferenceContext {
             interner,
             table: InPlaceUnificationTable::new(),
@@ -225,7 +228,7 @@ impl<'a> InferenceContext<'a> {
 
     /// Get the interner reference
     #[allow(dead_code)]
-    pub fn interner(&self) -> &TypeInterner {
+    pub fn interner(&self) -> &dyn TypeDatabase {
         self.interner
     }
 

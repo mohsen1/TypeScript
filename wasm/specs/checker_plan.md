@@ -33,7 +33,7 @@ Our focus is to make wasm checker complete
 - [x] **Remove unsafe symbol hash fallback** (require binder-based resolver)
 - [x] **Lower type literals with signatures/indexers** (call/construct/index in `{ ... }`)
 - [x] **Respect intrinsic shadowing** (resolve symbols before intrinsic keyword match)
-- [ ] **Define TypeDatabase Trait** (Preparation for Salsa)
+- [x] **Define TypeDatabase Trait** (Preparation for Salsa)
 
 **Status:** ✅ `./wasm/test.sh` passes.
 **Context:** The `TypeKey` refactor (String -> Atom) was half-finished and broke solver logic; this is now addressed, with follow-up tasks captured above.

@@ -12,7 +12,10 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 use crate::solver::types::*;
-use crate::solver::intern::TypeInterner;
+use crate::solver::TypeDatabase;
+
+#[cfg(test)]
+use crate::solver::TypeInterner;
 
 /// A substitution map from type parameter names to concrete types.
 #[derive(Clone, Debug, Default)]
@@ -33,7 +36,7 @@ impl TypeSubstitution {
     ///
     /// `type_params` - The declared type parameters (e.g., `<T, U>`)
     /// `type_args` - The provided type arguments (e.g., `<string, number>`)
-    pub fn from_args(interner: &crate::solver::intern::TypeInterner, type_params: &[TypeParamInfo], type_args: &[TypeId]) -> Self {
+    pub fn from_args(interner: &dyn TypeDatabase, type_params: &[TypeParamInfo], type_args: &[TypeId]) -> Self {
         let mut map = HashMap::new();
         for (param, &arg) in type_params.iter().zip(type_args.iter()) {
             // Resolve Atom to Arc<str> for substitution map
@@ -66,7 +69,7 @@ impl TypeSubstitution {
 
 /// Instantiator for applying type substitutions.
 pub struct TypeInstantiator<'a> {
-    interner: &'a TypeInterner,
+    interner: &'a dyn TypeDatabase,
     substitution: &'a TypeSubstitution,
     /// Track visited types to handle cycles
     visiting: HashMap<TypeId, TypeId>,
@@ -74,7 +77,7 @@ pub struct TypeInstantiator<'a> {
 
 impl<'a> TypeInstantiator<'a> {
     /// Create a new instantiator.
-    pub fn new(interner: &'a TypeInterner, substitution: &'a TypeSubstitution) -> Self {
+    pub fn new(interner: &'a dyn TypeDatabase, substitution: &'a TypeSubstitution) -> Self {
         TypeInstantiator {
             interner,
             substitution,
@@ -362,7 +365,7 @@ impl<'a> TypeInstantiator<'a> {
 
 /// Convenience function for instantiating a type with a substitution.
 pub fn instantiate_type(
-    interner: &TypeInterner,
+    interner: &dyn TypeDatabase,
     type_id: TypeId,
     substitution: &TypeSubstitution,
 ) -> TypeId {
@@ -375,7 +378,7 @@ pub fn instantiate_type(
 
 /// Convenience function for instantiating a generic type with type arguments.
 pub fn instantiate_generic(
-    interner: &TypeInterner,
+    interner: &dyn TypeDatabase,
     type_id: TypeId,
     type_params: &[TypeParamInfo],
     type_args: &[TypeId],

@@ -11,21 +11,24 @@ use crate::parser::NodeList;
 use crate::scanner::SyntaxKind;
 use crate::parser::syntax_kind_ext;
 use crate::solver::types::*;
-use crate::solver::intern::TypeInterner;
+use crate::solver::TypeDatabase;
 use crate::interner::Atom;
+
+#[cfg(test)]
+use crate::solver::TypeInterner;
 
 /// Type lowering context.
 /// Converts AST type nodes into interned TypeIds.
 pub struct TypeLowering<'a> {
     arena: &'a ThinNodeArena,
-    interner: &'a TypeInterner,
+    interner: &'a dyn TypeDatabase,
     /// Optional symbol resolver - resolves identifier nodes to SymbolIds.
     /// If provided, this enables correct abstract class detection.
     resolver: Option<&'a dyn Fn(NodeIndex) -> Option<u32>>,
 }
 
 impl<'a> TypeLowering<'a> {
-    pub fn new(arena: &'a ThinNodeArena, interner: &'a TypeInterner) -> Self {
+    pub fn new(arena: &'a ThinNodeArena, interner: &'a dyn TypeDatabase) -> Self {
         TypeLowering { arena, interner, resolver: None }
     }
 
@@ -33,7 +36,7 @@ impl<'a> TypeLowering<'a> {
     /// The resolver converts identifier names to actual SymbolIds from the binder.
     pub fn with_resolver(
         arena: &'a ThinNodeArena,
-        interner: &'a TypeInterner,
+        interner: &'a dyn TypeDatabase,
         resolver: &'a dyn Fn(NodeIndex) -> Option<u32>,
     ) -> Self {
         TypeLowering { arena, interner, resolver: Some(resolver) }
