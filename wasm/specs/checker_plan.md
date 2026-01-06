@@ -20,14 +20,23 @@ Pass tests/cases/compiler.
 Our focus is to make wasm checker complete
 
 ### Immediate Priorities
-- [ ] **Fix Atom Refactor Compilation Errors** (High Priority)
+- [x] **Fix Atom Refactor Compilation Errors** (High Priority)
   - Fix `solver/lower.rs` (intern strings from AST)
   - Fix `solver/diagnostics.rs` (resolve atoms for error messages)
   - Fix `solver/subtype.rs` (property name comparisons)
-- [ ] **Define TypeDatabase Trait** (Preparation for Salsa)
+- [x] **Shard TypeInterner** (Architecture perf requirement)
+- [x] **Lower tuple metadata** (named elements, rest, optional)
+- [x] **Fix template literal type spans** (TemplateLiteralType lowering)
+- [x] **Lower function parameter names** (ParamInfo.name)
+- [x] **Lower mapped types fully** (constraint + modifiers)
+- [x] **Handle generic type arguments** (TypeRef instantiation or TypeApplication)
+- [x] **Remove unsafe symbol hash fallback** (require binder-based resolver)
+- [x] **Lower type literals with signatures/indexers** (call/construct/index in `{ ... }`)
+- [x] **Respect intrinsic shadowing** (resolve symbols before intrinsic keyword match)
+- [x] **Define TypeDatabase Trait** (Preparation for Salsa)
 
-**Status:** 🚧 **Broken Build**. The `TypeKey` refactor (String -> Atom) is half-finished.
-**Context:** You changed `TypeKey` to use `Atom` (u32) instead of `Arc<str>`, which broke the solver logic that expects strings. This is the **highest priority** task in the entire repo.
+**Status:** ✅ `./wasm/test.sh` passes.
+**Context:** The `TypeKey` refactor (String -> Atom) was half-finished and broke solver logic; this is now addressed, with follow-up tasks captured above.
 
 **Step 1 (Fix Build):**
 *   **Goal:** Fix ~40 compilation errors in `wasm/src/solver/`.
