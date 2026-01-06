@@ -45,7 +45,8 @@ pub struct ThinCheckerState<'a> {
 
     /// Type interner for structural type interning.
     /// Uses solver's TypeInterner for O(1) type equality.
-    pub types: TypeInterner,
+    /// Shared across threads for global type deduplication.
+    pub types: &'a TypeInterner,
 
     /// Cached types for symbols.
     symbol_types: FxHashMap<SymbolId, TypeId>,
@@ -97,6 +98,24 @@ pub struct ThinCheckerState<'a> {
 
     /// Stack of expected return types for functions (for return statement checking).
     return_type_stack: Vec<TypeId>,
+
+    /// Current enclosing class info (name, static member names) for error 2662 suggestion.
+    /// When inside a class method/constructor, this helps suggest static members.
+    enclosing_class: Option<EnclosingClassInfo>,
+}
+
+/// Info about the enclosing class for static member suggestions and abstract property checks.
+/// Uses symbol flags for efficient lookups (O(1) vs O(n) string comparison).
+#[derive(Clone)]
+struct EnclosingClassInfo {
+    /// Name of the class.
+    name: String,
+    /// Member node indices for symbol lookup.
+    member_nodes: Vec<NodeIndex>,
+    /// Whether we're in a constructor (for error 2715 checking).
+    in_constructor: bool,
+    /// Whether this is a `declare class` (ambient context for error 1183).
+    is_declared: bool,
 }
 
 /// Maximum depth for recursive type instantiation.
@@ -107,15 +126,22 @@ pub const MAX_CALL_DEPTH: u32 = 20;
 
 impl<'a> ThinCheckerState<'a> {
     /// Create a new ThinCheckerState.
+    ///
+    /// # Arguments
+    /// * `arena` - The AST node arena
+    /// * `binder` - The binder state with symbols
+    /// * `types` - The shared type interner (for thread-safe type deduplication)
+    /// * `file_name` - The source file name
     pub fn new(
         arena: &'a ThinNodeArena,
         binder: &'a ThinBinderState,
+        types: &'a TypeInterner,
         file_name: String,
     ) -> Self {
         ThinCheckerState {
             arena,
             binder,
-            types: TypeInterner::new(),
+            types,
             symbol_types: FxHashMap::default(),
             node_types: FxHashMap::default(),
             type_parameter_names: FxHashMap::default(),
@@ -132,6 +158,7 @@ impl<'a> ThinCheckerState<'a> {
             call_depth: RefCell::new(0),
             local_scope_stack: Vec::new(),
             return_type_stack: Vec::new(),
+            enclosing_class: None,
         }
     }
 
@@ -558,6 +585,18 @@ impl<'a> ThinCheckerState<'a> {
             | "queueMicrotask" | "structuredClone" | "atob" | "btoa"
             | "performance" | "crypto" | "navigator" | "location" | "history" => TypeId::ANY,
             _ => {
+                // Check if we're inside a class and the name matches a static member (error 2662)
+                // Clone values to avoid borrow issues
+                if let Some(ref class_info) = self.enclosing_class.clone() {
+                    if self.is_static_member(&class_info.member_nodes, name) {
+                        self.error_cannot_find_name_static_member_at(
+                            name,
+                            &class_info.name,
+                            idx,
+                        );
+                        return TypeId::ERROR;
+                    }
+                }
                 // Report "cannot find name" error
                 self.error_cannot_find_name_at(name, idx);
                 TypeId::ERROR
@@ -894,6 +933,29 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
+        // Get the property name first (needed for abstract property check regardless of object type)
+        let Some(name_node) = self.arena.get(access.name_or_argument) else {
+            return TypeId::ANY;
+        };
+
+        // Check for abstract property access in constructor BEFORE evaluating types (error 2715)
+        // This must happen even when `this` has type ANY
+        if let Some(ident) = self.arena.get_identifier(name_node) {
+            let property_name = &ident.escaped_text;
+
+            if self.is_this_expression(access.expression) {
+                if let Some(ref class_info) = self.enclosing_class.clone() {
+                    if class_info.in_constructor && self.is_abstract_member(&class_info.member_nodes, property_name) {
+                        self.error_abstract_property_in_constructor(
+                            property_name,
+                            &class_info.name,
+                            access.name_or_argument,
+                        );
+                    }
+                }
+            }
+        }
+
         // Get the type of the object
         let object_type = self.get_type_of_node(access.expression);
 
@@ -901,11 +963,6 @@ impl<'a> ThinCheckerState<'a> {
         if object_type == TypeId::ANY || object_type == TypeId::ERROR {
             return TypeId::ANY;
         }
-
-        // Get the property name
-        let Some(name_node) = self.arena.get(access.name_or_argument) else {
-            return TypeId::ANY;
-        };
 
         // If it's an identifier, look up the property
         if let Some(ident) = self.arena.get_identifier(name_node) {
@@ -1591,6 +1648,68 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Report error 2662: Cannot find name 'X'. Did you mean the static member 'C.X'?
+    pub fn error_cannot_find_name_static_member_at(
+        &mut self,
+        name: &str,
+        class_name: &str,
+        idx: NodeIndex,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        if let Some(loc) = self.get_source_location(idx) {
+            let message = format!(
+                "Cannot find name '{}'. Did you mean the static member '{}.{}'?",
+                name, class_name, name
+            );
+            self.diagnostics.push(Diagnostic {
+                code: diagnostic_codes::CANNOT_FIND_NAME_DID_YOU_MEAN_STATIC,
+                category: crate::checker::state::DiagnosticCategory::Error,
+                message_text: message,
+                file: self.file_name.clone(),
+                start: loc.start,
+                length: loc.length(),
+                related_information: Vec::new(),
+            });
+        }
+    }
+
+    /// Report error 2715: Abstract property 'X' in class 'C' cannot be accessed in the constructor.
+    pub fn error_abstract_property_in_constructor(
+        &mut self,
+        prop_name: &str,
+        class_name: &str,
+        idx: NodeIndex,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        if let Some(loc) = self.get_source_location(idx) {
+            let message = format!(
+                "Abstract property '{}' in class '{}' cannot be accessed in the constructor.",
+                prop_name, class_name
+            );
+            self.diagnostics.push(Diagnostic {
+                code: diagnostic_codes::ABSTRACT_PROPERTY_IN_CONSTRUCTOR,
+                category: crate::checker::state::DiagnosticCategory::Error,
+                message_text: message,
+                file: self.file_name.clone(),
+                start: loc.start,
+                length: loc.length(),
+                related_information: Vec::new(),
+            });
+        }
+    }
+
+    /// Check if a node is a `this` expression.
+    fn is_this_expression(&self, idx: NodeIndex) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(node) = self.arena.get(idx) {
+            node.kind == SyntaxKind::ThisKeyword as u16
+        } else {
+            false
+        }
+    }
+
     /// Report an argument count mismatch error using solver diagnostics with source tracking.
     pub fn error_argument_count_mismatch_at(
         &mut self,
@@ -1784,6 +1903,22 @@ impl<'a> ThinCheckerState<'a> {
                         }
 
                         self.check_statement(func.body);
+
+                        // Check for error 2355: function with return type must return a value
+                        // Only check if there's an explicit return type annotation
+                        let has_type_annotation = !func.type_annotation.is_none();
+                        let requires_return = self.requires_return_value(return_type);
+                        let has_return = self.body_has_return_with_value(func.body);
+
+                        if has_type_annotation && requires_return && !has_return {
+                            use crate::checker::types::diagnostics::diagnostic_codes;
+                            self.error_at_node(
+                                func.type_annotation,
+                                "A function whose declared type is neither 'undefined', 'void', nor 'any' must return a value.",
+                                diagnostic_codes::FUNCTION_LACKS_RETURN_TYPE,
+                            );
+                        }
+
                         self.pop_return_type();
                         self.pop_local_scope();
                     }
@@ -2178,6 +2313,32 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
+        // Collect class name and static members for error 2662 suggestions
+        let class_name = if !class.name.is_none() {
+            if let Some(name_node) = self.arena.get(class.name) {
+                if let Some(ident) = self.arena.get_identifier(name_node) {
+                    Some(ident.escaped_text.clone())
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        // Save previous enclosing class and set current
+        let prev_enclosing_class = self.enclosing_class.take();
+        if let Some(name) = class_name {
+            self.enclosing_class = Some(EnclosingClassInfo {
+                name,
+                member_nodes: class.members.nodes.clone(),
+                in_constructor: false,
+                is_declared,
+            });
+        }
+
         // Check each class member
         for &member_idx in &class.members.nodes {
             self.check_class_member(member_idx);
@@ -2188,6 +2349,9 @@ impl<'a> ThinCheckerState<'a> {
         if !is_declared {
             self.check_class_member_implementations(&class.members.nodes);
         }
+
+        // Restore previous enclosing class
+        self.enclosing_class = prev_enclosing_class;
 
         self.pop_local_scope();
     }
@@ -2272,6 +2436,63 @@ impl<'a> ThinCheckerState<'a> {
             for &mod_idx in &mods.nodes {
                 if let Some(mod_node) = self.arena.get(mod_idx) {
                     if mod_node.kind == SyntaxKind::AbstractKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Get the const modifier node from a list of modifiers, if present.
+    /// Returns the NodeIndex of the const modifier for error reporting.
+    fn get_const_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> Option<NodeIndex> {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::ConstKeyword as u16 {
+                        return Some(mod_idx);
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    /// Check if a member with the given name is static by looking up its symbol flags.
+    /// Uses the binder's symbol information for efficient O(1) flag checks.
+    fn is_static_member(&self, member_nodes: &[NodeIndex], name: &str) -> bool {
+        use crate::binder::symbol_flags;
+
+        for &member_idx in member_nodes {
+            // Get symbol for this member
+            if let Some(sym_id) = self.binder.get_node_symbol(member_idx) {
+                if let Some(symbol) = self.binder.get_symbol(sym_id) {
+                    // Check if name matches and symbol has STATIC flag
+                    if symbol.escaped_name == name && (symbol.flags & symbol_flags::STATIC != 0) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if a member with the given name is an abstract property by looking up its symbol flags.
+    /// Only checks properties (not methods) because accessing this.abstractMethod() in constructor is allowed.
+    fn is_abstract_member(&self, member_nodes: &[NodeIndex], name: &str) -> bool {
+        use crate::binder::symbol_flags;
+
+        for &member_idx in member_nodes {
+            // Get symbol for this member
+            if let Some(sym_id) = self.binder.get_node_symbol(member_idx) {
+                if let Some(symbol) = self.binder.get_symbol(sym_id) {
+                    // Check if name matches and symbol has ABSTRACT flag (property only)
+                    if symbol.escaped_name == name
+                        && (symbol.flags & symbol_flags::ABSTRACT != 0)
+                        && (symbol.flags & symbol_flags::PROPERTY != 0)
+                    {
                         return true;
                     }
                 }
@@ -2772,6 +2993,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check a property declaration.
     fn check_property_declaration(&mut self, member_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
         let Some(node) = self.arena.get(member_idx) else {
             return;
         };
@@ -2779,6 +3002,15 @@ impl<'a> ThinCheckerState<'a> {
         let Some(prop) = self.arena.get_property_decl(node) else {
             return;
         };
+
+        // Error 1248: A class member cannot have the 'const' keyword
+        if let Some(const_mod) = self.get_const_modifier(&prop.modifiers) {
+            self.error_at_node(
+                const_mod,
+                "A class member cannot have the 'const' keyword.",
+                diagnostic_codes::CONST_MODIFIER_CANNOT_APPEAR_ON_A_CLASS_ELEMENT,
+            );
+        }
 
         // If property has type annotation and initializer, check type compatibility
         if !prop.type_annotation.is_none() && !prop.initializer.is_none() {
@@ -2796,6 +3028,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check a method declaration.
     fn check_method_declaration(&mut self, member_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
         let Some(node) = self.arena.get(member_idx) else {
             return;
         };
@@ -2803,6 +3037,29 @@ impl<'a> ThinCheckerState<'a> {
         let Some(method) = self.arena.get_method_decl(node) else {
             return;
         };
+
+        // Error 1248: A class member cannot have the 'const' keyword
+        if let Some(const_mod) = self.get_const_modifier(&method.modifiers) {
+            self.error_at_node(
+                const_mod,
+                "A class member cannot have the 'const' keyword.",
+                diagnostic_codes::CONST_MODIFIER_CANNOT_APPEAR_ON_A_CLASS_ELEMENT,
+            );
+        }
+
+        // Error 1183: An implementation cannot be declared in ambient contexts
+        // Check if we're in a declared class and the method has a body
+        if !method.body.is_none() {
+            if let Some(ref class_info) = self.enclosing_class {
+                if class_info.is_declared {
+                    self.error_at_node(
+                        member_idx,
+                        "An implementation cannot be declared in ambient contexts.",
+                        diagnostic_codes::IMPLEMENTATION_CANNOT_BE_IN_AMBIENT_CONTEXT,
+                    );
+                }
+            }
+        }
 
         // Enter a new local scope for the method body
         self.push_local_scope();
@@ -2864,6 +3121,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check a constructor declaration.
     fn check_constructor_declaration(&mut self, member_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
         let Some(node) = self.arena.get(member_idx) else {
             return;
         };
@@ -2871,6 +3130,20 @@ impl<'a> ThinCheckerState<'a> {
         let Some(ctor) = self.arena.get_constructor(node) else {
             return;
         };
+
+        // Error 1183: An implementation cannot be declared in ambient contexts
+        // Check if we're in a declared class and the constructor has a body
+        if !ctor.body.is_none() {
+            if let Some(ref class_info) = self.enclosing_class {
+                if class_info.is_declared {
+                    self.error_at_node(
+                        member_idx,
+                        "An implementation cannot be declared in ambient contexts.",
+                        diagnostic_codes::IMPLEMENTATION_CANNOT_BE_IN_AMBIENT_CONTEXT,
+                    );
+                }
+            }
+        }
 
         // Check for parameter properties in constructor overload signatures (error 2369)
         // Parameter properties are only allowed in constructor implementations (with body)
@@ -2912,9 +3185,19 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
+        // Set in_constructor flag for abstract property checks (error 2715)
+        if let Some(ref mut class_info) = self.enclosing_class {
+            class_info.in_constructor = true;
+        }
+
         // Check constructor body
         if !ctor.body.is_none() {
             self.check_statement(ctor.body);
+        }
+
+        // Reset in_constructor flag
+        if let Some(ref mut class_info) = self.enclosing_class {
+            class_info.in_constructor = false;
         }
 
         self.pop_local_scope();
@@ -2922,6 +3205,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check an accessor declaration (getter/setter).
     fn check_accessor_declaration(&mut self, member_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
         let Some(node) = self.arena.get(member_idx) else {
             return;
         };
@@ -2929,6 +3214,20 @@ impl<'a> ThinCheckerState<'a> {
         let Some(accessor) = self.arena.get_accessor(node) else {
             return;
         };
+
+        // Error 1183: An implementation cannot be declared in ambient contexts
+        // Check if we're in a declared class and the accessor has a body
+        if !accessor.body.is_none() {
+            if let Some(ref class_info) = self.enclosing_class {
+                if class_info.is_declared {
+                    self.error_at_node(
+                        member_idx,
+                        "An implementation cannot be declared in ambient contexts.",
+                        diagnostic_codes::IMPLEMENTATION_CANNOT_BE_IN_AMBIENT_CONTEXT,
+                    );
+                }
+            }
+        }
 
         // Enter a new local scope for the accessor body
         self.push_local_scope();
@@ -2968,6 +3267,11 @@ impl<'a> ThinCheckerState<'a> {
         // Parameter properties are only allowed in constructors, not in accessors
         self.check_parameter_properties(&accessor.parameters.nodes);
 
+        // For setters, check parameter constraints (1052, 1053)
+        if node.kind == syntax_kind_ext::SET_ACCESSOR {
+            self.check_setter_parameter(&accessor.parameters.nodes);
+        }
+
         // Check accessor body
         if !accessor.body.is_none() {
             self.check_statement(accessor.body);
@@ -2975,5 +3279,177 @@ impl<'a> ThinCheckerState<'a> {
 
         self.pop_return_type();
         self.pop_local_scope();
+    }
+
+    /// Check setter parameter constraints (1052, 1053).
+    /// - A 'set' accessor parameter cannot have an initializer
+    /// - A 'set' accessor cannot have rest parameter
+    fn check_setter_parameter(&mut self, parameters: &[NodeIndex]) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        for &param_idx in parameters {
+            let Some(param_node) = self.arena.get(param_idx) else {
+                continue;
+            };
+            let Some(param) = self.arena.get_parameter(param_node) else {
+                continue;
+            };
+
+            // Check for initializer (error 1052)
+            if !param.initializer.is_none() {
+                self.error_at_node(
+                    param.name,
+                    "A 'set' accessor parameter cannot have an initializer.",
+                    diagnostic_codes::SETTER_PARAMETER_CANNOT_HAVE_INITIALIZER,
+                );
+            }
+
+            // Check for rest parameter (error 1053)
+            if param.dot_dot_dot_token {
+                self.error_at_node(
+                    param_idx,
+                    "A 'set' accessor cannot have rest parameter.",
+                    diagnostic_codes::SETTER_CANNOT_HAVE_REST_PARAMETER,
+                );
+            }
+        }
+    }
+
+    /// Check if a return type requires a return value.
+    /// Returns false for void, undefined, any, and never.
+    fn requires_return_value(&self, return_type: TypeId) -> bool {
+        use crate::solver::TypeKey;
+
+        // void, undefined, any, never don't require a return value
+        if return_type == TypeId::VOID
+            || return_type == TypeId::UNDEFINED
+            || return_type == TypeId::ANY
+            || return_type == TypeId::NEVER
+        {
+            return false;
+        }
+
+        // Check for union types that include void/undefined
+        if let Some(TypeKey::Union(members)) = self.types.lookup(return_type) {
+            for &member in &members {
+                if member == TypeId::VOID || member == TypeId::UNDEFINED {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
+    /// Check if a function body has at least one return statement with a value.
+    /// This is a simplified check - doesn't do full control flow analysis.
+    fn body_has_return_with_value(&self, body_idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(body_idx) else {
+            return false;
+        };
+
+        // For block bodies, check all statements
+        if node.kind == syntax_kind_ext::BLOCK {
+            if let Some(block) = self.arena.get_block(node) {
+                return self.statements_have_return_with_value(&block.statements.nodes);
+            }
+        }
+
+        false
+    }
+
+    /// Check if any statement in the list contains a return with a value.
+    fn statements_have_return_with_value(&self, statements: &[NodeIndex]) -> bool {
+        for &stmt_idx in statements {
+            if self.statement_has_return_with_value(stmt_idx) {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Check if a statement contains a return with a value.
+    fn statement_has_return_with_value(&self, stmt_idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(stmt_idx) else {
+            return false;
+        };
+
+        match node.kind {
+            syntax_kind_ext::RETURN_STATEMENT => {
+                if let Some(return_data) = self.arena.get_return_statement(node) {
+                    // Return with expression
+                    return !return_data.expression.is_none();
+                }
+                false
+            }
+            syntax_kind_ext::BLOCK => {
+                if let Some(block) = self.arena.get_block(node) {
+                    return self.statements_have_return_with_value(&block.statements.nodes);
+                }
+                false
+            }
+            syntax_kind_ext::IF_STATEMENT => {
+                if let Some(if_data) = self.arena.get_if_statement(node) {
+                    // Check both then and else branches
+                    let then_has = self.statement_has_return_with_value(if_data.then_statement);
+                    let else_has = if !if_data.else_statement.is_none() {
+                        self.statement_has_return_with_value(if_data.else_statement)
+                    } else {
+                        false
+                    };
+                    return then_has || else_has;
+                }
+                false
+            }
+            syntax_kind_ext::SWITCH_STATEMENT => {
+                if let Some(switch_data) = self.arena.get_switch(node) {
+                    if let Some(case_block_node) = self.arena.get(switch_data.case_block) {
+                        // Case block is stored as a Block containing case clauses
+                        if let Some(case_block) = self.arena.get_block(case_block_node) {
+                            for &clause_idx in &case_block.statements.nodes {
+                                if let Some(clause_node) = self.arena.get(clause_idx) {
+                                    if let Some(clause) = self.arena.get_case_clause(clause_node) {
+                                        if self.statements_have_return_with_value(&clause.statements.nodes) {
+                                            return true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                false
+            }
+            syntax_kind_ext::TRY_STATEMENT => {
+                if let Some(try_data) = self.arena.get_try(node) {
+                    let try_has = self.statement_has_return_with_value(try_data.try_block);
+                    let catch_has = if !try_data.catch_clause.is_none() {
+                        self.statement_has_return_with_value(try_data.catch_clause)
+                    } else {
+                        false
+                    };
+                    let finally_has = if !try_data.finally_block.is_none() {
+                        self.statement_has_return_with_value(try_data.finally_block)
+                    } else {
+                        false
+                    };
+                    return try_has || catch_has || finally_has;
+                }
+                false
+            }
+            syntax_kind_ext::CATCH_CLAUSE => {
+                if let Some(catch_data) = self.arena.get_catch_clause(node) {
+                    return self.statement_has_return_with_value(catch_data.block);
+                }
+                false
+            }
+            syntax_kind_ext::WHILE_STATEMENT | syntax_kind_ext::DO_STATEMENT | syntax_kind_ext::FOR_STATEMENT | syntax_kind_ext::FOR_IN_STATEMENT | syntax_kind_ext::FOR_OF_STATEMENT => {
+                if let Some(loop_data) = self.arena.get_loop(node) {
+                    return self.statement_has_return_with_value(loop_data.statement);
+                }
+                false
+            }
+            _ => false,
+        }
     }
 }

@@ -1770,7 +1770,7 @@ impl ThinParserState {
                     self.next_token();
                     self.arena.create_modifier(SyntaxKind::AccessorKeyword, start_pos)
                 }
-                // Handle const as a modifier (e.g., for const enums context, but error in class members)
+                // Handle const as a modifier - error is reported by checker (1248)
                 SyntaxKind::ConstKeyword => {
                     self.next_token();
                     self.arena.create_modifier(SyntaxKind::ConstKeyword, start_pos)
@@ -1982,7 +1982,11 @@ impl ThinParserState {
                      self.is_token(SyntaxKind::OpenBracketToken) {
             self.parse_property_name()
         } else {
-            // Skip unknown token
+            // Report error for unknown token
+            self.parse_error_at_current_token(
+                "Unexpected token. A constructor, method, accessor, or property was expected.",
+                diagnostic_codes::UNEXPECTED_TOKEN_CLASS_MEMBER
+            );
             self.next_token();
             return NodeIndex::NONE;
         };

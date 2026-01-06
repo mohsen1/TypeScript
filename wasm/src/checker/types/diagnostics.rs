@@ -74,9 +74,11 @@ pub mod diagnostic_codes {
     pub const UNEXPECTED_TOKEN: u32 = 1012;
     pub const REST_PARAMETER_MUST_BE_LAST: u32 = 1014;
     pub const PARAMETER_CANNOT_HAVE_INITIALIZER: u32 = 1015;
-    pub const SETTER_CANNOT_HAVE_RETURN_TYPE: u32 = 1095;
-    pub const GETTER_MUST_NOT_HAVE_PARAMETERS: u32 = 1054;
     pub const SETTER_MUST_HAVE_EXACTLY_ONE_PARAMETER: u32 = 1049;
+    pub const SETTER_PARAMETER_CANNOT_HAVE_INITIALIZER: u32 = 1052;  // A 'set' accessor parameter cannot have an initializer.
+    pub const SETTER_CANNOT_HAVE_REST_PARAMETER: u32 = 1053;  // A 'set' accessor cannot have rest parameter.
+    pub const GETTER_MUST_NOT_HAVE_PARAMETERS: u32 = 1054;
+    pub const SETTER_CANNOT_HAVE_RETURN_TYPE: u32 = 1095;
     pub const TYPE_PARAMETER_LIST_CANNOT_BE_EMPTY: u32 = 1098;
     pub const EXPRESSION_EXPECTED: u32 = 1109;
     pub const TYPE_EXPECTED: u32 = 1110;
@@ -87,7 +89,9 @@ pub mod diagnostic_codes {
     pub const STATEMENT_EXPECTED: u32 = 1129;
     pub const CATCH_OR_FINALLY_EXPECTED: u32 = 1472;
     pub const DECORATORS_NOT_VALID_HERE: u32 = 1206;
+    pub const IMPLEMENTATION_CANNOT_BE_IN_AMBIENT_CONTEXT: u32 = 1183;  // An implementation cannot be declared in ambient contexts.
     pub const MODIFIERS_NOT_ALLOWED_HERE: u32 = 1184;
+    pub const CONST_MODIFIER_CANNOT_APPEAR_ON_A_CLASS_ELEMENT: u32 = 1248;  // 'const' modifier cannot appear on a class element.
     pub const UNEXPECTED_TOKEN_CLASS_MEMBER: u32 = 1068;  // Unexpected token. A constructor, method, accessor, or property was expected.
     pub const DECLARATION_OR_STATEMENT_EXPECTED: u32 = 1128;  // Declaration or statement expected.
     pub const VAR_DECLARATION_NOT_ALLOWED: u32 = 1440;  // Variable declaration not allowed at this location.
@@ -133,6 +137,8 @@ pub mod diagnostic_codes {
     // Class errors
     pub const CLASS_NAME_CANNOT_BE_ANY: u32 = 2414;  // Class name cannot be 'any'.
     pub const CANNOT_CREATE_INSTANCE_OF_ABSTRACT_CLASS: u32 = 2511;  // Cannot create an instance of an abstract class.
+    pub const CANNOT_FIND_NAME_DID_YOU_MEAN_STATIC: u32 = 2662;  // Cannot find name 'X'. Did you mean the static member 'C.X'?
+    pub const ABSTRACT_PROPERTY_IN_CONSTRUCTOR: u32 = 2715;  // Abstract property 'X' in class 'C' cannot be accessed in the constructor.
     pub const SUPER_ONLY_IN_DERIVED_CLASS: u32 = 2335;
     pub const THIS_CANNOT_BE_REFERENCED: u32 = 2332;
     pub const PROPERTY_HAS_NO_INITIALIZER: u32 = 2564;

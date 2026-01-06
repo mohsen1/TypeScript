@@ -131,6 +131,7 @@ use crate::thin_parser::ThinParserState;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
 use crate::thin_emitter::ThinPrinter;
+use crate::solver::TypeInterner;
 
 /// High-performance parser using ThinNode architecture (16 bytes/node).
 /// This is the optimized path for Phase 8 test suite evaluation.
@@ -139,6 +140,9 @@ pub struct ThinParser {
     parser: ThinParserState,
     source_file_idx: Option<parser::NodeIndex>,
     binder: Option<ThinBinderState>,
+    /// Local type interner for single-file checking.
+    /// For multi-file compilation, use MergedProgram.type_interner instead.
+    type_interner: TypeInterner,
 }
 
 #[wasm_bindgen]
@@ -150,6 +154,7 @@ impl ThinParser {
             parser: ThinParserState::new(file_name, source_text),
             source_file_idx: None,
             binder: None,
+            type_interner: TypeInterner::new(),
         }
     }
 
@@ -221,6 +226,7 @@ impl ThinParser {
             let mut checker = ThinCheckerState::new(
                 self.parser.get_arena(),
                 binder,
+                &self.type_interner,
                 file_name,
             );
 
@@ -228,10 +234,10 @@ impl ThinParser {
             checker.check_source_file(root_idx);
 
             let result = serde_json::json!({
-                "typeCount": checker.types.len(),
+                "typeCount": self.type_interner.len(),
                 "diagnostics": checker.diagnostics.iter().map(|d| {
                     serde_json::json!({
-                        "message": d.message_text.clone(),
+                        "message_text": d.message_text.clone(),
                         "code": d.code,
                         "start": d.start,
                         "length": d.length,
@@ -254,6 +260,7 @@ impl ThinParser {
             let mut checker = ThinCheckerState::new(
                 self.parser.get_arena(),
                 binder,
+                &self.type_interner,
                 file_name,
             );
 

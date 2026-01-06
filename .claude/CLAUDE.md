@@ -29,15 +29,19 @@ We have time. No deadlines. Do it right.
 LOOP:
   1. Read specs/migration_plan.md - understand current state
   2. Pick task with HIGHEST IMPACT (not just next in list)
-     - Phase 0 tasks (ThinNode, zero-alloc scanner, parallelism) are highest priority
-     - Architectural improvements > feature completion
-  3. Before major work: Ask "Will this 10x something, or just 1.1x?"
+  3. **BEFORE implementing**: Ask Gemini for advice
+     - Run: node scripts/ask-gemini.mjs "How should I implement [task]?"
+     - Get architectural guidance, edge cases, existing patterns to follow
   4. Implement in wasm/src/*.rs
   5. Test: ./wasm/test.sh
   6. If pass → update migration_plan.md, commit
-  7. At milestones → Gemini review: `node scripts/ask-gemini.mjs --review`
-  8. Address review findings, commit, continue
+  7. **AFTER implementing**: Ask Gemini to review the implementation
+     - Run: node scripts/ask-gemini.mjs --review wasm/src/[modified_file].rs
+     - Address any issues found
+  8. Final commit with review feedback addressed
 ```
+
+⚠️ **IMPORTANT**: Always consult Gemini BEFORE and AFTER each significant task. This catches design issues early and ensures code quality.
 
 ## 📊 When to Use Gemini Reviews
 

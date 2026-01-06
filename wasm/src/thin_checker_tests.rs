@@ -3,13 +3,14 @@
 use crate::thin_checker::ThinCheckerState;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
-use crate::solver::TypeId;
+use crate::solver::{TypeId, TypeInterner};
 
 #[test]
 fn test_thin_checker_creation() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
-    let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // Basic sanity check
     assert!(checker.diagnostics.is_empty());
@@ -19,7 +20,8 @@ fn test_thin_checker_creation() {
 fn test_thin_checker_basic_types() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
-    let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let _checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // Verify intrinsic TypeIds are constants (compile-time values)
     assert_eq!(TypeId::NUMBER.0, 9);
@@ -33,7 +35,8 @@ fn test_thin_checker_basic_types() {
 fn test_thin_checker_type_interner() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
-    let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // Test that TypeInterner is properly initialized
     // Intrinsics should be pre-registered
@@ -46,7 +49,8 @@ fn test_thin_checker_type_interner() {
 fn test_thin_checker_structural_equality() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
-    let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // Test structural equality via TypeInterner
     // Same string literal should get same TypeId
@@ -62,7 +66,8 @@ fn test_thin_checker_structural_equality() {
 fn test_thin_checker_union_normalization() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
-    let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // Test union normalization
     // Union with `any` should be `any`
@@ -82,7 +87,8 @@ fn test_thin_checker_union_normalization() {
 fn test_thin_checker_subtype_intrinsics() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
-    let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // Test intrinsic subtype relations
     // Any is assignable to everything
@@ -111,7 +117,8 @@ fn test_thin_checker_subtype_intrinsics() {
 fn test_thin_checker_subtype_literals() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
-    let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // String literal is subtype of string
     let hello = checker.types.literal_string("hello");
@@ -133,7 +140,8 @@ fn test_thin_checker_subtype_literals() {
 fn test_thin_checker_subtype_unions() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
-    let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // Create string | number union
     let string_or_number = checker.get_union_type(vec![TypeId::STRING, TypeId::NUMBER]);
@@ -154,7 +162,8 @@ fn test_thin_checker_subtype_unions() {
 fn test_thin_checker_type_identity() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
-    let checker = ThinCheckerState::new(&arena, &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let checker = ThinCheckerState::new(&arena, &binder, &types, "test.ts".to_string());
 
     // Same type is identical to itself
     assert!(checker.are_types_identical(TypeId::STRING, TypeId::STRING));
@@ -182,7 +191,8 @@ fn test_function_overload_missing_implementation_2391() {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
 
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
@@ -204,7 +214,8 @@ function foo() {}
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
 
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
@@ -226,7 +237,8 @@ function bar() {}
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
 
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
@@ -247,7 +259,8 @@ fn test_parameter_property_in_function_2369() {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
 
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
@@ -266,7 +279,8 @@ fn test_parameter_property_in_arrow_2369() {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
 
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
@@ -291,7 +305,8 @@ class C {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
 
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
@@ -317,7 +332,8 @@ class C {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
 
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
@@ -337,7 +353,8 @@ fn test_class_name_any_error_2414() {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
 
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
     let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
@@ -363,7 +380,8 @@ fn test_local_variable_scope_resolution() {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
 
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
     // Should have no "Cannot find name" errors (2304)
@@ -390,7 +408,8 @@ fn test_for_loop_variable_scope() {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
 
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
     // Should have no "Cannot find name" errors (2304) for loop variable 'i'
@@ -441,7 +460,8 @@ fn test_abstract_class_in_local_scope_2511() {
         eprintln!("Symbol A not found!");
     }
 
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
     // Debug: Check diagnostics
@@ -467,6 +487,75 @@ fn test_abstract_class_in_local_scope_2511() {
 }
 
 #[test]
+fn test_static_member_suggestion_2662() {
+    // Error 2662: Cannot find name 'foo'. Did you mean the static member 'C.foo'?
+    use crate::thin_parser::ThinParserState;
+    let source = r#"
+class C {
+    static foo: string;
+
+    bar() {
+        let k = foo;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Debug: show all diagnostics
+    eprintln!("=== Diagnostics for static member suggestion ===");
+    for d in &checker.diagnostics {
+        eprintln!("  code={}, msg={}", d.code, d.message_text);
+    }
+
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2662),
+        "Expected error 2662 (Cannot find name 'foo'. Did you mean the static member 'C.foo'?), got: {:?}", codes);
+
+    // Should NOT have generic "cannot find name" error 2304
+    assert!(!codes.contains(&2304),
+        "Should not have generic error 2304, should have specific 2662 instead. Got: {:?}", codes);
+}
+
+#[test]
+fn test_abstract_property_in_constructor_2715() {
+    // Error 2715: Abstract property 'prop' in class 'AbstractClass' cannot be accessed in the constructor.
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+abstract class AbstractClass {
+    constructor(str: string) {
+        let val = this.prop.toLowerCase();
+    }
+
+    abstract prop: string;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2715),
+        "Expected error 2715 (Abstract property cannot be accessed in constructor), got: {:?}", codes);
+}
+
+#[test]
 fn test_interface_name_cannot_be_reserved_2427() {
     // Error 2427: Interface name cannot be 'string' (or other primitive types)
     use crate::thin_parser::ThinParserState;
@@ -478,7 +567,8 @@ fn test_interface_name_cannot_be_reserved_2427() {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
 
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, "test.ts".to_string());
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
     checker.check_source_file(root);
 
     // Debug: show all diagnostics
@@ -490,4 +580,31 @@ fn test_interface_name_cannot_be_reserved_2427() {
     let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
     assert!(codes.contains(&2427),
         "Expected error 2427 (Interface name cannot be 'string'), got: {:?}", codes);
+}
+
+#[test]
+fn test_const_modifier_on_class_property_1248() {
+    // Error 1248: A class member cannot have the 'const' keyword
+    use crate::thin_parser::ThinParserState;
+    let source = r#"class AtomicNumbers { static const H = 1; }"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Debug: show all diagnostics
+    eprintln!("=== Diagnostics for 'static const H = 1' ===");
+    for d in &checker.diagnostics {
+        eprintln!("  code={}, msg={}", d.code, d.message_text);
+    }
+
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&1248),
+        "Expected error 1248 (A class member cannot have the 'const' keyword), got: {:?}", codes);
 }

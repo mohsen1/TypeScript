@@ -256,6 +256,8 @@ pub struct BoundFile {
     pub parse_errors: Vec<String>,
 }
 
+use crate::solver::TypeInterner;
+
 /// Merged program state after parallel binding
 pub struct MergedProgram {
     /// All bound files
@@ -266,6 +268,8 @@ pub struct MergedProgram {
     pub globals: SymbolTable,
     /// Per-file symbol tables (file-local symbols, symbol IDs remapped)
     pub file_locals: Vec<SymbolTable>,
+    /// Global type interner - shared across all threads for type deduplication
+    pub type_interner: TypeInterner,
 }
 
 /// Merge bind results into a unified program state
@@ -335,6 +339,7 @@ pub fn merge_bind_results(results: Vec<BindResult>) -> MergedProgram {
         symbols: global_symbols,
         globals,
         file_locals: file_locals_list,
+        type_interner: TypeInterner::new(),
     }
 }
 
@@ -523,10 +528,11 @@ pub fn check_functions_parallel(program: &MergedProgram) -> CheckResult {
             // Create a binder state from the node_symbols
             let binder = create_binder_from_bound_file(file, program, file_idx);
 
-            // Create checker for this file
+            // Create checker for this file, using the shared type interner
             let mut checker = ThinCheckerState::new(
                 &file.arena,
                 &binder,
+                &program.type_interner,
                 file.file_name.clone(),
             );
 
