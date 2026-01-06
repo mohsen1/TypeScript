@@ -1540,9 +1540,7 @@ impl<'a> ClassES5Emitter<'a> {
                     if let Some(decl_list) = self.arena.get_variable(init_node) {
                         let mut first = true;
                         for &decl_idx in &decl_list.declarations.nodes {
-                            if !first { self.write(", "); }
-                            first = false;
-                            self.emit_variable_declaration(decl_idx);
+                            self.emit_variable_declaration_with_first(decl_idx, &mut first);
                         }
                     }
                 } else {
