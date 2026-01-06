@@ -12,7 +12,7 @@ see SESSION_LOG.md -- always amended with each session's work
 # ✅ COMPLETED
 
 - **Phase 0-5**: Scanner, Parser, Binder, Solver (~77,000 LOC, 1041 tests)
-- **Phase 6**: Emitter (ES5 transforms, source maps, .d.ts) - **39.5% JS baseline**
+- **Phase 6**: Emitter (ES5 transforms, source maps, .d.ts) - **59.2% JS baseline**
 - **Phase 7**: Language Service (60%) - go-to-def, find refs, completions
 
 ## Recent Emitter Improvements
@@ -23,12 +23,16 @@ see SESSION_LOG.md -- always amended with each session's work
 - ✅ Constructor overloads: only emit implementation, skip signatures
 - ✅ Single-line empty block detection (preserve `{ }` vs `{\n}`)
 - ✅ Class extends: emit base class name, _super parameter, derived constructor with _super.apply
+- ✅ Combined getter/setter pairs into single `Object.defineProperty` calls
+- ✅ Skip abstract accessors in emit
+- ✅ Source order emit for methods/accessors
+- ✅ Declare variable skip (`declare const foo: number;` → empty)
 
 ## Emitter TODOs (for JS baseline 80%+)
-- ⬜ CommonJS exports (`"use strict"`, `module.exports`, `exports.X`) - 35 tests
-- ⬜ `__extends` helper function declaration at file level - 7 tests
-- ⬜ `Object.defineProperty` for getters/setters
-- ⬜ Parse error tolerance (some tests skipped)
+- ⬜ Arrow function `this` capture (`var _this = this;`) - ~3 tests
+- ⬜ CommonJS exports (`"use strict"`, `module.exports`, `exports.X`) - ~11 tests
+- ⬜ Comment preservation in emit - ~3 tests
+- ⬜ Parse error tolerance (some tests skipped) - ~2 tests
 
 ## Language Service TODOs (40% remaining)
 - ⬜ Formatting engine

@@ -22,6 +22,7 @@ use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::transforms::class_es5::ClassES5Emitter;
+use crate::transforms::arrow_es5::contains_this_reference;
 
 // =============================================================================
 // Emitter Options
@@ -140,6 +141,13 @@ pub struct ThinPrinter<'a> {
 
     /// Source text for detecting single-line constructs
     source_text: Option<&'a str>,
+
+    /// Stack of scopes that need `this` capture (for arrow functions)
+    /// When > 0, emit `_this` instead of `this` inside arrow function bodies
+    this_capture_depth: u32,
+
+    /// Whether we've already emitted `var _this = this;` in the current scope
+    this_captured_in_scope: bool,
 }
 
 impl<'a> ThinPrinter<'a> {
@@ -166,6 +174,8 @@ impl<'a> ThinPrinter<'a> {
             output_column: 0,
             target_es5: true, // Default to ES5 for baseline compatibility
             source_text: None,
+            this_capture_depth: 0,
+            this_captured_in_scope: false,
         }
     }
 
@@ -734,7 +744,14 @@ impl<'a> ThinPrinter<'a> {
             }
 
             // Other tokens and keywords - emit their text
-            k if k == SyntaxKind::ThisKeyword as u16 => self.write("this"),
+            k if k == SyntaxKind::ThisKeyword as u16 => {
+                // In ES5 mode inside an arrow function body, use _this instead of this
+                if self.target_es5 && self.this_capture_depth > 0 {
+                    self.write("_this")
+                } else {
+                    self.write("this")
+                }
+            }
             k if k == SyntaxKind::SuperKeyword as u16 => self.write("super"),
 
             // Default: do nothing (or handle other cases as needed)
@@ -966,23 +983,32 @@ impl<'a> ThinPrinter<'a> {
 
         // Transform arrow function to regular function for ES5
         if self.target_es5 {
+            // Check if arrow body uses `this` - if so, we need _this capture
+            let body_uses_this = !func.body.is_none()
+                && contains_this_reference(self.arena, func.body);
+
+            // Track that we're inside an arrow function body with `this`
+            if body_uses_this {
+                self.this_capture_depth += 1;
+            }
+
             if func.is_async {
                 self.write("async ");
             }
-            
+
             self.write("function (");
             self.emit_function_parameters_js(&func.parameters.nodes);
             self.write(") ");
-            
+
             // If body is not a block (concise arrow), wrap with return
             let body_node = self.arena.get(func.body);
             let is_block = body_node.map(|n| n.kind == syntax_kind_ext::BLOCK).unwrap_or(false);
-            
+
             if is_block {
                 // Check if it's a simple single-return block
                 if let Some(block_node) = self.arena.get(func.body) {
                     if let Some(block) = self.arena.get_block(block_node) {
-                        if block.statements.nodes.len() == 1 
+                        if block.statements.nodes.len() == 1
                             && self.is_simple_return_statement(block.statements.nodes[0]) {
                             self.emit_single_line_block(func.body);
                         } else {
@@ -999,6 +1025,11 @@ impl<'a> ThinPrinter<'a> {
                 self.write("{ return ");
                 self.emit(func.body);
                 self.write("; }");
+            }
+
+            // Restore this capture depth
+            if body_uses_this {
+                self.this_capture_depth -= 1;
             }
             return;
         }

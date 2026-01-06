@@ -27,6 +27,7 @@ use crate::parser::thin_node::{ThinNode, ThinNodeArena, FunctionData, ClassData,
 use crate::parser::{NodeIndex, NodeList};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
+use crate::transforms::arrow_es5::contains_this_reference;
 
 /// ES5 class emitter - emits ES5 IIFE pattern for classes
 pub struct ClassES5Emitter<'a> {
@@ -34,6 +35,8 @@ pub struct ClassES5Emitter<'a> {
     output: String,
     indent_level: u32,
     source_text: Option<&'a str>,
+    /// Whether we're emitting inside a scope that uses _this capture
+    use_this_capture: bool,
 }
 
 impl<'a> ClassES5Emitter<'a> {
@@ -43,6 +46,7 @@ impl<'a> ClassES5Emitter<'a> {
             output: String::with_capacity(4096),
             indent_level: 0,
             source_text: None,
+            use_this_capture: false,
         }
     }
 
@@ -179,7 +183,16 @@ impl<'a> ClassES5Emitter<'a> {
                 if has_extends {
                     self.emit_derived_constructor_body(ctor_data.body, &ctor_data.parameters, &instance_props);
                 } else {
-                    // Non-derived class: emit instance props and parameter props first
+                    // Non-derived class: check if we need _this capture for arrow functions
+                    let needs_capture = self.needs_this_capture(&instance_props);
+                    if needs_capture {
+                        self.write_indent();
+                        self.write("var _this = this;");
+                        self.write_line();
+                        // Note: use_this_capture is set per-arrow-function, not globally
+                    }
+
+                    // Emit instance props and parameter props first
                     self.emit_instance_property_initializers(&instance_props);
                     self.emit_parameter_properties(&ctor_data.parameters);
                     self.emit_block_contents(ctor_data.body);
@@ -259,6 +272,29 @@ impl<'a> ClassES5Emitter<'a> {
             self.write("}");
             self.write_line();
         }
+    }
+
+    /// Check if any property initializers contain arrow functions that reference `this`
+    fn needs_this_capture(&self, props: &[NodeIndex]) -> bool {
+        for &prop_idx in props {
+            let Some(prop_node) = self.arena.get(prop_idx) else { continue };
+            let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
+
+            if !prop_data.initializer.is_none() {
+                // Check if initializer is an arrow function with `this` in body
+                let init_node = self.arena.get(prop_data.initializer);
+                if let Some(node) = init_node {
+                    if node.kind == syntax_kind_ext::ARROW_FUNCTION {
+                        if let Some(func) = self.arena.get_function(node) {
+                            if !func.body.is_none() && contains_this_reference(self.arena, func.body) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        false
     }
 
     /// Emit instance property initializers as this.prop = value;
@@ -366,6 +402,54 @@ impl<'a> ClassES5Emitter<'a> {
             }
         }
 
+        // Emit instance property initializers using _this
+        for &prop_idx in instance_props {
+            let Some(prop_node) = self.arena.get(prop_idx) else { continue };
+            let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
+
+            // Skip properties without initializers
+            if prop_data.initializer.is_none() {
+                continue;
+            }
+
+            let name = self.get_identifier_text(prop_data.name);
+            if name.is_empty() {
+                continue;
+            }
+
+            self.write_indent();
+            self.write("_this.");
+            self.write(&name);
+            self.write(" = ");
+
+            // Check if this initializer contains `this` that needs capture
+            let init_node = self.arena.get(prop_data.initializer);
+            let needs_capture = if let Some(node) = init_node {
+                if node.kind == syntax_kind_ext::ARROW_FUNCTION {
+                    if let Some(func) = self.arena.get_function(node) {
+                        !func.body.is_none() && contains_this_reference(self.arena, func.body)
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            } else {
+                false
+            };
+
+            // Emit the initializer, with _this capture if needed
+            let prev = self.use_this_capture;
+            if needs_capture {
+                self.use_this_capture = true;
+            }
+            self.emit_expression(prop_data.initializer);
+            self.use_this_capture = prev;
+
+            self.write(";");
+            self.write_line();
+        }
+
         // Emit remaining statements (after super call), transforming this to _this
         let mut past_super = false;
         for &stmt_idx in &block.statements.nodes {
@@ -433,9 +517,11 @@ impl<'a> ClassES5Emitter<'a> {
 
     /// Emit a statement, but transform `this` references to `_this`
     fn emit_statement_with_this_transform(&mut self, stmt_idx: NodeIndex) {
-        // For now, just delegate to regular emit
-        // TODO: Implement proper this->_this transformation
+        // Enable this capture for the duration of emitting this statement
+        let prev = self.use_this_capture;
+        self.use_this_capture = true;
         self.emit_statement(stmt_idx);
+        self.use_this_capture = prev;
     }
 
     fn emit_methods(&mut self, class_name: &str, class_data: &ClassData) {
@@ -1082,7 +1168,14 @@ impl<'a> ClassES5Emitter<'a> {
             k if k == SyntaxKind::TrueKeyword as u16 => self.write("true"),
             k if k == SyntaxKind::FalseKeyword as u16 => self.write("false"),
             k if k == SyntaxKind::NullKeyword as u16 => self.write("null"),
-            k if k == SyntaxKind::ThisKeyword as u16 => self.write("this"),
+            k if k == SyntaxKind::ThisKeyword as u16 => {
+                // Use _this when inside an arrow function that needs capture
+                if self.use_this_capture {
+                    self.write("_this")
+                } else {
+                    self.write("this")
+                }
+            }
             k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
                 if let Some(access) = self.arena.get_access_expr(expr_node) {
                     self.emit_expression(access.expression);
@@ -1195,10 +1288,20 @@ impl<'a> ClassES5Emitter<'a> {
             k if k == syntax_kind_ext::ARROW_FUNCTION => {
                 // Transform arrow to function expression
                 if let Some(func) = self.arena.get_function(expr_node) {
+                    // Check if this arrow function body uses `this`
+                    let body_uses_this = !func.body.is_none()
+                        && contains_this_reference(self.arena, func.body);
+
+                    // Enable _this capture for the body if needed
+                    let prev_capture = self.use_this_capture;
+                    if body_uses_this {
+                        self.use_this_capture = true;
+                    }
+
                     self.write("function (");
                     self.emit_parameters(&func.parameters);
                     self.write(") ");
-                    
+
                     // Check if body is an expression or block
                     if let Some(body_node) = self.arena.get(func.body) {
                         if body_node.kind == syntax_kind_ext::BLOCK {
@@ -1210,6 +1313,9 @@ impl<'a> ClassES5Emitter<'a> {
                             self.write("; }");
                         }
                     }
+
+                    // Restore previous capture state
+                    self.use_this_capture = prev_capture;
                 }
             }
             k if k == syntax_kind_ext::FUNCTION_EXPRESSION => {
