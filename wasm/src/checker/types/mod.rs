@@ -9,4 +9,4 @@ pub mod diagnostics;
 // Re-export commonly used items
 pub use flags::{type_flags, object_flags, signature_flags};
 pub use type_def::*;
-pub use diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+pub use diagnostics::{diagnostic_codes, diagnostic_messages, format_message, Diagnostic, DiagnosticCategory, DiagnosticRelatedInformation};

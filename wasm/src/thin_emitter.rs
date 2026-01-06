@@ -21,8 +21,86 @@ use crate::parser::{NodeIndex, NodeList};
 use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
-use crate::emitter::{PrinterOptions, NewLineKind};
 use crate::transforms::class_es5::ClassES5Emitter;
+
+// =============================================================================
+// Emitter Options
+// =============================================================================
+
+/// ECMAScript target version.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ScriptTarget {
+    ES3 = 0,
+    ES5 = 1,
+    ES2015 = 2,
+    ES2016 = 3,
+    ES2017 = 4,
+    ES2018 = 5,
+    ES2019 = 6,
+    ES2020 = 7,
+    ES2021 = 8,
+    ES2022 = 9,
+    #[default]
+    ESNext = 99,
+}
+
+/// Module system kind.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ModuleKind {
+    #[default]
+    None = 0,
+    CommonJS = 1,
+    AMD = 2,
+    UMD = 3,
+    System = 4,
+    ES2015 = 5,
+    ES2020 = 6,
+    ES2022 = 7,
+    ESNext = 99,
+    Node16 = 100,
+    NodeNext = 199,
+}
+
+/// New line kind.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum NewLineKind {
+    #[default]
+    LineFeed = 0,
+    CarriageReturnLineFeed = 1,
+}
+
+/// Printer configuration options.
+#[derive(Clone, Debug)]
+pub struct PrinterOptions {
+    /// Remove comments from output
+    pub remove_comments: bool,
+    /// Target ECMAScript version
+    pub target: ScriptTarget,
+    /// Use single quotes for strings
+    pub single_quote: bool,
+    /// Omit trailing semicolons
+    pub omit_trailing_semicolon: bool,
+    /// Don't emit helpers
+    pub no_emit_helpers: bool,
+    /// Module kind
+    pub module: ModuleKind,
+    /// New line character
+    pub new_line: NewLineKind,
+}
+
+impl Default for PrinterOptions {
+    fn default() -> Self {
+        PrinterOptions {
+            remove_comments: false,
+            target: ScriptTarget::ESNext,
+            single_quote: false,
+            omit_trailing_semicolon: false,
+            no_emit_helpers: false,
+            module: ModuleKind::None,
+            new_line: NewLineKind::LineFeed,
+        }
+    }
+}
 
 // =============================================================================
 // ThinPrinter

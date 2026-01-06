@@ -32,7 +32,18 @@ use crate::parser::{
     },
     syntax_kind_ext,
 };
-use crate::parser_impl::ParseDiagnostic;
+// =============================================================================
+// Parse Diagnostic
+// =============================================================================
+
+/// A parse-time diagnostic (error or warning).
+#[derive(Clone, Debug)]
+pub struct ParseDiagnostic {
+    pub start: u32,
+    pub length: u32,
+    pub message: String,
+    pub code: u32,
+}
 
 // =============================================================================
 // ThinParserState

@@ -1153,8 +1153,8 @@ impl TypeDiagnostic {
     /// Convert to a checker::Diagnostic.
     ///
     /// Uses the provided file_name if no span is present.
-    pub fn to_checker_diagnostic(&self, default_file: &str) -> crate::checker::state::Diagnostic {
-        use crate::checker::state::{Diagnostic, DiagnosticCategory, DiagnosticRelatedInformation};
+    pub fn to_checker_diagnostic(&self, default_file: &str) -> crate::checker::types::diagnostics::Diagnostic {
+        use crate::checker::types::diagnostics::{Diagnostic, DiagnosticCategory, DiagnosticRelatedInformation};
 
         let (file, start, length) = if let Some(ref span) = self.span {
             (span.file.to_string(), span.start, span.length)
@@ -1331,7 +1331,7 @@ impl<'a> DiagnosticCollector<'a> {
     }
 
     /// Convert all collected diagnostics to checker diagnostics.
-    pub fn to_checker_diagnostics(&self) -> Vec<crate::checker::state::Diagnostic> {
+    pub fn to_checker_diagnostics(&self) -> Vec<crate::checker::types::diagnostics::Diagnostic> {
         self.diagnostics.iter()
             .map(|d| d.to_checker_diagnostic(&self.file))
             .collect()
