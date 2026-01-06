@@ -337,6 +337,9 @@ pub struct ThinPrinter<'a> {
 
     /// Source text for detecting single-line constructs
     pub(super) source_text: Option<&'a str>,
+
+    /// Last processed position in source text for comment gap detection
+    pub(super) last_processed_pos: u32,
 }
 
 impl<'a> ThinPrinter<'a> {
@@ -359,6 +362,7 @@ impl<'a> ThinPrinter<'a> {
             writer,
             ctx,
             source_text: None,
+            last_processed_pos: 0,
         }
     }
 
@@ -476,6 +480,89 @@ impl<'a> ThinPrinter<'a> {
             } else if comment.kind == CommentKind::MultiLine {
                 self.write_space();
             }
+        }
+    }
+
+    /// Emit comments in the gap between last_processed_pos and the given position.
+    /// This handles comments that appear between AST nodes.
+    fn emit_comments_in_gap(&mut self, up_to_pos: u32) {
+        if self.ctx.options.remove_comments {
+            return;
+        }
+
+        let Some(text) = self.source_text else {
+            return;
+        };
+
+        // Scan for comments between last_processed_pos and up_to_pos
+        let start = self.last_processed_pos as usize;
+        let end = std::cmp::min(up_to_pos as usize, text.len());
+
+        if start >= end {
+            return;
+        }
+
+        // Scan the gap for comments
+        let gap_text = &text[start..end];
+        let bytes = gap_text.as_bytes();
+        let len = bytes.len();
+        let mut pos = 0;
+
+        while pos < len {
+            let ch = bytes[pos];
+
+            // Skip whitespace
+            if ch == b' ' || ch == b'\t' || ch == b'\r' || ch == b'\n' {
+                pos += 1;
+                continue;
+            }
+
+            // Check for comment start
+            if ch == b'/' && pos + 1 < len {
+                let next = bytes[pos + 1];
+
+                if next == b'/' {
+                    // Single-line comment
+                    let comment_start = start + pos;
+                    let mut comment_end = pos + 2;
+                    while comment_end < len && bytes[comment_end] != b'\n' && bytes[comment_end] != b'\r' {
+                        comment_end += 1;
+                    }
+                    let comment_text = &text[comment_start..start + comment_end];
+                    self.write(comment_text);
+                    self.write_line();
+
+                    // Skip past the comment and newline
+                    pos = comment_end;
+                    if pos < len && bytes[pos] == b'\r' {
+                        pos += 1;
+                    }
+                    if pos < len && bytes[pos] == b'\n' {
+                        pos += 1;
+                    }
+                    continue;
+                } else if next == b'*' {
+                    // Multi-line comment
+                    let comment_start = start + pos;
+                    let mut comment_end = pos + 2;
+                    while comment_end + 1 < len {
+                        if bytes[comment_end] == b'*' && bytes[comment_end + 1] == b'/' {
+                            comment_end += 2;
+                            break;
+                        }
+                        comment_end += 1;
+                    }
+                    let comment_text = &text[comment_start..start + comment_end];
+                    self.write(comment_text);
+                    self.write_line();
+
+                    pos = comment_end;
+                    continue;
+                }
+            }
+
+            // Hit non-whitespace, non-comment content - stop scanning
+            break;
         }
     }
 
@@ -3722,7 +3809,42 @@ impl<'a> ThinPrinter<'a> {
             self.emit_extends_helper();
         }
 
+        // Extract all comments once at the start (if not removing comments)
+        let all_comments = if !self.ctx.options.remove_comments {
+            if let Some(text) = self.source_text {
+                crate::comments::get_comment_ranges(text)
+            } else {
+                Vec::new()
+            }
+        } else {
+            Vec::new()
+        };
+
+        let mut comment_idx = 0;
+
         for &stmt_idx in &source.statements.nodes {
+            if let Some(stmt_node) = self.arena.get(stmt_idx) {
+                // Emit any comments that appear before this statement
+                if let Some(text) = self.source_text {
+                    while comment_idx < all_comments.len() {
+                        let comment = &all_comments[comment_idx];
+                        if comment.end <= stmt_node.pos {
+                            // This comment is before the statement, emit it
+                            let comment_text = comment.get_text(text);
+                            self.write(comment_text);
+                            // Only add newline if the comment has a trailing newline
+                            if comment.has_trailing_new_line {
+                                self.write_line();
+                            }
+                            comment_idx += 1;
+                        } else {
+                            // This comment is after the statement start, stop
+                            break;
+                        }
+                    }
+                }
+            }
+
             let before_len = self.writer.len();
             self.emit(stmt_idx);
             // Only add newline if something was actually emitted

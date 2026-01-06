@@ -25,7 +25,7 @@ Our focus is to make wasm emitter complete
     - Detect and set flag in emit_source_file
     - Check flag in emit_export_declaration_commonjs and declaration emitters
     - Now correctly emits only initialization when `export =` present
-- ⬜ Comment preservation in emit - ~3 tests
+- 🚧 Comment preservation in emit - **PARTIALLY DONE** (all comments preserved, but baseline regressed 61.8% → 53.9%)
 - ⬜ Parse error tolerance (some tests skipped) - ~2 tests
 - ... add more tasks (Ask Gemini when needed)
 
