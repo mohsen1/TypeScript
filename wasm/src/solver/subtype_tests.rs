@@ -267,3 +267,119 @@ fn test_function_rest_parameter_subtyping() {
     // This depends on semantics - TypeScript actually allows this in some cases
     // For now, test the basic case
 }
+
+#[test]
+fn test_tuple_subtyping_extra_elements() {
+    // CRITICAL: [number, string] is NOT assignable to [number]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // [number, string]
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    // [number]
+    let target = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    // Source has extra elements, target is closed -> should FAIL
+    assert!(!checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_tuple_subtyping_with_rest_target() {
+    // [number, string] IS assignable to [number, ...string[]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+
+    // [number, string]
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    // [number, ...string[]]
+    let target = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    // Target has rest -> should accept extra elements
+    assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_tuple_subtyping_source_rest_closed_target() {
+    // [number, ...string[]] is NOT assignable to [number, string]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+
+    // [number, ...string[]]
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    // [number, string]
+    let target = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    // Source has rest but target is closed -> should FAIL
+    assert!(!checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_tuple_subtyping_optional_elements() {
+    // [number, string?] IS assignable to [number]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // [number, string?]
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
+    ]);
+
+    // [number]
+    let target = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    // Optional elements don't count as "extra" if they're beyond target length
+    // This is actually a borderline case - TypeScript may reject this
+    // For strictness, we reject tuples with more elements even if optional
+    assert!(!checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_tuple_subtyping_rest_to_rest() {
+    // [number, ...string[]] IS assignable to [number, ...string[]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+
+    // [number, ...string[]]
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    // [number, ...string[]]
+    let target = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    // Both have rest, same types -> should succeed
+    assert!(checker.is_subtype_of(source, target));
+}

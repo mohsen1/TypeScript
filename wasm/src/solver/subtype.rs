@@ -574,21 +574,56 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // Check each element
         for (i, t_elem) in target.iter().enumerate() {
             if t_elem.rest {
-                // Rest element: remaining source elements must match
+                // Target has rest element: remaining source elements must match
+                // Unwrap the array type to get the element type
+                let t_rest_elem_type = self.get_array_element_type(t_elem.type_id);
+
                 for s_elem in source.iter().skip(i) {
-                    if !self.check_subtype(s_elem.type_id, t_elem.type_id).is_true() {
-                        return SubtypeResult::False;
+                    if s_elem.rest {
+                        // Source is also rest ...S[]
+                        // S[] <: T[]
+                        if !self.check_subtype(s_elem.type_id, t_elem.type_id).is_true() {
+                            return SubtypeResult::False;
+                        }
+                    } else {
+                        // Regular source element vs Target Rest Element Type
+                        if !self.check_subtype(s_elem.type_id, t_rest_elem_type).is_true() {
+                            return SubtypeResult::False;
+                        }
                     }
                 }
-                break;
+                // Target rest consumes everything
+                return SubtypeResult::True;
             }
 
+            // Target is not rest
             if let Some(s_elem) = source.get(i) {
+                if s_elem.rest {
+                    // Source has rest but target expects fixed element -> Mismatch
+                    // e.g. Target: [number, number], Source: [number, ...number[]]
+                    return SubtypeResult::False;
+                }
+
                 if !self.check_subtype(s_elem.type_id, t_elem.type_id).is_true() {
                     return SubtypeResult::False;
                 }
             } else if !t_elem.optional {
                 // Missing required element
+                return SubtypeResult::False;
+            }
+        }
+
+        // If we reached here, target has NO rest element (it is closed).
+        // Ensure source has no extra elements.
+
+        // 1. Source length check: Source cannot have more elements than Target
+        if source.len() > target.len() {
+            return SubtypeResult::False;
+        }
+
+        // 2. Source open check: Source cannot have a rest element if Target is closed
+        for s_elem in source {
+            if s_elem.rest {
                 return SubtypeResult::False;
             }
         }
@@ -1357,20 +1392,31 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         for (i, t_elem) in target.iter().enumerate() {
             if t_elem.rest {
+                let t_rest_elem_type = self.get_array_element_type(t_elem.type_id);
                 // Check rest elements
                 for (j, s_elem) in source.iter().enumerate().skip(i) {
-                    if !self.check_subtype(s_elem.type_id, t_elem.type_id).is_true() {
+                    let target_type = if s_elem.rest { t_elem.type_id } else { t_rest_elem_type };
+                    if !self.check_subtype(s_elem.type_id, target_type).is_true() {
                         return Some(SubtypeFailureReason::TupleElementTypeMismatch {
                             index: j,
                             source_element: s_elem.type_id,
-                            target_element: t_elem.type_id,
+                            target_element: target_type,
                         });
                     }
                 }
-                break;
+                // Target rest consumes everything, so no length error possible here
+                return None;
             }
 
             if let Some(s_elem) = source.get(i) {
+                if s_elem.rest {
+                    // Source has rest but target expects fixed element
+                    return Some(SubtypeFailureReason::TupleElementMismatch {
+                        source_count: source.len(), // Approximate "infinity"
+                        target_count: target.len(),
+                    });
+                }
+
                 if !self.check_subtype(s_elem.type_id, t_elem.type_id).is_true() {
                     return Some(SubtypeFailureReason::TupleElementTypeMismatch {
                         index: i,
@@ -1381,6 +1427,23 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             } else if !t_elem.optional {
                 return Some(SubtypeFailureReason::TupleElementMismatch {
                     source_count: source.len(),
+                    target_count: target.len(),
+                });
+            }
+        }
+
+        // Target is closed. Check for extra elements in source.
+        if source.len() > target.len() {
+            return Some(SubtypeFailureReason::TupleElementMismatch {
+                source_count: source.len(),
+                target_count: target.len(),
+            });
+        }
+
+        for s_elem in source {
+            if s_elem.rest {
+                return Some(SubtypeFailureReason::TupleElementMismatch {
+                    source_count: source.len(), // implies open
                     target_count: target.len(),
                 });
             }

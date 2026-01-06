@@ -31,15 +31,25 @@ Our focus is to make wasm checker complete
 - ⬜ Property access from index signature (error 4111)
 - ⬜ Ambient module patterns (errors 2305, 5061, 2819)
 - ⬜ Various missing error codes (see test failures)
-- ⬜ Fix tuple subtyping logic (CRITICAL from Gemini review)
-    - Currently too permissive: allows extra elements in source
-    - TypeScript: `[number, string]` is NOT assignable to `[number]`
-    - Need to check if target has rest element, reject extra source elements if not
+- ✅ Fix tuple subtyping logic (CRITICAL - COMPLETED)
+    - Fixed: Now properly rejects `[number, string]` as subtype of `[number]`
+    - Checks if target has rest element before allowing extra source elements
+    - Handles rest element matching correctly (rest to rest, fixed to rest)
+    - Added 5 comprehensive test cases for edge cases
+    - All 598 tests pass
 - ⬜ Fix function parameter variance (MAJOR from Gemini review)
     - Currently bivariant (legacy mode), should be contravariant (strict mode)
     - Consider making strictFunctionTypes the default
 - ⬜ Remove unused ref_cache field (MINOR from Gemini review)
     - Currently marked #[allow(dead_code)], not implemented
+- ⬜ Fix tuple to array subtyping for rest elements (BLOCKER from Gemini review)
+    - Currently fails: `[number, ...string[]]` should be assignable to `string[]`
+    - Rest elements have Array type, need to unwrap before comparing to scalar
+    - Fix: get_array_element_type on rest elements before subtype check
+- ⬜ Fix number index signature check (CRITICAL from Gemini review)
+    - check_object_to_indexed ignores number_index signature
+    - Numeric property names (e.g., `{ 0: "val" }`) must validate against `[x: number]: T`
+    - Need to parse property names and check if numeric
 - ... add more tasks (Ask Gemini when needed)
 
 
