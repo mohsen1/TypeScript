@@ -9,6 +9,11 @@ use std::path::{Component, Path, PathBuf};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::binder::SymbolId;
+use crate::lsp::code_actions::{
+    CodeAction, CodeActionContext, CodeActionKind, CodeActionProvider, ImportCandidate,
+    ImportCandidateKind,
+};
+use crate::lsp::diagnostics::LspDiagnostic;
 use crate::lsp::utils::find_node_at_offset;
 use crate::parser::thin_node::NodeAccess;
 use crate::parser::{NodeIndex, syntax_kind_ext, thin_node::ThinNodeArena};
@@ -34,6 +39,11 @@ struct NamespaceReexportTarget {
     file: String,
     namespace: String,
     member: String,
+}
+
+struct ExportMatch {
+    kind: ImportCandidateKind,
+    is_type_only: bool,
 }
 
 /// Parsed file state used by LSP features.
@@ -515,6 +525,42 @@ impl Project {
         goto_def.get_definition(file.root(), position)
     }
 
+    /// Code actions for a file (project-aware).
+    pub fn get_code_actions(
+        &self,
+        file_name: &str,
+        range: Range,
+        diagnostics: Vec<LspDiagnostic>,
+        only: Option<Vec<CodeActionKind>>,
+    ) -> Option<Vec<CodeAction>> {
+        let file = self.files.get(file_name)?;
+        let import_candidates = self.import_candidates_for_diagnostics(file, &diagnostics);
+
+        let provider = CodeActionProvider::new(
+            file.arena(),
+            file.binder(),
+            file.line_map(),
+            file.file_name().to_string(),
+            file.source_text(),
+        );
+
+        let actions = provider.provide_code_actions(
+            file.root(),
+            range,
+            CodeActionContext {
+                diagnostics,
+                only,
+                import_candidates,
+            },
+        );
+
+        if actions.is_empty() {
+            None
+        } else {
+            Some(actions)
+        }
+    }
+
     fn collect_file_references(&self, file: &ProjectFile, node_idx: NodeIndex, output: &mut Vec<Location>) {
         if node_idx.is_none() {
             return;
@@ -987,6 +1033,274 @@ impl Project {
         }
     }
 
+    fn import_candidates_for_diagnostics(
+        &self,
+        file: &ProjectFile,
+        diagnostics: &[LspDiagnostic],
+    ) -> Vec<ImportCandidate> {
+        let mut candidates = Vec::new();
+        let mut seen = FxHashSet::default();
+
+        for diag in diagnostics {
+            if diag.code != Some(crate::checker::types::diagnostics::diagnostic_codes::CANNOT_FIND_NAME) {
+                continue;
+            }
+
+            let Some(missing_name) = self.identifier_at_range(file, diag.range) else {
+                continue;
+            };
+
+            self.collect_import_candidates_for_name(file, &missing_name, &mut candidates, &mut seen);
+        }
+
+        candidates
+    }
+
+    fn collect_import_candidates_for_name(
+        &self,
+        from_file: &ProjectFile,
+        missing_name: &str,
+        output: &mut Vec<ImportCandidate>,
+        seen: &mut FxHashSet<(String, String, String, bool)>,
+    ) {
+        for (file_name, _file) in &self.files {
+            if file_name == from_file.file_name() {
+                continue;
+            }
+
+            let Some(module_specifier) = self.module_specifier_from_files(from_file.file_name(), file_name) else {
+                continue;
+            };
+
+            let mut visited = FxHashSet::default();
+            let matches = self.matching_exports_in_file(file_name, missing_name, &mut visited);
+
+            for export_match in matches {
+                let candidate = ImportCandidate {
+                    module_specifier: module_specifier.clone(),
+                    local_name: missing_name.to_string(),
+                    kind: export_match.kind,
+                    is_type_only: export_match.is_type_only,
+                };
+
+                let kind_key = match &candidate.kind {
+                    ImportCandidateKind::Named { export_name } => format!("named:{}", export_name),
+                    ImportCandidateKind::Default => "default".to_string(),
+                    ImportCandidateKind::Namespace => "namespace".to_string(),
+                };
+
+                if seen.insert((
+                    candidate.module_specifier.clone(),
+                    candidate.local_name.clone(),
+                    kind_key,
+                    candidate.is_type_only,
+                )) {
+                    output.push(candidate);
+                }
+            }
+        }
+    }
+
+    fn matching_exports_in_file(
+        &self,
+        file_name: &str,
+        export_name: &str,
+        visited: &mut FxHashSet<String>,
+    ) -> Vec<ExportMatch> {
+        if !visited.insert(file_name.to_string()) {
+            return Vec::new();
+        }
+
+        let Some(file) = self.files.get(file_name) else { return Vec::new(); };
+        let arena = file.arena();
+        let Some(root_node) = arena.get(file.root()) else { return Vec::new(); };
+        let Some(source_file) = arena.get_source_file(root_node) else { return Vec::new(); };
+
+        let mut matches = Vec::new();
+
+        for &stmt_idx in &source_file.statements.nodes {
+            let Some(stmt_node) = arena.get(stmt_idx) else { continue; };
+            if stmt_node.kind != syntax_kind_ext::EXPORT_DECLARATION {
+                continue;
+            }
+
+            let Some(export) = arena.get_export_decl(stmt_node) else { continue; };
+
+            if export.is_default_export {
+                if self.default_export_matches(file, export.export_clause, export_name) {
+                    matches.push(ExportMatch {
+                        kind: ImportCandidateKind::Default,
+                        is_type_only: export.is_type_only,
+                    });
+                }
+                continue;
+            }
+
+            if export.module_specifier.is_none() {
+                if export.export_clause.is_none() {
+                    continue;
+                }
+
+                let Some(clause_node) = arena.get(export.export_clause) else { continue; };
+                if clause_node.kind == syntax_kind_ext::NAMED_EXPORTS {
+                    let Some(named) = arena.get_named_imports(clause_node) else { continue; };
+                    for &spec_idx in &named.elements.nodes {
+                        let Some(spec_node) = arena.get(spec_idx) else { continue; };
+                        let Some(spec) = arena.get_specifier(spec_node) else { continue; };
+
+                        let export_ident = if !spec.name.is_none() {
+                            spec.name
+                        } else {
+                            spec.property_name
+                        };
+                        let Some(export_text) = arena.get_identifier_text(export_ident) else { continue; };
+                        if export_text != export_name {
+                            continue;
+                        }
+
+                        matches.push(ExportMatch {
+                            kind: ImportCandidateKind::Named {
+                                export_name: export_text.to_string(),
+                            },
+                            is_type_only: export.is_type_only || spec.is_type_only,
+                        });
+                    }
+                } else if file.declaration_has_name(export.export_clause, export_name) {
+                    matches.push(ExportMatch {
+                        kind: ImportCandidateKind::Named {
+                            export_name: export_name.to_string(),
+                        },
+                        is_type_only: export.is_type_only,
+                    });
+                }
+
+                continue;
+            }
+
+            let module_specifier = match arena.get_literal_text(export.module_specifier) {
+                Some(text) => text,
+                None => continue,
+            };
+            let resolved = match self.resolve_module_specifier(file.file_name(), module_specifier) {
+                Some(path) => path,
+                None => continue,
+            };
+
+            if export.export_clause.is_none() {
+                if export_name == "default" {
+                    continue;
+                }
+
+                if self.file_exports_named(&resolved, export_name, visited) {
+                    matches.push(ExportMatch {
+                        kind: ImportCandidateKind::Named {
+                            export_name: export_name.to_string(),
+                        },
+                        is_type_only: export.is_type_only,
+                    });
+                }
+
+                continue;
+            }
+
+            let Some(clause_node) = arena.get(export.export_clause) else { continue; };
+            if clause_node.kind == syntax_kind_ext::NAMED_EXPORTS {
+                let Some(named) = arena.get_named_imports(clause_node) else { continue; };
+                for &spec_idx in &named.elements.nodes {
+                    let Some(spec_node) = arena.get(spec_idx) else { continue; };
+                    let Some(spec) = arena.get_specifier(spec_node) else { continue; };
+
+                    let export_ident = if !spec.name.is_none() {
+                        spec.name
+                    } else {
+                        spec.property_name
+                    };
+                    let Some(export_text) = arena.get_identifier_text(export_ident) else { continue; };
+                    if export_text != export_name {
+                        continue;
+                    }
+
+                    matches.push(ExportMatch {
+                        kind: ImportCandidateKind::Named {
+                            export_name: export_text.to_string(),
+                        },
+                        is_type_only: export.is_type_only || spec.is_type_only,
+                    });
+                }
+            } else if clause_node.kind == SyntaxKind::Identifier as u16 {
+                if let Some(export_text) = arena.get_identifier_text(export.export_clause) {
+                    if export_text == export_name {
+                        matches.push(ExportMatch {
+                            kind: ImportCandidateKind::Named {
+                                export_name: export_text.to_string(),
+                            },
+                            is_type_only: export.is_type_only,
+                        });
+                    }
+                }
+            }
+        }
+
+        matches
+    }
+
+    fn file_exports_named(
+        &self,
+        file_name: &str,
+        export_name: &str,
+        visited: &mut FxHashSet<String>,
+    ) -> bool {
+        self.matching_exports_in_file(file_name, export_name, visited)
+            .iter()
+            .any(|export_match| matches!(export_match.kind, ImportCandidateKind::Named { .. }))
+    }
+
+    fn default_export_matches(
+        &self,
+        file: &ProjectFile,
+        export_clause: NodeIndex,
+        export_name: &str,
+    ) -> bool {
+        if export_clause.is_none() {
+            return false;
+        }
+
+        let arena = file.arena();
+        let Some(node) = arena.get(export_clause) else { return false; };
+
+        match node.kind {
+            k if k == SyntaxKind::Identifier as u16 => arena
+                .get_identifier_text(export_clause)
+                .map_or(false, |name| name == export_name),
+            k if k == syntax_kind_ext::FUNCTION_DECLARATION => arena
+                .get_function(node)
+                .and_then(|func| arena.get_identifier_text(func.name))
+                .map_or(false, |name| name == export_name),
+            k if k == syntax_kind_ext::CLASS_DECLARATION => arena
+                .get_class(node)
+                .and_then(|class| arena.get_identifier_text(class.name))
+                .map_or(false, |name| name == export_name),
+            _ => false,
+        }
+    }
+
+    fn identifier_at_range(&self, file: &ProjectFile, range: Range) -> Option<String> {
+        let offset = file.line_map().position_to_offset(range.start, file.source_text())?;
+        let node_idx = find_node_at_offset(file.arena(), offset);
+        if node_idx.is_none() {
+            return None;
+        }
+
+        let node = file.arena().get(node_idx)?;
+        if node.kind != SyntaxKind::Identifier as u16 {
+            return None;
+        }
+
+        file.arena()
+            .get_identifier_text(node_idx)
+            .map(|text| text.to_string())
+    }
+
     fn import_target_at_position(&self, file: &ProjectFile, position: Position) -> Option<ImportTarget> {
         let offset = file.line_map().position_to_offset(position, file.source_text())?;
         let node_idx = find_node_at_offset(file.arena(), offset);
@@ -1069,6 +1383,21 @@ impl Project {
             .find(|candidate| self.files.contains_key(candidate))
     }
 
+    fn module_specifier_from_files(&self, from_file: &str, target_file: &str) -> Option<String> {
+        let from_dir = Path::new(from_file).parent().unwrap_or_else(|| Path::new(""));
+        let target_path = strip_ts_extension(Path::new(target_file));
+        let relative = relative_path(from_dir, &target_path);
+
+        let mut spec = path_to_string(&relative).replace('\\', "/");
+        if spec.is_empty() {
+            return None;
+        }
+        if !spec.starts_with('.') {
+            spec = format!("./{}", spec);
+        }
+        Some(spec)
+    }
+
     fn module_specifier_candidates(&self, from_file: &str, module_specifier: &str) -> Vec<String> {
         let mut candidates = Vec::new();
 
@@ -1079,19 +1408,28 @@ impl Project {
             if joined.extension().is_some() {
                 candidates.push(path_to_string(&joined));
             } else {
-                candidates.push(path_to_string(&joined.with_extension("ts")));
-                candidates.push(path_to_string(&joined.join("index.ts")));
+                for ext in TS_EXTENSION_CANDIDATES {
+                    candidates.push(path_to_string(&joined.with_extension(ext)));
+                }
+                for ext in TS_EXTENSION_CANDIDATES {
+                    candidates.push(path_to_string(&joined.join("index").with_extension(ext)));
+                }
             }
         } else {
             candidates.push(module_specifier.to_string());
-            if !module_specifier.ends_with(".ts") {
-                candidates.push(format!("{}.ts", module_specifier));
+            if Path::new(module_specifier).extension().is_none() {
+                for ext in TS_EXTENSION_CANDIDATES {
+                    candidates.push(format!("{}.{}", module_specifier, ext));
+                }
             }
         }
 
         candidates
     }
 }
+
+const TS_EXTENSION_CANDIDATES: [&str; 7] = ["ts", "tsx", "d.ts", "mts", "cts", "d.mts", "d.cts"];
+const TS_EXTENSION_SUFFIXES: [&str; 7] = [".d.ts", ".d.mts", ".d.cts", ".ts", ".tsx", ".mts", ".cts"];
 
 fn normalize_path(path: &Path) -> PathBuf {
     let mut normalized = PathBuf::new();
@@ -1109,6 +1447,62 @@ fn normalize_path(path: &Path) -> PathBuf {
     }
 
     normalized
+}
+
+fn strip_ts_extension(path: &Path) -> PathBuf {
+    let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+        return path.to_path_buf();
+    };
+
+    for suffix in TS_EXTENSION_SUFFIXES {
+        if file_name.ends_with(suffix) {
+            let base_name = &file_name[..file_name.len() - suffix.len()];
+            if base_name.is_empty() {
+                return path.to_path_buf();
+            }
+            let mut base = PathBuf::new();
+            if let Some(parent) = path.parent() {
+                base.push(parent);
+            }
+            base.push(base_name);
+            return base;
+        }
+    }
+
+    path.to_path_buf()
+}
+
+fn relative_path(from: &Path, to: &Path) -> PathBuf {
+    let from_components: Vec<_> = from
+        .components()
+        .filter(|c| *c != Component::CurDir)
+        .collect();
+    let to_components: Vec<_> = to
+        .components()
+        .filter(|c| *c != Component::CurDir)
+        .collect();
+
+    let mut common = 0;
+    while common < from_components.len()
+        && common < to_components.len()
+        && from_components[common] == to_components[common]
+    {
+        common += 1;
+    }
+
+    let mut result = PathBuf::new();
+    for _ in common..from_components.len() {
+        result.push("..");
+    }
+    for component in &to_components[common..] {
+        result.push(component.as_os_str());
+    }
+
+    if result.as_os_str().is_empty() {
+        result.push(".");
+    }
+
+    result
 }
 
 fn path_to_string(path: &Path) -> String {

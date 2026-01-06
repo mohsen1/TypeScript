@@ -1471,6 +1471,203 @@ const val = obj.x;
 }
 
 #[test]
+fn test_checker_lowers_full_source_file() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::{TypeKey, SymbolRef};
+
+    let source = r#"
+interface Foo { x: number; }
+type Bar = Foo | string;
+type Baz = [string, number];
+type Qux = { [key: string]: Foo };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let foo_sym = binder.file_locals.get("Foo").expect("Foo should exist");
+    let bar_sym = binder.file_locals.get("Bar").expect("Bar should exist");
+    let baz_sym = binder.file_locals.get("Baz").expect("Baz should exist");
+    let qux_sym = binder.file_locals.get("Qux").expect("Qux should exist");
+
+    let foo_type = checker.get_type_of_symbol(foo_sym);
+    let foo_key = types.lookup(foo_type).expect("Foo type should exist");
+    match foo_key {
+        TypeKey::Object(props) => {
+            let prop = props.iter()
+                .find(|prop| types.resolve_atom(prop.name) == "x")
+                .expect("Expected property x");
+            assert_eq!(prop.type_id, TypeId::NUMBER);
+        }
+        _ => panic!("Expected Foo to be Object type, got {:?}", foo_key),
+    }
+
+    let bar_type = checker.get_type_of_symbol(bar_sym);
+    let bar_key = types.lookup(bar_type).expect("Bar type should exist");
+    match bar_key {
+        TypeKey::Union(members) => {
+            assert_eq!(members.len(), 2);
+            assert!(members.contains(&TypeId::STRING));
+            assert!(members.contains(&foo_type));
+        }
+        _ => panic!("Expected Bar to be Union type, got {:?}", bar_key),
+    }
+
+    let baz_type = checker.get_type_of_symbol(baz_sym);
+    let baz_key = types.lookup(baz_type).expect("Baz type should exist");
+    match baz_key {
+        TypeKey::Tuple(elements) => {
+            assert_eq!(elements.len(), 2);
+            assert_eq!(elements[0].type_id, TypeId::STRING);
+            assert_eq!(elements[1].type_id, TypeId::NUMBER);
+        }
+        _ => panic!("Expected Baz to be Tuple type, got {:?}", baz_key),
+    }
+
+    let qux_type = checker.get_type_of_symbol(qux_sym);
+    let qux_key = types.lookup(qux_type).expect("Qux type should exist");
+    match qux_key {
+        TypeKey::ObjectWithIndex(shape) => {
+            let string_index = shape.string_index.expect("Expected string index signature");
+            assert_eq!(string_index.key_type, TypeId::STRING);
+            let value_key = types.lookup(string_index.value_type).expect("Index value type should exist");
+            match value_key {
+                TypeKey::Ref(SymbolRef(sym_id)) => assert_eq!(sym_id, foo_sym.0),
+                _ => panic!("Expected Foo reference type, got {:?}", value_key),
+            }
+        }
+        _ => panic!("Expected Qux to be ObjectWithIndex type, got {:?}", qux_key),
+    }
+}
+
+#[test]
+fn test_checker_cross_namespace_type_reference() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+namespace Outer {
+    export interface Inner { y: string; }
+}
+type Alias = Outer.Inner;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let alias_sym = binder.file_locals.get("Alias").expect("Alias should exist");
+    let alias_type = checker.get_type_of_symbol(alias_sym);
+    let alias_key = types.lookup(alias_type).expect("Alias type should exist");
+    match alias_key {
+        TypeKey::Object(props) => {
+            let prop = props.iter()
+                .find(|prop| types.resolve_atom(prop.name) == "y")
+                .expect("Expected property y");
+            assert_eq!(prop.type_id, TypeId::STRING);
+        }
+        _ => panic!("Expected Alias to resolve to Object type, got {:?}", alias_key),
+    }
+}
+
+#[test]
+fn test_checker_module_augmentation_merges_exports() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+namespace Outer {
+    export interface A { x: number; }
+}
+namespace Outer {
+    export interface B { y: string; }
+}
+type AliasA = Outer.A;
+type AliasB = Outer.B;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let alias_a_sym = binder.file_locals.get("AliasA").expect("AliasA should exist");
+    let alias_b_sym = binder.file_locals.get("AliasB").expect("AliasB should exist");
+
+    let alias_a_type = checker.get_type_of_symbol(alias_a_sym);
+    let alias_b_type = checker.get_type_of_symbol(alias_b_sym);
+
+    let alias_a_key = types.lookup(alias_a_type).expect("AliasA type should exist");
+    match alias_a_key {
+        TypeKey::Object(props) => {
+            let prop = props.iter()
+                .find(|prop| types.resolve_atom(prop.name) == "x")
+                .expect("Expected property x");
+            assert_eq!(prop.type_id, TypeId::NUMBER);
+        }
+        _ => panic!("Expected AliasA to resolve to Object type, got {:?}", alias_a_key),
+    }
+
+    let alias_b_key = types.lookup(alias_b_type).expect("AliasB type should exist");
+    match alias_b_key {
+        TypeKey::Object(props) => {
+            let prop = props.iter()
+                .find(|prop| types.resolve_atom(prop.name) == "y")
+                .expect("Expected property y");
+            assert_eq!(prop.type_id, TypeId::STRING);
+        }
+        _ => panic!("Expected AliasB to resolve to Object type, got {:?}", alias_b_key),
+    }
+}
+
+#[test]
+fn test_checker_circular_type_aliases() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type A = B;
+type B = A;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let a_sym = binder.file_locals.get("A").expect("A should exist");
+    let b_sym = binder.file_locals.get("B").expect("B should exist");
+
+    assert_eq!(checker.get_type_of_symbol(a_sym), TypeId::ANY);
+    assert_eq!(checker.get_type_of_symbol(b_sym), TypeId::ANY);
+}
+
+#[test]
 fn test_index_signature_at_solver_level() {
     use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult, ObjectShape, IndexSignature};
     use std::sync::Arc;

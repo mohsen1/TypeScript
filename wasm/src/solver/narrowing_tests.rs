@@ -1,5 +1,4 @@
 use super::*;
-use std::sync::Arc;
 
 // =============================================================================
 // Discriminant Detection Tests
@@ -8,16 +7,17 @@ use std::sync::Arc;
 #[test]
 fn test_find_discriminants_basic() {
     let interner = TypeInterner::new();
+    let type_name = interner.intern_string("type");
 
     // type Action = { type: "add" } | { type: "remove" }
     let type_add = interner.literal_string("add");
     let type_remove = interner.literal_string("remove");
 
     let member1 = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("type"), type_id: type_add, optional: false, readonly: false },
+        PropertyInfo { name: type_name, type_id: type_add, optional: false, readonly: false },
     ]);
     let member2 = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("type"), type_id: type_remove, optional: false, readonly: false },
+        PropertyInfo { name: type_name, type_id: type_remove, optional: false, readonly: false },
     ]);
 
     let union = interner.union(vec![member1, member2]);
@@ -25,13 +25,15 @@ fn test_find_discriminants_basic() {
     let discriminants = find_discriminants(&interner, union);
 
     assert_eq!(discriminants.len(), 1);
-    assert_eq!(discriminants[0].property_name.as_ref(), "type");
+    assert_eq!(discriminants[0].property_name, type_name);
     assert_eq!(discriminants[0].variants.len(), 2);
 }
 
 #[test]
 fn test_find_discriminants_multiple_props() {
     let interner = TypeInterner::new();
+    let kind_name = interner.intern_string("kind");
+    let type_name = interner.intern_string("type");
 
     // type Action = { kind: "a", type: 1 } | { kind: "b", type: 2 }
     let kind_a = interner.literal_string("a");
@@ -40,12 +42,12 @@ fn test_find_discriminants_multiple_props() {
     let type_2 = interner.literal_number(2.0);
 
     let member1 = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("kind"), type_id: kind_a, optional: false, readonly: false },
-        PropertyInfo { name: interner.intern_string("type"), type_id: type_1, optional: false, readonly: false },
+        PropertyInfo { name: kind_name, type_id: kind_a, optional: false, readonly: false },
+        PropertyInfo { name: type_name, type_id: type_1, optional: false, readonly: false },
     ]);
     let member2 = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("kind"), type_id: kind_b, optional: false, readonly: false },
-        PropertyInfo { name: interner.intern_string("type"), type_id: type_2, optional: false, readonly: false },
+        PropertyInfo { name: kind_name, type_id: kind_b, optional: false, readonly: false },
+        PropertyInfo { name: type_name, type_id: type_2, optional: false, readonly: false },
     ]);
 
     let union = interner.union(vec![member1, member2]);
@@ -59,14 +61,15 @@ fn test_find_discriminants_multiple_props() {
 #[test]
 fn test_find_discriminants_non_literal() {
     let interner = TypeInterner::new();
+    let type_name = interner.intern_string("type");
 
     // type T = { type: string } | { type: string }
     // Not a discriminated union - type is not literal
     let member1 = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("type"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: type_name, type_id: TypeId::STRING, optional: false, readonly: false },
     ]);
     let member2 = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("type"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: type_name, type_id: TypeId::STRING, optional: false, readonly: false },
     ]);
 
     let union = interner.union(vec![member1, member2]);
@@ -80,6 +83,8 @@ fn test_find_discriminants_non_literal() {
 #[test]
 fn test_find_discriminants_missing_property() {
     let interner = TypeInterner::new();
+    let type_name = interner.intern_string("type");
+    let kind_name = interner.intern_string("kind");
 
     // type T = { type: "a" } | { kind: "b" }
     // Not a discriminated union - no common property
@@ -87,10 +92,10 @@ fn test_find_discriminants_missing_property() {
     let kind_b = interner.literal_string("b");
 
     let member1 = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("type"), type_id: type_a, optional: false, readonly: false },
+        PropertyInfo { name: type_name, type_id: type_a, optional: false, readonly: false },
     ]);
     let member2 = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("kind"), type_id: kind_b, optional: false, readonly: false },
+        PropertyInfo { name: kind_name, type_id: kind_b, optional: false, readonly: false },
     ]);
 
     let union = interner.union(vec![member1, member2]);
@@ -107,52 +112,55 @@ fn test_find_discriminants_missing_property() {
 #[test]
 fn test_narrow_by_discriminant() {
     let interner = TypeInterner::new();
+    let type_name = interner.intern_string("type");
 
     // type Action = { type: "add", value: number } | { type: "remove", id: string }
     let type_add = interner.literal_string("add");
     let type_remove = interner.literal_string("remove");
 
     let member_add = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("type"), type_id: type_add, optional: false, readonly: false },
+        PropertyInfo { name: type_name, type_id: type_add, optional: false, readonly: false },
         PropertyInfo { name: interner.intern_string("value"), type_id: TypeId::NUMBER, optional: false, readonly: false },
     ]);
     let member_remove = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("type"), type_id: type_remove, optional: false, readonly: false },
+        PropertyInfo { name: type_name, type_id: type_remove, optional: false, readonly: false },
         PropertyInfo { name: interner.intern_string("id"), type_id: TypeId::STRING, optional: false, readonly: false },
     ]);
 
     let union = interner.union(vec![member_add, member_remove]);
 
     // Narrow to "add" variant
-    let narrowed = narrow_by_discriminant(&interner, union, "type", type_add);
+    let narrowed = narrow_by_discriminant(&interner, union, type_name, type_add);
     assert_eq!(narrowed, member_add);
 
     // Narrow to "remove" variant
-    let narrowed = narrow_by_discriminant(&interner, union, "type", type_remove);
+    let narrowed = narrow_by_discriminant(&interner, union, type_name, type_remove);
     assert_eq!(narrowed, member_remove);
 }
 
 #[test]
 fn test_narrow_by_discriminant_no_match() {
     let interner = TypeInterner::new();
+    let type_name = interner.intern_string("type");
 
     let type_add = interner.literal_string("add");
     let type_unknown = interner.literal_string("unknown");
 
     let member = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("type"), type_id: type_add, optional: false, readonly: false },
+        PropertyInfo { name: type_name, type_id: type_add, optional: false, readonly: false },
     ]);
 
     let union = interner.union(vec![member]);
 
     // Narrow to non-existent variant - returns original
-    let narrowed = narrow_by_discriminant(&interner, union, "type", type_unknown);
+    let narrowed = narrow_by_discriminant(&interner, union, type_name, type_unknown);
     assert_eq!(narrowed, union);
 }
 
 #[test]
 fn test_narrow_excluding_discriminant() {
     let interner = TypeInterner::new();
+    let type_name = interner.intern_string("type");
 
     // type Action = { type: "a" } | { type: "b" } | { type: "c" }
     let type_a = interner.literal_string("a");
@@ -160,13 +168,13 @@ fn test_narrow_excluding_discriminant() {
     let type_c = interner.literal_string("c");
 
     let member_a = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("type"), type_id: type_a, optional: false, readonly: false },
+        PropertyInfo { name: type_name, type_id: type_a, optional: false, readonly: false },
     ]);
     let member_b = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("type"), type_id: type_b, optional: false, readonly: false },
+        PropertyInfo { name: type_name, type_id: type_b, optional: false, readonly: false },
     ]);
     let member_c = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("type"), type_id: type_c, optional: false, readonly: false },
+        PropertyInfo { name: type_name, type_id: type_c, optional: false, readonly: false },
     ]);
 
     let union = interner.union(vec![member_a, member_b, member_c]);
@@ -174,7 +182,7 @@ fn test_narrow_excluding_discriminant() {
     let ctx = NarrowingContext::new(&interner);
 
     // Exclude "a" - should get "b" | "c"
-    let narrowed = ctx.narrow_by_excluding_discriminant(union, "type", type_a);
+    let narrowed = ctx.narrow_by_excluding_discriminant(union, type_name, type_a);
     let expected = interner.union(vec![member_b, member_c]);
     assert_eq!(narrowed, expected);
 }

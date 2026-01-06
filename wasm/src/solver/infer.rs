@@ -11,8 +11,7 @@
 //! - Efficient unification with path compression
 
 use ena::unify::{InPlaceUnificationTable, UnifyKey, UnifyValue, NoError};
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
+use std::collections::HashSet;
 use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::TypeDatabase;
@@ -134,11 +133,9 @@ pub struct InferenceContext<'a> {
     /// Unification table for inference variables
     table: InPlaceUnificationTable<InferenceVar>,
     /// Map from type parameter names to inference variables
-    type_params: Vec<(Arc<str>, InferenceVar)>,
-    /// Map from inference vars to interned names for occurs-checks
-    type_param_atoms: HashMap<u32, Atom>,
+    type_params: Vec<(Atom, InferenceVar)>,
     /// Constraints for each inference variable
-    constraints: HashMap<u32, ConstraintSet>,
+    constraints: Vec<ConstraintSet>,
 }
 
 impl<'a> InferenceContext<'a> {
@@ -147,29 +144,30 @@ impl<'a> InferenceContext<'a> {
             interner,
             table: InPlaceUnificationTable::new(),
             type_params: Vec::new(),
-            type_param_atoms: HashMap::new(),
-            constraints: HashMap::new(),
+            constraints: Vec::new(),
         }
     }
 
     /// Create a fresh inference variable
     pub fn fresh_var(&mut self) -> InferenceVar {
-        self.table.new_key(InferenceValue(None))
+        let var = self.table.new_key(InferenceValue(None));
+        let idx = var.0 as usize;
+        debug_assert_eq!(idx, self.constraints.len());
+        self.constraints.push(ConstraintSet::new());
+        var
     }
 
     /// Create an inference variable for a type parameter
-    pub fn fresh_type_param(&mut self, name: Arc<str>) -> InferenceVar {
+    pub fn fresh_type_param(&mut self, name: Atom) -> InferenceVar {
         let var = self.fresh_var();
-        let atom = self.interner.intern_string(name.as_ref());
         self.type_params.push((name, var));
-        self.type_param_atoms.insert(var.0, atom);
         var
     }
 
     /// Look up an inference variable by type parameter name
-    pub fn find_type_param(&self, name: &str) -> Option<InferenceVar> {
+    pub fn find_type_param(&self, name: Atom) -> Option<InferenceVar> {
         self.type_params.iter()
-            .find(|(n, _)| n.as_ref() == name)
+            .find(|(n, _)| *n == name)
             .map(|(_, v)| *v)
     }
 
@@ -227,16 +225,17 @@ impl<'a> InferenceContext<'a> {
         })?;
 
         let new_root = self.table.find(root_a);
+        let root_a_idx = root_a.0 as usize;
+        let root_b_idx = root_b.0 as usize;
+        let new_root_idx = new_root.0 as usize;
+        debug_assert!(new_root_idx == root_a_idx || new_root_idx == root_b_idx);
+
         let mut merged = ConstraintSet::new();
-        if let Some(constraints) = self.constraints.remove(&root_a.0) {
-            merged.merge_from(constraints);
+        merged.merge_from(std::mem::take(&mut self.constraints[root_a_idx]));
+        if root_b_idx != root_a_idx {
+            merged.merge_from(std::mem::take(&mut self.constraints[root_b_idx]));
         }
-        if let Some(constraints) = self.constraints.remove(&root_b.0) {
-            merged.merge_from(constraints);
-        }
-        if !merged.is_empty() {
-            self.constraints.insert(new_root.0, merged);
-        }
+        self.constraints[new_root_idx] = merged;
         Ok(())
     }
 
@@ -266,13 +265,13 @@ impl<'a> InferenceContext<'a> {
 
     fn occurs_in(&mut self, var: InferenceVar, ty: TypeId) -> bool {
         let root = self.table.find(var);
-        if self.type_param_atoms.is_empty() {
+        if self.type_params.is_empty() {
             return false;
         }
 
         let mut visited = HashSet::new();
-        for (&var_id, &atom) in &self.type_param_atoms {
-            if self.table.find(InferenceVar(var_id)) == root {
+        for &(atom, param_var) in &self.type_params {
+            if self.table.find(param_var) == root {
                 if self.type_contains_param(ty, atom, &mut visited) {
                     return true;
                 }
@@ -382,13 +381,13 @@ impl<'a> InferenceContext<'a> {
     }
 
     /// Resolve all type parameters to concrete types
-    pub fn resolve_all(&mut self) -> Result<Vec<(Arc<str>, TypeId)>, InferenceError> {
+    pub fn resolve_all(&mut self) -> Result<Vec<(Atom, TypeId)>, InferenceError> {
         // Clone type_params to avoid borrow conflict
         let type_params: Vec<_> = self.type_params.clone();
         let mut results = Vec::new();
         for (name, var) in type_params {
             match self.probe(var) {
-                Some(ty) => results.push((name.clone(), ty)),
+                Some(ty) => results.push((name, ty)),
                 None => return Err(InferenceError::Unresolved(var)),
             }
         }
@@ -409,26 +408,25 @@ impl<'a> InferenceContext<'a> {
     /// This is used when an argument type flows into a type parameter.
     pub fn add_lower_bound(&mut self, var: InferenceVar, ty: TypeId) {
         let root = self.table.find(var);
-        self.constraints
-            .entry(root.0)
-            .or_insert_with(ConstraintSet::new)
-            .add_lower_bound(ty);
+        self.constraints[root.0 as usize].add_lower_bound(ty);
     }
 
     /// Add an upper bound constraint: var <: ty
     /// This is used for `extends` constraints on type parameters.
     pub fn add_upper_bound(&mut self, var: InferenceVar, ty: TypeId) {
         let root = self.table.find(var);
-        self.constraints
-            .entry(root.0)
-            .or_insert_with(ConstraintSet::new)
-            .add_upper_bound(ty);
+        self.constraints[root.0 as usize].add_upper_bound(ty);
     }
 
     /// Get the constraints for a variable
     pub fn get_constraints(&mut self, var: InferenceVar) -> Option<&ConstraintSet> {
         let root = self.table.find(var);
-        self.constraints.get(&root.0)
+        let constraints = &self.constraints[root.0 as usize];
+        if constraints.is_empty() {
+            None
+        } else {
+            Some(constraints)
+        }
     }
 
     /// Collect a constraint from an assignment: source flows into target
@@ -460,7 +458,7 @@ impl<'a> InferenceContext<'a> {
         }
 
         // Get constraints
-        let constraints = self.constraints.get(&root.0).cloned().unwrap_or_default();
+        let constraints = self.constraints[root.0 as usize].clone();
         let upper_bounds = constraints.upper_bounds.clone();
 
         // Compute result from constraints
@@ -501,7 +499,7 @@ impl<'a> InferenceContext<'a> {
     }
 
     /// Resolve all type parameters using constraints.
-    pub fn resolve_all_with_constraints(&mut self) -> Result<Vec<(Arc<str>, TypeId)>, InferenceError> {
+    pub fn resolve_all_with_constraints(&mut self) -> Result<Vec<(Atom, TypeId)>, InferenceError> {
         let type_params: Vec<_> = self.type_params.clone();
         let mut results = Vec::new();
 

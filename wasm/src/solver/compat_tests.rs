@@ -515,10 +515,121 @@ fn test_empty_object_rejects_nullish_and_unknown() {
 }
 
 #[test]
+fn test_object_keyword_accepts_non_primitives() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let name = interner.intern_string("name");
+    let obj = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+    }]);
+    assert!(checker.is_assignable(obj, TypeId::OBJECT));
+
+    let array = interner.array(TypeId::NUMBER);
+    assert!(checker.is_assignable(array, TypeId::OBJECT));
+
+    let tuple = interner.tuple(vec![TupleElement {
+        type_id: TypeId::NUMBER,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    assert!(checker.is_assignable(tuple, TypeId::OBJECT));
+
+    let func = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+    assert!(checker.is_assignable(func, TypeId::OBJECT));
+}
+
+#[test]
 fn test_object_keyword_rejects_primitives() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
 
     assert!(!checker.is_assignable(TypeId::STRING, TypeId::OBJECT));
     assert!(!checker.is_assignable(TypeId::NUMBER, TypeId::OBJECT));
+}
+
+#[test]
+fn test_rest_any_callable_target_from_function() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    checker.set_strict_function_types(true);
+
+    let rest_any = interner.array(TypeId::ANY);
+    let target = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: vec![ParamInfo {
+                name: None,
+                type_id: rest_any,
+                optional: false,
+                rest: true,
+            }],
+            return_type: TypeId::VOID,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    let source = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    assert!(checker.is_assignable(source, target));
+}
+
+#[test]
+fn test_rest_unknown_callable_target_from_callable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    checker.set_strict_function_types(true);
+
+    let rest_unknown = interner.array(TypeId::UNKNOWN);
+    let target = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: vec![ParamInfo {
+                name: None,
+                type_id: rest_unknown,
+                optional: false,
+                rest: true,
+            }],
+            return_type: TypeId::VOID,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    let source = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: vec![ParamInfo {
+                name: None,
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            }],
+            return_type: TypeId::VOID,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    assert!(checker.is_assignable(source, target));
 }

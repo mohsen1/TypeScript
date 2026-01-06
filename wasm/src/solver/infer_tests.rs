@@ -22,16 +22,18 @@ fn test_inference_basic() {
 fn test_inference_type_param() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
 
     // Create type parameter T
-    let var_t = ctx.fresh_type_param(Arc::from("T"));
+    let var_t = ctx.fresh_type_param(t_name);
 
     // Look it up
-    let found = ctx.find_type_param("T");
+    let found = ctx.find_type_param(t_name);
     assert_eq!(found, Some(var_t));
 
     // Not found
-    let not_found = ctx.find_type_param("U");
+    let not_found = ctx.find_type_param(u_name);
     assert!(not_found.is_none());
 }
 
@@ -54,9 +56,11 @@ fn test_inference_conflict() {
 fn test_inference_unify_vars() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
 
-    let var_t = ctx.fresh_type_param(Arc::from("T"));
-    let var_u = ctx.fresh_type_param(Arc::from("U"));
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
 
     ctx.unify_vars(var_t, var_u).unwrap();
     ctx.unify_var_type(var_u, TypeId::STRING).unwrap();
@@ -89,10 +93,11 @@ fn test_inference_unify_vars_conflict() {
 fn test_inference_occurs_check() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
 
-    let var_t = ctx.fresh_type_param(Arc::from("T"));
+    let var_t = ctx.fresh_type_param(t_name);
     let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
-        name: interner.intern_string("T"),
+        name: t_name,
         constraint: None,
         default: None,
     }));
@@ -181,8 +186,9 @@ fn test_constraint_merge_on_unify() {
 fn test_resolve_single_lower_bound() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
 
-    let var = ctx.fresh_type_param(Arc::from("T"));
+    let var = ctx.fresh_type_param(t_name);
 
     // Add lower bound: string <: T
     ctx.add_lower_bound(var, TypeId::STRING);
@@ -196,8 +202,9 @@ fn test_resolve_single_lower_bound() {
 fn test_resolve_multiple_lower_bounds_union() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
 
-    let var = ctx.fresh_type_param(Arc::from("T"));
+    let var = ctx.fresh_type_param(t_name);
 
     // foo<T>(a: T, b: T) called with foo("hello", 42)
     let hello = interner.literal_string("hello");
@@ -217,7 +224,7 @@ fn test_resolve_upper_bound_only() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
 
-    let var = ctx.fresh_type_param(Arc::from("T"));
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
 
     // function f<T extends string>() - upper bound only
     ctx.add_upper_bound(var, TypeId::STRING);
@@ -231,8 +238,9 @@ fn test_resolve_upper_bound_only() {
 fn test_resolve_multiple_upper_bounds_intersection() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
 
-    let var = ctx.fresh_type_param(Arc::from("T"));
+    let var = ctx.fresh_type_param(t_name);
 
     ctx.add_upper_bound(var, TypeId::STRING);
     ctx.add_upper_bound(var, TypeId::NUMBER);
@@ -246,8 +254,9 @@ fn test_resolve_multiple_upper_bounds_intersection() {
 fn test_resolve_bounds_valid() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
 
-    let var = ctx.fresh_type_param(Arc::from("T"));
+    let var = ctx.fresh_type_param(t_name);
 
     // function f<T extends string>(x: T) called with f("hello")
     // Lower: "hello" <: T, Upper: T <: string
@@ -264,8 +273,9 @@ fn test_resolve_bounds_valid() {
 fn test_resolve_bounds_conflict() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
 
-    let var = ctx.fresh_type_param(Arc::from("T"));
+    let var = ctx.fresh_type_param(t_name);
 
     ctx.add_lower_bound(var, TypeId::STRING);
     ctx.add_upper_bound(var, TypeId::NUMBER);
@@ -286,7 +296,7 @@ fn test_resolve_no_constraints() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
 
-    let var = ctx.fresh_type_param(Arc::from("T"));
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
 
     // No constraints at all
     let result = ctx.resolve_with_constraints(var).unwrap();
@@ -363,10 +373,12 @@ fn test_best_common_type_all_never() {
 fn test_resolve_all_with_constraints() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+    let u_name = interner.intern_string("U");
 
     // Simulate: function foo<T, U>(a: T, b: U) called with foo("hello", 42)
-    let var_t = ctx.fresh_type_param(Arc::from("T"));
-    let var_u = ctx.fresh_type_param(Arc::from("U"));
+    let var_t = ctx.fresh_type_param(t_name);
+    let var_u = ctx.fresh_type_param(u_name);
 
     let hello = interner.literal_string("hello");
     let forty_two = interner.literal_number(42.0);
@@ -377,6 +389,6 @@ fn test_resolve_all_with_constraints() {
     let results = ctx.resolve_all_with_constraints().unwrap();
 
     assert_eq!(results.len(), 2);
-    assert_eq!(results[0], (Arc::from("T"), hello));
-    assert_eq!(results[1], (Arc::from("U"), forty_two));
+    assert_eq!(results[0], (t_name, hello));
+    assert_eq!(results[1], (u_name, forty_two));
 }

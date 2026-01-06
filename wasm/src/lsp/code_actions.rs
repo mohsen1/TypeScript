@@ -11,11 +11,10 @@
 //! - Organize Imports (sort-only)
 //! - Remove Unused Import (diagnostic-based quick fix)
 //! - Add Missing Property (diagnostic-based quick fix, local declarations)
-//! - Add Missing Import (diagnostic-based quick fix, candidate-based)
+//! - Add Missing Import (diagnostic-based quick fix, project-aware)
 //!
 //! Future features:
 //! - Remove Unused Declarations (diagnostic-based quick fix)
-//! - Add Missing Import (project-wide candidate generation)
 
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
@@ -178,7 +177,7 @@ impl<'a> CodeActionProvider<'a> {
                 actions.extend(self.missing_import_quickfixes(root, diag, &context.import_candidates));
             }
         }
-        // TODO: Feed project-wide import candidates into code action context.
+        // TODO: Wire import candidates into single-file wasm bindings.
 
         // Source Actions (file-level)
         let request_organize = context.only

@@ -181,9 +181,7 @@ impl<'a> CallEvaluator<'a> {
 
         // 1. Create inference variables and placeholders for each type parameter
         for tp in &func.type_params {
-            // Resolve Atom to String for inference context (still uses Arc<str>)
-            let tp_name_str = self.interner.resolve_atom(tp.name);
-            let var = infer_ctx.fresh_type_param(std::sync::Arc::from(tp_name_str.as_str()));
+            let var = infer_ctx.fresh_type_param(tp.name);
             type_param_vars.push(var);
 
             // Create a unique placeholder type for this inference variable
@@ -196,8 +194,7 @@ impl<'a> CallEvaluator<'a> {
             });
             let placeholder_id = self.interner.intern(placeholder_key);
 
-            // TypeSubstitution still uses Arc<str>, so resolve the atom
-            substitution.insert(std::sync::Arc::from(self.interner.resolve_atom(tp.name).as_str()), placeholder_id);
+            substitution.insert(tp.name, placeholder_id);
             var_map.insert(placeholder_id, var);
         }
 
@@ -253,8 +250,7 @@ impl<'a> CallEvaluator<'a> {
                 TypeId::UNKNOWN
             };
 
-            let name_str = self.interner.resolve_atom(tp.name);
-            final_subst.insert(std::sync::Arc::from(name_str.as_str()), ty);
+            final_subst.insert(tp.name, ty);
 
             if let Some(constraint) = tp.constraint {
                 let constraint_ty = instantiate_type(self.interner, constraint, &final_subst);

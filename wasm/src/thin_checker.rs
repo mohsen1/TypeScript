@@ -422,6 +422,39 @@ impl<'a> ThinCheckerState<'a> {
         TypeId::ANY
     }
 
+    /// Resolve a qualified name or identifier to a symbol ID.
+    fn resolve_qualified_symbol(&self, idx: NodeIndex) -> Option<SymbolId> {
+        let node = self.ctx.arena.get(idx)?;
+
+        if node.kind == SyntaxKind::Identifier as u16 {
+            return self.ctx.binder.resolve_identifier(self.ctx.arena, idx);
+        }
+
+        if node.kind != syntax_kind_ext::QUALIFIED_NAME {
+            return None;
+        }
+
+        let qn = self.ctx.arena.get_qualified_name(node)?;
+        let left_sym = self.resolve_qualified_symbol(qn.left)?;
+        let right_name = self.ctx.arena.get(qn.right)
+            .and_then(|node| self.ctx.arena.get_identifier(node))
+            .map(|ident| ident.escaped_text.as_str())?;
+
+        let left_symbol = self.ctx.binder.get_symbol(left_sym)?;
+        let exports = left_symbol.exports.as_ref()?;
+        exports.get(right_name)
+    }
+
+    fn resolve_type_symbol_for_lowering(&self, idx: NodeIndex) -> Option<u32> {
+        let sym_id = self.resolve_qualified_symbol(idx)?;
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        if (symbol.flags & symbol_flags::TYPE) != 0 {
+            Some(sym_id.0)
+        } else {
+            None
+        }
+    }
+
     /// Resolve a qualified name (A.B) to a type.
     /// Returns the type of the rightmost member, or reports TS2694 if not found.
     fn resolve_qualified_name(&mut self, idx: NodeIndex) -> TypeId {
@@ -1060,13 +1093,7 @@ impl<'a> ThinCheckerState<'a> {
         // Interface - return interface type with call signatures
         if flags & symbol_flags::INTERFACE != 0 {
             if !symbol.declarations.is_empty() {
-                let resolver = |node_idx: NodeIndex| {
-                    self.ctx.binder.resolve_identifier(self.ctx.arena, node_idx).and_then(|id| {
-                        self.ctx.binder.get_symbol(id)
-                            .filter(|symbol| (symbol.flags & symbol_flags::TYPE) != 0)
-                            .map(|_| id.0)
-                    })
-                };
+                let resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
                 let lowering = TypeLowering::with_resolver(self.ctx.arena, self.ctx.types, &resolver);
                 return lowering.lower_interface_declarations(&symbol.declarations);
             }
@@ -1079,8 +1106,13 @@ impl<'a> ThinCheckerState<'a> {
         // Type alias - resolve using checker's get_type_from_type_node to properly resolve symbols
         if flags & symbol_flags::TYPE_ALIAS != 0 {
             // Get the type node from the type alias declaration
-            if !value_decl.is_none() {
-                if let Some(node) = self.ctx.arena.get(value_decl) {
+            let decl_idx = if !value_decl.is_none() {
+                value_decl
+            } else {
+                symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+            };
+            if !decl_idx.is_none() {
+                if let Some(node) = self.ctx.arena.get(decl_idx) {
                     if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
                         // Use checker's type resolution which can resolve type references through binder
                         return self.get_type_from_type_node(type_alias.type_node);
@@ -1116,13 +1148,7 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(node) = self.ctx.arena.get(value_decl) {
                         if let Some(param) = self.ctx.arena.get_parameter(node) {
                         if !param.type_annotation.is_none() {
-                            let resolver = |node_idx: NodeIndex| {
-                                self.ctx.binder.resolve_identifier(self.ctx.arena, node_idx).and_then(|id| {
-                                    self.ctx.binder.get_symbol(id)
-                                        .filter(|symbol| (symbol.flags & symbol_flags::TYPE) != 0)
-                                        .map(|_| id.0)
-                                })
-                            };
+                            let resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
                             let lowering = TypeLowering::with_resolver(self.ctx.arena, self.ctx.types, &resolver);
                             return lowering.lower_type(param.type_annotation);
                         }
@@ -2042,7 +2068,7 @@ impl<'a> ThinCheckerState<'a> {
     ///
     /// Example: `action.type === "add"` narrows `{ type: "add" } | { type: "remove" }`
     /// to `{ type: "add" }`.
-    pub fn narrow_by_discriminant(&self, union_type: TypeId, property_name: &str, literal_value: TypeId) -> TypeId {
+    pub fn narrow_by_discriminant(&self, union_type: TypeId, property_name: Atom, literal_value: TypeId) -> TypeId {
         use crate::solver::NarrowingContext;
         let ctx = NarrowingContext::new(self.ctx.types);
         ctx.narrow_by_discriminant(union_type, property_name, literal_value)
@@ -2051,7 +2077,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Narrow a discriminated union by excluding a discriminant value.
     ///
     /// Example: `action.type !== "add"` narrows the union to exclude the "add" variant.
-    pub fn narrow_by_excluding_discriminant(&self, union_type: TypeId, property_name: &str, excluded_value: TypeId) -> TypeId {
+    pub fn narrow_by_excluding_discriminant(&self, union_type: TypeId, property_name: Atom, excluded_value: TypeId) -> TypeId {
         use crate::solver::NarrowingContext;
         let ctx = NarrowingContext::new(self.ctx.types);
         ctx.narrow_by_excluding_discriminant(union_type, property_name, excluded_value)
@@ -2110,13 +2136,7 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Use TypeLowering which handles all type nodes
-        let resolver = |node_idx: NodeIndex| {
-            self.ctx.binder.resolve_identifier(self.ctx.arena, node_idx).and_then(|id| {
-                self.ctx.binder.get_symbol(id)
-                    .filter(|symbol| (symbol.flags & symbol_flags::TYPE) != 0)
-                    .map(|_| id.0)
-            })
-        };
+        let resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
         let lowering = TypeLowering::with_resolver(self.ctx.arena, self.ctx.types, &resolver);
         lowering.lower_type(idx)
     }

@@ -10,7 +10,7 @@
 //! - Handling of constraints and defaults
 
 use std::collections::HashMap;
-use std::sync::Arc;
+use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::TypeDatabase;
 
@@ -21,7 +21,7 @@ use crate::solver::TypeInterner;
 #[derive(Clone, Debug, Default)]
 pub struct TypeSubstitution {
     /// Maps type parameter names to their substituted types
-    map: HashMap<Arc<str>, TypeId>,
+    map: HashMap<Atom, TypeId>,
 }
 
 impl TypeSubstitution {
@@ -36,24 +36,22 @@ impl TypeSubstitution {
     ///
     /// `type_params` - The declared type parameters (e.g., `<T, U>`)
     /// `type_args` - The provided type arguments (e.g., `<string, number>`)
-    pub fn from_args(interner: &dyn TypeDatabase, type_params: &[TypeParamInfo], type_args: &[TypeId]) -> Self {
+    pub fn from_args(type_params: &[TypeParamInfo], type_args: &[TypeId]) -> Self {
         let mut map = HashMap::new();
         for (param, &arg) in type_params.iter().zip(type_args.iter()) {
-            // Resolve Atom to Arc<str> for substitution map
-            let param_name = interner.resolve_atom(param.name);
-            map.insert(Arc::from(param_name.as_str()), arg);
+            map.insert(param.name, arg);
         }
         TypeSubstitution { map }
     }
 
     /// Add a single substitution.
-    pub fn insert(&mut self, name: Arc<str>, type_id: TypeId) {
+    pub fn insert(&mut self, name: Atom, type_id: TypeId) {
         self.map.insert(name, type_id);
     }
 
     /// Look up a substitution.
-    pub fn get(&self, name: &str) -> Option<TypeId> {
-        self.map.get(name).copied()
+    pub fn get(&self, name: Atom) -> Option<TypeId> {
+        self.map.get(&name).copied()
     }
 
     /// Check if substitution is empty.
@@ -141,9 +139,7 @@ impl<'a> TypeInstantiator<'a> {
         match key {
             // Type parameters get substituted
             TypeKey::TypeParameter(info) => {
-                // Resolve Atom to str for substitution lookup
-                let name_str = self.interner.resolve_atom(info.name);
-                if let Some(substituted) = self.substitution.get(name_str.as_str()) {
+                if let Some(substituted) = self.substitution.get(info.name) {
                     substituted
                 } else {
                     // No substitution found, return original type parameter
@@ -386,7 +382,7 @@ pub fn instantiate_generic(
     if type_params.is_empty() || type_args.is_empty() {
         return type_id;
     }
-    let substitution = TypeSubstitution::from_args(interner, type_params, type_args);
+    let substitution = TypeSubstitution::from_args(type_params, type_args);
     instantiate_type(interner, type_id, &substitution)
 }
 
