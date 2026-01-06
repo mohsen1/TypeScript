@@ -16,7 +16,10 @@ for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 Note:
 **Further baseline improvement requires checker/binder track** (type-checking capabilities).
 
-## What's Next?
+## Tasks (current focus)
+
+Pick the most doable and impactful
+
 1. Integrate LoweringPass into public API (lib.rs exports)
 2. Implement remaining directive handlers (arrow, async, modules)
 3. Deprecate old API, make transforms required
