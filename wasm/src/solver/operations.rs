@@ -236,22 +236,32 @@ impl<'a> CallEvaluator<'a> {
         // 4. Resolve inference variables
         let mut final_subst = TypeSubstitution::new();
         for (tp, &var) in func.type_params.iter().zip(type_param_vars.iter()) {
-            let mut ty = match infer_ctx.resolve_with_constraints(var) {
-                Ok(ty) => ty,
-                Err(_) => return CallResult::Success(TypeId::ANY),
-            };
-
             let has_constraints = infer_ctx
                 .get_constraints(var)
                 .map_or(false, |c| !c.is_empty());
-            if !has_constraints && ty == TypeId::UNKNOWN {
-                if let Some(default) = tp.default {
-                    ty = instantiate_type(self.interner, default, &final_subst);
+
+            let ty = if has_constraints {
+                match infer_ctx.resolve_with_constraints(var) {
+                    Ok(ty) => ty,
+                    Err(_) => return CallResult::Success(TypeId::ANY),
                 }
-            }
+            } else if let Some(default) = tp.default {
+                instantiate_type(self.interner, default, &final_subst)
+            } else if let Some(constraint) = tp.constraint {
+                instantiate_type(self.interner, constraint, &final_subst)
+            } else {
+                TypeId::UNKNOWN
+            };
 
             let name_str = self.interner.resolve_atom(tp.name);
             final_subst.insert(std::sync::Arc::from(name_str.as_str()), ty);
+
+            if let Some(constraint) = tp.constraint {
+                let constraint_ty = instantiate_type(self.interner, constraint, &final_subst);
+                if !self.subtype.is_assignable_to(ty, constraint_ty) {
+                    return CallResult::Success(TypeId::ANY);
+                }
+            }
         }
 
         let return_type = instantiate_type(self.interner, func.return_type, &final_subst);
