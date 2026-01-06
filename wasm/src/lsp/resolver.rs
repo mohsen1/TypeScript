@@ -320,6 +320,20 @@ impl<'a> ScopeWalker<'a> {
                     if let Some(res) = f(self, cond.when_false) { return Some(res); }
                 }
             }
+            k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
+                if let Some(template) = self.arena.get_template_expr(node) {
+                    if let Some(res) = f(self, template.head) { return Some(res); }
+                    for &span in &template.template_spans.nodes {
+                        if let Some(res) = f(self, span) { return Some(res); }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TEMPLATE_SPAN => {
+                if let Some(span) = self.arena.get_template_span(node) {
+                    if let Some(res) = f(self, span.expression) { return Some(res); }
+                    if let Some(res) = f(self, span.literal) { return Some(res); }
+                }
+            }
             k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION || k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION => {
                 if let Some(unary) = self.arena.get_unary_expr(node) {
                     if let Some(res) = f(self, unary.operand) { return Some(res); }

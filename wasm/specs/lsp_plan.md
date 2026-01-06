@@ -31,6 +31,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - Code actions (complete implementation)
 
 2. **Extend AST Coverage** (if needed)
+   - [x] Traverse template expressions in LSP resolver for references/completions
    - Add more expression types as needed (template literals, JSX, etc.)
    - Add import/export handling for cross-file navigation
 

@@ -236,4 +236,27 @@ mod references_tests {
         // Should not find references
         assert!(references.is_none(), "Should not find references at semicolon");
     }
+
+    #[test]
+    fn test_find_references_template_expression() {
+        let source = "const name = \"Ada\";\nconst msg = `hi ${name}`;";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let line_map = LineMap::build(source);
+
+        // Position at the 'name' inside the template expression (line 1)
+        let position = Position::new(1, 18);
+
+        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let references = find_refs.find_references(root, position);
+
+        assert!(references.is_some(), "Should find references in template expression");
+        let refs = references.unwrap();
+        assert!(refs.len() >= 2, "Should find declaration and template usage");
+    }
 }
