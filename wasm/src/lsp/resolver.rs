@@ -421,6 +421,59 @@ impl<'a> ScopeWalker<'a> {
         });
     }
 
+    /// Get the scope chain (symbol tables) active at the target node.
+    ///
+    /// This is used by the completions feature to suggest identifiers
+    /// that are visible at a given cursor position.
+    ///
+    /// Returns a vector of symbol tables, ordered from innermost to outermost scope.
+    pub fn get_scope_chain(&mut self, root: NodeIndex, target: NodeIndex) -> Vec<SymbolTable> {
+        let mut found_stack = None;
+        self.walk_for_scope(root, target, &mut found_stack);
+        found_stack.unwrap_or_else(|| self.scope_stack.clone())
+    }
+
+    /// Walk the AST to find a target node and capture its scope stack.
+    fn walk_for_scope(&mut self, current: NodeIndex, target: NodeIndex, result: &mut Option<Vec<SymbolTable>>) -> bool {
+        if current == target {
+            // Found the target! Capture the current scope stack
+            *result = Some(self.scope_stack.clone());
+            return true;
+        }
+
+        let Some(node) = self.arena.get(current) else { return false; };
+
+        // Optimization: Don't descend if target is not within current node's range
+        if let Some(target_node) = self.arena.get(target) {
+            if target_node.pos < node.pos || target_node.pos >= node.end {
+                return false;
+            }
+        }
+
+        // Check if this node creates a new scope
+        let creates_scope = self.node_creates_scope(current);
+
+        if creates_scope {
+            self.push_scope();
+            self.register_local_declarations(current);
+        }
+
+        // Recurse into children
+        let found = self.for_each_child(current, |walker, child_idx| {
+            if walker.walk_for_scope(child_idx, target, result) {
+                Some(true)
+            } else {
+                None
+            }
+        }).is_some();
+
+        if creates_scope {
+            self.pop_scope();
+        }
+
+        found
+    }
+
     /// Find all references to a symbol in the AST.
     pub fn find_references(&mut self, root: NodeIndex, target_symbol: SymbolId) -> Vec<NodeIndex> {
         let mut refs = Vec::new();
