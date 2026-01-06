@@ -395,24 +395,38 @@ impl<'a> ClassES5Emitter<'a> {
         self.write_line();
         self.increase_indent();
         
+        // Check if accessor body is empty
+        let body_is_empty = if !accessor_data.body.is_none() {
+            let body_node = self.arena.get(accessor_data.body);
+            body_node.map_or(true, |n| {
+                self.arena.get_block(n).map_or(true, |b| b.statements.nodes.is_empty())
+            })
+        } else {
+            true
+        };
+
         self.write_indent();
         if is_getter {
-            self.write("get: function () {");
+            self.write("get: function () ");
         } else {
             self.write("set: function (");
             self.emit_parameters(&accessor_data.parameters);
-            self.write(") {");
+            self.write(") ");
         }
-        self.write_line();
-        self.increase_indent();
-        
-        if !accessor_data.body.is_none() {
+
+        if body_is_empty {
+            // Inline empty body: { },
+            self.write("{ },");
+        } else {
+            // Multi-line body
+            self.write("{");
+            self.write_line();
+            self.increase_indent();
             self.emit_block_contents(accessor_data.body);
+            self.decrease_indent();
+            self.write_indent();
+            self.write("},");
         }
-        
-        self.decrease_indent();
-        self.write_indent();
-        self.write("},");
         self.write_line();
         
         self.write_indent();
