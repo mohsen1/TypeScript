@@ -2662,6 +2662,10 @@ impl<'a> ThinCheckerState<'a> {
         // Getter return type must be assignable to setter parameter type
         self.check_accessor_type_compatibility(&class.members.nodes);
 
+        // Check for property type compatibility with base class (error 2416)
+        // Property type in derived class must be assignable to same property in base class
+        self.check_property_inheritance_compatibility(stmt_idx, &class);
+
         // Restore previous enclosing class
         self.ctx.enclosing_class = prev_enclosing_class;
 
@@ -3243,6 +3247,263 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         None
+    }
+
+    /// Check that property types in derived class are compatible with base class (error 2416).
+    /// For each property/accessor in the derived class, checks if there's a corresponding
+    /// member in the base class with incompatible type.
+    fn check_property_inheritance_compatibility(
+        &mut self,
+        _class_idx: NodeIndex,
+        class_data: &crate::parser::thin_node::ClassData,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        use crate::scanner::SyntaxKind;
+
+        // Find base class from heritage clauses (extends, not implements)
+        let Some(ref heritage_clauses) = class_data.heritage_clauses else {
+            return;
+        };
+
+        let mut base_class_idx: Option<NodeIndex> = None;
+        let mut base_class_name = String::new();
+
+        for &clause_idx in &heritage_clauses.nodes {
+            let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
+                continue;
+            };
+
+            let Some(heritage) = self.ctx.arena.get_heritage_clause(clause_node) else {
+                continue;
+            };
+
+            // Only check extends clauses (token = ExtendsKeyword = 96)
+            if heritage.token != SyntaxKind::ExtendsKeyword as u16 {
+                continue;
+            }
+
+            // Get the first type in the extends clause (the base class)
+            if let Some(&type_idx) = heritage.types.nodes.first() {
+                if let Some(type_node) = self.ctx.arena.get(type_idx) {
+                    // Handle both cases:
+                    // 1. ExpressionWithTypeArguments (e.g., Base<T>)
+                    // 2. Simple Identifier (e.g., Base)
+                    let expr_idx = if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
+                        expr_type_args.expression
+                    } else {
+                        // For simple identifiers without type arguments, the type_node itself is the identifier
+                        type_idx
+                    };
+
+                    // Get the class name from the expression (identifier)
+                    if let Some(expr_node) = self.ctx.arena.get(expr_idx) {
+                        if let Some(ident) = self.ctx.arena.get_identifier(expr_node) {
+                            base_class_name = ident.escaped_text.clone();
+
+                            // Find the base class declaration via symbol lookup
+                            if let Some(sym_id) = self.ctx.binder.file_locals.get(&base_class_name) {
+                                if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                                    // Try value_declaration first, then declarations
+                                    if !symbol.value_declaration.is_none() {
+                                        base_class_idx = Some(symbol.value_declaration);
+                                    } else if let Some(&decl_idx) = symbol.declarations.first() {
+                                        base_class_idx = Some(decl_idx);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            break; // Only one extends clause is valid
+        }
+
+        // If no base class found, nothing to check
+        let Some(base_idx) = base_class_idx else {
+            return;
+        };
+
+        // Get the base class data
+        let Some(base_node) = self.ctx.arena.get(base_idx) else {
+            return;
+        };
+
+        let Some(base_class) = self.ctx.arena.get_class(base_node) else {
+            return;
+        };
+
+        // Get the derived class name for the error message
+        let derived_class_name = if !class_data.name.is_none() {
+            if let Some(name_node) = self.ctx.arena.get(class_data.name) {
+                if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                    ident.escaped_text.clone()
+                } else {
+                    String::from("<anonymous>")
+                }
+            } else {
+                String::from("<anonymous>")
+            }
+        } else {
+            String::from("<anonymous>")
+        };
+
+        // Check each member in the derived class
+        for &member_idx in &class_data.members.nodes {
+            let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+
+            // Get the member name and type
+            let (member_name, member_type, member_name_idx) = match member_node.kind {
+                k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                    let Some(prop) = self.ctx.arena.get_property_decl(member_node) else {
+                        continue;
+                    };
+                    let Some(name) = self.get_property_name(prop.name) else {
+                        continue;
+                    };
+
+                    // Skip static properties
+                    if self.has_static_modifier(&prop.modifiers) {
+                        continue;
+                    }
+
+                    // Get the type: either from annotation or inferred from initializer
+                    let prop_type = if !prop.type_annotation.is_none() {
+                        self.get_type_from_type_node(prop.type_annotation)
+                    } else if !prop.initializer.is_none() {
+                        self.get_type_of_node(prop.initializer)
+                    } else {
+                        TypeId::ANY
+                    };
+
+                    (name, prop_type, prop.name)
+                }
+                k if k == syntax_kind_ext::GET_ACCESSOR => {
+                    let Some(accessor) = self.ctx.arena.get_accessor(member_node) else {
+                        continue;
+                    };
+                    let Some(name) = self.get_property_name(accessor.name) else {
+                        continue;
+                    };
+
+                    // Skip static accessors
+                    if self.has_static_modifier(&accessor.modifiers) {
+                        continue;
+                    }
+
+                    // Get the return type
+                    let accessor_type = if !accessor.type_annotation.is_none() {
+                        self.get_type_from_type_node(accessor.type_annotation)
+                    } else {
+                        self.infer_getter_return_type(accessor.body)
+                    };
+
+                    (name, accessor_type, accessor.name)
+                }
+                _ => continue,
+            };
+
+            // Skip if type is ANY (no meaningful check)
+            if member_type == TypeId::ANY {
+                continue;
+            }
+
+            // Look for a matching member in the base class
+            for &base_member_idx in &base_class.members.nodes {
+                let Some(base_member_node) = self.ctx.arena.get(base_member_idx) else {
+                    continue;
+                };
+
+                let (base_name, base_type) = match base_member_node.kind {
+                    k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                        let Some(base_prop) = self.ctx.arena.get_property_decl(base_member_node) else {
+                            continue;
+                        };
+                        let Some(name) = self.get_property_name(base_prop.name) else {
+                            continue;
+                        };
+
+                        // Skip static properties
+                        if self.has_static_modifier(&base_prop.modifiers) {
+                            continue;
+                        }
+
+                        let prop_type = if !base_prop.type_annotation.is_none() {
+                            self.get_type_from_type_node(base_prop.type_annotation)
+                        } else if !base_prop.initializer.is_none() {
+                            self.get_type_of_node(base_prop.initializer)
+                        } else {
+                            TypeId::ANY
+                        };
+
+                        (name, prop_type)
+                    }
+                    k if k == syntax_kind_ext::GET_ACCESSOR => {
+                        let Some(base_accessor) = self.ctx.arena.get_accessor(base_member_node) else {
+                            continue;
+                        };
+                        let Some(name) = self.get_property_name(base_accessor.name) else {
+                            continue;
+                        };
+
+                        // Skip static accessors
+                        if self.has_static_modifier(&base_accessor.modifiers) {
+                            continue;
+                        }
+
+                        let accessor_type = if !base_accessor.type_annotation.is_none() {
+                            self.get_type_from_type_node(base_accessor.type_annotation)
+                        } else {
+                            self.infer_getter_return_type(base_accessor.body)
+                        };
+
+                        (name, accessor_type)
+                    }
+                    _ => continue,
+                };
+
+                // Skip if base type is ANY
+                if base_type == TypeId::ANY {
+                    continue;
+                }
+
+                // Check if names match
+                if member_name != base_name {
+                    continue;
+                }
+
+                // Check type compatibility - derived type must be assignable to base type
+                let mut subtype_checker = crate::solver::SubtypeChecker::new(&self.ctx.types);
+                if !subtype_checker.is_assignable_to(member_type, base_type) {
+                    // Format type strings for error message
+                    let member_type_str = self.format_type(member_type);
+                    let base_type_str = self.format_type(base_type);
+
+                    // Report error 2416 on the member name
+                    self.error_at_node(
+                        member_name_idx,
+                        &format!(
+                            "Property '{}' in type '{}' is not assignable to the same property in base type '{}'.",
+                            member_name, derived_class_name, base_class_name
+                        ),
+                        diagnostic_codes::PROPERTY_NOT_ASSIGNABLE_TO_SAME_IN_BASE,
+                    );
+
+                    // Add secondary error with type details
+                    if let Some((pos, end)) = self.get_node_span(member_name_idx) {
+                        self.error(
+                            pos,
+                            end - pos,
+                            format!("Type '{}' is not assignable to type '{}'.", member_type_str, base_type_str),
+                            diagnostic_codes::PROPERTY_NOT_ASSIGNABLE_TO_SAME_IN_BASE,
+                        );
+                    }
+                }
+
+                break; // Found matching base member, no need to continue
+            }
+        }
     }
 
     /// Get the name of a method declaration.

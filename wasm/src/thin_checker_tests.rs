@@ -737,3 +737,55 @@ class NoError {
     assert_eq!(count_2729, 1,
         "Expected exactly 1 error 2729 for property used before initialization, got {} in: {:?}", count_2729, codes);
 }
+
+#[test]
+fn test_property_not_assignable_to_same_in_base_2416() {
+    // Error 2416: Property 'num' in type 'WrongTypePropertyImpl' is not assignable
+    // to the same property in base type 'WrongTypeProperty'.
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+abstract class WrongTypeProperty {
+    abstract num: number;
+}
+class WrongTypePropertyImpl extends WrongTypeProperty {
+    num = "nope, wrong";
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    // Debug: Print parsed classes
+    let arena = parser.get_arena();
+    println!("Number of classes in arena: {}", arena.classes.len());
+    for (i, class) in arena.classes.iter().enumerate() {
+        println!("Class {}: has heritage = {}", i, class.heritage_clauses.is_some());
+        if let Some(ref hc) = class.heritage_clauses {
+            println!("  Heritage clause nodes: {}", hc.nodes.len());
+        }
+    }
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    // Debug: print file locals
+    println!("File locals count: {}", binder.file_locals.len());
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+
+    checker.check_source_file(root);
+
+    println!("Diagnostics:");
+    for diag in &checker.ctx.diagnostics {
+        println!("  TS{}: {}", diag.code, diag.message_text);
+    }
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should have at least one 2416 error for the incompatible property type
+    let count_2416 = codes.iter().filter(|&&c| c == 2416).count();
+    assert!(count_2416 >= 1,
+        "Expected at least 1 error 2416 for property not assignable to base, got {} in: {:?}", count_2416, codes);
+}
