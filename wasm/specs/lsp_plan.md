@@ -23,7 +23,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
 
 These issues block LSP responsiveness.
 
-#### Parent Mapping for Navigation
+#### Parent Mapping for Navigation ✅ COMPLETED (2026-01-06)
 
 **Problem:** `ThinNode` (16 bytes) doesn't store a `parent` pointer.
 
@@ -33,11 +33,18 @@ These issues block LSP responsiveness.
   - Full tree traversal every time (slow)
   - A side-table `Vec<ParentIndex>` (need to verify this exists)
 
-**Action Required:**
-- [ ] **Verify:** Does `ThinNodeArena` have a parent mapping mechanism?
-- [ ] **If No:** Add a parallel array `Vec<NodeIndex>` where `parent[child_idx] = parent_idx`
-- [ ] **If Space Permits:** Consider adding `parent: u32` to `ThinNode` (would make it 20 bytes)
-- [ ] Ensure LSP "walk up to parent" operations are O(1), not O(N)
+**Solution Implemented:**
+- [x] **Verified:** `ThinNodeArena` has `extended_info: Vec<ExtendedNodeInfo>` with parent field
+- [x] **Implemented:** Parent pointers are now set during node creation in all `add_*` methods
+- [x] **Helper methods added:** `set_parent`, `set_parent_list`, `set_parent_opt_list` for O(1) parent linking
+- [x] **Fixed Default:** `ExtendedNodeInfo::default()` now sets `parent = NodeIndex::NONE`
+- [x] **Tests added:** 3 comprehensive tests verify parent mapping works correctly
+- [x] **All tests pass:** 691/691 tests passing
+
+**Implementation Details:**
+- Parent pointers set incrementally during AST construction (O(N) total, O(1) per edge)
+- Updated methods: `add_binary_expr`, `add_call_expr`, `add_function`, `add_block`, `add_source_file`, `add_if_statement`, `add_variable`, `add_return`, `add_unary_expr`, `add_access_expr`, `add_variable_declaration`
+- LSP "walk up to parent" operations are now O(1) via `arena.get_extended(node).parent`
 
 #### Stateless Resolution (Shared with Checker)
 

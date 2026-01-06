@@ -1001,12 +1001,23 @@ pub struct ThinNodeArena {
 }
 
 /// Extended node info for nodes that need more than what fits in ThinNode
-#[derive(Clone, Debug, Default, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct ExtendedNodeInfo {
     pub parent: NodeIndex,
     pub id: u32,
     pub modifier_flags: u32,
     pub transform_flags: u32,
+}
+
+impl Default for ExtendedNodeInfo {
+    fn default() -> Self {
+        ExtendedNodeInfo {
+            parent: NodeIndex::NONE,
+            id: 0,
+            modifier_flags: 0,
+            transform_flags: 0,
+        }
+    }
 }
 
 impl ThinNodeArena {
@@ -1036,6 +1047,43 @@ impl ThinNodeArena {
 
         arena
     }
+
+    // ============================================================================
+    // Parent Mapping Helpers
+    // ============================================================================
+
+    /// Set the parent for a single child node.
+    /// This is called during node creation to maintain parent pointers.
+    #[inline]
+    fn set_parent(&mut self, child: NodeIndex, parent: NodeIndex) {
+        if !child.is_none() {
+            // Safety: child index is guaranteed to be valid and < current index
+            // because we build bottom-up (children are created before parents).
+            if let Some(info) = self.extended_info.get_mut(child.0 as usize) {
+                info.parent = parent;
+            }
+        }
+    }
+
+    /// Set the parent for a list of children.
+    #[inline]
+    fn set_parent_list(&mut self, list: &NodeList, parent: NodeIndex) {
+        for &child in &list.nodes {
+            self.set_parent(child, parent);
+        }
+    }
+
+    /// Set the parent for an optional list of children.
+    #[inline]
+    fn set_parent_opt_list(&mut self, list: &Option<NodeList>, parent: NodeIndex) {
+        if let Some(l) = list {
+            self.set_parent_list(l, parent);
+        }
+    }
+
+    // ============================================================================
+    // Node Creation Methods
+    // ============================================================================
 
     /// Add a token node (no additional data)
     pub fn add_token(&mut self, kind: u16, pos: u32, end: u32) -> NodeIndex {
@@ -1089,32 +1137,66 @@ impl ThinNodeArena {
 
     /// Add a binary expression
     pub fn add_binary_expr(&mut self, kind: u16, pos: u32, end: u32, data: BinaryExprData) -> NodeIndex {
+        let left = data.left;
+        let right = data.right;
+
         let data_index = self.binary_exprs.len() as u32;
         self.binary_exprs.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent(left, parent);
+        self.set_parent(right, parent);
+
+        parent
     }
 
     /// Add a call expression
     pub fn add_call_expr(&mut self, kind: u16, pos: u32, end: u32, data: CallExprData) -> NodeIndex {
+        let expression = data.expression;
+        let type_arguments = data.type_arguments.clone();
+        let arguments = data.arguments.clone();
+
         let data_index = self.call_exprs.len() as u32;
         self.call_exprs.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent(expression, parent);
+        self.set_parent_opt_list(&type_arguments, parent);
+        self.set_parent_opt_list(&arguments, parent);
+
+        parent
     }
 
     /// Add a function node
     pub fn add_function(&mut self, kind: u16, pos: u32, end: u32, data: FunctionData) -> NodeIndex {
+        let modifiers = data.modifiers.clone();
+        let name = data.name;
+        let type_parameters = data.type_parameters.clone();
+        let parameters = data.parameters.clone();
+        let type_annotation = data.type_annotation;
+        let body = data.body;
+
         let data_index = self.functions.len() as u32;
         self.functions.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent_opt_list(&modifiers, parent);
+        self.set_parent(name, parent);
+        self.set_parent_opt_list(&type_parameters, parent);
+        self.set_parent_list(&parameters, parent);
+        self.set_parent(type_annotation, parent);
+        self.set_parent(body, parent);
+
+        parent
     }
 
     /// Add a class node
@@ -1129,23 +1211,37 @@ impl ThinNodeArena {
 
     /// Add a block node
     pub fn add_block(&mut self, kind: u16, pos: u32, end: u32, data: BlockData) -> NodeIndex {
+        let statements = data.statements.clone();
+
         let data_index = self.blocks.len() as u32;
         self.blocks.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent_list(&statements, parent);
+
+        parent
     }
 
     /// Add a source file node
     pub fn add_source_file(&mut self, pos: u32, end: u32, data: SourceFileData) -> NodeIndex {
         use super::syntax_kind_ext::SOURCE_FILE;
+        let statements = data.statements.clone();
+        let end_of_file_token = data.end_of_file_token;
+
         let data_index = self.source_files.len() as u32;
         self.source_files.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(SOURCE_FILE, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent_list(&statements, parent);
+        self.set_parent(end_of_file_token, parent);
+
+        parent
     }
 
     // ==========================================================================
@@ -1174,22 +1270,36 @@ impl ThinNodeArena {
 
     /// Add a unary expression node
     pub fn add_unary_expr(&mut self, kind: u16, pos: u32, end: u32, data: UnaryExprData) -> NodeIndex {
+        let operand = data.operand;
+
         let data_index = self.unary_exprs.len() as u32;
         self.unary_exprs.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent(operand, parent);
+
+        parent
     }
 
     /// Add a property/element access expression node
     pub fn add_access_expr(&mut self, kind: u16, pos: u32, end: u32, data: AccessExprData) -> NodeIndex {
+        let expression = data.expression;
+        let name_or_argument = data.name_or_argument;
+
         let data_index = self.access_exprs.len() as u32;
         self.access_exprs.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent(expression, parent);
+        self.set_parent(name_or_argument, parent);
+
+        parent
     }
 
     /// Add a conditional expression node (a ? b : c)
@@ -1444,12 +1554,22 @@ impl ThinNodeArena {
 
     /// Add an if statement node
     pub fn add_if_statement(&mut self, kind: u16, pos: u32, end: u32, data: IfStatementData) -> NodeIndex {
+        let expression = data.expression;
+        let then_statement = data.then_statement;
+        let else_statement = data.else_statement;
+
         let data_index = self.if_statements.len() as u32;
         self.if_statements.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent(expression, parent);
+        self.set_parent(then_statement, parent);
+        self.set_parent(else_statement, parent);
+
+        parent
     }
 
     /// Add a loop node (for/while/do)
@@ -1469,22 +1589,36 @@ impl ThinNodeArena {
 
     /// Add a variable statement/declaration list node with flags
     pub fn add_variable_with_flags(&mut self, kind: u16, pos: u32, end: u32, data: VariableData, flags: u16) -> NodeIndex {
+        let modifiers = data.modifiers.clone();
+        let declarations = data.declarations.clone();
+
         let data_index = self.variables.len() as u32;
         self.variables.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data_and_flags(kind, pos, end, data_index, flags));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent_opt_list(&modifiers, parent);
+        self.set_parent_list(&declarations, parent);
+
+        parent
     }
 
     /// Add a return/throw statement node
     pub fn add_return(&mut self, kind: u16, pos: u32, end: u32, data: ReturnData) -> NodeIndex {
+        let expression = data.expression;
+
         let data_index = self.return_data.len() as u32;
         self.return_data.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent(expression, parent);
+
+        parent
     }
 
     /// Add an expression statement node
@@ -1969,12 +2103,22 @@ impl ThinNodeArena {
 
     /// Add a variable declaration node (individual)
     pub fn add_variable_declaration(&mut self, kind: u16, pos: u32, end: u32, data: VariableDeclarationData) -> NodeIndex {
+        let name = data.name;
+        let type_annotation = data.type_annotation;
+        let initializer = data.initializer;
+
         let data_index = self.variable_declarations.len() as u32;
         self.variable_declarations.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+
+        let parent = NodeIndex(index);
+        self.set_parent(name, parent);
+        self.set_parent(type_annotation, parent);
+        self.set_parent(initializer, parent);
+
+        parent
     }
 
     /// Add a for-in/for-of statement node
