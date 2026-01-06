@@ -9,7 +9,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
 **Independence:** MEDIUM - Needs stable TypeKey definitions from Track A. Heavy AST interaction.
 
 ## Current Status
-🟡 **In Progress** - Interface merging wired into checker type resolution; Phase 6 lowering tests added; BigInt literal test blocked by parser; module augmentation pending.
+🟡 **In Progress** - Interface merging wired into checker type resolution; Phase 6 lowering tests added; module augmentation supported; BigInt literal test blocked by parser.
 
 ## Tasks
 
@@ -76,7 +76,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - Merge properties, handle conflicts
 - [ ] Implement declaration space separation
   - [x] Type space vs value space (handle same name for class/type)
-  - [ ] Module augmentation support
+  - [x] Module augmentation support
 - [x] Tests for merging
   - [x] Test: Two interface declarations merge
   - [x] Test: Conflicting property types error

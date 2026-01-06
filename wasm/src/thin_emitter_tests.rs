@@ -79,6 +79,33 @@ fn test_thin_emit_switch_statement() {
 }
 
 #[test]
+fn test_thin_emit_for_of_es5() {
+    let source = "for (var v of arr) { v; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__values(arr)"),
+        "Expected __values helper usage in ES5 output: {}",
+        output
+    );
+    assert!(
+        output.contains("var v ="),
+        "Expected loop binding in ES5 output: {}",
+        output
+    );
+    assert!(
+        !output.contains("for (var v of arr)"),
+        "ES5 output should not contain raw for-of: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_class_declaration() {
     let source = "class Foo { }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

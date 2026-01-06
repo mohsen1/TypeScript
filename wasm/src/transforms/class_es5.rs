@@ -1682,16 +1682,50 @@ impl<'a> ClassES5Emitter<'a> {
         let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
         let Some(for_in_of) = self.arena.get_for_in_of(stmt_node) else { return };
 
-        self.write("for ");
         if for_in_of.await_modifier {
-            self.write("await ");
+            self.write("for await (");
+            self.emit_for_in_of_initializer(for_in_of.initializer);
+            self.write(" of ");
+            self.emit_expression(for_in_of.expression);
+            self.write(") ");
+            self.emit_statement(for_in_of.statement);
+            return;
         }
-        self.write("(");
-        self.emit_for_in_of_initializer(for_in_of.initializer);
-        self.write(" of ");
+
+        let iterator_name = self.get_temp_var_name();
+        let result_name = self.get_temp_var_name();
+
+        self.write("for (var ");
+        self.write(&iterator_name);
+        self.write(" = __values(");
         self.emit_expression(for_in_of.expression);
-        self.write(") ");
+        self.write("), ");
+        self.write(&result_name);
+        self.write(" = ");
+        self.write(&iterator_name);
+        self.write(".next(); !");
+        self.write(&result_name);
+        self.write(".done; ");
+        self.write(&result_name);
+        self.write(" = ");
+        self.write(&iterator_name);
+        self.write(".next()) ");
+
+        self.write("{");
+        self.write_line();
+        self.increase_indent();
+
+        self.write_indent();
+        self.emit_for_of_value_binding(for_in_of.initializer, &result_name);
+        self.write_line();
+
+        self.write_indent();
         self.emit_statement(for_in_of.statement);
+        self.write_line();
+
+        self.decrease_indent();
+        self.write_indent();
+        self.write("}");
     }
 
     fn emit_for_in_of_initializer(&mut self, initializer: NodeIndex) {
@@ -1710,6 +1744,76 @@ impl<'a> ClassES5Emitter<'a> {
             }
         } else {
             self.emit_expression(initializer);
+        }
+    }
+
+    fn emit_for_of_value_binding(&mut self, initializer: NodeIndex, result_name: &str) {
+        if initializer.is_none() {
+            return;
+        }
+
+        let Some(init_node) = self.arena.get(initializer) else { return };
+        if init_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+            self.write("var ");
+            if let Some(decl_list) = self.arena.get_variable(init_node) {
+                let mut first = true;
+                for &decl_idx in &decl_list.declarations.nodes {
+                    self.emit_for_of_declaration_value(decl_idx, result_name, &mut first);
+                }
+            }
+            self.write(";");
+        } else {
+            self.emit_expression(initializer);
+            self.write(" = ");
+            self.write(result_name);
+            self.write(".value;");
+        }
+    }
+
+    fn emit_for_of_declaration_value(&mut self, decl_idx: NodeIndex, result_name: &str, first: &mut bool) {
+        let Some(decl_node) = self.arena.get(decl_idx) else { return };
+        let Some(decl) = self.arena.get_variable_declaration(decl_node) else { return };
+
+        if self.is_binding_pattern(decl.name) {
+            self.emit_es5_destructuring_from_value(decl.name, result_name, first);
+            return;
+        }
+
+        if !*first {
+            self.write(", ");
+        }
+        *first = false;
+        self.emit_binding_name(decl.name);
+        self.write(" = ");
+        self.write(result_name);
+        self.write(".value");
+    }
+
+    fn emit_es5_destructuring_from_value(&mut self, pattern_idx: NodeIndex, result_name: &str, first: &mut bool) {
+        let Some(pattern_node) = self.arena.get(pattern_idx) else { return };
+
+        let temp_name = self.get_temp_var_name();
+        if !*first {
+            self.write(", ");
+        }
+        *first = false;
+        self.write(&temp_name);
+        self.write(" = ");
+        self.write(result_name);
+        self.write(".value");
+
+        if pattern_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN {
+            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                for &elem_idx in &pattern.elements.nodes {
+                    self.emit_es5_binding_element(elem_idx, &temp_name);
+                }
+            }
+        } else if pattern_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN {
+            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                for (i, &elem_idx) in pattern.elements.nodes.iter().enumerate() {
+                    self.emit_es5_array_binding_element(elem_idx, &temp_name, i);
+                }
+            }
         }
     }
     

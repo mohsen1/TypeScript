@@ -179,8 +179,13 @@ fn test_two_phase_emission_es5_class_for_in_of() {
         output
     );
     assert!(
-        output.contains("for (var v of arr)"),
-        "ES5 output should contain for-of loop: {}",
+        output.contains("__values(arr)"),
+        "ES5 output should downlevel for-of with __values helper: {}",
+        output
+    );
+    assert!(
+        output.contains("var v ="),
+        "ES5 output should bind iterator values: {}",
         output
     );
 }
