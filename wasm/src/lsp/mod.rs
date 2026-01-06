@@ -34,6 +34,8 @@ pub mod diagnostics;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod code_actions_tests;
+#[cfg(test)]
 mod project_tests;
 
 pub use definition::GoToDefinition;

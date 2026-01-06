@@ -28,7 +28,9 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - Future: Consider incremental re-parsing on edits
 
 3. **Add More LSP Features**
-   - Code actions (complete implementation)
+   - [x] Code action: remove unused import (6133)
+   - [ ] Code action: add missing property (2339)
+   - [ ] Code action: add missing import (2304)
 
 2. **Extend AST Coverage** (if needed)
    - [x] Traverse template expressions in LSP resolver for references/completions
@@ -46,7 +48,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
 #### Testing
 
 Latest run:
-- `./wasm/test.sh` ❌ (fails in `src/emitter_transform_integration_tests.rs` for CommonJS auto-detect; pre-existing on rust)
+- `./wasm/test.sh` ❌ (`src/emitter_transform_integration_tests.rs` `test_two_phase_emission_commonjs_auto_detect_exports`; pre-existing on rust)
 
 ## Quick Reference
 
