@@ -3,7 +3,6 @@
 //! LSP uses line/column positions, while our AST uses byte offsets.
 //! This module provides conversion utilities.
 
-use crate::parser::NodeIndex;
 
 /// A position in a source file (0-indexed line and column).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -36,6 +35,7 @@ impl Range {
 /// A location in a source file (file path + range).
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Location {
+    #[serde(rename = "uri")]
     pub file_path: String,
     pub range: Range,
 }
@@ -94,7 +94,8 @@ impl LineMap {
     }
 
     /// Convert a byte offset to a Position (line, character).
-    pub fn offset_to_position(&self, offset: u32) -> Position {
+    /// Character is counted in UTF-16 code units for LSP compatibility.
+    pub fn offset_to_position(&self, offset: u32, source: &str) -> Position {
         // Binary search for the line containing this offset
         let line = match self.line_starts.binary_search(&offset) {
             Ok(exact) => exact,
@@ -102,7 +103,10 @@ impl LineMap {
         };
 
         let line_start = self.line_starts.get(line).copied().unwrap_or(0);
-        let character = offset.saturating_sub(line_start);
+        let clamped_end = (offset as usize).min(source.len());
+        let start = (line_start as usize).min(clamped_end);
+        let slice = source.get(start..clamped_end).unwrap_or("");
+        let character = slice.chars().map(|ch| ch.len_utf16() as u32).sum();
 
         Position {
             line: line as u32,
@@ -111,12 +115,34 @@ impl LineMap {
     }
 
     /// Convert a Position (line, character) to a byte offset.
-    pub fn position_to_offset(&self, position: Position) -> u32 {
-        let line_start = self.line_starts
-            .get(position.line as usize)
-            .copied()
-            .unwrap_or(0);
-        line_start + position.character
+    pub fn position_to_offset(&self, position: Position, source: &str) -> Option<u32> {
+        let line_idx = position.line as usize;
+        let line_start = *self.line_starts.get(line_idx)?;
+        let line_limit = if line_idx + 1 < self.line_starts.len() {
+            self.line_starts[line_idx + 1]
+        } else {
+            source.len() as u32
+        };
+        let slice = source.get(line_start as usize..line_limit as usize).unwrap_or("");
+        let mut utf16_count = 0u32;
+        let mut byte_count = 0u32;
+
+        for ch in slice.chars() {
+            if ch == '\n' || ch == '\r' {
+                break;
+            }
+            let ch_utf16 = ch.len_utf16() as u32;
+            if utf16_count + ch_utf16 > position.character {
+                break;
+            }
+            utf16_count += ch_utf16;
+            byte_count += ch.len_utf8() as u32;
+            if utf16_count == position.character {
+                break;
+            }
+        }
+
+        Some(line_start + byte_count)
     }
 
     /// Get the number of lines.
@@ -128,17 +154,6 @@ impl LineMap {
     pub fn line_start(&self, line: usize) -> Option<u32> {
         self.line_starts.get(line).copied()
     }
-}
-
-/// Result of finding a node at a position.
-#[derive(Debug, Clone)]
-pub struct NodeAtPosition {
-    /// The node index
-    pub node: NodeIndex,
-    /// The node's start offset
-    pub start: u32,
-    /// The node's end offset
-    pub end: u32,
 }
 
 #[cfg(test)]
@@ -153,13 +168,13 @@ mod position_tests {
         assert_eq!(map.line_count(), 3);
 
         // First character of first line
-        assert_eq!(map.offset_to_position(0), Position::new(0, 0));
+        assert_eq!(map.offset_to_position(0, source), Position::new(0, 0));
         // Last character of first line
-        assert_eq!(map.offset_to_position(4), Position::new(0, 4));
+        assert_eq!(map.offset_to_position(4, source), Position::new(0, 4));
         // First character of second line
-        assert_eq!(map.offset_to_position(6), Position::new(1, 0));
+        assert_eq!(map.offset_to_position(6, source), Position::new(1, 0));
         // First character of third line
-        assert_eq!(map.offset_to_position(12), Position::new(2, 0));
+        assert_eq!(map.offset_to_position(12, source), Position::new(2, 0));
     }
 
     #[test]
@@ -170,7 +185,7 @@ mod position_tests {
         assert_eq!(map.line_count(), 3);
 
         // First character of second line (after \r\n)
-        assert_eq!(map.offset_to_position(7), Position::new(1, 0));
+        assert_eq!(map.offset_to_position(7, source), Position::new(1, 0));
     }
 
     #[test]
@@ -179,9 +194,24 @@ mod position_tests {
         let map = LineMap::build(source);
 
         for offset in 0..source.len() as u32 {
-            let pos = map.offset_to_position(offset);
-            let back = map.position_to_offset(pos);
+            let pos = map.offset_to_position(offset, source);
+            let back = map.position_to_offset(pos, source).unwrap();
             assert_eq!(offset, back, "roundtrip failed for offset {}", offset);
         }
+    }
+
+    #[test]
+    fn test_utf16_columns() {
+        let source = "A 🚀 B";
+        let map = LineMap::build(source);
+
+        let pos_rocket = map.offset_to_position(2, source);
+        assert_eq!(pos_rocket.character, 2);
+
+        let pos_b = map.offset_to_position(7, source);
+        assert_eq!(pos_b.character, 5);
+
+        let offset = map.position_to_offset(Position::new(0, 5), source).unwrap();
+        assert_eq!(offset, 7);
     }
 }

@@ -29,6 +29,7 @@ use crate::parser::{
         ImportDeclData, ImportClauseData, NamedImportsData, SpecifierData,
         ExportDeclData, ExportAssignmentData, QualifiedNameData,
         TemplateExprData, TemplateSpanData, LabeledData, TaggedTemplateData,
+        ParameterData,
     },
     syntax_kind_ext,
 };
@@ -2664,9 +2665,10 @@ impl ThinParserState {
         self.parse_expected(SyntaxKind::OpenBracketToken);
 
         // Parse parameter
+        let param_start = self.token_pos();
         let param_name = self.parse_identifier();
         self.parse_expected(SyntaxKind::ColonToken);
-        let _param_type = self.parse_type(); // Type of the index parameter (e.g., string, number)
+        let param_type = self.parse_type(); // Type of the index parameter (e.g., string, number)
 
         // Allow trailing comma (invalid syntax but should produce error, not crash)
         self.parse_optional(SyntaxKind::CommaToken);
@@ -2688,6 +2690,21 @@ impl ThinParserState {
             None
         };
 
+        let param_end = self.token_end();
+        let param_node = self.arena.add_parameter(
+            syntax_kind_ext::PARAMETER,
+            param_start,
+            param_end,
+            ParameterData {
+                modifiers: None,
+                dot_dot_dot_token: false,
+                name: param_name,
+                question_token: false,
+                type_annotation: param_type,
+                initializer: NodeIndex::NONE,
+            },
+        );
+
         let end_pos = self.token_end();
         self.arena.add_index_signature(
             syntax_kind_ext::INDEX_SIGNATURE,
@@ -2695,7 +2712,7 @@ impl ThinParserState {
             end_pos,
             crate::parser::thin_node::IndexSignatureData {
                 modifiers,
-                parameters: self.make_node_list(vec![param_name]),
+                parameters: self.make_node_list(vec![param_node]),
                 type_annotation,
             },
         )
@@ -6717,18 +6734,30 @@ impl ThinParserState {
     fn parse_template_literal_head(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
         let kind = self.token() as u16;
+        let text = self.scanner.get_token_value_ref().to_string();
         self.next_token();
         let end_pos = self.token_end();
-        self.arena.add_token(kind, start_pos, end_pos)
+        self.arena.add_literal(
+            kind,
+            start_pos,
+            end_pos,
+            LiteralData { text, raw_text: None, value: None },
+        )
     }
 
     /// Parse template literal span (TemplateMiddle or TemplateTail)
     fn parse_template_literal_span(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
         let kind = self.token() as u16;
+        let text = self.scanner.get_token_value_ref().to_string();
         self.next_token();
         let end_pos = self.token_end();
-        self.arena.add_token(kind, start_pos, end_pos)
+        self.arena.add_literal(
+            kind,
+            start_pos,
+            end_pos,
+            LiteralData { text, raw_text: None, value: None },
+        )
     }
 
     /// Parse object type literal or mapped type
@@ -6802,11 +6831,12 @@ impl ThinParserState {
             self.arena.add_token(SyntaxKind::ReadonlyKeyword as u16, pos, self.token_end())
         } else if self.is_token(SyntaxKind::PlusToken) || self.is_token(SyntaxKind::MinusToken) {
             let pos = self.token_pos();
+            let kind = self.token() as u16;
             self.next_token();
             if self.is_token(SyntaxKind::ReadonlyKeyword) {
                 self.next_token();
             }
-            self.arena.add_token(SyntaxKind::ReadonlyKeyword as u16, pos, self.token_end())
+            self.arena.add_token(kind, pos, self.token_end())
         } else {
             NodeIndex::NONE
         };
@@ -6852,11 +6882,12 @@ impl ThinParserState {
             self.arena.add_token(SyntaxKind::QuestionToken as u16, pos, self.token_end())
         } else if self.is_token(SyntaxKind::PlusToken) || self.is_token(SyntaxKind::MinusToken) {
             let pos = self.token_pos();
+            let kind = self.token() as u16;
             self.next_token();
             if self.is_token(SyntaxKind::QuestionToken) {
                 self.next_token();
             }
-            self.arena.add_token(SyntaxKind::QuestionToken as u16, pos, self.token_end())
+            self.arena.add_token(kind, pos, self.token_end())
         } else {
             NodeIndex::NONE
         };

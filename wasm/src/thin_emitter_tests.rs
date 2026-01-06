@@ -78,6 +78,28 @@ fn test_thin_emit_class_declaration() {
 }
 
 #[test]
+fn test_thin_emit_class_extends_es6() {
+    let source = "class Derived extends Base<T> {}";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es6(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("class Derived extends Base"),
+        "Expected 'class Derived extends Base' in ES6 output: {}",
+        output
+    );
+    assert!(
+        !output.contains("<T>"),
+        "ES6 output should erase type arguments: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_arrow_function() {
     let source = "let f = (x) => x * 2";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -474,6 +496,24 @@ fn test_commonjs_reexport() {
     let output = printer.get_output();
     assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
     assert!(output.contains("Object.defineProperty(exports, \"foo\""), "Expected Object.defineProperty for re-export: {}", output);
+}
+
+#[test]
+fn test_commonjs_export_star() {
+    let source = r#"export * from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(output.contains("__exportStar("), "Expected __exportStar call in CommonJS output: {}", output);
 }
 
 #[test]

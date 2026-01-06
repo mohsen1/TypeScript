@@ -47,8 +47,8 @@ fn parse_type_alias(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIn
     panic!("Could not find function type in parsed AST");
 }
 
-/// Helper to parse a type alias and return its type node index
-fn parse_type_alias_type_node(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
+/// Helper to parse a type alias and return the tuple type node index
+fn parse_tuple_type(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
         source.to_string(),
@@ -57,25 +57,112 @@ fn parse_type_alias_type_node(source: &str) -> (ThinNodeArena, crate::parser::ba
     assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
 
     let arena = std::mem::take(&mut parser.arena);
-
-    let mut type_node = crate::parser::base::NodeIndex::NONE;
     for i in 0..arena.len() {
         let idx = crate::parser::base::NodeIndex(i as u32);
         if let Some(node) = arena.get(idx) {
-            if node.kind == syntax_kind_ext::TYPE_ALIAS_DECLARATION {
-                if let Some(alias) = arena.get_type_alias(node) {
-                    type_node = alias.type_node;
-                    break;
+            if node.kind == syntax_kind_ext::TUPLE_TYPE {
+                return (arena, idx);
+            }
+        }
+    }
+
+    panic!("Could not find tuple type in parsed AST");
+}
+
+/// Helper to parse a type alias and return the template literal type node index
+fn parse_template_literal_type(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        source.to_string(),
+    );
+    let _root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let arena = std::mem::take(&mut parser.arena);
+    for i in 0..arena.len() {
+        let idx = crate::parser::base::NodeIndex(i as u32);
+        if let Some(node) = arena.get(idx) {
+            if node.kind == syntax_kind_ext::TEMPLATE_LITERAL_TYPE {
+                return (arena, idx);
+            }
+        }
+    }
+
+    panic!("Could not find template literal type in parsed AST");
+}
+
+/// Helper to parse a type alias and return the mapped type node index.
+fn parse_mapped_type(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        source.to_string(),
+    );
+    let _root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let arena = std::mem::take(&mut parser.arena);
+    for i in 0..arena.len() {
+        let idx = crate::parser::base::NodeIndex(i as u32);
+        if let Some(node) = arena.get(idx) {
+            if node.kind == syntax_kind_ext::MAPPED_TYPE {
+                return (arena, idx);
+            }
+        }
+    }
+
+    panic!("Could not find mapped type in parsed AST");
+}
+
+/// Helper to parse a type alias and return the type reference node index for a name.
+fn parse_type_reference(source: &str, name: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        source.to_string(),
+    );
+    let _root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let arena = std::mem::take(&mut parser.arena);
+    for i in 0..arena.len() {
+        let idx = crate::parser::base::NodeIndex(i as u32);
+        if let Some(node) = arena.get(idx) {
+            if node.kind == syntax_kind_ext::TYPE_REFERENCE {
+                if let Some(data) = arena.get_type_ref(node) {
+                    if let Some(type_name_node) = arena.get(data.type_name) {
+                        if let Some(ident) = arena.get_identifier(type_name_node) {
+                            if ident.escaped_text == name {
+                                return (arena, idx);
+                            }
+                        }
+                    }
                 }
             }
         }
     }
 
-    if type_node == crate::parser::base::NodeIndex::NONE {
-        panic!("Could not find type alias in parsed AST");
+    panic!("Could not find type reference in parsed AST");
+}
+
+/// Helper to parse a type alias and return the type literal node index.
+fn parse_type_literal(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        source.to_string(),
+    );
+    let _root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let arena = std::mem::take(&mut parser.arena);
+    for i in 0..arena.len() {
+        let idx = crate::parser::base::NodeIndex(i as u32);
+        if let Some(node) = arena.get(idx) {
+            if node.kind == syntax_kind_ext::TYPE_LITERAL {
+                return (arena, idx);
+            }
+        }
     }
 
-    (arena, type_node)
+    panic!("Could not find type literal in parsed AST");
 }
 
 #[test]
@@ -216,32 +303,37 @@ fn test_lower_function_type_no_type_parameters() {
 }
 
 #[test]
-fn test_lower_tuple_optional_and_rest_elements() {
-    let (arena, tuple_type_idx) = parse_type_alias_type_node("type T = [number, string?, ...boolean[]];");
+fn test_lower_tuple_type_metadata() {
+    let (arena, tuple_idx) = parse_tuple_type("type T = [x?: string, string?, ...number[]];");
 
     let interner = TypeInterner::new();
     let lowering = TypeLowering::new(&arena, &interner);
 
-    let type_id = lowering.lower_type(tuple_type_idx);
-
+    let type_id = lowering.lower_type(tuple_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
         TypeKey::Tuple(elements) => {
             assert_eq!(elements.len(), 3);
 
-            assert_eq!(elements[0].type_id, TypeId::NUMBER);
-            assert!(!elements[0].optional);
-            assert!(!elements[0].rest);
+            let first = &elements[0];
+            assert_eq!(first.name.map(|a| interner.resolve_atom(a)), Some("x".to_string()));
+            assert!(first.optional);
+            assert!(!first.rest);
+            assert_eq!(first.type_id, TypeId::STRING);
 
-            assert_eq!(elements[1].type_id, TypeId::STRING);
-            assert!(elements[1].optional);
-            assert!(!elements[1].rest);
+            let second = &elements[1];
+            assert!(second.name.is_none());
+            assert!(second.optional);
+            assert!(!second.rest);
+            assert_eq!(second.type_id, TypeId::STRING);
 
-            assert!(elements[2].rest);
-            assert!(!elements[2].optional);
-            match interner.lookup(elements[2].type_id) {
-                Some(TypeKey::Array(elem)) => assert_eq!(elem, TypeId::BOOLEAN),
-                other => panic!("Expected rest element to be array<boolean>, got {:?}", other),
+            let third = &elements[2];
+            assert!(third.name.is_none());
+            assert!(!third.optional);
+            assert!(third.rest);
+            match interner.lookup(third.type_id) {
+                Some(TypeKey::Array(elem)) => assert_eq!(elem, TypeId::NUMBER),
+                other => panic!("Expected array type for rest element, got {:?}", other),
             }
         }
         _ => panic!("Expected Tuple type, got {:?}", key),
@@ -249,36 +341,182 @@ fn test_lower_tuple_optional_and_rest_elements() {
 }
 
 #[test]
-fn test_lower_named_tuple_elements() {
-    let (arena, tuple_type_idx) = parse_type_alias_type_node("type T = [name: string, age?: number, ...flags: boolean[]];");
+fn test_lower_function_parameter_names() {
+    let (arena, func_type_idx) = parse_type_alias("type F = (x: string, y?: number) => void;");
 
     let interner = TypeInterner::new();
     let lowering = TypeLowering::new(&arena, &interner);
 
-    let type_id = lowering.lower_type(tuple_type_idx);
-
+    let type_id = lowering.lower_type(func_type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Tuple(elements) => {
-            assert_eq!(elements.len(), 3);
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.params.len(), 2);
+            assert_eq!(shape.params[0].name.map(|a| interner.resolve_atom(a)), Some("x".to_string()));
+            assert_eq!(shape.params[0].type_id, TypeId::STRING);
+            assert!(!shape.params[0].optional);
 
-            let name = elements[0].name.expect("Expected name for first element");
-            assert_eq!(interner.resolve_atom(name).as_str(), "name");
-            assert_eq!(elements[0].type_id, TypeId::STRING);
-            assert!(!elements[0].optional);
-            assert!(!elements[0].rest);
+            assert_eq!(shape.params[1].name.map(|a| interner.resolve_atom(a)), Some("y".to_string()));
+            assert_eq!(shape.params[1].type_id, TypeId::NUMBER);
+            assert!(shape.params[1].optional);
 
-            let age = elements[1].name.expect("Expected name for second element");
-            assert_eq!(interner.resolve_atom(age).as_str(), "age");
-            assert_eq!(elements[1].type_id, TypeId::NUMBER);
-            assert!(elements[1].optional);
-            assert!(!elements[1].rest);
-
-            let flags = elements[2].name.expect("Expected name for third element");
-            assert_eq!(interner.resolve_atom(flags).as_str(), "flags");
-            assert!(elements[2].rest);
-            assert!(!elements[2].optional);
+            assert_eq!(shape.return_type, TypeId::VOID);
         }
-        _ => panic!("Expected Tuple type, got {:?}", key),
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_reference_with_arguments() {
+    let (arena, type_ref_idx) = parse_type_reference("type T = Box<string>;", "Box");
+    let interner = TypeInterner::new();
+
+    let resolver = |node_idx: NodeIndex| {
+        arena.get(node_idx)
+            .and_then(|node| arena.get_identifier(node))
+            .and_then(|ident| {
+                if ident.escaped_text == "Box" {
+                    Some(1)
+                } else {
+                    None
+                }
+            })
+    };
+
+    let lowering = TypeLowering::with_resolver(&arena, &interner, &resolver);
+    let type_id = lowering.lower_type(type_ref_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Application(app) => {
+            assert_eq!(app.args, vec![TypeId::STRING]);
+            match interner.lookup(app.base) {
+                Some(TypeKey::Ref(SymbolRef(sym_id))) => assert_eq!(sym_id, 1),
+                other => panic!("Expected Ref base type, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Application type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_template_literal_type_spans() {
+    let (arena, template_idx) = parse_template_literal_type("type T = `hello${string}world`;");
+
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(template_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::TemplateLiteral(spans) => {
+            assert_eq!(spans.len(), 3);
+            match spans[0] {
+                TemplateSpan::Text(atom) => assert_eq!(interner.resolve_atom(atom), "hello"),
+                _ => panic!("Expected head text span"),
+            }
+            match spans[1] {
+                TemplateSpan::Type(t) => assert_eq!(t, TypeId::STRING),
+                _ => panic!("Expected type span"),
+            }
+            match spans[2] {
+                TemplateSpan::Text(atom) => assert_eq!(interner.resolve_atom(atom), "world"),
+                _ => panic!("Expected tail text span"),
+            }
+        }
+        _ => panic!("Expected TemplateLiteral type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_mapped_type_modifiers_and_constraint() {
+    let (arena, mapped_idx) = parse_mapped_type("type T = { readonly [K in string]?: number };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(mapped_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Mapped(mapped) => {
+            assert_eq!(interner.resolve_atom(mapped.type_param.name), "K");
+            assert_eq!(mapped.constraint, TypeId::STRING);
+            assert_eq!(mapped.template, TypeId::NUMBER);
+            assert_eq!(mapped.readonly_modifier, Some(MappedModifier::Add));
+            assert_eq!(mapped.optional_modifier, Some(MappedModifier::Add));
+        }
+        _ => panic!("Expected Mapped type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_mapped_type_remove_modifiers() {
+    let (arena, mapped_idx) = parse_mapped_type("type T = { -readonly [K in string]-?: number };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(mapped_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Mapped(mapped) => {
+            assert_eq!(mapped.readonly_modifier, Some(MappedModifier::Remove));
+            assert_eq!(mapped.optional_modifier, Some(MappedModifier::Remove));
+        }
+        _ => panic!("Expected Mapped type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_call_signature() {
+    let (arena, literal_idx) = parse_type_literal("type T = { (x: string): number; foo: string; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Callable(callable) => {
+            assert_eq!(callable.call_signatures.len(), 1);
+            assert_eq!(callable.construct_signatures.len(), 0);
+            assert_eq!(callable.properties.len(), 1);
+            assert_eq!(interner.resolve_atom(callable.properties[0].name), "foo");
+            assert_eq!(callable.properties[0].type_id, TypeId::STRING);
+        }
+        _ => panic!("Expected Callable type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_construct_signature() {
+    let (arena, literal_idx) = parse_type_literal("type T = { new (x: string): number; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Callable(callable) => {
+            assert_eq!(callable.call_signatures.len(), 0);
+            assert_eq!(callable.construct_signatures.len(), 1);
+        }
+        _ => panic!("Expected Callable type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_index_signature() {
+    let (arena, literal_idx) = parse_type_literal("type T = { [key: string]: number; foo: string; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::ObjectWithIndex(shape) => {
+            assert_eq!(shape.properties.len(), 1);
+            assert_eq!(interner.resolve_atom(shape.properties[0].name), "foo");
+            let string_index = shape.string_index.expect("Expected string index signature");
+            assert_eq!(string_index.key_type, TypeId::STRING);
+            assert_eq!(string_index.value_type, TypeId::NUMBER);
+        }
+        _ => panic!("Expected ObjectWithIndex type, got {:?}", key),
     }
 }

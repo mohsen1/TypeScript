@@ -21,6 +21,7 @@ pub struct GoToDefinition<'a> {
     binder: &'a ThinBinderState,
     line_map: &'a LineMap,
     file_name: String,
+    source_text: &'a str,
 }
 
 impl<'a> GoToDefinition<'a> {
@@ -30,12 +31,14 @@ impl<'a> GoToDefinition<'a> {
         binder: &'a ThinBinderState,
         line_map: &'a LineMap,
         file_name: String,
+        source_text: &'a str,
     ) -> Self {
         Self {
             arena,
             binder,
             line_map,
             file_name,
+            source_text,
         }
     }
 
@@ -47,7 +50,7 @@ impl<'a> GoToDefinition<'a> {
     /// Returns None if no symbol is found at the position.
     pub fn get_definition(&self, root: NodeIndex, position: Position) -> Option<Vec<Location>> {
         // 1. Convert position to byte offset
-        let offset = self.line_map.position_to_offset(position);
+        let offset = self.line_map.position_to_offset(position, self.source_text)?;
 
         // 2. Find the most specific node at this offset
         let node_idx = find_node_at_offset(self.arena, offset);
@@ -68,8 +71,8 @@ impl<'a> GoToDefinition<'a> {
             .iter()
             .filter_map(|&decl_idx| {
                 let decl_node = self.arena.get(decl_idx)?;
-                let start_pos = self.line_map.offset_to_position(decl_node.pos);
-                let end_pos = self.line_map.offset_to_position(decl_node.end);
+                let start_pos = self.line_map.offset_to_position(decl_node.pos, self.source_text);
+                let end_pos = self.line_map.offset_to_position(decl_node.end, self.source_text);
 
                 Some(Location {
                     file_path: self.file_name.clone(),
@@ -106,8 +109,8 @@ impl<'a> GoToDefinition<'a> {
             .iter()
             .filter_map(|&decl_idx| {
                 let decl_node = self.arena.get(decl_idx)?;
-                let start_pos = self.line_map.offset_to_position(decl_node.pos);
-                let end_pos = self.line_map.offset_to_position(decl_node.end);
+                let start_pos = self.line_map.offset_to_position(decl_node.pos, self.source_text);
+                let end_pos = self.line_map.offset_to_position(decl_node.end, self.source_text);
 
                 Some(Location {
                     file_path: self.file_name.clone(),
@@ -148,7 +151,7 @@ mod definition_tests {
         // Position at the 'x' in "x + 1" (line 1, column 0)
         let position = Position::new(1, 0);
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string());
+        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
         // Should find the definition at "const x = 1"
@@ -176,7 +179,7 @@ mod definition_tests {
         // Position outside any identifier
         let position = Position::new(0, 11); // At the semicolon
 
-        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string());
+        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
         let definitions = goto_def.get_definition(root, position);
 
         // Should not find a definition
