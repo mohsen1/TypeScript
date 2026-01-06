@@ -310,6 +310,10 @@ impl<'a> InferenceContext<'a> {
                             || self.type_contains_param(idx.value_type, target, visited)
                     })
             }
+            TypeKey::Application(app) => {
+                self.type_contains_param(app.base, target, visited)
+                    || app.args.iter().any(|&arg| self.type_contains_param(arg, target, visited))
+            }
             TypeKey::Function(shape) => {
                 if shape.type_params.iter().any(|tp| tp.name == target) {
                     return false;
