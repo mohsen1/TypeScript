@@ -73,13 +73,23 @@ These features would expand emitter capabilities but are not critical for baseli
 - ✅ Import/export helpers
 - ✅ ES5 downleveling (classes, arrows)
 - ✅ Parse error tolerance
+- ✅ **Comprehensive test suite** (14 edge case tests covering UTF-8, comments, helpers, transforms)
+- ✅ **Benchmark infrastructure** (Docker-safe, documented, ready to use)
 
 **Baseline at 53.9% (41/76 passing):**
 - Remaining failures are primarily type-checking/semantic errors
 - Not emission issues
 - Further improvement requires checker/binder track work
 
+**Testing & Benchmarking:**
+- ✅ 14 comprehensive edge case tests in `emitter_edge_case_tests.rs`
+- ✅ Docker-safe benchmark runner (`./wasm/bench.sh`)
+- ✅ Comprehensive benchmark documentation (`wasm/BENCHMARKS.md`)
+- ⏳ Baseline performance metrics - to be established on first full benchmark run
+- Target: > 50 MB/s throughput (must beat TypeScript-Go ~40 MB/s)
+
 **Next Steps:**
+- Run benchmarks to establish baseline: `./wasm/bench.sh`
 - Focus shifts to `checker-track` for baseline improvement
 - Emitter enhancements (System/AMD/UMD) can be revisited later if needed
 
