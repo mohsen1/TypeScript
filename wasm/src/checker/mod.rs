@@ -17,6 +17,7 @@ pub mod context;
 pub mod expr;
 pub mod statements;
 pub mod declarations;
+pub mod control_flow;
 
 // Re-export key types
 pub use types::{
@@ -32,3 +33,4 @@ pub use context::{CheckerContext, EnclosingClassInfo};
 pub use expr::ExpressionChecker;
 pub use statements::StatementChecker;
 pub use declarations::DeclarationChecker;
+pub use control_flow::FlowAnalyzer;
