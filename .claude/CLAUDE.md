@@ -38,7 +38,12 @@ Loop:
      - Run: node scripts/ask-gemini.mjs --review wasm/src/[modified_file].rs
      - Address any issues found
   8. Final commit with review feedback addressed
-  9. Sync changes with the `rust` branch (main work branch), resolve conflicts if necessary
+  9. **CRITICAL: Sync with origin after EVERY task**
+     - Run: `git push origin checker-track`
+     - Run: `git fetch origin && git merge origin/rust`
+     - Resolve any conflicts if they occur
+     - Run: `git push origin checker-track` (if there were merges)
+     - This keeps all tracks in sync and prevents divergence
   10. Repeat
 `
 
@@ -91,12 +96,26 @@ Commit frequently and atomically
 
 ## 🚨 Rules
 
-1. **Architecture in mind** - always keep in mind our big picture architecture
-2. **Never break the build** - tests must pass
-3. **ALWAYS use Docker for Rust** - ./wasm/test.sh only, NEVER raw cargo commands
-4. **Separate test files** - `foo.rs` and `foo_tests.rs` or `tests/foo.rs` 
-5. **Update the plan** - mark tasks complete, add new discoveries
+1. **STAY ON YOUR TRACK** - You are on the **checker-track**. NEVER switch to emitter or lsp work. If your track's work is near perfect, PERFECT IT. Add more tests. Clean up todos. Verify architecture compliance. Polish what you have.
+2. **Architecture in mind** - always keep in mind our big picture architecture
+3. **Never break the build** - tests must pass
+4. **ALWAYS use Docker for Rust** - ./wasm/test.sh only, NEVER raw cargo commands
+5. **Separate test files** - `foo.rs` and `foo_tests.rs` or `tests/foo.rs`
+6. **Update the plan** - mark tasks complete, add new discoveries
 7. **Gemini is your friend** - Gemini can unlock you when things are hard to debug, not sure about path to take. it can guide you how to start a work or review. make sure you use this help
+
+## 🎯 When Your Track Feels "Done"
+
+If checker work feels complete, that means you have MORE work to do:
+- **Add comprehensive tests** - edge cases, error cases, performance tests
+- **Review architecture adherence** - does your code follow `wasm/WASM_ARCHITECTURE.md`?
+- **Clean up todos** - remove completed items, update progress
+- **Optimize performance** - profile hot paths, reduce allocations
+- **Improve error messages** - make diagnostics more helpful
+- **Document complex logic** - add comments where non-obvious
+- **Ask Gemini for review** - get feedback on your best work
+
+**NEVER** say "my track is done, let me help other tracks". Perfect YOUR track.
 
 
 
