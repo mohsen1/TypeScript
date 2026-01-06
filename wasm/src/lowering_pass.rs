@@ -42,7 +42,9 @@ use crate::parser::syntax_kind_ext;
 use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::{NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
-use crate::transform_context::{TransformContext, TransformDirective};
+use crate::transform_context::{ModuleFormat, TransformContext, TransformDirective};
+use crate::thin_emitter::ModuleKind;
+use crate::transforms::arrow_es5::contains_this_reference;
 
 /// Lowering pass - Phase 1 of emission
 ///
@@ -51,6 +53,8 @@ pub struct LoweringPass<'a> {
     arena: &'a ThinNodeArena,
     ctx: &'a EmitContext,
     transforms: TransformContext,
+    commonjs_mode: bool,
+    has_export_assignment: bool,
 }
 
 impl<'a> LoweringPass<'a> {
@@ -60,12 +64,16 @@ impl<'a> LoweringPass<'a> {
             arena,
             ctx,
             transforms: TransformContext::new(),
+            commonjs_mode: false,
+            has_export_assignment: false,
         }
     }
 
     /// Run the lowering pass on a source file and return the transform context
     pub fn run(mut self, source_file: NodeIndex) -> TransformContext {
+        self.init_module_state(source_file);
         self.visit(source_file);
+        self.maybe_wrap_module(source_file);
         self.transforms
     }
 
@@ -78,6 +86,7 @@ impl<'a> LoweringPass<'a> {
         match node.kind {
             k if k == syntax_kind_ext::CLASS_DECLARATION => self.visit_class_declaration(node, idx),
             k if k == syntax_kind_ext::FUNCTION_DECLARATION => self.visit_function_declaration(node, idx),
+            k if k == syntax_kind_ext::FUNCTION_EXPRESSION => self.visit_function_expression(node, idx),
             k if k == syntax_kind_ext::ARROW_FUNCTION => self.visit_arrow_function(node, idx),
             k if k == syntax_kind_ext::VARIABLE_STATEMENT => self.visit_variable_statement(node, idx),
             k if k == syntax_kind_ext::EXPORT_DECLARATION => self.visit_export_declaration(node, idx),
@@ -91,9 +100,6 @@ impl<'a> LoweringPass<'a> {
             return;
         };
 
-        // For now, we'll implement a generic child visitor
-        // In the full implementation, we'd need to handle all node types
-        // This is a simplified version for the architecture refactor
         match node.kind {
             k if k == syntax_kind_ext::SOURCE_FILE => {
                 if let Some(sf) = self.arena.get_source_file(node) {
@@ -102,8 +108,319 @@ impl<'a> LoweringPass<'a> {
                     }
                 }
             }
+            k if k == syntax_kind_ext::BLOCK || k == syntax_kind_ext::CASE_BLOCK => {
+                if let Some(block) = self.get_block_like(node) {
+                    let statements = block.statements.nodes.clone();
+                    for stmt in statements {
+                        self.visit(stmt);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+                if let Some(var_stmt) = self.arena.get_variable(node) {
+                    for &decl_list in &var_stmt.declarations.nodes {
+                        self.visit(decl_list);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::VARIABLE_DECLARATION_LIST => {
+                if let Some(decl_list) = self.arena.get_variable(node) {
+                    for &decl in &decl_list.declarations.nodes {
+                        self.visit(decl);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::VARIABLE_DECLARATION => {
+                if let Some(decl) = self.arena.get_variable_declaration(node) {
+                    self.visit(decl.name);
+                    if !decl.initializer.is_none() {
+                        self.visit(decl.initializer);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::EXPRESSION_STATEMENT => {
+                if let Some(expr_stmt) = self.arena.get_expression_statement(node) {
+                    self.visit(expr_stmt.expression);
+                }
+            }
+            k if k == syntax_kind_ext::CALL_EXPRESSION => {
+                if let Some(call) = self.arena.get_call_expr(node) {
+                    self.visit(call.expression);
+                    if let Some(ref args) = call.arguments {
+                        for &arg_idx in &args.nodes {
+                            self.visit(arg_idx);
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::BINARY_EXPRESSION => {
+                if let Some(bin) = self.arena.get_binary_expr(node) {
+                    self.visit(bin.left);
+                    self.visit(bin.right);
+                }
+            }
+            k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+                || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION =>
+            {
+                if let Some(access) = self.arena.get_access_expr(node) {
+                    self.visit(access.expression);
+                    self.visit(access.name_or_argument);
+                }
+            }
+            k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
+                if let Some(prop) = self.arena.get_property_assignment(node) {
+                    self.visit(prop.name);
+                    self.visit(prop.initializer);
+                }
+            }
+            k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                if let Some(prop) = self.arena.get_property_decl(node) {
+                    if let Some(mods) = &prop.modifiers {
+                        for &mod_idx in &mods.nodes {
+                            self.visit(mod_idx);
+                        }
+                    }
+                    self.visit(prop.name);
+                    if !prop.initializer.is_none() {
+                        self.visit(prop.initializer);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                if let Some(method) = self.arena.get_method_decl(node) {
+                    if let Some(mods) = &method.modifiers {
+                        for &mod_idx in &mods.nodes {
+                            self.visit(mod_idx);
+                        }
+                    }
+                    self.visit(method.name);
+                    for &param_idx in &method.parameters.nodes {
+                        self.visit(param_idx);
+                    }
+                    if !method.body.is_none() {
+                        self.visit(method.body);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::CONSTRUCTOR => {
+                if let Some(ctor) = self.arena.get_constructor(node) {
+                    if let Some(mods) = &ctor.modifiers {
+                        for &mod_idx in &mods.nodes {
+                            self.visit(mod_idx);
+                        }
+                    }
+                    for &param_idx in &ctor.parameters.nodes {
+                        self.visit(param_idx);
+                    }
+                    if !ctor.body.is_none() {
+                        self.visit(ctor.body);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR
+                || k == syntax_kind_ext::SET_ACCESSOR =>
+            {
+                if let Some(accessor) = self.arena.get_accessor(node) {
+                    if let Some(mods) = &accessor.modifiers {
+                        for &mod_idx in &mods.nodes {
+                            self.visit(mod_idx);
+                        }
+                    }
+                    self.visit(accessor.name);
+                    for &param_idx in &accessor.parameters.nodes {
+                        self.visit(param_idx);
+                    }
+                    if !accessor.body.is_none() {
+                        self.visit(accessor.body);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::FUNCTION_EXPRESSION => {
+                if let Some(func) = self.arena.get_function(node) {
+                    for &param_idx in &func.parameters.nodes {
+                        self.visit(param_idx);
+                    }
+                    if !func.body.is_none() {
+                        self.visit(func.body);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::CLASS_EXPRESSION => {
+                if let Some(class_data) = self.arena.get_class(node) {
+                    if let Some(mods) = &class_data.modifiers {
+                        for &mod_idx in &mods.nodes {
+                            self.visit(mod_idx);
+                        }
+                    }
+                    for &member in &class_data.members.nodes {
+                        self.visit(member);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::PARAMETER => {
+                if let Some(param) = self.arena.get_parameter(node) {
+                    if let Some(mods) = &param.modifiers {
+                        for &mod_idx in &mods.nodes {
+                            self.visit(mod_idx);
+                        }
+                    }
+                    self.visit(param.name);
+                    if !param.initializer.is_none() {
+                        self.visit(param.initializer);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                || k == syntax_kind_ext::ARRAY_BINDING_PATTERN =>
+            {
+                if let Some(pattern) = self.arena.get_binding_pattern(node) {
+                    for &elem in &pattern.elements.nodes {
+                        self.visit(elem);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::BINDING_ELEMENT => {
+                if let Some(elem) = self.arena.get_binding_element(node) {
+                    if !elem.property_name.is_none() {
+                        self.visit(elem.property_name);
+                    }
+                    self.visit(elem.name);
+                    if !elem.initializer.is_none() {
+                        self.visit(elem.initializer);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::COMPUTED_PROPERTY_NAME => {
+                if let Some(computed) = self.arena.get_computed_property(node) {
+                    self.visit(computed.expression);
+                }
+            }
+            k if k == syntax_kind_ext::DECORATOR => {
+                if let Some(decorator) = self.arena.get_decorator(node) {
+                    self.visit(decorator.expression);
+                }
+            }
+            k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
+                if let Some(template) = self.arena.get_template_expr(node) {
+                    self.visit(template.head);
+                    for &span_idx in &template.template_spans.nodes {
+                        self.visit(span_idx);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TEMPLATE_SPAN => {
+                if let Some(span) = self.arena.get_template_span(node) {
+                    self.visit(span.expression);
+                    self.visit(span.literal);
+                }
+            }
+            k if k == syntax_kind_ext::SPREAD_ELEMENT
+                || k == syntax_kind_ext::SPREAD_ASSIGNMENT =>
+            {
+                if let Some(spread) = self.arena.get_spread(node) {
+                    self.visit(spread.expression);
+                }
+            }
+            k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
+                if let Some(paren) = self.arena.get_parenthesized(node) {
+                    self.visit(paren.expression);
+                }
+            }
+            k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
+                || k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION =>
+            {
+                if let Some(unary) = self.arena.get_unary_expr(node) {
+                    self.visit(unary.operand);
+                }
+            }
+            k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
+                if let Some(cond) = self.arena.get_conditional_expr(node) {
+                    self.visit(cond.condition);
+                    self.visit(cond.when_true);
+                    self.visit(cond.when_false);
+                }
+            }
+            k if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION
+                || k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION =>
+            {
+                if let Some(lit) = self.arena.get_literal_expr(node) {
+                    for &elem in &lit.elements.nodes {
+                        self.visit(elem);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::IF_STATEMENT => {
+                if let Some(if_stmt) = self.arena.get_if_statement(node) {
+                    self.visit(if_stmt.expression);
+                    self.visit(if_stmt.then_statement);
+                    if !if_stmt.else_statement.is_none() {
+                        self.visit(if_stmt.else_statement);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::FOR_STATEMENT
+                || k == syntax_kind_ext::WHILE_STATEMENT
+                || k == syntax_kind_ext::DO_STATEMENT =>
+            {
+                if let Some(loop_data) = self.arena.get_loop(node) {
+                    self.visit(loop_data.initializer);
+                    self.visit(loop_data.condition);
+                    self.visit(loop_data.incrementor);
+                    self.visit(loop_data.statement);
+                }
+            }
+            k if k == syntax_kind_ext::RETURN_STATEMENT => {
+                if let Some(ret) = self.arena.get_return_statement(node) {
+                    if !ret.expression.is_none() {
+                        self.visit(ret.expression);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::THROW_STATEMENT => {
+                if let Some(thr) = self.arena.get_return_statement(node) {
+                    if !thr.expression.is_none() {
+                        self.visit(thr.expression);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::SWITCH_STATEMENT => {
+                if let Some(switch) = self.arena.get_switch(node) {
+                    self.visit(switch.expression);
+                    self.visit(switch.case_block);
+                }
+            }
+            k if k == syntax_kind_ext::CASE_CLAUSE
+                || k == syntax_kind_ext::DEFAULT_CLAUSE =>
+            {
+                if let Some(clause) = self.arena.get_case_clause(node) {
+                    if !clause.expression.is_none() {
+                        self.visit(clause.expression);
+                    }
+                    for &stmt in &clause.statements.nodes {
+                        self.visit(stmt);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TRY_STATEMENT => {
+                if let Some(try_stmt) = self.arena.get_try(node) {
+                    self.visit(try_stmt.try_block);
+                    if !try_stmt.catch_clause.is_none() {
+                        self.visit(try_stmt.catch_clause);
+                    }
+                    if !try_stmt.finally_block.is_none() {
+                        self.visit(try_stmt.finally_block);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::CATCH_CLAUSE => {
+                if let Some(catch) = self.arena.get_catch_clause(node) {
+                    if !catch.variable_declaration.is_none() {
+                        self.visit(catch.variable_declaration);
+                    }
+                    self.visit(catch.block);
+                }
+            }
             _ => {
-                // Generic traversal - would need to be expanded for all node types
             }
         }
     }
@@ -148,16 +465,22 @@ impl<'a> LoweringPass<'a> {
             return;
         };
 
+        if let Some(mods) = &class.modifiers {
+            for &mod_idx in &mods.nodes {
+                self.visit(mod_idx);
+            }
+        }
+
         // Skip ambient declarations (declare class)
         if self.has_declare_modifier(&class.modifiers) {
             return;
         }
 
-        let mut is_exported = self.ctx.is_commonjs()
-            && !self.ctx.module_state.has_export_assignment
+        let mut is_exported = self.is_commonjs()
+            && !self.has_export_assignment
             && (force_export || self.has_export_modifier(&class.modifiers));
 
-        if force_export && self.ctx.is_commonjs() && !self.ctx.module_state.has_export_assignment {
+        if force_export && self.is_commonjs() && !self.has_export_assignment {
             is_exported = true;
         }
 
@@ -191,7 +514,7 @@ impl<'a> LoweringPass<'a> {
         // Wrap with CommonJS export if needed
         let final_directive = if is_exported && class_name.is_some() {
             TransformDirective::CommonJSExport {
-                name: class_name.unwrap(),
+                names: vec![class_name.unwrap()],
                 is_default,
                 inner: Box::new(base_directive),
             }
@@ -216,17 +539,47 @@ impl<'a> LoweringPass<'a> {
             return;
         };
 
-        // Check if this is an async function targeting ES5
-        if self.ctx.target_es5 && self.has_async_modifier(idx) {
-            self.transforms.insert(
-                idx,
-                TransformDirective::ES5AsyncFunction {
-                    function_node: idx,
-                },
-            );
+        if let Some(mods) = &func.modifiers {
+            for &mod_idx in &mods.nodes {
+                self.visit(mod_idx);
+            }
         }
 
-        // TODO: Handle CommonJS exports for functions
+        let is_exported =
+            self.is_commonjs() && self.has_export_modifier(&func.modifiers)
+                && !self.has_export_assignment;
+        let is_default = self.has_default_modifier(&func.modifiers);
+
+        let func_name = if !func.name.is_none() {
+            Some(self.get_identifier_text(func.name))
+        } else {
+            None
+        };
+
+        // Check if this is an async function targeting ES5
+        let base_directive = if self.ctx.target_es5 && self.has_async_modifier(idx) {
+            TransformDirective::ES5AsyncFunction { function_node: idx }
+        } else {
+            TransformDirective::Identity
+        };
+
+        let final_directive = if is_exported && func_name.is_some() {
+            TransformDirective::CommonJSExport {
+                names: vec![func_name.unwrap()],
+                is_default,
+                inner: Box::new(base_directive),
+            }
+        } else {
+            base_directive
+        };
+
+        if !matches!(final_directive, TransformDirective::Identity) {
+            self.transforms.insert(idx, final_directive);
+        }
+
+        for &param_idx in &func.parameters.nodes {
+            self.visit(param_idx);
+        }
 
         // Visit children
         if !func.body.is_none() {
@@ -236,13 +589,13 @@ impl<'a> LoweringPass<'a> {
 
     /// Visit an arrow function
     fn visit_arrow_function(&mut self, node: &ThinNode, idx: NodeIndex) {
-        let Some(_arrow) = self.arena.get_function(node) else {
+        let Some(arrow) = self.arena.get_function(node) else {
             return;
         };
 
         if self.ctx.target_es5 {
-            // TODO: Analyze if this arrow function captures 'this'
-            let captures_this = false; // Simplified for now
+            let captures_this = !arrow.body.is_none()
+                && contains_this_reference(self.arena, arrow.body);
 
             self.transforms.insert(
                 idx,
@@ -253,7 +606,13 @@ impl<'a> LoweringPass<'a> {
             );
         }
 
-        // TODO: Visit children
+        for &param_idx in &arrow.parameters.nodes {
+            self.visit(param_idx);
+        }
+
+        if !arrow.body.is_none() {
+            self.visit(arrow.body);
+        }
     }
 
     /// Visit a variable statement
@@ -262,8 +621,22 @@ impl<'a> LoweringPass<'a> {
             return;
         };
 
-        // TODO: Handle exported variable statements in CommonJS
-        // TODO: Handle const/let -> var transformation for ES5
+        if self.is_commonjs()
+            && self.has_export_modifier(&var_stmt.modifiers)
+            && !self.has_export_assignment
+        {
+            let export_names = self.collect_variable_names(&var_stmt.declarations);
+            if !export_names.is_empty() {
+                self.transforms.insert(
+                    idx,
+                    TransformDirective::CommonJSExport {
+                        names: export_names,
+                        is_default: false,
+                        inner: Box::new(TransformDirective::Identity),
+                    },
+                );
+            }
+        }
 
         // Visit each declaration
         for &decl in &var_stmt.declarations.nodes {
@@ -271,9 +644,52 @@ impl<'a> LoweringPass<'a> {
         }
     }
 
+    fn visit_function_expression(&mut self, node: &ThinNode, idx: NodeIndex) {
+        let Some(func) = self.arena.get_function(node) else {
+            return;
+        };
+
+        if self.ctx.target_es5 && func.is_async {
+            self.transforms.insert(
+                idx,
+                TransformDirective::ES5AsyncFunction { function_node: idx },
+            );
+        }
+
+        for &param_idx in &func.parameters.nodes {
+            self.visit(param_idx);
+        }
+
+        if !func.body.is_none() {
+            self.visit(func.body);
+        }
+    }
+
     // =========================================================================
     // Helper Methods
     // =========================================================================
+
+    fn init_module_state(&mut self, source_file: NodeIndex) {
+        let Some(node) = self.arena.get(source_file) else {
+            return;
+        };
+        let Some(source) = self.arena.get_source_file(node) else {
+            return;
+        };
+
+        self.has_export_assignment = self.contains_export_assignment(&source.statements);
+        self.commonjs_mode = if self.ctx.is_commonjs() {
+            true
+        } else if self.ctx.auto_detect_module {
+            self.file_is_module(&source.statements)
+        } else {
+            false
+        };
+    }
+
+    fn is_commonjs(&self) -> bool {
+        self.commonjs_mode
+    }
 
     /// Check if a modifier list contains the 'declare' keyword
     fn has_declare_modifier(&self, modifiers: &Option<NodeList>) -> bool {
@@ -359,6 +775,202 @@ impl<'a> LoweringPass<'a> {
 
         ident.escaped_text.clone()
     }
+
+    fn get_block_like(&self, node: &ThinNode) -> Option<&crate::parser::thin_node::BlockData> {
+        if node.kind == syntax_kind_ext::BLOCK || node.kind == syntax_kind_ext::CASE_BLOCK {
+            self.arena.blocks.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    fn collect_variable_names(&self, declarations: &NodeList) -> Vec<String> {
+        let mut names = Vec::new();
+        for &decl_list_idx in &declarations.nodes {
+            let Some(decl_list_node) = self.arena.get(decl_list_idx) else {
+                continue;
+            };
+            let Some(decl_list) = self.arena.get_variable(decl_list_node) else {
+                continue;
+            };
+
+            for &decl_idx in &decl_list.declarations.nodes {
+                let Some(decl_node) = self.arena.get(decl_idx) else {
+                    continue;
+                };
+                let Some(decl) = self.arena.get_variable_declaration(decl_node) else {
+                    continue;
+                };
+                if let Some(name) = self.get_binding_name(decl.name) {
+                    names.push(name);
+                }
+            }
+        }
+        names
+    }
+
+    fn get_binding_name(&self, name_idx: NodeIndex) -> Option<String> {
+        let node = self.arena.get(name_idx)?;
+        if node.kind == SyntaxKind::Identifier as u16 {
+            let id = self.arena.get_identifier(node)?;
+            Some(id.escaped_text.clone())
+        } else {
+            None
+        }
+    }
+
+    fn maybe_wrap_module(&mut self, source_file: NodeIndex) {
+        let format = match self.ctx.options.module {
+            ModuleKind::AMD => ModuleFormat::AMD,
+            ModuleKind::System => ModuleFormat::System,
+            ModuleKind::UMD => ModuleFormat::UMD,
+            _ => return,
+        };
+
+        let Some(node) = self.arena.get(source_file) else {
+            return;
+        };
+        let Some(source) = self.arena.get_source_file(node) else {
+            return;
+        };
+
+        if !self.file_is_module(&source.statements) {
+            return;
+        }
+
+        let dependencies = self.collect_module_dependencies(&source.statements.nodes);
+        self.transforms.insert(
+            source_file,
+            TransformDirective::ModuleWrapper {
+                format,
+                dependencies,
+                body: source.statements.nodes.clone(),
+            },
+        );
+    }
+
+    fn file_is_module(&self, statements: &NodeList) -> bool {
+        for &stmt_idx in &statements.nodes {
+            if let Some(node) = self.arena.get(stmt_idx) {
+                match node.kind {
+                    k if k == syntax_kind_ext::IMPORT_DECLARATION => return true,
+                    k if k == syntax_kind_ext::EXPORT_DECLARATION => return true,
+                    k if k == syntax_kind_ext::EXPORT_ASSIGNMENT => return true,
+                    k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+                        if let Some(var_stmt) = self.arena.get_variable(node) {
+                            if self.has_export_modifier(&var_stmt.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                        if let Some(func) = self.arena.get_function(node) {
+                            if self.has_export_modifier(&func.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                        if let Some(class) = self.arena.get_class(node) {
+                            if self.has_export_modifier(&class.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::ENUM_DECLARATION => {
+                        if let Some(enum_decl) = self.arena.get_enum(node) {
+                            if self.has_export_modifier(&enum_decl.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
+                        if let Some(iface) = self.arena.get_interface(node) {
+                            if self.has_export_modifier(&iface.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                        if let Some(type_alias) = self.arena.get_type_alias(node) {
+                            if self.has_export_modifier(&type_alias.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                        if let Some(module) = self.arena.get_module(node) {
+                            if self.has_export_modifier(&module.modifiers) {
+                                return true;
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        false
+    }
+
+    fn contains_export_assignment(&self, statements: &NodeList) -> bool {
+        for &stmt_idx in &statements.nodes {
+            if let Some(node) = self.arena.get(stmt_idx) {
+                if node.kind == syntax_kind_ext::EXPORT_ASSIGNMENT {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn collect_module_dependencies(&self, statements: &[NodeIndex]) -> Vec<String> {
+        let mut deps = Vec::new();
+        for &stmt_idx in statements {
+            let Some(node) = self.arena.get(stmt_idx) else {
+                continue;
+            };
+
+            if node.kind == syntax_kind_ext::IMPORT_DECLARATION
+                || node.kind == syntax_kind_ext::IMPORT_EQUALS_DECLARATION
+            {
+                if let Some(import_decl) = self.arena.get_import_decl(node) {
+                    if let Some(text) = self.get_module_specifier_text(import_decl.module_specifier) {
+                        if !deps.contains(&text) {
+                            deps.push(text);
+                        }
+                    }
+                }
+                continue;
+            }
+
+            if node.kind == syntax_kind_ext::EXPORT_DECLARATION {
+                if let Some(export_decl) = self.arena.get_export_decl(node) {
+                    if let Some(text) = self.get_module_specifier_text(export_decl.module_specifier) {
+                        if !deps.contains(&text) {
+                            deps.push(text);
+                        }
+                    }
+                }
+            }
+        }
+
+        deps
+    }
+
+    fn get_module_specifier_text(&self, specifier: NodeIndex) -> Option<String> {
+        if specifier.is_none() {
+            return None;
+        }
+
+        let Some(node) = self.arena.get(specifier) else {
+            return None;
+        };
+        let Some(literal) = self.arena.get_literal(node) else {
+            return None;
+        };
+
+        Some(literal.text.clone())
+    }
 }
 
 #[cfg(test)]
@@ -410,5 +1022,20 @@ mod tests {
 
         // CommonJS module should add export transform
         assert!(!transforms.is_empty(), "Expected CommonJS export transform");
+    }
+
+    #[test]
+    fn test_lowering_pass_nested_arrow_in_class() {
+        let (arena, root) = parse("class C { m() { const f = () => this; } }");
+        let mut ctx = EmitContext::default();
+        ctx.target_es5 = true;
+
+        let lowering = LoweringPass::new(&arena, &ctx);
+        let transforms = lowering.run(root);
+
+        assert!(
+            transforms.len() >= 2,
+            "Expected transforms for class and nested arrow function"
+        );
     }
 }

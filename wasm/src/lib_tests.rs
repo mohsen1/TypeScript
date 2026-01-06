@@ -1,12 +1,6 @@
 use super::*;
 
 #[test]
-fn test_add() {
-    assert_eq!(add(2, 2), 4);
-    assert_eq!(add(-1, 1), 0);
-}
-
-#[test]
 fn test_compare_strings_case_sensitive() {
     // Equal strings
     assert_eq!(

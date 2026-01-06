@@ -76,6 +76,7 @@ pub struct Completions<'a> {
     arena: &'a ThinNodeArena,
     binder: &'a ThinBinderState,
     line_map: &'a LineMap,
+    source_text: &'a str,
 }
 
 impl<'a> Completions<'a> {
@@ -84,11 +85,13 @@ impl<'a> Completions<'a> {
         arena: &'a ThinNodeArena,
         binder: &'a ThinBinderState,
         line_map: &'a LineMap,
+        source_text: &'a str,
     ) -> Self {
         Self {
             arena,
             binder,
             line_map,
+            source_text,
         }
     }
 
@@ -98,7 +101,7 @@ impl<'a> Completions<'a> {
     /// Returns None if no completions are available.
     pub fn get_completions(&self, root: NodeIndex, position: Position) -> Option<Vec<CompletionItem>> {
         // 1. Convert position to byte offset
-        let offset = self.line_map.position_to_offset(position);
+        let offset = self.line_map.position_to_offset(position, self.source_text)?;
 
         // 2. Find the node at this offset (or use root if not found)
         let node_idx = find_node_at_offset(self.arena, offset);
@@ -219,7 +222,7 @@ mod completions_tests {
         // Position at the end (line 2, column 0)
         let position = Position::new(2, 0);
 
-        let completions = Completions::new(arena, &binder, &line_map);
+        let completions = Completions::new(arena, &binder, &line_map, source);
         let items = completions.get_completions(root, position);
 
         assert!(items.is_some(), "Should have completions");
@@ -254,7 +257,7 @@ mod completions_tests {
         // Position inside the function (line 3, column 2)
         let position = Position::new(3, 2);
 
-        let completions = Completions::new(arena, &binder, &line_map);
+        let completions = Completions::new(arena, &binder, &line_map, source);
         let items = completions.get_completions(root, position);
 
         assert!(items.is_some(), "Should have completions");
@@ -289,7 +292,7 @@ mod completions_tests {
         // Position inside the function (line 3, column 2)
         let position = Position::new(3, 2);
 
-        let completions = Completions::new(arena, &binder, &line_map);
+        let completions = Completions::new(arena, &binder, &line_map, source);
         let items = completions.get_completions(root, position);
 
         assert!(items.is_some(), "Should have completions");
