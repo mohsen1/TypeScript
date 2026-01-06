@@ -31,3 +31,7 @@ harness = false
 [[bench]]
 name = "emitter_bench"
 harness = false
+
+[[bench]]
+name = "real_world_bench"
+harness = false
