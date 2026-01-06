@@ -90,6 +90,8 @@ impl<'a> LoweringPass<'a> {
             k if k == syntax_kind_ext::ARROW_FUNCTION => self.visit_arrow_function(node, idx),
             k if k == syntax_kind_ext::VARIABLE_STATEMENT => self.visit_variable_statement(node, idx),
             k if k == syntax_kind_ext::EXPORT_DECLARATION => self.visit_export_declaration(node, idx),
+            k if k == syntax_kind_ext::FOR_IN_STATEMENT => self.visit_for_in_statement(node),
+            k if k == syntax_kind_ext::FOR_OF_STATEMENT => self.visit_for_of_statement(node, idx),
             _ => self.visit_children(idx),
         }
     }
@@ -423,6 +425,33 @@ impl<'a> LoweringPass<'a> {
             _ => {
             }
         }
+    }
+
+    fn visit_for_in_statement(&mut self, node: &ThinNode) {
+        let Some(for_in_of) = self.arena.get_for_in_of(node) else {
+            return;
+        };
+
+        self.visit(for_in_of.initializer);
+        self.visit(for_in_of.expression);
+        self.visit(for_in_of.statement);
+    }
+
+    fn visit_for_of_statement(&mut self, node: &ThinNode, idx: NodeIndex) {
+        let Some(for_in_of) = self.arena.get_for_in_of(node) else {
+            return;
+        };
+
+        if self.ctx.target_es5 && !for_in_of.await_modifier {
+            self.transforms.insert(
+                idx,
+                TransformDirective::ES5ForOf { for_of_node: idx },
+            );
+        }
+
+        self.visit(for_in_of.initializer);
+        self.visit(for_in_of.expression);
+        self.visit(for_in_of.statement);
     }
 
     /// Visit a class declaration

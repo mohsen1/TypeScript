@@ -803,6 +803,19 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_node_default(node, idx);
             }
 
+            TransformDirective::ES5ForOf { for_of_node } => {
+                if let Some(for_of_node) = self.arena.get(for_of_node) {
+                    if let Some(for_in_of) = self.arena.get_for_in_of(for_of_node) {
+                        if !for_in_of.await_modifier {
+                            self.emit_for_of_statement_es5(for_in_of);
+                            return;
+                        }
+                    }
+                }
+
+                self.emit_node_default(node, idx);
+            }
+
             TransformDirective::ModuleWrapper {
                 format,
                 dependencies,
@@ -4892,10 +4905,17 @@ impl<'a> ThinPrinter<'a> {
     }
 
     fn needs_values_helper(&self) -> bool {
-        self.arena
-            .nodes
-            .iter()
-            .any(|node| node.kind == syntax_kind_ext::FOR_OF_STATEMENT)
+        self.arena.nodes.iter().any(|node| {
+            if node.kind != syntax_kind_ext::FOR_OF_STATEMENT {
+                return false;
+            }
+
+            if let Some(for_in_of) = self.arena.get_for_in_of(node) {
+                return !for_in_of.await_modifier;
+            }
+
+            false
+        })
     }
 
     /// Check if a statement contains a class that extends another (recursive)
