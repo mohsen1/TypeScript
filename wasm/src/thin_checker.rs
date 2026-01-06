@@ -1266,12 +1266,24 @@ impl<'a> ThinCheckerState<'a> {
             let arg_type = self.get_type_of_node(arg_idx);
             arg_types.push(arg_type);
 
+            if let Some(expected) = expected_type {
+                if expected != TypeId::ANY && expected != TypeId::UNKNOWN {
+                    if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
+                        if arg_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                            self.check_object_literal_excess_properties(arg_type, expected, arg_idx);
+                        }
+                    }
+                }
+            }
+
             // Restore previous context
             self.ctx.contextual_type = prev_context;
         }
 
         // Use CallEvaluator to resolve the call
         let mut subtype = SubtypeChecker::new(self.ctx.types);
+        subtype.strict_function_types = false;
+        subtype.allow_void_return = true;
         let mut evaluator = CallEvaluator::new(self.ctx.types, &mut subtype);
         let result = evaluator.resolve_call(callee_type, &arg_types);
 
@@ -3079,6 +3091,14 @@ impl<'a> ThinCheckerState<'a> {
                 stmt_idx
             };
             self.error_type_not_assignable_with_reason_at(return_type, expected_type, error_node);
+        }
+
+        if expected_type != TypeId::ANY && expected_type != TypeId::UNKNOWN && !return_data.expression.is_none() {
+            if let Some(expr_node) = self.ctx.arena.get(return_data.expression) {
+                if expr_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                    self.check_object_literal_excess_properties(return_type, expected_type, return_data.expression);
+                }
+            }
         }
     }
 

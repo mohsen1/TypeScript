@@ -16,6 +16,77 @@ fn test_lowering_new() {
     let _lowering = TypeLowering::new(&arena, &interner);
 }
 
+#[test]
+fn test_lower_intrinsic_type_annotation() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = string;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    assert_eq!(type_id, TypeId::STRING);
+}
+
+#[test]
+fn test_lower_literal_string_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = \"hello\";");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::String(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "hello");
+        }
+        _ => panic!("Expected string literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_number_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 42;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 42.0);
+        }
+        _ => panic!("Expected number literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_boolean_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = true;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Boolean(true)) => {}
+        _ => panic!("Expected boolean literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_deduplicates_identical_types() {
+    let (arena_one, type_one) = parse_type_alias_type_node("type A = \"same\";");
+    let (arena_two, type_two) = parse_type_alias_type_node("type B = \"same\";");
+    let interner = TypeInterner::new();
+
+    let lowering_one = TypeLowering::new(&arena_one, &interner);
+    let lowering_two = TypeLowering::new(&arena_two, &interner);
+
+    let type_id_one = lowering_one.lower_type(type_one);
+    let type_id_two = lowering_two.lower_type(type_two);
+
+    assert_eq!(type_id_one, type_id_two);
+}
+
 // =============================================================================
 // Type Parameter Lowering Tests
 // =============================================================================
@@ -45,6 +116,36 @@ fn parse_type_alias(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIn
     }
 
     panic!("Could not find function type in parsed AST");
+}
+
+/// Helper to parse a type alias and return its type node index
+fn parse_type_alias_type_node(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        source.to_string(),
+    );
+    let _root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let arena = std::mem::take(&mut parser.arena);
+    let mut type_node = crate::parser::base::NodeIndex::NONE;
+    for i in 0..arena.len() {
+        let idx = crate::parser::base::NodeIndex(i as u32);
+        if let Some(node) = arena.get(idx) {
+            if node.kind == syntax_kind_ext::TYPE_ALIAS_DECLARATION {
+                if let Some(alias) = arena.get_type_alias(node) {
+                    type_node = alias.type_node;
+                    break;
+                }
+            }
+        }
+    }
+
+    if type_node == crate::parser::base::NodeIndex::NONE {
+        panic!("Could not find type alias in parsed AST");
+    }
+
+    (arena, type_node)
 }
 
 /// Helper to parse a type alias and return the tuple type node index
@@ -341,6 +442,38 @@ fn test_lower_tuple_type_metadata() {
 }
 
 #[test]
+fn test_lower_union_type_normalization() {
+    let (arena, union_idx) = parse_type_alias_type_node("type T = string | number | string;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(union_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Union(members) => {
+            assert_eq!(members, vec![TypeId::NUMBER, TypeId::STRING]);
+        }
+        _ => panic!("Expected Union type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_intersection_type_normalization() {
+    let (arena, intersection_idx) = parse_type_alias_type_node("type T = string & number & string;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(intersection_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Intersection(members) => {
+            assert_eq!(members, vec![TypeId::NUMBER, TypeId::STRING]);
+        }
+        _ => panic!("Expected Intersection type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_function_parameter_names() {
     let (arena, func_type_idx) = parse_type_alias("type F = (x: string, y?: number) => void;");
 
@@ -461,6 +594,71 @@ fn test_lower_mapped_type_remove_modifiers() {
             assert_eq!(mapped.optional_modifier, Some(MappedModifier::Remove));
         }
         _ => panic!("Expected Mapped type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_object_properties() {
+    let (arena, literal_idx) = parse_type_literal("type T = { readonly foo?: string; bar: number; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Object(properties) => {
+            let foo = properties.iter()
+                .find(|prop| interner.resolve_atom(prop.name) == "foo")
+                .expect("Expected foo property");
+            assert_eq!(foo.type_id, TypeId::STRING);
+            assert!(foo.optional);
+            assert!(foo.readonly);
+
+            let bar = properties.iter()
+                .find(|prop| interner.resolve_atom(prop.name) == "bar")
+                .expect("Expected bar property");
+            assert_eq!(bar.type_id, TypeId::NUMBER);
+            assert!(!bar.optional);
+            assert!(!bar.readonly);
+        }
+        _ => panic!("Expected Object type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_nested_object() {
+    let (arena, literal_idx) = parse_type_alias_type_node(
+        "type T = { config: { enabled: boolean; retries?: number }; };"
+    );
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Object(properties) => {
+            let config = properties.iter()
+                .find(|prop| interner.resolve_atom(prop.name) == "config")
+                .expect("Expected config property");
+
+            match interner.lookup(config.type_id) {
+                Some(TypeKey::Object(nested)) => {
+                    let enabled = nested.iter()
+                        .find(|prop| interner.resolve_atom(prop.name) == "enabled")
+                        .expect("Expected enabled property");
+                    assert_eq!(enabled.type_id, TypeId::BOOLEAN);
+                    assert!(!enabled.optional);
+
+                    let retries = nested.iter()
+                        .find(|prop| interner.resolve_atom(prop.name) == "retries")
+                        .expect("Expected retries property");
+                    assert_eq!(retries.type_id, TypeId::NUMBER);
+                    assert!(retries.optional);
+                }
+                other => panic!("Expected nested Object type, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Object type, got {:?}", key),
     }
 }
 

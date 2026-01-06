@@ -9,25 +9,26 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
 **Independence:** MEDIUM - Needs stable TypeKey definitions from Track A. Heavy AST interaction.
 
 ## Current Status
-🟡 **In Progress** - Tuple element lowering (optional/rest/named) implemented and tested.
+🟡 **In Progress** - Phase 1/2 lowering tests added; BigInt literal test blocked by parser.
 
 ## Tasks
 
 ### Phase 1: Basic Type Lowering
-- [ ] Implement `lower_type_annotation(node: NodeIndex) -> TypeId`
+- [x] Implement `lower_type_annotation(node: NodeIndex) -> TypeId`
   - Handle primitive types: `number`, `string`, `boolean`, `void`, `any`, `unknown`
   - Use interner to deduplicate: `interner.intern_type(TypeKey::Intrinsic(...))`
-- [ ] Implement literal types
+- [x] Implement literal types
   - String literals: `"hello"` -> `TypeKey::Literal(atom)`
   - Number literals: `42` -> special handling (store as Atom? or separate pool?)
   - Boolean literals: `true`, `false`
-- [ ] Tests for basic lowering
+- [x] Tests for basic lowering
   - Test: `number` annotation -> Intrinsic(Number)
   - Test: `"hello"` -> Literal with correct Atom
   - Test: Verify deduplication (same type -> same TypeId)
+  - [ ] Add BigInt literal type test once `123n` parses in type position
 
 ### Phase 2: Complex Type Structures
-- [ ] Implement object type lowering
+- [x] Implement object type lowering
   - `{ name: string, age: number }` -> TypeKey::Object
   - Store properties in side table (Vec<Property>)
   - Property: `{ name: Atom, type: TypeId, optional: bool }`
@@ -35,14 +36,14 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - `string[]` -> TypeKey::Array(element)
   - `[string, number]` -> TypeKey::Tuple(Vec<TupleElement>)
   - Optional/rest/named tuple elements captured in TupleElement flags
-- [ ] Implement union and intersection types
+- [x] Implement union and intersection types
   - `string | number` -> TypeKey::Union(Slice<TypeId>)
   - `A & B` -> TypeKey::Intersection(Slice<TypeId>)
-- [ ] Tests for complex types
-  - Test: Object type with multiple properties
-  - Test: Nested objects
-  - Test: Union/intersection normalization
-  - Test: Tuple optional/rest/named elements (done)
+- [x] Tests for complex types
+  - [x] Test: Object type with multiple properties
+  - [x] Test: Nested objects
+  - [x] Test: Union/intersection normalization
+  - [x] Test: Tuple optional/rest/named elements
 
 ### Phase 3: Function Signatures
 - [ ] Implement function type lowering
