@@ -67,7 +67,7 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
   - ThinChecker assignability now routes through `CompatChecker`
 - [ ] Add comprehensive error messages
   - Explain WHY assignment failed (which property, which parameter)
-- [ ] Performance optimization
+- [x] Performance optimization
   - Cache compat checks (memoization)
   - Short-circuit on `any` early
 
