@@ -1106,7 +1106,11 @@ impl<'a> ThinCheckerState<'a> {
                         if let Some(param) = self.ctx.arena.get_parameter(node) {
                         if !param.type_annotation.is_none() {
                             let resolver = |node_idx: NodeIndex| {
-                                self.ctx.binder.resolve_identifier(self.ctx.arena, node_idx).map(|id| id.0)
+                                self.ctx.binder.resolve_identifier(self.ctx.arena, node_idx).and_then(|id| {
+                                    self.ctx.binder.get_symbol(id)
+                                        .filter(|symbol| (symbol.flags & symbol_flags::TYPE) != 0)
+                                        .map(|_| id.0)
+                                })
                             };
                             let lowering = TypeLowering::with_resolver(self.ctx.arena, self.ctx.types, &resolver);
                             return lowering.lower_type(param.type_annotation);
@@ -2096,7 +2100,11 @@ impl<'a> ThinCheckerState<'a> {
 
         // Use TypeLowering which handles all type nodes
         let resolver = |node_idx: NodeIndex| {
-            self.ctx.binder.resolve_identifier(self.ctx.arena, node_idx).map(|id| id.0)
+            self.ctx.binder.resolve_identifier(self.ctx.arena, node_idx).and_then(|id| {
+                self.ctx.binder.get_symbol(id)
+                    .filter(|symbol| (symbol.flags & symbol_flags::TYPE) != 0)
+                    .map(|_| id.0)
+            })
         };
         let lowering = TypeLowering::with_resolver(self.ctx.arena, self.ctx.types, &resolver);
         lowering.lower_type(idx)
