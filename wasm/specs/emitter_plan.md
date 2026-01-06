@@ -6,6 +6,9 @@
 Incrementally rewrite the TypeScript compiler in Rust, compiled to WebAssembly
 for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 
+### Goal
+100% accurate JS output and Source Maps.
+
 ## Tasks
 
 Our focus is to make wasm emitter complete

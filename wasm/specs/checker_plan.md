@@ -6,10 +6,32 @@
 Incrementally rewrite the TypeScript compiler in Rust, compiled to WebAssembly
 for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
 
+# Files
+
+src/solver/, src/thin_checker.rs, src/checker/ (legacy removal).
+
+# Goal
+
+Pass tests/cases/compiler.
 ## Tasks
 
 Our focus is to make wasm checker complete
 
+-  Fix the Solver Stack Overflow Risk
+    In `src/solver/subtype.rs`, add a depth check:
+
+    ```rust
+    // Add to SubtypeChecker struct
+    depth: u32,
+
+    // In check_subtype
+    if self.depth > 100 {
+        return SubtypeResult::Provisional; // Or Error
+    }
+    self.depth += 1;
+    // ... check ...
+    self.depth -= 1;
+```
 - 🔄 Move expression type computation to solver/operations.rs (incremental)
 - 🔄 Use NodeView API instead of raw arena lookups (incremental)
 - ⬜ Deprecate checker/types in favor of solver/types
