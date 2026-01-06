@@ -136,7 +136,7 @@ fn bench_emit_simple(c: &mut Criterion) {
             );
             let root = parser.parse_source_file();
             
-            let mut printer = ThinPrinter::new(parser.arena());
+            let mut printer = ThinPrinter::new(&parser.arena);
             printer.emit(root);
             black_box(printer.take_output())
         })
@@ -153,7 +153,7 @@ fn bench_emit_medium(c: &mut Criterion) {
             );
             let root = parser.parse_source_file();
             
-            let mut printer = ThinPrinter::new(parser.arena());
+            let mut printer = ThinPrinter::new(&parser.arena);
             printer.emit(root);
             black_box(printer.take_output())
         })
@@ -170,7 +170,7 @@ fn bench_emit_complex(c: &mut Criterion) {
             );
             let root = parser.parse_source_file();
             
-            let mut printer = ThinPrinter::new(parser.arena());
+            let mut printer = ThinPrinter::new(&parser.arena);
             printer.emit(root);
             black_box(printer.take_output())
         })
@@ -195,7 +195,7 @@ fn bench_emit_throughput(c: &mut Criterion) {
                 );
                 let root = parser.parse_source_file();
                 
-                let mut printer = ThinPrinter::new(parser.arena());
+                let mut printer = ThinPrinter::new(&parser.arena);
                 printer.emit(root);
                 black_box(printer.take_output())
             })
@@ -221,7 +221,7 @@ fn bench_emit_write_performance(c: &mut Criterion) {
         let root = parser.parse_source_file();
         
         b.iter(|| {
-            let mut printer = ThinPrinter::new(parser.arena());
+            let mut printer = ThinPrinter::new(&parser.arena);
             printer.emit(root);
             black_box(printer.take_output())
         })
@@ -248,7 +248,7 @@ fn bench_printer_comparison(c: &mut Criterion) {
             );
             let root = parser.parse_source_file();
             
-            let mut printer = ThinPrinter::new(parser.arena());
+            let mut printer = ThinPrinter::new(&parser.arena);
             printer.emit(root);
             black_box(printer.take_output())
         })
@@ -292,7 +292,7 @@ fn bench_emit_with_sourcemap(c: &mut Criterion) {
             );
             let root = parser.parse_source_file();
             
-            let mut printer = ThinPrinter::new(parser.arena());
+            let mut printer = ThinPrinter::new(&parser.arena);
             printer.emit(root);
             black_box(printer.take_output())
         })
@@ -307,7 +307,7 @@ fn bench_emit_with_sourcemap(c: &mut Criterion) {
             );
             let root = parser.parse_source_file();
             
-            let mut printer = ThinPrinter::new(parser.arena());
+            let mut printer = ThinPrinter::new(&parser.arena);
             printer.emit(root);
             let output = printer.take_output();
             black_box(output)
