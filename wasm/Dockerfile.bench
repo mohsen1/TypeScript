@@ -1,7 +1,7 @@
 # Dockerfile for running Rust benchmarks safely
 # Based on the test Dockerfile but optimized for benchmarking
 
-FROM rust:1.75-slim
+FROM rust:1.82-slim
 
 # Install dependencies
 RUN apt-get update && apt-get install -y \
