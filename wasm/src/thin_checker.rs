@@ -2329,6 +2329,50 @@ impl<'a> ThinCheckerState<'a> {
         // Check if this is a declared class (ambient declaration)
         let is_declared = self.has_declare_modifier(&class.modifiers);
 
+        // Check if this class is abstract
+        let is_abstract_class = self.has_abstract_modifier(&class.modifiers);
+
+        // Check for abstract members in non-abstract class (error 1253)
+        if !is_abstract_class {
+            for &member_idx in &class.members.nodes {
+                if let Some(member_node) = self.arena.get(member_idx) {
+                    let member_has_abstract = match member_node.kind {
+                        syntax_kind_ext::PROPERTY_DECLARATION => {
+                            if let Some(prop) = self.arena.get_property_decl(member_node) {
+                                self.has_abstract_modifier(&prop.modifiers)
+                            } else {
+                                false
+                            }
+                        }
+                        syntax_kind_ext::METHOD_DECLARATION => {
+                            if let Some(method) = self.arena.get_method_decl(member_node) {
+                                self.has_abstract_modifier(&method.modifiers)
+                            } else {
+                                false
+                            }
+                        }
+                        syntax_kind_ext::GET_ACCESSOR | syntax_kind_ext::SET_ACCESSOR => {
+                            if let Some(accessor) = self.arena.get_accessor(member_node) {
+                                self.has_abstract_modifier(&accessor.modifiers)
+                            } else {
+                                false
+                            }
+                        }
+                        _ => false,
+                    };
+
+                    if member_has_abstract {
+                        // Report on the 'abstract' keyword
+                        self.error_at_node(
+                            member_idx,
+                            "Abstract properties can only appear within an abstract class.",
+                            diagnostic_codes::ABSTRACT_ONLY_IN_ABSTRACT_CLASS,
+                        );
+                    }
+                }
+            }
+        }
+
         // Push a scope for type parameters
         self.push_local_scope();
 

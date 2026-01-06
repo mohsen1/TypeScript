@@ -159,6 +159,7 @@ pub mod diagnostic_codes {
     pub const IMPLEMENTATION_CANNOT_BE_IN_AMBIENT_CONTEXT: u32 = 1183;  // An implementation cannot be declared in ambient contexts.
     pub const MODIFIERS_NOT_ALLOWED_HERE: u32 = 1184;
     pub const CONST_MODIFIER_CANNOT_APPEAR_ON_A_CLASS_ELEMENT: u32 = 1248;  // 'const' modifier cannot appear on a class element.
+    pub const ABSTRACT_ONLY_IN_ABSTRACT_CLASS: u32 = 1253;  // 'abstract' modifier can only appear on a class, method, or property declaration.
     pub const UNEXPECTED_TOKEN_CLASS_MEMBER: u32 = 1068;  // Unexpected token. A constructor, method, accessor, or property was expected.
     pub const DECLARATION_OR_STATEMENT_EXPECTED: u32 = 1128;  // Declaration or statement expected.
     pub const VAR_DECLARATION_NOT_ALLOWED: u32 = 1440;  // Variable declaration not allowed at this location.
