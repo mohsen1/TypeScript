@@ -305,14 +305,29 @@ All 644 tests pass! ✅ (2 ignored)
    - All methods handle errors gracefully with Result<JsValue, JsValue>
    - **Status:** ✅ Compiles successfully, all LSP features now accessible from JavaScript!
 
-   **Known Issue:**
-   - 1 test failing in code_actions (test_extract_variable_property_access) - pre-existing, related to incomplete code actions implementation
+   **Fixed Issues:**
+   - ✅ Fixed code_actions test failure by using range containment instead of exact match
+   - ✅ All 683 tests passing!
+
+12. **Code Actions Bug Fix** (2026-01-06)
+   - Fixed `test_extract_variable_property_access` test failure
+   - Root cause: Parser bug where end positions are captured after `next_token()`, causing nodes to include following tokens in their span
+   - Workaround: Changed `find_expression_at_range` to use range containment (node contains selection) instead of exact position match
+   - This is more robust and works correctly despite the parser bug
+   - Tests: 3/3 passing ✅
+   - **Parser Bug Documented:** Parser's end position capture needs fixing (affects all LSP features)
 
 #### Next Steps
 
-1. **Fix Code Actions Test Failure**
-   - Debug and fix test_extract_variable_property_access
-   - Complete code actions implementation
+1. **Fix Parser End Position Bug** (HIGH PRIORITY)
+   - Parser captures end positions AFTER calling `next_token()`, including following tokens in node spans
+   - Affects all node types: identifiers, literals, expressions
+   - Solution: Capture `end_pos` BEFORE consuming tokens
+   - See Gemini's detailed fix recommendations for thin_parser.rs
+
+2. **Complete Code Actions Implementation**
+   - Add more refactoring actions (extract function, inline variable, etc.)
+   - Integrate with diagnostics for quick fixes
 
 2. **Fix Signature Help Edge Cases**
    - Debug multi-argument cursor position detection

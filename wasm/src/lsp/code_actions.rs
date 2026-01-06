@@ -146,7 +146,7 @@ impl<'a> CodeActionProvider<'a> {
         }
 
         // 4. Find the enclosing statement to determine where to insert the variable
-        let stmt_idx = self.find_enclosing_statement(expr_idx)?;
+        let stmt_idx = self.find_enclosing_statement(root, expr_idx)?;
         let stmt_node = self.arena.get(stmt_idx)?;
 
         // 5. Generate a unique variable name (simple version: use "extracted")
@@ -197,6 +197,7 @@ impl<'a> CodeActionProvider<'a> {
     }
 
     /// Find an expression node that matches the given range.
+    /// Finds the smallest expression node that contains the selection.
     fn find_expression_at_range(
         &self,
         root: NodeIndex,
@@ -210,18 +211,16 @@ impl<'a> CodeActionProvider<'a> {
             let node_start = node.pos;
             let node_end = node.end;
 
-            // Check if this node's range matches the selection
-            if node_start == start && node_end == end {
-                if self.is_expression(node.kind) {
-                    // Found an exact match
-                    let size = node_end - node_start;
-                    match best_match {
-                        None => best_match = Some((idx, size)),
-                        Some((_, best_size)) => {
-                            // Prefer smallest exact match (most specific)
-                            if size < best_size {
-                                best_match = Some((idx, size));
-                            }
+            // Check if this node contains the selection
+            // We look for nodes where the selection range is within the node's range
+            if node_start <= start && node_end >= end && self.is_expression(node.kind) {
+                let size = node_end - node_start;
+                // Find the smallest containing expression (most specific)
+                match best_match {
+                    None => best_match = Some((idx, size)),
+                    Some((_, best_size)) => {
+                        if size < best_size {
+                            best_match = Some((idx, size));
                         }
                     }
                 }
@@ -234,7 +233,7 @@ impl<'a> CodeActionProvider<'a> {
     }
 
     /// Find the enclosing statement for a given node.
-    fn find_enclosing_statement(&self, node_idx: NodeIndex) -> Option<NodeIndex> {
+    fn find_enclosing_statement(&self, root: NodeIndex, node_idx: NodeIndex) -> Option<NodeIndex> {
         // Walk up the tree until we find a statement
         // Note: ThinNodeArena doesn't have parent pointers, so we need to traverse from root
         // For simplicity, we'll use a helper that tracks parents during traversal
@@ -250,7 +249,7 @@ impl<'a> CodeActionProvider<'a> {
 
         // For now, we'll just traverse the entire tree and find the smallest statement
         // that contains our target node
-        self.traverse(NodeIndex(0), &mut |idx| {
+        self.traverse(root, &mut |idx| {
             let node = self.arena.get(idx)?;
 
             if self.is_statement(node.kind) && node.pos <= target_start && node.end >= target_node.end {
