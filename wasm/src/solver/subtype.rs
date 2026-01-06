@@ -734,9 +734,22 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::False;
         }
 
-        // All source properties must satisfy target's string index signature
-        if let Some(ref string_idx) = target.string_index {
-            for prop in source {
+        // Check properties against index signatures
+        for prop in source {
+            // Check if property name is numeric
+            let is_numeric = prop.name.parse::<f64>().is_ok();
+
+            if is_numeric {
+                // Numeric properties must satisfy number index signature if present
+                if let Some(ref number_idx) = target.number_index {
+                    if !self.check_subtype(prop.type_id, number_idx.value_type).is_true() {
+                        return SubtypeResult::False;
+                    }
+                }
+            }
+
+            // All properties (numeric or not) must also satisfy string index signature if present
+            if let Some(ref string_idx) = target.string_index {
                 if !self.check_subtype(prop.type_id, string_idx.value_type).is_true() {
                     return SubtypeResult::False;
                 }

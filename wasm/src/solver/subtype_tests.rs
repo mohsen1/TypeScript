@@ -467,3 +467,157 @@ fn test_tuple_to_array_mixed_types() {
     // This should FAIL - first element is number, not string
     assert!(!checker.is_subtype_of(source, target));
 }
+
+#[test]
+fn test_number_index_signature_numeric_property() {
+    // CRITICAL: { 0: string } should match { [x: number]: string }
+    use std::sync::Arc;
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // { 0: string }
+    let source = interner.object(vec![
+        PropertyInfo {
+            name: Arc::from("0"),
+            type_id: TypeId::STRING,
+            optional: false,
+            readonly: false,
+        },
+    ]);
+
+    // { [x: number]: string }
+    let target_shape = ObjectShape {
+        properties: vec![],
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        string_index: None,
+    };
+    let target = interner.object_with_index(target_shape);
+
+    // This should SUCCEED - numeric property "0" matches number index signature
+    assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_number_index_signature_type_mismatch() {
+    // { 0: number } should NOT match { [x: number]: string }
+    use std::sync::Arc;
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // { 0: number }
+    let source = interner.object(vec![
+        PropertyInfo {
+            name: Arc::from("0"),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+        },
+    ]);
+
+    // { [x: number]: string }
+    let target_shape = ObjectShape {
+        properties: vec![],
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        string_index: None,
+    };
+    let target = interner.object_with_index(target_shape);
+
+    // This should FAIL - numeric property has wrong type
+    assert!(!checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_number_index_signature_multiple_numeric_props() {
+    // { 0: string, 1: string, 2: string } should match { [x: number]: string }
+    use std::sync::Arc;
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // { 0: string, 1: string, 2: string }
+    let source = interner.object(vec![
+        PropertyInfo {
+            name: Arc::from("0"),
+            type_id: TypeId::STRING,
+            optional: false,
+            readonly: false,
+        },
+        PropertyInfo {
+            name: Arc::from("1"),
+            type_id: TypeId::STRING,
+            optional: false,
+            readonly: false,
+        },
+        PropertyInfo {
+            name: Arc::from("2"),
+            type_id: TypeId::STRING,
+            optional: false,
+            readonly: false,
+        },
+    ]);
+
+    // { [x: number]: string }
+    let target_shape = ObjectShape {
+        properties: vec![],
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        string_index: None,
+    };
+    let target = interner.object_with_index(target_shape);
+
+    // This should SUCCEED - all numeric properties match
+    assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_number_and_string_index_signatures() {
+    // { 0: string, foo: string } should match { [x: number]: string; [y: string]: string }
+    use std::sync::Arc;
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    // { 0: string, foo: string }
+    let source = interner.object(vec![
+        PropertyInfo {
+            name: Arc::from("0"),
+            type_id: TypeId::STRING,
+            optional: false,
+            readonly: false,
+        },
+        PropertyInfo {
+            name: Arc::from("foo"),
+            type_id: TypeId::STRING,
+            optional: false,
+            readonly: false,
+        },
+    ]);
+
+    // { [x: number]: string; [y: string]: string }
+    let target_shape = ObjectShape {
+        properties: vec![],
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    };
+    let target = interner.object_with_index(target_shape);
+
+    // This should SUCCEED - "0" satisfies number index, both satisfy string index
+    assert!(checker.is_subtype_of(source, target));
+}

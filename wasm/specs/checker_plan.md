@@ -48,10 +48,13 @@ Our focus is to make wasm checker complete
     - Uses get_array_element_type to unwrap rest array type
     - Added 4 comprehensive test cases
     - All 602 tests pass
-- ⬜ Fix number index signature check (CRITICAL from Gemini review)
-    - check_object_to_indexed ignores number_index signature
-    - Numeric property names (e.g., `{ 0: "val" }`) must validate against `[x: number]: T`
-    - Need to parse property names and check if numeric
+- ✅ Fix number index signature check (CRITICAL - COMPLETED)
+    - Fixed: check_object_to_indexed now validates numeric properties
+    - Parses property names with `parse::<f64>()` to detect numeric keys
+    - Numeric properties validated against `number_index` signature
+    - All properties still validated against `string_index` (TypeScript semantics)
+    - Added 4 comprehensive test cases
+    - All 606 tests pass
 - ... add more tasks (Ask Gemini when needed)
 
 
