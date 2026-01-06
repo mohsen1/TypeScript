@@ -9,7 +9,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
 **Independence:** MEDIUM - Needs stable TypeKey definitions from Track A. Heavy AST interaction.
 
 ## Current Status
-🟡 **In Progress** - Tuple element lowering (optional/rest/named) implemented and tested.
+🟡 **In Progress** - Union/intersection normalization and object property lowering tests added.
 
 ## Tasks
 
@@ -27,7 +27,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - Test: Verify deduplication (same type -> same TypeId)
 
 ### Phase 2: Complex Type Structures
-- [ ] Implement object type lowering
+- [x] Implement object type lowering
   - `{ name: string, age: number }` -> TypeKey::Object
   - Store properties in side table (Vec<Property>)
   - Property: `{ name: Atom, type: TypeId, optional: bool }`
@@ -35,13 +35,13 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - `string[]` -> TypeKey::Array(element)
   - `[string, number]` -> TypeKey::Tuple(Vec<TupleElement>)
   - Optional/rest/named tuple elements captured in TupleElement flags
-- [ ] Implement union and intersection types
+- [x] Implement union and intersection types
   - `string | number` -> TypeKey::Union(Slice<TypeId>)
   - `A & B` -> TypeKey::Intersection(Slice<TypeId>)
 - [ ] Tests for complex types
-  - Test: Object type with multiple properties
+  - Test: Object type with multiple properties (done)
   - Test: Nested objects
-  - Test: Union/intersection normalization
+  - Test: Union/intersection normalization (done)
   - Test: Tuple optional/rest/named elements (done)
 
 ### Phase 3: Function Signatures
