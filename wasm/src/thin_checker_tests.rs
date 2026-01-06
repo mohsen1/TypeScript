@@ -608,3 +608,36 @@ fn test_const_modifier_on_class_property_1248() {
     assert!(codes.contains(&1248),
         "Expected error 1248 (A class member cannot have the 'const' keyword), got: {:?}", codes);
 }
+
+#[test]
+fn test_accessor_type_compatibility_2322() {
+    // Error 2322: Type 'string' is not assignable to type 'number'
+    // When getter returns string but setter expects number
+    use crate::thin_parser::ThinParserState;
+    let source = r#"class C {
+    public set AnnotatedSetter(a: number) { }
+    public get AnnotatedSetter() { return ""; }
+}"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Debug: show all diagnostics
+    eprintln!("=== Diagnostics for accessor type mismatch ===");
+    for d in &checker.diagnostics {
+        eprintln!("  code={}, msg={}", d.code, d.message_text);
+    }
+
+    let codes: Vec<u32> = checker.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2322),
+        "Expected error 2322 (Type not assignable), got codes: {:?} diagnostics: {:?}",
+        codes,
+        checker.diagnostics.iter().map(|d| (d.code, d.message_text.clone())).collect::<Vec<_>>());
+}
