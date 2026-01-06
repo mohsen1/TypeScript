@@ -522,3 +522,80 @@ fn test_object_keyword_rejects_primitives() {
     assert!(!checker.is_assignable(TypeId::STRING, TypeId::OBJECT));
     assert!(!checker.is_assignable(TypeId::NUMBER, TypeId::OBJECT));
 }
+
+#[test]
+fn test_rest_any_callable_target_from_function() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    checker.set_strict_function_types(true);
+
+    let rest_any = interner.array(TypeId::ANY);
+    let target = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: vec![ParamInfo {
+                name: None,
+                type_id: rest_any,
+                optional: false,
+                rest: true,
+            }],
+            return_type: TypeId::VOID,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    let source = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    assert!(checker.is_assignable(source, target));
+}
+
+#[test]
+fn test_rest_unknown_callable_target_from_callable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    checker.set_strict_function_types(true);
+
+    let rest_unknown = interner.array(TypeId::UNKNOWN);
+    let target = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: vec![ParamInfo {
+                name: None,
+                type_id: rest_unknown,
+                optional: false,
+                rest: true,
+            }],
+            return_type: TypeId::VOID,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    let source = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: vec![ParamInfo {
+                name: None,
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            }],
+            return_type: TypeId::VOID,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    assert!(checker.is_assignable(source, target));
+}

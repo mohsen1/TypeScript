@@ -70,6 +70,7 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 ### Phase 6: Rest Parameter Bivariance
 - [x] Accept `(...args: any[] | unknown[]) => ...` as a universal supertype for params
 - [x] Tests for rest-parameter bivariance
+- [x] Callable/overload rest any/unknown coverage
 
 ### Phase 7: Empty Object Assignability
 - [x] Treat `{}` as non-nullish top (accept primitives, arrays, functions)

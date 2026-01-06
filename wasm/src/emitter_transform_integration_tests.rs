@@ -156,6 +156,36 @@ fn test_two_phase_emission_es5_class_for_destructuring() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_for_in_of() {
+    let source = "class Foo { method(obj, arr) { for (var k in obj) { k; } for (var v of arr) { v; } } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("for (var k in obj)"),
+        "ES5 output should contain for-in loop: {}",
+        output
+    );
+    assert!(
+        output.contains("for (var v of arr)"),
+        "ES5 output should contain for-of loop: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_class_switch_break_continue_do() {
     let source = "class Foo { method(x) { while (x) { continue; } switch (x) { case 1: break; default: return; } do { x--; } while (x); } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
