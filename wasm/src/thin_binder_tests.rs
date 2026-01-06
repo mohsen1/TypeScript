@@ -185,6 +185,9 @@ fn test_namespace_binding_debug() {
     let source = r#"
 namespace foo {
     export class Provide {}
+    class NotExported {}
+    export function bar() {}
+    function baz() {}
 }
 "#;
 
@@ -202,7 +205,17 @@ namespace foo {
     // Check if exports were captured
     assert!(foo_symbol.exports.is_some(), "foo should have exports");
 
-    // Check if Provide is in exports
+    // Check that ONLY exported members are in exports
     let exports = foo_symbol.exports.as_ref().unwrap();
+
+    // Exported members should be present
     assert!(exports.get("Provide").is_some(), "Provide should be in foo's exports");
+    assert!(exports.get("bar").is_some(), "bar should be in foo's exports");
+
+    // Non-exported members should NOT be in exports
+    assert!(exports.get("NotExported").is_none(), "NotExported should NOT be in foo's exports");
+    assert!(exports.get("baz").is_none(), "baz should NOT be in foo's exports");
+
+    // Should have exactly 2 exports
+    assert_eq!(exports.len(), 2, "foo should have exactly 2 exports");
 }

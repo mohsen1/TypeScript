@@ -501,6 +501,81 @@ impl ThinBinderState {
         false
     }
 
+    /// Check if modifiers list contains the 'export' keyword.
+    fn has_export_modifier(&self, arena: &ThinNodeArena, modifiers: &Option<NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::ExportKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if a node is exported.
+    /// Handles walking up the tree for VariableDeclaration -> VariableStatement.
+    fn is_node_exported(&self, arena: &ThinNodeArena, idx: NodeIndex) -> bool {
+        let Some(node) = arena.get(idx) else { return false };
+
+        // 1. Check direct modifiers (Function, Class, Interface, Enum, Module, TypeAlias)
+        match node.kind {
+            k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                if let Some(func) = arena.get_function(node) {
+                    return self.has_export_modifier(arena, &func.modifiers);
+                }
+            }
+            k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                if let Some(class) = arena.get_class(node) {
+                    return self.has_export_modifier(arena, &class.modifiers);
+                }
+            }
+            k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
+                if let Some(iface) = arena.get_interface(node) {
+                    return self.has_export_modifier(arena, &iface.modifiers);
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                if let Some(alias) = arena.get_type_alias(node) {
+                    return self.has_export_modifier(arena, &alias.modifiers);
+                }
+            }
+            k if k == syntax_kind_ext::ENUM_DECLARATION => {
+                if let Some(enum_decl) = arena.get_enum(node) {
+                    return self.has_export_modifier(arena, &enum_decl.modifiers);
+                }
+            }
+            k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                if let Some(module) = arena.get_module(node) {
+                    return self.has_export_modifier(arena, &module.modifiers);
+                }
+            }
+            // 2. Handle VariableDeclaration (walk up to VariableStatement)
+            k if k == syntax_kind_ext::VARIABLE_DECLARATION => {
+                // Walk up: VariableDeclaration -> VariableDeclarationList -> VariableStatement
+                if let Some(ext) = arena.get_extended(idx) {
+                    let list_idx = ext.parent;
+                    if let Some(list_ext) = arena.get_extended(list_idx) {
+                        let stmt_idx = list_ext.parent;
+                        if let Some(stmt_node) = arena.get(stmt_idx) {
+                            if stmt_node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
+                                if let Some(var_stmt) = arena.get_variable(stmt_node) {
+                                    return self.has_export_modifier(arena, &var_stmt.modifiers);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        false
+    }
+
     // Scope management
 
     fn enter_scope(&mut self, kind: ContainerKind, node: NodeIndex) {
@@ -517,9 +592,20 @@ impl ThinBinderState {
                 ContainerKind::Module => {
                     // Find the symbol for this module/namespace
                     if let Some(sym_id) = self.node_symbols.get(&ctx.container_node.0) {
-                        // Persist the current scope as the module's exports
+                        // Filter exports: only include symbols with is_exported = true or EXPORT_VALUE flag
+                        let mut exports = SymbolTable::new();
+                        for (name, &child_id) in self.current_scope.iter() {
+                            if let Some(child) = self.symbols.get(child_id) {
+                                // Check explicit export flag OR if it's an EXPORT_VALUE (from export {})
+                                if child.is_exported || (child.flags & symbol_flags::EXPORT_VALUE) != 0 {
+                                    exports.set(name.clone(), child_id);
+                                }
+                            }
+                        }
+
+                        // Persist filtered exports
                         if let Some(symbol) = self.symbols.get_mut(*sym_id) {
-                            symbol.exports = Some(Box::new(self.current_scope.clone()));
+                            symbol.exports = Some(Box::new(exports));
                         }
                     }
                 }
@@ -568,11 +654,15 @@ impl ThinBinderState {
                     symbol_flags::FUNCTION_SCOPED_VARIABLE
                 };
 
+                // Check if exported BEFORE allocating symbol
+                let is_exported = self.is_node_exported(arena, idx);
+
                 let sym_id = self.symbols.alloc(flags, name.to_string());
                 // Set the value_declaration to this variable declaration node
                 if let Some(sym) = self.symbols.get_mut(sym_id) {
                     sym.value_declaration = idx;
                     sym.declarations.push(idx);
+                    sym.is_exported = is_exported;
                 }
                 self.current_scope.set(name.to_string(), sym_id);
                 self.node_symbols.insert(idx.0, sym_id);
@@ -586,11 +676,15 @@ impl ThinBinderState {
             if let Some(name) = self.get_identifier_name(arena, func.name) {
                 // Check if already bound (hoisted)
                 if !self.current_scope.has(name) {
+                    // Check if exported BEFORE allocating symbol
+                    let is_exported = self.has_export_modifier(arena, &func.modifiers);
+
                     let sym_id = self.symbols.alloc(symbol_flags::FUNCTION, name.to_string());
                     // Set the value_declaration to this function declaration node
                     if let Some(sym) = self.symbols.get_mut(sym_id) {
                         sym.value_declaration = idx;
                         sym.declarations.push(idx);
+                        sym.is_exported = is_exported;
                     }
                     self.current_scope.set(name.to_string(), sym_id);
                     self.node_symbols.insert(idx.0, sym_id);
@@ -671,12 +765,16 @@ impl ThinBinderState {
                     flags |= symbol_flags::ABSTRACT;
                 }
 
+                // Check if exported BEFORE allocating symbol
+                let is_exported = self.has_export_modifier(arena, &class.modifiers);
+
                 let sym_id = self.symbols.alloc(flags, name.to_string());
 
                 // Add declaration info to the symbol
                 if let Some(sym) = self.symbols.get_mut(sym_id) {
                     sym.declarations.push(idx);
                     sym.value_declaration = idx;
+                    sym.is_exported = is_exported;
                 }
 
                 self.current_scope.set(name.to_string(), sym_id);
@@ -742,12 +840,16 @@ impl ThinBinderState {
     fn bind_interface_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
         if let Some(iface) = arena.get_interface(node) {
             if let Some(name) = self.get_identifier_name(arena, iface.name) {
+                // Check if exported BEFORE allocating symbol
+                let is_exported = self.has_export_modifier(arena, &iface.modifiers);
+
                 let sym_id = self.symbols.alloc(symbol_flags::INTERFACE, name.to_string());
 
                 // Add declaration info to the symbol
                 if let Some(sym) = self.symbols.get_mut(sym_id) {
                     sym.declarations.push(idx);
                     sym.value_declaration = idx;
+                    sym.is_exported = is_exported;
                 }
 
                 self.current_scope.set(name.to_string(), sym_id);
@@ -759,11 +861,15 @@ impl ThinBinderState {
     fn bind_type_alias_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
         if let Some(alias) = arena.get_type_alias(node) {
             if let Some(name) = self.get_identifier_name(arena, alias.name) {
+                // Check if exported BEFORE allocating symbol
+                let is_exported = self.has_export_modifier(arena, &alias.modifiers);
+
                 let sym_id = self.symbols.alloc(symbol_flags::TYPE_ALIAS, name.to_string());
                 // Set the value_declaration to this type alias declaration node
                 if let Some(sym) = self.symbols.get_mut(sym_id) {
                     sym.value_declaration = idx;
                     sym.declarations.push(idx);
+                    sym.is_exported = is_exported;
                 }
                 self.current_scope.set(name.to_string(), sym_id);
                 self.node_symbols.insert(idx.0, sym_id);
@@ -774,12 +880,16 @@ impl ThinBinderState {
     fn bind_enum_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
         if let Some(enum_decl) = arena.get_enum(node) {
             if let Some(name) = self.get_identifier_name(arena, enum_decl.name) {
+                // Check if exported BEFORE allocating symbol
+                let is_exported = self.has_export_modifier(arena, &enum_decl.modifiers);
+
                 let sym_id = self.symbols.alloc(symbol_flags::REGULAR_ENUM, name.to_string());
 
                 // Add declaration info to the symbol
                 if let Some(sym) = self.symbols.get_mut(sym_id) {
                     sym.declarations.push(idx);
                     sym.value_declaration = idx;
+                    sym.is_exported = is_exported;
                 }
 
                 self.current_scope.set(name.to_string(), sym_id);
@@ -894,6 +1004,41 @@ impl ThinBinderState {
         }
     }
 
+    /// Mark symbols associated with a declaration node as exported.
+    /// This is required because the parser wraps exported declarations in ExportDeclaration
+    /// nodes instead of attaching modifiers to the declaration itself.
+    fn mark_exported_symbols(&mut self, arena: &ThinNodeArena, idx: NodeIndex) {
+        // 1. Try direct symbol lookup (Function, Class, Enum, Module, Interface, TypeAlias)
+        if let Some(sym_id) = self.node_symbols.get(&idx.0) {
+            if let Some(sym) = self.symbols.get_mut(*sym_id) {
+                sym.is_exported = true;
+            }
+            return;
+        }
+
+        // 2. Handle VariableStatement -> VariableDeclarationList -> VariableDeclaration
+        // Variable statements don't have a symbol; their declarations do.
+        if let Some(node) = arena.get(idx) {
+            if node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
+                if let Some(var) = arena.get_variable(node) {
+                    for &list_idx in &var.declarations.nodes {
+                        if let Some(list_node) = arena.get(list_idx) {
+                            if let Some(list) = arena.get_variable(list_node) {
+                                for &decl_idx in &list.declarations.nodes {
+                                    if let Some(sym_id) = self.node_symbols.get(&decl_idx.0) {
+                                        if let Some(sym) = self.symbols.get_mut(*sym_id) {
+                                            sym.is_exported = true;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     fn bind_export_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, _idx: NodeIndex) {
         if let Some(export) = arena.get_export_decl(node) {
             // Export clause can be:
@@ -933,6 +1078,10 @@ impl ThinBinderState {
                         // Recursively bind the declaration
                         // This handles: export function foo() {}, export class Bar {}, export const x = 1
                         self.bind_node(arena, export.export_clause);
+
+                        // FIX: Explicitly mark the bound symbol(s) as exported
+                        // because the inner declaration node lacks the 'export' modifier
+                        self.mark_exported_symbols(arena, export.export_clause);
                     }
                     // Namespace export: export * as ns from 'mod'
                     else if let Some(name) = self.get_identifier_name(arena, export.export_clause) {
@@ -959,7 +1108,13 @@ impl ThinBinderState {
     fn bind_module_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
         if let Some(module) = arena.get_module(node) {
             if let Some(name) = self.get_identifier_name(arena, module.name) {
+                // Check if exported BEFORE allocating symbol
+                let is_exported = self.has_export_modifier(arena, &module.modifiers);
+
                 let sym_id = self.symbols.alloc(symbol_flags::VALUE_MODULE, name.to_string());
+                if let Some(sym) = self.symbols.get_mut(sym_id) {
+                    sym.is_exported = is_exported;
+                }
                 self.current_scope.set(name.to_string(), sym_id);
                 self.node_symbols.insert(idx.0, sym_id);
             }
