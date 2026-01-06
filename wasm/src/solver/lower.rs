@@ -24,9 +24,11 @@ use crate::solver::TypeInterner;
 pub struct TypeLowering<'a> {
     arena: &'a ThinNodeArena,
     interner: &'a dyn TypeDatabase,
-    /// Optional symbol resolver - resolves identifier nodes to SymbolIds.
+    /// Optional type resolver - resolves identifier nodes to SymbolIds.
     /// If provided, this enables correct abstract class detection.
-    resolver: Option<&'a dyn Fn(NodeIndex) -> Option<u32>>,
+    type_resolver: Option<&'a dyn Fn(NodeIndex) -> Option<u32>>,
+    /// Optional value resolver for typeof queries.
+    value_resolver: Option<&'a dyn Fn(NodeIndex) -> Option<u32>>,
     type_param_scopes: RefCell<Vec<Vec<(Atom, TypeId)>>>,
 }
 
@@ -153,7 +155,8 @@ impl<'a> TypeLowering<'a> {
         TypeLowering {
             arena,
             interner,
-            resolver: None,
+            type_resolver: None,
+            value_resolver: None,
             type_param_scopes: RefCell::new(Vec::new()),
         }
     }
@@ -168,14 +171,40 @@ impl<'a> TypeLowering<'a> {
         TypeLowering {
             arena,
             interner,
-            resolver: Some(resolver),
+            type_resolver: Some(resolver),
+            value_resolver: Some(resolver),
             type_param_scopes: RefCell::new(Vec::new()),
         }
     }
 
-    /// Resolve a node to a symbol ID if a resolver is provided.
-    fn resolve_symbol(&self, node_idx: NodeIndex) -> Option<u32> {
-        self.resolver.and_then(|resolver| resolver(node_idx))
+    /// Create a TypeLowering with separate type/value resolvers.
+    pub fn with_resolvers(
+        arena: &'a ThinNodeArena,
+        interner: &'a dyn TypeDatabase,
+        type_resolver: &'a dyn Fn(NodeIndex) -> Option<u32>,
+        value_resolver: &'a dyn Fn(NodeIndex) -> Option<u32>,
+    ) -> Self {
+        TypeLowering {
+            arena,
+            interner,
+            type_resolver: Some(type_resolver),
+            value_resolver: Some(value_resolver),
+            type_param_scopes: RefCell::new(Vec::new()),
+        }
+    }
+
+    /// Resolve a node to a type symbol ID if a resolver is provided.
+    fn resolve_type_symbol(&self, node_idx: NodeIndex) -> Option<u32> {
+        self.type_resolver.and_then(|resolver| resolver(node_idx))
+    }
+
+    /// Resolve a node to a value symbol ID if a resolver is provided.
+    fn resolve_value_symbol(&self, node_idx: NodeIndex) -> Option<u32> {
+        if let Some(resolver) = self.value_resolver {
+            resolver(node_idx)
+        } else {
+            self.resolve_type_symbol(node_idx)
+        }
     }
 
     fn push_type_param_scope(&self) {
@@ -1183,7 +1212,7 @@ impl<'a> TypeLowering<'a> {
 
     /// Lower a qualified name type (A.B).
     fn lower_qualified_name_type(&self, node_idx: NodeIndex) -> TypeId {
-        if let Some(symbol_id) = self.resolve_symbol(node_idx) {
+        if let Some(symbol_id) = self.resolve_type_symbol(node_idx) {
             return self.interner.reference(SymbolRef(symbol_id));
         }
         TypeId::ERROR
@@ -1203,7 +1232,7 @@ impl<'a> TypeLowering<'a> {
                 return type_param;
             }
 
-            if let Some(symbol_id) = self.resolve_symbol(node_idx) {
+            if let Some(symbol_id) = self.resolve_type_symbol(node_idx) {
                 return self.interner.reference(SymbolRef(symbol_id));
             }
 
@@ -1254,7 +1283,7 @@ impl<'a> TypeLowering<'a> {
 
         if let Some(data) = self.arena.get_type_query(node) {
             // Create a symbol reference from the expression name
-            if let Some(symbol_id) = self.resolve_symbol(data.expr_name) {
+            if let Some(symbol_id) = self.resolve_value_symbol(data.expr_name) {
                 return self.interner.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)));
             }
             TypeId::ERROR

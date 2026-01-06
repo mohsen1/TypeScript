@@ -445,10 +445,38 @@ impl<'a> ThinCheckerState<'a> {
         exports.get(right_name)
     }
 
+    fn entity_name_text(&self, idx: NodeIndex) -> Option<String> {
+        let node = self.ctx.arena.get(idx)?;
+        if node.kind == SyntaxKind::Identifier as u16 {
+            return self.ctx.arena.get_identifier(node).map(|ident| ident.escaped_text.clone());
+        }
+        if node.kind == syntax_kind_ext::QUALIFIED_NAME {
+            let qn = self.ctx.arena.get_qualified_name(node)?;
+            let left = self.entity_name_text(qn.left)?;
+            let right = self.entity_name_text(qn.right)?;
+            let mut combined = String::with_capacity(left.len() + 1 + right.len());
+            combined.push_str(&left);
+            combined.push('.');
+            combined.push_str(&right);
+            return Some(combined);
+        }
+        None
+    }
+
     fn resolve_type_symbol_for_lowering(&self, idx: NodeIndex) -> Option<u32> {
         let sym_id = self.resolve_qualified_symbol(idx)?;
         let symbol = self.ctx.binder.get_symbol(sym_id)?;
         if (symbol.flags & symbol_flags::TYPE) != 0 {
+            Some(sym_id.0)
+        } else {
+            None
+        }
+    }
+
+    fn resolve_value_symbol_for_lowering(&self, idx: NodeIndex) -> Option<u32> {
+        let sym_id = self.resolve_qualified_symbol(idx)?;
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        if (symbol.flags & (symbol_flags::VALUE | symbol_flags::ALIAS)) != 0 {
             Some(sym_id.0)
         } else {
             None
@@ -585,35 +613,21 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
-        // Get the identifier from expr_name
-        let Some(expr_node) = self.ctx.arena.get(type_query.expr_name) else {
-            return TypeId::ANY;
-        };
-
-        let Some(ident) = self.ctx.arena.get_identifier(expr_node) else {
-            return TypeId::ANY;
-        };
-
-        let name = &ident.escaped_text;
-
-        // Look up the symbol in the binder
-        if let Some(sym_id) = self.ctx.binder.file_locals.get(name) {
-            // Create TypeQuery with the actual SymbolId
-            return self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(sym_id.0)));
-        }
-
-        // Also check all symbols (for nested scopes)
-        if let Some(sym_id) = self.ctx.binder.get_symbols().find_by_name(name) {
-            return self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(sym_id.0)));
+        if let Some(sym_id) = self.resolve_value_symbol_for_lowering(type_query.expr_name) {
+            return self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(sym_id)));
         }
 
         // Not found - fall back to hash (for forward compatibility)
-        use std::hash::{Hash, Hasher};
-        use std::collections::hash_map::DefaultHasher;
-        let mut hasher = DefaultHasher::new();
-        name.hash(&mut hasher);
-        let symbol_id = hasher.finish() as u32;
-        self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)))
+        if let Some(name) = self.entity_name_text(type_query.expr_name) {
+            use std::hash::{Hash, Hasher};
+            use std::collections::hash_map::DefaultHasher;
+            let mut hasher = DefaultHasher::new();
+            name.hash(&mut hasher);
+            let symbol_id = hasher.finish() as u32;
+            return self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)));
+        }
+
+        TypeId::ANY
     }
 
     /// Get type from an array type node (T[]).
@@ -1093,8 +1107,14 @@ impl<'a> ThinCheckerState<'a> {
         // Interface - return interface type with call signatures
         if flags & symbol_flags::INTERFACE != 0 {
             if !symbol.declarations.is_empty() {
-                let resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
-                let lowering = TypeLowering::with_resolver(self.ctx.arena, self.ctx.types, &resolver);
+                let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
+                let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
+                let lowering = TypeLowering::with_resolvers(
+                    self.ctx.arena,
+                    self.ctx.types,
+                    &type_resolver,
+                    &value_resolver,
+                );
                 return lowering.lower_interface_declarations(&symbol.declarations);
             }
             if !value_decl.is_none() {
@@ -1148,8 +1168,14 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(node) = self.ctx.arena.get(value_decl) {
                         if let Some(param) = self.ctx.arena.get_parameter(node) {
                         if !param.type_annotation.is_none() {
-                            let resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
-                            let lowering = TypeLowering::with_resolver(self.ctx.arena, self.ctx.types, &resolver);
+                            let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
+                            let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
+                            let lowering = TypeLowering::with_resolvers(
+                                self.ctx.arena,
+                                self.ctx.types,
+                                &type_resolver,
+                                &value_resolver,
+                            );
                             return lowering.lower_type(param.type_annotation);
                         }
                     }
@@ -2136,8 +2162,14 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Use TypeLowering which handles all type nodes
-        let resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
-        let lowering = TypeLowering::with_resolver(self.ctx.arena, self.ctx.types, &resolver);
+        let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
+        let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
+        let lowering = TypeLowering::with_resolvers(
+            self.ctx.arena,
+            self.ctx.types,
+            &type_resolver,
+            &value_resolver,
+        );
         lowering.lower_type(idx)
     }
 
