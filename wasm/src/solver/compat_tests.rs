@@ -143,3 +143,26 @@ fn test_function_return_covariance() {
     assert!(checker.is_assignable(returns_dog, returns_animal));
     assert!(!checker.is_assignable(returns_animal, returns_dog));
 }
+
+#[test]
+fn test_void_return_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let returns_number = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: TypeId::NUMBER,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let returns_void = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    assert!(checker.is_assignable(returns_number, returns_void));
+    assert!(!checker.is_assignable(returns_void, returns_number));
+}

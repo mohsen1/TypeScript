@@ -41,12 +41,12 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
   - Test: Return types remain covariant
 
 ### Phase 3: Void Return Special Case
-- [ ] Implement void return compatibility
+- [x] Implement void return compatibility
   - Functions returning `T` assignable to `() => void`
   - Example: `Array.forEach` callback can return anything
-- [ ] Add contextual typing support
+- [x] Add contextual typing support
   - When target is `() => void`, don't check return type
-- [ ] Tests for void returns
+- [x] Tests for void returns
   - Test: `() => number` assignable to `() => void`
   - Test: `() => void` NOT assignable to `() => number`
 
