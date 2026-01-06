@@ -94,10 +94,20 @@ pub fn add_local(&mut self, name: String, ...) { ... }
   - Pre-interns common TypeScript identifiers (100+ keywords)
   - `intern_string()` method for type construction
   - `resolve_atom()` method for diagnostics
-- [ ] **Next:** Fix compilation errors in `thin_checker.rs` (call sites need updating)
-- [ ] **Next:** Update `TypeLowering` in `solver/lower.rs` to intern strings
-- [ ] **Next:** Update `TypeFormatter` in `solver/diagnostics.rs` to resolve Atoms
-- [ ] **Next:** Verify tests pass and measure performance improvement
+- [x] **Partial:** Fixed 2/3 type construction sites in `thin_checker.rs`
+  - Parameter names now use `intern_string()`
+  - PropertyInfo construction uses `intern_string()`
+- [ ] **In Progress:** ~40 compilation errors across solver files need fixing:
+  - `solver/lower.rs` - TypeLowering needs to intern strings (6 errors)
+  - `solver/diagnostics.rs` - TypeFormatter needs to resolve Atoms (10 errors)
+  - `solver/intern.rs` - Comparison methods need Atom support (3 errors)
+  - `solver/subtype.rs` - Property comparisons need resolution (4 errors)
+  - `solver/instantiate.rs`, `solver/evaluate.rs`, etc. (17+ errors)
+- [ ] **Next Session:** Systematically fix each solver file
+- [ ] **Then:** Verify all tests pass and measure performance improvement
+
+**Scope Note:** This is a large architectural refactor touching 10+ files.
+Estimated 2-3 more commits needed to complete all call site migrations.
 
 **Impact:**
 - Type equality/hashing now O(1) integer operations (was expensive string hashing)
