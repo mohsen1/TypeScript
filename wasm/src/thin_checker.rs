@@ -20,7 +20,7 @@ use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::binder::{SymbolId, symbol_flags};
 use crate::thin_binder::ThinBinderState;
-use crate::solver::{TypeId, TypeInterner};
+use crate::solver::{TypeId, TypeInterner, ContextualTypeContext};
 use crate::checker::types::diagnostics::{Diagnostic, DiagnosticCategory};
 use crate::checker::{CheckerContext, EnclosingClassInfo, FlowAnalyzer};
 
@@ -1043,10 +1043,27 @@ impl<'a> ThinCheckerState<'a> {
         // Get arguments list (may be None for calls without arguments)
         let args = call.arguments.as_ref().map(|a| &a.nodes).map(|n| n.as_slice()).unwrap_or(&[]);
 
-        // Collect argument types
-        let arg_types: Vec<TypeId> = args.iter()
-            .map(|&arg_idx| self.get_type_of_node(arg_idx))
-            .collect();
+        // Prepare for contextual typing of arguments
+        let mut arg_types = Vec::with_capacity(args.len());
+
+        // Create contextual context from callee type
+        let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, callee_type);
+
+        for (i, &arg_idx) in args.iter().enumerate() {
+            // Determine expected type for this argument
+            let expected_type = ctx_helper.get_parameter_type(i);
+
+            // Set contextual type for the argument
+            let prev_context = self.ctx.contextual_type;
+            self.ctx.contextual_type = expected_type;
+
+            // Check the argument with context
+            let arg_type = self.get_type_of_node(arg_idx);
+            arg_types.push(arg_type);
+
+            // Restore previous context
+            self.ctx.contextual_type = prev_context;
+        }
 
         // Use CallEvaluator to resolve the call
         let mut subtype = SubtypeChecker::new(&self.ctx.types);
@@ -1312,7 +1329,14 @@ impl<'a> ThinCheckerState<'a> {
         // Collect parameter info using solver's ParamInfo struct
         let mut params = Vec::new();
 
-        for &param_idx in &func.parameters.nodes {
+        // Setup contextual typing context if available
+        let ctx_helper = if let Some(ctx_type) = self.ctx.contextual_type {
+            Some(ContextualTypeContext::with_expected(self.ctx.types, ctx_type))
+        } else {
+            None
+        };
+
+        for (i, &param_idx) in func.parameters.nodes.iter().enumerate() {
             if let Some(param_node) = self.ctx.arena.get(param_idx) {
                 if let Some(param) = self.ctx.arena.get_parameter(param_node) {
                     // Get parameter name
@@ -1326,13 +1350,18 @@ impl<'a> ThinCheckerState<'a> {
                         None
                     };
 
-                    // Use type annotation if present, otherwise any
+                    // Use type annotation if present, otherwise infer from context
                     let type_id = if !param.type_annotation.is_none() {
                         // Check parameter type for parameter properties in function types
                         self.check_type_for_parameter_properties(param.type_annotation);
                         self.get_type_from_type_node(param.type_annotation)
                     } else {
-                        TypeId::ANY
+                        // Infer from contextual type
+                        if let Some(ref helper) = ctx_helper {
+                            helper.get_parameter_type(i).unwrap_or(TypeId::ANY)
+                        } else {
+                            TypeId::ANY
+                        }
                     };
 
                     // Check if optional or has initializer
@@ -1367,17 +1396,14 @@ impl<'a> ThinCheckerState<'a> {
         if !func.body.is_none() {
             self.push_local_scope();
 
-            // Add parameters to local scope
-            for &param_idx in &func.parameters.nodes {
+            // Add parameters to local scope using the already-computed types (including contextual)
+            for (i, &param_idx) in func.parameters.nodes.iter().enumerate() {
                 if let Some(param_node) = self.ctx.arena.get(param_idx) {
                     if let Some(param) = self.ctx.arena.get_parameter(param_node) {
                         if let Some(name_node) = self.ctx.arena.get(param.name) {
                             if let Some(name_data) = self.ctx.arena.get_identifier(name_node) {
-                                let param_type = if !param.type_annotation.is_none() {
-                                    self.get_type_from_type_node(param.type_annotation)
-                                } else {
-                                    TypeId::ANY
-                                };
+                                // Use type from params which already includes contextual typing
+                                let param_type = params.get(i).map(|p| p.type_id).unwrap_or(TypeId::ANY);
                                 self.add_local(name_data.escaped_text.clone(), param_type);
                             }
                         }
@@ -1456,6 +1482,13 @@ impl<'a> ThinCheckerState<'a> {
         // Collect properties from the object literal
         let mut properties: Vec<PropertyInfo> = Vec::new();
 
+        // Setup contextual typing context
+        let ctx_helper = if let Some(ctx_type) = self.ctx.contextual_type {
+            Some(ContextualTypeContext::with_expected(self.ctx.types, ctx_type))
+        } else {
+            None
+        };
+
         for &elem_idx in &obj.elements.nodes {
             let Some(elem_node) = self.ctx.arena.get(elem_idx) else {
                 continue;
@@ -1464,7 +1497,17 @@ impl<'a> ThinCheckerState<'a> {
             // Property assignment: { x: value }
             if let Some(prop) = self.ctx.arena.get_property_assignment(elem_node) {
                 if let Some(name) = self.get_property_name(prop.name) {
+                    // Set contextual type for property value
+                    let prev_context = self.ctx.contextual_type;
+                    if let Some(ref helper) = ctx_helper {
+                        self.ctx.contextual_type = helper.get_property_type(&name);
+                    }
+
                     let value_type = self.get_type_of_node(prop.initializer);
+
+                    // Restore context
+                    self.ctx.contextual_type = prev_context;
+
                     properties.push(PropertyInfo {
                         name: Arc::from(name.as_str()),
                         type_id: value_type,
@@ -1488,7 +1531,17 @@ impl<'a> ThinCheckerState<'a> {
             // Method shorthand: { foo() {} }
             else if let Some(method) = self.ctx.arena.get_method_decl(elem_node) {
                 if let Some(name) = self.get_property_name(method.name) {
+                    // Set contextual type for method
+                    let prev_context = self.ctx.contextual_type;
+                    if let Some(ref helper) = ctx_helper {
+                        self.ctx.contextual_type = helper.get_property_type(&name);
+                    }
+
                     let method_type = self.get_type_of_function(elem_idx);
+
+                    // Restore context
+                    self.ctx.contextual_type = prev_context;
+
                     properties.push(PropertyInfo {
                         name: Arc::from(name.as_str()),
                         type_id: method_type,

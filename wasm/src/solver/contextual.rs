@@ -59,25 +59,12 @@ impl<'a> ContextualTypeContext<'a> {
         let key = self.interner.lookup(expected)?;
 
         match key {
-            TypeKey::Function(shape) => {
-                if index < shape.params.len() {
-                    let param = &shape.params[index];
-                    if param.rest {
-                        // Rest parameter - extract element type from array
-                        if let Some(TypeKey::Array(elem)) = self.interner.lookup(param.type_id) {
-                            return Some(elem);
-                        }
-                    }
-                    Some(param.type_id)
-                } else if let Some(last) = shape.params.last() {
-                    // Index beyond params - check if last is rest
-                    if last.rest {
-                        // Extract element type from array
-                        if let Some(TypeKey::Array(elem)) = self.interner.lookup(last.type_id) {
-                            return Some(elem);
-                        }
-                    }
-                    None
+            TypeKey::Function(shape) => self.get_parameter_type_from_params(&shape.params, index),
+            TypeKey::Callable(shape) => {
+                // Use the first call signature for contextual typing
+                // TODO: Support overload selection based on argument count if available
+                if let Some(sig) = shape.call_signatures.first() {
+                    self.get_parameter_type_from_params(&sig.params, index)
                 } else {
                     None
                 }
@@ -258,6 +245,31 @@ impl<'a> ContextualTypeContext<'a> {
         match self.get_return_type() {
             Some(ty) => ContextualTypeContext::with_expected(self.interner, ty),
             None => ContextualTypeContext::new(self.interner),
+        }
+    }
+
+    /// Helper to extract parameter type from a list of params.
+    fn get_parameter_type_from_params(&self, params: &[ParamInfo], index: usize) -> Option<TypeId> {
+        if index < params.len() {
+            let param = &params[index];
+            if param.rest {
+                // Rest parameter - extract element type from array
+                if let Some(TypeKey::Array(elem)) = self.interner.lookup(param.type_id) {
+                    return Some(elem);
+                }
+            }
+            Some(param.type_id)
+        } else if let Some(last) = params.last() {
+            // Index beyond params - check if last is rest
+            if last.rest {
+                // Extract element type from array
+                if let Some(TypeKey::Array(elem)) = self.interner.lookup(last.type_id) {
+                    return Some(elem);
+                }
+            }
+            None
+        } else {
+            None
         }
     }
 }
