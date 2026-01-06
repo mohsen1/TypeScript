@@ -84,6 +84,87 @@ fn test_thin_checker_union_normalization() {
 }
 
 #[test]
+fn test_excess_property_in_variable_declaration() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Foo = { x: number };
+const ok: Foo = { x: 1 };
+const bad: Foo = { x: 1, y: 2 };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let excess_count = codes.iter().filter(|&&code| code == 2353).count();
+    assert_eq!(excess_count, 1,
+        "Expected exactly one error 2353 (Excess property), got codes: {:?}", codes);
+}
+
+#[test]
+fn test_excess_property_in_call_argument() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Foo = { x: number };
+function takesFoo(arg: Foo) {}
+takesFoo({ x: 1, y: 2 });
+const obj = { x: 1, y: 2 };
+takesFoo(obj);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let excess_count = codes.iter().filter(|&&code| code == 2353).count();
+    assert_eq!(excess_count, 1,
+        "Expected exactly one error 2353 (Excess property), got codes: {:?}", codes);
+}
+
+#[test]
+fn test_excess_property_in_return_statement() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Foo = { x: number };
+function makeFoo(): Foo {
+    return { x: 1, y: 2 };
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let excess_count = codes.iter().filter(|&&code| code == 2353).count();
+    assert_eq!(excess_count, 1,
+        "Expected exactly one error 2353 (Excess property), got codes: {:?}", codes);
+}
+
+#[test]
 fn test_thin_checker_subtype_intrinsics() {
     let arena = ThinNodeArena::new();
     let binder = ThinBinderState::new();
