@@ -3587,10 +3587,13 @@ impl<'a> ThinCheckerState<'a> {
             for (target_pos, &target_idx) in class_info.member_nodes.iter().enumerate() {
                 if let Some(member_name) = self.get_member_name(target_idx) {
                     if member_name == name {
-                        // Check if target is declared after current property
-                        if target_pos > current_pos {
-                            // Check if target is an instance property (not static, not a method)
-                            if self.is_instance_property(target_idx) {
+                        // Check if target is an instance property (not static, not a method)
+                        if self.is_instance_property(target_idx) {
+                            // Report 2729 if:
+                            // 1. Target is declared after current property, OR
+                            // 2. Target is an abstract property (no initializer in this class)
+                            let should_error = target_pos > current_pos || self.is_abstract_property(target_idx);
+                            if should_error {
                                 self.error_at_node(
                                     access_node_idx,
                                     &format!("Property '{}' is used before its initialization.", name),
@@ -3603,6 +3606,23 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
         }
+    }
+
+    /// Check if a property declaration is abstract (has abstract modifier).
+    fn is_abstract_property(&self, member_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(member_idx) else {
+            return false;
+        };
+
+        if node.kind != syntax_kind_ext::PROPERTY_DECLARATION {
+            return false;
+        }
+
+        if let Some(prop) = self.ctx.arena.get_property_decl(node) {
+            return self.has_abstract_modifier(&prop.modifiers);
+        }
+
+        false
     }
 
     /// Collect all `this.propertyName` accesses in an expression.
@@ -3679,12 +3699,10 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
             k if k == syntax_kind_ext::ARROW_FUNCTION => {
-                // Arrow functions preserve `this`, so continue recursing into body
-                if let Some(func) = self.ctx.arena.get_function(node) {
-                    if !func.body.is_none() {
-                        self.collect_this_accesses_recursive(func.body, accesses);
-                    }
-                }
+                // Arrow functions: while they preserve `this` context, property access
+                // inside is deferred until the function is called. So we don't recurse
+                // because the access doesn't happen during initialization.
+                // (This matches TypeScript's behavior for error 2729)
             }
             _ => {
                 // For other expressions, we don't recurse further to keep it simple
