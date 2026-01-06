@@ -28,6 +28,7 @@ use crate::parser::{NodeIndex, NodeList};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::transforms::arrow_es5::contains_this_reference;
+use crate::transforms::private_fields_es5::{PrivateFieldInfo, collect_private_fields, is_private_identifier};
 
 /// ES5 class emitter - emits ES5 IIFE pattern for classes
 pub struct ClassES5Emitter<'a> {
@@ -39,6 +40,10 @@ pub struct ClassES5Emitter<'a> {
     use_this_capture: bool,
     /// Counter for temporary variables (_a, _b, _c, etc.)
     temp_var_counter: u32,
+    /// Private fields for the current class
+    private_fields: Vec<PrivateFieldInfo>,
+    /// Current class name (for private field WeakMap names)
+    class_name: String,
 }
 
 impl<'a> ClassES5Emitter<'a> {
@@ -50,6 +55,8 @@ impl<'a> ClassES5Emitter<'a> {
             source_text: None,
             use_this_capture: false,
             temp_var_counter: 0,
+            private_fields: Vec::new(),
+            class_name: String::new(),
         }
     }
 
@@ -83,21 +90,37 @@ impl<'a> ClassES5Emitter<'a> {
 
     pub fn emit_class(&mut self, class_idx: NodeIndex) -> String {
         self.output.clear();
-        
+
         let Some(class_node) = self.arena.get(class_idx) else {
             return String::new();
         };
-        
+
         let Some(class_data) = self.arena.get_class(class_node) else {
             return String::new();
         };
-        
+
         // Get class name
         let class_name = self.get_identifier_text(class_data.name);
+        self.class_name = class_name.clone();
+
+        // Collect private fields from the class
+        self.private_fields = collect_private_fields(self.arena, class_idx, &class_name);
 
         // Check for extends clause and get base class name
         let base_class_name = self.get_extends_class_name(&class_data.heritage_clauses);
         let has_extends = base_class_name.is_some();
+
+        // Emit WeakMap variable declarations before the class (if we have private fields)
+        // var _ClassName_field1, _ClassName_field2;
+        if !self.private_fields.is_empty() {
+            self.write("var ");
+            let names: Vec<&str> = self.private_fields.iter()
+                .map(|f| f.weakmap_name.as_str())
+                .collect();
+            self.write(&names.join(", "));
+            self.write(";");
+            self.write_line();
+        }
 
         // var ClassName = /** @class */ (function (_super) {
         self.write("var ");
@@ -146,11 +169,23 @@ impl<'a> ClassES5Emitter<'a> {
 
         self.write("));");
 
+        // Emit WeakMap instantiations after the class (for instance private fields)
+        // _ClassName_field1 = new WeakMap(), _ClassName_field2 = new WeakMap();
+        let instantiations: Vec<String> = self.private_fields.iter()
+            .filter(|f| !f.is_static)
+            .map(|f| format!("{} = new WeakMap()", f.weakmap_name))
+            .collect();
+        if !instantiations.is_empty() {
+            self.write_line();
+            self.write(&instantiations.join(", "));
+            self.write(";");
+        }
+
         std::mem::take(&mut self.output)
     }
     
     fn emit_constructor(&mut self, class_name: &str, class_data: &ClassData, has_extends: bool) {
-        // Collect instance property initializers
+        // Collect instance property initializers (non-private only)
         let instance_props: Vec<NodeIndex> = class_data.members.nodes.iter()
             .filter_map(|&member_idx| {
                 let member_node = self.arena.get(member_idx)?;
@@ -160,6 +195,10 @@ impl<'a> ClassES5Emitter<'a> {
                 let prop_data = self.arena.get_property_decl(member_node)?;
                 // Skip static properties
                 if self.is_static(&prop_data.modifiers) {
+                    return None;
+                }
+                // Skip private fields (they use WeakMap pattern)
+                if is_private_identifier(self.arena, prop_data.name) {
                     return None;
                 }
                 // Include if has initializer
@@ -213,7 +252,10 @@ impl<'a> ClassES5Emitter<'a> {
                         // Note: use_this_capture is set per-arrow-function, not globally
                     }
 
-                    // Emit instance props and parameter props first
+                    // Emit private field initializations FIRST
+                    self.emit_private_field_initializations(false);
+
+                    // Then emit instance props and parameter props
                     self.emit_instance_property_initializers(&instance_props);
                     self.emit_parameter_properties(&ctor_data.parameters);
                     self.emit_block_contents(ctor_data.body);
@@ -265,16 +307,21 @@ impl<'a> ClassES5Emitter<'a> {
             self.write_line();
             self.increase_indent();
 
-            // For derived classes with no instance properties, just return _super.apply directly
-            if has_extends && instance_props.is_empty() {
+            let has_private_fields = self.private_fields.iter().any(|f| !f.is_static);
+
+            // For derived classes with no instance properties AND no private fields
+            if has_extends && instance_props.is_empty() && !has_private_fields {
                 self.write_indent();
                 self.write("return _super !== null && _super.apply(this, arguments) || this;");
                 self.write_line();
             } else if has_extends {
-                // For derived classes with instance props, use _this variable
+                // For derived classes with instance props or private fields, use _this variable
                 self.write_indent();
                 self.write("var _this = _super !== null && _super.apply(this, arguments) || this;");
                 self.write_line();
+
+                // Emit private field initializations first
+                self.emit_private_field_initializations(true);
 
                 // Emit instance property initializers
                 for &prop_idx in &instance_props {
@@ -295,7 +342,9 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write("return _this;");
                 self.write_line();
             } else {
-                // Non-derived class - just emit instance property initializers
+                // Non-derived class - emit private fields then instance property initializers
+                self.emit_private_field_initializations(false);
+
                 for &prop_idx in &instance_props {
                     let Some(prop_node) = self.arena.get(prop_idx) else { continue };
                     let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
@@ -356,6 +405,108 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(";");
             self.write_line();
         }
+    }
+
+    /// Emit private field initializations using WeakMap.set() pattern
+    /// For each private field:
+    /// 1. _ClassName_field.set(this, void 0); - allocate slot
+    /// 2. __classPrivateFieldSet(this, _ClassName_field, initialValue, "f"); - set value (if has initializer)
+    fn emit_private_field_initializations(&mut self, use_this: bool) {
+        let receiver = if use_this { "_this" } else { "this" };
+
+        for field in &self.private_fields.clone() {
+            // Skip static fields - they're handled differently
+            if field.is_static {
+                continue;
+            }
+
+            // Emit: _ClassName_field.set(this, void 0);
+            self.write_indent();
+            self.write(&field.weakmap_name);
+            self.write(".set(");
+            self.write(receiver);
+            self.write(", void 0);");
+            self.write_line();
+
+            // If has initializer, emit: __classPrivateFieldSet(this, _ClassName_field, value, "f");
+            if field.has_initializer && !field.initializer.is_none() {
+                self.write_indent();
+                self.write("__classPrivateFieldSet(");
+                self.write(receiver);
+                self.write(", ");
+                self.write(&field.weakmap_name);
+                self.write(", ");
+                self.emit_expression(field.initializer);
+                self.write(", \"f\");");
+                self.write_line();
+            }
+        }
+    }
+
+    /// Emit __classPrivateFieldGet(receiver, _ClassName_field, "f")
+    /// Called when encountering `this.#field` in method bodies
+    fn emit_private_field_get(&mut self, receiver_idx: NodeIndex, field_name_idx: NodeIndex) {
+        let field_name = self.get_private_field_name(field_name_idx);
+        let weakmap_name = self.get_weakmap_name_for_field(&field_name);
+
+        self.write("__classPrivateFieldGet(");
+        self.emit_expression(receiver_idx);
+        self.write(", ");
+        self.write(&weakmap_name);
+        self.write(", \"f\")");
+    }
+
+    /// Emit __classPrivateFieldSet(receiver, _ClassName_field, value, "f")
+    /// Called when encountering `this.#field = value` in method bodies
+    fn emit_private_field_set(&mut self, receiver_idx: NodeIndex, field_name_idx: NodeIndex, value_idx: NodeIndex) {
+        let field_name = self.get_private_field_name(field_name_idx);
+        let weakmap_name = self.get_weakmap_name_for_field(&field_name);
+
+        self.write("__classPrivateFieldSet(");
+        self.emit_expression(receiver_idx);
+        self.write(", ");
+        self.write(&weakmap_name);
+        self.write(", ");
+        self.emit_expression(value_idx);
+        self.write(", \"f\")");
+    }
+
+    /// Get the private field name from a PrivateIdentifier node (without #)
+    fn get_private_field_name(&self, name_idx: NodeIndex) -> String {
+        let Some(node) = self.arena.get(name_idx) else {
+            return String::new();
+        };
+        let Some(ident) = self.arena.get_identifier(node) else {
+            return String::new();
+        };
+        // Remove the # prefix
+        ident.escaped_text.strip_prefix('#').unwrap_or(&ident.escaped_text).to_string()
+    }
+
+    /// Get the WeakMap name for a private field
+    fn get_weakmap_name_for_field(&self, field_name: &str) -> String {
+        // Look up in our collected private fields
+        for field in &self.private_fields {
+            if field.name == field_name {
+                return field.weakmap_name.clone();
+            }
+        }
+        // Fallback: construct the name
+        format!("_{}_{}", self.class_name, field_name)
+    }
+
+    /// Check if an expression is a private field assignment (this.#field = ...)
+    fn is_private_field_assignment(&self, left_idx: NodeIndex) -> bool {
+        let Some(left_node) = self.arena.get(left_idx) else {
+            return false;
+        };
+        if left_node.kind != syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+            return false;
+        }
+        let Some(access) = self.arena.get_access_expr(left_node) else {
+            return false;
+        };
+        is_private_identifier(self.arena, access.name_or_argument)
     }
 
     /// Emit parameter properties as this.param = param;
@@ -1343,9 +1494,15 @@ impl<'a> ClassES5Emitter<'a> {
             }
             k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
                 if let Some(access) = self.arena.get_access_expr(expr_node) {
-                    self.emit_expression(access.expression);
-                    self.write(".");
-                    self.emit_expression(access.name_or_argument);
+                    // Check if this is a private field access (this.#field)
+                    if is_private_identifier(self.arena, access.name_or_argument) {
+                        // Transform to __classPrivateFieldGet(this, _ClassName_field, "f")
+                        self.emit_private_field_get(access.expression, access.name_or_argument);
+                    } else {
+                        self.emit_expression(access.expression);
+                        self.write(".");
+                        self.emit_expression(access.name_or_argument);
+                    }
                 }
             }
             k if k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
@@ -1394,11 +1551,24 @@ impl<'a> ClassES5Emitter<'a> {
             }
             k if k == syntax_kind_ext::BINARY_EXPRESSION => {
                 if let Some(bin) = self.arena.get_binary_expr(expr_node) {
-                    self.emit_expression(bin.left);
-                    self.write(" ");
-                    self.emit_binary_operator(bin.operator_token);
-                    self.write(" ");
-                    self.emit_expression(bin.right);
+                    // Check if this is a private field assignment (this.#field = value)
+                    let is_assignment = bin.operator_token == SyntaxKind::EqualsToken as u16;
+
+                    if is_assignment && self.is_private_field_assignment(bin.left) {
+                        // Transform to __classPrivateFieldSet(this, _field, value, "f")
+                        let left_node = self.arena.get(bin.left);
+                        if let Some(left) = left_node {
+                            if let Some(access) = self.arena.get_access_expr(left) {
+                                self.emit_private_field_set(access.expression, access.name_or_argument, bin.right);
+                            }
+                        }
+                    } else {
+                        self.emit_expression(bin.left);
+                        self.write(" ");
+                        self.emit_binary_operator(bin.operator_token);
+                        self.write(" ");
+                        self.emit_expression(bin.right);
+                    }
                 }
             }
             k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION => {
@@ -1855,20 +2025,61 @@ mod tests {
                 Counter.count++;
             }
         }"#;
-        
+
         let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
         let root = parser.parse_source_file();
-        
+
         if let Some(root_node) = parser.arena.get(root) {
             if let Some(source_file) = parser.arena.get_source_file(root_node) {
                 if let Some(&class_idx) = source_file.statements.nodes.first() {
                     let mut emitter = ClassES5Emitter::new(&parser.arena);
                     let output = emitter.emit_class(class_idx);
-                    
+
                     assert!(output.contains("Counter.count = 0"),
                             "Expected static property: {}", output);
                     assert!(output.contains("Counter.increment = function"),
                             "Expected static method: {}", output);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_class_with_private_fields() {
+        let source = r#"class Counter {
+            #count = 0;
+            increment() {
+                this.#count++;
+            }
+            getCount() {
+                return this.#count;
+            }
+        }"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        if let Some(root_node) = parser.arena.get(root) {
+            if let Some(source_file) = parser.arena.get_source_file(root_node) {
+                if let Some(&class_idx) = source_file.statements.nodes.first() {
+                    let mut emitter = ClassES5Emitter::new(&parser.arena);
+                    let output = emitter.emit_class(class_idx);
+
+                    // Check for WeakMap variable declaration
+                    assert!(output.contains("var _Counter_count;"),
+                            "Expected WeakMap var declaration: {}", output);
+
+                    // Check for WeakMap instantiation
+                    assert!(output.contains("_Counter_count = new WeakMap();"),
+                            "Expected WeakMap instantiation: {}", output);
+
+                    // Check for .set() in constructor
+                    assert!(output.contains("_Counter_count.set(this, void 0);"),
+                            "Expected WeakMap.set() in constructor: {}", output);
+
+                    // Check for __classPrivateFieldSet in constructor (for initializer)
+                    assert!(output.contains("__classPrivateFieldSet(this, _Counter_count, 0, \"f\")"),
+                            "Expected __classPrivateFieldSet for initializer: {}", output);
                 }
             }
         }

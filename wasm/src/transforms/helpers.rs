@@ -181,6 +181,27 @@ pub const MAKE_TEMPLATE_OBJECT_HELPER: &str = r#"var __makeTemplateObject = (thi
     return cooked;
 };"#;
 
+/// Helper code for __classPrivateFieldGet (private field access)
+pub const CLASS_PRIVATE_FIELD_GET_HELPER: &str = r#"var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (receiver, state, kind, f) {
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a getter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
+    return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
+};"#;
+
+/// Helper code for __classPrivateFieldSet (private field assignment)
+pub const CLASS_PRIVATE_FIELD_SET_HELPER: &str = r#"var __classPrivateFieldSet = (this && this.__classPrivateFieldSet) || function (receiver, state, value, kind, f) {
+    if (kind === "m") throw new TypeError("Private method is not writable");
+    if (kind === "a" && !f) throw new TypeError("Private accessor was defined without a setter");
+    if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot write private member to an object whose class did not declare it");
+    return (kind === "a" ? f.call(receiver, value) : f ? f.value = value : state.set(receiver, value)), value;
+};"#;
+
+/// Helper code for __classPrivateFieldIn (private field #field in obj check)
+pub const CLASS_PRIVATE_FIELD_IN_HELPER: &str = r#"var __classPrivateFieldIn = (this && this.__classPrivateFieldIn) || function(state, receiver) {
+    if (receiver === null || (typeof receiver !== "object" && typeof receiver !== "function")) throw new TypeError("Cannot use 'in' operator on non-object");
+    return typeof state === "function" ? receiver === state : state.has(receiver);
+};"#;
+
 /// Helper code for __createBinding (export bindings)
 pub const CREATE_BINDING_HELPER: &str = r#"var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
@@ -302,6 +323,18 @@ pub fn emit_helpers(helpers: &HelpersNeeded) -> String {
     }
     if helpers.make_template_object {
         output.push_str(MAKE_TEMPLATE_OBJECT_HELPER);
+        output.push('\n');
+    }
+    if helpers.class_private_field_get {
+        output.push_str(CLASS_PRIVATE_FIELD_GET_HELPER);
+        output.push('\n');
+    }
+    if helpers.class_private_field_set {
+        output.push_str(CLASS_PRIVATE_FIELD_SET_HELPER);
+        output.push('\n');
+    }
+    if helpers.class_private_field_in {
+        output.push_str(CLASS_PRIVATE_FIELD_IN_HELPER);
         output.push('\n');
     }
 

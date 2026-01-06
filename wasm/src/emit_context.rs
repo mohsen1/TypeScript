@@ -9,6 +9,8 @@
 //! 4. Enable transforms to manage their own state without bloating ThinPrinter
 
 use crate::thin_emitter::{ModuleKind, NewLineKind, PrinterOptions, ScriptTarget};
+use crate::transforms::block_scoping_es5::BlockScopeState;
+use crate::transforms::private_fields_es5::PrivateFieldState;
 
 /// Flags that control emission behavior for the current scope/branch
 #[derive(Debug, Clone, Default)]
@@ -180,6 +182,12 @@ pub struct EmitContext {
 
     /// Module transformation state
     pub module_state: ModuleTransformState,
+
+    /// Block scoping transformation state (let/const → var)
+    pub block_scope_state: BlockScopeState,
+
+    /// Private fields transformation state (#field → WeakMap)
+    pub private_field_state: PrivateFieldState,
 }
 
 impl EmitContext {
@@ -202,6 +210,8 @@ impl EmitContext {
             arrow_state: ArrowTransformState::default(),
             destructuring_state: DestructuringState::default(),
             module_state: ModuleTransformState::default(),
+            block_scope_state: BlockScopeState::default(),
+            private_field_state: PrivateFieldState::default(),
         }
     }
 
