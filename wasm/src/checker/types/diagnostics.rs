@@ -91,6 +91,8 @@ pub mod diagnostic_messages {
     pub const TYPES_OF_PROPERTY_INCOMPATIBLE: &str = "Types of property '{0}' are incompatible.";
     pub const ONLY_REFERS_TO_A_TYPE_BUT_IS_BEING_USED_AS_A_VALUE_HERE: &str =
         "'{0}' only refers to a type, but is being used as a value here.";
+    pub const ONLY_REFERS_TO_A_VALUE_BUT_IS_BEING_USED_AS_A_TYPE_HERE: &str =
+        "'{0}' refers to a value, but is being used as a type here. Did you mean 'typeof {0}'?";
 
     // Function/call errors
     pub const EXPECTED_ARGUMENTS: &str = "Expected {0} arguments, but got {1}.";
@@ -197,6 +199,7 @@ pub mod diagnostic_codes {
     pub const PROPERTY_DOES_NOT_EXIST_ON_TYPE: u32 = 2339;
     pub const TYPE_HAS_NO_PROPERTY: u32 = 2339;
     pub const ONLY_REFERS_TO_A_TYPE_BUT_IS_BEING_USED_AS_A_VALUE_HERE: u32 = 2693;
+    pub const ONLY_REFERS_TO_A_VALUE_BUT_IS_BEING_USED_AS_A_TYPE_HERE: u32 = 2749;
 
     // Function/call errors
     pub const ARGUMENT_NOT_ASSIGNABLE_TO_PARAMETER: u32 = 2345;

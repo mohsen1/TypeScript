@@ -925,6 +925,104 @@ fn test_object_interface_accepts_primitives() {
 }
 
 #[test]
+fn test_function_type_accepts_callables() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let function_top = interner.callable(CallableShape {
+        call_signatures: Vec::new(),
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    let function = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    assert!(checker.is_assignable(function, function_top));
+
+    let callable = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: vec![ParamInfo {
+                name: None,
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::BOOLEAN,
+            type_predicate: None,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+    assert!(checker.is_assignable(callable, function_top));
+}
+
+#[test]
+fn test_function_type_rejects_non_callables() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let function_top = interner.callable(CallableShape {
+        call_signatures: Vec::new(),
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    let name = interner.intern_string("name");
+    let obj = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    assert!(!checker.is_assignable(obj, function_top));
+}
+
+#[test]
+fn test_function_type_not_assignable_to_specific_callable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let function_top = interner.callable(CallableShape {
+        call_signatures: Vec::new(),
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    let specific_callable = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            params: vec![ParamInfo {
+                name: None,
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::STRING,
+            type_predicate: None,
+            type_params: Vec::new(),
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    assert!(!checker.is_assignable(function_top, specific_callable));
+}
+
+#[test]
 fn test_tuple_array_assignability_tuple_to_array() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
