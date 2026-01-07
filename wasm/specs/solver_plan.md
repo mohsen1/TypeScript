@@ -70,6 +70,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Added compat-layer assignability coverage for tuple/array rules.
 - [x] Respect type parameter constraints in overlap checks
   - Binary comparison overlap now considers generic constraints for disjoint primitives.
+- [x] Add overlap coverage for unconstrained/union-constrained type params
+  - Binary comparison allows unconstrained generics and rejects disjoint constrained unions.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.
