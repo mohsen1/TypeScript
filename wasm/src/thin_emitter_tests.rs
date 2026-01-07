@@ -141,6 +141,28 @@ fn test_thin_emit_string_literal_single_quote() {
 }
 
 #[test]
+fn test_thin_emit_call_expression() {
+    let source = "const result = foo.bar(baz[0]);";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("foo.bar("),
+        "Expected property access call in output: {}",
+        output
+    );
+    assert!(
+        output.contains("baz[0]"),
+        "Expected element access in output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_if_statement() {
     let source = "if (x > 0) { y = 1; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

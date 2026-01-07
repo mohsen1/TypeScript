@@ -67,6 +67,7 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Validate mapped types over `keyof bigint` produce expected properties.
 - [x] Enforce tuple/array assignment rule
   - Allow tuple-to-array; reject array-to-tuple except empty arrays to optional/empty tuples.
+  - Added compat-layer assignability coverage for tuple/array rules.
 - [x] Respect type parameter constraints in overlap checks
   - Binary comparison overlap now considers generic constraints for disjoint primitives.
 
