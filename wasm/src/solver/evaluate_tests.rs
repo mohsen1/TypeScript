@@ -468,6 +468,46 @@ fn test_index_access_array() {
 }
 
 #[test]
+fn test_index_access_array_string_index() {
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let includes_key = interner.literal_string("includes");
+    let includes_type = evaluate_index_access(&interner, string_array, includes_key);
+
+    let result = evaluate_index_access(&interner, string_array, TypeId::STRING);
+    let key = interner.lookup(result).expect("expected union for array[string]");
+
+    match key {
+        TypeKey::Union(members) => {
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&includes_type));
+            assert!(!members.contains(&TypeId::STRING));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_index_access_array_string_index_with_no_unchecked_indexed_access() {
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let mut evaluator = TypeEvaluator::new(&interner);
+    evaluator.set_no_unchecked_indexed_access(true);
+
+    let result = evaluator.evaluate_index_access(string_array, TypeId::STRING);
+    let key = interner.lookup(result).expect("expected union for array[string]");
+
+    match key {
+        TypeKey::Union(members) => {
+            assert!(members.contains(&TypeId::UNDEFINED));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_index_access_array_string_literal_length() {
     let interner = TypeInterner::new();
 
@@ -535,6 +575,52 @@ fn test_index_access_tuple_literal() {
 
     let result = evaluate_index_access(&interner, tuple, zero);
     assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_index_access_tuple_string_index() {
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let map_key = interner.literal_string("map");
+    let map_type = evaluate_index_access(&interner, tuple, map_key);
+
+    let result = evaluate_index_access(&interner, tuple, TypeId::STRING);
+    let key = interner.lookup(result).expect("expected union for tuple[string]");
+
+    match key {
+        TypeKey::Union(members) => {
+            assert!(members.contains(&TypeId::STRING));
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&map_type));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_index_access_tuple_string_index_with_no_unchecked_indexed_access() {
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let mut evaluator = TypeEvaluator::new(&interner);
+    evaluator.set_no_unchecked_indexed_access(true);
+
+    let result = evaluator.evaluate_index_access(tuple, TypeId::STRING);
+    let key = interner.lookup(result).expect("expected union for tuple[string]");
+
+    match key {
+        TypeKey::Union(members) => {
+            assert!(members.contains(&TypeId::UNDEFINED));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
 }
 
 #[test]

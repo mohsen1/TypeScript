@@ -263,6 +263,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Allow constructor types returning void to accept concrete constructor returns
 - [x] Tests for constructor void return assignability
 
+### Phase 48: Array/Tuple String Index Access
+- [x] Evaluate array/tuple index access with string index types
+- [x] Tests for array/tuple string index access and noUncheckedIndexedAccess
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

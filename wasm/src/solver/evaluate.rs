@@ -438,6 +438,17 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         keys
     }
 
+    fn array_member_types(&self) -> Vec<TypeId> {
+        vec![
+            TypeId::NUMBER,
+            self.apparent_method_type(TypeId::ANY),
+            self.apparent_method_type(TypeId::BOOLEAN),
+            self.apparent_method_type(TypeId::NUMBER),
+            self.apparent_method_type(TypeId::UNDEFINED),
+            self.apparent_method_type(TypeId::STRING),
+        ]
+    }
+
     fn array_member_kind(&self, name: &str) -> Option<ApparentMemberKind> {
         if name == "length" {
             return Some(ApparentMemberKind::Value(TypeId::NUMBER));
@@ -477,6 +488,11 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
         if self.is_number_like(index_type) {
             return self.add_undefined_if_unchecked(elem);
+        }
+
+        if index_type == TypeId::STRING {
+            let union = self.interner.union(self.array_member_types());
+            return self.add_undefined_if_unchecked(union);
         }
 
         if let Some(TypeKey::Literal(LiteralValue::String(name))) = self.interner.lookup(index_type) {
@@ -532,6 +548,16 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
             }
             return TypeId::UNDEFINED;
+        }
+
+        if index_type == TypeId::STRING {
+            let mut types: Vec<TypeId> = elements.iter().map(|e| e.type_id).collect();
+            types.extend(self.array_member_types());
+            if types.is_empty() {
+                return TypeId::NEVER;
+            }
+            let union = self.interner.union(types);
+            return self.add_undefined_if_unchecked(union);
         }
 
         if let Some(TypeKey::Literal(LiteralValue::String(name))) = self.interner.lookup(index_type) {
