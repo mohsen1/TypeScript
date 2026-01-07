@@ -88,6 +88,9 @@ Status: Active
   - Add coverage for `import Alias = NS; Alias.Foo` and nested alias member access.
 - [x] Enforce type-only namespace members in nested access
   - Add coverage for `Outer.Inner.Type` used as a value.
+- [x] Report TS2693 for local type-only symbols in value position
+  - Error on interface/type alias usage in expression contexts.
+  - Add focused tests for interface and type alias values.
 
 ## Baseline / Validation
 - `./wasm/test.sh`

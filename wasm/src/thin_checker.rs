@@ -2499,6 +2499,13 @@ impl<'a> ThinCheckerState<'a> {
                 self.error_type_only_value_at(name, idx);
                 return TypeId::ERROR;
             }
+            let flags = self.ctx.binder.get_symbol(sym_id).map(|symbol| symbol.flags).unwrap_or(0);
+            let has_type = (flags & symbol_flags::TYPE) != 0;
+            let has_value = (flags & symbol_flags::VALUE) != 0;
+            if has_type && !has_value {
+                self.error_type_only_value_at(name, idx);
+                return TypeId::ERROR;
+            }
             let declared_type = self.get_type_of_symbol(sym_id);
             return self.apply_flow_narrowing(idx, declared_type);
         }
