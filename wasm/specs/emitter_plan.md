@@ -44,6 +44,7 @@ Status: Active
   - [x] Add JSX hyphenated element name emission coverage in thin emitter tests.
   - [x] Add JSX hyphenated element + attribute coverage in thin emitter tests.
   - [x] Add JSX member element attribute coverage in thin emitter tests.
+  - [x] Add JSX member element hyphenated attribute coverage in thin emitter tests.
   - [x] Add JSX namespaced attribute string literal coverage in thin emitter tests.
   - [x] Add JSX member element namespaced attribute coverage in thin emitter tests.
   - [x] Add JSX member element namespaced attribute expression coverage in thin emitter tests.
