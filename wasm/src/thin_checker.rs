@@ -3521,7 +3521,7 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of property access expression.
     fn get_type_of_property_access(&mut self, idx: NodeIndex) -> TypeId {
-        use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
+        use crate::solver::{PropertyAccessResult, QueryDatabase};
 
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
@@ -3574,9 +3574,8 @@ impl<'a> ThinCheckerState<'a> {
                 return TypeId::ERROR;
             }
 
-            // Use PropertyAccessEvaluator to resolve the property access
-            let evaluator = PropertyAccessEvaluator::new(self.ctx.types);
-            let result = evaluator.resolve_property_access(object_type, property_name);
+            // Use solver QueryDatabase to resolve the property access
+            let result = self.ctx.types.property_access_type(object_type, property_name);
 
             match result {
                 PropertyAccessResult::Success { type_id: prop_type, from_index_signature } => {
@@ -3638,7 +3637,7 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of element access expression (e.g., arr[0], obj["prop"]).
     fn get_type_of_element_access(&mut self, idx: NodeIndex) -> TypeId {
-        use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
+        use crate::solver::{PropertyAccessResult, QueryDatabase};
 
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
@@ -3731,8 +3730,7 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(property_name) = self.get_literal_string_from_node(access.name_or_argument) {
                 if numeric_string_index.is_none() {
                     use_index_signature_check = false;
-                    let evaluator = PropertyAccessEvaluator::new(self.ctx.types);
-                    let result = evaluator.resolve_property_access(object_type_for_access, property_name);
+                    let result = self.ctx.types.property_access_type(object_type_for_access, property_name);
                     result_type = Some(match result {
                         PropertyAccessResult::Success { type_id, .. } => type_id,
                         PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
@@ -4029,14 +4027,13 @@ impl<'a> ThinCheckerState<'a> {
         object_type: TypeId,
         keys: &[Atom],
     ) -> Option<TypeId> {
-        use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
+        use crate::solver::{PropertyAccessResult, QueryDatabase};
 
         if keys.is_empty() {
             return None;
         }
 
         let numeric_as_index = self.is_array_like_type(object_type);
-        let evaluator = PropertyAccessEvaluator::new(self.ctx.types);
         let mut types = Vec::with_capacity(keys.len());
 
         for &key in keys {
@@ -4049,7 +4046,7 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
 
-            match evaluator.resolve_property_access(object_type, &name) {
+            match self.ctx.types.property_access_type(object_type, &name) {
                 PropertyAccessResult::Success { type_id, .. } => types.push(type_id),
                 PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
                     types.push(property_type.unwrap_or(TypeId::ANY));
@@ -4488,7 +4485,7 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of object literal.
     fn get_type_of_object_literal(&mut self, idx: NodeIndex) -> TypeId {
-        use crate::solver::PropertyInfo;
+        use crate::solver::{PropertyInfo, QueryDatabase};
         use std::sync::Arc;
 
         let Some(node) = self.ctx.arena.get(idx) else {
@@ -4502,13 +4499,6 @@ impl<'a> ThinCheckerState<'a> {
         // Collect properties from the object literal
         let mut properties: Vec<PropertyInfo> = Vec::new();
 
-        // Setup contextual typing context
-        let ctx_helper = if let Some(ctx_type) = self.ctx.contextual_type {
-            Some(ContextualTypeContext::with_expected(self.ctx.types, ctx_type))
-        } else {
-            None
-        };
-
         for &elem_idx in &obj.elements.nodes {
             let Some(elem_node) = self.ctx.arena.get(elem_idx) else {
                 continue;
@@ -4519,8 +4509,8 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(name) = self.get_property_name(prop.name) {
                     // Set contextual type for property value
                     let prev_context = self.ctx.contextual_type;
-                    if let Some(ref helper) = ctx_helper {
-                        self.ctx.contextual_type = helper.get_property_type(&name);
+                    if let Some(ctx_type) = prev_context {
+                        self.ctx.contextual_type = self.ctx.types.contextual_property_type(ctx_type, &name);
                     }
 
                     let value_type = self.get_type_of_node(prop.initializer);
@@ -4557,8 +4547,8 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(name) = self.get_property_name(method.name) {
                     // Set contextual type for method
                     let prev_context = self.ctx.contextual_type;
-                    if let Some(ref helper) = ctx_helper {
-                        self.ctx.contextual_type = helper.get_property_type(&name);
+                    if let Some(ctx_type) = prev_context {
+                        self.ctx.contextual_type = self.ctx.types.contextual_property_type(ctx_type, &name);
                     }
 
                     let method_type = self.get_type_of_function(elem_idx);

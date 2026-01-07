@@ -108,6 +108,53 @@ fn test_conditional_non_distributive_union() {
 }
 
 #[test]
+fn test_rest_unknown_bivariant_conditional_evaluate_strict() {
+    let interner = TypeInterner::new();
+
+    let rest_unknown = interner.array(TypeId::UNKNOWN);
+    let target = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: rest_unknown,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let source = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+    let cond = ConditionalType {
+        check_type: source,
+        extends_type: target,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, lit_false);
+}
+
+#[test]
 fn test_conditional_instantiated_param_distributes() {
     let interner = TypeInterner::new();
 
