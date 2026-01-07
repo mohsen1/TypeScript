@@ -1279,6 +1279,8 @@ impl SemVer {
     };
 }
 
+// NOTE: Keep this in sync with the TypeScript version this compiler targets.
+// TODO: Make this configurable once CLI plumbing is available.
 const TYPES_VERSIONS_COMPILER_VERSION: SemVer = SemVer {
     major: 6,
     minor: 0,
@@ -1680,8 +1682,8 @@ fn types_versions_specificity(pattern: &str) -> usize {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 struct RangeScore {
-    min_version: SemVer,
     constraints: usize,
+    min_version: SemVer,
     key_len: usize,
 }
 
@@ -1689,8 +1691,8 @@ fn match_types_versions_range(range: &str, compiler_version: SemVer) -> Option<R
     let range = range.trim();
     if range.is_empty() || range == "*" {
         return Some(RangeScore {
-            min_version: SemVer::ZERO,
             constraints: 0,
+            min_version: SemVer::ZERO,
             key_len: range.len(),
         });
     }
@@ -1720,8 +1722,8 @@ fn match_types_versions_range_segment(
     }
     if segment == "*" {
         return Some(RangeScore {
-            min_version: SemVer::ZERO,
             constraints: 0,
+            min_version: SemVer::ZERO,
             key_len,
         });
     }
@@ -1744,8 +1746,8 @@ fn match_types_versions_range_segment(
     }
 
     Some(RangeScore {
-        min_version,
         constraints,
+        min_version,
         key_len,
     })
 }
