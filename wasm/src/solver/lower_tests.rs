@@ -1528,6 +1528,60 @@ fn test_lower_type_literal_call_signature() {
 }
 
 #[test]
+fn test_lower_type_literal_call_signature_type_predicate() {
+    let (arena, literal_idx) = parse_type_literal("type T = { (x: any): x is string; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Callable(callable) => {
+            assert_eq!(callable.call_signatures.len(), 1);
+            let sig = &callable.call_signatures[0];
+            assert_eq!(sig.return_type, TypeId::BOOLEAN);
+            let predicate = sig.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(!predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::Identifier(atom) => {
+                    assert_eq!(interner.resolve_atom(atom).as_str(), "x");
+                }
+                _ => panic!("Expected identifier predicate target"),
+            }
+            assert_eq!(predicate.type_id, Some(TypeId::STRING));
+        }
+        _ => panic!("Expected Callable type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_call_signature_asserts_predicate_without_is() {
+    let (arena, literal_idx) = parse_type_literal("type T = { (x: any): asserts x; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Callable(callable) => {
+            assert_eq!(callable.call_signatures.len(), 1);
+            let sig = &callable.call_signatures[0];
+            assert_eq!(sig.return_type, TypeId::VOID);
+            let predicate = sig.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::Identifier(atom) => {
+                    assert_eq!(interner.resolve_atom(atom).as_str(), "x");
+                }
+                _ => panic!("Expected identifier predicate target"),
+            }
+            assert_eq!(predicate.type_id, None);
+        }
+        _ => panic!("Expected Callable type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_type_literal_overloaded_call_signatures() {
     let (arena, literal_idx) = parse_type_literal(
         "type T = { (x: string): number; (x: number): string; };",

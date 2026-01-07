@@ -80,6 +80,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Type predicates with `this` parameter
   - [x] Test: `asserts this` predicate without type
   - [x] Test: `asserts x` predicate without type (captures predicate metadata)
+  - [x] Test: Call signature type predicates in type literals
 
 ### Phase 4: Generic Types
 - [x] Implement type parameter lowering
