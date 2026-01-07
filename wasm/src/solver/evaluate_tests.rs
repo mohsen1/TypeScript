@@ -538,6 +538,46 @@ fn test_keyof_readonly_tuple() {
 }
 
 #[test]
+fn test_keyof_type_param_constraint() {
+    let interner = TypeInterner::new();
+
+    let constraint = interner.object(vec![
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
+    ]);
+
+    let type_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(constraint),
+        default: None,
+    }));
+
+    let result = evaluate_keyof(&interner, type_param);
+    let expected = interner.union(vec![
+        interner.literal_string("x"),
+        interner.literal_string("y"),
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_type_param_no_constraint_deferred() {
+    let interner = TypeInterner::new();
+
+    let type_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    }));
+
+    let result = evaluate_keyof(&interner, type_param);
+    match interner.lookup(result) {
+        Some(TypeKey::KeyOf(inner)) => assert_eq!(inner, type_param),
+        other => panic!("Expected deferred KeyOf, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_keyof_resolves_ref() {
     use crate::solver::{TypeEnvironment, SymbolRef};
 

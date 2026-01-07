@@ -500,6 +500,17 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     self.interner.intern(TypeKey::KeyOf(operand))
                 }
             }
+            TypeKey::TypeParameter(param) | TypeKey::Infer(param) => {
+                if let Some(constraint) = param.constraint {
+                    if constraint == evaluated_operand {
+                        self.interner.intern(TypeKey::KeyOf(operand))
+                    } else {
+                        self.evaluate_keyof(constraint)
+                    }
+                } else {
+                    self.interner.intern(TypeKey::KeyOf(operand))
+                }
+            }
             TypeKey::Object(props) => {
                 // keyof { x: T, y: U } = "x" | "y"
                 if props.is_empty() {
