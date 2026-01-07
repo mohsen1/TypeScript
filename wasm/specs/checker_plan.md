@@ -9,7 +9,7 @@ Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (in
 ## Current Status
 - Solver TypeDatabase + lowering/inference/compat layers are integrated.
 - Control flow narrowing includes false-branch logic for typeof/truthiness.
-- TODOs remain in readonly modifiers and namespace member resolution.
+- TODOs remain in namespace member resolution.
 - Checker uses binder persistent scopes with SymbolId type caching; local scope stack removed.
 - Solver inference skips constraining defaulted placeholders in union targets to preserve defaults.
 - Type literal lowering uses checker paths for type params while preserving ref semantics for named members.
@@ -22,7 +22,7 @@ Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (in
 - [x] Handle type parameters in call/construct signatures
   - Populate `SolverCallSignature.type_params` from interface signature nodes.
   - Thread through call resolution / inference; add tests for generic call signatures.
-- [ ] Honor readonly modifiers on property/method signatures
+- [x] Honor readonly modifiers on property/method signatures
   - Read `readonly` in `thin_checker.rs` when lowering interface members.
   - Enforce readonly assignment rules in `checker/expr.rs` + subtype checks.
 - [x] Complete control-flow narrowing for false branches
