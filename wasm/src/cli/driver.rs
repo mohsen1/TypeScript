@@ -20,7 +20,6 @@ use crate::parser::syntax_kind_ext;
 use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
 use crate::parser::NodeIndex;
 use crate::scanner::SyntaxKind;
-use crate::source_map::SourceMapGenerator;
 use crate::thin_parser::ThinParserState;
 use crate::thin_parser::ParseDiagnostic;
 use crate::thin_binder::ThinBinderState;
@@ -2655,13 +2654,33 @@ fn emit_outputs(
             let decl_base = declaration_dir.or(out_dir);
             if let Some(dts_path) = declaration_output_path(base_dir, root_dir, decl_base, &input_path) {
                 let mut emitter = DeclarationEmitter::new(&file.arena);
+                let map_info = if options.declaration_map {
+                    map_output_info(&dts_path)
+                } else {
+                    None
+                };
+
+                if let Some((_, _, output_name)) = map_info.as_ref() {
+                    if let Some(source_text) = file
+                        .arena
+                        .get(file.source_file)
+                        .and_then(|node| file.arena.get_source_file(node))
+                        .map(|source| source.text.as_str())
+                    {
+                        emitter.set_source_map_text(source_text);
+                    }
+                    emitter.enable_source_map(output_name, &file.file_name);
+                }
+
                 let mut contents = emitter.emit(file.source_file);
+                let map_json = map_info
+                    .as_ref()
+                    .and_then(|_| emitter.generate_source_map_json());
                 let mut map_output = None;
 
-                if options.declaration_map {
-                    if let Some((map_path, map_name, output_name)) = map_output_info(&dts_path) {
+                if let Some((map_path, map_name, _)) = map_info {
+                    if let Some(map_json) = map_json {
                         append_source_mapping_url(&mut contents, &map_name, new_line);
-                        let map_json = generate_basic_source_map(&output_name, &file.file_name);
                         map_output = Some(OutputFile {
                             path: map_path,
                             contents: map_json,
@@ -2685,13 +2704,6 @@ fn map_output_info(output_path: &Path) -> Option<(PathBuf, String, String)> {
     let map_name = format!("{output_name}.map");
     let map_path = output_path.with_file_name(&map_name);
     Some((map_path, map_name, output_name))
-}
-
-fn generate_basic_source_map(output_name: &str, source_name: &str) -> String {
-    let mut map = SourceMapGenerator::new(output_name.to_string());
-    let source_index = map.add_source(source_name.to_string());
-    map.add_simple_mapping(0, 0, source_index, 0, 0);
-    map.generate_json()
 }
 
 fn append_source_mapping_url(contents: &mut String, map_name: &str, new_line: &str) {

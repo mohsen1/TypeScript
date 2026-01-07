@@ -10,7 +10,7 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Args/tsconfig parsing, globbing, compile + emit work.
 - Watch mode implemented with notify + debounce.
 - Incremental compile in place (cache reuse + export-hash dependent invalidation + symbol-level dependent invalidation).
-- Module resolution supports node/bundler + exports/conditions basics + typesVersions mappings (default TS version 6.0.0, override via flag/env `TSZ_TYPES_VERSIONS_COMPILER_VERSION`).
+- Module resolution supports node/bundler + exports/conditions basics + typesVersions mappings (default TS version 6.0.0, override via flag/env/tsconfig `TSZ_TYPES_VERSIONS_COMPILER_VERSION`).
 - Benchmark harness script added for tsz vs tsc comparisons.
 
 ## Current Investigation Notes (Incremental export hash)
@@ -64,6 +64,8 @@ Tests run in this state:
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_invalid_override_falls_back` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_respects_env_version_override` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_invalid_env_falls_back` (pass).
+- `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_respects_tsconfig_version_override` (pass).
+- `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_env_overrides_tsconfig` (pass).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
@@ -96,6 +98,8 @@ Tests run in this state:
   - [x] Apply `typesVersions` mappings for package subpaths.
 - [x] typesVersions range selection/fallback + fixed version doc.
 - [x] typesVersions compiler version override (flag/env) + fallback tests (Status: Active, env: TSZ_TYPES_VERSIONS_COMPILER_VERSION, manual env override).
+- [x] typesVersions compiler version override via tsconfig + docs (Status: Active, precedence: CLI > env > tsconfig).
+- [ ] Module resolution parity: support package.json `imports` (# specifiers) with conditions (Status: Active).
 - [x] Benchmark harness
   - Script: `wasm/bench_cli.sh` (tsz vs tsc timing + memory stats).
 

@@ -50,6 +50,7 @@ pub(crate) struct IncrementalParseResult {
     pub statements: NodeList,
     pub end_pos: u32,
     pub end_of_file_token: NodeIndex,
+    pub reparse_start: u32,
 }
 
 // =============================================================================
@@ -487,6 +488,7 @@ impl ThinParserState {
         start: u32,
     ) -> IncrementalParseResult {
         let start = usize::min(start as usize, source_text.len());
+        let reparse_start = start as u32;
 
         self.file_name = file_name;
         self.scanner.set_text(source_text, Some(start), None);
@@ -508,6 +510,7 @@ impl ThinParserState {
             statements,
             end_pos,
             end_of_file_token: eof_token,
+            reparse_start,
         }
     }
 
