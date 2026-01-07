@@ -90,6 +90,7 @@ impl<'a> LoweringPass<'a> {
             k if k == syntax_kind_ext::ARROW_FUNCTION => self.visit_arrow_function(node, idx),
             k if k == syntax_kind_ext::VARIABLE_STATEMENT => self.visit_variable_statement(node, idx),
             k if k == syntax_kind_ext::ENUM_DECLARATION => self.visit_enum_declaration(node, idx),
+            k if k == syntax_kind_ext::MODULE_DECLARATION => self.visit_module_declaration(node, idx),
             k if k == syntax_kind_ext::EXPORT_DECLARATION => self.visit_export_declaration(node, idx),
             k if k == syntax_kind_ext::FOR_IN_STATEMENT => self.visit_for_in_statement(node),
             k if k == syntax_kind_ext::FOR_OF_STATEMENT => self.visit_for_of_statement(node, idx),
@@ -464,6 +465,10 @@ impl<'a> LoweringPass<'a> {
         self.lower_enum_declaration(node, idx, false);
     }
 
+    fn visit_module_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
+        self.lower_module_declaration(node, idx, false);
+    }
+
     fn visit_export_declaration(&mut self, node: &ThinNode, _idx: NodeIndex) {
         let Some(export_decl) = self.arena.get_export_decl(node) else {
             return;
@@ -501,6 +506,11 @@ impl<'a> LoweringPass<'a> {
 
             if export_node.kind == syntax_kind_ext::ENUM_DECLARATION {
                 self.lower_enum_declaration(export_node, export_decl.export_clause, true);
+                return;
+            }
+
+            if export_node.kind == syntax_kind_ext::MODULE_DECLARATION {
+                self.lower_module_declaration(export_node, export_decl.export_clause, true);
                 return;
             }
         }
@@ -728,6 +738,56 @@ impl<'a> LoweringPass<'a> {
         }
     }
 
+    fn lower_module_declaration(
+        &mut self,
+        node: &ThinNode,
+        idx: NodeIndex,
+        force_export: bool,
+    ) {
+        let Some(module_decl) = self.arena.get_module(node) else {
+            return;
+        };
+
+        // Skip ambient declarations (declare namespace/module)
+        if self.has_declare_modifier(&module_decl.modifiers) {
+            return;
+        }
+
+        let mut is_exported = self.is_commonjs()
+            && !self.has_export_assignment
+            && (force_export || self.has_export_modifier(&module_decl.modifiers));
+        if force_export && self.is_commonjs() && !self.has_export_assignment {
+            is_exported = true;
+        }
+
+        let module_name = self.get_module_root_name(module_decl.name);
+
+        let base_directive = if self.ctx.target_es5 {
+            TransformDirective::ES5Namespace { namespace_node: idx }
+        } else {
+            TransformDirective::Identity
+        };
+
+        let final_directive = if is_exported && module_name.is_some() {
+            let export_directive = TransformDirective::CommonJSExport {
+                names: vec![module_name.unwrap()],
+                is_default: false,
+                inner: Box::new(TransformDirective::Identity),
+            };
+
+            match base_directive {
+                TransformDirective::Identity => export_directive,
+                other => TransformDirective::Chain(vec![other, export_directive]),
+            }
+        } else {
+            base_directive
+        };
+
+        if !matches!(final_directive, TransformDirective::Identity) {
+            self.transforms.insert(idx, final_directive);
+        }
+    }
+
     /// Visit a function declaration
     fn visit_function_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
         self.lower_function_declaration(node, idx, false, false);
@@ -934,6 +994,25 @@ impl<'a> LoweringPass<'a> {
         };
 
         ident.escaped_text.clone()
+    }
+
+    fn get_module_root_name(&self, name_idx: NodeIndex) -> Option<String> {
+        if name_idx.is_none() {
+            return None;
+        }
+
+        let node = self.arena.get(name_idx)?;
+        if node.kind == SyntaxKind::Identifier as u16 {
+            return self.arena.get_identifier(node).map(|id| id.escaped_text.clone());
+        }
+
+        if node.kind == syntax_kind_ext::QUALIFIED_NAME {
+            if let Some(qn) = self.arena.qualified_names.get(node.data_index as usize) {
+                return self.get_module_root_name(qn.left);
+            }
+        }
+
+        None
     }
 
     fn get_block_like(&self, node: &ThinNode) -> Option<&crate::parser::thin_node::BlockData> {
