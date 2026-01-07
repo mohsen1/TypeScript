@@ -37,6 +37,14 @@ pub struct FlowAnalyzer<'a> {
     interner: &'a TypeInterner,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PropertyPresence {
+    Required,
+    Optional,
+    Absent,
+    Unknown,
+}
+
 impl<'a> FlowAnalyzer<'a> {
     /// Create a new FlowAnalyzer.
     pub fn new(
@@ -365,6 +373,14 @@ impl<'a> FlowAnalyzer<'a> {
     ) -> TypeId {
         let operator = bin.operator_token;
 
+        if operator == SyntaxKind::InstanceOfKeyword as u16 {
+            return self.narrow_by_instanceof(type_id, bin, target, is_true_branch);
+        }
+
+        if operator == SyntaxKind::InKeyword as u16 {
+            return self.narrow_by_in_operator(type_id, bin, target, is_true_branch);
+        }
+
         let (is_equals, is_strict) = match operator {
             k if k == SyntaxKind::EqualsEqualsEqualsToken as u16 => (true, true),
             k if k == SyntaxKind::ExclamationEqualsEqualsToken as u16 => (false, true),
@@ -461,6 +477,272 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         None
+    }
+
+    fn narrow_by_instanceof(
+        &self,
+        type_id: TypeId,
+        bin: &crate::parser::thin_node::BinaryExprData,
+        target: NodeIndex,
+        is_true_branch: bool,
+    ) -> TypeId {
+        if !is_true_branch {
+            return type_id;
+        }
+
+        if !self.is_matching_reference(bin.left, target) {
+            return type_id;
+        }
+
+        self.narrow_to_objectish(type_id)
+    }
+
+    fn narrow_by_in_operator(
+        &self,
+        type_id: TypeId,
+        bin: &crate::parser::thin_node::BinaryExprData,
+        target: NodeIndex,
+        is_true_branch: bool,
+    ) -> TypeId {
+        if !self.is_matching_reference(bin.right, target) {
+            return type_id;
+        }
+
+        let Some((prop_name, prop_is_number)) = self.in_property_name(bin.left) else {
+            return type_id;
+        };
+
+        if type_id == TypeId::ANY || type_id == TypeId::UNKNOWN {
+            return type_id;
+        }
+
+        let Some(TypeKey::Union(members)) = self.interner.lookup(type_id) else {
+            return type_id;
+        };
+
+        let members = self.interner.type_list(members);
+        let mut filtered = Vec::new();
+        for &member in members.iter() {
+            let presence = self.property_presence(member, prop_name, prop_is_number);
+            if self.keep_in_operator_member(presence, is_true_branch) {
+                filtered.push(member);
+            }
+        }
+
+        match filtered.len() {
+            0 => TypeId::NEVER,
+            1 => filtered[0],
+            _ => {
+                if filtered.len() == members.len() {
+                    type_id
+                } else {
+                    self.interner.union(filtered)
+                }
+            }
+        }
+    }
+
+    fn narrow_to_objectish(&self, type_id: TypeId) -> TypeId {
+        if type_id == TypeId::ANY || type_id == TypeId::UNKNOWN {
+            return type_id;
+        }
+
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(type_id) {
+            let members = self.interner.type_list(members);
+            let mut kept = Vec::new();
+            for &member in members.iter() {
+                if !self.is_definitely_non_object(member) {
+                    kept.push(member);
+                }
+            }
+
+            return match kept.len() {
+                0 => TypeId::NEVER,
+                1 => kept[0],
+                _ => {
+                    if kept.len() == members.len() {
+                        type_id
+                    } else {
+                        self.interner.union(kept)
+                    }
+                }
+            };
+        }
+
+        if self.is_definitely_non_object(type_id) {
+            TypeId::NEVER
+        } else {
+            type_id
+        }
+    }
+
+    fn is_definitely_non_object(&self, type_id: TypeId) -> bool {
+        if matches!(
+            type_id,
+            TypeId::NEVER
+                | TypeId::VOID
+                | TypeId::UNDEFINED
+                | TypeId::NULL
+                | TypeId::BOOLEAN
+                | TypeId::NUMBER
+                | TypeId::STRING
+                | TypeId::BIGINT
+                | TypeId::SYMBOL
+        ) {
+            return true;
+        }
+
+        match self.interner.lookup(type_id) {
+            Some(TypeKey::Literal(_)) => true,
+            Some(TypeKey::Intrinsic(kind)) => matches!(
+                kind,
+                crate::solver::IntrinsicKind::Void
+                    | crate::solver::IntrinsicKind::Undefined
+                    | crate::solver::IntrinsicKind::Null
+                    | crate::solver::IntrinsicKind::Boolean
+                    | crate::solver::IntrinsicKind::Number
+                    | crate::solver::IntrinsicKind::String
+                    | crate::solver::IntrinsicKind::Bigint
+                    | crate::solver::IntrinsicKind::Symbol
+                    | crate::solver::IntrinsicKind::Never
+            ),
+            _ => false,
+        }
+    }
+
+    fn in_property_name(&self, idx: NodeIndex) -> Option<(Atom, bool)> {
+        let idx = self.skip_parenthesized(idx);
+        let node = self.arena.get(idx)?;
+
+        if node.kind == SyntaxKind::StringLiteral as u16
+            || node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+        {
+            let lit = self.arena.get_literal(node)?;
+            let atom = self.interner.intern_string(&lit.text);
+            return Some((atom, false));
+        }
+
+        if node.kind == SyntaxKind::NumericLiteral as u16 {
+            let lit = self.arena.get_literal(node)?;
+            let atom = self.interner.intern_string(&lit.text);
+            return Some((atom, true));
+        }
+
+        if node.kind == syntax_kind_ext::PREFIX_UNARY_EXPRESSION {
+            let unary = self.arena.get_unary_expr(node)?;
+            let op = unary.operator;
+            if op == SyntaxKind::PlusToken as u16 || op == SyntaxKind::MinusToken as u16 {
+                let operand = self.skip_parenthesized(unary.operand);
+                let operand_node = self.arena.get(operand)?;
+                if operand_node.kind == SyntaxKind::NumericLiteral as u16 {
+                    let lit = self.arena.get_literal(operand_node)?;
+                    let mut text = String::new();
+                    if op == SyntaxKind::MinusToken as u16 {
+                        text.push('-');
+                    }
+                    text.push_str(&lit.text);
+                    let atom = self.interner.intern_string(&text);
+                    return Some((atom, true));
+                }
+            }
+        }
+
+        None
+    }
+
+    fn keep_in_operator_member(
+        &self,
+        presence: PropertyPresence,
+        is_true_branch: bool,
+    ) -> bool {
+        match (presence, is_true_branch) {
+            (PropertyPresence::Required, false) => false,
+            (PropertyPresence::Absent, true) => false,
+            _ => true,
+        }
+    }
+
+    fn property_presence(
+        &self,
+        type_id: TypeId,
+        prop_name: Atom,
+        prop_is_number: bool,
+    ) -> PropertyPresence {
+        let Some(key) = self.interner.lookup(type_id) else {
+            return PropertyPresence::Unknown;
+        };
+
+        match key {
+            TypeKey::Intrinsic(crate::solver::IntrinsicKind::Object) => PropertyPresence::Unknown,
+            TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                self.property_presence_in_object(shape_id, prop_name, prop_is_number)
+            }
+            TypeKey::Callable(callable_id) => {
+                self.property_presence_in_callable(callable_id, prop_name)
+            }
+            TypeKey::Array(_) | TypeKey::Tuple(_) => {
+                if prop_is_number {
+                    PropertyPresence::Optional
+                } else {
+                    PropertyPresence::Unknown
+                }
+            }
+            _ => PropertyPresence::Unknown,
+        }
+    }
+
+    fn property_presence_in_object(
+        &self,
+        shape_id: crate::solver::ObjectShapeId,
+        prop_name: Atom,
+        prop_is_number: bool,
+    ) -> PropertyPresence {
+        let shape = self.interner.object_shape(shape_id);
+        let mut found = None;
+
+        match self.interner.object_property_index(shape_id, prop_name) {
+            crate::solver::PropertyLookup::Found(idx) => {
+                found = shape.properties.get(idx);
+            }
+            crate::solver::PropertyLookup::Uncached => {
+                found = shape.properties.iter().find(|prop| prop.name == prop_name);
+            }
+            crate::solver::PropertyLookup::NotFound => {}
+        }
+
+        if let Some(prop) = found {
+            return if prop.optional {
+                PropertyPresence::Optional
+            } else {
+                PropertyPresence::Required
+            };
+        }
+
+        if prop_is_number && shape.number_index.is_some() {
+            return PropertyPresence::Optional;
+        }
+
+        if shape.string_index.is_some() {
+            return PropertyPresence::Optional;
+        }
+
+        PropertyPresence::Absent
+    }
+
+    fn property_presence_in_callable(
+        &self,
+        callable_id: crate::solver::CallableShapeId,
+        prop_name: Atom,
+    ) -> PropertyPresence {
+        let shape = self.interner.callable_shape(callable_id);
+        if let Some(prop) = shape.properties.iter().find(|prop| prop.name == prop_name) {
+            return if prop.optional {
+                PropertyPresence::Optional
+            } else {
+                PropertyPresence::Required
+            };
+        }
+        PropertyPresence::Absent
     }
 
     fn union_types(&self, left: TypeId, right: TypeId) -> TypeId {
