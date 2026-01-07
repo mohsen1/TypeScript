@@ -612,12 +612,49 @@ impl ThinBinderState {
             k if k == syntax_kind_ext::WHILE_STATEMENT ||
                  k == syntax_kind_ext::DO_STATEMENT => {
                 if let Some(loop_data) = arena.get_loop(node) {
+                    let loop_label = self.create_loop_label();
+                    if !self.current_flow.is_none() {
+                        self.add_antecedent(loop_label, self.current_flow);
+                    }
+                    self.current_flow = loop_label;
+
                     if node.kind == syntax_kind_ext::DO_STATEMENT {
                         self.bind_node(arena, loop_data.statement);
                         self.bind_expression(arena, loop_data.condition);
+
+                        let pre_condition_flow = self.current_flow;
+                        let true_flow = self.create_flow_condition(
+                            flow_flags::TRUE_CONDITION,
+                            pre_condition_flow,
+                            loop_data.condition,
+                        );
+                        self.add_antecedent(loop_label, true_flow);
+
+                        let false_flow = self.create_flow_condition(
+                            flow_flags::FALSE_CONDITION,
+                            pre_condition_flow,
+                            loop_data.condition,
+                        );
+                        self.current_flow = false_flow;
                     } else {
                         self.bind_expression(arena, loop_data.condition);
+
+                        let pre_condition_flow = self.current_flow;
+                        let true_flow = self.create_flow_condition(
+                            flow_flags::TRUE_CONDITION,
+                            pre_condition_flow,
+                            loop_data.condition,
+                        );
+                        self.current_flow = true_flow;
                         self.bind_node(arena, loop_data.statement);
+                        self.add_antecedent(loop_label, self.current_flow);
+
+                        let false_flow = self.create_flow_condition(
+                            flow_flags::FALSE_CONDITION,
+                            pre_condition_flow,
+                            loop_data.condition,
+                        );
+                        self.current_flow = false_flow;
                     }
                 }
             }
@@ -2301,6 +2338,11 @@ impl ThinBinderState {
     /// Create a branch label flow node for merging control flow paths.
     fn create_branch_label(&mut self) -> FlowNodeId {
         self.flow_nodes.alloc(flow_flags::BRANCH_LABEL)
+    }
+
+    /// Create a loop label flow node for back-edges.
+    fn create_loop_label(&mut self) -> FlowNodeId {
+        self.flow_nodes.alloc(flow_flags::LOOP_LABEL)
     }
 
     /// Create a flow condition node for tracking type narrowing.

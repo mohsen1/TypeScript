@@ -4580,6 +4580,79 @@ if (typeof x === "string") {
 }
 
 #[test]
+fn test_flow_narrowing_applies_in_while() {
+    use crate::thin_parser::ThinParserState;
+    use crate::parser::syntax_kind_ext;
+
+    let source = r#"
+let x: string | number;
+while (typeof x === "string") {
+    x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    let while_idx = source_file.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::WHILE_STATEMENT))
+        .expect("while statement");
+    let while_node = arena.get(while_idx).expect("while node");
+    let loop_data = arena.get_loop(while_node).expect("while data");
+
+    let body_node = arena.get(loop_data.statement).expect("while body");
+    let block = arena.get_block(body_node).expect("while block");
+    let expr_stmt_idx = block.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::EXPRESSION_STATEMENT))
+        .expect("inner expression statement");
+    let expr_stmt = arena.get_expression_statement(arena.get(expr_stmt_idx).expect("inner expr node"))
+        .expect("inner expression data");
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let inner_type = checker.get_type_of_node(expr_stmt.expression);
+    assert_eq!(inner_type, TypeId::STRING);
+}
+
+#[test]
+fn test_flow_narrowing_not_applied_in_do_while_body() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let x: string | number;
+do {
+    x.toUpperCase();
+} while (typeof x === "string");
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2339),
+        "Expected error 2339 for do-while body without narrowing, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_parameter_identifier_type_from_symbol_cache() {
     use crate::thin_parser::ThinParserState;
     use crate::parser::syntax_kind_ext;
