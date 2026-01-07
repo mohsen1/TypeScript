@@ -15,6 +15,7 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - package.json `imports` condition selection coverage (require vs import).
 - Active: benchmarks vs tsc on large repos.
 - Benchmark harness script added for tsz vs tsc comparisons.
+- Bench attempt on `src/compiler/tsconfig.json` failed in `tsz` (unsupported syntax like optional chaining + lib parsing errors). Next: add optional chaining parsing or pick a compatible large repo / bench-specific tsconfig that avoids libs.
 
 ## Current Investigation Notes (Incremental export hash)
 Summary of the incremental work (export hash fixed):
@@ -79,6 +80,7 @@ Tests run in this state:
 - `./wasm/test.sh cli::driver_tests::compile_resolves_package_imports_prefers_import_condition_for_esm` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_tsconfig_types_includes_selected_packages` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_tsconfig_type_roots_includes_packages` (pass).
+- `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` (failed: tsz diagnostics on optional chaining + lib .d.ts parsing).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
