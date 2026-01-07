@@ -5005,6 +5005,84 @@ do {
 }
 
 #[test]
+fn test_flow_narrowing_not_applied_after_while_exit() {
+    use crate::thin_parser::ThinParserState;
+    use crate::parser::syntax_kind_ext;
+
+    let source = r#"
+let x: string | number;
+while (typeof x === "string") {
+    break;
+}
+x;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    let expr_stmt_idx = source_file.statements.nodes.iter().copied()
+        .filter(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::EXPRESSION_STATEMENT))
+        .last()
+        .expect("expression statement");
+    let expr_stmt = arena.get_expression_statement(arena.get(expr_stmt_idx).expect("expr node"))
+        .expect("expression data");
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let after_type = checker.get_type_of_node(expr_stmt.expression);
+    let expected = checker.ctx.types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(after_type, expected);
+}
+
+#[test]
+fn test_flow_narrowing_not_applied_after_for_exit() {
+    use crate::thin_parser::ThinParserState;
+    use crate::parser::syntax_kind_ext;
+
+    let source = r#"
+let x: string | number;
+for (; typeof x === "string"; ) {
+    break;
+}
+x;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    let expr_stmt_idx = source_file.statements.nodes.iter().copied()
+        .filter(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::EXPRESSION_STATEMENT))
+        .last()
+        .expect("expression statement");
+    let expr_stmt = arena.get_expression_statement(arena.get(expr_stmt_idx).expect("expr node"))
+        .expect("expression data");
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let after_type = checker.get_type_of_node(expr_stmt.expression);
+    let expected = checker.ctx.types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(after_type, expected);
+}
+
+#[test]
 fn test_parameter_identifier_type_from_symbol_cache() {
     use crate::thin_parser::ThinParserState;
     use crate::parser::syntax_kind_ext;
