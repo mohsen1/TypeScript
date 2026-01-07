@@ -109,6 +109,8 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Validate index signature bounds during inference resolution
 - [x] Add negative index signature bounds coverage
 - [x] Refine number index property checks during bounds validation
+- [x] Match numeric literal name checks to TypeScript canonical `Number.toString` behavior
+- [x] Add numeric literal name bounds coverage for exponent and non-canonical forms
 - [x] Enforce index signature consistency during bounds validation
 
 ## Architecture Notes
