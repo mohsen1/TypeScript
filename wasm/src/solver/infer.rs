@@ -374,13 +374,15 @@ impl<'a> InferenceContext<'a> {
                 }
                 shape.properties.iter().any(|p| self.type_contains_param(p.type_id, target, visited))
             }
-            TypeKey::Conditional(cond) => {
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.interner.conditional_type(cond_id);
                 self.type_contains_param(cond.check_type, target, visited)
                     || self.type_contains_param(cond.extends_type, target, visited)
                     || self.type_contains_param(cond.true_type, target, visited)
                     || self.type_contains_param(cond.false_type, target, visited)
             }
-            TypeKey::Mapped(mapped) => {
+            TypeKey::Mapped(mapped_id) => {
+                let mapped = self.interner.mapped_type(mapped_id);
                 if mapped.type_param.name == target {
                     return false;
                 }

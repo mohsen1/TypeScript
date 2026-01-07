@@ -166,6 +166,8 @@ pub struct TypeInterner {
     object_shapes: RwLock<ValueInterner<ObjectShape>>,
     function_shapes: RwLock<ValueInterner<FunctionShape>>,
     callable_shapes: RwLock<ValueInterner<CallableShape>>,
+    conditional_types: RwLock<ValueInterner<ConditionalType>>,
+    mapped_types: RwLock<ValueInterner<MappedType>>,
     applications: RwLock<ValueInterner<TypeApplication>>,
 }
 
@@ -185,6 +187,8 @@ impl TypeInterner {
             object_shapes: RwLock::new(ValueInterner::new()),
             function_shapes: RwLock::new(ValueInterner::new()),
             callable_shapes: RwLock::new(ValueInterner::new()),
+            conditional_types: RwLock::new(ValueInterner::new()),
+            mapped_types: RwLock::new(ValueInterner::new()),
             applications: RwLock::new(ValueInterner::new()),
         }
     }
@@ -252,6 +256,38 @@ impl TypeInterner {
                 call_signatures: Vec::new(),
                 construct_signatures: Vec::new(),
                 properties: Vec::new(),
+            }))
+    }
+
+    pub fn conditional_type(&self, id: ConditionalTypeId) -> Arc<ConditionalType> {
+        self.conditional_types
+            .read()
+            .unwrap()
+            .get(id.0)
+            .unwrap_or_else(|| Arc::new(ConditionalType {
+                check_type: TypeId::ERROR,
+                extends_type: TypeId::ERROR,
+                true_type: TypeId::ERROR,
+                false_type: TypeId::ERROR,
+                is_distributive: false,
+            }))
+    }
+
+    pub fn mapped_type(&self, id: MappedTypeId) -> Arc<MappedType> {
+        self.mapped_types
+            .read()
+            .unwrap()
+            .get(id.0)
+            .unwrap_or_else(|| Arc::new(MappedType {
+                type_param: TypeParamInfo {
+                    name: self.intern_string("_"),
+                    constraint: None,
+                    default: None,
+                },
+                constraint: TypeId::ERROR,
+                template: TypeId::ERROR,
+                readonly_modifier: None,
+                optional_modifier: None,
             }))
     }
 
@@ -347,6 +383,16 @@ impl TypeInterner {
     fn intern_callable_shape(&self, shape: CallableShape) -> CallableShapeId {
         let mut shapes = self.callable_shapes.write().unwrap();
         CallableShapeId(shapes.intern(shape))
+    }
+
+    fn intern_conditional_type(&self, conditional: ConditionalType) -> ConditionalTypeId {
+        let mut types = self.conditional_types.write().unwrap();
+        ConditionalTypeId(types.intern(conditional))
+    }
+
+    fn intern_mapped_type(&self, mapped: MappedType) -> MappedTypeId {
+        let mut types = self.mapped_types.write().unwrap();
+        MappedTypeId(types.intern(mapped))
     }
 
     fn intern_application(&self, application: TypeApplication) -> TypeApplicationId {
@@ -757,6 +803,18 @@ impl TypeInterner {
     pub fn template_literal(&self, spans: Vec<TemplateSpan>) -> TypeId {
         let list_id = self.intern_template_list(spans);
         self.intern(TypeKey::TemplateLiteral(list_id))
+    }
+
+    /// Intern a conditional type
+    pub fn conditional(&self, conditional: ConditionalType) -> TypeId {
+        let conditional_id = self.intern_conditional_type(conditional);
+        self.intern(TypeKey::Conditional(conditional_id))
+    }
+
+    /// Intern a mapped type
+    pub fn mapped(&self, mapped: MappedType) -> TypeId {
+        let mapped_id = self.intern_mapped_type(mapped);
+        self.intern(TypeKey::Mapped(mapped_id))
     }
 
     /// Intern a type reference

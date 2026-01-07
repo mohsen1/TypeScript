@@ -1305,7 +1305,7 @@ impl<'a> TypeLowering<'a> {
                 false_type,
                 is_distributive,
             };
-            self.interner.intern(TypeKey::Conditional(Box::new(cond)))
+            self.interner.conditional(cond)
         } else {
             TypeId::ERROR
         }
@@ -1462,13 +1462,15 @@ impl<'a> TypeLowering<'a> {
                     self.collect_infer_bindings(arg, visited);
                 }
             }
-            TypeKey::Conditional(cond) => {
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.interner.conditional_type(cond_id);
                 self.collect_infer_bindings(cond.check_type, visited);
                 self.collect_infer_bindings(cond.extends_type, visited);
                 self.collect_infer_bindings(cond.true_type, visited);
                 self.collect_infer_bindings(cond.false_type, visited);
             }
-            TypeKey::Mapped(mapped) => {
+            TypeKey::Mapped(mapped_id) => {
+                let mapped = self.interner.mapped_type(mapped_id);
                 if let Some(constraint) = mapped.type_param.constraint {
                     self.collect_infer_bindings(constraint, visited);
                 }
@@ -1524,7 +1526,7 @@ impl<'a> TypeLowering<'a> {
                 readonly_modifier: self.lower_mapped_modifier(data.readonly_token, SyntaxKind::ReadonlyKeyword as u16),
                 optional_modifier: self.lower_mapped_modifier(data.question_token, SyntaxKind::QuestionToken as u16),
             };
-            self.interner.intern(TypeKey::Mapped(Box::new(mapped)))
+            self.interner.mapped(mapped)
         } else {
             TypeId::ERROR
         }

@@ -484,8 +484,14 @@ impl<'a> TypeFormatter<'a> {
                     .collect();
                 format!("{}<{}>", self.format(app.base), args.join(", "))
             }
-            TypeKey::Conditional(cond) => self.format_conditional(cond),
-            TypeKey::Mapped(mapped) => self.format_mapped(mapped),
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.interner.conditional_type(*cond_id);
+                self.format_conditional(cond.as_ref())
+            }
+            TypeKey::Mapped(mapped_id) => {
+                let mapped = self.interner.mapped_type(*mapped_id);
+                self.format_mapped(mapped.as_ref())
+            }
             TypeKey::IndexAccess(obj, idx) => {
                 format!("{}[{}]", self.format(*obj), self.format(*idx))
             }

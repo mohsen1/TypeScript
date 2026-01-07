@@ -401,13 +401,13 @@ fn test_instantiate_conditional() {
         constraint: None,
         default: None,
     }));
-    let cond = interner.intern(TypeKey::Conditional(Box::new(ConditionalType {
+    let cond = interner.conditional(ConditionalType {
         check_type: type_param_t,
         extends_type: TypeId::STRING,
         true_type: type_param_t,
         false_type: TypeId::NEVER,
         is_distributive: true,
-    })));
+    });
 
     // Substitute T = "hello" (a string literal)
     let hello_lit = interner.literal_string("hello");
@@ -416,13 +416,13 @@ fn test_instantiate_conditional() {
     let result = instantiate_type(&interner, cond, &subst);
 
     // Result should be "hello" extends string ? "hello" : never
-    let expected = interner.intern(TypeKey::Conditional(Box::new(ConditionalType {
+    let expected = interner.conditional(ConditionalType {
         check_type: hello_lit,
         extends_type: TypeId::STRING,
         true_type: hello_lit,
         false_type: TypeId::NEVER,
         is_distributive: true,
-    })));
+    });
     assert_eq!(result, expected);
 }
 
@@ -438,24 +438,24 @@ fn test_instantiate_mapped_type_shadowed_param() {
     };
     let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
 
-    let mapped = interner.intern(TypeKey::Mapped(Box::new(MappedType {
+    let mapped = interner.mapped(MappedType {
         type_param: t_param.clone(),
         constraint: TypeId::STRING,
         template: t_type,
         readonly_modifier: None,
         optional_modifier: None,
-    })));
+    });
 
     let mut subst = TypeSubstitution::new();
     subst.insert(t_name, TypeId::NUMBER);
     let result = instantiate_type(&interner, mapped, &subst);
 
-    let expected = interner.intern(TypeKey::Mapped(Box::new(MappedType {
+    let expected = interner.mapped(MappedType {
         type_param: t_param,
         constraint: TypeId::STRING,
         template: t_type,
         readonly_modifier: None,
         optional_modifier: None,
-    })));
+    });
     assert_eq!(result, expected);
 }

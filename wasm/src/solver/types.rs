@@ -79,6 +79,14 @@ pub struct TypeApplicationId(pub u32);
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TemplateLiteralId(pub u32);
 
+/// Interned conditional type.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ConditionalTypeId(pub u32);
+
+/// Interned mapped type.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct MappedTypeId(pub u32);
+
 /// The structural "shape" of a type.
 /// This is the key used for interning - structurally identical types
 /// will have the same TypeKey and therefore the same TypeId.
@@ -127,10 +135,10 @@ pub enum TypeKey {
     Application(TypeApplicationId),
 
     /// Conditional type (T extends U ? X : Y)
-    Conditional(Box<ConditionalType>),
+    Conditional(ConditionalTypeId),
 
     /// Mapped type ({ [K in Keys]: ValueType })
-    Mapped(Box<MappedType>),
+    Mapped(MappedTypeId),
 
     /// Index access type (T[K])
     IndexAccess(TypeId, TypeId),

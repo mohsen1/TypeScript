@@ -1975,7 +1975,7 @@ fn test_infer_generic_conditional_param_from_arg() {
         false_type: TypeId::NEVER,
         is_distributive: false,
     };
-    let conditional_type = interner.intern(TypeKey::Conditional(Box::new(conditional)));
+    let conditional_type = interner.conditional(conditional);
 
     let func = FunctionShape {
         type_params: vec![t_param],
@@ -2023,7 +2023,7 @@ fn test_infer_generic_mapped_param_from_object_arg() {
         readonly_modifier: None,
         optional_modifier: None,
     };
-    let mapped_type = interner.intern(TypeKey::Mapped(Box::new(mapped)));
+    let mapped_type = interner.mapped(mapped);
 
     let func = FunctionShape {
         type_params: vec![t_param],

@@ -303,16 +303,20 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             }
         }
 
-        if let TypeKey::Conditional(source_cond) = &source_key {
-            if let TypeKey::Conditional(target_cond) = &target_key {
-                return self.check_conditional_subtype(source_cond, target_cond);
+        if let TypeKey::Conditional(source_cond_id) = &source_key {
+            if let TypeKey::Conditional(target_cond_id) = &target_key {
+                let source_cond = self.interner.conditional_type(*source_cond_id);
+                let target_cond = self.interner.conditional_type(*target_cond_id);
+                return self.check_conditional_subtype(source_cond.as_ref(), target_cond.as_ref());
             }
 
-            return self.conditional_branches_subtype(source_cond, target);
+            let source_cond = self.interner.conditional_type(*source_cond_id);
+            return self.conditional_branches_subtype(source_cond.as_ref(), target);
         }
 
-        if let TypeKey::Conditional(target_cond) = &target_key {
-            return self.subtype_of_conditional_target(source, target_cond);
+        if let TypeKey::Conditional(target_cond_id) = &target_key {
+            let target_cond = self.interner.conditional_type(*target_cond_id);
+            return self.subtype_of_conditional_target(source, target_cond.as_ref());
         }
 
         // =========================================================================

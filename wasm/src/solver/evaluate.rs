@@ -180,14 +180,16 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         };
 
         match &key {
-            TypeKey::Conditional(cond) => {
-                self.evaluate_conditional(cond)
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.interner.conditional_type(*cond_id);
+                self.evaluate_conditional(cond.as_ref())
             }
             TypeKey::IndexAccess(obj, idx) => {
                 self.evaluate_index_access(*obj, *idx)
             }
-            TypeKey::Mapped(mapped) => {
-                self.evaluate_mapped(mapped)
+            TypeKey::Mapped(mapped_id) => {
+                let mapped = self.interner.mapped_type(*mapped_id);
+                self.evaluate_mapped(mapped.as_ref())
             }
             TypeKey::KeyOf(operand) => {
                 self.evaluate_keyof(*operand)
@@ -236,7 +238,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         // Step 2: Check for naked type parameter (defer)
         if let Some(TypeKey::TypeParameter(_)) = self.interner.lookup(check_type) {
             // Type parameter hasn't been substituted - defer evaluation
-            return self.interner.intern(TypeKey::Conditional(Box::new(cond.clone())));
+            return self.interner.conditional(cond.clone());
         }
 
         // Step 3: Perform subtype check
@@ -775,7 +777,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         // If we can't determine concrete keys, keep it as a mapped type (deferred)
         let key_set = match self.extract_mapped_keys(keys) {
             Some(keys) => keys,
-            None => return self.interner.intern(TypeKey::Mapped(Box::new(mapped.clone()))),
+            None => return self.interner.mapped(mapped.clone()),
         };
 
         let optional = match mapped.optional_modifier {

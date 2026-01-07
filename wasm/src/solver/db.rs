@@ -6,9 +6,10 @@
 use crate::interner::Atom;
 use crate::solver::intern::TypeInterner;
 use crate::solver::types::{
-    CallableShape, CallableShapeId, ConditionalType, FunctionShape, FunctionShapeId, MappedType,
-    ObjectShape, ObjectShapeId, PropertyInfo, SymbolRef, TemplateLiteralId, TemplateSpan,
-    TupleElement, TupleListId, TypeApplication, TypeApplicationId, TypeId, TypeKey, TypeListId,
+    CallableShape, CallableShapeId, ConditionalType, ConditionalTypeId, FunctionShape,
+    FunctionShapeId, MappedType, MappedTypeId, ObjectShape, ObjectShapeId, PropertyInfo, SymbolRef,
+    TemplateLiteralId, TemplateSpan, TupleElement, TupleListId, TypeApplication,
+    TypeApplicationId, TypeId, TypeKey, TypeListId,
 };
 use rustc_hash::FxHashMap;
 use std::sync::{Arc, RwLock};
@@ -28,6 +29,8 @@ pub trait TypeDatabase {
     fn object_shape(&self, id: ObjectShapeId) -> Arc<ObjectShape>;
     fn function_shape(&self, id: FunctionShapeId) -> Arc<FunctionShape>;
     fn callable_shape(&self, id: CallableShapeId) -> Arc<CallableShape>;
+    fn conditional_type(&self, id: ConditionalTypeId) -> Arc<ConditionalType>;
+    fn mapped_type(&self, id: MappedTypeId) -> Arc<MappedType>;
     fn type_application(&self, id: TypeApplicationId) -> Arc<TypeApplication>;
 
     fn literal_string(&self, value: &str) -> TypeId;
@@ -45,6 +48,8 @@ pub trait TypeDatabase {
     fn function(&self, shape: FunctionShape) -> TypeId;
     fn callable(&self, shape: CallableShape) -> TypeId;
     fn template_literal(&self, spans: Vec<TemplateSpan>) -> TypeId;
+    fn conditional(&self, conditional: ConditionalType) -> TypeId;
+    fn mapped(&self, mapped: MappedType) -> TypeId;
     fn reference(&self, symbol: SymbolRef) -> TypeId;
     fn application(&self, base: TypeId, args: Vec<TypeId>) -> TypeId;
 }
@@ -88,6 +93,14 @@ impl TypeDatabase for TypeInterner {
 
     fn callable_shape(&self, id: CallableShapeId) -> Arc<CallableShape> {
         TypeInterner::callable_shape(self, id)
+    }
+
+    fn conditional_type(&self, id: ConditionalTypeId) -> Arc<ConditionalType> {
+        TypeInterner::conditional_type(self, id)
+    }
+
+    fn mapped_type(&self, id: MappedTypeId) -> Arc<MappedType> {
+        TypeInterner::mapped_type(self, id)
     }
 
     fn type_application(&self, id: TypeApplicationId) -> Arc<TypeApplication> {
@@ -148,6 +161,14 @@ impl TypeDatabase for TypeInterner {
 
     fn template_literal(&self, spans: Vec<TemplateSpan>) -> TypeId {
         TypeInterner::template_literal(self, spans)
+    }
+
+    fn conditional(&self, conditional: ConditionalType) -> TypeId {
+        TypeInterner::conditional(self, conditional)
+    }
+
+    fn mapped(&self, mapped: MappedType) -> TypeId {
+        TypeInterner::mapped(self, mapped)
     }
 
     fn reference(&self, symbol: SymbolRef) -> TypeId {
@@ -284,6 +305,14 @@ impl TypeDatabase for QueryCache<'_> {
         self.interner.callable_shape(id)
     }
 
+    fn conditional_type(&self, id: ConditionalTypeId) -> Arc<ConditionalType> {
+        self.interner.conditional_type(id)
+    }
+
+    fn mapped_type(&self, id: MappedTypeId) -> Arc<MappedType> {
+        self.interner.mapped_type(id)
+    }
+
     fn type_application(&self, id: TypeApplicationId) -> Arc<TypeApplication> {
         self.interner.type_application(id)
     }
@@ -342,6 +371,14 @@ impl TypeDatabase for QueryCache<'_> {
 
     fn template_literal(&self, spans: Vec<TemplateSpan>) -> TypeId {
         self.interner.template_literal(spans)
+    }
+
+    fn conditional(&self, conditional: ConditionalType) -> TypeId {
+        self.interner.conditional(conditional)
+    }
+
+    fn mapped(&self, mapped: MappedType) -> TypeId {
+        self.interner.mapped(mapped)
     }
 
     fn reference(&self, symbol: SymbolRef) -> TypeId {
