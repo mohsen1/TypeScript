@@ -1658,11 +1658,14 @@ impl<'a> CodeActionProvider<'a> {
         });
 
         // Replace the expression with the variable name
-        let replacement_text = if self.needs_jsx_expression_wrapper(expr_idx) {
+        let mut replacement_text = if self.needs_jsx_expression_wrapper(expr_idx) {
             format!("{{{}}}", var_name)
         } else {
             var_name.clone()
         };
+        if expr_node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+            replacement_text = format!("({})", replacement_text);
+        }
         edits.push(TextEdit {
             range: replacement_range,
             new_text: replacement_text,

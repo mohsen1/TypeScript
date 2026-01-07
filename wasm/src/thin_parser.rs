@@ -5624,8 +5624,8 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::OpenParenToken);
         let expression = self.parse_expression();
-        self.parse_expected(SyntaxKind::CloseParenToken);
         let end_pos = self.token_end();
+        self.parse_expected(SyntaxKind::CloseParenToken);
 
         self.arena.add_parenthesized(
             syntax_kind_ext::PARENTHESIZED_EXPRESSION,
