@@ -6088,8 +6088,13 @@ impl ThinParserState {
             let snapshot = self.scanner.save_state();
             let current = self.current_token;
 
-            let name = self.parse_type_predicate_parameter_name();
-            if self.is_token(SyntaxKind::IsKeyword) {
+            self.next_token();
+            let is_predicate = self.is_token(SyntaxKind::IsKeyword);
+            self.scanner.restore_state(snapshot);
+            self.current_token = current;
+
+            if is_predicate {
+                let name = self.parse_type_predicate_parameter_name();
                 // This is a type predicate: x is T
                 let start_pos = if let Some(node) = self.arena.get(name) {
                     node.pos
@@ -6112,10 +6117,6 @@ impl ThinParserState {
                     },
                 );
             }
-
-            // Not a type predicate, restore state and parse as regular type
-            self.scanner.restore_state(snapshot);
-            self.current_token = current;
         }
 
         // Check for 'asserts' type predicate: asserts x is T
