@@ -1080,9 +1080,7 @@ impl ThinBinderState {
                             if self.has_static_modifier(arena, &method.modifiers) {
                                 flags |= symbol_flags::STATIC;
                             }
-                            let sym_id = self.symbols.alloc(flags, name.to_string());
-                            self.current_scope.set(name.to_string(), sym_id);
-                            self.node_symbols.insert(idx.0, sym_id);
+                            self.declare_symbol(name, flags, idx, false);
                         }
                         self.bind_callable_body(arena, &method.parameters, method.body, idx);
                     }
@@ -1097,9 +1095,7 @@ impl ThinBinderState {
                             if self.has_static_modifier(arena, &prop.modifiers) {
                                 flags |= symbol_flags::STATIC;
                             }
-                            let sym_id = self.symbols.alloc(flags, name.to_string());
-                            self.current_scope.set(name.to_string(), sym_id);
-                            self.node_symbols.insert(idx.0, sym_id);
+                            self.declare_symbol(name, flags, idx, false);
                         }
                     }
                 }
@@ -1117,17 +1113,13 @@ impl ThinBinderState {
                             if self.has_static_modifier(arena, &accessor.modifiers) {
                                 flags |= symbol_flags::STATIC;
                             }
-                            let sym_id = self.symbols.alloc(flags, name.to_string());
-                            self.current_scope.set(name.to_string(), sym_id);
-                            self.node_symbols.insert(idx.0, sym_id);
+                            self.declare_symbol(name, flags, idx, false);
                         }
                         self.bind_callable_body(arena, &accessor.parameters, accessor.body, idx);
                     }
                 }
                 k if k == syntax_kind_ext::CONSTRUCTOR => {
-                    let sym_id = self.symbols.alloc(symbol_flags::CONSTRUCTOR, "constructor".to_string());
-                    self.current_scope.set("constructor".to_string(), sym_id);
-                    self.node_symbols.insert(idx.0, sym_id);
+                    self.declare_symbol("constructor", symbol_flags::CONSTRUCTOR, idx, false);
                     if let Some(ctor) = arena.get_constructor(node) {
                         self.bind_callable_body(arena, &ctor.parameters, ctor.body, idx);
                     }
