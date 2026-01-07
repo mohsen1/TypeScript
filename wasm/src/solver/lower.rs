@@ -1511,9 +1511,6 @@ impl<'a> TypeLowering<'a> {
             return Some(value);
         }
 
-        let cleaned = Self::strip_numeric_separators(text);
-        let text = cleaned.as_ref();
-
         if let Some(rest) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
             return Self::parse_radix_digits(rest, 16);
         }
@@ -1522,6 +1519,11 @@ impl<'a> TypeLowering<'a> {
         }
         if let Some(rest) = text.strip_prefix("0o").or_else(|| text.strip_prefix("0O")) {
             return Self::parse_radix_digits(rest, 8);
+        }
+
+        if text.as_bytes().contains(&b'_') {
+            let cleaned = Self::strip_numeric_separators(text);
+            return cleaned.as_ref().parse::<f64>().ok();
         }
 
         text.parse::<f64>().ok()
