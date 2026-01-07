@@ -2244,6 +2244,60 @@ impl<'a> PropertyAccessEvaluator<'a> {
     }
 }
 
+pub fn property_is_readonly(interner: &dyn TypeDatabase, type_id: TypeId, prop_name: &str) -> bool {
+    match interner.lookup(type_id) {
+        Some(TypeKey::ReadonlyType(inner)) => {
+            if let Some(TypeKey::Array(_) | TypeKey::Tuple(_)) = interner.lookup(inner) {
+                if is_numeric_index_name(prop_name) {
+                    return true;
+                }
+            }
+            property_is_readonly(interner, inner, prop_name)
+        }
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            let prop_atom = interner.intern_string(prop_name);
+            shape
+                .properties
+                .iter()
+                .find(|prop| prop.name == prop_atom)
+                .is_some_and(|prop| prop.readonly)
+        }
+        Some(TypeKey::ObjectWithIndex(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            let prop_atom = interner.intern_string(prop_name);
+            if let Some(prop) = shape.properties.iter().find(|prop| prop.name == prop_atom) {
+                return prop.readonly;
+            }
+            if shape.string_index.as_ref().is_some_and(|idx| idx.readonly) {
+                return true;
+            }
+            if shape.number_index.as_ref().is_some_and(|idx| idx.readonly) {
+                return true;
+            }
+            false
+        }
+        Some(TypeKey::Union(types)) | Some(TypeKey::Intersection(types)) => {
+            let types = interner.type_list(types);
+            types
+                .iter()
+                .any(|t| property_is_readonly(interner, *t, prop_name))
+        }
+        _ => false,
+    }
+}
+
+fn is_numeric_index_name(name: &str) -> bool {
+    let parsed: f64 = match name.parse() {
+        Ok(value) => value,
+        Err(_) => return false,
+    };
+    if !parsed.is_finite() || parsed.fract() != 0.0 || parsed < 0.0 {
+        return false;
+    }
+    parsed <= (usize::MAX as f64)
+}
+
 // =============================================================================
 // Binary Operations
 // =============================================================================
