@@ -714,6 +714,40 @@ fn test_thin_emit_import_type_specifier_filtered() {
 }
 
 #[test]
+fn test_thin_emit_import_equals_external() {
+    let source = r#"import Foo = require("./bar"); Foo;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var Foo = require(\"./bar\")"),
+        "Expected import equals require emission: {}",
+        output
+    );
+}
+
+#[test]
+fn test_thin_emit_import_equals_internal() {
+    let source = "import Foo = Bar.Baz; Foo;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var Foo = Bar.Baz"),
+        "Expected import equals internal alias emission: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_export() {
     let source = "export function greet() { return 'hello'; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -746,6 +780,23 @@ fn test_thin_emit_export_default() {
     assert!(
         output.contains("function"),
         "Output should contain 'function': {}",
+        output
+    );
+}
+
+#[test]
+fn test_thin_emit_export_import_equals_es6() {
+    let source = r#"export import Foo = require("./bar");"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es6(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("export var Foo = require(\"./bar\");"),
+        "Expected export import equals in ES6 output: {}",
         output
     );
 }
@@ -1042,6 +1093,34 @@ fn test_auto_detect_skips_type_only_exports() {
 }
 
 #[test]
+fn test_auto_detect_skips_internal_import_equals() {
+    let source = "import Foo = Bar.Baz; const x = 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::with_options(&parser.arena, PrinterOptions::default());
+    printer.set_auto_detect_module(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        !output.contains("\"use strict\";"),
+        "Internal import equals should not trigger CommonJS preamble: {}",
+        output
+    );
+    assert!(
+        !output.contains("exports."),
+        "Internal import equals should not emit exports assignments: {}",
+        output
+    );
+    assert!(
+        output.contains("var Foo = Bar.Baz"),
+        "Expected internal import equals emission: {}",
+        output
+    );
+}
+
+#[test]
 fn test_commonjs_import_named() {
     let source = r#"import { foo, bar } from "./module";"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -1271,6 +1350,32 @@ fn test_commonjs_export_function() {
     let output = printer.get_output();
     assert!(output.contains("function add"), "Expected 'function add' in CommonJS output: {}", output);
     assert!(output.contains("exports.add = add;"), "Expected 'exports.add = add;' in CommonJS output: {}", output);
+}
+
+#[test]
+fn test_commonjs_export_import_equals() {
+    let source = r#"export import Foo = require("./bar");"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var Foo = require(\"./bar\")"),
+        "Expected import equals require in CommonJS output: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.Foo = Foo;"),
+        "Expected 'exports.Foo = Foo;' in CommonJS output: {}",
+        output
+    );
 }
 
 #[test]

@@ -1279,7 +1279,7 @@ impl<'a> LoweringPass<'a> {
         };
 
         if clause_node.kind != syntax_kind_ext::IMPORT_CLAUSE {
-            return true;
+            return self.import_equals_has_external_module(import_decl.module_specifier);
         }
 
         let Some(clause) = self.arena.get_import_clause(clause_node) else {
@@ -1326,6 +1326,18 @@ impl<'a> LoweringPass<'a> {
         }
 
         false
+    }
+
+    fn import_equals_has_external_module(&self, module_specifier: NodeIndex) -> bool {
+        if module_specifier.is_none() {
+            return false;
+        }
+
+        let Some(node) = self.arena.get(module_specifier) else {
+            return false;
+        };
+
+        node.kind == SyntaxKind::StringLiteral as u16
     }
 
     fn export_decl_has_runtime_value(

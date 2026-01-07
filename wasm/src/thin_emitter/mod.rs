@@ -1565,6 +1565,9 @@ impl<'a> ThinPrinter<'a> {
             k if k == syntax_kind_ext::IMPORT_DECLARATION => {
                 self.emit_import_declaration(node);
             }
+            k if k == syntax_kind_ext::IMPORT_EQUALS_DECLARATION => {
+                self.emit_import_equals_declaration(node);
+            }
             k if k == syntax_kind_ext::IMPORT_CLAUSE => {
                 self.emit_import_clause(node);
             }
@@ -4380,6 +4383,40 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
+    fn emit_import_equals_declaration(&mut self, node: &ThinNode) {
+        self.emit_import_equals_declaration_inner(node);
+        self.write_semicolon();
+    }
+
+    fn emit_import_equals_declaration_inner(&mut self, node: &ThinNode) {
+        let Some(import) = self.arena.get_import_decl(node) else {
+            return;
+        };
+
+        if import.import_clause.is_none() {
+            return;
+        }
+
+        self.write("var ");
+        self.emit(import.import_clause);
+        self.write(" = ");
+
+        let Some(module_node) = self.arena.get(import.module_specifier) else {
+            return;
+        };
+
+        if module_node.kind == SyntaxKind::StringLiteral as u16 {
+            if let Some(lit) = self.arena.get_literal(module_node) {
+                self.write("require(\"");
+                self.write(&lit.text);
+                self.write("\")");
+            }
+            return;
+        }
+
+        self.emit_entity_name(import.module_specifier);
+    }
+
     fn emit_import_clause(&mut self, node: &ThinNode) {
         let Some(clause) = self.arena.get_import_clause(node) else {
             return;
@@ -4467,6 +4504,13 @@ impl<'a> ThinPrinter<'a> {
         let Some(clause_node) = self.arena.get(export.export_clause) else {
             return;
         };
+
+        if clause_node.kind == syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
+            self.write("export ");
+            self.emit_import_equals_declaration_inner(clause_node);
+            self.write_semicolon();
+            return;
+        }
 
         if clause_node.kind == syntax_kind_ext::NAMED_EXPORTS {
             if let Some(named_exports) = self.arena.get_named_imports(clause_node) {
@@ -4611,6 +4655,25 @@ impl<'a> ThinPrinter<'a> {
         // Check if export_clause contains a declaration (export const x, export function f, etc.)
         if let Some(clause_node) = self.arena.get(export.export_clause) {
             if self.export_clause_is_type_only(clause_node) {
+                return;
+            }
+
+            if clause_node.kind == syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
+                self.emit_import_equals_declaration(clause_node);
+                if !self.ctx.module_state.has_export_assignment {
+                    if let Some(import_decl) = self.arena.get_import_decl(clause_node) {
+                        let name = self.get_identifier_text_idx(import_decl.import_clause);
+                        if !name.is_empty() {
+                            self.write_line();
+                            self.write("exports.");
+                            self.write(&name);
+                            self.write(" = ");
+                            self.write(&name);
+                            self.write(";");
+                            self.write_line();
+                        }
+                    }
+                }
                 return;
             }
 
@@ -4908,6 +4971,34 @@ impl<'a> ThinPrinter<'a> {
             }
         }
         String::new()
+    }
+
+    fn emit_entity_name(&mut self, idx: NodeIndex) {
+        if idx.is_none() {
+            return;
+        }
+
+        let Some(node) = self.arena.get(idx) else {
+            return;
+        };
+
+        match node.kind {
+            k if k == SyntaxKind::Identifier as u16 => {
+                if let Some(id) = self.arena.get_identifier(node) {
+                    self.write(&id.escaped_text);
+                }
+            }
+            k if k == SyntaxKind::ThisKeyword as u16 => self.write("this"),
+            k if k == SyntaxKind::SuperKeyword as u16 => self.write("super"),
+            k if k == syntax_kind_ext::QUALIFIED_NAME => {
+                if let Some(name) = self.arena.get_qualified_name(node) {
+                    self.emit_entity_name(name.left);
+                    self.write(".");
+                    self.emit_entity_name(name.right);
+                }
+            }
+            _ => {}
+        }
     }
 
     fn emit_named_exports(&mut self, node: &ThinNode) {
@@ -6086,7 +6177,7 @@ impl<'a> ThinPrinter<'a> {
         };
 
         if clause_node.kind != syntax_kind_ext::IMPORT_CLAUSE {
-            return true;
+            return self.import_equals_has_external_module(import_decl.module_specifier);
         }
 
         let Some(clause) = self.arena.get_import_clause(clause_node) else {
@@ -6133,6 +6224,18 @@ impl<'a> ThinPrinter<'a> {
         }
 
         false
+    }
+
+    fn import_equals_has_external_module(&self, module_specifier: NodeIndex) -> bool {
+        if module_specifier.is_none() {
+            return false;
+        }
+
+        let Some(node) = self.arena.get(module_specifier) else {
+            return false;
+        };
+
+        node.kind == SyntaxKind::StringLiteral as u16
     }
 
     fn export_decl_has_runtime_value(
