@@ -1141,6 +1141,68 @@ impl<'a> TypeLowering<'a> {
         Some(value)
     }
 
+    fn normalize_bigint_literal<'b>(&self, text: &'b str) -> Option<std::borrow::Cow<'b, str>> {
+        if let Some(rest) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
+            return Self::bigint_base_to_decimal(rest, 16).map(std::borrow::Cow::Owned);
+        }
+        if let Some(rest) = text.strip_prefix("0b").or_else(|| text.strip_prefix("0B")) {
+            return Self::bigint_base_to_decimal(rest, 2).map(std::borrow::Cow::Owned);
+        }
+        if let Some(rest) = text.strip_prefix("0o").or_else(|| text.strip_prefix("0O")) {
+            return Self::bigint_base_to_decimal(rest, 8).map(std::borrow::Cow::Owned);
+        }
+
+        let trimmed = text.trim_start_matches('0');
+        if trimmed.is_empty() {
+            return Some(std::borrow::Cow::Borrowed("0"));
+        }
+        if trimmed.len() == text.len() {
+            Some(std::borrow::Cow::Borrowed(text))
+        } else {
+            Some(std::borrow::Cow::Owned(trimmed.to_string()))
+        }
+    }
+
+    fn bigint_base_to_decimal(text: &str, base: u32) -> Option<String> {
+        if text.is_empty() {
+            return None;
+        }
+
+        let mut digits: Vec<u8> = vec![0];
+        for &byte in text.as_bytes() {
+            let digit = match byte {
+                b'0'..=b'9' => (byte - b'0') as u32,
+                b'a'..=b'f' => (byte - b'a' + 10) as u32,
+                b'A'..=b'F' => (byte - b'A' + 10) as u32,
+                _ => return None,
+            };
+            if digit >= base {
+                return None;
+            }
+
+            let mut carry = digit;
+            for slot in &mut digits {
+                let value = (*slot as u32) * base + carry;
+                *slot = (value % 10) as u8;
+                carry = value / 10;
+            }
+            while carry > 0 {
+                digits.push((carry % 10) as u8);
+                carry /= 10;
+            }
+        }
+
+        while digits.len() > 1 && *digits.last().unwrap() == 0 {
+            digits.pop();
+        }
+
+        let mut out = String::with_capacity(digits.len());
+        for digit in digits.iter().rev() {
+            out.push(char::from(b'0' + *digit));
+        }
+        Some(out)
+    }
+
     /// Lower a literal type ("foo", 42, etc.)
     fn lower_literal_type(&self, node_idx: NodeIndex) -> TypeId {
         let node = match self.arena.get(node_idx) {
@@ -1173,7 +1235,11 @@ impl<'a> TypeLowering<'a> {
                     k if k == SyntaxKind::BigIntLiteral as u16 => {
                         if let Some(lit_data) = self.arena.get_literal(literal_node) {
                             let text = lit_data.text.strip_suffix('n').unwrap_or(&lit_data.text);
-                            self.interner.literal_bigint(text)
+                            if let Some(normalized) = self.normalize_bigint_literal(text) {
+                                self.interner.literal_bigint(normalized.as_ref())
+                            } else {
+                                TypeId::BIGINT
+                            }
                         } else {
                             TypeId::BIGINT
                         }
@@ -1207,7 +1273,11 @@ impl<'a> TypeLowering<'a> {
                                     if let Some(lit_data) = self.arena.get_literal(operand_node) {
                                         let text = lit_data.text.strip_suffix('n').unwrap_or(&lit_data.text);
                                         let negative = op == SyntaxKind::MinusToken as u16;
-                                        self.interner.literal_bigint_with_sign(negative, text)
+                                        if let Some(normalized) = self.normalize_bigint_literal(text) {
+                                            self.interner.literal_bigint_with_sign(negative, normalized.as_ref())
+                                        } else {
+                                            TypeId::BIGINT
+                                        }
                                     } else {
                                         TypeId::BIGINT
                                     }

@@ -22,6 +22,8 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - Number literals: `42` -> special handling (store as Atom? or separate pool?)
   - Boolean literals: `true`, `false`
   - Hex/binary/octal numeric literals map to numeric literal types
+  - BigInt literals normalize base prefixes to decimal
+  - BigInt literals with base prefixes are tokenized in the scanner
 - [x] Tests for basic lowering
   - Test: `number` annotation -> Intrinsic(Number)
   - Test: `"hello"` -> Literal with correct Atom
@@ -29,6 +31,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Add BigInt literal type test once `123n` parses in type position
   - [x] Test: Negative numeric and bigint literal types
   - [x] Test: Hex/binary/octal numeric literal types
+  - [x] Test: Hex/binary/octal bigint literal types (normalized)
 
 ### Phase 2: Complex Type Structures
 - [x] Implement object type lowering
