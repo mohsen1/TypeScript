@@ -643,6 +643,24 @@ impl<'a> ThinCheckerState<'a> {
         self.resolve_alias_symbol(member_sym, visited_aliases)
     }
 
+    fn missing_type_query_left(&self, idx: NodeIndex) -> Option<NodeIndex> {
+        let mut current = idx;
+        loop {
+            let node = self.ctx.arena.get(current)?;
+            if node.kind == SyntaxKind::Identifier as u16 {
+                if self.resolve_identifier_symbol(current).is_none() {
+                    return Some(current);
+                }
+                return None;
+            }
+            if node.kind != syntax_kind_ext::QUALIFIED_NAME {
+                return None;
+            }
+            let qn = self.ctx.arena.get_qualified_name(node)?;
+            current = qn.left;
+        }
+    }
+
     fn resolve_alias_symbol(
         &self,
         sym_id: SymbolId,
@@ -901,6 +919,15 @@ impl<'a> ThinCheckerState<'a> {
             if is_identifier {
                 self.error_cannot_find_name_at(&name, type_query.expr_name);
                 return TypeId::ERROR;
+            }
+            if let Some(missing_idx) = self.missing_type_query_left(type_query.expr_name) {
+                if let Some(missing_name) = self.ctx.arena.get(missing_idx)
+                    .and_then(|node| self.ctx.arena.get_identifier(node))
+                    .map(|ident| ident.escaped_text.clone())
+                {
+                    self.error_cannot_find_name_at(&missing_name, missing_idx);
+                    return TypeId::ERROR;
+                }
             }
             // Not found - fall back to hash (for forward compatibility)
             use std::hash::{Hash, Hasher};
