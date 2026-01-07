@@ -516,6 +516,25 @@ fn update_import_symbol_ids(
                 }
             }
         }
+        for (specifier, binding_nodes) in collect_export_binding_nodes(&file.arena, file.source_file) {
+            let resolved = resolve_module_specifier(
+                Path::new(&file.file_name),
+                &specifier,
+                options,
+                base_dir,
+                &mut resolution_cache,
+            );
+            let Some(resolved) = resolved else {
+                continue;
+            };
+            let canonical = canonicalize_or_owned(&resolved);
+            let entry = by_dep.entry(canonical).or_insert_with(Vec::new);
+            for node_idx in binding_nodes {
+                if let Some(sym_id) = file.node_symbols.get(&node_idx.0).copied() {
+                    entry.push(sym_id);
+                }
+            }
+        }
         for symbols in by_dep.values_mut() {
             symbols.sort_by_key(|sym| sym.0);
             symbols.dedup();
@@ -818,6 +837,58 @@ fn collect_import_bindings(
         let local_names = collect_import_local_names(arena, import_decl);
         if !local_names.is_empty() {
             bindings.push((specifier.to_string(), local_names));
+        }
+    }
+
+    bindings
+}
+
+fn collect_export_binding_nodes(
+    arena: &ThinNodeArena,
+    source_file: NodeIndex,
+) -> Vec<(String, Vec<NodeIndex>)> {
+    let mut bindings = Vec::new();
+    let Some(node) = arena.get(source_file) else {
+        return bindings;
+    };
+    let Some(source) = arena.get_source_file(node) else {
+        return bindings;
+    };
+
+    for &stmt_idx in &source.statements.nodes {
+        if stmt_idx.is_none() {
+            continue;
+        }
+        let Some(stmt) = arena.get(stmt_idx) else {
+            continue;
+        };
+        let Some(export_decl) = arena.get_export_decl(stmt) else {
+            continue;
+        };
+        let Some(specifier) = arena.get_literal_text(export_decl.module_specifier) else {
+            continue;
+        };
+        if export_decl.export_clause.is_none() {
+            continue;
+        }
+        let clause_idx = export_decl.export_clause;
+        let Some(clause_node) = arena.get(clause_idx) else {
+            continue;
+        };
+
+        let mut nodes = Vec::new();
+        if let Some(named) = arena.get_named_imports(clause_node) {
+            for &spec_idx in &named.elements.nodes {
+                if !spec_idx.is_none() {
+                    nodes.push(spec_idx);
+                }
+            }
+        } else if arena.get_identifier_text(clause_idx).is_some() {
+            nodes.push(clause_idx);
+        }
+
+        if !nodes.is_empty() {
+            bindings.push((specifier.to_string(), nodes));
         }
     }
 
