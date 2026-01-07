@@ -10,8 +10,9 @@ engine on top to match TypeScript behavior while preserving correctness where po
 
 > This is a very high level project direction coming from project's manager's boss.
 
-- Don't get too bugged down with performance. lets ship something first that works. 
-- lib.d.ts and similar -- lets handle this.
+- Don't get too bogged down with performance. let's ship something first that works.
+- lib.d.ts and similar -- let's handle this.
+- I saw emitter/mod.rs is a giant file. Smaller files are better.
 - I want to see `test/cases` baseline pass rates in manager report
 - While you have the mechanisms, tsc has thousands of specific error messages. Your diagnostic engine is generic; matching the user experience of tsc errors requires massive effort.
 - tsconfig.json has hundreds of flags. You handle the big ones (target, module, strict), but full compatibility is a long tail.
@@ -21,9 +22,10 @@ engine on top to match TypeScript behavior while preserving correctness where po
 Last updated: 2026-01-07
 
 - Overall: Migration is active; Rust/WASM compiler is under construction and not production-ready.
-- Tracks: CLI now includes symbol-level invalidation with basic source maps; checker added switch/case flow narrowing and tightened dependency scoping; solver added cached property lookups; emitter shares directive payloads; LSP is reshuffling signature-help tests while refining overload JSDoc mapping.
-- Risk: LSP signature-help tests are currently failing in-track; symbol-level invalidation touches core cache behavior; source maps remain stubbed to a single 0,0 mapping; ES module imports still resolve to `any`; parser/arena child enumeration TODOs remain; namespace member checking tests are still disabled.
-- Next focus: Split `thin_emitter/mod.rs` into smaller modules, fix signature-help failures, validate symbol-level invalidation with tests, build real source maps, type ES imports, close parser/arena TODOs, and keep correctness ahead of perf tweaks.
+- Tracks: CLI export-hash + symbol-level dependent invalidation; checker is moving toward user-defined type predicate narrowing; solver moved union/intersection buffers to SmallVec; emitter is extracting module wrapper + ES5 template helpers; LSP fixed hover JSDoc matching for exported vars and signature-help trailing commas.
+- Baselines (`tests/cases`, first 100): compiler errors 60/77 (77.9%) pass, JS 40/76 (52.6%) pass; conformance errors 18/90 (20.0%) pass, JS 1/88 (1.1%) pass.
+- Risk: ES module imports still resolve to `any` (cross-file types unreliable); source maps remain stubbed to a single 0,0 mapping; parser/arena child enumeration TODOs remain; baseline pass rates are still low on conformance.
+- Next focus: finish splitting `thin_emitter/mod.rs`, implement user-defined type predicates, extend symbol-level invalidation to import-equals/re-exports, improve baseline pass rates, and keep correctness ahead of perf tweaks.
 
 ## Status
 This project is not ready for general use yet. The interface and distribution are in progress.
