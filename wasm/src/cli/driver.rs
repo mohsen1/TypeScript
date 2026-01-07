@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use crate::binder::SymbolTable;
 use crate::checker::types::diagnostics::{Diagnostic, DiagnosticCategory};
 use crate::cli::args::CliArgs;
-use crate::cli::config::{load_tsconfig, resolve_compiler_options, ResolvedCompilerOptions, TsConfig};
+use crate::cli::config::{load_tsconfig, resolve_compiler_options, JsxEmit, ResolvedCompilerOptions, TsConfig};
 use crate::cli::fs::{discover_ts_files, FileDiscoveryOptions};
 use crate::declaration_emitter::DeclarationEmitter;
 use crate::parallel::{self, BoundFile, MergedProgram};
@@ -262,7 +262,7 @@ fn emit_outputs(
     for file in &program.files {
         let input_path = PathBuf::from(&file.file_name);
 
-        if let Some(js_path) = js_output_path(base_dir, root_dir, out_dir, &input_path) {
+        if let Some(js_path) = js_output_path(base_dir, root_dir, out_dir, options.jsx, &input_path) {
             let mut printer = ThinPrinter::with_options(&file.arena, options.printer.clone());
             printer.emit(file.source_file);
             outputs.push(OutputFile {
@@ -305,13 +305,14 @@ fn js_output_path(
     base_dir: &Path,
     root_dir: Option<&Path>,
     out_dir: Option<&Path>,
+    jsx: Option<JsxEmit>,
     input_path: &Path,
 ) -> Option<PathBuf> {
     if is_declaration_file(input_path) {
         return None;
     }
 
-    let extension = js_extension_for(input_path)?;
+    let extension = js_extension_for(input_path, jsx)?;
     let relative = output_relative_path(base_dir, root_dir, input_path);
     let mut output = match out_dir {
         Some(out_dir) => out_dir.join(relative),
@@ -381,7 +382,7 @@ fn is_declaration_file(path: &Path) -> bool {
     name.ends_with(".d.ts") || name.ends_with(".d.mts") || name.ends_with(".d.cts")
 }
 
-fn js_extension_for(path: &Path) -> Option<&'static str> {
+fn js_extension_for(path: &Path, jsx: Option<JsxEmit>) -> Option<&'static str> {
     let name = path.file_name().and_then(|name| name.to_str())?;
     if name.ends_with(".mts") {
         return Some("mjs");
@@ -391,7 +392,11 @@ fn js_extension_for(path: &Path) -> Option<&'static str> {
     }
 
     match path.extension().and_then(|ext| ext.to_str()) {
-        Some("ts") | Some("tsx") => Some("js"),
+        Some("ts") => Some("js"),
+        Some("tsx") => match jsx {
+            Some(JsxEmit::Preserve) => Some("jsx"),
+            Some(JsxEmit::ReactNative) | None => Some("js"),
+        },
         _ => None,
     }
 }

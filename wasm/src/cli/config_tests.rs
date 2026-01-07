@@ -1,4 +1,4 @@
-use super::config::{load_tsconfig, parse_tsconfig, resolve_compiler_options};
+use super::config::{load_tsconfig, parse_tsconfig, resolve_compiler_options, JsxEmit};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -107,6 +107,7 @@ fn resolve_compiler_options_defaults() {
 
     assert_eq!(resolved.printer.target, ScriptTarget::ESNext);
     assert_eq!(resolved.printer.module, ModuleKind::None);
+    assert!(resolved.jsx.is_none());
     assert!(resolved.root_dir.is_none());
     assert!(resolved.out_dir.is_none());
     assert!(!resolved.checker.strict);
@@ -121,6 +122,7 @@ fn resolve_compiler_options_overrides() {
           "compilerOptions": {
             "target": "ES2020",
             "module": "common-js",
+            "jsx": "preserve",
             "rootDir": "src",
             "outDir": "dist",
             "declaration": true,
@@ -138,6 +140,7 @@ fn resolve_compiler_options_overrides() {
 
     assert_eq!(resolved.printer.target, ScriptTarget::ES2020);
     assert_eq!(resolved.printer.module, ModuleKind::CommonJS);
+    assert_eq!(resolved.jsx, Some(JsxEmit::Preserve));
     assert_eq!(resolved.root_dir, Some(PathBuf::from("src")));
     assert_eq!(resolved.out_dir, Some(PathBuf::from("dist")));
     assert_eq!(resolved.declaration_dir, Some(PathBuf::from("types")));
@@ -163,4 +166,21 @@ fn resolve_compiler_options_rejects_unknown_values() {
         .expect_err("unknown compilerOptions should error");
     let message = err.to_string();
     assert!(message.contains("compilerOptions.target"), "{message}");
+}
+
+#[test]
+fn resolve_compiler_options_rejects_unsupported_jsx() {
+    let config = parse_tsconfig(
+        r#"{
+          "compilerOptions": {
+            "jsx": "react"
+          }
+        }"#,
+    )
+    .expect("should parse config");
+
+    let err = resolve_compiler_options(config.compiler_options.as_ref())
+        .expect_err("unsupported jsx should error");
+    let message = err.to_string();
+    assert!(message.contains("compilerOptions.jsx"), "{message}");
 }

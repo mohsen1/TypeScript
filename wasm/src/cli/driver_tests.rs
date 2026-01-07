@@ -162,3 +162,27 @@ fn compile_with_project_dir_uses_tsconfig() {
     assert!(result.diagnostics.is_empty());
     assert!(config_dir.join("dist/src/index.js").is_file());
 }
+
+#[test]
+fn compile_with_jsx_preserve_emits_jsx_extension() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "jsx": "preserve"
+          },
+          "include": ["src/**/*.tsx"]
+        }"#,
+    );
+    write_file(&base.join("src/view.tsx"), "export const View = () => <div />;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+    assert!(base.join("dist/src/view.jsx").is_file());
+}
