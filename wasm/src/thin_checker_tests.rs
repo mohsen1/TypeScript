@@ -3991,6 +3991,84 @@ const bad = Alias;
 }
 
 #[test]
+fn test_namespace_type_only_member_via_alias_value_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace NS {
+    export interface Foo { value: number; }
+}
+import Alias = NS;
+let ok: Alias.Foo;
+const bad = Alias.Foo;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = codes.iter().filter(|&&code| code == 2693).count();
+    assert_eq!(
+        count,
+        1,
+        "Expected one 2693 error for type-only namespace member via alias, got: {:?}",
+        codes
+    );
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 for type-only namespace member via alias, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_namespace_type_only_nested_member_via_alias_value_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Outer {
+    export namespace Inner {
+        export type Foo = number;
+    }
+}
+import Alias = Outer;
+let ok: Alias.Inner.Foo;
+const bad = Alias.Inner.Foo;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = codes.iter().filter(|&&code| code == 2693).count();
+    assert_eq!(
+        count,
+        1,
+        "Expected one 2693 error for nested type-only namespace member via alias, got: {:?}",
+        codes
+    );
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 for nested type-only namespace member via alias, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_namespace_value_member_access() {
     use crate::thin_parser::ThinParserState;
 
