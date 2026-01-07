@@ -478,6 +478,64 @@ impl<'a> LoweringPass<'a> {
             return;
         }
 
+        if export_decl.is_default_export && self.is_commonjs() {
+            if let Some(export_node) = self.arena.get(export_decl.export_clause) {
+                if export_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                    if let Some(func) = self.arena.get_function(export_node) {
+                        let func_name = self.get_identifier_text(func.name);
+                        let is_anonymous = func_name == "function"
+                            || !Self::is_valid_identifier_name(&func_name);
+                        if is_anonymous {
+                            self.transforms.insert(
+                                export_decl.export_clause,
+                                TransformDirective::CommonJSExportDefaultExpr,
+                            );
+
+                            if let Some(mods) = &func.modifiers {
+                                for &mod_idx in &mods.nodes {
+                                    self.visit(mod_idx);
+                                }
+                            }
+
+                            for &param_idx in &func.parameters.nodes {
+                                self.visit(param_idx);
+                            }
+
+                            if !func.body.is_none() {
+                                self.visit(func.body);
+                            }
+
+                            return;
+                        }
+                    }
+                }
+
+                if export_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                    if let Some(class) = self.arena.get_class(export_node) {
+                        let class_name = self.get_identifier_text(class.name);
+                        if !Self::is_valid_identifier_name(&class_name) {
+                            self.transforms.insert(
+                                export_decl.export_clause,
+                                TransformDirective::CommonJSExportDefaultExpr,
+                            );
+
+                            if let Some(mods) = &class.modifiers {
+                                for &mod_idx in &mods.nodes {
+                                    self.visit(mod_idx);
+                                }
+                            }
+
+                            for &member_idx in &class.members.nodes {
+                                self.visit(member_idx);
+                            }
+
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
         if let Some(export_node) = self.arena.get(export_decl.export_clause) {
             if export_node.kind == syntax_kind_ext::CLASS_DECLARATION {
                 self.lower_class_declaration(
@@ -1010,6 +1068,17 @@ impl<'a> LoweringPass<'a> {
         };
 
         ident.escaped_text.clone()
+    }
+
+    fn is_valid_identifier_name(name: &str) -> bool {
+        let mut chars = name.chars();
+        let Some(first) = chars.next() else {
+            return false;
+        };
+        if !(first == '_' || first == '$' || first.is_alphabetic()) {
+            return false;
+        }
+        chars.all(|ch| ch == '_' || ch == '$' || ch.is_alphanumeric())
     }
 
     fn get_module_root_name(&self, name_idx: NodeIndex) -> Option<String> {
