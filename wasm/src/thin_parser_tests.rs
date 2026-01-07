@@ -1922,6 +1922,18 @@ fn test_thin_parser_relational_with_parenthesized_rhs() {
 }
 
 #[test]
+fn test_thin_parser_every_type_arrow_conditional_comma() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "if (everyType(type, t => !!t.symbol?.parent && isArrayOrTupleSymbol(t.symbol.parent) && (!memberName ? (memberName = t.symbol.escapedName, true) : memberName === t.symbol.escapedName))) { }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty());
+}
+
+#[test]
 fn test_thin_parser_spread_in_call_arguments() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
