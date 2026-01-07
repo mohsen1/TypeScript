@@ -59,6 +59,7 @@ Pick the most doable and impactful
 34. CommonJS preamble: include default/named export declarations in exports init [done]
 35. CommonJS export declarations: enum transform + exports assignment [done]
 36. CommonJS export declarations: namespace transform + exports assignment [done]
+37. Enum modifiers: attach const/declare in parser; erase const/declare enum emit + CommonJS exports [done]
 
 
 ## Quick Reference

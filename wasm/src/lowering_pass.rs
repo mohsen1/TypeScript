@@ -683,8 +683,10 @@ impl<'a> LoweringPass<'a> {
             return;
         };
 
-        // Skip ambient declarations (declare enum)
-        if self.has_declare_modifier(&enum_decl.modifiers) {
+        // Skip ambient and const enums (declare/const enums are erased)
+        if self.has_declare_modifier(&enum_decl.modifiers)
+            || self.has_const_modifier(&enum_decl.modifiers)
+        {
             return;
         }
 
@@ -917,6 +919,20 @@ impl<'a> LoweringPass<'a> {
             self.arena
                 .get(mod_idx)
                 .map(|n| n.kind == SyntaxKind::DeclareKeyword as u16)
+                .unwrap_or(false)
+        })
+    }
+
+    /// Check if a modifier list contains the 'const' keyword
+    fn has_const_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        let Some(mods) = modifiers else {
+            return false;
+        };
+
+        mods.nodes.iter().any(|&mod_idx| {
+            self.arena
+                .get(mod_idx)
+                .map(|n| n.kind == SyntaxKind::ConstKeyword as u16)
                 .unwrap_or(false)
         })
     }

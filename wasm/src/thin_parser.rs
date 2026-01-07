@@ -524,7 +524,8 @@ impl ThinParserState {
             SyntaxKind::ConstKeyword => {
                 // const enum or const variable
                 if self.look_ahead_is_const_enum() {
-                    self.parse_const_enum_declaration()
+                    let start_pos = self.token_pos();
+                    self.parse_const_enum_declaration(start_pos, Vec::new())
                 } else {
                     self.parse_variable_statement()
                 }
@@ -692,17 +693,19 @@ impl ThinParserState {
     }
 
     /// Parse const enum declaration
-    fn parse_const_enum_declaration(&mut self) -> NodeIndex {
-        // Consume 'const'
+    fn parse_const_enum_declaration(&mut self, start_pos: u32, mut modifiers: Vec<NodeIndex>) -> NodeIndex {
+        let const_start = self.token_pos();
         self.parse_expected(SyntaxKind::ConstKeyword);
+        let const_end = self.token_end();
+        let const_modifier = self.arena.add_token(
+            SyntaxKind::ConstKeyword as u16,
+            const_start,
+            const_end,
+        );
+        modifiers.push(const_modifier);
 
-        // Parse the enum declaration normally
-        let enum_decl = self.parse_enum_declaration();
-
-        // The enum is already created - we just need to mark it as const
-        // For now, return as-is since the enum node doesn't have a const flag
-        // TODO: Add const flag to enum node if needed for semantics
-        enum_decl
+        let modifiers = Some(self.make_node_list(modifiers));
+        self.parse_enum_declaration_with_modifiers(start_pos, modifiers)
     }
 
     /// Parse labeled statement: label: statement
@@ -2834,6 +2837,15 @@ impl ThinParserState {
     /// Parse enum declaration
     fn parse_enum_declaration(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        self.parse_enum_declaration_with_modifiers(start_pos, None)
+    }
+
+    /// Parse enum declaration with explicit modifiers
+    fn parse_enum_declaration_with_modifiers(
+        &mut self,
+        start_pos: u32,
+        modifiers: Option<NodeList>,
+    ) -> NodeIndex {
         self.parse_expected(SyntaxKind::EnumKeyword);
 
         let name = self.parse_identifier();
@@ -2850,7 +2862,7 @@ impl ThinParserState {
             start_pos,
             end_pos,
             EnumData {
-                modifiers: None,
+                modifiers,
                 name,
                 members,
             },
@@ -2922,7 +2934,10 @@ impl ThinParserState {
             }
             SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
             SyntaxKind::TypeKeyword => self.parse_type_alias_declaration(),
-            SyntaxKind::EnumKeyword => self.parse_enum_declaration(),
+            SyntaxKind::EnumKeyword => {
+                let modifiers = Some(self.make_node_list(vec![declare_modifier]));
+                self.parse_enum_declaration_with_modifiers(start_pos, modifiers)
+            }
             SyntaxKind::NamespaceKeyword |
             SyntaxKind::ModuleKeyword => self.parse_declare_module(start_pos, declare_modifier),
             SyntaxKind::GlobalKeyword => self.parse_declare_module(start_pos, declare_modifier),
@@ -2934,7 +2949,7 @@ impl ThinParserState {
             SyntaxKind::ConstKeyword => {
                 // declare const enum or declare const variable
                 if self.look_ahead_is_const_enum() {
-                    self.parse_const_enum_declaration()
+                    self.parse_const_enum_declaration(start_pos, vec![declare_modifier])
                 } else {
                     let modifiers = self.make_node_list(vec![declare_modifier]);
                     self.parse_variable_statement_with_modifiers(Some(start_pos), Some(modifiers))
@@ -3567,7 +3582,7 @@ impl ThinParserState {
             SyntaxKind::ConstKeyword => {
                 // export const enum or export const variable
                 if self.look_ahead_is_const_enum() {
-                    self.parse_const_enum_declaration()
+                    self.parse_const_enum_declaration(self.token_pos(), Vec::new())
                 } else {
                     self.parse_variable_statement()
                 }
