@@ -5108,7 +5108,7 @@ impl<'a> ThinCheckerState<'a> {
             None
         };
 
-        let mut compute_final_type = |checker: &mut ThinCheckerState| -> TypeId {
+        let compute_final_type = |checker: &mut ThinCheckerState| -> TypeId {
             let declared_type = if !var_decl.type_annotation.is_none() {
                 checker.get_type_from_type_node(var_decl.type_annotation)
             } else {
