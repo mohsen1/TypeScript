@@ -1886,6 +1886,44 @@ interface Bar {
 }
 
 #[test]
+fn test_checker_typeof_with_type_arguments() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::{TypeKey, SymbolRef};
+
+    let source = r#"
+const Foo = <T>(value: T) => value;
+type Alias = typeof Foo<string>;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let foo_sym = binder.file_locals.get("Foo").expect("Foo should exist");
+    let alias_sym = binder.file_locals.get("Alias").expect("Alias should exist");
+
+    let alias_type = checker.get_type_of_symbol(alias_sym);
+    let alias_key = types.lookup(alias_type).expect("Alias type should exist");
+    match alias_key {
+        TypeKey::Application(app) => {
+            assert_eq!(app.args, vec![TypeId::STRING]);
+            match types.lookup(app.base) {
+                Some(TypeKey::TypeQuery(SymbolRef(sym_id))) => assert_eq!(sym_id, foo_sym.0),
+                other => panic!("Expected TypeQuery base type, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Alias to be Application type, got {:?}", alias_key),
+    }
+}
+
+#[test]
 fn test_checker_circular_type_aliases() {
     use crate::thin_parser::ThinParserState;
 

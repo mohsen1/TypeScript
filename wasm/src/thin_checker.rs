@@ -683,21 +683,30 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
-        if let Some(sym_id) = self.resolve_value_symbol_for_lowering(type_query.expr_name) {
-            return self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(sym_id)));
-        }
-
-        // Not found - fall back to hash (for forward compatibility)
-        if let Some(name) = self.entity_name_text(type_query.expr_name) {
+        let base = if let Some(sym_id) = self.resolve_value_symbol_for_lowering(type_query.expr_name) {
+            self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(sym_id)))
+        } else if let Some(name) = self.entity_name_text(type_query.expr_name) {
+            // Not found - fall back to hash (for forward compatibility)
             use std::hash::{Hash, Hasher};
             use std::collections::hash_map::DefaultHasher;
             let mut hasher = DefaultHasher::new();
             name.hash(&mut hasher);
             let symbol_id = hasher.finish() as u32;
-            return self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)));
+            self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)))
+        } else {
+            return TypeId::ANY;
+        };
+
+        if let Some(args) = &type_query.type_arguments {
+            if !args.nodes.is_empty() {
+                let type_args = args.nodes.iter()
+                    .map(|&idx| self.get_type_from_type_node(idx))
+                    .collect();
+                return self.ctx.types.application(base, type_args);
+            }
         }
 
-        TypeId::ANY
+        base
     }
 
     /// Get type from an array type node (T[]).
