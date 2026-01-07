@@ -185,11 +185,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             TypeKey::Array(elem) => {
                 // Array[number] -> element type
                 if self.is_number_like(index_type) {
-                    if index_type == TypeId::NUMBER {
-                        self.add_undefined_if_unchecked(elem)
-                    } else {
-                        elem
-                    }
+                    self.add_undefined_if_unchecked(elem)
                 } else {
                     // Could be string key for length etc, but for now return element
                     elem
@@ -448,6 +444,26 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     .map(|p| self.interner.intern(TypeKey::Literal(LiteralValue::String(p.name))))
                     .collect();
                 self.interner.union(key_types)
+            }
+            TypeKey::ObjectWithIndex(shape) => {
+                let mut key_types: Vec<TypeId> = shape
+                    .properties
+                    .iter()
+                    .map(|p| self.interner.intern(TypeKey::Literal(LiteralValue::String(p.name))))
+                    .collect();
+
+                if shape.string_index.is_some() {
+                    key_types.push(TypeId::STRING);
+                    key_types.push(TypeId::NUMBER);
+                } else if shape.number_index.is_some() {
+                    key_types.push(TypeId::NUMBER);
+                }
+
+                if key_types.is_empty() {
+                    TypeId::NEVER
+                } else {
+                    self.interner.union(key_types)
+                }
             }
             TypeKey::Array(_) => {
                 // keyof T[] = number | array methods

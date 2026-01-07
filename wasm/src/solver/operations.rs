@@ -724,6 +724,27 @@ impl<'a> CallEvaluator<'a> {
     ) {
         for (i, t_elem) in target.iter().enumerate() {
             if t_elem.rest {
+                if var_map.contains_key(&t_elem.type_id) {
+                    let mut tail = Vec::new();
+                    let mut has_rest = false;
+                    for s_elem in source.iter().skip(i) {
+                        if s_elem.rest {
+                            has_rest = true;
+                            break;
+                        }
+                        tail.push(TupleElement {
+                            type_id: s_elem.type_id,
+                            name: s_elem.name.clone(),
+                            optional: s_elem.optional,
+                            rest: false,
+                        });
+                    }
+                    if !has_rest {
+                        let tail_tuple = self.interner.tuple(tail);
+                        self.constrain_types(ctx, var_map, tail_tuple, t_elem.type_id);
+                        return;
+                    }
+                }
                 let rest_elem_type = self.rest_element_type(t_elem.type_id);
                 for s_elem in source.iter().skip(i) {
                     if s_elem.rest {
@@ -887,10 +908,15 @@ impl<'a> PropertyAccessEvaluator<'a> {
             return PropertyAccessResult::IsUnknown;
         }
 
-        if obj_type == TypeId::NULL || obj_type == TypeId::UNDEFINED {
+        if obj_type == TypeId::NULL || obj_type == TypeId::UNDEFINED || obj_type == TypeId::VOID {
+            let cause = if obj_type == TypeId::VOID {
+                TypeId::UNDEFINED
+            } else {
+                obj_type
+            };
             return PropertyAccessResult::PossiblyNullOrUndefined {
                 property_type: None,
-                cause: obj_type,
+                cause,
             };
         }
 
@@ -965,8 +991,13 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
                 for &member in members {
                     // Check for null/undefined directly
-                    if member == TypeId::NULL || member == TypeId::UNDEFINED {
-                        nullable_causes.push(member);
+                    if member == TypeId::NULL || member == TypeId::UNDEFINED || member == TypeId::VOID {
+                        let cause = if member == TypeId::VOID {
+                            TypeId::UNDEFINED
+                        } else {
+                            member
+                        };
+                        nullable_causes.push(cause);
                         continue;
                     }
 

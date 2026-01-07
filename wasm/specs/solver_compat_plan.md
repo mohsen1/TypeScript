@@ -129,11 +129,21 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Add compat flag to include `undefined` in index access results
 - [x] Thread unchecked index access through subtype evaluation
 - [x] Tests for unchecked index access behavior
+- [x] Include `undefined` for numeric literal array indices when enabled
 
 ### Phase 18: Unchecked Property Access Via Index Signatures
 - [x] Add `noUncheckedIndexedAccess` toggle to property access evaluator
 - [x] Include `undefined` when resolving string index signatures
 - [x] Tests for index-signature property access toggle
+
+### Phase 19: Keyof With Index Signatures
+- [x] Include string/number index keys in `keyof` for indexed objects
+- [x] Preserve named properties alongside numeric index keys
+- [x] Tests for `keyof` with index signatures
+
+### Phase 20: Void Property Access
+- [x] Treat `void` as undefined for property access nullish checks
+- [x] Tests for property access on `void`
 
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness

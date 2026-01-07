@@ -16,15 +16,16 @@
 //! Future features:
 //! - Remove Unused Declarations (diagnostic-based quick fix)
 
-use crate::binder::ScopeId;
+use crate::binder::{symbol_flags, ScopeId, SymbolId};
 use crate::parser::NodeIndex;
-use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
+use crate::parser::thin_node::{NodeAccess, ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::comments::get_leading_comments_from_cache;
 use crate::thin_binder::ThinBinderState;
 use crate::lsp::position::{Position, Range, LineMap};
 use crate::lsp::diagnostics::LspDiagnostic;
 use crate::lsp::rename::{WorkspaceEdit, TextEdit};
+use crate::lsp::resolver::ScopeWalker;
 use crate::lsp::utils::find_node_at_offset;
 use crate::scanner::SyntaxKind;
 use rustc_hash::FxHashSet;
@@ -1489,6 +1490,9 @@ impl<'a> CodeActionProvider<'a> {
         if !self.expression_and_statement_share_scope(expr_idx, stmt_idx) {
             return None;
         }
+        if self.extraction_has_tdz_violation(root, expr_idx, stmt_idx) {
+            return None;
+        }
 
         // 5. Generate a unique variable name scoped to the insertion point.
         let var_name = self.unique_extracted_name(stmt_idx);
@@ -1498,6 +1502,7 @@ impl<'a> CodeActionProvider<'a> {
         let node_start = expr_node.pos;
         let node_end = expr_node.end;
         let selected_text = self.source.get(node_start as usize..node_end as usize)?;
+        let initializer_text = self.format_extracted_initializer(expr_node, selected_text);
         let replacement_range = Range::new(
             self.line_map.offset_to_position(node_start, self.source),
             self.line_map.offset_to_position(node_end, self.source),
@@ -1514,7 +1519,7 @@ impl<'a> CodeActionProvider<'a> {
         // Calculate indentation by looking at the statement's line
         let indent = self.get_indentation_at_position(&stmt_pos);
 
-        let declaration = format!("{}const {} = {};\n", indent, var_name, selected_text);
+        let declaration = format!("{}const {} = {};\n", indent, var_name, initializer_text);
 
         let mut edits = Vec::new();
 
@@ -1566,6 +1571,23 @@ impl<'a> CodeActionProvider<'a> {
         }
     }
 
+    fn format_extracted_initializer(&self, expr_node: &ThinNode, selected_text: &str) -> String {
+        if self.needs_parentheses_for_extraction(expr_node) {
+            return format!("({})", selected_text);
+        }
+        selected_text.to_string()
+    }
+
+    fn needs_parentheses_for_extraction(&self, expr_node: &ThinNode) -> bool {
+        if expr_node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            if let Some(binary) = self.arena.get_binary_expr(expr_node) {
+                return binary.operator_token == SyntaxKind::CommaToken as u16;
+            }
+        }
+
+        false
+    }
+
     fn expression_and_statement_share_scope(&self, expr_idx: NodeIndex, stmt_idx: NodeIndex) -> bool {
         let expr_scope = match self.find_enclosing_scope_id(expr_idx) {
             Some(scope_id) => scope_id,
@@ -1576,6 +1598,230 @@ impl<'a> CodeActionProvider<'a> {
             None => return true,
         };
         expr_scope == stmt_scope
+    }
+
+    fn extraction_has_tdz_violation(&self, root: NodeIndex, expr_idx: NodeIndex, stmt_idx: NodeIndex) -> bool {
+        let stmt_node = match self.arena.get(stmt_idx) {
+            Some(node) => node,
+            None => return false,
+        };
+        let insertion_pos = stmt_node.pos;
+
+        let mut identifiers = Vec::new();
+        self.collect_identifier_uses_in_expression(expr_idx, &mut identifiers);
+        if identifiers.is_empty() {
+            return false;
+        }
+
+        let mut seen_symbols = FxHashSet::default();
+        let mut walker = ScopeWalker::new(self.arena, self.binder);
+        for ident_idx in identifiers {
+            let Some(sym_id) = walker.resolve_node(root, ident_idx) else {
+                continue;
+            };
+            if !seen_symbols.insert(sym_id) {
+                continue;
+            }
+            if self.symbol_has_tdz_after(sym_id, insertion_pos) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn symbol_has_tdz_after(&self, sym_id: SymbolId, insertion_pos: u32) -> bool {
+        let Some(symbol) = self.binder.symbols.get(sym_id) else {
+            return false;
+        };
+        if !self.symbol_is_lexical(symbol.flags) {
+            return false;
+        }
+
+        let mut earliest_decl: Option<u32> = None;
+        for decl_idx in &symbol.declarations {
+            let Some(decl_node) = self.arena.get(*decl_idx) else {
+                continue;
+            };
+            earliest_decl = Some(match earliest_decl {
+                Some(pos) => pos.min(decl_node.pos),
+                None => decl_node.pos,
+            });
+        }
+
+        matches!(earliest_decl, Some(pos) if pos > insertion_pos)
+    }
+
+    fn symbol_is_lexical(&self, flags: u32) -> bool {
+        (flags & symbol_flags::BLOCK_SCOPED_VARIABLE) != 0
+            || (flags & symbol_flags::CLASS) != 0
+    }
+
+    fn collect_identifier_uses_in_expression(&self, expr_idx: NodeIndex, out: &mut Vec<NodeIndex>) {
+        if expr_idx.is_none() {
+            return;
+        }
+
+        let Some(node) = self.arena.get(expr_idx) else {
+            return;
+        };
+
+        match node.kind {
+            k if k == SyntaxKind::Identifier as u16 => {
+                out.push(expr_idx);
+            }
+            k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
+                if let Some(access) = self.arena.get_access_expr(node) {
+                    self.collect_identifier_uses_in_expression(access.expression, out);
+                }
+            }
+            k if k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
+                if let Some(access) = self.arena.get_access_expr(node) {
+                    self.collect_identifier_uses_in_expression(access.expression, out);
+                    self.collect_identifier_uses_in_expression(access.name_or_argument, out);
+                }
+            }
+            k if k == syntax_kind_ext::CALL_EXPRESSION || k == syntax_kind_ext::NEW_EXPRESSION => {
+                if let Some(call) = self.arena.get_call_expr(node) {
+                    self.collect_identifier_uses_in_expression(call.expression, out);
+                    if let Some(args) = &call.arguments {
+                        for &arg in &args.nodes {
+                            self.collect_identifier_uses_in_expression(arg, out);
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::BINARY_EXPRESSION => {
+                if let Some(binary) = self.arena.get_binary_expr(node) {
+                    self.collect_identifier_uses_in_expression(binary.left, out);
+                    self.collect_identifier_uses_in_expression(binary.right, out);
+                }
+            }
+            k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
+                || k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION => {
+                if let Some(unary) = self.arena.get_unary_expr(node) {
+                    self.collect_identifier_uses_in_expression(unary.operand, out);
+                }
+            }
+            k if k == syntax_kind_ext::AWAIT_EXPRESSION
+                || k == syntax_kind_ext::YIELD_EXPRESSION
+                || k == syntax_kind_ext::NON_NULL_EXPRESSION
+                || k == syntax_kind_ext::SPREAD_ELEMENT
+                || k == syntax_kind_ext::SPREAD_ASSIGNMENT => {
+                if node.has_data() {
+                    if let Some(unary) = self.arena.unary_exprs_ex.get(node.data_index as usize) {
+                        self.collect_identifier_uses_in_expression(unary.expression, out);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
+                if let Some(cond) = self.arena.get_conditional_expr(node) {
+                    self.collect_identifier_uses_in_expression(cond.condition, out);
+                    self.collect_identifier_uses_in_expression(cond.when_true, out);
+                    self.collect_identifier_uses_in_expression(cond.when_false, out);
+                }
+            }
+            k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
+                if let Some(paren) = self.arena.get_parenthesized(node) {
+                    self.collect_identifier_uses_in_expression(paren.expression, out);
+                }
+            }
+            k if k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION => {
+                if let Some(literal) = self.arena.get_literal_expr(node) {
+                    for &elem in &literal.elements.nodes {
+                        self.collect_identifier_uses_in_expression(elem, out);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION => {
+                if let Some(literal) = self.arena.get_literal_expr(node) {
+                    for &elem in &literal.elements.nodes {
+                        self.collect_identifier_uses_in_object_literal_element(elem, out);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION => {
+                if node.has_data() {
+                    if let Some(tagged) = self.arena.tagged_templates.get(node.data_index as usize) {
+                        self.collect_identifier_uses_in_expression(tagged.tag, out);
+                        self.collect_identifier_uses_in_expression(tagged.template, out);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
+                if let Some(template) = self.arena.get_template_expr(node) {
+                    for &span_idx in &template.template_spans.nodes {
+                        let Some(span_node) = self.arena.get(span_idx) else { continue };
+                        if let Some(span) = self.arena.get_template_span(span_node) {
+                            self.collect_identifier_uses_in_expression(span.expression, out);
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_ASSERTION
+                || k == syntax_kind_ext::AS_EXPRESSION
+                || k == syntax_kind_ext::SATISFIES_EXPRESSION => {
+                if node.has_data() {
+                    if let Some(assertion) = self.arena.type_assertions.get(node.data_index as usize) {
+                        self.collect_identifier_uses_in_expression(assertion.expression, out);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::FUNCTION_EXPRESSION
+                || k == syntax_kind_ext::ARROW_FUNCTION
+                || k == syntax_kind_ext::CLASS_EXPRESSION => {
+                // Skip nested scopes to avoid capturing non-evaluated identifiers.
+            }
+            _ => {}
+        }
+    }
+
+    fn collect_identifier_uses_in_object_literal_element(
+        &self,
+        element_idx: NodeIndex,
+        out: &mut Vec<NodeIndex>,
+    ) {
+        let Some(element_node) = self.arena.get(element_idx) else {
+            return;
+        };
+
+        match element_node.kind {
+            k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
+                if let Some(prop) = self.arena.get_property_assignment(element_node) {
+                    self.collect_identifier_uses_in_computed_property_name(prop.name, out);
+                    self.collect_identifier_uses_in_expression(prop.initializer, out);
+                }
+            }
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                if let Some(method) = self.arena.get_method_decl(element_node) {
+                    self.collect_identifier_uses_in_computed_property_name(method.name, out);
+                }
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                if let Some(accessor) = self.arena.get_accessor(element_node) {
+                    self.collect_identifier_uses_in_computed_property_name(accessor.name, out);
+                }
+            }
+            _ => {
+                self.collect_identifier_uses_in_expression(element_idx, out);
+            }
+        }
+    }
+
+    fn collect_identifier_uses_in_computed_property_name(
+        &self,
+        name_idx: NodeIndex,
+        out: &mut Vec<NodeIndex>,
+    ) {
+        let Some(name_node) = self.arena.get(name_idx) else {
+            return;
+        };
+
+        if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+            if let Some(computed) = self.arena.get_computed_property(name_node) {
+                self.collect_identifier_uses_in_expression(computed.expression, out);
+            }
+        }
     }
 
     fn find_enclosing_scope_id(&self, node_idx: NodeIndex) -> Option<ScopeId> {

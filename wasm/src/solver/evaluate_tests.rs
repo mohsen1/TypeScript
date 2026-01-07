@@ -261,6 +261,21 @@ fn test_index_access_with_no_unchecked_indexed_access() {
 }
 
 #[test]
+fn test_index_access_array_literal_with_no_unchecked_indexed_access() {
+    let interner = TypeInterner::new();
+
+    let array = interner.array(TypeId::STRING);
+    let zero = interner.literal_number(0.0);
+
+    let mut evaluator = TypeEvaluator::new(&interner);
+    evaluator.set_no_unchecked_indexed_access(true);
+
+    let result = evaluator.evaluate_index_access(array, zero);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_index_access_array() {
     let interner = TypeInterner::new();
 
@@ -381,6 +396,58 @@ fn test_keyof_object() {
     let key_x = interner.literal_string("x");
     let key_y = interner.literal_string("y");
     let expected = interner.union(vec![key_x, key_y]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_object_with_string_index_signature() {
+    let interner = TypeInterner::new();
+
+    let key_x = interner.intern_string("x");
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name: key_x,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::BOOLEAN,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let result = evaluate_keyof(&interner, obj);
+    let expected = interner.union(vec![interner.literal_string("x"), TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_object_with_number_index_signature() {
+    let interner = TypeInterner::new();
+
+    let key_x = interner.intern_string("x");
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name: key_x,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+
+    let result = evaluate_keyof(&interner, obj);
+    let expected = interner.union(vec![interner.literal_string("x"), TypeId::NUMBER]);
     assert_eq!(result, expected);
 }
 

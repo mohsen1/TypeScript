@@ -58,7 +58,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Union/intersection normalization
   - [x] Test: Tuple optional/rest/named elements
   - [x] Test: Conditional type with infer (including constraint)
-  - [x] Test: Conditional infer binding in true branch
+  - [x] Test: Conditional infer binding in true/false branches
 
 ### Phase 3: Function Signatures
 - [x] Implement function type lowering
