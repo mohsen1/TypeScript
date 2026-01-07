@@ -17,6 +17,8 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Benchmark harness script added for tsz vs tsc comparisons.
 - Bench attempt on `src/compiler/tsconfig.json` failed in `tsz` (unsupported syntax like optional chaining + lib parsing errors). Next: add optional chaining parsing or pick a compatible large repo / bench-specific tsconfig that avoids libs.
 - Latest attempt: `npm install --no-save --no-package-lock typescript @types/node`, `cargo build --release --bin tsz`, `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` → tsz failed before timing; tsc not run.
+- Bench harness update: fixed BSD `/usr/bin/time -l` parsing in `wasm/bench_cli.sh` so elapsed time is read from the `real` token.
+- Synthetic benchmark (1000-file project in `/tmp/tsz_bench_large` with minimal `globals.d.ts`): `./wasm/bench_cli.sh --repo /tmp/tsz_bench_large --tsconfig tsconfig.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` → tsz avg 0.170s best 0.170s max_rss 19.6 MiB; tsc avg 0.200s best 0.200s max_rss 141.3 MiB. Next: run on real repo once optional chaining + lib parsing land.
 
 ## Current Investigation Notes (Incremental export hash)
 Summary of the incremental work (export hash fixed):
@@ -83,6 +85,7 @@ Tests run in this state:
 - `./wasm/test.sh cli::driver_tests::compile_resolves_tsconfig_type_roots_includes_packages` (pass).
 - `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` (failed: tsz diagnostics on optional chaining + lib .d.ts parsing).
 - `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` (failed again: tsz exits with diagnostics; no timings).
+- `./wasm/bench_cli.sh --repo /tmp/tsz_bench_large --tsconfig tsconfig.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` (tsz avg 0.170s best 0.170s max_rss 19.6 MiB; tsc avg 0.200s best 0.200s max_rss 141.3 MiB).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
