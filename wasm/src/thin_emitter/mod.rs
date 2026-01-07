@@ -1474,6 +1474,9 @@ impl<'a> ThinPrinter<'a> {
             k if k == SyntaxKind::Identifier as u16 => {
                 self.emit_identifier(node);
             }
+            k if k == syntax_kind_ext::TYPE_PARAMETER => {
+                self.emit_type_parameter(node);
+            }
 
             // Literals
             k if k == SyntaxKind::NumericLiteral as u16 => {
@@ -3003,6 +3006,24 @@ impl<'a> ThinPrinter<'a> {
         if !param.initializer.is_none() {
             self.write(" = ");
             self.emit_expression(param.initializer);
+        }
+    }
+
+    fn emit_type_parameter(&mut self, node: &ThinNode) {
+        let Some(param) = self.arena.get_type_parameter(node) else {
+            return;
+        };
+
+        self.emit(param.name);
+
+        if !param.constraint.is_none() {
+            self.write(" extends ");
+            self.emit(param.constraint);
+        }
+
+        if !param.default.is_none() {
+            self.write(" = ");
+            self.emit(param.default);
         }
     }
 
@@ -6210,7 +6231,13 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // TODO: type parameters
+        if let Some(ref type_params) = sig.type_parameters {
+            if !type_params.nodes.is_empty() {
+                self.write("<");
+                self.emit_comma_separated(&type_params.nodes);
+                self.write(">");
+            }
+        }
 
         self.write("(");
         if let Some(ref params) = sig.parameters {
@@ -6231,7 +6258,13 @@ impl<'a> ThinPrinter<'a> {
 
         self.write("new ");
 
-        // TODO: type parameters
+        if let Some(ref type_params) = sig.type_parameters {
+            if !type_params.nodes.is_empty() {
+                self.write("<");
+                self.emit_comma_separated(&type_params.nodes);
+                self.write(">");
+            }
+        }
 
         self.write("(");
         if let Some(ref params) = sig.parameters {
