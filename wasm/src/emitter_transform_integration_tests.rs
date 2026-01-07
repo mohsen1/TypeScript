@@ -6,6 +6,8 @@
 
 use crate::emit_context::EmitContext;
 use crate::lowering_pass::LoweringPass;
+use crate::parser::NodeIndex;
+use crate::scanner::SyntaxKind;
 use crate::thin_emitter::ThinPrinter;
 use crate::thin_parser::ThinParserState;
 use crate::transform_context::{TransformContext, TransformDirective};
@@ -307,6 +309,87 @@ fn test_lowering_pass_es5_object_literal_directive() {
 }
 
 #[test]
+fn test_lowering_pass_es5_template_literal_directive() {
+    let source = "const msg = `hi ${name}`; const plain = `bye`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut template_expr = None;
+    let mut no_sub = None;
+    for (idx, node) in arena.nodes.iter().enumerate() {
+        let node_idx = NodeIndex(idx as u32);
+        if node.kind == crate::parser::syntax_kind_ext::TEMPLATE_EXPRESSION {
+            template_expr = Some(node_idx);
+        } else if node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16 {
+            no_sub = Some(node_idx);
+        }
+    }
+
+    let template_expr = template_expr.expect("expected template expression node");
+    let no_sub = no_sub.expect("expected no-substitution template node");
+
+    assert!(
+        matches!(
+            transforms.get(template_expr),
+            Some(TransformDirective::ES5TemplateLiteral { .. })
+        ),
+        "LoweringPass should emit ES5TemplateLiteral directive for template expression"
+    );
+    assert!(
+        matches!(
+            transforms.get(no_sub),
+            Some(TransformDirective::ES5TemplateLiteral { .. })
+        ),
+        "LoweringPass should emit ES5TemplateLiteral directive for no-substitution template"
+    );
+}
+
+#[test]
+fn test_lowering_pass_es5_variable_declaration_list_directive() {
+    let source = "let { x, y } = obj;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let stmt_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected variable statement");
+    let stmt_node = arena.get(stmt_idx).expect("expected variable node");
+    let var_stmt = arena
+        .get_variable(stmt_node)
+        .expect("expected variable statement data");
+    let decl_list_idx = *var_stmt
+        .declarations
+        .nodes
+        .first()
+        .expect("expected declaration list");
+
+    let directive = transforms.get(decl_list_idx);
+    assert!(
+        matches!(
+            directive,
+            Some(TransformDirective::ES5VariableDeclarationList { .. })
+        ),
+        "LoweringPass should emit ES5VariableDeclarationList directive for destructuring"
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_object_literal_computed() {
     let source = "const obj = { a: 1, [key]: 2 };";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -335,6 +418,67 @@ fn test_two_phase_emission_es5_object_literal_computed() {
     assert!(
         !output.contains("[key]:"),
         "ES5 output should not keep computed property syntax: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_variable_destructuring() {
+    let source = "let { x, y } = obj;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var _a = obj"),
+        "ES5 output should introduce temp for destructuring: {}",
+        output
+    );
+    assert!(
+        output.contains("x = _a.x"),
+        "ES5 output should assign destructured properties: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_object_literal_shorthand_method() {
+    let source = "var x = 1; var obj = { x, method(y = 1) { return y + x; } };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("x: x"),
+        "ES5 output should expand shorthand properties: {}",
+        output
+    );
+    assert!(
+        output.contains("method: function"),
+        "ES5 output should downlevel object literal methods: {}",
+        output
+    );
+    assert!(
+        output.contains("if (y === void 0) { y = 1; }"),
+        "ES5 output should downlevel default parameters: {}",
         output
     );
 }
