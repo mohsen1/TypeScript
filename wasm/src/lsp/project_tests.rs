@@ -1382,7 +1382,10 @@ fn test_project_scope_cache_reuse_hover_to_signature_help_after_edit_across_file
         "b.ts".to_string(),
         "function foo(a: number, b: string) {}\nfoo(1, \"x\");\n".to_string(),
     );
-    let hover_position = Position::new(1, 0);
+    let hover_position = {
+        let file = project.file("b.ts").unwrap();
+        range_for_substring(file.source_text(), file.line_map(), "foo(1").start
+    };
     let signature_position = {
         let file = project.file("b.ts").unwrap();
         range_for_substring(file.source_text(), file.line_map(), "1").start
