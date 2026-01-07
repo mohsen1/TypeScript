@@ -127,6 +127,9 @@ pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
     /// Whether null/undefined are treated as separate types.
     /// Default: true (strict null checks).
     pub strict_null_checks: bool,
+    /// Whether indexed access includes `undefined`.
+    /// Default: false (legacy TS behavior).
+    pub no_unchecked_indexed_access: bool,
 }
 
 impl<'a> SubtypeChecker<'a, NoopResolver> {
@@ -143,6 +146,7 @@ impl<'a> SubtypeChecker<'a, NoopResolver> {
             allow_bivariant_rest: false,
             exact_optional_property_types: false,
             strict_null_checks: true,
+            no_unchecked_indexed_access: false,
         }
     }
 }
@@ -160,6 +164,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             allow_bivariant_rest: false,
             exact_optional_property_types: false,
             strict_null_checks: true,
+            no_unchecked_indexed_access: false,
         }
     }
 
@@ -1113,7 +1118,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     /// Uses TypeEvaluator to reduce types like `T extends U ? X : Y` to either X or Y.
     fn evaluate_type(&self, type_id: TypeId) -> TypeId {
         use crate::solver::evaluate::TypeEvaluator;
-        let evaluator = TypeEvaluator::with_resolver(self.interner, self.resolver);
+        let mut evaluator = TypeEvaluator::with_resolver(self.interner, self.resolver);
+        evaluator.set_no_unchecked_indexed_access(self.no_unchecked_indexed_access);
         evaluator.evaluate(type_id)
     }
 

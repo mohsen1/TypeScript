@@ -33,6 +33,7 @@ pub enum ConditionalResult {
 pub struct TypeEvaluator<'a, R: TypeResolver = NoopResolver> {
     interner: &'a dyn TypeDatabase,
     resolver: &'a R,
+    no_unchecked_indexed_access: bool,
 }
 
 impl<'a> TypeEvaluator<'a, NoopResolver> {
@@ -42,6 +43,7 @@ impl<'a> TypeEvaluator<'a, NoopResolver> {
         TypeEvaluator {
             interner,
             resolver: &NOOP,
+            no_unchecked_indexed_access: false,
         }
     }
 }
@@ -49,7 +51,15 @@ impl<'a> TypeEvaluator<'a, NoopResolver> {
 impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     /// Create a new evaluator with a custom resolver.
     pub fn with_resolver(interner: &'a dyn TypeDatabase, resolver: &'a R) -> Self {
-        TypeEvaluator { interner, resolver }
+        TypeEvaluator {
+            interner,
+            resolver,
+            no_unchecked_indexed_access: false,
+        }
+    }
+
+    pub fn set_no_unchecked_indexed_access(&mut self, enabled: bool) {
+        self.no_unchecked_indexed_access = enabled;
     }
 
     /// Evaluate a type, resolving any meta-types if possible.
@@ -175,7 +185,11 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             TypeKey::Array(elem) => {
                 // Array[number] -> element type
                 if self.is_number_like(index_type) {
-                    elem
+                    if index_type == TypeId::NUMBER {
+                        self.add_undefined_if_unchecked(elem)
+                    } else {
+                        elem
+                    }
                 } else {
                     // Could be string key for length etc, but for now return element
                     elem
@@ -207,7 +221,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             let mut results = Vec::new();
             for &member in &members {
                 let result = self.evaluate_object_index(props, member);
-                if result != TypeId::UNDEFINED {
+                if result != TypeId::UNDEFINED || self.no_unchecked_indexed_access {
                     results.push(result);
                 }
             }
@@ -223,7 +237,8 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             if all_types.is_empty() {
                 return TypeId::UNDEFINED;
             }
-            return self.interner.union(all_types);
+            let union = self.interner.union(all_types);
+            return self.add_undefined_if_unchecked(union);
         }
 
         TypeId::UNDEFINED
@@ -236,7 +251,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             let mut results = Vec::new();
             for &member in &members {
                 let result = self.evaluate_object_with_index(shape, member);
-                if result != TypeId::UNDEFINED {
+                if result != TypeId::UNDEFINED || self.no_unchecked_indexed_access {
                     results.push(result);
                 }
             }
@@ -254,7 +269,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
             }
             if let Some(string_index) = shape.string_index.as_ref() {
-                return string_index.value_type;
+                return self.add_undefined_if_unchecked(string_index.value_type);
             }
             return TypeId::UNDEFINED;
         }
@@ -262,29 +277,32 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         // If index is a literal number, prefer number index, then string index.
         if let Some(TypeKey::Literal(LiteralValue::Number(_))) = self.interner.lookup(index_type) {
             if let Some(number_index) = shape.number_index.as_ref() {
-                return number_index.value_type;
+                return self.add_undefined_if_unchecked(number_index.value_type);
             }
             if let Some(string_index) = shape.string_index.as_ref() {
-                return string_index.value_type;
+                return self.add_undefined_if_unchecked(string_index.value_type);
             }
             return TypeId::UNDEFINED;
         }
 
         if index_type == TypeId::STRING {
-            if let Some(string_index) = shape.string_index.as_ref() {
-                return string_index.value_type;
-            }
-            return self.union_property_types(&shape.properties);
+            let result = if let Some(string_index) = shape.string_index.as_ref() {
+                string_index.value_type
+            } else {
+                self.union_property_types(&shape.properties)
+            };
+            return self.add_undefined_if_unchecked(result);
         }
 
         if index_type == TypeId::NUMBER {
-            if let Some(number_index) = shape.number_index.as_ref() {
-                return number_index.value_type;
-            }
-            if let Some(string_index) = shape.string_index.as_ref() {
-                return string_index.value_type;
-            }
-            return self.union_property_types(&shape.properties);
+            let result = if let Some(number_index) = shape.number_index.as_ref() {
+                number_index.value_type
+            } else if let Some(string_index) = shape.string_index.as_ref() {
+                string_index.value_type
+            } else {
+                self.union_property_types(&shape.properties)
+            };
+            return self.add_undefined_if_unchecked(result);
         }
 
         TypeId::UNDEFINED
@@ -297,6 +315,13 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         } else {
             self.interner.union(all_types)
         }
+    }
+
+    fn add_undefined_if_unchecked(&self, type_id: TypeId) -> TypeId {
+        if !self.no_unchecked_indexed_access || type_id == TypeId::UNDEFINED {
+            return type_id;
+        }
+        self.interner.union(vec![type_id, TypeId::UNDEFINED])
     }
 
     /// Evaluate index access on a tuple type
@@ -322,7 +347,8 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             if all_types.is_empty() {
                 return TypeId::NEVER;
             }
-            return self.interner.union(all_types);
+            let union = self.interner.union(all_types);
+            return self.add_undefined_if_unchecked(union);
         }
 
         TypeId::UNDEFINED

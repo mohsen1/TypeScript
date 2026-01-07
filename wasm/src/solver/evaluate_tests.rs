@@ -233,6 +233,34 @@ fn test_index_access_object_with_number_index_signature() {
 }
 
 #[test]
+fn test_index_access_with_no_unchecked_indexed_access() {
+    let interner = TypeInterner::new();
+
+    let indexed = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let array = interner.array(TypeId::STRING);
+
+    let mut evaluator = TypeEvaluator::new(&interner);
+    evaluator.set_no_unchecked_indexed_access(true);
+
+    let result = evaluator.evaluate_index_access(indexed, TypeId::STRING);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+
+    let result = evaluator.evaluate_index_access(array, TypeId::NUMBER);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_index_access_array() {
     let interner = TypeInterner::new();
 
