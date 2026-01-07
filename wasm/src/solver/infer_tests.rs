@@ -403,6 +403,47 @@ fn test_resolve_bounds_object_with_index_subtype() {
 }
 
 #[test]
+fn test_resolve_bounds_object_with_index_mismatch() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let upper_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let lower_type = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower_type);
+    ctx.add_upper_bound(var, upper_type);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower_type && actual_upper == upper_type
+    ));
+}
+
+#[test]
 fn test_resolve_bounds_function_subtype() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
