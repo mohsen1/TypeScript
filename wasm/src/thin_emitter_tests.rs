@@ -169,6 +169,50 @@ fn test_thin_emit_class_method_destructured_param_es5() {
 }
 
 #[test]
+fn test_thin_emit_object_rest_destructuring_es5() {
+    let source = "let { x, ...rest } = obj;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var __rest"),
+        "Expected __rest helper in ES5 output: {}",
+        output
+    );
+    assert!(
+        output.contains("rest = __rest(_a, [\"x\"])"),
+        "Expected object rest destructuring in ES5 output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_thin_emit_array_rest_destructuring_es5() {
+    let source = "let [x, ...rest] = arr;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("rest = _a.slice(1)"),
+        "Expected array rest destructuring in ES5 output: {}",
+        output
+    );
+    assert!(
+        !output.contains("__rest"),
+        "Array rest should not require __rest helper: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_arrow_function() {
     let source = "let f = (x) => x * 2";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

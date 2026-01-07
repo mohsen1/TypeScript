@@ -105,7 +105,9 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 ### Phase 13: Apparent Members of Primitives
 - [x] Resolve property access on primitive intrinsics and literal types via apparent members
 - [x] Return callable types for built-in primitive/array methods
+- [x] Apply apparent primitive members during object assignability checks
 - [x] Tests for primitive method property access and literal string properties
+- [x] Tests for primitive-to-object assignability
 
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness

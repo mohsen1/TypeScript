@@ -1179,8 +1179,18 @@ impl<'a> ClassES5Emitter<'a> {
         match pattern_node.kind {
             k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN => {
                 if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                    let rest_props = self.collect_object_rest_props(pattern);
                     for &elem_idx in &pattern.elements.nodes {
-                        self.emit_param_object_binding_element(elem_idx, temp_name, started);
+                        if elem_idx.is_none() {
+                            continue;
+                        }
+                        let Some(elem_node) = self.arena.get(elem_idx) else { continue };
+                        let Some(elem) = self.arena.get_binding_element(elem_node) else { continue };
+                        if elem.dot_dot_dot_token {
+                            self.emit_param_object_rest_element(elem, &rest_props, temp_name, started);
+                        } else {
+                            self.emit_param_object_binding_element(elem_idx, temp_name, started);
+                        }
                     }
                 }
             }
@@ -1241,6 +1251,7 @@ impl<'a> ClassES5Emitter<'a> {
         let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
 
         if elem.dot_dot_dot_token {
+            self.emit_param_array_rest_element(elem.name, temp_name, index, started);
             return;
         }
 
@@ -1256,6 +1267,69 @@ impl<'a> ClassES5Emitter<'a> {
         self.write("[");
         self.write(&index.to_string());
         self.write("]");
+    }
+
+    fn emit_param_object_rest_element(
+        &mut self,
+        elem: &crate::parser::thin_node::BindingElementData,
+        rest_props: &[NodeIndex],
+        temp_name: &str,
+        started: &mut bool,
+    ) {
+        let rest_target = elem.name;
+        let is_pattern = self.is_binding_pattern(rest_target);
+        let rest_temp = if is_pattern {
+            Some(self.get_temp_var_name())
+        } else {
+            None
+        };
+
+        self.emit_param_assignment_prefix(started);
+        if let Some(ref name) = rest_temp {
+            self.write(name);
+        } else {
+            self.emit_binding_name(rest_target);
+        }
+        self.write(" = __rest(");
+        self.write(temp_name);
+        self.write(", ");
+        self.emit_rest_exclude_list(rest_props);
+        self.write(")");
+
+        if let Some(ref name) = rest_temp {
+            self.emit_param_binding_assignments(rest_target, name, started);
+        }
+    }
+
+    fn emit_param_array_rest_element(
+        &mut self,
+        rest_target: NodeIndex,
+        temp_name: &str,
+        index: usize,
+        started: &mut bool,
+    ) {
+        let is_pattern = self.is_binding_pattern(rest_target);
+        let rest_temp = if is_pattern {
+            Some(self.get_temp_var_name())
+        } else {
+            None
+        };
+
+        self.emit_param_assignment_prefix(started);
+        if let Some(ref name) = rest_temp {
+            self.write(name);
+        } else {
+            self.emit_binding_name(rest_target);
+        }
+        self.write(" = ");
+        self.write(temp_name);
+        self.write(".slice(");
+        self.write(&index.to_string());
+        self.write(")");
+
+        if let Some(ref name) = rest_temp {
+            self.emit_param_binding_assignments(rest_target, name, started);
+        }
     }
 
     fn emit_param_assignment_prefix(&mut self, started: &mut bool) {
@@ -1523,26 +1597,16 @@ impl<'a> ClassES5Emitter<'a> {
         self.write(" = ");
         self.emit_expression(decl.initializer);
 
-        // Now emit each binding element
-        if pattern_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN {
-            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
-                for &elem_idx in &pattern.elements.nodes {
-                    self.emit_es5_binding_element(elem_idx, &temp_name);
-                }
-            }
-        } else if pattern_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN {
-            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
-                for (i, &elem_idx) in pattern.elements.nodes.iter().enumerate() {
-                    self.emit_es5_array_binding_element(elem_idx, &temp_name, i);
-                }
-            }
-        }
+        self.emit_es5_destructuring_pattern(pattern_node, &temp_name);
     }
 
     /// Emit a single binding element for ES5 object destructuring
     fn emit_es5_binding_element(&mut self, elem_idx: NodeIndex, temp_name: &str) {
         let Some(elem_node) = self.arena.get(elem_idx) else { return };
         let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+        if elem.dot_dot_dot_token {
+            return;
+        }
 
         // Get the property name (or use the binding name if no propertyName)
         let prop_name = if !elem.property_name.is_none() {
@@ -1572,6 +1636,11 @@ impl<'a> ClassES5Emitter<'a> {
         let Some(elem_node) = self.arena.get(elem_idx) else { return };
         let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
 
+        if elem.dot_dot_dot_token {
+            self.emit_es5_array_rest_element(elem.name, temp_name, index);
+            return;
+        }
+
         let binding_name = self.get_identifier_text_clone(elem.name);
         if binding_name.is_empty() {
             return;
@@ -1585,6 +1654,161 @@ impl<'a> ClassES5Emitter<'a> {
         self.write("[");
         self.write(&index.to_string());
         self.write("]");
+    }
+
+    fn emit_es5_destructuring_pattern(&mut self, pattern_node: &ThinNode, temp_name: &str) {
+        if pattern_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN {
+            let Some(pattern) = self.arena.get_binding_pattern(pattern_node) else { return };
+            let rest_props = self.collect_object_rest_props(pattern);
+            for &elem_idx in &pattern.elements.nodes {
+                if elem_idx.is_none() {
+                    continue;
+                }
+                let Some(elem_node) = self.arena.get(elem_idx) else { continue };
+                let Some(elem) = self.arena.get_binding_element(elem_node) else { continue };
+                if elem.dot_dot_dot_token {
+                    self.emit_es5_object_rest_element(elem, &rest_props, temp_name);
+                } else {
+                    self.emit_es5_binding_element(elem_idx, temp_name);
+                }
+            }
+        } else if pattern_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN {
+            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                for (i, &elem_idx) in pattern.elements.nodes.iter().enumerate() {
+                    self.emit_es5_array_binding_element(elem_idx, temp_name, i);
+                }
+            }
+        }
+    }
+
+    fn emit_es5_object_rest_element(
+        &mut self,
+        elem: &crate::parser::thin_node::BindingElementData,
+        rest_props: &[NodeIndex],
+        temp_name: &str,
+    ) {
+        let rest_target = elem.name;
+        let is_pattern = self.is_binding_pattern(rest_target);
+        let rest_temp = if is_pattern {
+            Some(self.get_temp_var_name())
+        } else {
+            None
+        };
+
+        self.write(", ");
+        if let Some(ref name) = rest_temp {
+            self.write(name);
+        } else {
+            self.emit_binding_name(rest_target);
+        }
+        self.write(" = __rest(");
+        self.write(temp_name);
+        self.write(", ");
+        self.emit_rest_exclude_list(rest_props);
+        self.write(")");
+
+        if let Some(ref name) = rest_temp {
+            self.emit_es5_destructuring_pattern_idx(rest_target, name);
+        }
+    }
+
+    fn emit_es5_array_rest_element(&mut self, rest_target: NodeIndex, temp_name: &str, index: usize) {
+        let is_pattern = self.is_binding_pattern(rest_target);
+        let rest_temp = if is_pattern {
+            Some(self.get_temp_var_name())
+        } else {
+            None
+        };
+
+        self.write(", ");
+        if let Some(ref name) = rest_temp {
+            self.write(name);
+        } else {
+            let binding_name = self.get_identifier_text_clone(rest_target);
+            if binding_name.is_empty() {
+                return;
+            }
+            self.write(&binding_name);
+        }
+        self.write(" = ");
+        self.write(temp_name);
+        self.write(".slice(");
+        self.write(&index.to_string());
+        self.write(")");
+
+        if let Some(ref name) = rest_temp {
+            self.emit_es5_destructuring_pattern_idx(rest_target, name);
+        }
+    }
+
+    fn emit_es5_destructuring_pattern_idx(&mut self, pattern_idx: NodeIndex, temp_name: &str) {
+        let Some(pattern_node) = self.arena.get(pattern_idx) else { return };
+        self.emit_es5_destructuring_pattern(pattern_node, temp_name);
+    }
+
+    fn collect_object_rest_props(&self, pattern: &crate::parser::thin_node::BindingPatternData) -> Vec<NodeIndex> {
+        let mut props = Vec::new();
+        for &elem_idx in &pattern.elements.nodes {
+            let Some(elem_node) = self.arena.get(elem_idx) else { continue };
+            let Some(elem) = self.arena.get_binding_element(elem_node) else { continue };
+            if elem.dot_dot_dot_token {
+                continue;
+            }
+            let key_idx = if !elem.property_name.is_none() {
+                elem.property_name
+            } else {
+                elem.name
+            };
+            if let Some(key_node) = self.arena.get(key_idx) {
+                if key_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                    || key_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+                {
+                    continue;
+                }
+            }
+            props.push(key_idx);
+        }
+        props
+    }
+
+    fn emit_rest_exclude_list(&mut self, props: &[NodeIndex]) {
+        self.write("[");
+        let mut first = true;
+        for &prop_idx in props {
+            if !first {
+                self.write(", ");
+            }
+            first = false;
+            self.emit_rest_property_key(prop_idx);
+        }
+        self.write("]");
+    }
+
+    fn emit_rest_property_key(&mut self, key_idx: NodeIndex) {
+        let Some(key_node) = self.arena.get(key_idx) else { return };
+
+        if key_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+            if let Some(computed) = self.arena.get_computed_property(key_node) {
+                self.emit_expression(computed.expression);
+            }
+            return;
+        }
+
+        if let Some(ident) = self.arena.get_identifier(key_node) {
+            self.write("\"");
+            self.write(&ident.escaped_text);
+            self.write("\"");
+            return;
+        }
+
+        if let Some(lit) = self.arena.get_literal(key_node) {
+            self.write("\"");
+            self.write(&lit.text);
+            self.write("\"");
+            return;
+        }
+
+        self.emit_expression(key_idx);
     }
 
     /// Get the next temporary variable name (_a, _b, _c, etc.)
@@ -1886,19 +2110,7 @@ impl<'a> ClassES5Emitter<'a> {
         self.write(result_name);
         self.write(".value");
 
-        if pattern_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN {
-            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
-                for &elem_idx in &pattern.elements.nodes {
-                    self.emit_es5_binding_element(elem_idx, &temp_name);
-                }
-            }
-        } else if pattern_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN {
-            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
-                for (i, &elem_idx) in pattern.elements.nodes.iter().enumerate() {
-                    self.emit_es5_array_binding_element(elem_idx, &temp_name, i);
-                }
-            }
-        }
+        self.emit_es5_destructuring_pattern(pattern_node, &temp_name);
     }
     
     fn emit_while_statement(&mut self, stmt_idx: NodeIndex) {

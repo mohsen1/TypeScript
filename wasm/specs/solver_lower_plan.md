@@ -99,6 +99,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Cross-module type references
   - [x] Test: Circular type references (handle gracefully)
   - [x] Test: typeof value references in interfaces (qualified and unqualified)
+  - [x] Test: typeof lowering uses value resolver (type vs value space)
 - [x] Parser: fix interface member parsing to track progress by token position (avoid skipping consecutive identifiers)
 
 ## Architecture Notes
