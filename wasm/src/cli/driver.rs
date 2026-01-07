@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use rayon::prelude::*;
+use serde::Deserialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
@@ -282,13 +283,16 @@ fn resolve_module_specifier(
     let specifier = specifier.replace('\\', "/");
     let mut candidates = Vec::new();
 
+    let mut allow_node_modules = false;
+
     if Path::new(&specifier).is_absolute() {
-        candidates.extend(expand_module_path_candidates(&PathBuf::from(specifier)));
+        candidates.extend(expand_module_path_candidates(&PathBuf::from(specifier.as_str())));
     } else if specifier.starts_with('.') {
         let from_dir = from_file.parent().unwrap_or(base_dir);
         let joined = from_dir.join(&specifier);
         candidates.extend(expand_module_path_candidates(&joined));
     } else if let Some(base_url) = options.base_url.as_ref() {
+        allow_node_modules = true;
         if let Some(paths) = options.paths.as_ref() {
             if let Some((mapping, wildcard)) = select_path_mapping(paths, &specifier) {
                 for target in &mapping.targets {
@@ -306,6 +310,8 @@ fn resolve_module_specifier(
         if candidates.is_empty() {
             candidates.extend(expand_module_path_candidates(&base_url.join(&specifier)));
         }
+    } else {
+        allow_node_modules = true;
     }
 
     for candidate in candidates {
@@ -313,6 +319,11 @@ fn resolve_module_specifier(
             return Some(canonicalize_or_owned(&candidate));
         }
     }
+
+    if allow_node_modules {
+        return resolve_node_module_specifier(from_file, &specifier, base_dir);
+    }
+
     None
 }
 
@@ -397,6 +408,177 @@ fn normalize_path(path: &Path) -> PathBuf {
 }
 
 const TS_EXTENSION_CANDIDATES: [&str; 7] = ["ts", "tsx", "d.ts", "mts", "cts", "d.mts", "d.cts"];
+
+#[derive(Debug, Deserialize)]
+struct PackageJson {
+    #[serde(default)]
+    types: Option<String>,
+    #[serde(default)]
+    typings: Option<String>,
+    #[serde(default)]
+    main: Option<String>,
+    #[serde(default)]
+    module: Option<String>,
+    #[serde(default)]
+    exports: Option<serde_json::Value>,
+}
+
+fn resolve_node_module_specifier(
+    from_file: &Path,
+    module_specifier: &str,
+    base_dir: &Path,
+) -> Option<PathBuf> {
+    let (package_name, subpath) = split_package_specifier(module_specifier)?;
+    let mut current = from_file.parent().unwrap_or(base_dir);
+
+    loop {
+        let package_root = current.join("node_modules").join(&package_name);
+        if package_root.is_dir() {
+            let resolved = if let Some(subpath) = subpath.as_deref() {
+                resolve_package_entry(&package_root, subpath)
+            } else {
+                resolve_package_root(&package_root)
+            };
+            if resolved.is_some() {
+                return resolved;
+            }
+        }
+
+        if current == base_dir {
+            break;
+        }
+        let Some(parent) = current.parent() else {
+            break;
+        };
+        current = parent;
+    }
+
+    None
+}
+
+fn split_package_specifier(specifier: &str) -> Option<(String, Option<String>)> {
+    let mut parts = specifier.split('/');
+    let first = parts.next()?;
+
+    if first.starts_with('@') {
+        let second = parts.next()?;
+        let package = format!("{first}/{second}");
+        let rest = parts.collect::<Vec<_>>().join("/");
+        let subpath = if rest.is_empty() { None } else { Some(rest) };
+        return Some((package, subpath));
+    }
+
+    let rest = parts.collect::<Vec<_>>().join("/");
+    let subpath = if rest.is_empty() { None } else { Some(rest) };
+    Some((first.to_string(), subpath))
+}
+
+fn resolve_package_root(package_root: &Path) -> Option<PathBuf> {
+    let package_json_path = package_root.join("package.json");
+    let package_json = read_package_json(&package_json_path);
+    let mut candidates = Vec::new();
+
+    if let Some(package_json) = package_json.as_ref() {
+        candidates = collect_package_entry_candidates(package_json);
+    }
+
+    if !candidates.iter().any(|entry| entry == "index" || entry == "./index") {
+        candidates.push("index".to_string());
+    }
+
+    for entry in candidates {
+        if let Some(resolved) = resolve_package_entry(package_root, &entry) {
+            return Some(resolved);
+        }
+    }
+
+    None
+}
+
+fn resolve_package_entry(package_root: &Path, entry: &str) -> Option<PathBuf> {
+    let entry = entry.trim();
+    if entry.is_empty() {
+        return None;
+    }
+    let entry = entry.trim_start_matches("./");
+    let path = if Path::new(entry).is_absolute() {
+        PathBuf::from(entry)
+    } else {
+        package_root.join(entry)
+    };
+
+    for candidate in expand_module_path_candidates(&path) {
+        if candidate.is_file() && is_ts_file(&candidate) {
+            return Some(canonicalize_or_owned(&candidate));
+        }
+    }
+
+    None
+}
+
+fn read_package_json(path: &Path) -> Option<PackageJson> {
+    let contents = std::fs::read_to_string(path).ok()?;
+    serde_json::from_str(&contents).ok()
+}
+
+fn collect_package_entry_candidates(package_json: &PackageJson) -> Vec<String> {
+    let mut seen = HashSet::new();
+    let mut candidates = Vec::new();
+
+    for value in [
+        package_json.types.as_ref(),
+        package_json.typings.as_ref(),
+    ] {
+        if let Some(value) = value {
+            if seen.insert(value.clone()) {
+                candidates.push(value.clone());
+            }
+        }
+    }
+
+    if let Some(exports) = package_json.exports.as_ref() {
+        if let Some(entry) = extract_exports_path(exports) {
+            if seen.insert(entry.clone()) {
+                candidates.push(entry);
+            }
+        }
+    }
+
+    for value in [
+        package_json.module.as_ref(),
+        package_json.main.as_ref(),
+    ] {
+        if let Some(value) = value {
+            if seen.insert(value.clone()) {
+                candidates.push(value.clone());
+            }
+        }
+    }
+
+    candidates
+}
+
+fn extract_exports_path(exports: &serde_json::Value) -> Option<String> {
+    match exports {
+        serde_json::Value::String(value) => Some(value.clone()),
+        serde_json::Value::Object(map) => {
+            if let Some(entry) = map.get(".") {
+                if let Some(path) = extract_exports_path(entry) {
+                    return Some(path);
+                }
+            }
+
+            for key in ["types", "default", "import", "require"] {
+                if let Some(value) = map.get(key).and_then(|value| value.as_str()) {
+                    return Some(value.to_string());
+                }
+            }
+
+            None
+        }
+        _ => None,
+    }
+}
 
 fn collect_diagnostics(program: &MergedProgram) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();

@@ -30,7 +30,8 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
   - `extends` chain already supported
 - [ ] Module resolution parity
   - [x] Resolve relative + baseUrl/paths imports with TS extension inference.
-  - [ ] Support Node16/NodeNext resolution and `.d.ts` lookup.
+  - [x] Resolve bare specifiers via node_modules package.json entries + index fallback.
+  - [ ] Support Node16/NodeNext exports conditions + subpath exports.
 - [ ] Benchmark harness
   - Script for `tsz` vs `tsc` on large repos with timing + memory stats.
 

@@ -245,3 +245,44 @@ fn compile_resolves_paths_mappings() {
     assert!(result.diagnostics.is_empty());
     assert!(base.join("dist/src/lib/value.js").is_file());
 }
+
+#[test]
+fn compile_resolves_node_modules_types() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "noEmitOnError": true
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { value } from 'pkg'; export { value };",
+    );
+    write_file(
+        &base.join("node_modules/pkg/package.json"),
+        r#"{
+          "types": "index.d.ts"
+        }"#,
+    );
+    write_file(
+        &base.join("node_modules/pkg/index.d.ts"),
+        "export const value = ;",
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("node_modules/pkg/index.d.ts")));
+    assert!(!base.join("dist/src/index.js").is_file());
+}
