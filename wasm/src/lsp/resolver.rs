@@ -4,8 +4,8 @@
 //! identifier *usages* to symbols as well. This module provides a lightweight
 //! scope walker that reconstructs scope chains on demand.
 
-use crate::parser::thin_node::{ThinNodeArena, NodeAccess};
-use crate::parser::{NodeIndex, syntax_kind_ext};
+use crate::parser::thin_node::{ThinNode, ThinNodeArena, NodeAccess};
+use crate::parser::{NodeIndex, syntax_kind_ext, node_flags};
 use crate::scanner::SyntaxKind;
 use crate::binder::{SymbolId, SymbolTable};
 use crate::thin_binder::ThinBinderState;
@@ -19,6 +19,8 @@ pub struct ScopeWalker<'a> {
     binder: &'a ThinBinderState,
     /// Stack of active scopes (maps name -> SymbolId)
     scope_stack: Vec<SymbolTable>,
+    /// Indices of function-scoped entries within scope_stack
+    function_scope_indices: Vec<usize>,
 }
 
 impl<'a> ScopeWalker<'a> {
@@ -29,23 +31,43 @@ impl<'a> ScopeWalker<'a> {
             binder,
             // Start with file-level scope
             scope_stack: vec![binder.file_locals.clone()],
+            function_scope_indices: vec![0],
         }
     }
 
     /// Push a new scope onto the stack.
-    fn push_scope(&mut self) {
+    fn push_scope(&mut self, is_function_scope: bool) {
+        let next_index = self.scope_stack.len();
         self.scope_stack.push(SymbolTable::new());
+        if is_function_scope {
+            self.function_scope_indices.push(next_index);
+        }
     }
 
     /// Pop the current scope from the stack.
     fn pop_scope(&mut self) {
+        let index = self.scope_stack.len().saturating_sub(1);
         self.scope_stack.pop();
+        if self.function_scope_indices.last() == Some(&index) {
+            self.function_scope_indices.pop();
+        }
     }
 
     /// Register a declaration in the current scope.
     fn declare_local(&mut self, name: String, sym_id: SymbolId) {
         if let Some(scope) = self.scope_stack.last_mut() {
             scope.set(name, sym_id);
+        }
+    }
+
+    /// Register a declaration in the nearest function scope.
+    fn declare_function_scoped(&mut self, name: String, sym_id: SymbolId) {
+        if let Some(&index) = self.function_scope_indices.last() {
+            if let Some(scope) = self.scope_stack.get_mut(index) {
+                scope.set(name, sym_id);
+            }
+        } else {
+            self.declare_local(name, sym_id);
         }
     }
 
@@ -81,6 +103,21 @@ impl<'a> ScopeWalker<'a> {
                 || k == syntax_kind_ext::CLASS_EXPRESSION
                 || k == syntax_kind_ext::MODULE_DECLARATION
                 || k == syntax_kind_ext::MODULE_BLOCK
+        )
+    }
+
+    /// Check if a node creates a function scope.
+    fn node_creates_function_scope(&self, node_idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(node_idx) else { return false; };
+        matches!(
+            node.kind,
+            k if k == syntax_kind_ext::FUNCTION_DECLARATION
+                || k == syntax_kind_ext::FUNCTION_EXPRESSION
+                || k == syntax_kind_ext::ARROW_FUNCTION
+                || k == syntax_kind_ext::METHOD_DECLARATION
+                || k == syntax_kind_ext::CONSTRUCTOR
+                || k == syntax_kind_ext::GET_ACCESSOR
+                || k == syntax_kind_ext::SET_ACCESSOR
         )
     }
 
@@ -796,6 +833,23 @@ impl<'a> ScopeWalker<'a> {
                     if let Some(res) = f(self, switch.case_block) { return Some(res); }
                 }
             }
+            k if k == syntax_kind_ext::EXPORT_ASSIGNMENT => {
+                if let Some(assign) = self.arena.get_export_assignment(node) {
+                    if let Some(res) = f(self, assign.expression) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::LABELED_STATEMENT => {
+                if let Some(labeled) = self.arena.get_labeled_statement(node) {
+                    if let Some(res) = f(self, labeled.label) { return Some(res); }
+                    if let Some(res) = f(self, labeled.statement) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::WITH_STATEMENT => {
+                if let Some(with_stmt) = self.arena.get_with_statement(node) {
+                    if let Some(res) = f(self, with_stmt.expression) { return Some(res); }
+                    if let Some(res) = f(self, with_stmt.then_statement) { return Some(res); }
+                }
+            }
             k if k == syntax_kind_ext::CASE_CLAUSE || k == syntax_kind_ext::DEFAULT_CLAUSE => {
                 if let Some(case) = self.arena.get_case_clause(node) {
                     if !case.expression.is_none() {
@@ -844,7 +898,11 @@ impl<'a> ScopeWalker<'a> {
         let creates_scope = self.node_creates_scope(current);
 
         if creates_scope {
-            self.push_scope();
+            let is_function_scope = self.node_creates_function_scope(current);
+            self.push_scope(is_function_scope);
+            if is_function_scope {
+                self.register_hoisted_var_declarations(current);
+            }
             // Register declarations visible in this scope
             self.register_local_declarations(current);
         }
@@ -865,19 +923,127 @@ impl<'a> ScopeWalker<'a> {
         result
     }
 
+    fn is_var_declaration_list(&self, node: &ThinNode) -> bool {
+        (node.flags as u32 & (node_flags::LET | node_flags::CONST)) == 0
+    }
+
+    fn is_var_declaration(&self, decl_idx: NodeIndex) -> bool {
+        let Some(ext) = self.arena.get_extended(decl_idx) else { return false; };
+        let Some(parent) = self.arena.get(ext.parent) else { return false; };
+        if parent.kind != syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+            return false;
+        }
+        self.is_var_declaration_list(parent)
+    }
+
+    fn register_binding_declarations_in_function_scope(&mut self, name_idx: NodeIndex) {
+        self.register_binding_declarations_with_scope(name_idx, true);
+    }
+
+    fn register_binding_declarations_with_scope(&mut self, name_idx: NodeIndex, function_scope: bool) {
+        if name_idx.is_none() {
+            return;
+        }
+
+        if let Some(&sym_id) = self.binder.node_symbols.get(&name_idx.0) {
+            if let Some(symbol) = self.binder.symbols.get(sym_id) {
+                if function_scope {
+                    self.declare_function_scoped(symbol.escaped_name.clone(), sym_id);
+                } else {
+                    self.declare_local(symbol.escaped_name.clone(), sym_id);
+                }
+            }
+            return;
+        }
+
+        let Some(node) = self.arena.get(name_idx) else {
+            return;
+        };
+
+        match node.kind {
+            k if k == syntax_kind_ext::BINDING_ELEMENT => {
+                if let Some(binding) = self.arena.get_binding_element(node) {
+                    self.register_binding_declarations_with_scope(binding.name, function_scope);
+                }
+            }
+            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                || k == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
+                if let Some(pattern) = self.arena.get_binding_pattern(node) {
+                    for &elem in &pattern.elements.nodes {
+                        if elem.is_none() {
+                            continue;
+                        }
+                        self.register_binding_declarations_with_scope(elem, function_scope);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn register_hoisted_var_declarations(&mut self, container: NodeIndex) {
+        let Some(node) = self.arena.get(container) else { return; };
+
+        let body = match node.kind {
+            k if k == syntax_kind_ext::FUNCTION_DECLARATION
+                || k == syntax_kind_ext::FUNCTION_EXPRESSION
+                || k == syntax_kind_ext::ARROW_FUNCTION => {
+                self.arena.get_function(node).map(|func| func.body)
+            }
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                self.arena.get_method_decl(node).map(|method| method.body)
+            }
+            k if k == syntax_kind_ext::CONSTRUCTOR => {
+                self.arena.get_constructor(node).map(|ctor| ctor.body)
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                self.arena.get_accessor(node).map(|accessor| accessor.body)
+            }
+            _ => None,
+        };
+
+        let Some(body_idx) = body else { return; };
+        if body_idx.is_none() {
+            return;
+        }
+
+        let mut var_lists = Vec::new();
+        self.collect_var_declaration_lists(body_idx, &mut var_lists);
+        for list_idx in var_lists {
+            let Some(list_node) = self.arena.get(list_idx) else { continue; };
+            let Some(list) = self.arena.get_variable(list_node) else { continue; };
+            for &decl_idx in &list.declarations.nodes {
+                if let Some(decl_node) = self.arena.get(decl_idx) {
+                    if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
+                        self.register_binding_declarations_in_function_scope(decl.name);
+                    }
+                }
+            }
+        }
+    }
+
+    fn collect_var_declaration_lists(&mut self, current: NodeIndex, lists: &mut Vec<NodeIndex>) {
+        if current.is_none() {
+            return;
+        }
+
+        let Some(node) = self.arena.get(current) else { return; };
+
+        if self.node_creates_function_scope(current) {
+            return;
+        }
+
+        if node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST && self.is_var_declaration_list(node) {
+            lists.push(current);
+        }
+
+        self.for_each_child(current, |walker, child_idx| {
+            walker.collect_var_declaration_lists(child_idx, lists);
+            None::<()>
+        });
+    }
+
     /// Register local declarations from a container node.
-    ///
-    /// # Known Limitations
-    ///
-    /// **`var` hoisting**: This implementation registers all declarations in the current scope,
-    /// including `var` declarations. In JavaScript, `var` declarations should be hoisted to the
-    /// nearest function scope, not the block scope. This means that `var` declarations inside
-    /// blocks will be incorrectly scoped to the block instead of the function, which may cause
-    /// incorrect resolution for hoisted usages.
-    ///
-    /// This is acceptable for the LSP's lightweight resolver design, as full hoisting semantics
-    /// are complex and would require tracking function scope boundaries during traversal.
-    /// The ThinBinder handles hoisting correctly during the binding phase.
     fn register_local_declarations(&mut self, container: NodeIndex) {
         let mut skip_name = None;
         if let Some(node) = self.arena.get(container) {
@@ -914,40 +1080,46 @@ impl<'a> ScopeWalker<'a> {
                 }
             }
 
-            // Check if this child has a symbol associated in the binder
-            if let Some(&sym_id) = walker.binder.node_symbols.get(&child_idx.0) {
-                if let Some(symbol) = walker.binder.symbols.get(sym_id) {
-                    walker.declare_local(symbol.escaped_name.clone(), sym_id);
-                }
-            }
-
-            // For VariableStatement, recurse into it to find VariableDeclarationList
             if let Some(node) = walker.arena.get(child_idx) {
-                if node.kind == syntax_kind_ext::VARIABLE_DECLARATION {
-                    if let Some(decl) = walker.arena.get_variable_declaration(node) {
-                        walker.register_binding_declarations(decl.name);
-                    }
-                }
                 if node.kind == syntax_kind_ext::PARAMETER {
                     if let Some(param) = walker.arena.get_parameter(node) {
                         walker.register_binding_declarations(param.name);
                     }
+                }
+                if node.kind == syntax_kind_ext::VARIABLE_DECLARATION {
+                    if let Some(decl) = walker.arena.get_variable_declaration(node) {
+                        if walker.is_var_declaration(child_idx) {
+                            walker.register_binding_declarations_in_function_scope(decl.name);
+                        } else {
+                            walker.register_binding_declarations(decl.name);
+                        }
+                    }
+                    return None::<()>;
                 }
                 if node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
                     walker.for_each_child(child_idx, |w, list_idx| {
                         // Inside VariableStatement is VariableDeclarationList
                         if let Some(list_node) = w.arena.get(list_idx) {
                             if list_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+                                let is_var = w.is_var_declaration_list(list_node);
                                 w.for_each_child(list_idx, |w2, decl_idx| {
                                     // Inside List is VariableDeclaration - this has the symbol!
                                     if let Some(&sym_id) = w2.binder.node_symbols.get(&decl_idx.0) {
                                         if let Some(symbol) = w2.binder.symbols.get(sym_id) {
-                                            w2.declare_local(symbol.escaped_name.clone(), sym_id);
+                                            if is_var {
+                                                w2.declare_function_scoped(symbol.escaped_name.clone(), sym_id);
+                                            } else {
+                                                w2.declare_local(symbol.escaped_name.clone(), sym_id);
+                                            }
                                         }
                                     }
                                     if let Some(decl_node) = w2.arena.get(decl_idx) {
                                         if let Some(decl) = w2.arena.get_variable_declaration(decl_node) {
-                                            w2.register_binding_declarations(decl.name);
+                                            if is_var {
+                                                w2.register_binding_declarations_in_function_scope(decl.name);
+                                            } else {
+                                                w2.register_binding_declarations(decl.name);
+                                            }
                                         }
                                     }
                                     None::<()>
@@ -956,6 +1128,7 @@ impl<'a> ScopeWalker<'a> {
                         }
                         None::<()>
                     });
+                    return None::<()>;
                 }
                 // For ExportDeclaration, unwrap to find the inner declaration
                 else if node.kind == syntax_kind_ext::EXPORT_DECLARATION {
@@ -978,19 +1151,36 @@ impl<'a> ScopeWalker<'a> {
                 }
                 // For VariableDeclarationList (direct child), we need to go one level deeper
                 else if node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+                    let is_var = walker.is_var_declaration_list(node);
                     walker.for_each_child(child_idx, |w, decl_idx| {
                         if let Some(&sym_id) = w.binder.node_symbols.get(&decl_idx.0) {
                             if let Some(symbol) = w.binder.symbols.get(sym_id) {
-                                w.declare_local(symbol.escaped_name.clone(), sym_id);
+                                if is_var {
+                                    w.declare_function_scoped(symbol.escaped_name.clone(), sym_id);
+                                } else {
+                                    w.declare_local(symbol.escaped_name.clone(), sym_id);
+                                }
                             }
                         }
                         if let Some(decl_node) = w.arena.get(decl_idx) {
                             if let Some(decl) = w.arena.get_variable_declaration(decl_node) {
-                                w.register_binding_declarations(decl.name);
+                                if is_var {
+                                    w.register_binding_declarations_in_function_scope(decl.name);
+                                } else {
+                                    w.register_binding_declarations(decl.name);
+                                }
                             }
                         }
                         None::<()> // Continue iteration
                     });
+                    return None::<()>;
+                }
+            }
+
+            // Check if this child has a symbol associated in the binder
+            if let Some(&sym_id) = walker.binder.node_symbols.get(&child_idx.0) {
+                if let Some(symbol) = walker.binder.symbols.get(sym_id) {
+                    walker.declare_local(symbol.escaped_name.clone(), sym_id);
                 }
             }
 
@@ -999,40 +1189,7 @@ impl<'a> ScopeWalker<'a> {
     }
 
     fn register_binding_declarations(&mut self, name_idx: NodeIndex) {
-        if name_idx.is_none() {
-            return;
-        }
-
-        if let Some(&sym_id) = self.binder.node_symbols.get(&name_idx.0) {
-            if let Some(symbol) = self.binder.symbols.get(sym_id) {
-                self.declare_local(symbol.escaped_name.clone(), sym_id);
-            }
-            return;
-        }
-
-        let Some(node) = self.arena.get(name_idx) else {
-            return;
-        };
-
-        match node.kind {
-            k if k == syntax_kind_ext::BINDING_ELEMENT => {
-                if let Some(binding) = self.arena.get_binding_element(node) {
-                    self.register_binding_declarations(binding.name);
-                }
-            }
-            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN
-                || k == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
-                if let Some(pattern) = self.arena.get_binding_pattern(node) {
-                    for &elem in &pattern.elements.nodes {
-                        if elem.is_none() {
-                            continue;
-                        }
-                        self.register_binding_declarations(elem);
-                    }
-                }
-            }
-            _ => {}
-        }
+        self.register_binding_declarations_with_scope(name_idx, false);
     }
 
     /// Get the scope chain (symbol tables) active at the target node.
@@ -1068,7 +1225,11 @@ impl<'a> ScopeWalker<'a> {
         let creates_scope = self.node_creates_scope(current);
 
         if creates_scope {
-            self.push_scope();
+            let is_function_scope = self.node_creates_function_scope(current);
+            self.push_scope(is_function_scope);
+            if is_function_scope {
+                self.register_hoisted_var_declarations(current);
+            }
             self.register_local_declarations(current);
         }
 
@@ -1117,7 +1278,11 @@ impl<'a> ScopeWalker<'a> {
         let creates_scope = self.node_creates_scope(current);
 
         if creates_scope {
-            self.push_scope();
+            let is_function_scope = self.node_creates_function_scope(current);
+            self.push_scope(is_function_scope);
+            if is_function_scope {
+                self.register_hoisted_var_declarations(current);
+            }
             self.register_local_declarations(current);
         }
 
