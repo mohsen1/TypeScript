@@ -13,6 +13,7 @@ use crate::thin_checker::ThinCheckerState;
 use crate::scanner_impl::ScannerState;
 use crate::scanner::SyntaxKind;
 use crate::comments::{get_jsdoc_content, get_leading_comments_from_cache, is_jsdoc_comment};
+use std::collections::HashMap;
 
 /// Represents a parameter in a signature.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -56,6 +57,7 @@ struct SignatureCandidate {
     required_params: usize,
     total_params: usize,
     has_rest: bool,
+    param_names: Vec<Option<String>>,
 }
 
 pub struct SignatureHelpProvider<'a> {
@@ -136,9 +138,16 @@ impl<'a> SignatureHelpProvider<'a> {
         // 6. Extract signatures from the type
         let mut signatures = self.get_signatures_from_type(callee_type, &checker, call_kind);
 
-        if let Some(doc) = self.signature_documentation_for_symbol(root, symbol_id) {
+        if let Some(parsed) = self.signature_documentation_for_symbol(root, symbol_id) {
             for sig in &mut signatures {
-                sig.info.documentation = Some(doc.clone());
+                sig.info.documentation = parsed.summary.clone();
+                for (idx, name) in sig.param_names.iter().enumerate() {
+                    let Some(name) = name else { continue; };
+                    let Some(param_doc) = parsed.params.get(name) else { continue; };
+                    if let Some(param_info) = sig.info.parameters.get_mut(idx) {
+                        param_info.documentation = Some(param_doc.clone());
+                    }
+                }
             }
         }
 
@@ -352,11 +361,17 @@ impl<'a> SignatureHelpProvider<'a> {
         is_constructor: bool,
     ) -> SignatureCandidate {
         let (required_params, total_params, has_rest) = self.signature_meta(&shape.params);
+        let param_names = shape
+            .params
+            .iter()
+            .map(|param| param.name.map(|atom| checker.ctx.types.resolve_atom(atom)))
+            .collect();
         SignatureCandidate {
             info: self.format_signature(shape, checker, is_constructor),
             required_params,
             total_params,
             has_rest,
+            param_names,
         }
     }
 
@@ -420,7 +435,7 @@ impl<'a> SignatureHelpProvider<'a> {
         &self,
         root: NodeIndex,
         symbol_id: crate::binder::SymbolId,
-    ) -> Option<String> {
+    ) -> Option<ParsedJsdoc> {
         let symbol = self.binder.get_symbol(symbol_id)?;
         let mut decls = Vec::new();
         if !symbol.value_declaration.is_none() {
@@ -433,9 +448,14 @@ impl<'a> SignatureHelpProvider<'a> {
                 continue;
             }
             let doc = self.get_documentation(root, decl);
-            if !doc.is_empty() {
-                return Some(doc);
+            if doc.is_empty() {
+                continue;
             }
+            let parsed = self.parse_jsdoc(&doc);
+            if parsed.is_empty() {
+                continue;
+            }
+            return Some(parsed);
         }
 
         None
@@ -469,6 +489,121 @@ impl<'a> SignatureHelpProvider<'a> {
 
         docs.reverse();
         docs.join("\n\n")
+    }
+
+    fn parse_jsdoc(&self, doc: &str) -> ParsedJsdoc {
+        let mut summary_lines = Vec::new();
+        let mut params = HashMap::new();
+        let mut current_param: Option<String> = None;
+        let mut current_desc = String::new();
+        let mut in_tags = false;
+
+        for line in doc.lines() {
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                if !in_tags {
+                    summary_lines.push(String::new());
+                }
+                continue;
+            }
+
+            if trimmed.starts_with('@') {
+                in_tags = true;
+                if let Some(name) = current_param.take() {
+                    let desc = current_desc.trim().to_string();
+                    if !desc.is_empty() {
+                        params.insert(name, desc);
+                    }
+                    current_desc.clear();
+                }
+
+                if let Some((name, desc)) = self.parse_param_tag(trimmed) {
+                    current_param = Some(name);
+                    current_desc = desc;
+                }
+                continue;
+            }
+
+            if let Some(_) = current_param {
+                if !current_desc.is_empty() {
+                    current_desc.push(' ');
+                }
+                current_desc.push_str(trimmed);
+            } else if !in_tags {
+                summary_lines.push(trimmed.to_string());
+            }
+        }
+
+        if let Some(name) = current_param {
+            let desc = current_desc.trim().to_string();
+            if !desc.is_empty() {
+                params.insert(name, desc);
+            }
+        }
+
+        let summary = summary_lines
+            .join("\n")
+            .trim()
+            .to_string();
+
+        ParsedJsdoc {
+            summary: if summary.is_empty() { None } else { Some(summary) },
+            params,
+        }
+    }
+
+    fn parse_param_tag(&self, line: &str) -> Option<(String, String)> {
+        let rest = line.strip_prefix("@param")?.trim();
+        if rest.is_empty() {
+            return None;
+        }
+
+        let rest = if rest.starts_with('{') {
+            if let Some(end) = rest.find('}') {
+                rest[end + 1..].trim()
+            } else {
+                rest
+            }
+        } else {
+            rest
+        };
+
+        let mut parts = rest.splitn(2, char::is_whitespace);
+        let name_raw = parts.next()?.trim();
+        if name_raw.is_empty() {
+            return None;
+        }
+        let desc = parts.next().unwrap_or("").trim().to_string();
+        let name = self.normalize_param_name(name_raw);
+        if name.is_empty() {
+            return None;
+        }
+        Some((name, desc))
+    }
+
+    fn normalize_param_name(&self, name: &str) -> String {
+        let trimmed = name.trim();
+        let mut name = if trimmed.starts_with('[') && trimmed.ends_with(']') && trimmed.len() > 2 {
+            &trimmed[1..trimmed.len() - 1]
+        } else {
+            trimmed
+        };
+        if let Some(eq) = name.find('=') {
+            name = &name[..eq];
+        }
+        name.trim().to_string()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct ParsedJsdoc {
+    summary: Option<String>,
+    params: HashMap<String, String>,
+}
+
+impl ParsedJsdoc {
+    fn is_empty(&self) -> bool {
+        self.summary.is_none() && self.params.is_empty()
     }
 }
 
@@ -764,5 +899,44 @@ mod signature_help_tests {
             .clone()
             .unwrap_or_default();
         assert_eq!(doc, "Adds two numbers.");
+    }
+
+    #[test]
+    fn test_signature_help_param_docs() {
+        let source = "/**\n * Adds two numbers.\n * @param a First number.\n * @param b Second number.\n */\nfunction add(a: number, b: number): number { return a + b; }\nadd(1, 2);";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let interner = TypeInterner::new();
+        let line_map = LineMap::build(source);
+
+        let provider = SignatureHelpProvider::new(
+            parser.get_arena(),
+            &binder,
+            &line_map,
+            &interner,
+            source,
+            "test.ts".to_string(),
+        );
+
+        let pos = Position::new(6, 6); // At "1"
+        let mut cache = None;
+        let help = provider.get_signature_help(root, pos, &mut cache);
+        assert!(help.is_some(), "Should find signature help");
+
+        let help = help.unwrap();
+        let sig = &help.signatures[help.active_signature as usize];
+        assert_eq!(sig.parameters.len(), 2);
+        assert_eq!(
+            sig.parameters[0].documentation.as_deref(),
+            Some("First number.")
+        );
+        assert_eq!(
+            sig.parameters[1].documentation.as_deref(),
+            Some("Second number.")
+        );
     }
 }
