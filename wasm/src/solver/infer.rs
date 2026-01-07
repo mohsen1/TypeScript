@@ -609,6 +609,36 @@ impl<'a> InferenceContext<'a> {
             return self.tuple_subtype_array(s_elems, *t_elem);
         }
 
+        if let (Some(TypeKey::Object(s_props)), Some(TypeKey::Object(t_props))) =
+            (source_key.as_ref(), target_key.as_ref())
+        {
+            return self.object_subtype_of(s_props, t_props);
+        }
+
+        if let (Some(TypeKey::ObjectWithIndex(s_shape)), Some(TypeKey::ObjectWithIndex(t_shape))) =
+            (source_key.as_ref(), target_key.as_ref())
+        {
+            return self.object_with_index_subtype_of(s_shape, t_shape);
+        }
+
+        if let (Some(TypeKey::Object(s_props)), Some(TypeKey::ObjectWithIndex(t_shape))) =
+            (source_key.as_ref(), target_key.as_ref())
+        {
+            return self.object_props_subtype_index(s_props, t_shape);
+        }
+
+        if let (Some(TypeKey::ObjectWithIndex(s_shape)), Some(TypeKey::Object(t_props))) =
+            (source_key.as_ref(), target_key.as_ref())
+        {
+            return self.object_subtype_of(&s_shape.properties, t_props);
+        }
+
+        if let (Some(TypeKey::Function(s_fn)), Some(TypeKey::Function(t_fn))) =
+            (source_key.as_ref(), target_key.as_ref())
+        {
+            return self.function_subtype_of(s_fn, t_fn);
+        }
+
         // Intersection: A & B <: T if either member is a subtype of T
         if let Some(TypeKey::Intersection(members)) = source_key.as_ref() {
             return members.iter().any(|&member| self.is_subtype(member, target));
@@ -630,6 +660,177 @@ impl<'a> InferenceContext<'a> {
         }
 
         false
+    }
+
+    fn optional_property_type(&self, prop: &PropertyInfo) -> TypeId {
+        if prop.optional {
+            self.interner.union(vec![prop.type_id, TypeId::UNDEFINED])
+        } else {
+            prop.type_id
+        }
+    }
+
+    fn object_subtype_of(&self, source: &[PropertyInfo], target: &[PropertyInfo]) -> bool {
+        for t_prop in target {
+            let s_prop = source.iter().find(|p| p.name == t_prop.name);
+            match s_prop {
+                Some(sp) => {
+                    if sp.optional && !t_prop.optional {
+                        return false;
+                    }
+                    let source_type = self.optional_property_type(sp);
+                    let target_type = self.optional_property_type(t_prop);
+                    if !self.is_subtype(source_type, target_type) {
+                        return false;
+                    }
+                }
+                None => {
+                    if !t_prop.optional {
+                        return false;
+                    }
+                }
+            }
+        }
+        true
+    }
+
+    fn object_props_subtype_index(&self, source: &[PropertyInfo], target: &ObjectShape) -> bool {
+        if !self.object_subtype_of(source, &target.properties) {
+            return false;
+        }
+        if let Some(t_string_idx) = &target.string_index {
+            for prop in source {
+                let prop_type = self.optional_property_type(prop);
+                if !self.is_subtype(prop_type, t_string_idx.value_type) {
+                    return false;
+                }
+            }
+        }
+        if let Some(t_number_idx) = &target.number_index {
+            for prop in source {
+                let prop_type = self.optional_property_type(prop);
+                if !self.is_subtype(prop_type, t_number_idx.value_type) {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    fn object_with_index_subtype_of(&self, source: &ObjectShape, target: &ObjectShape) -> bool {
+        if !self.object_subtype_of(&source.properties, &target.properties) {
+            return false;
+        }
+
+        if let Some(t_string_idx) = &target.string_index {
+            match &source.string_index {
+                Some(s_string_idx) => {
+                    if !self.is_subtype(s_string_idx.value_type, t_string_idx.value_type) {
+                        return false;
+                    }
+                }
+                None => {
+                    for prop in &source.properties {
+                        let prop_type = self.optional_property_type(prop);
+                        if !self.is_subtype(prop_type, t_string_idx.value_type) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(t_number_idx) = &target.number_index {
+            match &source.number_index {
+                Some(s_number_idx) => {
+                    if !self.is_subtype(s_number_idx.value_type, t_number_idx.value_type) {
+                        return false;
+                    }
+                }
+                None => {
+                    for prop in &source.properties {
+                        let prop_type = self.optional_property_type(prop);
+                        if !self.is_subtype(prop_type, t_number_idx.value_type) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        true
+    }
+
+    fn rest_element_type(&self, type_id: TypeId) -> TypeId {
+        if type_id == TypeId::ANY {
+            return TypeId::ANY;
+        }
+        match self.interner.lookup(type_id) {
+            Some(TypeKey::Array(elem)) => elem,
+            _ => type_id,
+        }
+    }
+
+    fn are_parameters_compatible(&self, source: TypeId, target: TypeId) -> bool {
+        self.is_subtype(target, source)
+    }
+
+    fn function_subtype_of(&self, source: &FunctionShape, target: &FunctionShape) -> bool {
+        if source.is_constructor != target.is_constructor {
+            return false;
+        }
+
+        if !self.is_subtype(source.return_type, target.return_type) {
+            return false;
+        }
+
+        let target_has_rest = target.params.last().map_or(false, |p| p.rest);
+        let source_has_rest = source.params.last().map_or(false, |p| p.rest);
+        let target_fixed = if target_has_rest {
+            target.params.len().saturating_sub(1)
+        } else {
+            target.params.len()
+        };
+        let source_fixed = if source_has_rest {
+            source.params.len().saturating_sub(1)
+        } else {
+            source.params.len()
+        };
+
+        if !target_has_rest && source.params.len() > target.params.len() {
+            return false;
+        }
+
+        let fixed_compare = std::cmp::min(source_fixed, target_fixed);
+        for i in 0..fixed_compare {
+            let s_param = &source.params[i];
+            let t_param = &target.params[i];
+            if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
+                return false;
+            }
+        }
+
+        if target_has_rest {
+            let rest_param = target.params.last().unwrap();
+            let rest_elem = self.rest_element_type(rest_param.type_id);
+
+            for i in target_fixed..source_fixed {
+                let s_param = &source.params[i];
+                if !self.are_parameters_compatible(s_param.type_id, rest_elem) {
+                    return false;
+                }
+            }
+
+            if source_has_rest {
+                let s_rest = source.params.last().unwrap();
+                let s_rest_elem = self.rest_element_type(s_rest.type_id);
+                if !self.are_parameters_compatible(s_rest_elem, rest_elem) {
+                    return false;
+                }
+            }
+        }
+
+        true
     }
 
     fn tuple_subtype_array(&self, source: &[TupleElement], target_elem: TypeId) -> bool {
