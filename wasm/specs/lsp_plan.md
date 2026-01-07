@@ -31,6 +31,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Code action: remove unused import (6133)
    - [x] Code action: add missing property (2339, object literals + `this` in class)
    - [x] Add missing property: preserve single-line trailing commas
+   - [x] Add missing property: element access string literals
    - [x] Code action: add missing import (2304, candidate-based)
    - [x] Feed project export candidates into code action context
    - [x] Expose wasm code actions context (diagnostics + import candidates)
