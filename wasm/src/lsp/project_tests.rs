@@ -134,6 +134,47 @@ fn test_project_update_file_applies_edits() {
 }
 
 #[test]
+fn test_project_update_file_reuses_prefix_nodes() {
+    let mut project = Project::new();
+    let source = "const alpha = 1;\nconst beta = 2;\n";
+    project.set_file("a.ts".to_string(), source.to_string());
+
+    let (root_before, first_stmt_before, arena_len_before) = {
+        let file = project.file("a.ts").unwrap();
+        let arena = file.arena();
+        let root = file.root();
+        let source_node = arena.get(root).unwrap();
+        let source_file = arena.get_source_file(source_node).unwrap();
+        (
+            root,
+            source_file.statements.nodes[0],
+            arena.len(),
+        )
+    };
+
+    let edit = {
+        let file = project.file("a.ts").unwrap();
+        let range = range_for_substring(file.source_text(), file.line_map(), "beta");
+        TextEdit::new(range, "gamma".to_string())
+    };
+    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+
+    let file = project.file("a.ts").unwrap();
+    assert_eq!(file.source_text(), "const alpha = 1;\nconst gamma = 2;\n");
+
+    let arena = file.arena();
+    let root_after = file.root();
+    let source_node = arena.get(root_after).unwrap();
+    let source_file = arena.get_source_file(source_node).unwrap();
+    assert_eq!(root_after, root_before);
+    assert_eq!(source_file.statements.nodes[0], first_stmt_before);
+    assert!(arena.len() > arena_len_before, "Expected incremental parse to append nodes");
+
+    let parent = arena.get_extended(first_stmt_before).unwrap().parent;
+    assert_eq!(parent, root_after);
+}
+
+#[test]
 fn test_project_update_file_refreshes_cross_file_references() {
     let mut project = Project::new();
 
