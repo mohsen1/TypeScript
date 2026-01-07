@@ -17,6 +17,7 @@ Status: Active
 - Solver inference skips constraining defaulted placeholders in union targets to preserve defaults.
 - Type literal lowering uses checker paths for type params while preserving ref semantics for named members.
 - Solver diagnostics rendering preserves related messages without spans via fallback span.
+- TS2693 namespace type-only access coverage re-validated.
 
 ## Highest-Impact Next Tasks (pick one at a time)
 - [x] Replace local scope stack with binder persistent scopes
