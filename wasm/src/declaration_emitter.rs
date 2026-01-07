@@ -629,6 +629,27 @@ impl<'a> DeclarationEmitter<'a> {
     fn emit_export_declaration(&mut self, export_idx: NodeIndex) {
         let Some(export_node) = self.arena.get(export_idx) else { return };
         let Some(export) = self.arena.get_export_decl(export_node) else { return };
+
+        if export.is_default_export {
+            if !export.export_clause.is_none() {
+                if let Some(clause_node) = self.arena.get(export.export_clause) {
+                    match clause_node.kind {
+                        k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                            self.emit_export_default_function(export.export_clause);
+                            return;
+                        }
+                        k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                            self.emit_export_default_class(export.export_clause);
+                            return;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            self.emit_export_default_expression(export.export_clause);
+            return;
+        }
         
         // Check if export_clause is a declaration (interface, class, function, type, enum)
         if !export.export_clause.is_none() {
@@ -708,6 +729,81 @@ impl<'a> DeclarationEmitter<'a> {
             self.write("export default ");
         }
         self.emit_expression(assign.expression);
+        self.write(";");
+        self.write_line();
+    }
+
+    fn emit_export_default_function(&mut self, func_idx: NodeIndex) {
+        let Some(func_node) = self.arena.get(func_idx) else { return };
+        let Some(func) = self.arena.get_function(func_node) else { return };
+
+        self.write_indent();
+        self.write("export default function ");
+        self.emit_node(func.name);
+
+        if let Some(ref type_params) = func.type_parameters {
+            if !type_params.nodes.is_empty() {
+                self.emit_type_parameters(type_params);
+            }
+        }
+
+        self.write("(");
+        self.emit_parameters(&func.parameters);
+        self.write(")");
+
+        if !func.type_annotation.is_none() {
+            self.write(": ");
+            self.emit_type(func.type_annotation);
+        }
+
+        self.write(";");
+        self.write_line();
+    }
+
+    fn emit_export_default_class(&mut self, class_idx: NodeIndex) {
+        let Some(class_node) = self.arena.get(class_idx) else { return };
+        let Some(class) = self.arena.get_class(class_node) else { return };
+
+        let is_abstract = self.has_modifier(&class.modifiers, SyntaxKind::AbstractKeyword as u16);
+
+        self.write_indent();
+        self.write("export default ");
+        if is_abstract {
+            self.write("abstract ");
+        }
+        self.write("class ");
+        self.emit_node(class.name);
+
+        if let Some(ref type_params) = class.type_parameters {
+            if !type_params.nodes.is_empty() {
+                self.emit_type_parameters(type_params);
+            }
+        }
+
+        if let Some(ref heritage) = class.heritage_clauses {
+            self.emit_heritage_clauses(heritage);
+        }
+
+        self.write(" {");
+        self.write_line();
+        self.increase_indent();
+
+        for &member_idx in &class.members.nodes {
+            self.emit_class_member(member_idx);
+        }
+
+        self.decrease_indent();
+        self.write_indent();
+        self.write("}");
+        self.write_line();
+    }
+
+    fn emit_export_default_expression(&mut self, expr_idx: NodeIndex) {
+        self.write_indent();
+        self.write("export default ");
+        if !expr_idx.is_none() {
+            self.emit_expression(expr_idx);
+        }
         self.write(";");
         self.write_line();
     }

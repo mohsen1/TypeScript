@@ -22,6 +22,7 @@ Status: Active
 - [x] Add identifier name entries to source maps for transform-path metadata.
 - [x] Emit type-only re-exports in declaration emitter (export type / export { type ... }).
 - [x] Emit export assignment (`export =`) in declaration emitter.
+- [x] Emit default export declarations in declaration emitter.
 - [x] Shrink `thin_emitter/mod.rs` for maintainability
   - [x] Extract comment utilities + comment/output helpers into modules (keep API stable).
   - [x] Extract module wrapper emission helpers into a submodule (keep API stable).
