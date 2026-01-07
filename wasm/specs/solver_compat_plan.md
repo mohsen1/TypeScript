@@ -129,6 +129,7 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Add compat flag to include `undefined` in index access results
 - [x] Thread unchecked index access through subtype evaluation
 - [x] Tests for unchecked index access behavior
+- [x] Include `undefined` for numeric literal array indices when enabled
 
 ### Phase 18: Unchecked Property Access Via Index Signatures
 - [x] Add `noUncheckedIndexedAccess` toggle to property access evaluator

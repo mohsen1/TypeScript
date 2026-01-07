@@ -185,11 +185,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             TypeKey::Array(elem) => {
                 // Array[number] -> element type
                 if self.is_number_like(index_type) {
-                    if index_type == TypeId::NUMBER {
-                        self.add_undefined_if_unchecked(elem)
-                    } else {
-                        elem
-                    }
+                    self.add_undefined_if_unchecked(elem)
                 } else {
                     // Could be string key for length etc, but for now return element
                     elem

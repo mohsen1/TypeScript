@@ -261,6 +261,21 @@ fn test_index_access_with_no_unchecked_indexed_access() {
 }
 
 #[test]
+fn test_index_access_array_literal_with_no_unchecked_indexed_access() {
+    let interner = TypeInterner::new();
+
+    let array = interner.array(TypeId::STRING);
+    let zero = interner.literal_number(0.0);
+
+    let mut evaluator = TypeEvaluator::new(&interner);
+    evaluator.set_no_unchecked_indexed_access(true);
+
+    let result = evaluator.evaluate_index_access(array, zero);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_index_access_array() {
     let interner = TypeInterner::new();
 
