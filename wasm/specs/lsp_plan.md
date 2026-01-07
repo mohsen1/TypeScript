@@ -16,9 +16,10 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
   - [x] Add overload JSDoc tests for methods/constructors, including `this` and rest params.
   - [x] Add JSDoc proximity tests to guard against unrelated comment chaining.
   - [x] Attach hover JSDoc to single-decl variable statements (use statement start).
-- [ ] Error-recovery robustness
+- [x] Error-recovery robustness
   - [x] Ensure hover/signature help tolerate missing nodes in incomplete calls/expressions.
   - [x] Add EOF fallback tests for hover and signature help.
+  - [x] Recover hover/signature help after incomplete member access/call chains.
   - [x] Advance active parameter on trailing commas without counting comment commas.
 - [x] Incremental file updates
   - [x] Add `Project::update_file` that applies LSP edits and re-parses.
@@ -47,3 +48,5 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
 - Edits <50ms for medium projects.
 - Correct docs and signatures for overloaded functions.
 - Stable rename/organize imports across files.
+
+Status: Active

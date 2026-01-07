@@ -144,6 +144,38 @@ fn test_signature_help_incomplete_call_eof() {
 }
 
 #[test]
+fn test_signature_help_incomplete_member_call() {
+    let source = "interface Obj { method(a: number, b: string): void; }\ndeclare const obj: Obj;\nobj.method(";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let interner = TypeInterner::new();
+    let line_map = LineMap::build(source);
+
+    let provider = SignatureHelpProvider::new(
+        parser.get_arena(),
+        &binder,
+        &line_map,
+        &interner,
+        source,
+        "test.ts".to_string(),
+    );
+
+    let pos = Position::new(2, 11); // After the opening paren.
+    let mut cache = None;
+    let help = provider.get_signature_help(root, pos, &mut cache);
+
+    assert!(help.is_some(), "Should find signature help for member call");
+    if let Some(h) = help {
+        assert_eq!(h.active_parameter, 0, "Should be on first parameter");
+        assert!(!h.signatures.is_empty(), "Should have signatures");
+    }
+}
+
+#[test]
 fn test_signature_help_between_arguments() {
     // Test edge case: cursor between arguments (after comma, before next arg)
     // function process(a: any, b: number, c: string): void {}

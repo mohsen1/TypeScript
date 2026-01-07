@@ -57,6 +57,7 @@ Tests run in this state:
 - `./wasm/test.sh cli::driver_tests::invalidate_paths_with_dependents_symbols_handles_namespace_reexports` (pass).
 - `./wasm/test.sh cli::driver_tests::invalidate_paths_with_dependents_symbols_handles_star_reexports` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions` (pass).
+- `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_best_match` (pass).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
@@ -87,6 +88,7 @@ Tests run in this state:
   - [x] Expand exports conditions (node/browser) + moduleResolution-specific ordering.
   - [x] Honor package.json `type` + Node16/NodeNext extension rules.
   - [x] Apply `typesVersions` mappings for package subpaths.
+- [x] typesVersions range selection/prioritization (Status: Active)
 - [x] Benchmark harness
   - Script: `wasm/bench_cli.sh` (tsz vs tsc timing + memory stats).
 

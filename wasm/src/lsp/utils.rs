@@ -35,6 +35,47 @@ pub fn find_node_at_offset(arena: &ThinNodeArena, offset: u32) -> NodeIndex {
     best_match
 }
 
+/// Find the nearest node at or before an offset, skipping whitespace and
+/// optional chaining/member access punctuation when no node is found.
+pub fn find_node_at_or_before_offset(arena: &ThinNodeArena, offset: u32, source: &str) -> NodeIndex {
+    let node = find_node_at_offset(arena, offset);
+    if node.is_some() {
+        return node;
+    }
+
+    let max_len = source.len() as u32;
+    let mut idx = offset.min(max_len);
+    if idx == 0 {
+        return NodeIndex::NONE;
+    }
+
+    let bytes = source.as_bytes();
+    while idx > 0 {
+        let prev = bytes[(idx - 1) as usize];
+        if prev.is_ascii_whitespace() {
+            idx -= 1;
+            continue;
+        }
+        if prev == b'.' {
+            idx -= 1;
+            continue;
+        }
+        if prev == b'?' {
+            if bytes.get(idx as usize) == Some(&b'.') {
+                idx -= 1;
+                continue;
+            }
+        }
+        break;
+    }
+
+    if idx == 0 {
+        return NodeIndex::NONE;
+    }
+
+    find_node_at_offset(arena, idx - 1)
+}
+
 /// Find all nodes that overlap with a given range.
 ///
 /// Returns nodes where [node.pos, node.end) overlaps with [start, end).
