@@ -9,7 +9,7 @@ use crate::binder::symbol_flags;
 use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeInterner, TypeId, TypeKey, FunctionShape};
 use crate::lsp::position::{Position, LineMap};
-use crate::lsp::utils::find_node_at_offset;
+use crate::lsp::utils::find_node_at_or_before_offset;
 use crate::lsp::resolver::{ScopeCache, ScopeCacheStats};
 use crate::lsp::jsdoc::{jsdoc_for_node, parse_jsdoc, ParsedJsdoc};
 use crate::thin_checker::ThinCheckerState;
@@ -143,10 +143,7 @@ impl<'a> SignatureHelpProvider<'a> {
         let offset = self.line_map.position_to_offset(position, self.source_text)?;
 
         // 1. Find the deepest node at the cursor
-        let mut leaf_node = find_node_at_offset(self.arena, offset);
-        if leaf_node.is_none() && offset > 0 {
-            leaf_node = find_node_at_offset(self.arena, offset - 1);
-        }
+        let leaf_node = find_node_at_or_before_offset(self.arena, offset, self.source_text);
 
         // 2. Walk up to find the nearest CallExpression or NewExpression
         let (call_node_idx, call_expr, call_kind) = self.find_containing_call(leaf_node)?;

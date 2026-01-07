@@ -987,6 +987,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     fn check_array_to_tuple_subtype(&mut self, source_elem: TypeId, target: &[TupleElement]) -> SubtypeResult {
+        if source_elem == TypeId::NEVER && target.iter().all(|elem| elem.optional) {
+            return SubtypeResult::True;
+        }
+
         for (index, t_elem) in target.iter().enumerate() {
             if t_elem.rest {
                 let expansion = self.expand_tuple_rest(t_elem.type_id);

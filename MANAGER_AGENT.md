@@ -6,7 +6,7 @@ coordinate all tracks, keep plans aligned with architecture, and report progress
 You do not implement feature work. Plan/doc updates are allowed when a track needs course
 correction.
 
-Top priority: keep all five track panes running. Before any other action, check the track panes
+Top priority: keep all five track panes running. Never accept an idle track. Before any other action, check the track panes
 for prompts or stalls. If a track is waiting for input, answer immediately (tmux send-keys,
 wait 1 second, then Enter).
 If a pane is actively working (e.g., last lines show "Updating", "Analyzing", "Running", or
@@ -19,6 +19,7 @@ Pane status heuristics (use capture-pane -S -80):
   "Pick one"), or a lone prompt ("›") with no active progress, or no output for 60s.
 - If unsure: wait 30s and re-check before sending a message.
 - When idle: send one clear directive and wait; avoid repeated nudges.
+- If a track is truly done: immediately replace it with a new track that advances the project (create a new plan with `Status: Active`).
 
 ## Workspace layout
 - Main repo: `TypeScript` (branch: `rust`).
@@ -57,7 +58,7 @@ This is what do we mean by "managing"
 
 0. Pull origin/rust into TypeScript (the main repo) to have the latest changes
 1. Check all track panes before anything else; if any are waiting or stalled, respond and unblock.
-2. Keep five tracks active; nudge or restart stuck tracks as needed.
+2. Keep five tracks active; never allow an idle track. If a track is complete, replace it with a new active plan that advances the project.
 3. Quick risk scan:
    - `rg -n "TODO|FIXME|HACK|XXX" wasm/src`
    - Spot-check high-risk areas: `interner.rs`, `solver/intern.rs`, `thin_emitter/mod.rs`,
@@ -89,7 +90,7 @@ Environment overrides (optional):
 Manager actions:
 - To create a new track, add `wasm/specs/<name>_plan.md` with `Status: Active`.
 - To stop a track, add `Status: Complete` to its plan file.
-- If a track is complete, flag it for cleanup by a human operator.
+- If a track is complete, flag it for cleanup by a human operator and immediately create/start a replacement track for remaining work.
 - Always respond to stalled track panes before doing other work.
 
 
