@@ -76,6 +76,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Optional parameters
   - [x] Test: Rest parameters
   - [x] Test: Overloaded signatures (Vec<Signature>)
+  - [x] Test: Type predicates with `this` parameter
 
 ### Phase 4: Generic Types
 - [x] Implement type parameter lowering

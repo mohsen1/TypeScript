@@ -6084,11 +6084,11 @@ impl ThinParserState {
     fn parse_return_type(&mut self) -> NodeIndex {
         // Check if this is a type predicate: identifier 'is' Type
         // We need to look ahead to see if there's an identifier followed by 'is'
-        if self.is_token(SyntaxKind::Identifier) {
+        if self.is_token(SyntaxKind::Identifier) || self.is_token(SyntaxKind::ThisKeyword) {
             let snapshot = self.scanner.save_state();
             let current = self.current_token;
 
-            let name = self.parse_identifier();
+            let name = self.parse_type_predicate_parameter_name();
             if self.is_token(SyntaxKind::IsKeyword) {
                 // This is a type predicate: x is T
                 let start_pos = if let Some(node) = self.arena.get(name) {
@@ -6126,12 +6126,23 @@ impl ThinParserState {
         self.parse_type()
     }
 
+    fn parse_type_predicate_parameter_name(&mut self) -> NodeIndex {
+        if self.is_token(SyntaxKind::ThisKeyword) {
+            let start_pos = self.token_pos();
+            let end_pos = self.token_end();
+            self.next_token();
+            return self.arena.add_token(SyntaxKind::ThisKeyword as u16, start_pos, end_pos);
+        }
+
+        self.parse_identifier()
+    }
+
     /// Parse 'asserts' type predicate: asserts x or asserts x is T
     fn parse_asserts_type_predicate(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::AssertsKeyword);
 
-        let parameter_name = self.parse_identifier();
+        let parameter_name = self.parse_type_predicate_parameter_name();
 
         let type_node = if self.is_token(SyntaxKind::IsKeyword) {
             self.next_token();

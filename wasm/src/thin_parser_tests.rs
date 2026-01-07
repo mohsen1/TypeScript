@@ -1043,6 +1043,30 @@ fn test_thin_parser_arrow_type_predicate() {
 }
 
 #[test]
+fn test_thin_parser_this_type_predicate() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "function isString(this: any): this is string { return true; }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+}
+
+#[test]
+fn test_thin_parser_asserts_this_type_predicate() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "function assertString(this: any): asserts this is string { }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+}
+
+#[test]
 fn test_thin_parser_constructor_type() {
     // Constructor type: new () => T
     let mut parser = ThinParserState::new(
