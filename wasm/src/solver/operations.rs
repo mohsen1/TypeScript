@@ -20,7 +20,7 @@
 
 use crate::interner::Atom;
 use crate::solver::types::*;
-use crate::solver::TypeDatabase;
+use crate::solver::{apparent_primitive_member_kind, ApparentMemberKind, TypeDatabase};
 use crate::solver::subtype::SubtypeChecker;
 use crate::solver::diagnostics::PendingDiagnostic;
 use crate::solver::infer::InferenceContext;
@@ -894,95 +894,49 @@ impl<'a> PropertyAccessEvaluator<'a> {
         }
     }
 
-    /// Resolve properties on string type.
-    fn resolve_string_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
-        match prop_name {
-            "length" => PropertyAccessResult::Success {
-                type_id: TypeId::NUMBER,
+    fn resolve_apparent_property(
+        &self,
+        kind: IntrinsicKind,
+        owner_type: TypeId,
+        prop_name: &str,
+        prop_atom: Atom,
+    ) -> PropertyAccessResult {
+        match apparent_primitive_member_kind(self.interner, kind, prop_name) {
+            Some(ApparentMemberKind::Value(type_id)) => PropertyAccessResult::Success {
+                type_id,
                 from_index_signature: false,
             },
-            "at" | "charAt" | "concat" | "padEnd" | "padStart" | "repeat" | "slice" |
-            "substring" | "toLocaleLowerCase" | "toLocaleUpperCase" | "toLowerCase" |
-            "toString" | "toUpperCase" | "trim" | "trimEnd" | "trimStart" | "valueOf" => {
-                self.method_result(TypeId::STRING)
-            }
-            "charCodeAt" | "codePointAt" | "indexOf" | "lastIndexOf" | "search" => {
-                self.method_result(TypeId::NUMBER)
-            }
-            "endsWith" | "includes" | "startsWith" => {
-                self.method_result(TypeId::BOOLEAN)
-            }
-            "match" | "matchAll" => self.method_result(TypeId::ANY),
-            "replace" | "replaceAll" => self.method_result(TypeId::STRING),
-            "split" => {
-                let array_type = self.interner.array(TypeId::STRING);
-                self.method_result(array_type)
-            }
-            _ => PropertyAccessResult::PropertyNotFound {
-                type_id: TypeId::STRING,
+            Some(ApparentMemberKind::Method(return_type)) => self.method_result(return_type),
+            None => PropertyAccessResult::PropertyNotFound {
+                type_id: owner_type,
                 property_name: prop_atom,
             },
         }
+    }
+
+    /// Resolve properties on string type.
+    fn resolve_string_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
+        self.resolve_apparent_property(IntrinsicKind::String, TypeId::STRING, prop_name, prop_atom)
     }
 
     /// Resolve properties on number type.
     fn resolve_number_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
-        match prop_name {
-            "toExponential" | "toFixed" | "toLocaleString" | "toPrecision" | "toString" => {
-                self.method_result(TypeId::STRING)
-            }
-            "valueOf" => self.method_result(TypeId::NUMBER),
-            _ => PropertyAccessResult::PropertyNotFound {
-                type_id: TypeId::NUMBER,
-                property_name: prop_atom,
-            },
-        }
+        self.resolve_apparent_property(IntrinsicKind::Number, TypeId::NUMBER, prop_name, prop_atom)
     }
 
     /// Resolve properties on boolean type.
     fn resolve_boolean_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
-        match prop_name {
-            "toLocaleString" | "toString" => self.method_result(TypeId::STRING),
-            "valueOf" => self.method_result(TypeId::BOOLEAN),
-            _ => PropertyAccessResult::PropertyNotFound {
-                type_id: TypeId::BOOLEAN,
-                property_name: prop_atom,
-            },
-        }
+        self.resolve_apparent_property(IntrinsicKind::Boolean, TypeId::BOOLEAN, prop_name, prop_atom)
     }
 
     /// Resolve properties on bigint type.
     fn resolve_bigint_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
-        match prop_name {
-            "toLocaleString" | "toString" => self.method_result(TypeId::STRING),
-            "valueOf" => self.method_result(TypeId::BIGINT),
-            _ => PropertyAccessResult::PropertyNotFound {
-                type_id: TypeId::BIGINT,
-                property_name: prop_atom,
-            },
-        }
+        self.resolve_apparent_property(IntrinsicKind::Bigint, TypeId::BIGINT, prop_name, prop_atom)
     }
 
     /// Resolve properties on symbol primitive type.
     fn resolve_symbol_primitive_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
-        match prop_name {
-            // Symbol.prototype.description: string | undefined
-            "description" => {
-                let union = self.interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
-                PropertyAccessResult::Success {
-                    type_id: union,
-                    from_index_signature: false,
-                }
-            }
-            // Symbol.prototype.toString(): string
-            // Symbol.prototype.valueOf(): symbol
-            "toString" => self.method_result(TypeId::STRING),
-            "valueOf" => self.method_result(TypeId::SYMBOL),
-            _ => PropertyAccessResult::PropertyNotFound {
-                type_id: TypeId::SYMBOL,
-                property_name: prop_atom,
-            },
-        }
+        self.resolve_apparent_property(IntrinsicKind::Symbol, TypeId::SYMBOL, prop_name, prop_atom)
     }
 
     /// Resolve properties on array type.
