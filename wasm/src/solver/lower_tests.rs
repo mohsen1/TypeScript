@@ -107,6 +107,70 @@ fn test_lower_literal_octal_number_type() {
 }
 
 #[test]
+fn test_lower_literal_number_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 1_234_567;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 1_234_567.0);
+        }
+        _ => panic!("Expected number literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_hex_number_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0xFF_FF;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 65_535.0);
+        }
+        _ => panic!("Expected hex literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_binary_number_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0b1010_0101;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 165.0);
+        }
+        _ => panic!("Expected binary literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_octal_number_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0o12_34;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 668.0);
+        }
+        _ => panic!("Expected octal literal type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_literal_bigint_type() {
     let (arena, type_idx) = parse_type_alias_type_node("type T = 123n;");
     let interner = TypeInterner::new();
@@ -165,6 +229,70 @@ fn test_lower_literal_octal_bigint_type() {
     match key {
         TypeKey::Literal(LiteralValue::BigInt(atom)) => {
             assert_eq!(interner.resolve_atom(atom), "63");
+        }
+        _ => panic!("Expected octal bigint literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_bigint_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 1_000n;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "1000");
+        }
+        _ => panic!("Expected bigint literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_hex_bigint_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0xFF_FFn;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "65535");
+        }
+        _ => panic!("Expected hex bigint literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_binary_bigint_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0b1010_0101n;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "165");
+        }
+        _ => panic!("Expected binary bigint literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_octal_bigint_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0o12_34n;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "668");
         }
         _ => panic!("Expected octal bigint literal type, got {:?}", key),
     }
