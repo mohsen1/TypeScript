@@ -2401,6 +2401,71 @@ fn test_mapped_type_with_template_substitution() {
 }
 
 #[test]
+fn test_mapped_type_key_remap_filters_keys() {
+    let interner = TypeInterner::new();
+
+    let prop_a = PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    };
+    let prop_b = PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    };
+    let obj = interner.object(vec![prop_a.clone(), prop_b.clone()]);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: Some(keys),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    let name_type = interner.conditional(ConditionalType {
+        check_type: key_param_id,
+        extends_type: key_a,
+        true_type: TypeId::NEVER,
+        false_type: key_param_id,
+        is_distributive: true,
+    });
+    let template = interner.intern(TypeKey::IndexAccess(obj, key_param_id));
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: keys,
+        name_type: Some(name_type),
+        template,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    let prop_b_index = interner.intern(TypeKey::IndexAccess(obj, key_b));
+    let expected = interner.object(vec![PropertyInfo {
+        name: prop_b.name,
+        type_id: prop_b_index,
+        write_type: prop_b_index,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_mapped_type_deferred() {
     let interner = TypeInterner::new();
 
