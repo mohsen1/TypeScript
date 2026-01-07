@@ -386,6 +386,23 @@ fn test_resolve_bounds_function_subtype() {
 }
 
 #[test]
+fn test_resolve_bounds_application_subtype() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let base = interner.reference(SymbolRef(1));
+    let upper = interner.application(base, vec![TypeId::STRING]);
+    let lower = interner.application(base, vec![interner.literal_string("hello")]);
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
 fn test_resolve_bounds_conflict() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);

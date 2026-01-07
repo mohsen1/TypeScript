@@ -639,6 +639,23 @@ impl<'a> InferenceContext<'a> {
             return self.function_subtype_of(s_fn, t_fn);
         }
 
+        if let (Some(TypeKey::Application(s_app)), Some(TypeKey::Application(t_app))) =
+            (source_key.as_ref(), target_key.as_ref())
+        {
+            if s_app.args.len() != t_app.args.len() {
+                return false;
+            }
+            if !self.is_subtype(s_app.base, t_app.base) {
+                return false;
+            }
+            for (s_arg, t_arg) in s_app.args.iter().zip(t_app.args.iter()) {
+                if !self.is_subtype(*s_arg, *t_arg) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         // Intersection: A & B <: T if either member is a subtype of T
         if let Some(TypeKey::Intersection(members)) = source_key.as_ref() {
             return members.iter().any(|&member| self.is_subtype(member, target));
