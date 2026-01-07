@@ -19,6 +19,10 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Latest attempt: `npm install --no-save --no-package-lock typescript @types/node`, `cargo build --release --bin tsz`, `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` → tsz failed before timing; tsc not run.
 - Bench harness update: fixed BSD `/usr/bin/time -l` parsing in `wasm/bench_cli.sh` so elapsed time is read from the `real` token.
 - Synthetic benchmark (1000-file project in `/tmp/tsz_bench_large` with minimal `globals.d.ts`): `./wasm/bench_cli.sh --repo /tmp/tsz_bench_large --tsconfig tsconfig.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` → tsz avg 0.170s best 0.170s max_rss 19.6 MiB; tsc avg 0.200s best 0.200s max_rss 141.3 MiB. Next: run on real repo once optional chaining + lib parsing land.
+- Bench-specific config added: `bench/tsconfig.bench.json` with `bench/globals.d.ts` (minimal libs/types). Generated 1000-file synthetic project with `python3 bench/generate_synth_project.py --count 1000` (local `bench/synth/`) and ran `./wasm/bench_cli.sh --repo . --tsconfig bench/tsconfig.bench.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` → tsz avg 0.180s best 0.180s max_rss 19.7 MiB; tsc avg 0.200s best 0.200s max_rss 143.2 MiB.
+- Note: without `bench/globals.d.ts` or a lib, `tsc` fails with missing global type errors (Array/Boolean/etc.), so the bench config keeps libs/types empty and supplies minimal globals.
+- Symlinked synth attempt: generated `/tmp/tsz_bench_large` and symlinked `bench/synth -> /tmp/tsz_bench_large/src`, then ran `./wasm/bench_cli.sh --repo . --tsconfig bench/tsconfig.bench.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` → tsz avg 0.003s best 0.000s max_rss 8.3 MiB; tsc avg 0.297s best 0.270s max_rss 154.5 MiB. Note: tsz file discovery uses `WalkDir` without following symlinks, so `bench/synth` was skipped and tsz effectively compiled only `bench/globals.d.ts` (results not representative).
+- TSC lib error repro (no globals + lib []): `/Users/claude/code/TypeScript-cli-track/node_modules/.bin/tsc --project /tmp/tsz_bench_large/tsconfig.noglobals.json --pretty false --noEmit` with a synthetic file using `Promise` yields `error TS2583: Cannot find name 'Promise'` (twice).
 
 ## Current Investigation Notes (Incremental export hash)
 Summary of the incremental work (export hash fixed):
@@ -86,6 +90,9 @@ Tests run in this state:
 - `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` (failed: tsz diagnostics on optional chaining + lib .d.ts parsing).
 - `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` (failed again: tsz exits with diagnostics; no timings).
 - `./wasm/bench_cli.sh --repo /tmp/tsz_bench_large --tsconfig tsconfig.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` (tsz avg 0.170s best 0.170s max_rss 19.6 MiB; tsc avg 0.200s best 0.200s max_rss 141.3 MiB).
+- `python3 bench/generate_synth_project.py --count 1000` (generated local `bench/synth`).
+- `./wasm/bench_cli.sh --repo . --tsconfig bench/tsconfig.bench.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` (tsz avg 0.180s best 0.180s max_rss 19.7 MiB; tsc avg 0.200s best 0.200s max_rss 143.2 MiB).
+- `./wasm/bench_cli.sh --repo . --tsconfig bench/tsconfig.bench.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` (symlinked `bench/synth` → `/tmp/tsz_bench_large/src`: tsz avg 0.003s best 0.000s max_rss 8.3 MiB; tsc avg 0.297s best 0.270s max_rss 154.5 MiB; tsz skipped symlinked files).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches

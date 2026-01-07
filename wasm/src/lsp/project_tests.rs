@@ -1188,6 +1188,50 @@ fn test_project_performance_scope_cache_hits_rename() {
 }
 
 #[test]
+fn test_project_scope_cache_cleared_after_update() {
+    let mut project = Project::new();
+
+    project.set_file(
+        "a.ts".to_string(),
+        "const value = 1;\nvalue;\nconst later = 2;\n".to_string(),
+    );
+    let position = Position::new(1, 0);
+
+    assert!(project.get_definition("a.ts", position).is_some());
+    let first = project
+        .performance()
+        .timing(ProjectRequestKind::Definition)
+        .expect("Expected timing data for definition");
+
+    assert!(project.get_definition("a.ts", position).is_some());
+    let second = project
+        .performance()
+        .timing(ProjectRequestKind::Definition)
+        .expect("Expected timing data for definition");
+
+    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
+    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+
+    let edit = {
+        let file = project.file("a.ts").unwrap();
+        let range = range_for_substring(file.source_text(), file.line_map(), "2");
+        TextEdit::new(range, "3".to_string())
+    };
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
+
+    assert!(project.get_definition("a.ts", position).is_some());
+    let third = project
+        .performance()
+        .timing(ProjectRequestKind::Definition)
+        .expect("Expected timing data for definition");
+
+    assert!(third.scope_misses > 0, "Expected cache misses after edit");
+    assert_eq!(third.scope_hits, 0, "Expected cache hits cleared after edit");
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 
