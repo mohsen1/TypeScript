@@ -2343,6 +2343,24 @@ impl<'a> BinaryOpEvaluator<'a> {
             return false;
         }
 
+        if let Some(TypeKey::TypeParameter(info) | TypeKey::Infer(info)) =
+            self.interner.lookup(left)
+        {
+            if let Some(constraint) = info.constraint {
+                return self.has_overlap(constraint, right);
+            }
+            return true;
+        }
+
+        if let Some(TypeKey::TypeParameter(info) | TypeKey::Infer(info)) =
+            self.interner.lookup(right)
+        {
+            if let Some(constraint) = info.constraint {
+                return self.has_overlap(left, constraint);
+            }
+            return true;
+        }
+
         if let Some(TypeKey::Union(members)) = self.interner.lookup(left) {
             let members = self.interner.type_list(members);
             return members.iter().any(|member| self.has_overlap(*member, right));
