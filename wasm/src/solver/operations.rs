@@ -1374,7 +1374,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 for prop in props {
                     if prop.name == prop_atom {
                         return PropertyAccessResult::Success {
-                            type_id: prop.type_id,
+                            type_id: self.optional_property_type(prop),
                             from_index_signature: false,
                         };
                     }
@@ -1391,7 +1391,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 for prop in &shape.properties {
                     if prop.name == prop_atom {
                         return PropertyAccessResult::Success {
-                            type_id: prop.type_id,
+                            type_id: self.optional_property_type(prop),
                             from_index_signature: false,
                         };
                     }
@@ -1596,6 +1596,14 @@ impl<'a> PropertyAccessEvaluator<'a> {
             return type_id;
         }
         self.interner.union(vec![type_id, TypeId::UNDEFINED])
+    }
+
+    fn optional_property_type(&self, prop: &PropertyInfo) -> TypeId {
+        if prop.optional {
+            self.interner.union(vec![prop.type_id, TypeId::UNDEFINED])
+        } else {
+            prop.type_id
+        }
     }
 
     fn resolve_apparent_property(
