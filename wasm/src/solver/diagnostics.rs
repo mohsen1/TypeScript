@@ -445,39 +445,17 @@ impl<'a> TypeFormatter<'a> {
         match key {
             TypeKey::Intrinsic(kind) => self.format_intrinsic(*kind),
             TypeKey::Literal(lit) => self.format_literal(lit),
-            TypeKey::Object(shape_id) => {
-                let shape = self.interner.object_shape(*shape_id);
-                self.format_object(shape.properties.as_slice())
-            }
-            TypeKey::ObjectWithIndex(shape_id) => {
-                let shape = self.interner.object_shape(*shape_id);
-                self.format_object_with_index(shape.as_ref())
-            }
-            TypeKey::Union(members) => {
-                let members = self.interner.type_list(*members);
-                self.format_union(members.as_ref())
-            }
-            TypeKey::Intersection(members) => {
-                let members = self.interner.type_list(*members);
-                self.format_intersection(members.as_ref())
-            }
+            TypeKey::Object(props) => self.format_object(props.as_slice()),
+            TypeKey::ObjectWithIndex(shape) => self.format_object_with_index(shape),
+            TypeKey::Union(members) => self.format_union(members.as_slice()),
+            TypeKey::Intersection(members) => self.format_intersection(members.as_slice()),
             TypeKey::Array(elem) => format!("{}[]", self.format(*elem)),
-            TypeKey::Tuple(elements) => {
-                let elements = self.interner.tuple_list(*elements);
-                self.format_tuple(elements.as_ref())
-            }
-            TypeKey::Function(shape) => {
-                let shape = self.interner.function_shape(*shape);
-                self.format_function(shape.as_ref())
-            }
-            TypeKey::Callable(shape) => {
-                let shape = self.interner.callable_shape(*shape);
-                self.format_callable(shape.as_ref())
-            }
+            TypeKey::Tuple(elements) => self.format_tuple(elements.as_slice()),
+            TypeKey::Function(shape) => self.format_function(shape),
+            TypeKey::Callable(shape) => self.format_callable(shape),
             TypeKey::TypeParameter(info) => self.atom(info.name).to_string(),
             TypeKey::Ref(sym) => format!("Ref({})", sym.0),
             TypeKey::Application(app) => {
-                let app = self.interner.type_application(*app);
                 let args: Vec<String> = app.args.iter()
                     .map(|&arg| self.format(arg))
                     .collect();
@@ -488,10 +466,7 @@ impl<'a> TypeFormatter<'a> {
             TypeKey::IndexAccess(obj, idx) => {
                 format!("{}[{}]", self.format(*obj), self.format(*idx))
             }
-            TypeKey::TemplateLiteral(spans) => {
-                let spans = self.interner.template_list(*spans);
-                self.format_template_literal(spans.as_ref())
-            }
+            TypeKey::TemplateLiteral(spans) => self.format_template_literal(spans.as_slice()),
             TypeKey::TypeQuery(sym) => format!("typeof Ref({})", sym.0),
             TypeKey::KeyOf(operand) => format!("keyof {}", self.format(*operand)),
             TypeKey::ReadonlyType(inner) => format!("readonly {}", self.format(*inner)),
