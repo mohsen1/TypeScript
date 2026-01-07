@@ -13,6 +13,7 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 
 ## Highest-Impact Next Tasks
 - [ ] Shrink `thin_emitter/mod.rs` for maintainability
+  - [x] Extract comment utilities + output helpers into modules (keep API stable).
   - [ ] Split into focused modules (printer core, ES5 helpers, module emission).
   - [ ] Keep public API stable and update call sites/tests.
 - [ ] Performance tuning: remove obvious hot-path overheads
