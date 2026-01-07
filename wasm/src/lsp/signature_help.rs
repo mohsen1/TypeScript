@@ -291,8 +291,61 @@ impl<'a> SignatureHelpProvider<'a> {
             }
         }
 
-        // Cursor is after all arguments - return the last argument index
+        if let Some(&last_arg_idx) = args.nodes.last() {
+            if let Some(last_arg_node) = self.arena.get(last_arg_idx) {
+                let call_end = self.arena.get(call_idx).map(|node| node.end).unwrap_or(cursor_offset);
+                let scan_end = cursor_offset.min(call_end);
+                if scan_end > last_arg_node.end && self.has_comma_between(last_arg_node.end, scan_end) {
+                    return args.nodes.len() as u32;
+                }
+            }
+        }
+
+        // Cursor is after all arguments - return the last argument index.
         (args.nodes.len().saturating_sub(1)) as u32
+    }
+
+    fn has_comma_between(&self, start: u32, end: u32) -> bool {
+        if start >= end {
+            return false;
+        }
+
+        let max_len = self.source_text.len() as u32;
+        let start = start.min(max_len) as usize;
+        let end = end.min(max_len) as usize;
+        if start >= end {
+            return false;
+        }
+
+        let bytes = self.source_text.as_bytes();
+        let mut i = start;
+        while i < end {
+            match bytes[i] {
+                b',' => return true,
+                b'/' if i + 1 < end && bytes[i + 1] == b'/' => {
+                    i += 2;
+                    while i < end && bytes[i] != b'\n' && bytes[i] != b'\r' {
+                        i += 1;
+                    }
+                }
+                b'/' if i + 1 < end && bytes[i + 1] == b'*' => {
+                    i += 2;
+                    while i + 1 < end {
+                        if bytes[i] == b'*' && bytes[i + 1] == b'/' {
+                            i += 2;
+                            break;
+                        }
+                        i += 1;
+                    }
+                    if i + 1 >= end {
+                        i = end;
+                    }
+                }
+                _ => i += 1,
+            }
+        }
+
+        false
     }
 
     /// Extract signature information from a TypeId.
