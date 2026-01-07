@@ -37,6 +37,7 @@ use crate::parser::{NodeIndex, NodeList};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::transforms::arrow_es5::contains_this_reference;
+use crate::transforms::emit_utils;
 use crate::transforms::private_fields_es5::{PrivateFieldInfo, collect_private_fields, is_private_identifier};
 
 struct ParamTransform {
@@ -1259,7 +1260,7 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write("for (var ");
                 self.write(&iter_name);
                 self.write(" = ");
-                self.write(&rest.index.to_string());
+                self.write_usize(rest.index);
                 self.write("; ");
                 self.write(&iter_name);
                 self.write(" < arguments.length; ");
@@ -1269,7 +1270,7 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write("[");
                 self.write(&iter_name);
                 self.write(" - ");
-                self.write(&rest.index.to_string());
+                self.write_usize(rest.index);
                 self.write("] = arguments[");
                 self.write(&iter_name);
                 self.write("];");
@@ -1478,7 +1479,7 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
 
             if !elem.initializer.is_none() {
@@ -1507,7 +1508,7 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
             self.write(", ");
             self.write_identifier_text(elem.name);
@@ -1522,7 +1523,7 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
         }
     }
@@ -1582,7 +1583,7 @@ impl<'a> ClassES5Emitter<'a> {
         self.write(" = ");
         self.write(temp_name);
         self.write(".slice(");
-        self.write(&index.to_string());
+        self.write_usize(index);
         self.write(")");
 
         if let Some(ref name) = rest_temp {
@@ -1936,7 +1937,7 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
 
             if !elem.initializer.is_none() {
@@ -1965,7 +1966,7 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
         } else {
             let value_name = self.get_temp_var_name();
@@ -1974,7 +1975,7 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
             self.write(", ");
             self.write_identifier_text(elem.name);
@@ -2063,7 +2064,7 @@ impl<'a> ClassES5Emitter<'a> {
         self.write(" = ");
         self.write(temp_name);
         self.write(".slice(");
-        self.write(&index.to_string());
+        self.write_usize(index);
         self.write(")");
 
         if let Some(ref name) = rest_temp {
@@ -3553,6 +3554,10 @@ impl<'a> ClassES5Emitter<'a> {
     // Helper methods
     fn write(&mut self, s: &str) {
         self.output.push_str(s);
+    }
+
+    fn write_usize(&mut self, value: usize) {
+        emit_utils::push_usize(&mut self.output, value);
     }
 
     fn write_line(&mut self) {
