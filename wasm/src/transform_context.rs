@@ -151,6 +151,12 @@ pub enum TransformDirective {
         object_literal: NodeIndex,
     },
 
+    /// ES5 Variable Declaration List: Transform destructuring declarations to assignments.
+    ES5VariableDeclarationList {
+        /// Original variable declaration list node
+        decl_list: NodeIndex,
+    },
+
     /// ES5 Template Literal: Transform template literals/tagged templates to ES5 output.
     ES5TemplateLiteral {
         /// Original template node (template expression, tagged template, or no-sub literal)
