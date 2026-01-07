@@ -839,6 +839,50 @@ fn test_index_access_tuple_optional_literal() {
 }
 
 #[test]
+fn test_index_access_tuple_negative_literal() {
+    let interner = TypeInterner::new();
+
+    let number_array = interner.array(TypeId::NUMBER);
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+    ]);
+    let negative = interner.literal_number(-1.0);
+
+    let result = evaluate_index_access(&interner, tuple, negative);
+    assert_eq!(result, TypeId::UNDEFINED);
+}
+
+#[test]
+fn test_index_access_tuple_fractional_literal() {
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let fractional = interner.literal_number(1.5);
+
+    let result = evaluate_index_access(&interner, tuple, fractional);
+    assert_eq!(result, TypeId::UNDEFINED);
+}
+
+#[test]
+fn test_index_access_tuple_negative_string_literal() {
+    let interner = TypeInterner::new();
+
+    let number_array = interner.array(TypeId::NUMBER);
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+    ]);
+    let negative = interner.literal_string("-1");
+
+    let result = evaluate_index_access(&interner, tuple, negative);
+    assert_eq!(result, TypeId::UNDEFINED);
+}
+
+#[test]
 fn test_index_access_tuple_string_index() {
     let interner = TypeInterner::new();
 

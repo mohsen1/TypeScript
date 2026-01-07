@@ -10,7 +10,7 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 - LoweringPass -> TransformDirective -> ThinPrinter pipeline exists.
 - ES5/ESNext transforms largely implemented.
 - Performance-only work is deferred until correctness parity signoff.
-Status: Complete
+Status: Active
 
 ## Highest-Impact Next Tasks
 - [x] Emit minimal source maps for no-transform JS output (ThinPrinter mapping + CLI output map).

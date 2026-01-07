@@ -31,6 +31,15 @@ pub struct CliArgs {
     #[arg(long = "noEmit", alias = "no-emit")]
     pub no_emit: bool,
 
+    /// Override the compiler version used for typesVersions resolution
+    /// (or set TSZ_TYPES_VERSIONS_COMPILER_VERSION).
+    #[arg(
+        long = "typesVersions",
+        alias = "types-versions",
+        value_name = "VERSION"
+    )]
+    pub types_versions_compiler_version: Option<String>,
+
     /// Watch input files and recompile on changes.
     #[arg(short, long)]
     pub watch: bool,
