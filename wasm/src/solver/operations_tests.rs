@@ -1255,6 +1255,88 @@ fn test_infer_generic_object_property() {
 }
 
 #[test]
+fn test_infer_generic_optional_property_value() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("box")),
+            type_id: interner.object(vec![PropertyInfo {
+                name: interner.intern_string("a"),
+                type_id: t_type,
+                optional: true,
+                readonly: false,
+                is_method: false,
+            }]),
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let arg = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[arg]);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_infer_generic_optional_property_missing() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("box")),
+            type_id: interner.object(vec![PropertyInfo {
+                name: interner.intern_string("a"),
+                type_id: t_type,
+                optional: true,
+                readonly: false,
+                is_method: false,
+            }]),
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let arg = interner.object(Vec::new());
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[arg]);
+    assert_eq!(result, TypeId::UNKNOWN);
+}
+
+#[test]
 fn test_infer_generic_tuple_element() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
