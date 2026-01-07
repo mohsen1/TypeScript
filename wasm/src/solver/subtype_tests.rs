@@ -45,6 +45,20 @@ fn test_literal_subtyping() {
 }
 
 #[test]
+fn test_unique_symbol_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let sym_a = interner.intern(TypeKey::UniqueSymbol(SymbolRef(1)));
+    let sym_b = interner.intern(TypeKey::UniqueSymbol(SymbolRef(2)));
+
+    assert!(checker.is_subtype_of(sym_a, sym_a));
+    assert!(!checker.is_subtype_of(sym_a, sym_b));
+    assert!(checker.is_subtype_of(sym_a, TypeId::SYMBOL));
+    assert!(!checker.is_subtype_of(TypeId::SYMBOL, sym_a));
+}
+
+#[test]
 fn test_union_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
