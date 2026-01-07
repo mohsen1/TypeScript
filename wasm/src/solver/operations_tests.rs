@@ -1061,6 +1061,54 @@ fn test_infer_generic_function_identity() {
 }
 
 #[test]
+fn test_infer_generic_function_this_type_param() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let param_func = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: Some(t_type),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("cb")),
+            type_id: param_func,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let arg_func = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: Vec::new(),
+        this_type: Some(TypeId::NUMBER),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[arg_func]);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
 fn test_infer_generic_callable_param_from_function() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
@@ -1077,11 +1125,11 @@ fn test_infer_generic_callable_param_from_function() {
             type_params: Vec::new(),
             params: vec![ParamInfo {
                 name: Some(interner.intern_string("x")),
-                type_id: t_type,
+                type_id: TypeId::NUMBER,
                 optional: false,
                 rest: false,
             }],
-            this_type: None,
+            this_type: Some(t_type),
             return_type: TypeId::VOID,
             type_predicate: None,
         }],
@@ -1111,7 +1159,7 @@ fn test_infer_generic_callable_param_from_function() {
             optional: false,
             rest: false,
         }],
-        this_type: None,
+        this_type: Some(TypeId::NUMBER),
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
@@ -1137,11 +1185,11 @@ fn test_infer_generic_function_param_from_callable() {
         type_params: Vec::new(),
         params: vec![ParamInfo {
             name: Some(interner.intern_string("value")),
-            type_id: t_type,
+            type_id: TypeId::NUMBER,
             optional: false,
             rest: false,
         }],
-        this_type: None,
+        this_type: Some(t_type),
         return_type: TypeId::VOID,
         type_predicate: None,
         is_constructor: false,
@@ -1170,7 +1218,7 @@ fn test_infer_generic_function_param_from_callable() {
                 optional: false,
                 rest: false,
             }],
-            this_type: None,
+            this_type: Some(TypeId::NUMBER),
             return_type: TypeId::VOID,
             type_predicate: None,
         }],
@@ -1199,11 +1247,11 @@ fn test_infer_generic_callable_param_from_callable() {
             type_params: Vec::new(),
             params: vec![ParamInfo {
                 name: Some(interner.intern_string("x")),
-                type_id: t_type,
+                type_id: TypeId::NUMBER,
                 optional: false,
                 rest: false,
             }],
-            this_type: None,
+            this_type: Some(t_type),
             return_type: TypeId::VOID,
             type_predicate: None,
         }],
@@ -1234,7 +1282,7 @@ fn test_infer_generic_callable_param_from_callable() {
                 optional: false,
                 rest: false,
             }],
-            this_type: None,
+            this_type: Some(TypeId::NUMBER),
             return_type: TypeId::VOID,
             type_predicate: None,
         }],
