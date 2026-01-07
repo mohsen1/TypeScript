@@ -302,6 +302,18 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             }
         }
 
+        if let TypeKey::Conditional(source_cond) = &source_key {
+            if let TypeKey::Conditional(target_cond) = &target_key {
+                return self.check_conditional_subtype(source_cond, target_cond);
+            }
+
+            return self.conditional_branches_subtype(source_cond, target);
+        }
+
+        if let TypeKey::Conditional(target_cond) = &target_key {
+            return self.subtype_of_conditional_target(source, target_cond);
+        }
+
         // =========================================================================
         // Structural checks
         // =========================================================================
@@ -547,16 +559,6 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 }
             }
 
-            // Conditional types
-            (TypeKey::Conditional(s_cond), TypeKey::Conditional(t_cond)) => {
-                // TODO: Implement proper conditional type comparison
-                if s_cond == t_cond {
-                    SubtypeResult::True
-                } else {
-                    SubtypeResult::False
-                }
-            }
-
             // Index access types
             (TypeKey::IndexAccess(s_obj, s_idx), TypeKey::IndexAccess(t_obj, t_idx)) => {
                 if self.check_subtype(*s_obj, *t_obj).is_true()
@@ -639,6 +641,56 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             // object keyword handling is in check_subtype_inner
             _ => SubtypeResult::False,
         }
+    }
+
+    fn check_conditional_subtype(
+        &mut self,
+        source: &ConditionalType,
+        target: &ConditionalType,
+    ) -> SubtypeResult {
+        if source.is_distributive != target.is_distributive {
+            return SubtypeResult::False;
+        }
+
+        if !self.types_equivalent(source.check_type, target.check_type) {
+            return SubtypeResult::False;
+        }
+
+        if !self.types_equivalent(source.extends_type, target.extends_type) {
+            return SubtypeResult::False;
+        }
+
+        if self.check_subtype(source.true_type, target.true_type).is_true()
+            && self.check_subtype(source.false_type, target.false_type).is_true()
+        {
+            SubtypeResult::True
+        } else {
+            SubtypeResult::False
+        }
+    }
+
+    fn conditional_branches_subtype(&mut self, cond: &ConditionalType, target: TypeId) -> SubtypeResult {
+        if self.check_subtype(cond.true_type, target).is_true()
+            && self.check_subtype(cond.false_type, target).is_true()
+        {
+            SubtypeResult::True
+        } else {
+            SubtypeResult::False
+        }
+    }
+
+    fn subtype_of_conditional_target(&mut self, source: TypeId, target: &ConditionalType) -> SubtypeResult {
+        if self.check_subtype(source, target.true_type).is_true()
+            && self.check_subtype(source, target.false_type).is_true()
+        {
+            SubtypeResult::True
+        } else {
+            SubtypeResult::False
+        }
+    }
+
+    fn types_equivalent(&mut self, left: TypeId, right: TypeId) -> bool {
+        self.check_subtype(left, right).is_true() && self.check_subtype(right, left).is_true()
     }
 
     fn is_object_keyword_type(&mut self, source: TypeId) -> bool {

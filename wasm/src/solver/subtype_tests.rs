@@ -952,6 +952,93 @@ fn test_type_parameter_identity_only() {
 }
 
 #[test]
+fn test_deferred_conditional_source_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    }));
+
+    let conditional = interner.intern(TypeKey::Conditional(Box::new(ConditionalType {
+        check_type: t_param,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::NUMBER,
+        false_type: TypeId::BOOLEAN,
+        is_distributive: true,
+    })));
+
+    let target_union = interner.union(vec![TypeId::NUMBER, TypeId::BOOLEAN]);
+
+    assert!(checker.is_subtype_of(conditional, target_union));
+    assert!(!checker.is_subtype_of(conditional, TypeId::NUMBER));
+}
+
+#[test]
+fn test_deferred_conditional_target_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    }));
+
+    let conditional = interner.intern(TypeKey::Conditional(Box::new(ConditionalType {
+        check_type: t_param,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::NUMBER,
+        false_type: TypeId::BOOLEAN,
+        is_distributive: true,
+    })));
+
+    assert!(!checker.is_subtype_of(TypeId::NUMBER, conditional));
+}
+
+#[test]
+fn test_deferred_conditional_structural_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    }));
+
+    let source = interner.intern(TypeKey::Conditional(Box::new(ConditionalType {
+        check_type: t_param,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::NUMBER,
+        false_type: TypeId::BOOLEAN,
+        is_distributive: true,
+    })));
+
+    let union_nb = interner.union(vec![TypeId::NUMBER, TypeId::BOOLEAN]);
+    let target = interner.intern(TypeKey::Conditional(Box::new(ConditionalType {
+        check_type: t_param,
+        extends_type: TypeId::STRING,
+        true_type: union_nb,
+        false_type: union_nb,
+        is_distributive: true,
+    })));
+
+    let mismatch = interner.intern(TypeKey::Conditional(Box::new(ConditionalType {
+        check_type: t_param,
+        extends_type: TypeId::NUMBER,
+        true_type: union_nb,
+        false_type: union_nb,
+        is_distributive: true,
+    })));
+
+    assert!(checker.is_subtype_of(source, target));
+    assert!(!checker.is_subtype_of(source, mismatch));
+}
+
+#[test]
 fn test_strict_function_variance() {
     use std::sync::Arc;
     let interner = TypeInterner::new();

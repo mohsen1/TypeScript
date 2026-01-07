@@ -169,6 +169,12 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Track distributive conditional types and skip distribution when wrapped
 - [x] Tests for distributive flag lowering and non-distributive unions
 
+### Phase 27: Deferred Conditional Subtyping
+- [x] Require both branches to be assignable when conditional source is deferred
+- [x] Require source assignable to both branches for conditional targets
+- [x] Compare deferred conditional structure before branch subtyping
+- [x] Tests for deferred conditional source/target/conditional subtyping
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
