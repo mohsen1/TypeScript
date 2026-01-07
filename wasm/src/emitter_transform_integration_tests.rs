@@ -6,6 +6,8 @@
 
 use crate::emit_context::EmitContext;
 use crate::lowering_pass::LoweringPass;
+use crate::parser::NodeIndex;
+use crate::scanner::SyntaxKind;
 use crate::thin_emitter::ThinPrinter;
 use crate::thin_parser::ThinParserState;
 use crate::transform_context::{TransformContext, TransformDirective};
@@ -303,6 +305,47 @@ fn test_lowering_pass_es5_object_literal_directive() {
     assert!(
         matches!(directive, Some(TransformDirective::ES5ObjectLiteral { .. })),
         "LoweringPass should emit ES5ObjectLiteral directive for computed property"
+    );
+}
+
+#[test]
+fn test_lowering_pass_es5_template_literal_directive() {
+    let source = "const msg = `hi ${name}`; const plain = `bye`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut template_expr = None;
+    let mut no_sub = None;
+    for (idx, node) in arena.nodes.iter().enumerate() {
+        let node_idx = NodeIndex(idx as u32);
+        if node.kind == crate::parser::syntax_kind_ext::TEMPLATE_EXPRESSION {
+            template_expr = Some(node_idx);
+        } else if node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16 {
+            no_sub = Some(node_idx);
+        }
+    }
+
+    let template_expr = template_expr.expect("expected template expression node");
+    let no_sub = no_sub.expect("expected no-substitution template node");
+
+    assert!(
+        matches!(
+            transforms.get(template_expr),
+            Some(TransformDirective::ES5TemplateLiteral { .. })
+        ),
+        "LoweringPass should emit ES5TemplateLiteral directive for template expression"
+    );
+    assert!(
+        matches!(
+            transforms.get(no_sub),
+            Some(TransformDirective::ES5TemplateLiteral { .. })
+        ),
+        "LoweringPass should emit ES5TemplateLiteral directive for no-substitution template"
     );
 }
 
