@@ -256,9 +256,8 @@ impl<'a> ThinPrinter<'a> {
         let mut writer = SourceWriter::with_capacity(capacity);
         writer.set_new_line_kind(options.new_line);
 
-        // Create EmitContext with ES5 targeting by default for baseline compatibility
-        let mut ctx = EmitContext::with_options(options);
-        ctx.target_es5 = true;
+        // Create EmitContext from options (target controls ES5 vs ESNext)
+        let ctx = EmitContext::with_options(options);
 
         ThinPrinter {
             arena,
@@ -296,16 +295,16 @@ impl<'a> ThinPrinter<'a> {
 
     /// Create a new ThinPrinter targeting ES5.
     pub fn new_es5(arena: &'a ThinNodeArena) -> Self {
-        let mut printer = Self::new(arena);
-        printer.ctx.target_es5 = true;
-        printer
+        let mut options = PrinterOptions::default();
+        options.target = ScriptTarget::ES5;
+        Self::with_options(arena, options)
     }
 
     /// Create a new ThinPrinter targeting ES6+.
     pub fn new_es6(arena: &'a ThinNodeArena) -> Self {
-        let mut printer = Self::new(arena);
-        printer.ctx.target_es5 = false;
-        printer
+        let mut options = PrinterOptions::default();
+        options.target = ScriptTarget::ES2015;
+        Self::with_options(arena, options)
     }
 
     /// Set whether to target ES5 (classes→IIFEs, arrows→functions).
@@ -1664,9 +1663,6 @@ impl<'a> ThinPrinter<'a> {
                 if self.needs_async_helpers() {
                     helpers.awaiter = true;
                     helpers.generator = true;
-                }
-                if self.needs_make_template_object_helper() {
-                    helpers.make_template_object = true;
                 }
                 if self.needs_class_private_field_helpers() {
                     helpers.class_private_field_get = true;

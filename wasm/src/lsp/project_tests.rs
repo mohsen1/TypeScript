@@ -1922,6 +1922,59 @@ fn test_project_nested_function_body_edit_preserves_suffix_definition_scope_cach
 }
 
 #[test]
+fn test_project_nested_function_body_edit_suffix_definition_without_hover() {
+    let mut project = Project::new();
+
+    project.set_file(
+        "a.ts".to_string(),
+        "const alpha = 1;\nfunction outer() {\n  function inner() {\n    return alpha;\n  }\n  return inner();\n}\nconst beta = alpha;\nbeta;\n".to_string(),
+    );
+    let position = {
+        let file = project.file("a.ts").unwrap();
+        range_for_substring(file.source_text(), file.line_map(), "beta;").start
+    };
+
+    let edit = {
+        let file = project.file("a.ts").unwrap();
+        let range = range_for_substring(file.source_text(), file.line_map(), "return alpha;");
+        TextEdit::new(range, "return alpha + 1;".to_string())
+    };
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
+
+    let expected_decl_start = {
+        let file = project.file("a.ts").unwrap();
+        range_for_substring(file.source_text(), file.line_map(), "beta = alpha").start
+    };
+
+    let definitions = project
+        .get_definition("a.ts", position)
+        .expect("Expected definition for suffix symbol");
+    assert!(
+        definitions.iter().any(|loc| {
+            loc.file_path == "a.ts" && loc.range.start == expected_decl_start
+        }),
+        "Expected definition to point at beta declaration after nested edit"
+    );
+
+    let timing = project
+        .performance()
+        .timing(ProjectRequestKind::Definition)
+        .expect("Expected timing data for definition");
+
+    assert!(
+        timing.scope_misses > 0,
+        "Expected cache misses on cold definition after nested edit"
+    );
+    assert_eq!(
+        timing.scope_hits,
+        0,
+        "Expected no cache hits on cold definition after nested edit"
+    );
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 

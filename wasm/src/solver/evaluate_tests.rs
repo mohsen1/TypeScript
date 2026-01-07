@@ -108,6 +108,53 @@ fn test_conditional_non_distributive_union() {
 }
 
 #[test]
+fn test_rest_unknown_bivariant_conditional_evaluate_strict() {
+    let interner = TypeInterner::new();
+
+    let rest_unknown = interner.array(TypeId::UNKNOWN);
+    let target = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: rest_unknown,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let source = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+    let cond = ConditionalType {
+        check_type: source,
+        extends_type: target,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, lit_false);
+}
+
+#[test]
 fn test_conditional_instantiated_param_distributes() {
     let interner = TypeInterner::new();
 
@@ -1892,6 +1939,40 @@ fn test_keyof_object_keyword() {
     // keyof object = never
     let result = evaluate_keyof(&interner, TypeId::OBJECT);
     assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_object_trifecta_keyof_object_interface() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let object_interface = interner.object(vec![
+        PropertyInfo { name: interner.intern_string("toString"), type_id: TypeId::STRING,
+ write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("valueOf"), type_id: TypeId::NUMBER,
+ write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+    ]);
+
+    let sym = SymbolRef(1);
+    env.insert(sym, object_interface);
+
+    let ref_type = interner.reference(sym);
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate_keyof(ref_type);
+    let key = interner.lookup(result).expect("expected union for keyof Object interface");
+
+    match key {
+        TypeKey::Union(members) => {
+            let members = interner.type_list(members);
+            let to_string = interner.literal_string("toString");
+            let value_of = interner.literal_string("valueOf");
+            assert!(members.contains(&to_string));
+            assert!(members.contains(&value_of));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
 }
 
 #[test]

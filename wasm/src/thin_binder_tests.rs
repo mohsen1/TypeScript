@@ -352,6 +352,20 @@ fn assert_bound_state_resolves_param_without_scopes(
     assert_bound_state_resolves_param_impl(source, function_name, param_name, false);
 }
 
+fn node_is_within(arena: &crate::parser::thin_node::ThinNodeArena, node_idx: crate::parser::NodeIndex, container: crate::parser::NodeIndex) -> bool {
+    let mut current = node_idx;
+    while !current.is_none() {
+        if current == container {
+            return true;
+        }
+        let Some(ext) = arena.get_extended(current) else {
+            break;
+        };
+        current = ext.parent;
+    }
+    false
+}
+
 #[test]
 fn test_thin_binder_resolves_parameter_from_bound_state() {
     let source = r#"
@@ -422,6 +436,142 @@ export function getModuleInstanceState(node: ModuleDeclaration, visited?: Map<nu
 "#;
 
     assert_bound_state_resolves_param_without_scopes(source, "getModuleInstanceState", "node");
+}
+
+#[test]
+fn test_thin_binder_resolves_block_local_from_bound_state_binder_ts_432() {
+    use crate::binder::SymbolTable;
+    use crate::parallel;
+    use crate::parser::{syntax_kind_ext, NodeIndex};
+
+    let source = r#"
+export function getModuleInstanceStateForAliasTarget(
+    specifier: ExportSpecifier,
+    visited: Map<number, ModuleInstanceState | undefined>
+) {
+    const name = specifier.propertyName || specifier.name;
+    let p: Node | undefined = specifier.parent;
+    while (p) {
+        if (isBlock(p) || isModuleBlock(p) || isSourceFile(p)) {
+            const statements = p.statements;
+            let found: ModuleInstanceState | undefined;
+            for (const statement of statements) {
+                if (nodeHasName(statement, name)) {
+                    return found;
+                }
+            }
+        }
+        p = p.parent;
+    }
+    return ModuleInstanceState.Instantiated;
+}
+"#;
+
+    let program = parallel::compile_files(vec![("test.ts".to_string(), source.to_string())]);
+    let file = &program.files[0];
+
+    let mut file_locals = SymbolTable::new();
+    for (name, &sym_id) in program.file_locals[0].iter() {
+        file_locals.set(name.clone(), sym_id);
+    }
+    for (name, &sym_id) in program.globals.iter() {
+        if !file_locals.has(name) {
+            file_locals.set(name.clone(), sym_id);
+        }
+    }
+
+    let binder = ThinBinderState::from_bound_state_with_scopes(
+        program.symbols.clone(),
+        file_locals,
+        file.node_symbols.clone(),
+        file.scopes.clone(),
+        file.node_scope_ids.clone(),
+    );
+
+    let arena = &file.arena;
+    let mut function_body = NodeIndex::NONE;
+    for i in 0..arena.len() {
+        let idx = NodeIndex(i as u32);
+        let Some(node) = arena.get(idx) else { continue; };
+        if node.kind != syntax_kind_ext::FUNCTION_DECLARATION {
+            continue;
+        }
+        let Some(func) = arena.get_function(node) else { continue; };
+        let name = arena
+            .get(func.name)
+            .and_then(|name_node| arena.get_identifier(name_node))
+            .map(|ident| ident.escaped_text.as_str());
+        if name == Some("getModuleInstanceStateForAliasTarget") {
+            function_body = func.body;
+            break;
+        }
+    }
+
+    assert!(
+        !function_body.is_none(),
+        "Expected function body for getModuleInstanceStateForAliasTarget"
+    );
+
+    let mut decl_name_idx = NodeIndex::NONE;
+    let mut decl_symbol = None;
+    for i in 0..arena.len() {
+        let idx = NodeIndex(i as u32);
+        let Some(node) = arena.get(idx) else { continue; };
+        if node.kind != syntax_kind_ext::VARIABLE_DECLARATION {
+            continue;
+        }
+        let Some(decl) = arena.get_variable_declaration(node) else { continue; };
+        let name = arena
+            .get(decl.name)
+            .and_then(|name_node| arena.get_identifier(name_node))
+            .map(|ident| ident.escaped_text.as_str());
+        if name != Some("statements") {
+            continue;
+        }
+        if !node_is_within(arena, idx, function_body) {
+            continue;
+        }
+        decl_name_idx = decl.name;
+        decl_symbol = binder.get_node_symbol(decl.name);
+        break;
+    }
+
+    assert!(
+        !decl_name_idx.is_none(),
+        "Expected declaration for statements"
+    );
+    assert!(decl_symbol.is_some(), "Expected symbol for statements declaration");
+
+    let mut usage_idx = NodeIndex::NONE;
+    for i in 0..arena.len() {
+        let idx = NodeIndex(i as u32);
+        let Some(node) = arena.get(idx) else { continue; };
+        if node.kind != syntax_kind_ext::FOR_OF_STATEMENT {
+            continue;
+        }
+        if !node_is_within(arena, idx, function_body) {
+            continue;
+        }
+        let Some(for_data) = arena.get_for_in_of(node) else { continue; };
+        let Some(expr_node) = arena.get(for_data.expression) else { continue; };
+        let Some(ident) = arena.get_identifier(expr_node) else { continue; };
+        if ident.escaped_text == "statements" {
+            usage_idx = for_data.expression;
+            break;
+        }
+    }
+
+    assert!(
+        !usage_idx.is_none(),
+        "Expected for-of expression to reference statements"
+    );
+
+    let resolved = binder.resolve_identifier(arena, usage_idx);
+    assert_eq!(
+        resolved,
+        decl_symbol,
+        "Expected for-of expression to resolve to statements declaration"
+    );
 }
 #[test]
 fn test_namespace_binding_debug() {

@@ -236,11 +236,50 @@ pub trait QueryDatabase: TypeDatabase {
         crate::solver::evaluate::evaluate_keyof(self.as_type_database(), operand)
     }
 
+    fn resolve_property_access(
+        &self,
+        object_type: TypeId,
+        prop_name: &str,
+    ) -> crate::solver::PropertyAccessResult {
+        let evaluator = crate::solver::operations::PropertyAccessEvaluator::new(self.as_type_database());
+        evaluator.resolve_property_access(object_type, prop_name)
+    }
+
+    fn property_access_type(
+        &self,
+        object_type: TypeId,
+        prop_name: &str,
+    ) -> crate::solver::PropertyAccessResult {
+        self.resolve_property_access(object_type, prop_name)
+    }
+
+    fn contextual_property_type(&self, expected: TypeId, prop_name: &str) -> Option<TypeId> {
+        let ctx = crate::solver::ContextualTypeContext::with_expected(
+            self.as_type_database(),
+            expected,
+        );
+        ctx.get_property_type(prop_name)
+    }
+
     fn is_property_readonly(&self, object_type: TypeId, prop_name: &str) -> bool {
         crate::solver::operations::property_is_readonly(
             self.as_type_database(),
             object_type,
             prop_name,
+        )
+    }
+
+    fn is_readonly_index_signature(
+        &self,
+        object_type: TypeId,
+        wants_string: bool,
+        wants_number: bool,
+    ) -> bool {
+        crate::solver::operations::is_readonly_index_signature(
+            self.as_type_database(),
+            object_type,
+            wants_string,
+            wants_number,
         )
     }
 

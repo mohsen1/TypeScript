@@ -728,6 +728,52 @@ fn test_rest_unknown_bivariant_even_strict() {
 }
 
 #[test]
+fn test_rest_unknown_bivariant_strict_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    checker.set_strict_function_types(true);
+
+    let rest_unknown = interner.array(TypeId::UNKNOWN);
+    let target = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: rest_unknown,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let source = interner.function(FunctionShape {
+        params: vec![
+            ParamInfo {
+                name: None,
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: None,
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    assert!(checker.is_assignable_strict(source, target));
+}
+
+#[test]
 fn test_rest_any_still_checks_return_type() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
@@ -1123,6 +1169,19 @@ fn test_object_interface_accepts_primitives() {
         TemplateSpan::Text(interner.intern_string("suffix")),
     ]);
     assert!(checker.is_assignable(template, object_interface));
+}
+
+#[test]
+fn test_object_trifecta_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let empty_object = interner.object(Vec::new());
+    let object_interface = make_object_interface(&interner);
+
+    assert!(checker.is_assignable(TypeId::STRING, empty_object));
+    assert!(checker.is_assignable(TypeId::STRING, object_interface));
+    assert!(!checker.is_assignable(TypeId::STRING, TypeId::OBJECT));
 }
 
 #[test]
