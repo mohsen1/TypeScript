@@ -773,18 +773,13 @@ impl<'a> ThinPrinter<'a> {
             TransformDirective::ES5AsyncFunction { function_node } => {
                 if let Some(func_node) = self.arena.get(function_node) {
                     if let Some(func) = self.arena.get_function(func_node) {
-                        let is_exported = self.ctx.is_commonjs()
-                            && self.has_export_modifier(&func.modifiers)
-                            && !self.ctx.module_state.has_export_assignment;
-                        let is_default = self.has_default_modifier(&func.modifiers);
-
                         let func_name = if !func.name.is_none() {
                             self.get_identifier_text_idx(func.name)
                         } else {
                             String::new()
                         };
 
-                        self.emit_async_function_es5(func, &func_name, is_exported, is_default);
+                        self.emit_async_function_es5(func, &func_name);
                         return;
                     }
                 }
@@ -892,14 +887,9 @@ impl<'a> ThinPrinter<'a> {
                     if let Some(func) = self.arena.get_function(func_node) {
                         if !func.name.is_none() {
                             let func_name = self.get_identifier_text_idx(func.name);
-                            self.emit_async_function_es5(func, &func_name, false, false);
+                            self.emit_async_function_es5(func, &func_name);
                         } else {
-                            self.emit_async_function_es5(
-                                func,
-                                export_name.unwrap_or(""),
-                                false,
-                                false,
-                            );
+                            self.emit_async_function_es5(func, export_name.unwrap_or(""));
                         }
                     }
                 }
@@ -1000,18 +990,13 @@ impl<'a> ThinPrinter<'a> {
             TransformDirective::ES5AsyncFunction { function_node } => {
                 if let Some(func_node) = self.arena.get(*function_node) {
                     if let Some(func) = self.arena.get_function(func_node) {
-                        let is_exported = self.ctx.is_commonjs()
-                            && self.has_export_modifier(&func.modifiers)
-                            && !self.ctx.module_state.has_export_assignment;
-                        let is_default = self.has_default_modifier(&func.modifiers);
-
                         let func_name = if !func.name.is_none() {
                             self.get_identifier_text_idx(func.name)
                         } else {
                             String::new()
                         };
 
-                        self.emit_async_function_es5(func, &func_name, is_exported, is_default);
+                        self.emit_async_function_es5(func, &func_name);
                         return;
                     }
                 }
@@ -2225,12 +2210,7 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Transform arrow function to regular function for ES5
-        if self.ctx.target_es5 {
-            self.emit_arrow_function_es5(node, func);
-        } else {
-            self.emit_arrow_function_native(func);
-        }
+        self.emit_arrow_function_native(func);
     }
 
     /// Emit ES5-compatible function expression for arrow function
@@ -2453,24 +2433,6 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        let is_exported = self.ctx.is_commonjs()
-            && self.has_export_modifier(&func.modifiers)
-            && !self.ctx.module_state.has_export_assignment;
-        let is_default = self.has_default_modifier(&func.modifiers);
-
-        // Get function name for export
-        let func_name = if !func.name.is_none() {
-            self.get_identifier_text_idx(func.name)
-        } else {
-            String::new()
-        };
-
-        // ES5 async transform: wrap in __awaiter/__generator
-        if self.ctx.target_es5 && func.is_async {
-            self.emit_async_function_es5(func, &func_name, is_exported, is_default);
-            return;
-        }
-
         if func.is_async {
             self.write("async ");
         }
@@ -2505,20 +2467,6 @@ impl<'a> ThinPrinter<'a> {
         } else {
             self.emit(func.body);
         }
-
-        // CommonJS: emit exports.funcName = funcName; after the function
-        if is_exported && !func_name.is_empty() {
-            self.write_line();
-            if is_default {
-                self.write("exports.default = ");
-            } else {
-                self.write("exports.");
-                self.write(&func_name);
-                self.write(" = ");
-            }
-            self.write(&func_name);
-            self.write(";");
-        }
     }
 
     /// Emit an async function transformed to ES5 __awaiter/__generator pattern
@@ -2526,8 +2474,6 @@ impl<'a> ThinPrinter<'a> {
         &mut self,
         func: &crate::parser::thin_node::FunctionData,
         func_name: &str,
-        is_exported: bool,
-        is_default: bool,
     ) {
         // function name(params) {
         self.write("function");
@@ -2569,19 +2515,6 @@ impl<'a> ThinPrinter<'a> {
         self.decrease_indent();
         self.write("}");
 
-        // CommonJS: emit exports.funcName = funcName; after the function
-        if is_exported && !func_name.is_empty() {
-            self.write_line();
-            if is_default {
-                self.write("exports.default = ");
-            } else {
-                self.write("exports.");
-                self.write(func_name);
-                self.write(" = ");
-            }
-            self.write(func_name);
-            self.write(";");
-        }
     }
 
     fn emit_function_parameters_es5(&mut self, params: &[NodeIndex]) -> ParamTransformPlan {
@@ -3700,11 +3633,6 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        if self.ctx.target_es5 && !for_in_of.await_modifier {
-            self.emit_for_of_statement_es5(for_in_of);
-            return;
-        }
-
         self.write("for ");
         if for_in_of.await_modifier {
             self.write("await ");
@@ -3891,11 +3819,6 @@ impl<'a> ThinPrinter<'a> {
 
     /// Emit a class declaration.
     ///
-    /// **Architecture Note**: This method contains the old inline transform logic for
-    /// backward compatibility. When transforms are provided via TransformContext,
-    /// the transform system handles ES5/CommonJS transforms and this method is NOT called.
-    ///
-    /// New code should use: LoweringPass → TransformContext → apply_transform()
     fn emit_class_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
         let Some(class) = self.arena.get_class(node) else {
             return;
@@ -3906,62 +3829,7 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        let is_exported = self.ctx.is_commonjs()
-            && self.has_export_modifier(&class.modifiers)
-            && !self.ctx.module_state.has_export_assignment;
-        let is_default = self.has_default_modifier(&class.modifiers);
-
-        // Get class name for export
-        let class_name = if !class.name.is_none() {
-            self.get_identifier_text_idx(class.name)
-        } else {
-            String::new()
-        };
-
-        // Use ES5 IIFE transform when targeting ES5 (OLD PATH - for backward compatibility)
-        // When TransformContext is used, this is handled by TransformDirective::ES5Class
-        if self.ctx.target_es5 {
-            let mut es5_emitter = ClassES5Emitter::new(self.arena);
-            es5_emitter.set_indent_level(self.writer.indent_level());
-            if let Some(source_text) = self.source_text {
-                es5_emitter.set_source_text(source_text);
-            }
-            let es5_output = es5_emitter.emit_class(idx);
-            self.write(&es5_output);
-
-            // CommonJS: emit exports.ClassName = ClassName; after the ES5 class
-            if is_exported && !class_name.is_empty() {
-                self.write_line();
-                if is_default {
-                    self.write("exports.default = ");
-                } else {
-                    self.write("exports.");
-                    self.write(&class_name);
-                    self.write(" = ");
-                }
-                self.write(&class_name);
-                self.write(";");
-            }
-            return;
-        }
-
-        // ES6+ path: emit native class syntax
         self.emit_class_es6(node, idx);
-
-        // CommonJS: emit exports.ClassName = ClassName; after the class (OLD PATH)
-        // When TransformContext is used, this is handled by TransformDirective::CommonJSExport
-        if is_exported && !class_name.is_empty() {
-            self.write_line();
-            if is_default {
-                self.write("exports.default = ");
-            } else {
-                self.write("exports.");
-                self.write(&class_name);
-                self.write(" = ");
-            }
-            self.write(&class_name);
-            self.write(";");
-        }
     }
 
     /// Emit a class using ES6 native class syntax (no transforms).
@@ -4717,7 +4585,7 @@ impl<'a> ThinPrinter<'a> {
                         if let Some(func) = self.arena.get_function(clause_node) {
                             self.write("exports.default = ");
                             if self.ctx.target_es5 && func.is_async {
-                                self.emit_async_function_es5(func, "", false, false);
+                                self.emit_async_function_es5(func, "");
                             } else {
                                 self.emit_function_expression(clause_node, export.export_clause);
                             }
@@ -5345,7 +5213,7 @@ impl<'a> ThinPrinter<'a> {
     // Declarations - Enum, Interface, Type Alias
     // =========================================================================
 
-    fn emit_enum_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
+    fn emit_enum_declaration(&mut self, node: &ThinNode, _idx: NodeIndex) {
         let Some(enum_decl) = self.arena.get_enum(node) else {
             return;
         };
@@ -5357,16 +5225,7 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        // For ES5 target: transform to IIFE pattern
-        if self.ctx.target_es5 {
-            let mut enum_emitter = crate::transforms::enum_es5::EnumES5Emitter::new(self.arena);
-            enum_emitter.set_indent_level(self.writer.indent_level());
-            let output = enum_emitter.emit_enum(idx);
-            self.write(&output);
-            return;
-        }
-
-        // For modern targets: emit TypeScript-style enum
+        // Emit TypeScript-style enum
         self.write("enum ");
         self.emit(enum_decl.name);
         self.write(" {");
@@ -5457,15 +5316,7 @@ impl<'a> ThinPrinter<'a> {
         self.write_semicolon();
     }
 
-    fn emit_module_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
-        if self.ctx.target_es5 {
-            // Use ES5 namespace transform: namespace → IIFE pattern
-            let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
-            let output = ns_emitter.emit_namespace(idx);
-            self.write(&output);
-            return;
-        }
-
+    fn emit_module_declaration(&mut self, node: &ThinNode, _idx: NodeIndex) {
         let Some(module) = self.arena.get_module(node) else {
             return;
         };
