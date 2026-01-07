@@ -1,4 +1,6 @@
 use super::ThinPrinter;
+use crate::parser::{NodeIndex, NodeList};
+use crate::scanner::SyntaxKind;
 use crate::source_writer::SourcePosition;
 
 impl<'a> ThinPrinter<'a> {
@@ -91,5 +93,94 @@ impl<'a> ThinPrinter<'a> {
     /// Decrease indentation.
     pub(super) fn decrease_indent(&mut self) {
         self.writer.decrease_indent();
+    }
+
+    // =========================================================================
+    // Identifier Helpers
+    // =========================================================================
+
+    pub(super) fn has_identifier_text(&self, idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(idx) else { return false };
+        self.arena.get_identifier(node).is_some()
+    }
+
+    pub(super) fn write_identifier_text(&mut self, idx: NodeIndex) {
+        let Some(node) = self.arena.get(idx) else { return };
+        if let Some(ident) = self.arena.get_identifier(node) {
+            self.write(&ident.escaped_text);
+        }
+    }
+
+    /// Get identifier text from a node index
+    pub(super) fn get_identifier_text(&self, idx: NodeIndex) -> String {
+        let Some(node) = self.arena.get(idx) else { return String::new() };
+        if let Some(ident) = self.arena.get_identifier(node) {
+            return ident.escaped_text.clone();
+        }
+        String::new()
+    }
+
+    // =========================================================================
+    // Emitter Helpers
+    // =========================================================================
+
+    pub(super) fn emit_comma_separated(&mut self, nodes: &[NodeIndex]) {
+        let mut first = true;
+        for &idx in nodes {
+            if !first {
+                self.write(", ");
+            }
+            first = false;
+            self.emit(idx);
+        }
+    }
+
+    pub(super) fn emit_heritage_expression(&mut self, idx: NodeIndex) {
+        if idx.is_none() {
+            return;
+        }
+
+        let Some(node) = self.arena.get(idx) else {
+            return;
+        };
+
+        if let Some(expr) = self.arena.get_expr_type_args(node) {
+            self.emit(expr.expression);
+        } else {
+            self.emit(idx);
+        }
+    }
+
+    // =========================================================================
+    // Modifier Helpers
+    // =========================================================================
+
+    /// Check if modifiers include the `declare` keyword
+    pub(super) fn has_declare_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        self.has_modifier(modifiers, SyntaxKind::DeclareKeyword as u16)
+    }
+
+    /// Check if modifiers include the `export` keyword
+    pub(super) fn has_export_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        self.has_modifier(modifiers, SyntaxKind::ExportKeyword as u16)
+    }
+
+    /// Check if modifiers include the `default` keyword
+    pub(super) fn has_default_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        self.has_modifier(modifiers, SyntaxKind::DefaultKeyword as u16)
+    }
+
+    /// Check if modifiers include a specific keyword
+    pub(super) fn has_modifier(&self, modifiers: &Option<NodeList>, kind: u16) -> bool {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == kind {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 }
