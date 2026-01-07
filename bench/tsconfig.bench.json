@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "module": "esnext",
+    "target": "es2015",
+    "lib": [],
+    "types": [],
+    "strict": false
+  },
+  "files": ["./globals.d.ts"],
+  "include": ["synth/**/*.ts"]
+}
