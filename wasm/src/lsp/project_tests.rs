@@ -1264,6 +1264,41 @@ fn test_project_scope_cache_reuse_hover_to_definition_after_edit() {
 }
 
 #[test]
+fn test_project_scope_cache_reuse_hover_to_completions_after_edit() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "const value = 1;\nvalue;\n".to_string());
+    let position = Position::new(1, 0);
+
+    let edit = {
+        let file = project.file("a.ts").unwrap();
+        let range = range_for_substring(file.source_text(), file.line_map(), "1");
+        TextEdit::new(range, "2".to_string())
+    };
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
+
+    assert!(project.get_hover("a.ts", position).is_some());
+    let items = project
+        .get_completions("a.ts", position)
+        .expect("Expected completions");
+    assert!(items.iter().any(|item| item.label == "value"));
+
+    let timing = project
+        .performance()
+        .timing(ProjectRequestKind::Completions)
+        .expect("Expected timing data for completions");
+
+    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover after edit");
+    assert_eq!(
+        timing.scope_misses,
+        0,
+        "Expected completions to reuse cached scope after edit"
+    );
+}
+
+#[test]
 fn test_project_scope_cache_reuse_across_requests() {
     let mut project = Project::new();
 

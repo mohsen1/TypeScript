@@ -61,6 +61,7 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
   - [x] Verify scope cache reuse from hover to references.
   - [x] Verify scope cache reuse from hover to rename.
   - [x] Verify scope cache reuse from hover to definition after edit.
+  - [x] Verify scope cache reuse from hover to completions after edit.
 - [x] Cross-file rename
   - [x] Project-level rename builds workspace edits from multi-file references.
   - [x] Preserve local alias names when renaming exported symbols.
