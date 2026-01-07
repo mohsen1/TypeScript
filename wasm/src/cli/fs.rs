@@ -6,7 +6,7 @@ use walkdir::{DirEntry, WalkDir};
 
 use crate::cli::config::TsConfig;
 
-const DEFAULT_EXCLUDES: [&str; 3] = ["node_modules", "bower_components", "jspm_packages"];
+pub(crate) const DEFAULT_EXCLUDES: [&str; 3] = ["node_modules", "bower_components", "jspm_packages"];
 
 #[derive(Debug, Clone)]
 pub struct FileDiscoveryOptions {
@@ -204,7 +204,7 @@ fn ensure_file_exists(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn is_ts_file(path: &Path) -> bool {
+pub(crate) fn is_ts_file(path: &Path) -> bool {
     let name = match path.file_name().and_then(|name| name.to_str()) {
         Some(name) => name,
         None => return false,

@@ -91,7 +91,7 @@ struct OutputFile {
     contents: String,
 }
 
-fn find_tsconfig(cwd: &Path) -> Option<PathBuf> {
+pub(crate) fn find_tsconfig(cwd: &Path) -> Option<PathBuf> {
     let candidate = cwd.join("tsconfig.json");
     if candidate.is_file() {
         Some(candidate)
@@ -100,7 +100,7 @@ fn find_tsconfig(cwd: &Path) -> Option<PathBuf> {
     }
 }
 
-fn load_config(path: Option<&Path>) -> Result<Option<TsConfig>> {
+pub(crate) fn load_config(path: Option<&Path>) -> Result<Option<TsConfig>> {
     let Some(path) = path else {
         return Ok(None);
     };
@@ -109,7 +109,7 @@ fn load_config(path: Option<&Path>) -> Result<Option<TsConfig>> {
     Ok(Some(config))
 }
 
-fn config_base_dir(cwd: &Path, tsconfig_path: Option<&Path>) -> PathBuf {
+pub(crate) fn config_base_dir(cwd: &Path, tsconfig_path: Option<&Path>) -> PathBuf {
     tsconfig_path
         .and_then(|path| path.parent().map(Path::to_path_buf))
         .unwrap_or_else(|| cwd.to_path_buf())
@@ -343,7 +343,7 @@ fn js_extension_for(path: &Path) -> Option<&'static str> {
     }
 }
 
-fn normalize_output_dir(base_dir: &Path, dir: Option<PathBuf>) -> Option<PathBuf> {
+pub(crate) fn normalize_output_dir(base_dir: &Path, dir: Option<PathBuf>) -> Option<PathBuf> {
     dir.map(|dir| {
         if dir.is_absolute() {
             dir
@@ -357,7 +357,7 @@ fn canonicalize_or_owned(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
-fn apply_cli_overrides(options: &mut ResolvedCompilerOptions, args: &CliArgs) {
+pub(crate) fn apply_cli_overrides(options: &mut ResolvedCompilerOptions, args: &CliArgs) {
     if let Some(target) = args.target {
         options.printer.target = target.to_script_target();
     }

@@ -105,6 +105,23 @@ pub enum TransformDirective {
     /// ```
     CommonJSExportDefaultExpr,
 
+    /// CommonJS default export for anonymous class declarations in ES5.
+    ///
+    /// ```typescript
+    /// export default class { method() {} }
+    /// ```
+    ///
+    /// Becomes:
+    ///
+    /// ```javascript
+    /// var _a = /** @class */ (function () { ... }());
+    /// exports.default = _a;
+    /// ```
+    CommonJSExportDefaultClassES5 {
+        /// Original class node index
+        class_node: NodeIndex,
+    },
+
     /// ES5 Arrow Function: Transform arrow to regular function
     ///
     /// ```typescript

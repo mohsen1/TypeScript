@@ -11,6 +11,7 @@ fn parses_defaults() {
     assert!(args.out_dir.is_none());
     assert!(!args.strict);
     assert!(!args.no_emit);
+    assert!(!args.watch);
     assert!(args.files.is_empty());
 }
 
@@ -26,6 +27,7 @@ fn parses_common_flags() {
         "dist",
         "--strict",
         "--noEmit",
+        "--watch",
         "src/index.ts",
     ])
     .expect("flagged args should parse");
@@ -35,5 +37,6 @@ fn parses_common_flags() {
     assert_eq!(args.out_dir.as_deref(), Some(std::path::Path::new("dist")));
     assert!(args.strict);
     assert!(args.no_emit);
+    assert!(args.watch);
     assert_eq!(args.files, vec![std::path::PathBuf::from("src/index.ts")]);
 }

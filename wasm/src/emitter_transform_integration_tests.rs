@@ -390,6 +390,34 @@ fn test_lowering_pass_es5_variable_declaration_list_directive() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_variable_declaration_list_uses_var() {
+    let source = "let x = 1; const y = 2;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var x = 1;"),
+        "ES5 output should emit var for let: {}",
+        output
+    );
+    assert!(
+        output.contains("var y = 2;"),
+        "ES5 output should emit var for const: {}",
+        output
+    );
+}
+
+#[test]
 fn test_lowering_pass_es5_function_parameters_directive() {
     let source = "function foo(x = 1) { return x; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -1449,6 +1477,40 @@ fn test_lowering_pass_commonjs_default_anonymous_class_directive() {
     assert!(
         matches!(directive, Some(TransformDirective::CommonJSExportDefaultExpr)),
         "LoweringPass should emit default export directive for anonymous class"
+    );
+}
+
+#[test]
+fn test_lowering_pass_commonjs_default_anonymous_class_directive_es5() {
+    let source = "export default class { method() { return 1; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let stmt_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected export declaration");
+    let stmt_node = arena.get(stmt_idx).expect("expected export node");
+    let export_decl = arena
+        .get_export_decl(stmt_node)
+        .expect("expected export declaration data");
+
+    let directive = transforms.get(export_decl.export_clause);
+    assert!(
+        matches!(directive, Some(TransformDirective::CommonJSExportDefaultClassES5 { .. })),
+        "LoweringPass should emit ES5 default export directive for anonymous class"
     );
 }
 
