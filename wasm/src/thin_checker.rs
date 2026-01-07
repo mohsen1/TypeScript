@@ -1764,8 +1764,13 @@ impl<'a> ThinCheckerState<'a> {
         let literal_index = self.get_literal_index_from_node(access.name_or_argument)
             .or(numeric_string_index);
         let index_type = self.get_type_of_node(access.name_or_argument);
+        let result_type = self.get_element_access_type(object_type, index_type, literal_index);
 
-        self.get_element_access_type(object_type, index_type, literal_index)
+        if self.should_report_no_index_signature(object_type, index_type, literal_index) {
+            self.error_no_index_signature_at(index_type, object_type, access.name_or_argument);
+        }
+
+        result_type
     }
 
     fn get_element_access_type(
@@ -1915,6 +1920,85 @@ impl<'a> ThinCheckerState<'a> {
             return None;
         }
         Some(parsed as usize)
+    }
+
+    fn should_report_no_index_signature(
+        &self,
+        object_type: TypeId,
+        index_type: TypeId,
+        literal_index: Option<usize>,
+    ) -> bool {
+        use crate::solver::TypeKey;
+
+        if object_type == TypeId::ANY || object_type == TypeId::UNKNOWN || object_type == TypeId::ERROR {
+            return false;
+        }
+
+        if index_type == TypeId::ANY || index_type == TypeId::UNKNOWN {
+            return false;
+        }
+
+        let wants_number = index_type == TypeId::NUMBER || literal_index.is_some();
+        let wants_string = index_type == TypeId::STRING;
+        if !wants_number && !wants_string {
+            return false;
+        }
+
+        let object_key = match self.ctx.types.lookup(object_type) {
+            Some(TypeKey::ReadonlyType(inner)) => self.ctx.types.lookup(inner),
+            other => other,
+        };
+
+        !self.is_element_indexable_key(&object_key, wants_string, wants_number)
+    }
+
+    fn is_element_indexable_key(
+        &self,
+        object_key: &Option<crate::solver::TypeKey>,
+        wants_string: bool,
+        wants_number: bool,
+    ) -> bool {
+        use crate::solver::{IntrinsicKind, LiteralValue, TypeKey};
+
+        match object_key {
+            Some(TypeKey::Array(_)) | Some(TypeKey::Tuple(_)) => wants_number,
+            Some(TypeKey::ObjectWithIndex(shape)) => {
+                let has_string = shape.string_index.is_some();
+                let has_number = shape.number_index.is_some();
+                (wants_string && has_string) || (wants_number && (has_number || has_string))
+            }
+            Some(TypeKey::Union(members)) => members.iter().all(|member| {
+                let key = self.ctx.types.lookup(*member);
+                self.is_element_indexable_key(&key, wants_string, wants_number)
+            }),
+            Some(TypeKey::Intersection(members)) => members.iter().any(|member| {
+                let key = self.ctx.types.lookup(*member);
+                self.is_element_indexable_key(&key, wants_string, wants_number)
+            }),
+            Some(TypeKey::Literal(LiteralValue::String(_))) => wants_number,
+            Some(TypeKey::Intrinsic(IntrinsicKind::String)) => wants_number,
+            _ => false,
+        }
+    }
+
+    fn error_no_index_signature_at(
+        &mut self,
+        index_type: TypeId,
+        object_type: TypeId,
+        idx: NodeIndex,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        use crate::solver::TypeFormatter;
+
+        let mut formatter = TypeFormatter::new(self.ctx.types);
+        let index_str = formatter.format(index_type);
+        let object_str = formatter.format(object_type);
+        let message = format!(
+            "Element implicitly has an 'any' type because expression of type '{}' can't be used to index type '{}'.",
+            index_str, object_str
+        );
+
+        self.error_at_node(idx, &message, diagnostic_codes::NO_INDEX_SIGNATURE);
     }
 
     /// Get type of conditional expression (ternary: a ? b : c).
