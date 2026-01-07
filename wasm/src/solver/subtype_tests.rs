@@ -100,6 +100,45 @@ fn test_apparent_number_member_subtyping() {
 }
 
 #[test]
+fn test_object_trifecta_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let array = interner.array(TypeId::STRING);
+    let tuple = interner.tuple(vec![TupleElement {
+        type_id: TypeId::BOOLEAN,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let func = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let empty_object = interner.object(Vec::new());
+
+    assert!(checker.is_subtype_of(obj, TypeId::OBJECT));
+    assert!(checker.is_subtype_of(array, TypeId::OBJECT));
+    assert!(checker.is_subtype_of(tuple, TypeId::OBJECT));
+    assert!(checker.is_subtype_of(func, TypeId::OBJECT));
+    assert!(checker.is_subtype_of(TypeId::STRING, empty_object));
+    assert!(!checker.is_subtype_of(TypeId::STRING, TypeId::OBJECT));
+    assert!(!checker.is_subtype_of(TypeId::NUMBER, TypeId::OBJECT));
+}
+
+#[test]
 fn test_unique_symbol_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);

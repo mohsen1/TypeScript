@@ -1126,6 +1126,19 @@ fn test_object_interface_accepts_primitives() {
 }
 
 #[test]
+fn test_object_trifecta_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let empty_object = interner.object(Vec::new());
+    let object_interface = make_object_interface(&interner);
+
+    assert!(checker.is_assignable(TypeId::STRING, empty_object));
+    assert!(checker.is_assignable(TypeId::STRING, object_interface));
+    assert!(!checker.is_assignable(TypeId::STRING, TypeId::OBJECT));
+}
+
+#[test]
 fn test_split_accessor_allows_wider_setter_in_source() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
