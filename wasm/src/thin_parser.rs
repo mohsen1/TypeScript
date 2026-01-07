@@ -5296,7 +5296,17 @@ impl ThinParserState {
         let end_pos = self.token_end();
         // Use zero-copy accessor for parsing
         let text_ref = self.scanner.get_token_value_ref();
-        let value = text_ref.parse::<f64>().ok();
+        let value = if text_ref.as_bytes().contains(&b'_') {
+            let mut sanitized = String::with_capacity(text_ref.len());
+            for &byte in text_ref.as_bytes() {
+                if byte != b'_' {
+                    sanitized.push(byte as char);
+                }
+            }
+            sanitized.parse::<f64>().ok()
+        } else {
+            text_ref.parse::<f64>().ok()
+        };
         let text = text_ref.to_string();
         self.next_token();
 

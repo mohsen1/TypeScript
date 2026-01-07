@@ -172,6 +172,67 @@ fn test_index_access_object_union_key() {
 }
 
 #[test]
+fn test_index_access_object_with_string_index_signature() {
+    let interner = TypeInterner::new();
+
+    let key_x = interner.intern_string("x");
+    let key_y = interner.literal_string("y");
+
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name: key_x,
+            type_id: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let key_x_literal = interner.literal_string("x");
+    let result = evaluate_index_access(&interner, obj, key_x_literal);
+    assert_eq!(result, TypeId::STRING);
+
+    let result = evaluate_index_access(&interner, obj, key_y);
+    assert_eq!(result, TypeId::NUMBER);
+
+    let result = evaluate_index_access(&interner, obj, TypeId::STRING);
+    assert_eq!(result, TypeId::NUMBER);
+
+    let key_union = interner.union(vec![key_x_literal, key_y]);
+    let result = evaluate_index_access(&interner, obj, key_union);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_index_access_object_with_number_index_signature() {
+    let interner = TypeInterner::new();
+
+    let obj = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::BOOLEAN,
+            readonly: false,
+        }),
+    });
+
+    let result = evaluate_index_access(&interner, obj, TypeId::NUMBER);
+    assert_eq!(result, TypeId::BOOLEAN);
+
+    let one = interner.literal_number(1.0);
+    let result = evaluate_index_access(&interner, obj, one);
+    assert_eq!(result, TypeId::BOOLEAN);
+}
+
+#[test]
 fn test_index_access_array() {
     let interner = TypeInterner::new();
 

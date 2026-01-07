@@ -16,6 +16,7 @@
 //! Future features:
 //! - Remove Unused Declarations (diagnostic-based quick fix)
 
+use crate::binder::ScopeId;
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
@@ -26,6 +27,7 @@ use crate::lsp::diagnostics::LspDiagnostic;
 use crate::lsp::rename::{WorkspaceEdit, TextEdit};
 use crate::lsp::utils::find_node_at_offset;
 use crate::scanner::SyntaxKind;
+use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
 
 // =============================================================================
@@ -1486,9 +1488,8 @@ impl<'a> CodeActionProvider<'a> {
         }
         // TODO: Validate that extracted expressions don't capture out-of-scope identifiers.
 
-        // TODO: Validate name collisions in scope before inserting.
-        // 5. Generate a unique variable name (simple version: use "extracted")
-        let var_name = "extracted";
+        // 5. Generate a unique variable name scoped to the insertion point.
+        let var_name = self.unique_extracted_name(stmt_idx);
 
         // TODO: Preserve operator precedence (wrap in parentheses when needed).
         // 6. Extract the selected text (snap to node boundaries)
@@ -1527,7 +1528,7 @@ impl<'a> CodeActionProvider<'a> {
         // Replace the expression with the variable name
         edits.push(TextEdit {
             range: replacement_range,
-            new_text: var_name.to_string(),
+            new_text: var_name.clone(),
         });
 
         // Create the workspace edit
@@ -1540,6 +1541,58 @@ impl<'a> CodeActionProvider<'a> {
             edit: Some(WorkspaceEdit { changes }),
             is_preferred: true,
         })
+    }
+
+    fn unique_extracted_name(&self, stmt_idx: NodeIndex) -> String {
+        let mut names = FxHashSet::default();
+        if let Some(scope_id) = self.find_enclosing_scope_id(stmt_idx) {
+            self.collect_scope_names(scope_id, &mut names);
+        }
+
+        let base = "extracted";
+        if !names.contains(base) {
+            return base.to_string();
+        }
+
+        let mut suffix = 2;
+        loop {
+            let candidate = format!("{}{}", base, suffix);
+            if !names.contains(&candidate) {
+                return candidate;
+            }
+            suffix += 1;
+        }
+    }
+
+    fn find_enclosing_scope_id(&self, node_idx: NodeIndex) -> Option<ScopeId> {
+        let mut current = node_idx;
+        while !current.is_none() {
+            if let Some(&scope_id) = self.binder.node_scope_ids.get(&current.0) {
+                return Some(scope_id);
+            }
+            let ext = match self.arena.get_extended(current) {
+                Some(ext) => ext,
+                None => break,
+            };
+            current = ext.parent;
+        }
+
+        if !self.binder.scopes.is_empty() {
+            Some(ScopeId(0))
+        } else {
+            None
+        }
+    }
+
+    fn collect_scope_names(&self, mut scope_id: ScopeId, names: &mut FxHashSet<String>) {
+        while !scope_id.is_none() {
+            let scope = match self.binder.scopes.get(scope_id.0 as usize) {
+                Some(scope) => scope,
+                None => break,
+            };
+            names.extend(scope.table.iter().map(|(name, _)| name.clone()));
+            scope_id = scope.parent;
+        }
     }
 
     /// Find an expression node that matches the given range.

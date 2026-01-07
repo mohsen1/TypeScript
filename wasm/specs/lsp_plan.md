@@ -42,6 +42,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Signature help: select constructor overloads for `new`
    - [x] Signature help: surface JSDoc documentation
    - [x] Signature help: attach @param docs to parameters
+   - [x] Extract variable: avoid name collisions in scope
 
 2. **Extend AST Coverage** (if needed)
    - [x] Traverse template expressions in LSP resolver for references/completions

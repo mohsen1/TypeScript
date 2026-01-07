@@ -24,6 +24,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - Hex/binary/octal numeric literals map to numeric literal types
   - BigInt literals normalize base prefixes to decimal
   - BigInt literals with base prefixes are tokenized in the scanner
+  - Numeric separators are accepted for numeric and bigint literals
 - [x] Parse and lower `unique symbol` type operator
 - [x] Tests for basic lowering
   - Test: `number` annotation -> Intrinsic(Number)
@@ -33,6 +34,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Negative numeric and bigint literal types
   - [x] Test: Hex/binary/octal numeric literal types
   - [x] Test: Hex/binary/octal bigint literal types (normalized)
+  - [x] Test: Numeric/bigint literal separators across bases
   - [x] Test: `unique symbol` type operator lowering
   - [x] Test: `keyof` type operator lowering
   - [x] Test: `readonly` type operator lowering
@@ -100,6 +102,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - Check if already lowered (cache)
   - Otherwise, lower the symbol's type annotation
   - Store in cache for next lookup
+- [x] Lower typeof type queries with type arguments into applications
 - [x] Add comprehensive tests
   - [x] Test: Interface index signature property access (4111)
   - [x] Test: Explicit property bypasses 4111
@@ -109,6 +112,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Circular type references (handle gracefully)
   - [x] Test: typeof value references in interfaces (qualified and unqualified)
   - [x] Test: typeof lowering uses value resolver (type vs value space)
+  - [x] Test: typeof type query with type arguments
 - [x] Parser: fix interface member parsing to track progress by token position (avoid skipping consecutive identifiers)
 - [x] Perf: avoid extra String clone when lowering negative bigint literals
 - [x] Perf: avoid extra allocation when normalizing bigint leading zeros

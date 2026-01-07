@@ -62,6 +62,11 @@ pub enum CallResult {
     },
 }
 
+struct TupleRestExpansion {
+    fixed: Vec<TupleElement>,
+    variadic: Option<TypeId>,
+}
+
 /// Evaluates function calls.
 pub struct CallEvaluator<'a> {
     interner: &'a dyn TypeDatabase,
@@ -182,7 +187,12 @@ impl<'a> CallEvaluator<'a> {
         }).collect();
 
         // 3. Collect constraints from arguments
+        let rest_tuple_inference = self.rest_tuple_inference_target(&instantiated_params, arg_types, &var_map);
+        let rest_tuple_start = rest_tuple_inference.as_ref().map(|(start, _, _)| *start);
         for (i, &arg_type) in arg_types.iter().enumerate() {
+            if rest_tuple_start.is_some_and(|start| i >= start) {
+                continue;
+            }
             let Some(target_type) = self.param_type_for_arg_index(&instantiated_params, i) else {
                 break;
             };
@@ -200,6 +210,9 @@ impl<'a> CallEvaluator<'a> {
 
             // arg_type <: target_type
             self.constrain_types(&mut infer_ctx, &var_map, arg_type, target_type);
+        }
+        if let Some((_start, target_type, tuple_type)) = rest_tuple_inference {
+            self.constrain_types(&mut infer_ctx, &var_map, tuple_type, target_type);
         }
 
         // 4. Resolve inference variables
@@ -276,18 +289,23 @@ impl<'a> CallEvaluator<'a> {
             Some(TypeKey::Tuple(elements)) => {
                 let mut min = required;
                 let mut max = required;
-                let mut has_rest = false;
                 for elem in elements {
                     if elem.rest {
-                        has_rest = true;
-                        break;
+                        let expansion = self.expand_tuple_rest(elem.type_id);
+                        for fixed in expansion.fixed {
+                            max += 1;
+                            if !fixed.optional {
+                                min += 1;
+                            }
+                        }
+                        return (min, if expansion.variadic.is_some() { None } else { Some(max) });
                     }
                     max += 1;
                     if !elem.optional {
                         min += 1;
                     }
                 }
-                (min, if has_rest { None } else { Some(max) })
+                (min, Some(max))
             }
             _ => (required, None),
         }
@@ -308,22 +326,21 @@ impl<'a> CallEvaluator<'a> {
             Some(TypeKey::Array(elem)) => Some(elem),
             Some(TypeKey::Tuple(elements)) => {
                 let mut fixed_count = 0usize;
-                let mut rest_elem_type = None;
                 for elem in elements {
                     if elem.rest {
-                        rest_elem_type = Some(self.rest_element_type(elem.type_id));
-                        break;
+                        let expansion = self.expand_tuple_rest(elem.type_id);
+                        let inner_offset = offset.saturating_sub(fixed_count);
+                        if inner_offset < expansion.fixed.len() {
+                            return Some(expansion.fixed[inner_offset].type_id);
+                        }
+                        return expansion.variadic;
                     }
                     if fixed_count == offset {
                         return Some(elem.type_id);
                     }
                     fixed_count += 1;
                 }
-                if offset >= fixed_count {
-                    rest_elem_type
-                } else {
-                    None
-                }
+                None
             }
             _ => Some(rest_param.type_id),
         }
@@ -334,6 +351,84 @@ impl<'a> CallEvaluator<'a> {
             Some(TypeKey::Array(elem)) => elem,
             _ => type_id,
         }
+    }
+
+    fn expand_tuple_rest(&self, type_id: TypeId) -> TupleRestExpansion {
+        match self.interner.lookup(type_id) {
+            Some(TypeKey::Array(elem)) => TupleRestExpansion {
+                fixed: Vec::new(),
+                variadic: Some(elem),
+            },
+            Some(TypeKey::Tuple(elements)) => {
+                let mut fixed = Vec::new();
+                for elem in elements {
+                    if elem.rest {
+                        let inner = self.expand_tuple_rest(elem.type_id);
+                        fixed.extend(inner.fixed);
+                        return TupleRestExpansion {
+                            fixed,
+                            variadic: inner.variadic,
+                        };
+                    }
+                    fixed.push(elem.clone());
+                }
+                TupleRestExpansion {
+                    fixed,
+                    variadic: None,
+                }
+            }
+            _ => TupleRestExpansion {
+                fixed: Vec::new(),
+                variadic: Some(type_id),
+            },
+        }
+    }
+
+    fn rest_tuple_inference_target(
+        &self,
+        params: &[ParamInfo],
+        arg_types: &[TypeId],
+        var_map: &FxHashMap<TypeId, crate::solver::infer::InferenceVar>,
+    ) -> Option<(usize, TypeId, TypeId)> {
+        let rest_param = params.last().filter(|param| param.rest)?;
+        let rest_start = params.len().saturating_sub(1);
+
+        let target = match self.interner.lookup(rest_param.type_id) {
+            Some(TypeKey::TypeParameter(_)) if var_map.contains_key(&rest_param.type_id) => {
+                Some((rest_start, rest_param.type_id))
+            }
+            Some(TypeKey::Tuple(elements)) => {
+                let mut prefix_len = 0usize;
+                let mut target = None;
+                for elem in elements {
+                    if elem.rest {
+                        if var_map.contains_key(&elem.type_id) {
+                            target = Some((rest_start + prefix_len, elem.type_id));
+                        }
+                        break;
+                    }
+                    prefix_len += 1;
+                }
+                target
+            }
+            _ => None,
+        }?;
+
+        let (start_index, target_type) = target;
+        if start_index >= arg_types.len() {
+            return None;
+        }
+
+        let tuple_elements = arg_types[start_index..]
+            .iter()
+            .map(|&ty| TupleElement {
+                type_id: ty,
+                name: None,
+                optional: false,
+                rest: false,
+            })
+            .collect();
+        Some((start_index, target_type, self.interner.tuple(tuple_elements)))
     }
 
     fn type_contains_placeholder(

@@ -1100,10 +1100,27 @@ impl<'a> TypeLowering<'a> {
         }
     }
 
+    fn strip_numeric_separators<'b>(text: &'b str) -> std::borrow::Cow<'b, str> {
+        if !text.as_bytes().contains(&b'_') {
+            return std::borrow::Cow::Borrowed(text);
+        }
+
+        let mut out = String::with_capacity(text.len());
+        for &byte in text.as_bytes() {
+            if byte != b'_' {
+                out.push(byte as char);
+            }
+        }
+        std::borrow::Cow::Owned(out)
+    }
+
     fn parse_numeric_literal_value(&self, value: Option<f64>, text: &str) -> Option<f64> {
         if let Some(value) = value {
             return Some(value);
         }
+
+        let cleaned = Self::strip_numeric_separators(text);
+        let text = cleaned.as_ref();
 
         if let Some(rest) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
             return Self::parse_radix_digits(rest, 16);
@@ -1125,7 +1142,12 @@ impl<'a> TypeLowering<'a> {
 
         let mut value = 0f64;
         let base_value = base as f64;
+        let mut saw_digit = false;
         for &byte in text.as_bytes() {
+            if byte == b'_' {
+                continue;
+            }
+
             let digit = match byte {
                 b'0'..=b'9' => (byte - b'0') as u32,
                 b'a'..=b'f' => (byte - b'a' + 10) as u32,
@@ -1135,31 +1157,63 @@ impl<'a> TypeLowering<'a> {
             if digit >= base {
                 return None;
             }
+            saw_digit = true;
             value = value * base_value + digit as f64;
+        }
+
+        if !saw_digit {
+            return None;
         }
 
         Some(value)
     }
 
     fn normalize_bigint_literal<'b>(&self, text: &'b str) -> Option<std::borrow::Cow<'b, str>> {
-        if let Some(rest) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
-            return Self::bigint_base_to_decimal(rest, 16).map(std::borrow::Cow::Owned);
-        }
-        if let Some(rest) = text.strip_prefix("0b").or_else(|| text.strip_prefix("0B")) {
-            return Self::bigint_base_to_decimal(rest, 2).map(std::borrow::Cow::Owned);
-        }
-        if let Some(rest) = text.strip_prefix("0o").or_else(|| text.strip_prefix("0O")) {
-            return Self::bigint_base_to_decimal(rest, 8).map(std::borrow::Cow::Owned);
-        }
+        match Self::strip_numeric_separators(text) {
+            std::borrow::Cow::Borrowed(cleaned) => {
+                if let Some(rest) = cleaned.strip_prefix("0x").or_else(|| cleaned.strip_prefix("0X")) {
+                    return Self::bigint_base_to_decimal(rest, 16).map(std::borrow::Cow::Owned);
+                }
+                if let Some(rest) = cleaned.strip_prefix("0b").or_else(|| cleaned.strip_prefix("0B")) {
+                    return Self::bigint_base_to_decimal(rest, 2).map(std::borrow::Cow::Owned);
+                }
+                if let Some(rest) = cleaned.strip_prefix("0o").or_else(|| cleaned.strip_prefix("0O")) {
+                    return Self::bigint_base_to_decimal(rest, 8).map(std::borrow::Cow::Owned);
+                }
 
-        let trimmed = text.trim_start_matches('0');
-        if trimmed.is_empty() {
-            return Some(std::borrow::Cow::Borrowed("0"));
-        }
-        if trimmed.len() == text.len() {
-            Some(std::borrow::Cow::Borrowed(text))
-        } else {
-            Some(std::borrow::Cow::Borrowed(trimmed))
+                let trimmed = cleaned.trim_start_matches('0');
+                if trimmed.is_empty() {
+                    return Some(std::borrow::Cow::Borrowed("0"));
+                }
+                if trimmed.len() == cleaned.len() {
+                    return Some(std::borrow::Cow::Borrowed(cleaned));
+                }
+                Some(std::borrow::Cow::Borrowed(trimmed))
+            }
+            std::borrow::Cow::Owned(mut cleaned) => {
+                let cleaned_ref = cleaned.as_str();
+                if let Some(rest) = cleaned_ref.strip_prefix("0x").or_else(|| cleaned_ref.strip_prefix("0X")) {
+                    return Self::bigint_base_to_decimal(rest, 16).map(std::borrow::Cow::Owned);
+                }
+                if let Some(rest) = cleaned_ref.strip_prefix("0b").or_else(|| cleaned_ref.strip_prefix("0B")) {
+                    return Self::bigint_base_to_decimal(rest, 2).map(std::borrow::Cow::Owned);
+                }
+                if let Some(rest) = cleaned_ref.strip_prefix("0o").or_else(|| cleaned_ref.strip_prefix("0O")) {
+                    return Self::bigint_base_to_decimal(rest, 8).map(std::borrow::Cow::Owned);
+                }
+
+                let trimmed = cleaned_ref.trim_start_matches('0');
+                if trimmed.is_empty() {
+                    return Some(std::borrow::Cow::Borrowed("0"));
+                }
+                if trimmed.len() == cleaned_ref.len() {
+                    return Some(std::borrow::Cow::Owned(cleaned));
+                }
+
+                let trim_len = cleaned_ref.len() - trimmed.len();
+                cleaned.drain(..trim_len);
+                Some(std::borrow::Cow::Owned(cleaned))
+            }
         }
     }
 
@@ -1396,7 +1450,18 @@ impl<'a> TypeLowering<'a> {
         if let Some(data) = self.arena.get_type_query(node) {
             // Create a symbol reference from the expression name
             if let Some(symbol_id) = self.resolve_value_symbol(data.expr_name) {
-                return self.interner.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)));
+                let base = self.interner.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)));
+                if let Some(args) = &data.type_arguments {
+                    if !args.nodes.is_empty() {
+                        let type_args: Vec<TypeId> = args
+                            .nodes
+                            .iter()
+                            .map(|&idx| self.lower_type(idx))
+                            .collect();
+                        return self.interner.application(base, type_args);
+                    }
+                }
+                return base;
             }
             TypeId::ERROR
         } else {

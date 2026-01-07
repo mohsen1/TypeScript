@@ -120,6 +120,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Allow null/undefined to assign when strictNullChecks is off
 - [x] Tests for strict null checks toggle
 
+### Phase 16: Index Access With Index Signatures
+- [x] Evaluate `T[K]` for object types with string/number index signatures
+- [x] Prefer explicit properties over index signatures for literal keys
+- [x] Tests for index-signature index access evaluation
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
