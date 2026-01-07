@@ -119,6 +119,7 @@ Status: Active
 - [x] Keep loop-exit narrowing conservative for while/for/do statements
   - Avoid applying false-condition narrowing after loop exits that can break early.
   - Add focused tests for while/for loop exit behavior.
+  - Add focused test for do-while loop exit behavior.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
