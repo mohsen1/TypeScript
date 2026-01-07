@@ -396,6 +396,10 @@ impl ThinBinderState {
         };
 
         match node.kind {
+            k if k == SyntaxKind::Identifier as u16 => {
+                self.record_flow(idx);
+                return;
+            }
             // Variable declarations
             k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
                 if let Some(var_stmt) = arena.get_variable(node) {

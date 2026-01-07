@@ -1252,8 +1252,8 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
     }
 
     fn is_numeric_property_name(&self, name: Atom) -> bool {
-        let prop_name = self.interner.resolve_atom(name);
-        InferenceContext::is_numeric_literal_name(&prop_name)
+        let prop_name = self.interner.resolve_atom_ref(name);
+        InferenceContext::is_numeric_literal_name(prop_name.as_ref())
     }
 
     fn constrain_tuple_types(

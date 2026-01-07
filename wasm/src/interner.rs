@@ -10,7 +10,7 @@
 use rustc_hash::{FxHashMap, FxHasher};
 use serde::Serialize;
 use std::hash::{Hash, Hasher};
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 
 /// An interned string identifier.
 ///
@@ -155,8 +155,8 @@ impl Interner {
 
 #[derive(Default)]
 struct ShardState {
-    map: FxHashMap<String, Atom>,
-    strings: Vec<String>,
+    map: FxHashMap<Arc<str>, Atom>,
+    strings: Vec<Arc<str>>,
 }
 
 struct InternerShard {
@@ -184,8 +184,9 @@ impl ShardedInterner {
         let shards = std::array::from_fn(|_| InternerShard::new());
         {
             let mut state = shards[0].state.write().unwrap();
-            state.strings.push(String::new());
-            state.map.insert(String::new(), Atom::NONE);
+            let empty: Arc<str> = Arc::from("");
+            state.strings.push(empty.clone());
+            state.map.insert(empty, Atom::NONE);
         }
         ShardedInterner { shards }
     }
@@ -212,7 +213,7 @@ impl ShardedInterner {
         }
 
         let atom = Self::make_atom(local_index, shard_idx as u32);
-        let owned = s.to_string();
+        let owned: Arc<str> = Arc::from(s);
         state.strings.push(owned.clone());
         state.map.insert(owned, atom);
         atom
@@ -229,7 +230,7 @@ impl ShardedInterner {
         let shard = &self.shards[shard_idx];
         let mut state = shard.state.write().unwrap();
 
-        if let Some(&atom) = state.map.get(&s) {
+        if let Some(&atom) = state.map.get(s.as_str()) {
             return atom;
         }
 
@@ -239,21 +240,22 @@ impl ShardedInterner {
         }
 
         let atom = Self::make_atom(local_index, shard_idx as u32);
-        state.strings.push(s.clone());
-        state.map.insert(s, atom);
+        let owned: Arc<str> = Arc::from(s);
+        state.strings.push(owned.clone());
+        state.map.insert(owned, atom);
         atom
     }
 
     /// Resolve an Atom back to its string value.
     /// Returns empty string if atom is out of bounds (safety for error recovery).
     #[inline]
-    pub fn resolve(&self, atom: Atom) -> String {
-        self.try_resolve(atom).unwrap_or_default()
+    pub fn resolve(&self, atom: Atom) -> Arc<str> {
+        self.try_resolve(atom).unwrap_or_else(|| Arc::from(""))
     }
 
     /// Try to resolve an Atom, returning None if invalid.
     #[inline]
-    pub fn try_resolve(&self, atom: Atom) -> Option<String> {
+    pub fn try_resolve(&self, atom: Atom) -> Option<Arc<str>> {
         let (shard_idx, local_index) = Self::split_atom(atom)?;
         let shard = self.shards.get(shard_idx)?;
         let state = shard.state.read().unwrap();

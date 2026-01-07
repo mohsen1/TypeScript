@@ -9,7 +9,8 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 ## Current Status
 - Args/tsconfig parsing, globbing, compile + emit work.
 - Watch mode implemented with notify + debounce.
-- No incremental compile or module-resolution parity yet.
+- Incremental compile in place (cache reuse + export-hash dependent invalidation); still missing symbol-level invalidation.
+- Module resolution supports node/bundler + exports/conditions basics; parity still incomplete.
 
 ## Current Investigation Notes (Incremental export hash)
 Summary of the incremental work (export hash fixed):
@@ -40,6 +41,7 @@ Resolved behavior:
 
 Remaining limitation:
 - ES module imports still resolve to `any`, so cross-file type diagnostics are not yet reliable.
+- Source maps are stubbed with a single 0,0 mapping; full node-level mappings still TODO.
 
 Tests run in this state:
 - `./wasm/test.sh cli::driver_tests::compile_with_cache_rechecks_dependents_on_export_change` (pass).
@@ -60,8 +62,8 @@ Tests run in this state:
   - [x] paths
   - [x] rootDir
   - [x] jsx (preserve/react-native)
-  - [ ] sourceMap
-  - [ ] declarationMap
+  - [x] sourceMap (basic .map output + sourceMappingURL comments)
+  - [x] declarationMap (basic .d.ts.map output + sourceMappingURL comments)
   - [x] noEmitOnError
   - [x] lib (resolve `compilerOptions.lib` to src/lib and follow references)
 - [x] Respect `--project` and tsconfig inheritance in CLI.

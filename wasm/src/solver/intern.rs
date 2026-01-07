@@ -202,6 +202,11 @@ impl TypeInterner {
     /// Resolve an Atom back to its string value.
     /// This is used when formatting types for error messages.
     pub fn resolve_atom(&self, atom: Atom) -> String {
+        self.string_interner.resolve(atom).to_string()
+    }
+
+    /// Resolve an Atom without allocating a new String.
+    pub fn resolve_atom_ref(&self, atom: Atom) -> Arc<str> {
         self.string_interner.resolve(atom)
     }
 

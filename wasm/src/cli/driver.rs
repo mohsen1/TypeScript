@@ -19,11 +19,12 @@ use crate::parallel::{self, BindResult, BoundFile, MergedProgram};
 use crate::parser::syntax_kind_ext;
 use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
 use crate::parser::NodeIndex;
+use crate::source_map::SourceMapGenerator;
 use crate::thin_parser::ThinParserState;
 use crate::thin_parser::ParseDiagnostic;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
-use crate::thin_emitter::{ModuleKind, ThinPrinter};
+use crate::thin_emitter::{ModuleKind, NewLineKind, ThinPrinter};
 use crate::solver::{TypeFormatter, TypeId};
 use rustc_hash::FxHasher;
 
@@ -1895,6 +1896,7 @@ fn emit_outputs(
     dirty_paths: Option<&HashSet<PathBuf>>,
 ) -> Result<Vec<OutputFile>> {
     let mut outputs = Vec::new();
+    let new_line = new_line_str(options.printer.new_line);
 
     for file in &program.files {
         let input_path = PathBuf::from(&file.file_name);
@@ -1907,26 +1909,82 @@ fn emit_outputs(
         if let Some(js_path) = js_output_path(base_dir, root_dir, out_dir, options.jsx, &input_path) {
             let mut printer = ThinPrinter::with_options(&file.arena, options.printer.clone());
             printer.emit(file.source_file);
-            outputs.push(OutputFile {
-                path: js_path,
-                contents: printer.take_output(),
-            });
+            let mut contents = printer.take_output();
+            let mut map_output = None;
+
+            if options.source_map {
+                if let Some((map_path, map_name, output_name)) = map_output_info(&js_path) {
+                    append_source_mapping_url(&mut contents, &map_name, new_line);
+                    let map_json = generate_basic_source_map(&output_name, &file.file_name);
+                    map_output = Some(OutputFile {
+                        path: map_path,
+                        contents: map_json,
+                    });
+                }
+            }
+
+            outputs.push(OutputFile { path: js_path, contents });
+            if let Some(map_output) = map_output {
+                outputs.push(map_output);
+            }
         }
 
         if options.emit_declarations {
             let decl_base = declaration_dir.or(out_dir);
             if let Some(dts_path) = declaration_output_path(base_dir, root_dir, decl_base, &input_path) {
                 let mut emitter = DeclarationEmitter::new(&file.arena);
-                let contents = emitter.emit(file.source_file);
-                outputs.push(OutputFile {
-                    path: dts_path,
-                    contents,
-                });
+                let mut contents = emitter.emit(file.source_file);
+                let mut map_output = None;
+
+                if options.declaration_map {
+                    if let Some((map_path, map_name, output_name)) = map_output_info(&dts_path) {
+                        append_source_mapping_url(&mut contents, &map_name, new_line);
+                        let map_json = generate_basic_source_map(&output_name, &file.file_name);
+                        map_output = Some(OutputFile {
+                            path: map_path,
+                            contents: map_json,
+                        });
+                    }
+                }
+
+                outputs.push(OutputFile { path: dts_path, contents });
+                if let Some(map_output) = map_output {
+                    outputs.push(map_output);
+                }
             }
         }
     }
 
     Ok(outputs)
+}
+
+fn map_output_info(output_path: &Path) -> Option<(PathBuf, String, String)> {
+    let output_name = output_path.file_name()?.to_string_lossy().into_owned();
+    let map_name = format!("{output_name}.map");
+    let map_path = output_path.with_file_name(&map_name);
+    Some((map_path, map_name, output_name))
+}
+
+fn generate_basic_source_map(output_name: &str, source_name: &str) -> String {
+    let mut map = SourceMapGenerator::new(output_name.to_string());
+    let source_index = map.add_source(source_name.to_string());
+    map.add_simple_mapping(0, 0, source_index, 0, 0);
+    map.generate_json()
+}
+
+fn append_source_mapping_url(contents: &mut String, map_name: &str, new_line: &str) {
+    if !contents.is_empty() && !contents.ends_with(new_line) {
+        contents.push_str(new_line);
+    }
+    contents.push_str("//# sourceMappingURL=");
+    contents.push_str(map_name);
+}
+
+fn new_line_str(kind: NewLineKind) -> &'static str {
+    match kind {
+        NewLineKind::LineFeed => "\n",
+        NewLineKind::CarriageReturnLineFeed => "\r\n",
+    }
 }
 
 fn write_outputs(outputs: &[OutputFile]) -> Result<Vec<PathBuf>> {
