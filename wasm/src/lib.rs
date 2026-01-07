@@ -2,7 +2,7 @@ use wasm_bindgen::prelude::*;
 
 // String interning for identifier deduplication (Performance optimization)
 pub mod interner;
-pub use interner::{Atom, Interner};
+pub use interner::{Atom, Interner, ShardedInterner};
 #[cfg(test)]
 mod interner_tests;
 
