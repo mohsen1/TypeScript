@@ -61,6 +61,7 @@ Pick the most doable and impactful
 36. CommonJS export declarations: namespace transform + exports assignment [done]
 37. Enum modifiers: attach const/declare in parser; erase const/declare enum emit + CommonJS exports [done]
 38. Imports/exports: handle namespace imports and erase type-only import/export in JS output [done]
+39. CommonJS: emit side-effect imports as require() [done]
 
 
 ## Quick Reference

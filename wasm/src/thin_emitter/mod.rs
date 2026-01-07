@@ -4284,11 +4284,22 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        if import.import_clause.is_none() {
-            return; // Side-effect import: import "module"; -> skip or emit require
-        }
-
         let Some(clause_node) = self.arena.get(import.import_clause) else {
+            // Side-effect import: import "module"; -> emit require
+            let module_spec = if let Some(spec_node) = self.arena.get(import.module_specifier) {
+                if let Some(lit) = self.arena.get_literal(spec_node) {
+                    lit.text.clone()
+                } else {
+                    return;
+                }
+            } else {
+                return;
+            };
+
+            self.write("require(\"");
+            self.write(&module_spec);
+            self.write("\");");
+            self.write_line();
             return;
         };
         let Some(clause) = self.arena.get_import_clause(clause_node) else {
