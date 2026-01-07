@@ -129,6 +129,39 @@ fn test_type_not_assignable_diagnostic() {
 }
 
 #[test]
+fn test_union_member_mismatch_diagnostic_includes_related_members() {
+    let interner = TypeInterner::new();
+    let union_members = vec![
+        TypeId::STRING,
+        TypeId::NUMBER,
+        TypeId::BOOLEAN,
+        TypeId::BIGINT,
+    ];
+    let union = interner.union(union_members.clone());
+
+    let reason = SubtypeFailureReason::NoUnionMemberMatches {
+        source_type: TypeId::NULL,
+        target_union_members: union_members,
+    };
+
+    let pending = reason.to_diagnostic(TypeId::NULL, union);
+    assert_eq!(pending.related.len(), 3);
+
+    let mut formatter = TypeFormatter::new(&interner);
+    let diag = formatter.render(&pending);
+    assert_eq!(diag.related.len(), 3);
+    assert!(diag.message.contains("null"));
+
+    let related_messages: Vec<&str> = diag.related.iter()
+        .map(|info| info.message.as_str())
+        .collect();
+    assert!(related_messages.iter().any(|msg| msg.contains("string")));
+    assert!(related_messages.iter().any(|msg| msg.contains("number")));
+    assert!(related_messages.iter().any(|msg| msg.contains("boolean")));
+    assert!(!related_messages.iter().any(|msg| msg.contains("bigint")));
+}
+
+#[test]
 fn test_property_missing_diagnostic() {
     let interner = TypeInterner::new();
     let mut builder = DiagnosticBuilder::new(&interner);
