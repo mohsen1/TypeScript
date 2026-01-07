@@ -2050,6 +2050,73 @@ type Qux = { [key: string]: Foo };
 }
 
 #[test]
+fn test_interface_extends_inherits_properties() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Base {
+    base: string;
+}
+interface Derived extends Base {
+    derived: number;
+}
+const obj: Derived = { base: "x", derived: 1 };
+const base_value = obj.base;
+const derived_value = obj.derived;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let base_sym = binder.file_locals.get("base_value").expect("base_value should exist");
+    let base_type = checker.get_type_of_symbol(base_sym);
+    assert_eq!(base_type, TypeId::STRING);
+
+    let derived_sym = binder.file_locals.get("derived_value").expect("derived_value should exist");
+    let derived_type = checker.get_type_of_symbol(derived_sym);
+    assert_eq!(derived_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_interface_extends_applies_type_arguments() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Box<T> {
+    value: T;
+}
+interface Derived extends Box<string> {
+    count: number;
+}
+const obj: Derived = { value: "x", count: 1 };
+const value = obj.value;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::STRING);
+}
+
+#[test]
 fn test_interface_extends_readonly_property_mismatch_2430() {
     use crate::thin_parser::ThinParserState;
 
@@ -3511,4 +3578,31 @@ var x: Alias;
     // Should produce error 2694: Namespace 'NS' has no exported member 'NotExported'
     // This error occurs when the alias is used (var x: Alias), which triggers type resolution
     assert!(codes.contains(&2694), "Expected error 2694 for import alias of non-exported member, got: {:?}", codes);
+}
+
+#[test]
+fn test_deep_binary_expression_type_check() {
+    use crate::thin_parser::ThinParserState;
+
+    const COUNT: usize = 50000;
+    let mut source = String::with_capacity(COUNT * 4);
+    for i in 0..COUNT {
+        if i > 0 {
+            source.push_str(" + ");
+        }
+        source.push('0');
+    }
+    source.push(';');
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source);
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(checker.ctx.diagnostics.is_empty());
 }

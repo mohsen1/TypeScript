@@ -999,6 +999,261 @@ impl<'a> ThinCheckerState<'a> {
         TypeId::ANY
     }
 
+    fn merge_interface_heritage_types(
+        &mut self,
+        declarations: &[NodeIndex],
+        mut derived_type: TypeId,
+    ) -> TypeId {
+        use crate::scanner::SyntaxKind;
+        use crate::solver::{TypeSubstitution, instantiate_type};
+
+        let mut pushed_derived = false;
+        let mut derived_param_updates = Vec::new();
+
+        for &decl_idx in declarations {
+            let Some(node) = self.ctx.arena.get(decl_idx) else {
+                continue;
+            };
+            let Some(interface) = self.ctx.arena.get_interface(node) else {
+                continue;
+            };
+
+            if !pushed_derived {
+                let (_params, updates) = self.push_type_parameters(&interface.type_parameters);
+                derived_param_updates = updates;
+                pushed_derived = true;
+            }
+
+            let Some(ref heritage_clauses) = interface.heritage_clauses else {
+                continue;
+            };
+
+            for &clause_idx in &heritage_clauses.nodes {
+                let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
+                    continue;
+                };
+                let Some(heritage) = self.ctx.arena.get_heritage_clause(clause_node) else {
+                    continue;
+                };
+
+                if heritage.token != SyntaxKind::ExtendsKeyword as u16 {
+                    continue;
+                }
+
+                for &type_idx in &heritage.types.nodes {
+                    let Some(type_node) = self.ctx.arena.get(type_idx) else {
+                        continue;
+                    };
+
+                    let (expr_idx, type_arguments) = if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
+                        (expr_type_args.expression, expr_type_args.type_arguments.as_ref())
+                    } else {
+                        (type_idx, None)
+                    };
+
+                    let Some(base_sym_id) = self.resolve_heritage_symbol(expr_idx) else {
+                        continue;
+                    };
+                    let Some(base_symbol) = self.ctx.binder.get_symbol(base_sym_id) else {
+                        continue;
+                    };
+
+                    let mut type_args = Vec::new();
+                    if let Some(args) = type_arguments {
+                        for &arg_idx in &args.nodes {
+                            type_args.push(self.get_type_from_type_node(arg_idx));
+                        }
+                    }
+
+                    let mut base_type_params = Vec::new();
+                    let mut base_param_updates = Vec::new();
+                    let mut base_type = None;
+
+                    for &base_decl_idx in &base_symbol.declarations {
+                        let Some(base_node) = self.ctx.arena.get(base_decl_idx) else {
+                            continue;
+                        };
+                        if let Some(base_iface) = self.ctx.arena.get_interface(base_node) {
+                            let (params, updates) = self.push_type_parameters(&base_iface.type_parameters);
+                            base_type_params = params;
+                            base_param_updates = updates;
+                            base_type = Some(self.get_type_of_symbol(base_sym_id));
+                            break;
+                        }
+                        if let Some(base_alias) = self.ctx.arena.get_type_alias(base_node) {
+                            let (params, updates) = self.push_type_parameters(&base_alias.type_parameters);
+                            base_type_params = params;
+                            base_param_updates = updates;
+                            base_type = Some(self.get_type_of_symbol(base_sym_id));
+                            break;
+                        }
+                        if let Some(base_class) = self.ctx.arena.get_class(base_node) {
+                            let (params, updates) = self.push_type_parameters(&base_class.type_parameters);
+                            base_type_params = params;
+                            base_param_updates = updates;
+                            base_type = Some(self.get_class_instance_type(base_decl_idx, base_class));
+                            break;
+                        }
+                    }
+
+                    if base_type.is_none() && !base_symbol.value_declaration.is_none() {
+                        let base_decl_idx = base_symbol.value_declaration;
+                        if let Some(base_node) = self.ctx.arena.get(base_decl_idx) {
+                            if let Some(base_iface) = self.ctx.arena.get_interface(base_node) {
+                                let (params, updates) = self.push_type_parameters(&base_iface.type_parameters);
+                                base_type_params = params;
+                                base_param_updates = updates;
+                                base_type = Some(self.get_type_of_symbol(base_sym_id));
+                            } else if let Some(base_alias) = self.ctx.arena.get_type_alias(base_node) {
+                                let (params, updates) = self.push_type_parameters(&base_alias.type_parameters);
+                                base_type_params = params;
+                                base_param_updates = updates;
+                                base_type = Some(self.get_type_of_symbol(base_sym_id));
+                            } else if let Some(base_class) = self.ctx.arena.get_class(base_node) {
+                                let (params, updates) = self.push_type_parameters(&base_class.type_parameters);
+                                base_type_params = params;
+                                base_param_updates = updates;
+                                base_type = Some(self.get_class_instance_type(base_decl_idx, base_class));
+                            }
+                        }
+                    }
+
+                    let Some(mut base_type) = base_type else {
+                        continue;
+                    };
+
+                    if type_args.len() < base_type_params.len() {
+                        for param in base_type_params.iter().skip(type_args.len()) {
+                            let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                            type_args.push(fallback);
+                        }
+                    }
+                    if type_args.len() > base_type_params.len() {
+                        type_args.truncate(base_type_params.len());
+                    }
+
+                    let substitution = TypeSubstitution::from_args(&base_type_params, &type_args);
+                    base_type = instantiate_type(self.ctx.types, base_type, &substitution);
+
+                    self.pop_type_parameters(base_param_updates);
+
+                    derived_type = self.merge_interface_types(derived_type, base_type);
+                }
+            }
+        }
+
+        if pushed_derived {
+            self.pop_type_parameters(derived_param_updates);
+        }
+
+        derived_type
+    }
+
+    fn merge_interface_types(&mut self, derived: TypeId, base: TypeId) -> TypeId {
+        use crate::solver::{CallableShape, ObjectShape, TypeKey};
+
+        if derived == base {
+            return derived;
+        }
+
+        let derived_key = self.ctx.types.lookup(derived);
+        let base_key = self.ctx.types.lookup(base);
+
+        match (derived_key, base_key) {
+            (Some(TypeKey::Callable(derived_shape)), Some(TypeKey::Callable(base_shape))) => {
+                let mut call_signatures = derived_shape.call_signatures.clone();
+                call_signatures.extend(base_shape.call_signatures.iter().cloned());
+                let mut construct_signatures = derived_shape.construct_signatures.clone();
+                construct_signatures.extend(base_shape.construct_signatures.iter().cloned());
+                let properties = self.merge_properties(&derived_shape.properties, &base_shape.properties);
+                self.ctx.types.callable(CallableShape {
+                    call_signatures,
+                    construct_signatures,
+                    properties,
+                })
+            }
+            (Some(TypeKey::Callable(derived_shape)), Some(TypeKey::Object(base_props))) => {
+                let properties = self.merge_properties(&derived_shape.properties, &base_props);
+                self.ctx.types.callable(CallableShape {
+                    call_signatures: derived_shape.call_signatures.clone(),
+                    construct_signatures: derived_shape.construct_signatures.clone(),
+                    properties,
+                })
+            }
+            (Some(TypeKey::Callable(derived_shape)), Some(TypeKey::ObjectWithIndex(base_shape))) => {
+                let properties = self.merge_properties(&derived_shape.properties, &base_shape.properties);
+                self.ctx.types.callable(CallableShape {
+                    call_signatures: derived_shape.call_signatures.clone(),
+                    construct_signatures: derived_shape.construct_signatures.clone(),
+                    properties,
+                })
+            }
+            (Some(TypeKey::Object(derived_props)), Some(TypeKey::Callable(base_shape))) => {
+                let properties = self.merge_properties(&derived_props, &base_shape.properties);
+                self.ctx.types.callable(CallableShape {
+                    call_signatures: base_shape.call_signatures.clone(),
+                    construct_signatures: base_shape.construct_signatures.clone(),
+                    properties,
+                })
+            }
+            (Some(TypeKey::ObjectWithIndex(derived_shape)), Some(TypeKey::Callable(base_shape))) => {
+                let properties = self.merge_properties(&derived_shape.properties, &base_shape.properties);
+                self.ctx.types.callable(CallableShape {
+                    call_signatures: base_shape.call_signatures.clone(),
+                    construct_signatures: base_shape.construct_signatures.clone(),
+                    properties,
+                })
+            }
+            (Some(TypeKey::Object(derived_props)), Some(TypeKey::Object(base_props))) => {
+                let properties = self.merge_properties(&derived_props, &base_props);
+                self.ctx.types.object(properties)
+            }
+            (Some(TypeKey::Object(derived_props)), Some(TypeKey::ObjectWithIndex(base_shape))) => {
+                let properties = self.merge_properties(&derived_props, &base_shape.properties);
+                self.ctx.types.object_with_index(ObjectShape {
+                    properties,
+                    string_index: base_shape.string_index.clone(),
+                    number_index: base_shape.number_index.clone(),
+                })
+            }
+            (Some(TypeKey::ObjectWithIndex(derived_shape)), Some(TypeKey::Object(base_props))) => {
+                let properties = self.merge_properties(&derived_shape.properties, &base_props);
+                self.ctx.types.object_with_index(ObjectShape {
+                    properties,
+                    string_index: derived_shape.string_index.clone(),
+                    number_index: derived_shape.number_index.clone(),
+                })
+            }
+            (Some(TypeKey::ObjectWithIndex(derived_shape)), Some(TypeKey::ObjectWithIndex(base_shape))) => {
+                let properties = self.merge_properties(&derived_shape.properties, &base_shape.properties);
+                self.ctx.types.object_with_index(ObjectShape {
+                    properties,
+                    string_index: derived_shape.string_index.clone().or_else(|| base_shape.string_index.clone()),
+                    number_index: derived_shape.number_index.clone().or_else(|| base_shape.number_index.clone()),
+                })
+            }
+            _ => derived,
+        }
+    }
+
+    fn merge_properties(
+        &self,
+        derived: &[crate::solver::PropertyInfo],
+        base: &[crate::solver::PropertyInfo],
+    ) -> Vec<crate::solver::PropertyInfo> {
+        use crate::interner::Atom;
+        use rustc_hash::FxHashMap;
+
+        let mut merged: FxHashMap<Atom, crate::solver::PropertyInfo> = FxHashMap::default();
+        for prop in base {
+            merged.insert(prop.name, prop.clone());
+        }
+        for prop in derived {
+            merged.insert(prop.name, prop.clone());
+        }
+        merged.into_values().collect()
+    }
+
     /// Helper to extract parameters from a SignatureData.
     fn extract_params_from_signature(
         &mut self,
@@ -1878,7 +2133,8 @@ impl<'a> ThinCheckerState<'a> {
                     &type_resolver,
                     &value_resolver,
                 );
-                return lowering.lower_interface_declarations(&symbol.declarations);
+                let interface_type = lowering.lower_interface_declarations(&symbol.declarations);
+                return self.merge_interface_heritage_types(&symbol.declarations, interface_type);
             }
             if !value_decl.is_none() {
                 return self.get_type_of_interface(value_decl);
@@ -1972,67 +2228,88 @@ impl<'a> ThinCheckerState<'a> {
     fn get_type_of_binary_expression(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{BinaryOpEvaluator, BinaryOpResult};
 
-        let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
-        };
-
-        let Some(binary) = self.ctx.arena.get_binary_expr(node) else {
-            return TypeId::ANY;
-        };
-
-        let op_kind = binary.operator_token;
-
-        // Special case: Assignment operator (not a type operation)
-        if op_kind == SyntaxKind::EqualsToken as u16 {
-            // Check for readonly property assignment
-            self.check_readonly_assignment(binary.left, idx);
-            return self.get_type_of_node(binary.right);
-        }
-
-        // Get operand types
-        let left_type = self.get_type_of_node(binary.left);
-        let right_type = self.get_type_of_node(binary.right);
-
-        // Map SyntaxKind to operation string
-        let op_str = match op_kind {
-            k if k == SyntaxKind::PlusToken as u16 => "+",
-            k if k == SyntaxKind::MinusToken as u16 => "-",
-            k if k == SyntaxKind::AsteriskToken as u16 => "*",
-            k if k == SyntaxKind::SlashToken as u16 => "/",
-            k if k == SyntaxKind::PercentToken as u16 => "%",
-            k if k == SyntaxKind::LessThanToken as u16 => "<",
-            k if k == SyntaxKind::GreaterThanToken as u16 => ">",
-            k if k == SyntaxKind::LessThanEqualsToken as u16 => "<=",
-            k if k == SyntaxKind::GreaterThanEqualsToken as u16 => ">=",
-            k if k == SyntaxKind::EqualsEqualsToken as u16 => "==",
-            k if k == SyntaxKind::ExclamationEqualsToken as u16 => "!=",
-            k if k == SyntaxKind::EqualsEqualsEqualsToken as u16 => "===",
-            k if k == SyntaxKind::ExclamationEqualsEqualsToken as u16 => "!==",
-            k if k == SyntaxKind::AmpersandAmpersandToken as u16 => "&&",
-            k if k == SyntaxKind::BarBarToken as u16 => "||",
-            // Bitwise operators - for now, return number directly
-            k if k == SyntaxKind::AmpersandToken as u16
-                || k == SyntaxKind::BarToken as u16
-                || k == SyntaxKind::CaretToken as u16
-                || k == SyntaxKind::LessThanLessThanToken as u16
-                || k == SyntaxKind::GreaterThanGreaterThanToken as u16
-                || k == SyntaxKind::GreaterThanGreaterThanGreaterThanToken as u16 => return TypeId::NUMBER,
-            _ => return TypeId::ANY,
-        };
-
-        // Use BinaryOpEvaluator to resolve the operation
         let evaluator = BinaryOpEvaluator::new(self.ctx.types);
-        let result = evaluator.evaluate(left_type, right_type, op_str);
+        let mut stack = vec![(idx, false)];
+        let mut type_stack: Vec<TypeId> = Vec::new();
 
-        match result {
-            BinaryOpResult::Success(result_type) => result_type,
+        while let Some((node_idx, visited)) = stack.pop() {
+            let Some(node) = self.ctx.arena.get(node_idx) else {
+                type_stack.push(TypeId::ANY);
+                continue;
+            };
 
-            BinaryOpResult::TypeError { .. } => {
-                // For now, return any instead of error for binary op mismatches
-                // TypeScript is lenient with many binary operations
-                TypeId::ANY
+            if node.kind != syntax_kind_ext::BINARY_EXPRESSION {
+                type_stack.push(self.get_type_of_node(node_idx));
+                continue;
             }
+
+            let Some(binary) = self.ctx.arena.get_binary_expr(node) else {
+                type_stack.push(TypeId::ANY);
+                continue;
+            };
+
+            let op_kind = binary.operator_token;
+
+            if !visited {
+                stack.push((node_idx, true));
+                if op_kind == SyntaxKind::EqualsToken as u16 {
+                    stack.push((binary.right, false));
+                } else {
+                    stack.push((binary.right, false));
+                    stack.push((binary.left, false));
+                }
+                continue;
+            }
+
+            if op_kind == SyntaxKind::EqualsToken as u16 {
+                let right_type = type_stack.pop().unwrap_or(TypeId::ANY);
+                self.check_readonly_assignment(binary.left, node_idx);
+                type_stack.push(right_type);
+                continue;
+            }
+
+            let right_type = type_stack.pop().unwrap_or(TypeId::ANY);
+            let left_type = type_stack.pop().unwrap_or(TypeId::ANY);
+            let op_str = match op_kind {
+                k if k == SyntaxKind::PlusToken as u16 => "+",
+                k if k == SyntaxKind::MinusToken as u16 => "-",
+                k if k == SyntaxKind::AsteriskToken as u16 => "*",
+                k if k == SyntaxKind::SlashToken as u16 => "/",
+                k if k == SyntaxKind::PercentToken as u16 => "%",
+                k if k == SyntaxKind::LessThanToken as u16 => "<",
+                k if k == SyntaxKind::GreaterThanToken as u16 => ">",
+                k if k == SyntaxKind::LessThanEqualsToken as u16 => "<=",
+                k if k == SyntaxKind::GreaterThanEqualsToken as u16 => ">=",
+                k if k == SyntaxKind::EqualsEqualsToken as u16 => "==",
+                k if k == SyntaxKind::ExclamationEqualsToken as u16 => "!=",
+                k if k == SyntaxKind::EqualsEqualsEqualsToken as u16 => "===",
+                k if k == SyntaxKind::ExclamationEqualsEqualsToken as u16 => "!==",
+                k if k == SyntaxKind::AmpersandAmpersandToken as u16 => "&&",
+                k if k == SyntaxKind::BarBarToken as u16 => "||",
+                k if k == SyntaxKind::AmpersandToken as u16
+                    || k == SyntaxKind::BarToken as u16
+                    || k == SyntaxKind::CaretToken as u16
+                    || k == SyntaxKind::LessThanLessThanToken as u16
+                    || k == SyntaxKind::GreaterThanGreaterThanToken as u16
+                    || k == SyntaxKind::GreaterThanGreaterThanGreaterThanToken as u16 => {
+                    type_stack.push(TypeId::NUMBER);
+                    continue;
+                }
+                _ => {
+                    type_stack.push(TypeId::ANY);
+                    continue;
+                }
+            };
+
+            let result = evaluator.evaluate(left_type, right_type, op_str);
+            let result_type = match result {
+                BinaryOpResult::Success(result_type) => result_type,
+                BinaryOpResult::TypeError { .. } => TypeId::ANY,
+            };
+            type_stack.push(result_type);
         }
+
+        type_stack.pop().unwrap_or(TypeId::ANY)
     }
 
     /// Get type of variable declaration.

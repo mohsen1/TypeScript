@@ -251,3 +251,24 @@ var x: Alias;
     // Verify it has a declaration
     assert!(!alias_symbol.declarations.is_empty(), "Alias should have declarations");
 }
+
+#[test]
+fn test_thin_binder_deep_binary_expression() {
+    const COUNT: usize = 50000;
+    let mut source = String::with_capacity(COUNT * 4);
+    for i in 0..COUNT {
+        if i > 0 {
+            source.push_str(" + ");
+        }
+        source.push('0');
+    }
+    source.push(';');
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source);
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    assert!(binder.file_locals.is_empty());
+}
