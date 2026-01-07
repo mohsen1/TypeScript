@@ -38,10 +38,10 @@ The current `ThinNodeArena` makes in-place mutation difficult.
 Last updated: 2026-01-07
 
 - Overall: Migration is active; Rust/WASM compiler is under construction and not production-ready.
-- Tracks: CLI typesVersions range selection is in place and still needs compiler-version configurability; emitter is implementing real source maps (no-transform paths first); checker is tackling default initializer/alias clearing for destructuring; LSP is refining IncrementalParseResult to avoid full rebinds on small edits; solver fixed tuple rest index access and optional tuple undefined handling, with the next correctness item queued.
+- Tracks: CLI typesVersions compiler version is now configurable (flag/env) with fallback tests; emitter emits minimal real source maps for no-transform JS with tests; checker cleared destructuring defaults/aliases and re-enabled namespace value member tests; LSP is still refining IncrementalParseResult to avoid full rebinds on small edits; solver fixed tuple rest index access, optional tuple undefined handling, and negative/fractional tuple indices.
 - Baselines (`tests/cases`, first 100): compiler errors 60/77 (77.9%) pass, JS 40/76 (52.6%) pass; conformance errors 18/90 (20.0%) pass, JS 1/88 (1.1%) pass.
-- Risk: ES module imports still resolve to `any` (cross-file types unreliable); source maps remain stubbed to a single 0,0 mapping; parser/arena child enumeration TODOs remain; baseline pass rates are still low on conformance; assignment/flow clearing uses conservative heuristics; typesVersions compiler version is fixed (TODO in cli/driver.rs).
-- Next focus: close module-resolution parity gaps, ship real source maps, implement incremental rebind improvements in LSP, finish flow clearing edge cases, type ES imports, improve baseline pass rates, and keep correctness ahead of perf tweaks.
+- Risk: ES module imports still resolve to `any` (cross-file types unreliable); source maps are only minimal for no-transform JS (transform paths and .d.ts maps still stubbed); parser/arena child enumeration TODOs remain; baseline pass rates are still low on conformance; assignment/flow clearing uses conservative heuristics.
+- Next focus: close module-resolution parity gaps (including config-file support for typesVersions override), ship transform/declaration source maps, implement incremental rebind improvements in LSP, finish flow clearing edge cases, type ES imports, improve baseline pass rates, and keep correctness ahead of perf tweaks.
 
 ## Status
 This project is not ready for general use yet. The interface and distribution are in progress.
