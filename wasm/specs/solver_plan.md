@@ -37,8 +37,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Add microbench for subtype/evaluate/infer to `./wasm/bench.sh`.
 - [ ] Introduce SmallVec (or stack-first buffers) for short union/intersection/member lists
   - Reduce Vec churn in interner normalization and hot-path unions.
-- [ ] Add fast-path property lookup for large object shapes
-  - Consider per-shape cached map for property name → index to speed subtype/operations.
+- [x] Add fast-path property lookup for large object shapes
+  - Cached per-shape map in TypeInterner; wired into subtype/infer/property access.
 - [ ] Expand array/tuple method inference beyond `any` placeholders
   - Cover map/filter/concat/at/reduce + iterator helpers to improve precision.
 - [ ] Add microbench for property lookup and union/intersection normalization
