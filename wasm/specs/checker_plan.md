@@ -153,6 +153,9 @@ Status: Active
 - [x] Infer const literal key types for computed element access
   - Treat `const key = "prop"` / `const idx = 0` as literal key types in flow narrowing.
   - Risk: literal inference only covers simple literal initializers (no const context propagation).
+- [x] Narrow discriminant comparisons for computed element access
+  - Use literal key types (e.g. `key: "kind"`) to match discriminant property names.
+  - Add focused test for computed element discriminant narrowing.
 
 ## Baseline / Validation
 - `./wasm/test.sh`

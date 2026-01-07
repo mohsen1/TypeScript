@@ -210,6 +210,75 @@ fn test_thin_binder_exported_const() {
     assert!(binder.file_locals.has("x"), "Exported const 'x' should be in file_locals");
     assert!(binder.file_locals.has("y"), "Exported const 'y' should be in file_locals");
 }
+
+#[test]
+fn test_thin_binder_resolves_parameter_from_bound_state() {
+    use crate::binder::SymbolTable;
+    use crate::parallel;
+    use crate::parser::{syntax_kind_ext, NodeIndex};
+
+    let source = r#"
+export function getModuleInstanceState(node: { body?: { parent?: {} } }) {
+    if (node.body && !node.body.parent) {
+        return node.body;
+    }
+    return node.body;
+}
+"#;
+
+    let program = parallel::compile_files(vec![("test.ts".to_string(), source.to_string())]);
+    let file = &program.files[0];
+
+    let mut file_locals = SymbolTable::new();
+    for (name, &sym_id) in program.file_locals[0].iter() {
+        file_locals.set(name.clone(), sym_id);
+    }
+    for (name, &sym_id) in program.globals.iter() {
+        if !file_locals.has(name) {
+            file_locals.set(name.clone(), sym_id);
+        }
+    }
+
+    let binder = ThinBinderState::from_bound_state_with_scopes(
+        program.symbols.clone(),
+        file_locals,
+        file.node_symbols.clone(),
+        file.scopes.clone(),
+        file.node_scope_ids.clone(),
+    );
+
+    let arena = &file.arena;
+    let mut resolved = false;
+    for i in 0..arena.len() {
+        let idx = NodeIndex(i as u32);
+        let Some(node) = arena.get(idx) else { continue; };
+        let Some(ident) = arena.get_identifier(node) else { continue; };
+        if ident.escaped_text != "node" {
+            continue;
+        }
+        let parent_idx = match arena.get_extended(idx) {
+            Some(ext) => ext.parent,
+            None => continue,
+        };
+        if parent_idx.is_none() {
+            continue;
+        }
+        if let Some(parent) = arena.get(parent_idx) {
+            if parent.kind == syntax_kind_ext::PARAMETER {
+                continue;
+            }
+        }
+        if binder.resolve_identifier(arena, idx).is_some() {
+            resolved = true;
+            break;
+        }
+    }
+
+    assert!(
+        resolved,
+        "Expected to resolve 'node' identifier in function body from bound state"
+    );
+}
 #[test]
 fn test_namespace_binding_debug() {
     use crate::thin_parser::ThinParserState;

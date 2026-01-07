@@ -699,8 +699,7 @@ impl<'a> DeclarationEmitter<'a> {
                 if clause_node.kind == syntax_kind_ext::NAMED_EXPORTS {
                     self.emit_named_exports(export.export_clause, !export.is_type_only);
                 } else if clause_node.kind == SyntaxKind::Identifier as u16 {
-                    self.write("* as ");
-                    self.emit_node(export.export_clause);
+                    self.emit_namespace_export_clause(export.export_clause);
                 } else {
                     self.emit_node(export.export_clause);
                 }
@@ -806,6 +805,11 @@ impl<'a> DeclarationEmitter<'a> {
         }
         self.write(";");
         self.write_line();
+    }
+
+    fn emit_namespace_export_clause(&mut self, clause_idx: NodeIndex) {
+        self.write("* as ");
+        self.emit_node(clause_idx);
     }
 
     fn emit_named_exports(&mut self, exports_idx: NodeIndex, allow_type_prefix: bool) {
