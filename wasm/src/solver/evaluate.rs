@@ -732,8 +732,15 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     }
 
     fn apparent_method_type(&self, return_type: TypeId) -> TypeId {
+        let rest_array = self.interner.array(TypeId::ANY);
+        let rest_param = ParamInfo {
+            name: None,
+            type_id: rest_array,
+            optional: false,
+            rest: true,
+        };
         self.interner.function(FunctionShape {
-            params: Vec::new(),
+            params: vec![rest_param],
             this_type: None,
             return_type,
             type_params: Vec::new(),

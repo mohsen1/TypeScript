@@ -561,7 +561,11 @@ fn test_index_access_string_literal_member() {
     let to_string_key = interner.literal_string("toString");
     let to_string_type = evaluate_index_access(&interner, TypeId::STRING, to_string_key);
     match interner.lookup(to_string_type) {
-        Some(TypeKey::Function(func)) => assert_eq!(func.return_type, TypeId::STRING),
+        Some(TypeKey::Function(func)) => {
+            assert_eq!(func.return_type, TypeId::STRING);
+            assert_eq!(func.params.len(), 1);
+            assert!(func.params[0].rest);
+        }
         other => panic!("Expected function type, got {:?}", other),
     }
 }

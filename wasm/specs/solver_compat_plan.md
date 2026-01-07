@@ -239,6 +239,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Tests for unchecked primitive index access
 - [x] Compat assignability coverage for unchecked primitive index access
 
+### Phase 42: Primitive Method Index Types
+- [x] Align primitive index-access method types with any-args callable shape
+- [x] Tests for primitive method index access parameter shape
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
