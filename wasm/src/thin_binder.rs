@@ -536,6 +536,12 @@ impl ThinBinderState {
             k if k == syntax_kind_ext::EXPORT_DECLARATION => {
                 self.bind_export_declaration(arena, node, idx);
             }
+            // Export assignment - bind the assigned expression
+            k if k == syntax_kind_ext::EXPORT_ASSIGNMENT => {
+                if let Some(assign) = arena.get_export_assignment(node) {
+                    self.bind_node(arena, assign.expression);
+                }
+            }
 
             // Module/namespace declarations
             k if k == syntax_kind_ext::MODULE_DECLARATION => {
