@@ -1161,6 +1161,33 @@ fn test_project_performance_scope_cache_hits_references() {
 }
 
 #[test]
+fn test_project_performance_scope_cache_hits_rename() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "const value = 1;\nvalue;\n".to_string());
+    let position = Position::new(1, 0);
+
+    let _ = project
+        .get_rename_edits("a.ts", position, "next".to_string())
+        .expect("Expected rename edits");
+    let first = project
+        .performance()
+        .timing(ProjectRequestKind::Rename)
+        .expect("Expected timing data for rename");
+
+    let _ = project
+        .get_rename_edits("a.ts", position, "next2".to_string())
+        .expect("Expected rename edits");
+    let second = project
+        .performance()
+        .timing(ProjectRequestKind::Rename)
+        .expect("Expected timing data for rename");
+
+    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
+    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 
