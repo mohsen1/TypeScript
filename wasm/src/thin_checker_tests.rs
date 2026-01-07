@@ -2555,6 +2555,112 @@ const f: <T>(value: T) => T = (value) => value;
 }
 
 #[test]
+fn test_interface_generic_call_signature_uses_type_params() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+interface Callable {
+    <T>(value: T): T;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let callable_sym = binder.file_locals.get("Callable").expect("Callable should exist");
+    let callable_type = checker.get_type_of_symbol(callable_sym);
+    let callable_key = types.lookup(callable_type).expect("Callable type should exist");
+    match callable_key {
+        TypeKey::Callable(shape) => {
+            assert_eq!(shape.call_signatures.len(), 1);
+            let sig = &shape.call_signatures[0];
+            assert_eq!(sig.type_params.len(), 1);
+            assert_eq!(types.resolve_atom(sig.type_params[0].name), "T");
+            assert_eq!(sig.params.len(), 1);
+
+            let param_key = types.lookup(sig.params[0].type_id).expect("Param type should exist");
+            match param_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected param type to be type parameter, got {:?}", param_key),
+            }
+
+            let return_key = types.lookup(sig.return_type).expect("Return type should exist");
+            match return_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected return type to be type parameter, got {:?}", return_key),
+            }
+        }
+        _ => panic!("Expected Callable to be Callable type, got {:?}", callable_key),
+    }
+}
+
+#[test]
+fn test_interface_generic_construct_signature_uses_type_params() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+interface Factory {
+    new <T>(value: T): T;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let factory_sym = binder.file_locals.get("Factory").expect("Factory should exist");
+    let factory_type = checker.get_type_of_symbol(factory_sym);
+    let factory_key = types.lookup(factory_type).expect("Factory type should exist");
+    match factory_key {
+        TypeKey::Callable(shape) => {
+            assert_eq!(shape.construct_signatures.len(), 1);
+            let sig = &shape.construct_signatures[0];
+            assert_eq!(sig.type_params.len(), 1);
+            assert_eq!(types.resolve_atom(sig.type_params[0].name), "T");
+            assert_eq!(sig.params.len(), 1);
+
+            let param_key = types.lookup(sig.params[0].type_id).expect("Param type should exist");
+            match param_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected param type to be type parameter, got {:?}", param_key),
+            }
+
+            let return_key = types.lookup(sig.return_type).expect("Return type should exist");
+            match return_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected return type to be type parameter, got {:?}", return_key),
+            }
+        }
+        _ => panic!("Expected Factory to be Callable type, got {:?}", factory_key),
+    }
+}
+
+#[test]
 fn test_checker_lowers_generic_function_declaration_uses_type_params() {
     use crate::thin_parser::ThinParserState;
     use crate::solver::TypeKey;
