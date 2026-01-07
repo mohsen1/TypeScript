@@ -155,6 +155,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Infer type params from constructor call signatures
 - [x] Infer type params from KeyOf wrapper positions
 - [x] Infer type params from IndexAccess wrapper positions
+- [x] Infer type params from index access on concrete object properties
 - [x] Infer type params from template literal wrapper positions
 - [x] Infer type params from conditional types with concrete check types
 - [x] Infer type params from mapped types with concrete key sets
