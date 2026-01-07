@@ -287,9 +287,21 @@ impl<'a> NarrowingContext<'a> {
     pub fn narrow_excluding_type(&self, source_type: TypeId, excluded_type: TypeId) -> TypeId {
         // If source is a union, filter out matching members
         if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
-            let remaining: Vec<TypeId> = members.iter()
-                .filter(|&&m| !self.is_assignable_to(m, excluded_type))
-                .copied()
+            let remaining: Vec<TypeId> = members
+                .iter()
+                .filter_map(|&member| {
+                    if let Some(narrowed) = self.narrow_type_param_excluding(member, excluded_type) {
+                        if narrowed == TypeId::NEVER {
+                            return None;
+                        }
+                        return Some(narrowed);
+                    }
+                    if self.is_assignable_to(member, excluded_type) {
+                        None
+                    } else {
+                        Some(member)
+                    }
+                })
                 .collect();
 
             if remaining.is_empty() {
@@ -299,6 +311,10 @@ impl<'a> NarrowingContext<'a> {
             } else {
                 return self.interner.union(remaining);
             }
+        }
+
+        if let Some(narrowed) = self.narrow_type_param_excluding(source_type, excluded_type) {
+            return narrowed;
         }
 
         // If source is assignable to excluded, return never
@@ -412,6 +428,28 @@ impl<'a> NarrowingContext<'a> {
 
         if narrowed_constraint == TypeId::NEVER {
             return None;
+        }
+
+        Some(self.interner.intersection(vec![source, narrowed_constraint]))
+    }
+
+    fn narrow_type_param_excluding(&self, source: TypeId, excluded: TypeId) -> Option<TypeId> {
+        let info = match self.interner.lookup(source) {
+            Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info,
+            _ => return None,
+        };
+
+        let constraint = info.constraint?;
+        if constraint == source || constraint == TypeId::UNKNOWN {
+            return None;
+        }
+
+        let narrowed_constraint = self.narrow_excluding_type(constraint, excluded);
+        if narrowed_constraint == constraint {
+            return None;
+        }
+        if narrowed_constraint == TypeId::NEVER {
+            return Some(TypeId::NEVER);
         }
 
         Some(self.interner.intersection(vec![source, narrowed_constraint]))

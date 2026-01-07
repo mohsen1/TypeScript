@@ -572,6 +572,55 @@ fn test_narrow_excluding_type() {
 }
 
 #[test]
+fn test_narrow_excluding_type_param_with_union_constraint() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    let constraint = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(constraint),
+        default: None,
+    }));
+    let union = interner.union(vec![param, TypeId::BOOLEAN]);
+
+    let narrowed = ctx.narrow_excluding_type(union, TypeId::STRING);
+    let expected_param = interner.intersection(vec![param, TypeId::NUMBER]);
+    let expected = interner.union(vec![expected_param, TypeId::BOOLEAN]);
+    assert_eq!(narrowed, expected);
+}
+
+#[test]
+fn test_narrow_excluding_type_param_with_non_overlapping_constraint() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    let param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::NUMBER),
+        default: None,
+    }));
+
+    let narrowed = ctx.narrow_excluding_type(param, TypeId::STRING);
+    assert_eq!(narrowed, param);
+}
+
+#[test]
+fn test_narrow_excluding_type_param_to_never() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    let param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    let narrowed = ctx.narrow_excluding_type(param, TypeId::STRING);
+    assert_eq!(narrowed, TypeId::NEVER);
+}
+
+#[test]
 fn test_narrow_to_never() {
     let interner = TypeInterner::new();
     let ctx = NarrowingContext::new(&interner);
