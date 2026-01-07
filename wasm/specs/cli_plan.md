@@ -11,6 +11,7 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Watch mode implemented with notify + debounce.
 - Incremental compile in place (cache reuse + export-hash dependent invalidation + symbol-level dependent invalidation).
 - Module resolution supports node/bundler + exports/conditions basics; parity still incomplete.
+- Benchmark harness script added for tsz vs tsc comparisons.
 
 ## Current Investigation Notes (Incremental export hash)
 Summary of the incremental work (export hash fixed):
@@ -84,8 +85,8 @@ Tests run in this state:
   - [x] Support exports subpath mapping + basic condition selection (types/import/require/default).
   - [x] Expand exports conditions (node/browser) + moduleResolution-specific ordering.
   - [x] Honor package.json `type` + Node16/NodeNext extension rules.
-- [ ] Benchmark harness
-  - Script for `tsz` vs `tsc` on large repos with timing + memory stats.
+- [x] Benchmark harness
+  - Script: `wasm/bench_cli.sh` (tsz vs tsc timing + memory stats).
 
 ## Task Ledger (legacy checklist)
 
