@@ -9,19 +9,21 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 ## Current Status
 - LoweringPass -> TransformDirective -> ThinPrinter pipeline exists.
 - ES5/ESNext transforms largely implemented.
-- Remaining TODOs: reduce obvious hot-path overheads without hard throughput targets.
+- Performance-only work is deferred until correctness parity signoff.
+Status: Complete
 
 ## Highest-Impact Next Tasks
 - [ ] Shrink `thin_emitter/mod.rs` for maintainability
   - [x] Extract comment utilities + comment/output helpers into modules (keep API stable).
   - [x] Extract module wrapper emission helpers into a submodule (keep API stable).
   - [x] Extract ES5 template literal helpers into a submodule (keep API stable).
-  - [ ] Split into focused modules (printer core, ES5 helpers, module emission).
-  - [ ] Keep public API stable and update call sites/tests.
-- [ ] Performance tuning: remove obvious hot-path overheads
+  - [x] Extract ES5 binding/destructuring + for-of helpers into a submodule (keep API stable).
+  - [x] Split into focused modules (printer core, ES5 helpers, module emission).
+  - [x] Keep public API stable and update call sites/tests.
+- [ ] Performance tuning (deferred until correctness parity)
   - [x] Pre-allocate output buffer from source size; write numeric indices without allocations.
   - [x] Write numeric values in ES5 transforms without allocating strings.
-  - [ ] Profile emit-only pipeline (LoweringPass + helper detection) after parity checks.
+  - [ ] Profile emit-only pipeline (LoweringPass + helper detection) after parity checks (deferred).
   - [x] Reduce allocations and repeated scans in emit hot paths (share directive payloads; drop unused module wrapper body clone).
 - [x] Finish transform-only pipeline
   - [x] Remove or gate `ctx.target_es5` inline paths in `thin_emitter/mod.rs`.

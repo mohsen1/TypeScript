@@ -737,6 +737,26 @@ fn test_array_to_fixed_optional_tuple() {
 }
 
 #[test]
+fn test_never_array_to_optional_tuple() {
+    // never[] IS assignable to [] and [string?]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let never_array = interner.array(TypeId::NEVER);
+    let empty_tuple = interner.tuple(Vec::new());
+    let optional_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
+    ]);
+    let required_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    assert!(checker.is_subtype_of(never_array, empty_tuple));
+    assert!(checker.is_subtype_of(never_array, optional_tuple));
+    assert!(!checker.is_subtype_of(never_array, required_tuple));
+}
+
+#[test]
 fn test_number_index_signature_numeric_property() {
     // CRITICAL: { 0: string } should match { [x: number]: string }
     use std::sync::Arc;

@@ -10,7 +10,8 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Args/tsconfig parsing, globbing, compile + emit work.
 - Watch mode implemented with notify + debounce.
 - Incremental compile in place (cache reuse + export-hash dependent invalidation + symbol-level dependent invalidation).
-- Module resolution supports node/bundler + exports/conditions basics; parity still incomplete.
+- Module resolution supports node/bundler + exports/conditions basics + typesVersions mappings.
+- Benchmark harness script added for tsz vs tsc comparisons.
 
 ## Current Investigation Notes (Incremental export hash)
 Summary of the incremental work (export hash fixed):
@@ -46,13 +47,16 @@ Resolved behavior:
 Remaining limitation:
 - ES module imports still resolve to `any`, so cross-file type diagnostics are not yet reliable.
 - Source maps are stubbed with a single 0,0 mapping; full node-level mappings still TODO.
-- Symbol-level invalidation mapping still falls back to full invalidation for star re-exports (`export * from`, `export * as ns from`).
 
 Tests run in this state:
 - `./wasm/test.sh cli::driver_tests::compile_with_cache_rechecks_dependents_on_export_change` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_with_cache_skips_dependents_when_exports_unchanged` (pass).
 - `./wasm/test.sh cli::driver_tests::invalidate_paths_with_dependents_symbols_keeps_unrelated_cache` (pass).
 - `./wasm/test.sh cli::driver_tests::invalidate_paths_with_dependents_symbols_handles_reexports` (pass).
+- `./wasm/test.sh cli::driver_tests::invalidate_paths_with_dependents_symbols_handles_import_equals` (pass).
+- `./wasm/test.sh cli::driver_tests::invalidate_paths_with_dependents_symbols_handles_namespace_reexports` (pass).
+- `./wasm/test.sh cli::driver_tests::invalidate_paths_with_dependents_symbols_handles_star_reexports` (pass).
+- `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions` (pass).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
@@ -76,14 +80,15 @@ Tests run in this state:
 - [x] Respect `--project` and tsconfig inheritance in CLI.
   - `--project` accepts file or directory
   - `extends` chain already supported
-- [ ] Module resolution parity
+- [x] Module resolution parity
   - [x] Resolve relative + baseUrl/paths imports with TS extension inference.
   - [x] Resolve bare specifiers via node_modules package.json entries + index fallback.
   - [x] Support exports subpath mapping + basic condition selection (types/import/require/default).
   - [x] Expand exports conditions (node/browser) + moduleResolution-specific ordering.
   - [x] Honor package.json `type` + Node16/NodeNext extension rules.
-- [ ] Benchmark harness
-  - Script for `tsz` vs `tsc` on large repos with timing + memory stats.
+  - [x] Apply `typesVersions` mappings for package subpaths.
+- [x] Benchmark harness
+  - Script: `wasm/bench_cli.sh` (tsz vs tsc timing + memory stats).
 
 ## Task Ledger (legacy checklist)
 

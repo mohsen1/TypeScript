@@ -631,6 +631,15 @@ impl ThinBinderState {
 
             // Binary expressions - traverse into operands
             k if k == syntax_kind_ext::BINARY_EXPRESSION => {
+                if let Some(bin) = arena.get_binary_expr(node) {
+                    if self.is_assignment_operator(bin.operator_token) {
+                        self.bind_node(arena, bin.left);
+                        self.bind_node(arena, bin.right);
+                        let flow = self.create_flow_assignment(idx);
+                        self.current_flow = flow;
+                        return;
+                    }
+                }
                 self.bind_binary_expression_iterative(arena, idx);
             }
 
@@ -657,6 +666,12 @@ impl ThinBinderState {
                 || k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION => {
                 if let Some(unary) = arena.get_unary_expr(node) {
                     self.bind_node(arena, unary.operand);
+                    if unary.operator == SyntaxKind::PlusPlusToken as u16
+                        || unary.operator == SyntaxKind::MinusMinusToken as u16
+                    {
+                        let flow = self.create_flow_assignment(idx);
+                        self.current_flow = flow;
+                    }
                 }
             }
 
@@ -758,6 +773,10 @@ impl ThinBinderState {
                         for &arg in &args.nodes {
                             self.bind_node(arena, arg);
                         }
+                    }
+                    if self.is_array_mutation_call(arena, idx) {
+                        let flow = self.create_flow_array_mutation(idx);
+                        self.current_flow = flow;
                     }
                 }
             }
@@ -1823,6 +1842,30 @@ impl ThinBinderState {
         id
     }
 
+    /// Create a flow node for an assignment.
+    fn create_flow_assignment(&mut self, assignment: NodeIndex) -> FlowNodeId {
+        let id = self.flow_nodes.alloc(flow_flags::ASSIGNMENT);
+        if let Some(node) = self.flow_nodes.get_mut(id) {
+            node.node = assignment;
+            if !self.current_flow.is_none() {
+                node.antecedent.push(self.current_flow);
+            }
+        }
+        id
+    }
+
+    /// Create a flow node for array mutation (e.g. push/splice).
+    fn create_flow_array_mutation(&mut self, call: NodeIndex) -> FlowNodeId {
+        let id = self.flow_nodes.alloc(flow_flags::ARRAY_MUTATION);
+        if let Some(node) = self.flow_nodes.get_mut(id) {
+            node.node = call;
+            if !self.current_flow.is_none() {
+                node.antecedent.push(self.current_flow);
+            }
+        }
+        id
+    }
+
     /// Add an antecedent to a flow node (for merging branches).
     fn add_antecedent(&mut self, label: FlowNodeId, antecedent: FlowNodeId) {
         if antecedent.is_none() || antecedent == self.unreachable_flow {
@@ -1839,53 +1882,166 @@ impl ThinBinderState {
     // Expression binding for flow analysis
     // =========================================================================
 
+    fn is_assignment_operator(&self, operator: u16) -> bool {
+        matches!(
+            operator,
+            k if k == SyntaxKind::EqualsToken as u16
+                || k == SyntaxKind::PlusEqualsToken as u16
+                || k == SyntaxKind::MinusEqualsToken as u16
+                || k == SyntaxKind::AsteriskEqualsToken as u16
+                || k == SyntaxKind::AsteriskAsteriskEqualsToken as u16
+                || k == SyntaxKind::SlashEqualsToken as u16
+                || k == SyntaxKind::PercentEqualsToken as u16
+                || k == SyntaxKind::LessThanLessThanEqualsToken as u16
+                || k == SyntaxKind::GreaterThanGreaterThanEqualsToken as u16
+                || k == SyntaxKind::GreaterThanGreaterThanGreaterThanEqualsToken as u16
+                || k == SyntaxKind::AmpersandEqualsToken as u16
+                || k == SyntaxKind::BarEqualsToken as u16
+                || k == SyntaxKind::BarBarEqualsToken as u16
+                || k == SyntaxKind::AmpersandAmpersandEqualsToken as u16
+                || k == SyntaxKind::QuestionQuestionEqualsToken as u16
+                || k == SyntaxKind::CaretEqualsToken as u16
+        )
+    }
+
+    fn is_array_mutation_call(&self, arena: &ThinNodeArena, call_idx: NodeIndex) -> bool {
+        let Some(call_node) = arena.get(call_idx) else {
+            return false;
+        };
+        let Some(call) = arena.get_call_expr(call_node) else {
+            return false;
+        };
+        let Some(callee_node) = arena.get(call.expression) else {
+            return false;
+        };
+        let Some(access) = arena.get_access_expr(callee_node) else {
+            return false;
+        };
+        if access.question_dot_token {
+            return false;
+        }
+        let Some(name_node) = arena.get(access.name_or_argument) else {
+            return false;
+        };
+        let name = if let Some(ident) = arena.get_identifier(name_node) {
+            ident.escaped_text.as_str()
+        } else if let Some(literal) = arena.get_literal(name_node) {
+            if name_node.kind == SyntaxKind::StringLiteral as u16 {
+                literal.text.as_str()
+            } else {
+                return false;
+            }
+        } else {
+            return false;
+        };
+
+        matches!(
+            name,
+            "copyWithin"
+                | "fill"
+                | "pop"
+                | "push"
+                | "reverse"
+                | "shift"
+                | "sort"
+                | "splice"
+                | "unshift"
+        )
+    }
+
     // Avoid deep recursion on large left-associative binary expression chains.
     fn bind_binary_expression_iterative(&mut self, arena: &ThinNodeArena, root: NodeIndex) {
-        let mut stack = vec![root];
-        while let Some(idx) = stack.pop() {
-            let node = match arena.get(idx) {
-                Some(n) => n,
-                None => continue,
-            };
+        enum WorkItem {
+            Visit(NodeIndex),
+            PostAssign(NodeIndex),
+        }
 
-            if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
-                if let Some(bin) = arena.get_binary_expr(node) {
-                    if !bin.right.is_none() {
-                        stack.push(bin.right);
+        let mut stack = vec![WorkItem::Visit(root)];
+        while let Some(item) = stack.pop() {
+            match item {
+                WorkItem::Visit(idx) => {
+                    let node = match arena.get(idx) {
+                        Some(n) => n,
+                        None => continue,
+                    };
+
+                    if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+                        if let Some(bin) = arena.get_binary_expr(node) {
+                            if self.is_assignment_operator(bin.operator_token) {
+                                stack.push(WorkItem::PostAssign(idx));
+                                if !bin.right.is_none() {
+                                    stack.push(WorkItem::Visit(bin.right));
+                                }
+                                if !bin.left.is_none() {
+                                    stack.push(WorkItem::Visit(bin.left));
+                                }
+                                continue;
+                            }
+                            if !bin.right.is_none() {
+                                stack.push(WorkItem::Visit(bin.right));
+                            }
+                            if !bin.left.is_none() {
+                                stack.push(WorkItem::Visit(bin.left));
+                            }
+                        }
+                        continue;
                     }
-                    if !bin.left.is_none() {
-                        stack.push(bin.left);
-                    }
+
+                    self.bind_node(arena, idx);
                 }
-                continue;
+                WorkItem::PostAssign(idx) => {
+                    let flow = self.create_flow_assignment(idx);
+                    self.current_flow = flow;
+                }
             }
-
-            self.bind_node(arena, idx);
         }
     }
 
     fn bind_binary_expression_flow_iterative(&mut self, arena: &ThinNodeArena, root: NodeIndex) {
-        let mut stack = vec![root];
-        while let Some(idx) = stack.pop() {
-            let node = match arena.get(idx) {
-                Some(n) => n,
-                None => continue,
-            };
+        enum WorkItem {
+            Visit(NodeIndex),
+            PostAssign(NodeIndex),
+        }
 
-            if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
-                self.record_flow(idx);
-                if let Some(bin) = arena.get_binary_expr(node) {
-                    if !bin.right.is_none() {
-                        stack.push(bin.right);
+        let mut stack = vec![WorkItem::Visit(root)];
+        while let Some(item) = stack.pop() {
+            match item {
+                WorkItem::Visit(idx) => {
+                    let node = match arena.get(idx) {
+                        Some(n) => n,
+                        None => continue,
+                    };
+
+                    if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+                        self.record_flow(idx);
+                        if let Some(bin) = arena.get_binary_expr(node) {
+                            if self.is_assignment_operator(bin.operator_token) {
+                                stack.push(WorkItem::PostAssign(idx));
+                                if !bin.right.is_none() {
+                                    stack.push(WorkItem::Visit(bin.right));
+                                }
+                                if !bin.left.is_none() {
+                                    stack.push(WorkItem::Visit(bin.left));
+                                }
+                                continue;
+                            }
+                            if !bin.right.is_none() {
+                                stack.push(WorkItem::Visit(bin.right));
+                            }
+                            if !bin.left.is_none() {
+                                stack.push(WorkItem::Visit(bin.left));
+                            }
+                        }
+                        continue;
                     }
-                    if !bin.left.is_none() {
-                        stack.push(bin.left);
-                    }
+
+                    self.bind_expression(arena, idx);
                 }
-                continue;
+                WorkItem::PostAssign(idx) => {
+                    let flow = self.create_flow_assignment(idx);
+                    self.current_flow = flow;
+                }
             }
-
-            self.bind_expression(arena, idx);
         }
     }
 
@@ -1902,6 +2058,16 @@ impl ThinBinderState {
         };
 
         if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            if let Some(bin) = arena.get_binary_expr(node) {
+                if self.is_assignment_operator(bin.operator_token) {
+                    self.record_flow(idx);
+                    self.bind_expression(arena, bin.left);
+                    self.bind_expression(arena, bin.right);
+                    let flow = self.create_flow_assignment(idx);
+                    self.current_flow = flow;
+                    return;
+                }
+            }
             self.bind_binary_expression_flow_iterative(arena, idx);
             return;
         }
@@ -1920,6 +2086,12 @@ impl ThinBinderState {
             k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION => {
                 if let Some(unary) = arena.get_unary_expr(node) {
                     self.bind_expression(arena, unary.operand);
+                    if unary.operator == SyntaxKind::PlusPlusToken as u16
+                        || unary.operator == SyntaxKind::MinusMinusToken as u16
+                    {
+                        let flow = self.create_flow_assignment(idx);
+                        self.current_flow = flow;
+                    }
                 }
                 return;
             }
@@ -1946,6 +2118,10 @@ impl ThinBinderState {
                         for &arg in &args.nodes {
                             self.bind_expression(arena, arg);
                         }
+                    }
+                    if self.is_array_mutation_call(arena, idx) {
+                        let flow = self.create_flow_array_mutation(idx);
+                        self.current_flow = flow;
                     }
                 }
                 return;
