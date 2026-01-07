@@ -104,6 +104,11 @@ impl TypeResolver for TypeEnvironment {
     }
 }
 
+struct TupleRestExpansion {
+    fixed: Vec<TupleElement>,
+    variadic: Option<TypeId>,
+}
+
 /// Subtype checking context.
 /// Maintains the "seen" set for cycle detection.
 pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
@@ -776,25 +781,44 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // Check each element
         for (i, t_elem) in target.iter().enumerate() {
             if t_elem.rest {
-                // Target has rest element: remaining source elements must match
-                // Unwrap the array type to get the element type
-                let t_rest_elem_type = self.get_array_element_type(t_elem.type_id);
+                let expansion = self.expand_tuple_rest(t_elem.type_id);
+                let mut source_iter = source.iter().enumerate().skip(i);
 
-                for s_elem in source.iter().skip(i) {
-                    if s_elem.rest {
-                        // Source is also rest ...S[]
-                        // S[] <: T[]
-                        if !self.check_subtype(s_elem.type_id, t_elem.type_id).is_true() {
-                            return SubtypeResult::False;
+                for t_fixed in &expansion.fixed {
+                    match source_iter.next() {
+                        Some((_, s_elem)) => {
+                            if s_elem.rest {
+                                return SubtypeResult::False;
+                            }
+                            if !self.check_subtype(s_elem.type_id, t_fixed.type_id).is_true() {
+                                return SubtypeResult::False;
+                            }
                         }
-                    } else {
-                        // Regular source element vs Target Rest Element Type
-                        if !self.check_subtype(s_elem.type_id, t_rest_elem_type).is_true() {
-                            return SubtypeResult::False;
+                        None => {
+                            if !t_fixed.optional {
+                                return SubtypeResult::False;
+                            }
                         }
                     }
                 }
-                // Target rest consumes everything
+
+                if let Some(variadic) = expansion.variadic {
+                    let variadic_array = self.interner.array(variadic);
+                    for (_, s_elem) in source_iter {
+                        if s_elem.rest {
+                            if !self.check_subtype(s_elem.type_id, variadic_array).is_true() {
+                                return SubtypeResult::False;
+                            }
+                        } else if !self.check_subtype(s_elem.type_id, variadic).is_true() {
+                            return SubtypeResult::False;
+                        }
+                    }
+                    return SubtypeResult::True;
+                }
+
+                if source_iter.next().is_some() {
+                    return SubtypeResult::False;
+                }
                 return SubtypeResult::True;
             }
 
@@ -1111,6 +1135,37 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             Some(TypeKey::Array(elem)) => elem,
             // For any[], the type itself is assignable from anything
             _ => type_id,
+        }
+    }
+
+    fn expand_tuple_rest(&self, type_id: TypeId) -> TupleRestExpansion {
+        match self.interner.lookup(type_id) {
+            Some(TypeKey::Array(elem)) => TupleRestExpansion {
+                fixed: Vec::new(),
+                variadic: Some(elem),
+            },
+            Some(TypeKey::Tuple(elements)) => {
+                let mut fixed = Vec::new();
+                for elem in elements {
+                    if elem.rest {
+                        let inner = self.expand_tuple_rest(elem.type_id);
+                        fixed.extend(inner.fixed);
+                        return TupleRestExpansion {
+                            fixed,
+                            variadic: inner.variadic,
+                        };
+                    }
+                    fixed.push(elem.clone());
+                }
+                TupleRestExpansion {
+                    fixed,
+                    variadic: None,
+                }
+            }
+            _ => TupleRestExpansion {
+                fixed: Vec::new(),
+                variadic: Some(type_id),
+            },
         }
     }
 
@@ -1789,19 +1844,58 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         for (i, t_elem) in target.iter().enumerate() {
             if t_elem.rest {
-                let t_rest_elem_type = self.get_array_element_type(t_elem.type_id);
-                // Check rest elements
-                for (j, s_elem) in source.iter().enumerate().skip(i) {
-                    let target_type = if s_elem.rest { t_elem.type_id } else { t_rest_elem_type };
-                    if !self.check_subtype(s_elem.type_id, target_type).is_true() {
-                        return Some(SubtypeFailureReason::TupleElementTypeMismatch {
-                            index: j,
-                            source_element: s_elem.type_id,
-                            target_element: target_type,
-                        });
+                let expansion = self.expand_tuple_rest(t_elem.type_id);
+                let mut source_iter = source.iter().enumerate().skip(i);
+
+                for t_fixed in &expansion.fixed {
+                    match source_iter.next() {
+                        Some((j, s_elem)) => {
+                            if s_elem.rest {
+                                return Some(SubtypeFailureReason::TupleElementMismatch {
+                                    source_count: source.len(),
+                                    target_count: target.len(),
+                                });
+                            }
+                            if !self.check_subtype(s_elem.type_id, t_fixed.type_id).is_true() {
+                                return Some(SubtypeFailureReason::TupleElementTypeMismatch {
+                                    index: j,
+                                    source_element: s_elem.type_id,
+                                    target_element: t_fixed.type_id,
+                                });
+                            }
+                        }
+                        None => {
+                            if !t_fixed.optional {
+                                return Some(SubtypeFailureReason::TupleElementMismatch {
+                                    source_count: source.len(),
+                                    target_count: target.len(),
+                                });
+                            }
+                        }
                     }
                 }
-                // Target rest consumes everything, so no length error possible here
+
+                if let Some(variadic) = expansion.variadic {
+                    let variadic_array = self.interner.array(variadic);
+                    for (j, s_elem) in source_iter {
+                        let target_type = if s_elem.rest { variadic_array } else { variadic };
+                        if !self.check_subtype(s_elem.type_id, target_type).is_true() {
+                            return Some(SubtypeFailureReason::TupleElementTypeMismatch {
+                                index: j,
+                                source_element: s_elem.type_id,
+                                target_element: target_type,
+                            });
+                        }
+                    }
+                    return None;
+                }
+
+                if source_iter.next().is_some() {
+                    return Some(SubtypeFailureReason::TupleElementMismatch {
+                        source_count: source.len(),
+                        target_count: target.len(),
+                    });
+                }
                 return None;
             }
 
