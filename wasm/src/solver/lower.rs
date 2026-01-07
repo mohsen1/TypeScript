@@ -1035,7 +1035,7 @@ impl<'a> TypeLowering<'a> {
 
         for prop in properties {
             let prop_type = if prop.optional {
-                self.interner.union(vec![prop.type_id, TypeId::UNDEFINED])
+                self.interner.union2(prop.type_id, TypeId::UNDEFINED)
             } else {
                 prop.type_id
             };
