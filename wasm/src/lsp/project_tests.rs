@@ -322,6 +322,43 @@ fn test_project_update_file_removes_suffix_symbol_mappings() {
 }
 
 #[test]
+fn test_project_update_file_removes_suffix_flow_mappings() {
+    let mut project = Project::new();
+    let source = "const alpha = 1;\nbeta;\n";
+    project.set_file("a.ts".to_string(), source.to_string());
+
+    let beta_ident_idx = {
+        let file = project.file("a.ts").unwrap();
+        let arena = file.arena();
+        let root = file.root();
+        let source_node = arena.get(root).unwrap();
+        let source_file = arena.get_source_file(source_node).unwrap();
+        let stmt_idx = source_file.statements.nodes[1];
+        let stmt_node = arena.get(stmt_idx).unwrap();
+        let expr_stmt = arena.get_expression_statement(stmt_node).unwrap();
+        expr_stmt.expression
+    };
+
+    {
+        let file = project.file("a.ts").unwrap();
+        assert!(file
+            .binder()
+            .get_node_flow(beta_ident_idx)
+            .is_some());
+    }
+
+    let edit = {
+        let file = project.file("a.ts").unwrap();
+        let range = range_for_substring(file.source_text(), file.line_map(), "beta;\n");
+        TextEdit::new(range, "".to_string())
+    };
+    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+
+    let file = project.file("a.ts").unwrap();
+    assert!(file.binder().get_node_flow(beta_ident_idx).is_none());
+}
+
+#[test]
 fn test_project_update_file_inserts_suffix_statement() {
     let mut project = Project::new();
     let source = "const alpha = 1;\n";

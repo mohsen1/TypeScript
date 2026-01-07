@@ -306,6 +306,7 @@ impl ThinBinderState {
         prefix_statements: &[NodeIndex],
         old_suffix_statements: &[NodeIndex],
         new_suffix_statements: &[NodeIndex],
+        reparse_start: u32,
     ) -> bool {
         let last_prefix = match prefix_statements.last() {
             Some(stmt) => *stmt,
@@ -318,6 +319,8 @@ impl ThinBinderState {
         if self.scopes.is_empty() {
             return false;
         }
+
+        self.prune_incremental_maps(arena, reparse_start);
 
         let mut prefix_names = FxHashSet::default();
         self.collect_file_scope_names_for_statements(arena, prefix_statements, &mut prefix_names);
@@ -382,6 +385,22 @@ impl ThinBinderState {
         self.file_locals = std::mem::take(&mut self.current_scope);
 
         true
+    }
+
+    fn prune_incremental_maps(&mut self, arena: &ThinNodeArena, reparse_start: u32) {
+        if reparse_start == 0 {
+            return;
+        }
+
+        let keep_node = |node_id: &u32| {
+            arena
+                .get(NodeIndex(*node_id))
+                .map_or(false, |node| node.pos < reparse_start)
+        };
+
+        self.node_flow.retain(|node_id, _| keep_node(node_id));
+        self.node_scope_ids.retain(|node_id, _| keep_node(node_id));
+        self.switch_clause_to_switch.retain(|node_id, _| keep_node(node_id));
     }
 
     /// Collect hoisted declarations from statements.
