@@ -5,6 +5,7 @@
 
 use std::cmp::Ordering;
 use std::path::{Component, Path, PathBuf};
+use std::time::{Duration, Instant};
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -19,6 +20,7 @@ use crate::lsp::diagnostics::{convert_diagnostic, LspDiagnostic};
 use crate::lsp::hover::{HoverInfo, HoverProvider};
 use crate::lsp::signature_help::{SignatureHelp, SignatureHelpProvider};
 use crate::lsp::utils::find_node_at_offset;
+use crate::lsp::resolver::{ScopeCache, ScopeCacheStats};
 use crate::parser::thin_node::NodeAccess;
 use crate::parser::{NodeIndex, syntax_kind_ext, thin_node::ThinNodeArena};
 use crate::scanner::SyntaxKind;
@@ -62,6 +64,7 @@ pub struct ProjectFile {
     line_map: LineMap,
     type_interner: TypeInterner,
     type_cache: Option<TypeCache>,
+    scope_cache: ScopeCache,
 }
 
 impl ProjectFile {
@@ -84,6 +87,7 @@ impl ProjectFile {
             line_map,
             type_interner: TypeInterner::new(),
             type_cache: None,
+            scope_cache: ScopeCache::default(),
         }
     }
 
@@ -127,9 +131,18 @@ impl ProjectFile {
 
         self.line_map = LineMap::build(self.parser.get_source_text());
         self.type_cache = None;
+        self.scope_cache.clear();
     }
 
     pub fn get_hover(&mut self, position: Position) -> Option<HoverInfo> {
+        self.get_hover_with_stats(position, None)
+    }
+
+    pub fn get_hover_with_stats(
+        &mut self,
+        position: Position,
+        scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<HoverInfo> {
         let provider = HoverProvider::new(
             self.parser.get_arena(),
             &self.binder,
@@ -139,10 +152,24 @@ impl ProjectFile {
             self.file_name.clone(),
         );
 
-        provider.get_hover(self.root, position, &mut self.type_cache)
+        provider.get_hover_with_scope_cache(
+            self.root,
+            position,
+            &mut self.type_cache,
+            &mut self.scope_cache,
+            scope_stats,
+        )
     }
 
     pub fn get_signature_help(&mut self, position: Position) -> Option<SignatureHelp> {
+        self.get_signature_help_with_stats(position, None)
+    }
+
+    pub fn get_signature_help_with_stats(
+        &mut self,
+        position: Position,
+        scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<SignatureHelp> {
         let provider = SignatureHelpProvider::new(
             self.parser.get_arena(),
             &self.binder,
@@ -152,10 +179,24 @@ impl ProjectFile {
             self.file_name.clone(),
         );
 
-        provider.get_signature_help(self.root, position, &mut self.type_cache)
+        provider.get_signature_help_with_scope_cache(
+            self.root,
+            position,
+            &mut self.type_cache,
+            &mut self.scope_cache,
+            scope_stats,
+        )
     }
 
     pub fn get_completions(&mut self, position: Position) -> Option<Vec<CompletionItem>> {
+        self.get_completions_with_stats(position, None)
+    }
+
+    pub fn get_completions_with_stats(
+        &mut self,
+        position: Position,
+        scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<Vec<CompletionItem>> {
         let provider = Completions::new_with_types(
             self.parser.get_arena(),
             &self.binder,
@@ -165,7 +206,13 @@ impl ProjectFile {
             self.file_name.clone(),
         );
 
-        provider.get_completions_with_cache(self.root, position, &mut self.type_cache)
+        provider.get_completions_with_caches(
+            self.root,
+            position,
+            &mut self.type_cache,
+            &mut self.scope_cache,
+            scope_stats,
+        )
     }
 
     pub fn get_diagnostics(&mut self) -> Vec<LspDiagnostic> {
@@ -571,6 +618,43 @@ impl ProjectFile {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ProjectRequestKind {
+    Definition,
+    References,
+    Hover,
+    SignatureHelp,
+    Completions,
+    Diagnostics,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProjectRequestTiming {
+    pub duration: Duration,
+    pub scope_hits: u32,
+    pub scope_misses: u32,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ProjectPerformance {
+    timings: FxHashMap<ProjectRequestKind, ProjectRequestTiming>,
+}
+
+impl ProjectPerformance {
+    fn record(&mut self, kind: ProjectRequestKind, duration: Duration, stats: ScopeCacheStats) {
+        let timing = ProjectRequestTiming {
+            duration,
+            scope_hits: stats.hits,
+            scope_misses: stats.misses,
+        };
+        self.timings.insert(kind, timing);
+    }
+
+    pub fn timing(&self, kind: ProjectRequestKind) -> Option<ProjectRequestTiming> {
+        self.timings.get(&kind).copied()
+    }
+}
+
 fn apply_text_edits(source: &str, line_map: &LineMap, edits: &[TextEdit]) -> Option<String> {
     let mut edits_with_offsets = Vec::with_capacity(edits.len());
     for edit in edits {
@@ -595,6 +679,7 @@ fn apply_text_edits(source: &str, line_map: &LineMap, edits: &[TextEdit]) -> Opt
 /// Multi-file container for LSP operations.
 pub struct Project {
     files: FxHashMap<String, ProjectFile>,
+    performance: ProjectPerformance,
 }
 
 impl Project {
@@ -602,12 +687,18 @@ impl Project {
     pub fn new() -> Self {
         Self {
             files: FxHashMap::default(),
+            performance: ProjectPerformance::default(),
         }
     }
 
     /// Total number of files tracked by the project.
     pub fn file_count(&self) -> usize {
         self.files.len()
+    }
+
+    /// Snapshot of per-request timing data.
+    pub fn performance(&self) -> &ProjectPerformance {
+        &self.performance
     }
 
     /// Add or replace a file, re-parsing and re-binding its contents.
@@ -650,38 +741,83 @@ impl Project {
     }
 
     /// Go to definition within a single file.
-    pub fn get_definition(&self, file_name: &str, position: Position) -> Option<Vec<Location>> {
-        let file = self.files.get(file_name)?;
-        if let Some(definitions) = self.definition_from_import(file, position) {
-            return Some(definitions);
-        }
-        let goto_def = GoToDefinition::new(
-            file.arena(),
-            file.binder(),
-            file.line_map(),
-            file.file_name().to_string(),
-            file.source_text(),
-        );
-        goto_def.get_definition(file.root(), position)
+    pub fn get_definition(&mut self, file_name: &str, position: Position) -> Option<Vec<Location>> {
+        let start = Instant::now();
+        let mut scope_stats = ScopeCacheStats::default();
+        let result = (|| {
+            {
+                let file = self.files.get(file_name)?;
+                if let Some(definitions) = self.definition_from_import(file, position) {
+                    return Some(definitions);
+                }
+            }
+
+            let file = self.files.get_mut(file_name)?;
+            let arena = file.parser.get_arena();
+            let binder = &file.binder;
+            let line_map = &file.line_map;
+            let source_text = file.parser.get_source_text();
+            let file_name = file.file_name.clone();
+            let root = file.root;
+            let goto_def = GoToDefinition::new(
+                arena,
+                binder,
+                line_map,
+                file_name,
+                source_text,
+            );
+            goto_def.get_definition_with_scope_cache(
+                root,
+                position,
+                &mut file.scope_cache,
+                Some(&mut scope_stats),
+            )
+        })();
+
+        self.performance
+            .record(ProjectRequestKind::Definition, start.elapsed(), scope_stats);
+
+        result
     }
 
     /// Hover within a single file.
     pub fn get_hover(&mut self, file_name: &str, position: Position) -> Option<HoverInfo> {
-        let file = self.files.get_mut(file_name)?;
-        file.get_hover(position)
+        let start = Instant::now();
+        let mut scope_stats = ScopeCacheStats::default();
+        let result = self
+            .files
+            .get_mut(file_name)?
+            .get_hover_with_stats(position, Some(&mut scope_stats));
+
+        self.performance
+            .record(ProjectRequestKind::Hover, start.elapsed(), scope_stats);
+
+        result
     }
 
     /// Signature help within a single file.
     pub fn get_signature_help(&mut self, file_name: &str, position: Position) -> Option<SignatureHelp> {
-        let file = self.files.get_mut(file_name)?;
-        file.get_signature_help(position)
+        let start = Instant::now();
+        let mut scope_stats = ScopeCacheStats::default();
+        let result = self
+            .files
+            .get_mut(file_name)?
+            .get_signature_help_with_stats(position, Some(&mut scope_stats));
+
+        self.performance
+            .record(ProjectRequestKind::SignatureHelp, start.elapsed(), scope_stats);
+
+        result
     }
 
     /// Completions within a single file.
     pub fn get_completions(&mut self, file_name: &str, position: Position) -> Option<Vec<CompletionItem>> {
+        let start = Instant::now();
+        let mut scope_stats = ScopeCacheStats::default();
         let mut completions = {
             let file = self.files.get_mut(file_name)?;
-            file.get_completions(position).unwrap_or_default()
+            file.get_completions_with_stats(position, Some(&mut scope_stats))
+                .unwrap_or_default()
         };
 
         let mut existing = FxHashSet::default();
@@ -715,18 +851,32 @@ impl Project {
             }
         }
 
-        if completions.is_empty() {
+        let result = if completions.is_empty() {
             None
         } else {
             completions.sort_by(|a, b| a.label.cmp(&b.label));
             Some(completions)
-        }
+        };
+
+        self.performance
+            .record(ProjectRequestKind::Completions, start.elapsed(), scope_stats);
+
+        result
     }
 
     /// Diagnostics within a single file.
     pub fn get_diagnostics(&mut self, file_name: &str) -> Option<Vec<LspDiagnostic>> {
-        let file = self.files.get_mut(file_name)?;
-        Some(file.get_diagnostics())
+        let start = Instant::now();
+        let scope_stats = ScopeCacheStats::default();
+        let result = {
+            let file = self.files.get_mut(file_name)?;
+            Some(file.get_diagnostics())
+        };
+
+        self.performance
+            .record(ProjectRequestKind::Diagnostics, start.elapsed(), scope_stats);
+
+        result
     }
 
     /// Code actions for a file (project-aware).
@@ -765,20 +915,30 @@ impl Project {
         }
     }
 
-    fn collect_file_references(&self, file: &ProjectFile, node_idx: NodeIndex, output: &mut Vec<Location>) {
+    fn collect_file_references(
+        file: &mut ProjectFile,
+        node_idx: NodeIndex,
+        scope_stats: Option<&mut ScopeCacheStats>,
+        output: &mut Vec<Location>,
+    ) {
         if node_idx.is_none() {
             return;
         }
 
         let find_refs = FindReferences::new(
-            file.arena(),
-            file.binder(),
-            file.line_map(),
-            file.file_name().to_string(),
-            file.source_text(),
+            file.parser.get_arena(),
+            &file.binder,
+            &file.line_map,
+            file.file_name.clone(),
+            file.parser.get_source_text(),
         );
 
-        if let Some(mut refs) = find_refs.find_references_for_node(file.root(), node_idx) {
+        if let Some(mut refs) = find_refs.find_references_for_node_with_scope_cache(
+            file.root(),
+            node_idx,
+            &mut file.scope_cache,
+            scope_stats,
+        ) {
             output.append(&mut refs);
         }
     }
@@ -1095,126 +1255,223 @@ impl Project {
     }
 
     /// Find references within a single file.
-    pub fn find_references(&self, file_name: &str, position: Position) -> Option<Vec<Location>> {
-        let file = self.files.get(file_name)?;
-        let offset = file.line_map().position_to_offset(position, file.source_text())?;
-        let node_idx = find_node_at_offset(file.arena(), offset);
-        if node_idx.is_none() {
-            return None;
-        }
+    pub fn find_references(&mut self, file_name: &str, position: Position) -> Option<Vec<Location>> {
+        let start = Instant::now();
+        let mut scope_stats = ScopeCacheStats::default();
+        let result = (|| {
+            let (node_idx, symbol_id, local_name) = {
+                let file = self.files.get_mut(file_name)?;
+                let offset = file
+                    .line_map
+                    .position_to_offset(position, file.parser.get_source_text())?;
+                let node_idx = find_node_at_offset(file.parser.get_arena(), offset);
+                if node_idx.is_none() {
+                    return None;
+                }
 
-        let symbol_id = file.resolve_symbol(node_idx)?;
-        let symbol = file.binder().symbols.get(symbol_id)?;
-        let local_name = symbol.escaped_name.clone();
+                let finder = FindReferences::new(
+                    file.parser.get_arena(),
+                    &file.binder,
+                    &file.line_map,
+                    file.file_name.clone(),
+                    file.parser.get_source_text(),
+                );
+                let symbol_id = finder.resolve_symbol_for_node_with_scope_cache(
+                    file.root(),
+                    node_idx,
+                    &mut file.scope_cache,
+                    Some(&mut scope_stats),
+                )?;
+                let symbol = file.binder().symbols.get(symbol_id)?;
+                let local_name = symbol.escaped_name.clone();
+                (node_idx, symbol_id, local_name)
+            };
 
-        let mut locations = Vec::new();
-        self.collect_file_references(file, node_idx, &mut locations);
+            let mut locations = Vec::new();
+            {
+                let file = self.files.get_mut(file_name)?;
+                Self::collect_file_references(file, node_idx, Some(&mut scope_stats), &mut locations);
+            }
 
-        let mut cross_targets: Vec<(String, String)> = Vec::new();
-        let import_targets = file.import_targets_for_local(&local_name);
-
-        if !import_targets.is_empty() {
-            for target in import_targets {
-                let Some(resolved) = self.resolve_module_specifier(file.file_name(), &target.module_specifier) else {
-                    continue;
+            let (import_targets, export_names, source_file_name) = {
+                let file = self.files.get(file_name)?;
+                let import_targets = file.import_targets_for_local(&local_name);
+                let export_names = if import_targets.is_empty() {
+                    file.exported_names_for_symbol(symbol_id)
+                } else {
+                    Vec::new()
                 };
-                match target.kind {
-                    ImportKind::Named(name) => cross_targets.push((resolved, name)),
-                    ImportKind::Default => cross_targets.push((resolved, "default".to_string())),
-                    ImportKind::Namespace => {}
+                (import_targets, export_names, file.file_name().to_string())
+            };
+
+            let mut cross_targets: Vec<(String, String)> = Vec::new();
+            if !import_targets.is_empty() {
+                for target in import_targets {
+                    let Some(resolved) = self.resolve_module_specifier(&source_file_name, &target.module_specifier) else {
+                        continue;
+                    };
+                    match target.kind {
+                        ImportKind::Named(name) => cross_targets.push((resolved, name)),
+                        ImportKind::Default => cross_targets.push((resolved, "default".to_string())),
+                        ImportKind::Namespace => {}
+                    }
                 }
-            }
-        } else {
-            for export_name in file.exported_names_for_symbol(symbol_id) {
-                cross_targets.push((file.file_name().to_string(), export_name));
-            }
-        }
-
-        let mut expanded_targets = Vec::new();
-        let mut pending = cross_targets;
-        let mut seen_targets: FxHashSet<(String, String)> = FxHashSet::default();
-        let mut namespace_targets = Vec::new();
-
-        while let Some((def_file, export_name)) = pending.pop() {
-            if !seen_targets.insert((def_file.clone(), export_name.clone())) {
-                continue;
-            }
-            expanded_targets.push((def_file.clone(), export_name.clone()));
-
-            let mut reexport_refs = Vec::new();
-            let (reexports, reexport_namespaces) =
-                self.reexport_targets_for(&def_file, &export_name, &mut reexport_refs);
-            locations.extend(reexport_refs);
-            pending.extend(reexports);
-            namespace_targets.extend(reexport_namespaces);
-        }
-
-        for (def_file, export_name) in expanded_targets {
-            if let Some(target_file) = self.files.get(&def_file) {
-                let export_nodes = target_file.export_nodes(&export_name);
-                for node in export_nodes {
-                    self.collect_file_references(target_file, node, &mut locations);
+            } else {
+                for export_name in export_names {
+                    cross_targets.push((source_file_name.clone(), export_name));
                 }
             }
 
-            for (other_name, other_file) in &self.files {
-                if other_name == &def_file {
+            let mut expanded_targets = Vec::new();
+            let mut pending = cross_targets;
+            let mut seen_targets: FxHashSet<(String, String)> = FxHashSet::default();
+            let mut namespace_targets = Vec::new();
+
+            while let Some((def_file, export_name)) = pending.pop() {
+                if !seen_targets.insert((def_file.clone(), export_name.clone())) {
+                    continue;
+                }
+                expanded_targets.push((def_file.clone(), export_name.clone()));
+
+                let mut reexport_refs = Vec::new();
+                let (reexports, reexport_namespaces) =
+                    self.reexport_targets_for(&def_file, &export_name, &mut reexport_refs);
+                locations.extend(reexport_refs);
+                pending.extend(reexports);
+                namespace_targets.extend(reexport_namespaces);
+            }
+
+            let file_names: Vec<String> = self.files.keys().cloned().collect();
+
+            for (def_file, export_name) in expanded_targets {
+                let export_nodes = {
+                    let target_file = self.files.get(&def_file);
+                    target_file
+                        .map(|file| file.export_nodes(&export_name))
+                        .unwrap_or_default()
+                };
+                if !export_nodes.is_empty() {
+                    if let Some(target_file) = self.files.get_mut(&def_file) {
+                        for node in export_nodes {
+                            Self::collect_file_references(
+                                target_file,
+                                node,
+                                Some(&mut scope_stats),
+                                &mut locations,
+                            );
+                        }
+                    }
+                }
+
+                for other_name in &file_names {
+                    if other_name == &def_file {
+                        continue;
+                    }
+
+                    let binding_nodes = {
+                        let other_file = self.files.get(other_name);
+                        other_file
+                            .map(|file| self.import_binding_nodes(file, &def_file, &export_name))
+                            .unwrap_or_default()
+                    };
+                    if !binding_nodes.is_empty() {
+                        if let Some(other_file) = self.files.get_mut(other_name) {
+                            for node in binding_nodes {
+                                Self::collect_file_references(
+                                    other_file,
+                                    node,
+                                    Some(&mut scope_stats),
+                                    &mut locations,
+                                );
+                            }
+                        }
+                    }
+
+                    let namespace_names = {
+                        let other_file = self.files.get(other_name);
+                        other_file
+                            .map(|file| self.namespace_import_names(file, &def_file))
+                            .unwrap_or_default()
+                    };
+                    if !namespace_names.is_empty() {
+                        if let Some(other_file) = self.files.get(other_name) {
+                            for namespace_name in namespace_names {
+                                self.collect_namespace_member_locations(
+                                    other_file,
+                                    &namespace_name,
+                                    &export_name,
+                                    &mut locations,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+
+            let mut seen_namespace_targets: FxHashSet<(String, String, String)> = FxHashSet::default();
+            for target in namespace_targets {
+                if !seen_namespace_targets.insert((
+                    target.file.clone(),
+                    target.namespace.clone(),
+                    target.member.clone(),
+                )) {
                     continue;
                 }
 
-                let binding_nodes = self.import_binding_nodes(other_file, &def_file, &export_name);
-                for node in binding_nodes {
-                    self.collect_file_references(other_file, node, &mut locations);
-                }
+                for other_name in &file_names {
+                    if other_name == &target.file {
+                        continue;
+                    }
 
-                for namespace_name in self.namespace_import_names(other_file, &def_file) {
-                    self.collect_namespace_member_locations(other_file, &namespace_name, &export_name, &mut locations);
-                }
-            }
-        }
+                    let local_names = {
+                        let other_file = self.files.get(other_name);
+                        other_file
+                            .map(|file| self.named_import_local_names(file, &target.file, &target.namespace))
+                            .unwrap_or_default()
+                    };
+                    if local_names.is_empty() {
+                        continue;
+                    }
 
-        let mut seen_namespace_targets: FxHashSet<(String, String, String)> = FxHashSet::default();
-        for target in namespace_targets {
-            if !seen_namespace_targets.insert((
-                target.file.clone(),
-                target.namespace.clone(),
-                target.member.clone(),
-            )) {
-                continue;
-            }
-
-            for (other_name, other_file) in &self.files {
-                if other_name == &target.file {
-                    continue;
-                }
-
-                let local_names = self.named_import_local_names(other_file, &target.file, &target.namespace);
-                for local_name in local_names {
-                    self.collect_namespace_member_locations(other_file, &local_name, &target.member, &mut locations);
+                    if let Some(other_file) = self.files.get(other_name) {
+                        for local_name in local_names {
+                            self.collect_namespace_member_locations(
+                                other_file,
+                                &local_name,
+                                &target.member,
+                                &mut locations,
+                            );
+                        }
+                    }
                 }
             }
-        }
 
-        if locations.is_empty() {
-            return None;
-        }
-
-        locations.sort_by(|a, b| {
-            let file_cmp = a.file_path.cmp(&b.file_path);
-            if file_cmp != Ordering::Equal {
-                return file_cmp;
+            if locations.is_empty() {
+                return None;
             }
-            let start_cmp = (a.range.start.line, a.range.start.character)
-                .cmp(&(b.range.start.line, b.range.start.character));
-            if start_cmp != Ordering::Equal {
-                return start_cmp;
-            }
-            (a.range.end.line, a.range.end.character)
-                .cmp(&(b.range.end.line, b.range.end.character))
-        });
-        locations.dedup_by(|a, b| a.file_path == b.file_path && a.range == b.range);
 
-        Some(locations)
+            locations.sort_by(|a, b| {
+                let file_cmp = a.file_path.cmp(&b.file_path);
+                if file_cmp != Ordering::Equal {
+                    return file_cmp;
+                }
+                let start_cmp = (a.range.start.line, a.range.start.character)
+                    .cmp(&(b.range.start.line, b.range.start.character));
+                if start_cmp != Ordering::Equal {
+                    return start_cmp;
+                }
+                (a.range.end.line, a.range.end.character)
+                    .cmp(&(b.range.end.line, b.range.end.character))
+            });
+            locations.dedup_by(|a, b| a.file_path == b.file_path && a.range == b.range);
+
+            Some(locations)
+        })();
+
+        self.performance
+            .record(ProjectRequestKind::References, start.elapsed(), scope_stats);
+
+        result
     }
 
     fn definition_from_import(&self, file: &ProjectFile, position: Position) -> Option<Vec<Location>> {
