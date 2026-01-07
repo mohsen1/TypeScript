@@ -170,6 +170,47 @@ fn test_project_signature_help_includes_jsdoc() {
 }
 
 #[test]
+fn test_project_completions_auto_import_named() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "export const foo = 1;\n".to_string());
+    project.set_file("b.ts".to_string(), "foo;\n".to_string());
+
+    let items = project
+        .get_completions("b.ts", Position::new(0, 1))
+        .expect("Expected completions");
+
+    let has_auto_import = items.iter().any(|item| {
+        if item.label != "foo" {
+            return false;
+        }
+        let detail = item.detail.as_deref().unwrap_or("");
+        let doc = item.documentation.as_deref().unwrap_or("");
+        detail.contains("auto-import") && detail.contains("./a") && doc.contains("import { foo } from \"./a\";")
+    });
+
+    assert!(has_auto_import, "Should include auto-import completion for foo");
+}
+
+#[test]
+fn test_project_diagnostics_cached() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "const value: string = 1;\n".to_string());
+
+    let diagnostics = project
+        .get_diagnostics("a.ts")
+        .expect("Expected diagnostics");
+    assert!(!diagnostics.is_empty(), "Should report diagnostics");
+    assert_eq!(diagnostics[0].severity, Some(DiagnosticSeverity::Error));
+
+    let diagnostics_again = project
+        .get_diagnostics("a.ts")
+        .expect("Expected diagnostics on cached run");
+    assert_eq!(diagnostics_again.len(), diagnostics.len());
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 
