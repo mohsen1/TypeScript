@@ -8,6 +8,7 @@ use crate::emit_context::EmitContext;
 use crate::lowering_pass::LoweringPass;
 use crate::thin_emitter::ThinPrinter;
 use crate::thin_parser::ThinParserState;
+use crate::transform_context::{TransformContext, TransformDirective};
 
 #[test]
 fn test_two_phase_emission_es5_class() {
@@ -607,10 +608,66 @@ fn test_two_phase_emission_commonjs_export_assignment_suppresses_named_exports()
 }
 
 #[test]
+fn test_transform_directive_chain_es5_class_commonjs_export() {
+    let source = "class Foo {}";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut transforms = TransformContext::new();
+    transforms.insert(
+        class_idx,
+        TransformDirective::Chain(vec![
+            TransformDirective::ES5Class {
+                class_node: class_idx,
+                class_name: Some("Foo".to_string()),
+                heritage: None,
+                members: Vec::new(),
+            },
+            TransformDirective::CommonJSExport {
+                names: vec!["Foo".to_string()],
+                is_default: false,
+                inner: Box::new(TransformDirective::Identity),
+            },
+        ]),
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var Foo = /** @class */"),
+        "Chained ES5 class transform should emit IIFE: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.Foo = Foo;"),
+        "Chained CommonJS export should emit assignment: {}",
+        output
+    );
+    assert!(
+        !output.contains("class Foo"),
+        "Chained transforms should downlevel class syntax: {}",
+        output
+    );
+}
+
+#[test]
 fn test_transform_directive_composability() {
     // This test verifies that the architecture supports composable transforms
     // For now, we just verify that the TransformContext can be created and passed around
-    use crate::transform_context::{TransformContext, TransformDirective};
     use crate::parser::NodeIndex;
 
     let mut ctx = TransformContext::new();
