@@ -422,7 +422,9 @@ impl ThinParserState {
             SyntaxKind::LessThanEqualsToken |
             SyntaxKind::GreaterThanEqualsToken |
             SyntaxKind::InstanceOfKeyword |
-            SyntaxKind::InKeyword => 10,
+            SyntaxKind::InKeyword |
+            SyntaxKind::AsKeyword |
+            SyntaxKind::SatisfiesKeyword => 10,
             SyntaxKind::LessThanLessThanToken |
             SyntaxKind::GreaterThanGreaterThanToken |
             SyntaxKind::GreaterThanGreaterThanGreaterThanToken => 11,
@@ -606,10 +608,22 @@ impl ThinParserState {
                 }
             }
             SyntaxKind::InterfaceKeyword => self.parse_interface_declaration(),
-            SyntaxKind::TypeKeyword => self.parse_type_alias_declaration(),
+            SyntaxKind::TypeKeyword => {
+                if self.look_ahead_is_type_alias_declaration() {
+                    self.parse_type_alias_declaration()
+                } else {
+                    self.parse_expression_statement()
+                }
+            }
             SyntaxKind::EnumKeyword => self.parse_enum_declaration(),
             SyntaxKind::DeclareKeyword => self.parse_ambient_declaration(),
-            SyntaxKind::NamespaceKeyword | SyntaxKind::ModuleKeyword => self.parse_module_declaration(),
+            SyntaxKind::NamespaceKeyword | SyntaxKind::ModuleKeyword => {
+                if self.look_ahead_is_module_declaration() {
+                    self.parse_module_declaration()
+                } else {
+                    self.parse_expression_statement()
+                }
+            }
             SyntaxKind::IfKeyword => self.parse_if_statement(),
             SyntaxKind::ReturnKeyword => self.parse_return_statement(),
             SyntaxKind::WhileKeyword => self.parse_while_statement(),
@@ -711,6 +725,32 @@ impl ThinParserState {
         self.scanner.restore_state(snapshot);
         self.current_token = current;
         is_call
+    }
+
+    /// Look ahead to see if "namespace"/"module" starts a declaration.
+    fn look_ahead_is_module_declaration(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        self.next_token(); // skip namespace/module
+        let is_decl = matches!(self.token(), SyntaxKind::Identifier | SyntaxKind::StringLiteral);
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_decl
+    }
+
+    /// Look ahead to see if "type" starts a type alias declaration.
+    fn look_ahead_is_type_alias_declaration(&mut self) -> bool {
+        let snapshot = self.scanner.save_state();
+        let current = self.current_token;
+
+        self.next_token(); // skip 'type'
+        let is_decl = self.is_token(SyntaxKind::Identifier);
+
+        self.scanner.restore_state(snapshot);
+        self.current_token = current;
+        is_decl
     }
 
     /// Look ahead to see if we have "identifier :" (labeled statement)
@@ -4321,8 +4361,6 @@ impl ThinParserState {
         match self.token() {
             // (params) => ...
             SyntaxKind::OpenParenToken => self.look_ahead_is_arrow_function(),
-            // identifier => ...
-            SyntaxKind::Identifier => self.look_ahead_is_simple_arrow_function(),
             // async could be:
             // 1. async (x) => ... or async x => ... (async arrow function)
             // 2. async => ... (non-async arrow where 'async' is parameter name)
@@ -4339,7 +4377,7 @@ impl ThinParserState {
             }
             // <T>(x) => ... (generic arrow function)
             SyntaxKind::LessThanToken => self.look_ahead_is_generic_arrow_function(),
-            _ => false,
+            _ => self.is_identifier_or_keyword() && self.look_ahead_is_simple_arrow_function(),
         }
     }
 
@@ -4630,6 +4668,11 @@ impl ThinParserState {
                 break;
             }
 
+            if op == SyntaxKind::AsKeyword || op == SyntaxKind::SatisfiesKeyword {
+                left = self.parse_as_or_satisfies_expression(left, start_pos);
+                continue;
+            }
+
             let operator_token = op as u16;
             self.next_token();
 
@@ -4696,11 +4739,6 @@ impl ThinParserState {
                     },
                 );
             }
-        }
-
-        // Handle as/satisfies type assertions: expr as Type, expr satisfies Type
-        if self.is_token(SyntaxKind::AsKeyword) || self.is_token(SyntaxKind::SatisfiesKeyword) {
-            left = self.parse_as_or_satisfies_expression(left, start_pos);
         }
 
         self.exit_recursion();
@@ -5112,8 +5150,25 @@ impl ThinParserState {
         let mut args = Vec::new();
 
         while !self.is_token(SyntaxKind::CloseParenToken) {
-            let arg = self.parse_assignment_expression();
-            args.push(arg);
+            if self.is_token(SyntaxKind::DotDotDotToken) {
+                let spread_start = self.token_pos();
+                self.next_token();
+                let expression = self.parse_assignment_expression();
+                let spread_end = self.token_end();
+                let spread = self.arena.add_unary_expr_ex(
+                    syntax_kind_ext::SPREAD_ELEMENT,
+                    spread_start,
+                    spread_end,
+                    crate::parser::thin_node::UnaryExprDataEx {
+                        expression,
+                        asterisk_token: false,
+                    },
+                );
+                args.push(spread);
+            } else {
+                let arg = self.parse_assignment_expression();
+                args.push(arg);
+            }
 
             if !self.parse_optional(SyntaxKind::CommaToken) {
                 break;
@@ -5173,12 +5228,16 @@ impl ThinParserState {
             | SyntaxKind::RequireKeyword
             | SyntaxKind::ModuleKeyword => self.parse_keyword_as_identifier(),
             _ => {
-                // Unknown primary expression - create an error token
-                let start_pos = self.token_pos();
-                let end_pos = self.token_end();
-                self.error_expression_expected();
-                self.next_token();
-                self.arena.add_token(SyntaxKind::Unknown as u16, start_pos, end_pos)
+                if self.is_identifier_or_keyword() {
+                    self.parse_identifier_name()
+                } else {
+                    // Unknown primary expression - create an error token
+                    let start_pos = self.token_pos();
+                    let end_pos = self.token_end();
+                    self.error_expression_expected();
+                    self.next_token();
+                    self.arena.add_token(SyntaxKind::Unknown as u16, start_pos, end_pos)
+                }
             }
         }
     }
@@ -6214,7 +6273,7 @@ impl ThinParserState {
     fn parse_return_type(&mut self) -> NodeIndex {
         // Check if this is a type predicate: identifier 'is' Type
         // We need to look ahead to see if there's an identifier followed by 'is'
-        if self.is_token(SyntaxKind::Identifier) || self.is_token(SyntaxKind::ThisKeyword) {
+        if self.is_identifier_or_keyword() || self.is_token(SyntaxKind::ThisKeyword) {
             let snapshot = self.scanner.save_state();
             let current = self.current_token;
 
@@ -6265,7 +6324,7 @@ impl ThinParserState {
             return self.arena.add_token(SyntaxKind::ThisKeyword as u16, start_pos, end_pos);
         }
 
-        self.parse_identifier()
+        self.parse_identifier_name()
     }
 
     /// Parse 'asserts' type predicate: asserts x or asserts x is T

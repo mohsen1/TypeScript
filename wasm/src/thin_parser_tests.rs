@@ -1911,6 +1911,83 @@ fn test_thin_parser_optional_chain_call_with_type_arguments() {
 }
 
 #[test]
+fn test_thin_parser_spread_in_call_arguments() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "foo(...args, 1, ...rest)".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+}
+
+#[test]
+fn test_thin_parser_as_expression_followed_by_logical_or() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "const x = (value as readonly number[] | undefined) || fallback".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+}
+
+#[test]
+fn test_thin_parser_keyword_identifier_in_expression() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "const set = new Set<number>(); set.add(1)".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+}
+
+#[test]
+fn test_thin_parser_arrow_param_keyword_identifier() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "const f = symbol => symbol".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+}
+
+#[test]
+fn test_thin_parser_type_predicate_keyword_param() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "function isSymbol(symbol: unknown): symbol is Symbol { return true; }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+}
+
+#[test]
+fn test_thin_parser_namespace_identifier_assignment_statement() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "let namespace = 1; namespace = 2;".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+}
+
+#[test]
+fn test_thin_parser_type_identifier_assignment_statement() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "let type = { intrinsicName: \"\" }; type.intrinsicName = \"x\";".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+}
+
+#[test]
 fn test_thin_parser_nullish_coalescing() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
