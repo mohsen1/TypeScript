@@ -1828,6 +1828,18 @@ fn test_thin_parser_re_export() {
 }
 
 #[test]
+fn test_thin_parser_default_re_export_specifiers() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        r#"export { default } from "bar"; export { default as Foo } from "bar";"#.to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+}
+
+#[test]
 fn test_thin_parser_export_star() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
