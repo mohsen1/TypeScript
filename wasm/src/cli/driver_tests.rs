@@ -381,3 +381,128 @@ fn compile_prefers_browser_exports_for_bundler() {
         .any(|diag| diag.file.contains("node_modules/pkg/browser.d.ts")));
     assert!(!base.join("dist/src/index.js").is_file());
 }
+
+#[test]
+fn compile_node_next_resolves_js_extension_to_ts() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "moduleResolution": "nodenext",
+            "noEmitOnError": true
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { value } from './util.js'; export { value };",
+    );
+    write_file(&base.join("src/util.ts"), "export const value = ;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("src/util.ts")));
+    assert!(!base.join("dist/src/index.js").is_file());
+}
+
+#[test]
+fn compile_node_next_prefers_mts_for_module_package() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "moduleResolution": "nodenext",
+            "noEmitOnError": true
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { value } from 'pkg'; export { value };",
+    );
+    write_file(
+        &base.join("node_modules/pkg/package.json"),
+        r#"{
+          "type": "module"
+        }"#,
+    );
+    write_file(
+        &base.join("node_modules/pkg/index.mts"),
+        "export const value = ;",
+    );
+    write_file(
+        &base.join("node_modules/pkg/index.cts"),
+        "export const value = 1;",
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("node_modules/pkg/index.mts")));
+    assert!(!base.join("dist/src/index.js").is_file());
+}
+
+#[test]
+fn compile_node_next_prefers_cts_for_commonjs_package() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "moduleResolution": "nodenext",
+            "noEmitOnError": true
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { value } from 'pkg'; export { value };",
+    );
+    write_file(
+        &base.join("node_modules/pkg/package.json"),
+        r#"{
+          "type": "commonjs"
+        }"#,
+    );
+    write_file(
+        &base.join("node_modules/pkg/index.mts"),
+        "export const value = 1;",
+    );
+    write_file(
+        &base.join("node_modules/pkg/index.cts"),
+        "export const value = ;",
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("node_modules/pkg/index.cts")));
+    assert!(!base.join("dist/src/index.js").is_file());
+}
