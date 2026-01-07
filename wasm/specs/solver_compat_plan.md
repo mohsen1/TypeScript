@@ -157,6 +157,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Evaluate index access on union object types (cross-product behavior)
 - [x] Tests for union object index access with noUncheckedIndexedAccess
 
+### Phase 24: Intersection Reduction (Disjoint Primitives)
+- [x] Reduce intersections of disjoint primitive domains to `never`
+- [x] Tests for disjoint primitive intersections
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
