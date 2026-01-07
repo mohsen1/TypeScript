@@ -129,9 +129,7 @@ impl<'a> LoweringPass<'a> {
             }
             k if k == syntax_kind_ext::VARIABLE_DECLARATION_LIST => {
                 if let Some(decl_list) = self.arena.get_variable(node) {
-                    if self.ctx.target_es5
-                        && self.decl_list_needs_es5_destructuring(decl_list)
-                    {
+                    if self.ctx.target_es5 {
                         self.transforms.insert(
                             idx,
                             TransformDirective::ES5VariableDeclarationList { decl_list: idx },
@@ -547,10 +545,11 @@ impl<'a> LoweringPass<'a> {
                         let is_anonymous = func_name == "function"
                             || !Self::is_valid_identifier_name(&func_name);
                         if is_anonymous {
-                            self.transforms.insert(
+                            let directive = self.commonjs_default_export_function_directive(
                                 export_decl.export_clause,
-                                TransformDirective::CommonJSExportDefaultExpr,
+                                func,
                             );
+                            self.transforms.insert(export_decl.export_clause, directive);
 
                             if let Some(mods) = &func.modifiers {
                                 for &mod_idx in &mods.nodes {
@@ -575,10 +574,14 @@ impl<'a> LoweringPass<'a> {
                     if let Some(class) = self.arena.get_class(export_node) {
                         let class_name = self.get_identifier_text(class.name);
                         if !Self::is_valid_identifier_name(&class_name) {
-                            self.transforms.insert(
-                                export_decl.export_clause,
-                                TransformDirective::CommonJSExportDefaultExpr,
-                            );
+                            let directive = if self.ctx.target_es5 {
+                                TransformDirective::CommonJSExportDefaultClassES5 {
+                                    class_node: export_decl.export_clause,
+                                }
+                            } else {
+                                TransformDirective::CommonJSExportDefaultExpr
+                            };
+                            self.transforms.insert(export_decl.export_clause, directive);
 
                             if let Some(mods) = &class.modifiers {
                                 for &mod_idx in &mods.nodes {
@@ -635,6 +638,31 @@ impl<'a> LoweringPass<'a> {
         }
 
         self.visit(export_decl.export_clause);
+    }
+
+    fn commonjs_default_export_function_directive(
+        &self,
+        function_node: NodeIndex,
+        func: &crate::parser::thin_node::FunctionData,
+    ) -> TransformDirective {
+        let mut directives = Vec::new();
+        if self.ctx.target_es5 {
+            if func.is_async {
+                directives.push(TransformDirective::ES5AsyncFunction { function_node });
+            } else if self.function_parameters_need_es5_transform(&func.parameters) {
+                directives.push(TransformDirective::ES5FunctionParameters { function_node });
+            }
+        }
+
+        directives.push(TransformDirective::CommonJSExportDefaultExpr);
+
+        if directives.len() == 1 {
+            directives
+                .pop()
+                .expect("commonjs default export directive should not be empty")
+        } else {
+            TransformDirective::Chain(directives)
+        }
     }
 
     fn lower_class_declaration(
@@ -1130,22 +1158,6 @@ impl<'a> LoweringPass<'a> {
 
             node.kind == syntax_kind_ext::METHOD_DECLARATION
                 || node.kind == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT
-        })
-    }
-
-    fn decl_list_needs_es5_destructuring(
-        &self,
-        decl_list: &crate::parser::thin_node::VariableData,
-    ) -> bool {
-        decl_list.declarations.nodes.iter().any(|&decl_idx| {
-            let Some(decl_node) = self.arena.get(decl_idx) else {
-                return false;
-            };
-            let Some(decl) = self.arena.get_variable_declaration(decl_node) else {
-                return false;
-            };
-
-            !decl.initializer.is_none() && self.is_binding_pattern_idx(decl.name)
         })
     }
 
