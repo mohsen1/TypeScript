@@ -1857,3 +1857,33 @@ fn test_mapped_type_key_remap_filters_keys() {
     assert!(checker.is_assignable(mapped, expected));
     assert!(!checker.is_assignable(mapped, requires_a));
 }
+
+#[test]
+fn test_keyof_intersection_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+    let keyof_a = interner.intern(TypeKey::KeyOf(obj_a));
+    let keyof_intersection = interner.intern(TypeKey::KeyOf(intersection));
+
+    assert!(checker.is_assignable(keyof_a, keyof_intersection));
+    assert!(!checker.is_assignable(keyof_intersection, keyof_a));
+}

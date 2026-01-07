@@ -90,6 +90,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Callables assignable to Function; Function not assignable to specific signatures.
 - [x] Add mapped type key remapping coverage (`as never`)
   - Remapped keys returning `never` are filtered from mapped outputs.
+- [x] Add keyof contravariance coverage for intersections
+  - `keyof (A & B)` unions keys and stays assignable from `keyof A`.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.
