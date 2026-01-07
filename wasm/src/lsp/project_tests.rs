@@ -1767,6 +1767,77 @@ fn test_project_scope_cache_reuse_after_other_file_edit() {
 }
 
 #[test]
+fn test_project_nested_function_body_edit_preserves_prefix_symbol_and_scope_cache() {
+    let mut project = Project::new();
+
+    project.set_file(
+        "a.ts".to_string(),
+        "const alpha = 1;\nfunction outer() {\n  function inner() {\n    return alpha;\n  }\n  return inner();\n}\nalpha;\n".to_string(),
+    );
+    let position = Position::new(7, 0);
+
+    let alpha_symbol_before = {
+        let file = project.file("a.ts").unwrap();
+        file.binder()
+            .file_locals
+            .get("alpha")
+            .expect("Expected symbol for alpha")
+    };
+
+    let edit = {
+        let file = project.file("a.ts").unwrap();
+        let range = range_for_substring(file.source_text(), file.line_map(), "return alpha;");
+        TextEdit::new(range, "return alpha + 1;".to_string())
+    };
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
+
+    let alpha_symbol_after = {
+        let file = project.file("a.ts").unwrap();
+        file.binder()
+            .file_locals
+            .get("alpha")
+            .expect("Expected symbol for alpha after update")
+    };
+
+    assert_eq!(alpha_symbol_before, alpha_symbol_after);
+
+    assert!(project.get_hover("a.ts", position).is_some());
+    assert!(project.get_definition("a.ts", position).is_some());
+    let first = project
+        .performance()
+        .timing(ProjectRequestKind::Definition)
+        .expect("Expected timing data for definition");
+
+    assert!(project.get_definition("a.ts", position).is_some());
+    let second = project
+        .performance()
+        .timing(ProjectRequestKind::Definition)
+        .expect("Expected timing data for definition");
+
+    if first.scope_hits > 0 {
+        assert_eq!(
+            first.scope_misses,
+            0,
+            "Expected definition to reuse cached scope after nested edit"
+        );
+    } else {
+        assert!(
+            first.scope_misses > 0,
+            "Expected cache misses after nested edit"
+        );
+    }
+
+    assert!(second.scope_hits > 0, "Expected scope cache hit after nested edit");
+    assert_eq!(
+        second.scope_misses,
+        0,
+        "Expected definition to reuse cached scope after cache warm"
+    );
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 
