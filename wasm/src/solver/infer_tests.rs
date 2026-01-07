@@ -270,6 +270,26 @@ fn test_resolve_bounds_valid() {
 }
 
 #[test]
+fn test_resolve_bounds_tuple_lower_array_upper() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let t_name = interner.intern_string("T");
+
+    let var = ctx.fresh_type_param(t_name);
+    let string_array = interner.array(TypeId::STRING);
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    ctx.add_lower_bound(var, tuple);
+    ctx.add_upper_bound(var, string_array);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, tuple);
+}
+
+#[test]
 fn test_resolve_bounds_conflict() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
