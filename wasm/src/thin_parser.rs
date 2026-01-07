@@ -5294,8 +5294,8 @@ impl ThinParserState {
             }
         }
 
-        self.parse_expected(SyntaxKind::CloseBracketToken);
         let end_pos = self.token_end();
+        self.parse_expected(SyntaxKind::CloseBracketToken);
 
         self.arena.add_binding_pattern(
             syntax_kind_ext::ARRAY_BINDING_PATTERN,
@@ -5671,8 +5671,8 @@ impl ThinParserState {
             }
         }
 
-        self.parse_expected(SyntaxKind::CloseBracketToken);
         let end_pos = self.token_end();
+        self.parse_expected(SyntaxKind::CloseBracketToken);
 
         self.arena.add_literal_expr(
             syntax_kind_ext::ARRAY_LITERAL_EXPRESSION,
@@ -5700,8 +5700,8 @@ impl ThinParserState {
             }
         }
 
-        self.parse_expected(SyntaxKind::CloseBraceToken);
         let end_pos = self.token_end();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
 
         self.arena.add_literal_expr(
             syntax_kind_ext::OBJECT_LITERAL_EXPRESSION,

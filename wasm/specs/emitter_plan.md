@@ -32,7 +32,7 @@ Next Steps: Cleanup. Remove the legacy inline transformation logic from ThinPrin
 5. Implement System/AMD/UMD module formats (if needed) [done]
 6. Public API integration (export LoweringPass) [done - covered by #1]
 7. Deprecate inline transform logic (breaking change) [partial: removed inline ES5 class/enum/namespace/arrow/for-of/async/object literal computed/spread paths; default anonymous export now handled via transform directive]
-8. More unit test if there are gaps [added parity tests; auto-detect/export-assignment coverage; export default arrow; arrow this in object literals/await/type assertions/satisfies/tagged templates; ES5 template literal/tagged template downlevel; ES5 class template/tagged template downlevel]
+8. More unit test if there are gaps [added parity tests; auto-detect/export-assignment coverage; export default arrow; arrow this in object literals/await/type assertions/satisfies/tagged templates; ES5 template literal/tagged template downlevel; ES5 class template/tagged template downlevel; ES5 object literal shorthand/method downlevel]
 9. Emit ES6 class heritage clauses (extends) [done]
 10. Class ES5 transform: emit try/throw statements and parenthesized expressions [done]
 11. CommonJS export star (export * from) support [done]
@@ -71,6 +71,7 @@ Next Steps: Cleanup. Remove the legacy inline transformation logic from ThinPrin
 44. ES5 emit: downlevel template literals + tagged templates with __makeTemplateObject helper [done]
 45. ES5 emit: include __awaiter/__generator helpers when async downleveling [done]
 46. ES5 class emitter: downlevel template literals + tagged templates [done]
+47. ES5 object literal emit: downlevel shorthand properties + methods [done]
 
 
 ## Quick Reference

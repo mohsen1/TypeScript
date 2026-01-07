@@ -22,7 +22,7 @@
 
 use crate::emit_context::EmitContext;
 use crate::parser::{NodeIndex, NodeList};
-use crate::parser::thin_node::{ThinNode, ThinNodeArena, TemplateExprData};
+use crate::parser::thin_node::{ThinNode, ThinNodeArena, TemplateExprData, MethodDeclData};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::source_writer::SourceWriter;
@@ -2045,6 +2045,80 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
+    fn emit_object_literal_entries_es5(&mut self, elements: &[NodeIndex]) {
+        if elements.is_empty() {
+            self.write("{}");
+            return;
+        }
+
+        if elements.len() > 1 {
+            self.write("{");
+            self.write_line();
+            self.increase_indent();
+            for (i, &prop) in elements.iter().enumerate() {
+                self.emit_object_literal_member_es5(prop);
+                if i < elements.len() - 1 {
+                    self.write(",");
+                }
+                self.write_line();
+            }
+            self.decrease_indent();
+            self.write("}");
+        } else {
+            self.write("{ ");
+            self.emit_object_literal_member_es5(elements[0]);
+            self.write(" }");
+        }
+    }
+
+    fn emit_object_literal_member_es5(&mut self, prop_idx: NodeIndex) {
+        let Some(node) = self.arena.get(prop_idx) else { return };
+
+        match node.kind {
+            k if k == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT => {
+                if let Some(shorthand) = self.arena.get_shorthand_property(node) {
+                    self.emit(shorthand.name);
+                    self.write(": ");
+                    self.emit(shorthand.name);
+                }
+            }
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                if let Some(method) = self.arena.get_method_decl(node) {
+                    self.emit(method.name);
+                    self.write(": ");
+                    self.emit_object_literal_method_value_es5(method);
+                }
+            }
+            _ => self.emit(prop_idx),
+        }
+    }
+
+    fn emit_object_literal_method_value_es5(&mut self, method: &MethodDeclData) {
+        if method.body.is_none() {
+            self.write("function () {}");
+            return;
+        }
+
+        let is_async = self.has_modifier(&method.modifiers, SyntaxKind::AsyncKeyword as u16);
+        if is_async {
+            self.emit_async_function_es5_body("", &method.parameters.nodes, method.body, "this");
+            return;
+        }
+
+        self.write("function");
+        if method.asterisk_token {
+            self.write("*");
+        }
+        self.write(" (");
+        let param_transforms = self.emit_function_parameters_es5(&method.parameters.nodes);
+        self.write(") ");
+        if self.ctx.target_es5 && param_transforms.has_transforms() {
+            self.emit_block_with_param_prologue(method.body, &param_transforms);
+        } else {
+            self.emit(method.body);
+        }
+    }
+
     /// Check if a property member has a computed property name
     fn is_computed_property_member(&self, idx: NodeIndex) -> bool {
         let Some(node) = self.arena.get(idx) else { return false };
@@ -2074,8 +2148,10 @@ impl<'a> ThinPrinter<'a> {
     /// Pattern: { [k]: v } → (_a = {}, _a[k] = v, _a)
     /// Pattern: { a: 1, [k]: v, b: 2 } → (_a = { a: 1 }, _a[k] = v, _a.b = 2, _a)
     fn emit_object_literal_es5(&mut self, elements: &[NodeIndex]) {
-        // Get temp variable name
-        let temp_var = self.ctx.destructuring_state.next_temp_var();
+        if elements.is_empty() {
+            self.write("{}");
+            return;
+        }
 
         // Find the index of the first computed property
         let first_computed_idx = elements.iter()
@@ -2087,34 +2163,21 @@ impl<'a> ThinPrinter<'a> {
             })
             .unwrap_or(elements.len());
 
+        if first_computed_idx == elements.len() {
+            self.emit_object_literal_entries_es5(elements);
+            return;
+        }
+
+        // Get temp variable name
+        let temp_var = self.ctx.destructuring_state.next_temp_var();
+
         self.write("(");
         self.write(&temp_var);
         self.write(" = ");
 
         // Emit initial non-computed properties as the object literal
         if first_computed_idx > 0 {
-            self.write("{");
-            if first_computed_idx > 1 {
-                self.write_line();
-                self.increase_indent();
-            } else {
-                self.write(" ");
-            }
-            for i in 0..first_computed_idx {
-                let prop_idx = elements[i];
-                self.emit(prop_idx);
-                if i < first_computed_idx - 1 {
-                    self.write(",");
-                    self.write_line();
-                }
-            }
-            if first_computed_idx > 1 {
-                self.write_line();
-                self.decrease_indent();
-            } else {
-                self.write(" ");
-            }
-            self.write("}");
+            self.emit_object_literal_entries_es5(&elements[..first_computed_idx]);
         } else {
             self.write("{}");
         }
@@ -2157,14 +2220,8 @@ impl<'a> ThinPrinter<'a> {
             k if k == syntax_kind_ext::METHOD_DECLARATION => {
                 if let Some(method) = self.arena.get_method_decl(node) {
                     self.emit_assignment_target_es5(method.name, temp_var);
-                    self.write(" = function");
-                    if method.asterisk_token {
-                        self.write("*");
-                    }
-                    self.write(" (");
-                    self.emit_function_parameters_js(&method.parameters.nodes);
-                    self.write(") ");
-                    self.emit(method.body);
+                    self.write(" = ");
+                    self.emit_object_literal_method_value_es5(method);
                 }
             }
             k if k == syntax_kind_ext::GET_ACCESSOR => {
@@ -2590,6 +2647,21 @@ impl<'a> ThinPrinter<'a> {
         func_name: &str,
         this_expr: &str,
     ) {
+        self.emit_async_function_es5_body(
+            func_name,
+            &func.parameters.nodes,
+            func.body,
+            this_expr,
+        );
+    }
+
+    fn emit_async_function_es5_body(
+        &mut self,
+        func_name: &str,
+        params: &[NodeIndex],
+        body: NodeIndex,
+        this_expr: &str,
+    ) {
         // function name(params) {
         self.write("function");
         if !func_name.is_empty() {
@@ -2597,7 +2669,7 @@ impl<'a> ThinPrinter<'a> {
             self.write(func_name);
         }
         self.write("(");
-        let param_transforms = self.emit_function_parameters_es5(&func.parameters.nodes);
+        let param_transforms = self.emit_function_parameters_es5(params);
         self.write(") {");
         self.write_line();
         self.increase_indent();
@@ -2612,10 +2684,10 @@ impl<'a> ThinPrinter<'a> {
         // Transform emitter handles its own indentation inside __awaiter
         async_emitter.set_indent_level(self.writer.indent_level() + 1);
 
-        let generator_body = if async_emitter.body_contains_await(func.body) {
-            async_emitter.emit_generator_body_with_await(func.body)
+        let generator_body = if async_emitter.body_contains_await(body) {
+            async_emitter.emit_generator_body_with_await(body)
         } else {
-            async_emitter.emit_simple_generator_body(func.body)
+            async_emitter.emit_simple_generator_body(body)
         };
 
         // Write with surrounding __awaiter wrapper
@@ -2631,7 +2703,6 @@ impl<'a> ThinPrinter<'a> {
         self.write_line();
         self.decrease_indent();
         self.write("}");
-
     }
 
     fn emit_function_parameters_es5(&mut self, params: &[NodeIndex]) -> ParamTransformPlan {
