@@ -137,6 +137,8 @@ Status: Active
 - [x] Keep property and element access references aligned in flow narrowing
   - Narrow across `obj.prop` and `obj["prop"]` forms.
   - Clear narrowings when assignments use the opposite access form.
+- [x] Keep computed element access conservative in flow narrowing
+  - Do not narrow `obj[key]` when the key is not a literal string.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
