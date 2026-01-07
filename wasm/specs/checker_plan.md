@@ -13,6 +13,7 @@ Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (in
 - Checker uses binder persistent scopes with SymbolId type caching; local scope stack removed.
 - Solver inference skips constraining defaulted placeholders in union targets to preserve defaults.
 - Type literal lowering uses checker paths for type params while preserving ref semantics for named members.
+- Solver diagnostics rendering preserves related messages without spans via fallback span.
 
 ## Highest-Impact Next Tasks (pick one at a time)
 - [x] Replace local scope stack with binder persistent scopes

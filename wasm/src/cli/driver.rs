@@ -181,14 +181,15 @@ fn compile_inner(
         cache.update_dependencies(dependencies);
     }
 
-    let program = if let Some(cache) = cache.as_deref_mut() {
-        build_program_with_cache(sources, cache)
+    let (program, dirty_paths) = if let Some(cache) = cache.as_deref_mut() {
+        let result = build_program_with_cache(sources, cache);
+        (result.program, Some(result.dirty_paths))
     } else {
         let compile_inputs: Vec<(String, String)> = sources
             .into_iter()
             .map(|source| (source.path.to_string_lossy().into_owned(), source.text))
             .collect();
-        parallel::compile_files(compile_inputs)
+        (parallel::compile_files(compile_inputs), None)
     };
     let mut diagnostics = collect_diagnostics(&program, cache);
     diagnostics.sort_by(|left, right| {
@@ -213,6 +214,7 @@ fn compile_inner(
             root_dir.as_deref(),
             out_dir.as_deref(),
             declaration_dir.as_deref(),
+            dirty_paths.as_ref(),
         )?;
         write_outputs(&outputs)?
     };
@@ -230,12 +232,18 @@ struct SourceMeta {
     cached_ok: bool,
 }
 
+struct BuildProgramResult {
+    program: MergedProgram,
+    dirty_paths: HashSet<PathBuf>,
+}
+
 fn build_program_with_cache(
     sources: Vec<SourceFile>,
     cache: &mut CompilationCache,
-) -> MergedProgram {
+) -> BuildProgramResult {
     let mut meta = Vec::with_capacity(sources.len());
     let mut to_parse = Vec::new();
+    let mut dirty_paths = HashSet::new();
 
     for source in sources {
         let hash = hash_text(&source.text);
@@ -247,6 +255,7 @@ fn build_program_with_cache(
             .unwrap_or(false);
 
         if !cached_ok {
+            dirty_paths.insert(source.path.clone());
             to_parse.push((file_name.clone(), source.text));
         }
 
@@ -304,7 +313,10 @@ fn build_program_with_cache(
         ordered.push(&cached.bind_result);
     }
 
-    parallel::merge_bind_results_ref(&ordered)
+    BuildProgramResult {
+        program: parallel::merge_bind_results_ref(&ordered),
+        dirty_paths,
+    }
 }
 
 fn hash_text(text: &str) -> u64 {
@@ -1235,11 +1247,17 @@ fn emit_outputs(
     root_dir: Option<&Path>,
     out_dir: Option<&Path>,
     declaration_dir: Option<&Path>,
+    dirty_paths: Option<&HashSet<PathBuf>>,
 ) -> Result<Vec<OutputFile>> {
     let mut outputs = Vec::new();
 
     for file in &program.files {
         let input_path = PathBuf::from(&file.file_name);
+        if let Some(dirty_paths) = dirty_paths {
+            if !dirty_paths.contains(&input_path) {
+                continue;
+            }
+        }
 
         if let Some(js_path) = js_output_path(base_dir, root_dir, out_dir, options.jsx, &input_path) {
             let mut printer = ThinPrinter::with_options(&file.arena, options.printer.clone());
