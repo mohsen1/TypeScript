@@ -393,6 +393,9 @@ impl ThinBinderState {
             k if k == syntax_kind_ext::CLASS_DECLARATION => {
                 self.bind_class_declaration(arena, node, idx);
             }
+            k if k == syntax_kind_ext::CLASS_EXPRESSION => {
+                self.bind_class_expression(arena, node, idx);
+            }
 
             // Interface declarations
             k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
@@ -938,6 +941,10 @@ impl ThinBinderState {
                     }
                 }
             }
+
+            if !decl.initializer.is_none() {
+                self.bind_node(arena, decl.initializer);
+            }
         }
     }
 
@@ -978,6 +985,10 @@ impl ThinBinderState {
                             self.declare_symbol(name, symbol_flags::FUNCTION_SCOPED_VARIABLE, ident_idx, false);
                         }
                     }
+                }
+
+                if !param.initializer.is_none() {
+                    self.bind_node(arena, param.initializer);
                 }
             }
         }
@@ -1067,6 +1078,27 @@ impl ThinBinderState {
         }
     }
 
+    fn bind_class_expression(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
+        if let Some(class) = arena.get_class(node) {
+            self.enter_scope(ContainerKind::Class, idx);
+
+            if let Some(name) = self.get_identifier_name(arena, class.name) {
+                let mut flags = symbol_flags::CLASS;
+                if self.has_abstract_modifier(arena, &class.modifiers) {
+                    flags |= symbol_flags::ABSTRACT;
+                }
+                let sym_id = self.declare_symbol(name, flags, idx, false);
+                self.node_symbols.insert(class.name.0, sym_id);
+            }
+
+            for &member_idx in &class.members.nodes {
+                self.bind_class_member(arena, member_idx);
+            }
+
+            self.exit_scope();
+        }
+    }
+
     fn bind_class_member(&mut self, arena: &ThinNodeArena, idx: NodeIndex) {
         if let Some(node) = arena.get(idx) {
             match node.kind {
@@ -1098,6 +1130,10 @@ impl ThinBinderState {
                             }
                             let sym_id = self.declare_symbol(name, flags, idx, false);
                             self.node_symbols.insert(prop.name.0, sym_id);
+                        }
+
+                        if !prop.initializer.is_none() {
+                            self.bind_node(arena, prop.initializer);
                         }
                     }
                 }
