@@ -101,10 +101,13 @@ Manager actions:
 
 
 ## Communication via tmux
-- Send message to a worker:
-  - `tmux send-keys -t <session> "your message"`
+- Cancel a worker's current run before sending a new directive (Esc stops Codex generation):
+  - `tmux send-keys -t <session>:<window>.<pane> Escape`
   - wait 1 second
-  - `tmux send-keys -t <session> C-m`
+- Send message to a worker:
+  - `tmux send-keys -t <session>:<window>.<pane> "your message"`
+  - wait 1 second
+  - `tmux send-keys -t <session>:<window>.<pane> C-m`
 - Read a worker pane to decide next action:
   - `tmux capture-pane -p -t zang-hub:hub.<pane> -S -200`
   - Use the output to decide whether to nudge, pause, or redirect a worker.
