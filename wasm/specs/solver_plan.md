@@ -61,6 +61,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - String numeric tuple keys validate i64 parsing and reject non-integer values.
 - [x] Add mapped type coverage for primitive keyof (number)
   - Validate mapped types over `keyof number` produce expected boolean properties.
+- [x] Add mapped type coverage for primitive keyof (boolean/symbol)
+  - Validate mapped types over `keyof boolean` and `keyof symbol` produce expected properties.
 - [x] Respect type parameter constraints in overlap checks
   - Binary comparison overlap now considers generic constraints for disjoint primitives.
 
