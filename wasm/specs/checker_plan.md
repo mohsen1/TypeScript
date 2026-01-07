@@ -91,6 +91,9 @@ Status: Active
 - [x] Report TS2693 for local type-only symbols in value position
   - Error on interface/type alias usage in expression contexts.
   - Add focused tests for interface and type alias values.
+- [x] Report TS2693 for type-only symbols in `typeof` type queries
+  - Error when `typeof` references interface/type alias exports.
+  - Add focused tests for type-query usage.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
