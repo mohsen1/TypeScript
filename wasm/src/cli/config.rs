@@ -32,6 +32,10 @@ pub struct CompilerOptions {
     #[serde(default)]
     pub lib: Option<Vec<String>>,
     #[serde(default)]
+    pub base_url: Option<String>,
+    #[serde(default)]
+    pub paths: Option<HashMap<String, Vec<String>>>,
+    #[serde(default)]
     pub root_dir: Option<String>,
     #[serde(default)]
     pub out_dir: Option<String>,
@@ -58,6 +62,8 @@ pub struct ResolvedCompilerOptions {
     pub checker: CheckerOptions,
     pub jsx: Option<JsxEmit>,
     pub lib_files: Vec<PathBuf>,
+    pub base_url: Option<PathBuf>,
+    pub paths: Option<Vec<PathMapping>>,
     pub root_dir: Option<PathBuf>,
     pub out_dir: Option<PathBuf>,
     pub declaration_dir: Option<PathBuf>,
@@ -72,6 +78,42 @@ pub enum JsxEmit {
     ReactNative,
 }
 
+#[derive(Debug, Clone)]
+pub struct PathMapping {
+    pub(crate) pattern: String,
+    pub(crate) prefix: String,
+    pub(crate) suffix: String,
+    pub(crate) targets: Vec<String>,
+}
+
+impl PathMapping {
+    pub(crate) fn match_specifier(&self, specifier: &str) -> Option<String> {
+        if !self.pattern.contains('*') {
+            return if self.pattern == specifier {
+                Some(String::new())
+            } else {
+                None
+            };
+        }
+
+        if !specifier.starts_with(&self.prefix) || !specifier.ends_with(&self.suffix) {
+            return None;
+        }
+
+        let start = self.prefix.len();
+        let end = specifier.len().saturating_sub(self.suffix.len());
+        if end < start {
+            return None;
+        }
+
+        Some(specifier[start..end].to_string())
+    }
+
+    pub(crate) fn specificity(&self) -> usize {
+        self.prefix.len() + self.suffix.len()
+    }
+}
+
 impl Default for ResolvedCompilerOptions {
     fn default() -> Self {
         ResolvedCompilerOptions {
@@ -79,6 +121,8 @@ impl Default for ResolvedCompilerOptions {
             checker: CheckerOptions::default(),
             jsx: None,
             lib_files: Vec::new(),
+            base_url: None,
+            paths: None,
             root_dir: None,
             out_dir: None,
             declaration_dir: None,
@@ -109,6 +153,27 @@ pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<Res
 
     if let Some(lib_list) = options.lib.as_ref() {
         resolved.lib_files = resolve_lib_files(lib_list)?;
+    }
+
+    let base_url = options.base_url.as_deref().map(str::trim);
+    if let Some(base_url) = base_url {
+        if !base_url.is_empty() {
+            resolved.base_url = Some(PathBuf::from(base_url));
+        }
+    }
+
+    if let Some(paths) = options.paths.as_ref() {
+        let has_base_url = options
+            .base_url
+            .as_deref()
+            .map(|value| !value.trim().is_empty())
+            .unwrap_or(false);
+        if !has_base_url {
+            bail!("compilerOptions.paths requires compilerOptions.baseUrl");
+        }
+        if !paths.is_empty() {
+            resolved.paths = Some(build_path_mappings(paths));
+        }
     }
 
     if let Some(root_dir) = options.root_dir.as_deref() {
@@ -221,6 +286,8 @@ fn merge_compiler_options(base: CompilerOptions, child: CompilerOptions) -> Comp
         module: child.module.or(base.module),
         jsx: child.jsx.or(base.jsx),
         lib: child.lib.or(base.lib),
+        base_url: child.base_url.or(base.base_url),
+        paths: child.paths.or(base.paths),
         root_dir: child.root_dir.or(base.root_dir),
         out_dir: child.out_dir.or(base.out_dir),
         declaration: child.declaration.or(base.declaration),
@@ -280,6 +347,46 @@ fn parse_jsx_emit(value: &str) -> Result<JsxEmit> {
     };
 
     Ok(jsx)
+}
+
+fn build_path_mappings(paths: &HashMap<String, Vec<String>>) -> Vec<PathMapping> {
+    let mut mappings = Vec::new();
+    for (pattern, targets) in paths {
+        if targets.is_empty() {
+            continue;
+        }
+        let pattern = normalize_path_pattern(pattern);
+        let targets = targets.iter().map(|target| normalize_path_pattern(target)).collect();
+        let (prefix, suffix) = split_path_pattern(&pattern);
+        mappings.push(PathMapping {
+            pattern,
+            prefix,
+            suffix,
+            targets,
+        });
+    }
+    mappings.sort_by(|left, right| {
+        right
+            .specificity()
+            .cmp(&left.specificity())
+            .then_with(|| right.pattern.len().cmp(&left.pattern.len()))
+            .then_with(|| left.pattern.cmp(&right.pattern))
+    });
+    mappings
+}
+
+fn normalize_path_pattern(value: &str) -> String {
+    value.trim().replace('\\', "/")
+}
+
+fn split_path_pattern(pattern: &str) -> (String, String) {
+    match pattern.find('*') {
+        Some(star_idx) => {
+            let (prefix, rest) = pattern.split_at(star_idx);
+            (prefix.to_string(), rest[1..].to_string())
+        }
+        None => (pattern.to_string(), String::new()),
+    }
 }
 
 fn resolve_lib_files(lib_list: &[String]) -> Result<Vec<PathBuf>> {
