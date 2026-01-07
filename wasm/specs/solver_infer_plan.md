@@ -134,6 +134,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Add optional object property inference coverage
 - [x] Add optional property inference coverage for explicit undefined values
 - [x] Include optional properties in index/property access evaluation
+- [x] Add optional property access coverage for indexed objects
 - [x] Add optional property inference coverage for index signature inference
 - [x] Add optional property inference coverage for number index signature inference
 - [x] Add optional property inference coverage for mixed index signatures
