@@ -13,8 +13,9 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 
 ## Highest-Impact Next Tasks
 - [ ] Performance tuning: reach 500+ MiB/s emitter throughput
-  - Profile emit-only pipeline (LoweringPass + helper detection).
-  - Reduce allocations and repeated scans in emit hot paths.
+  - [x] Pre-allocate output buffer from source size; write numeric indices without allocations.
+  - [ ] Profile emit-only pipeline (LoweringPass + helper detection).
+  - [ ] Reduce allocations and repeated scans in emit hot paths.
 - [x] Finish transform-only pipeline
   - [x] Remove or gate `ctx.target_es5` inline paths in `thin_emitter/mod.rs`.
   - [x] Ensure LoweringPass emits directives for all ES5 transforms (class, arrow, async, template, params, object literal).

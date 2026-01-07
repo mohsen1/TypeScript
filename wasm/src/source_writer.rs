@@ -178,6 +178,29 @@ impl SourceWriter {
         self.write(" ");
     }
 
+    /// Write an unsigned integer without allocating.
+    pub fn write_usize(&mut self, mut value: usize) {
+        self.ensure_indent();
+
+        if value == 0 {
+            self.raw_write("0");
+            return;
+        }
+
+        let mut buf = [0u8; 20];
+        let mut i = buf.len();
+        while value > 0 {
+            let digit = (value % 10) as u8;
+            i -= 1;
+            buf[i] = b'0' + digit;
+            value /= 10;
+        }
+
+        // SAFETY: buffer only contains ASCII digits.
+        let digits = unsafe { std::str::from_utf8_unchecked(&buf[i..]) };
+        self.raw_write(digits);
+    }
+
     // =========================================================================
     // Indentation
     // =========================================================================
@@ -240,6 +263,22 @@ impl SourceWriter {
     /// Get the output length in bytes
     pub fn len(&self) -> usize {
         self.output.len()
+    }
+
+    /// Get the output buffer capacity in bytes.
+    pub fn capacity(&self) -> usize {
+        self.output.capacity()
+    }
+
+    /// Ensure the output buffer can hold at least `capacity` bytes without reallocating.
+    pub fn ensure_output_capacity(&mut self, capacity: usize) {
+        let current = self.output.capacity();
+        if current < capacity {
+            let len = self.output.len();
+            if capacity > len {
+                self.output.reserve(capacity - len);
+            }
+        }
     }
 
     /// Check if output is empty
@@ -339,6 +378,10 @@ impl Default for SourceWriter {
         Self::new()
     }
 }
+
+#[cfg(test)]
+#[path = "source_writer_tests.rs"]
+mod source_writer_tests;
 
 // =============================================================================
 // Helper Functions

@@ -528,6 +528,8 @@ impl<'a> ThinPrinter<'a> {
     /// Set the source text (for detecting single-line constructs).
     pub fn set_source_text(&mut self, text: &'a str) {
         self.source_text = Some(text);
+        let estimated = text.len().saturating_mul(3) / 2;
+        self.writer.ensure_output_capacity(estimated);
     }
 
     /// Check if a node spans a single line in the source.
@@ -717,6 +719,11 @@ impl<'a> ThinPrinter<'a> {
     /// Write a space.
     pub(super) fn write_space(&mut self) {
         self.writer.write_space();
+    }
+
+    /// Write an unsigned integer.
+    pub(super) fn write_usize(&mut self, value: usize) {
+        self.writer.write_usize(value);
     }
 
     /// Write a semicolon (respecting options).
@@ -3532,7 +3539,7 @@ impl<'a> ThinPrinter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
 
             if !elem.initializer.is_none() {
@@ -3561,7 +3568,7 @@ impl<'a> ThinPrinter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
         } else {
             let value_name = self.get_temp_var_name();
@@ -3570,7 +3577,7 @@ impl<'a> ThinPrinter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
             self.write(", ");
             self.write_identifier_text(elem.name);
@@ -3634,7 +3641,7 @@ impl<'a> ThinPrinter<'a> {
                 self.write("for (var ");
                 self.write(&iter_name);
                 self.write(" = ");
-                self.write(&rest.index.to_string());
+                self.write_usize(rest.index);
                 self.write("; ");
                 self.write(&iter_name);
                 self.write(" < arguments.length; ");
@@ -3644,7 +3651,7 @@ impl<'a> ThinPrinter<'a> {
                 self.write("[");
                 self.write(&iter_name);
                 self.write(" - ");
-                self.write(&rest.index.to_string());
+                self.write_usize(rest.index);
                 self.write("] = arguments[");
                 self.write(&iter_name);
                 self.write("];");
@@ -3802,7 +3809,7 @@ impl<'a> ThinPrinter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
 
             if !elem.initializer.is_none() {
@@ -3831,7 +3838,7 @@ impl<'a> ThinPrinter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
             self.write(", ");
             self.write_identifier_text(elem.name);
@@ -3846,7 +3853,7 @@ impl<'a> ThinPrinter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
         }
     }
@@ -3909,7 +3916,7 @@ impl<'a> ThinPrinter<'a> {
         self.write(" = ");
         self.write(temp_name);
         self.write(".slice(");
-        self.write(&index.to_string());
+        self.write_usize(index);
         self.write(")");
 
         if let Some(ref name) = rest_temp {
@@ -3977,7 +3984,7 @@ impl<'a> ThinPrinter<'a> {
         self.write(" = ");
         self.write(temp_name);
         self.write(".slice(");
-        self.write(&index.to_string());
+        self.write_usize(index);
         self.write(")");
 
         if let Some(ref name) = rest_temp {
