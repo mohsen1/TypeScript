@@ -1939,6 +1939,7 @@ fn test_mapped_type_key_remap_filters_keys() {
     let requires_a = interner.object(vec![prop_a]);
 
     assert!(checker.is_assignable(mapped, expected));
+    assert!(checker.is_assignable(expected, mapped));
     assert!(!checker.is_assignable(mapped, requires_a));
 }
 
