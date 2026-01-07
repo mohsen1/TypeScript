@@ -135,6 +135,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Add optional property inference coverage for number index signature inference
 - [x] Add optional property inference coverage for mixed index signatures
 - [x] Add optional non-canonical numeric property coverage for mixed index signatures
+- [x] Add optional argument mismatch coverage for required properties
 - [x] Enforce index signature consistency during bounds validation
 
 ## Architecture Notes
