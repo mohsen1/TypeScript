@@ -554,18 +554,52 @@ impl TypeInterner {
     }
 
     /// Intern a union type, normalizing and deduplicating members
-    pub fn union(&self, mut members: Vec<TypeId>) -> TypeId {
-        // Flatten nested unions
+    pub fn union(&self, members: Vec<TypeId>) -> TypeId {
+        self.union_from_iter(members)
+    }
+
+    /// Fast path for unions that already fit in registers.
+    pub fn union2(&self, left: TypeId, right: TypeId) -> TypeId {
+        self.union_from_iter([left, right])
+    }
+
+    /// Fast path for three-member unions without heap allocations.
+    pub fn union3(&self, first: TypeId, second: TypeId, third: TypeId) -> TypeId {
+        self.union_from_iter([first, second, third])
+    }
+
+    fn union_from_iter<I>(&self, members: I) -> TypeId
+    where
+        I: IntoIterator<Item = TypeId>,
+    {
+        let mut iter = members.into_iter();
+        let Some(first) = iter.next() else {
+            return TypeId::NEVER;
+        };
+        let Some(second) = iter.next() else {
+            return first;
+        };
+
         let mut flat: TypeListBuffer = SmallVec::new();
-        for member in members.drain(..) {
-            if let Some(TypeKey::Union(inner)) = self.lookup(member) {
-                let members = self.type_list(inner);
-                flat.extend(members.iter().copied());
-            } else {
-                flat.push(member);
-            }
+        self.push_union_member(&mut flat, first);
+        self.push_union_member(&mut flat, second);
+        for member in iter {
+            self.push_union_member(&mut flat, member);
         }
 
+        self.normalize_union(flat)
+    }
+
+    fn push_union_member(&self, flat: &mut TypeListBuffer, member: TypeId) {
+        if let Some(TypeKey::Union(inner)) = self.lookup(member) {
+            let members = self.type_list(inner);
+            flat.extend(members.iter().copied());
+        } else {
+            flat.push(member);
+        }
+    }
+
+    fn normalize_union(&self, mut flat: TypeListBuffer) -> TypeId {
         // Deduplicate and sort for consistent hashing
         flat.sort_by_key(|id| id.0);
         flat.dedup();
@@ -602,18 +636,47 @@ impl TypeInterner {
     }
 
     /// Intern an intersection type, normalizing and deduplicating members
-    pub fn intersection(&self, mut members: Vec<TypeId>) -> TypeId {
-        // Flatten nested intersections
+    pub fn intersection(&self, members: Vec<TypeId>) -> TypeId {
+        self.intersection_from_iter(members)
+    }
+
+    /// Fast path for two-member intersections.
+    pub fn intersection2(&self, left: TypeId, right: TypeId) -> TypeId {
+        self.intersection_from_iter([left, right])
+    }
+
+    fn intersection_from_iter<I>(&self, members: I) -> TypeId
+    where
+        I: IntoIterator<Item = TypeId>,
+    {
+        let mut iter = members.into_iter();
+        let Some(first) = iter.next() else {
+            return TypeId::UNKNOWN;
+        };
+        let Some(second) = iter.next() else {
+            return first;
+        };
+
         let mut flat: TypeListBuffer = SmallVec::new();
-        for member in members.drain(..) {
-            if let Some(TypeKey::Intersection(inner)) = self.lookup(member) {
-                let members = self.type_list(inner);
-                flat.extend(members.iter().copied());
-            } else {
-                flat.push(member);
-            }
+        self.push_intersection_member(&mut flat, first);
+        self.push_intersection_member(&mut flat, second);
+        for member in iter {
+            self.push_intersection_member(&mut flat, member);
         }
 
+        self.normalize_intersection(flat)
+    }
+
+    fn push_intersection_member(&self, flat: &mut TypeListBuffer, member: TypeId) {
+        if let Some(TypeKey::Intersection(inner)) = self.lookup(member) {
+            let members = self.type_list(inner);
+            flat.extend(members.iter().copied());
+        } else {
+            flat.push(member);
+        }
+    }
+
+    fn normalize_intersection(&self, mut flat: TypeListBuffer) -> TypeId {
         // Deduplicate and sort for consistent hashing
         flat.sort_by_key(|id| id.0);
         flat.dedup();
