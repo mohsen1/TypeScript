@@ -50,6 +50,12 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Assert unknown dominates unions and is identity for intersections.
 - [x] Allow empty array assignability to optional tuples
   - Treat never[] as assignable to tuples with only optional elements.
+- [x] Include undefined for optional tuple index access
+  - Tuple indexing now unions optional elements with undefined.
+- [x] Resolve tuple rest index element types
+  - Tuple indexing now returns rest element types instead of rest containers.
+- [x] Expand keyof for tuples with rest tuples
+  - Tuple keyof now includes indices from rest tuple expansions.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.

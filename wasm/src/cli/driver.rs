@@ -1264,6 +1264,29 @@ struct PackageJson {
     types_versions: Option<serde_json::Value>,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+struct SemVer {
+    major: u32,
+    minor: u32,
+    patch: u32,
+}
+
+impl SemVer {
+    const ZERO: SemVer = SemVer {
+        major: 0,
+        minor: 0,
+        patch: 0,
+    };
+}
+
+// NOTE: Keep this in sync with the TypeScript version this compiler targets.
+// TODO: Make this configurable once CLI plumbing is available.
+const TYPES_VERSIONS_COMPILER_VERSION: SemVer = SemVer {
+    major: 6,
+    minor: 0,
+    patch: 0,
+};
+
 fn export_conditions(options: &ResolvedCompilerOptions) -> Vec<&'static str> {
     let resolution = options.effective_module_resolution();
     let mut conditions = Vec::new();
@@ -1585,14 +1608,42 @@ fn resolve_types_versions(
 fn select_types_versions_paths(
     types_versions: &serde_json::Value,
 ) -> Option<&serde_json::Map<String, serde_json::Value>> {
+    select_types_versions_paths_for_version(types_versions, TYPES_VERSIONS_COMPILER_VERSION)
+}
+
+fn select_types_versions_paths_for_version(
+    types_versions: &serde_json::Value,
+    compiler_version: SemVer,
+) -> Option<&serde_json::Map<String, serde_json::Value>> {
     let map = types_versions.as_object()?;
-    for key in ["*", ">=0", ">=0.0", ">=0.0.0"] {
-        if let Some(value) = map.get(key) {
-            return value.as_object();
+    let mut best_score: Option<RangeScore> = None;
+    let mut best_key: Option<&str> = None;
+    let mut best_value: Option<&serde_json::Map<String, serde_json::Value>> = None;
+
+    for (key, value) in map {
+        let Some(value_map) = value.as_object() else {
+            continue;
+        };
+        let Some(score) = match_types_versions_range(key, compiler_version) else {
+            continue;
+        };
+        let is_better = match best_score {
+            None => true,
+            Some(best) => {
+                score > best
+                    || (score == best
+                        && best_key.map_or(true, |best_key| key.as_str() < best_key))
+            }
+        };
+
+        if is_better {
+            best_score = Some(score);
+            best_key = Some(key);
+            best_value = Some(value_map);
         }
     }
-    let (_, value) = map.iter().next()?;
-    value.as_object()
+
+    best_value
 }
 
 fn match_types_versions_pattern(pattern: &str, subpath: &str) -> Option<String> {
@@ -1627,6 +1678,140 @@ fn types_versions_specificity(pattern: &str) -> usize {
     } else {
         pattern.len()
     }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+struct RangeScore {
+    constraints: usize,
+    min_version: SemVer,
+    key_len: usize,
+}
+
+fn match_types_versions_range(range: &str, compiler_version: SemVer) -> Option<RangeScore> {
+    let range = range.trim();
+    if range.is_empty() || range == "*" {
+        return Some(RangeScore {
+            constraints: 0,
+            min_version: SemVer::ZERO,
+            key_len: range.len(),
+        });
+    }
+
+    let mut best: Option<RangeScore> = None;
+    for segment in range.split("||") {
+        let segment = segment.trim();
+        let Some(score) = match_types_versions_range_segment(segment, compiler_version, range.len())
+        else {
+            continue;
+        };
+        if best.map_or(true, |current| score > current) {
+            best = Some(score);
+        }
+    }
+
+    best
+}
+
+fn match_types_versions_range_segment(
+    segment: &str,
+    compiler_version: SemVer,
+    key_len: usize,
+) -> Option<RangeScore> {
+    if segment.is_empty() {
+        return None;
+    }
+    if segment == "*" {
+        return Some(RangeScore {
+            constraints: 0,
+            min_version: SemVer::ZERO,
+            key_len,
+        });
+    }
+
+    let mut min_version = SemVer::ZERO;
+    let mut constraints = 0usize;
+
+    for token in segment.split_whitespace() {
+        if token.is_empty() || token == "*" {
+            continue;
+        }
+        let (op, version) = parse_range_token(token)?;
+        if !compare_range(compiler_version, op, version) {
+            return None;
+        }
+        constraints += 1;
+        if matches!(op, RangeOp::Gt | RangeOp::Gte | RangeOp::Eq) && version > min_version {
+            min_version = version;
+        }
+    }
+
+    Some(RangeScore {
+        constraints,
+        min_version,
+        key_len,
+    })
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RangeOp {
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+    Eq,
+}
+
+fn parse_range_token(token: &str) -> Option<(RangeOp, SemVer)> {
+    let token = token.trim();
+    if token.is_empty() {
+        return None;
+    }
+
+    let (op, rest) = if let Some(rest) = token.strip_prefix(">=") {
+        (RangeOp::Gte, rest)
+    } else if let Some(rest) = token.strip_prefix("<=") {
+        (RangeOp::Lte, rest)
+    } else if let Some(rest) = token.strip_prefix('>') {
+        (RangeOp::Gt, rest)
+    } else if let Some(rest) = token.strip_prefix('<') {
+        (RangeOp::Lt, rest)
+    } else if let Some(rest) = token.strip_prefix('=') {
+        (RangeOp::Eq, rest)
+    } else {
+        (RangeOp::Eq, token)
+    };
+
+    parse_semver(rest).map(|version| (op, version))
+}
+
+fn compare_range(version: SemVer, op: RangeOp, bound: SemVer) -> bool {
+    match op {
+        RangeOp::Gt => version > bound,
+        RangeOp::Gte => version >= bound,
+        RangeOp::Lt => version < bound,
+        RangeOp::Lte => version <= bound,
+        RangeOp::Eq => version == bound,
+    }
+}
+
+fn parse_semver(value: &str) -> Option<SemVer> {
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+    let core = value
+        .split(|ch| ch == '-' || ch == '+')
+        .next()
+        .unwrap_or(value);
+    let mut parts = core.split('.');
+    let major: u32 = parts.next()?.parse().ok()?;
+    let minor: u32 = parts.next().unwrap_or("0").parse().ok()?;
+    let patch: u32 = parts.next().unwrap_or("0").parse().ok()?;
+    Some(SemVer {
+        major,
+        minor,
+        patch,
+    })
 }
 
 fn resolve_exports_subpath(

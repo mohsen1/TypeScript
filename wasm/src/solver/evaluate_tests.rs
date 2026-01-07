@@ -783,6 +783,62 @@ fn test_index_access_tuple_literal() {
 }
 
 #[test]
+fn test_index_access_tuple_rest_array_literal() {
+    let interner = TypeInterner::new();
+
+    // [string, ...number[]][1] -> number
+    let number_array = interner.array(TypeId::NUMBER);
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+    ]);
+    let one = interner.literal_number(1.0);
+    let two = interner.literal_number(2.0);
+
+    assert_eq!(evaluate_index_access(&interner, tuple, one), TypeId::NUMBER);
+    assert_eq!(evaluate_index_access(&interner, tuple, two), TypeId::NUMBER);
+}
+
+#[test]
+fn test_index_access_tuple_rest_tuple_literal() {
+    let interner = TypeInterner::new();
+
+    // [string, ...[number, boolean]][1] -> number
+    let rest_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+    ]);
+
+    let one = interner.literal_number(1.0);
+    let two = interner.literal_number(2.0);
+    let three = interner.literal_number(3.0);
+
+    assert_eq!(evaluate_index_access(&interner, tuple, one), TypeId::NUMBER);
+    assert_eq!(evaluate_index_access(&interner, tuple, two), TypeId::BOOLEAN);
+    assert_eq!(evaluate_index_access(&interner, tuple, three), TypeId::UNDEFINED);
+}
+
+#[test]
+fn test_index_access_tuple_optional_literal() {
+    let interner = TypeInterner::new();
+
+    // [string, number?][1] -> number | undefined
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+    ]);
+    let one = interner.literal_number(1.0);
+
+    let result = evaluate_index_access(&interner, tuple, one);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_index_access_tuple_string_index() {
     let interner = TypeInterner::new();
 
@@ -1106,6 +1162,21 @@ fn test_index_access_tuple_number() {
 }
 
 #[test]
+fn test_index_access_tuple_optional_number() {
+    let interner = TypeInterner::new();
+
+    // [string, number?][number] -> string | number | undefined
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+    ]);
+
+    let result = evaluate_index_access(&interner, tuple, TypeId::NUMBER);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_nested_conditional() {
     let interner = TypeInterner::new();
 
@@ -1379,6 +1450,40 @@ fn test_keyof_tuple() {
             assert!(members.contains(&TypeId::NUMBER));
             assert!(members.contains(&length));
             assert!(members.contains(&map));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_keyof_tuple_with_rest_tuple() {
+    let interner = TypeInterner::new();
+
+    // keyof [string, ...[number, boolean]] includes expanded indices
+    let rest_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+    ]);
+
+    let result = evaluate_keyof(&interner, tuple);
+    let key = interner.lookup(result).expect("expected union for keyof tuple with rest");
+
+    match key {
+        TypeKey::Union(members) => {
+            let members = interner.type_list(members);
+            let key_0 = interner.literal_string("0");
+            let key_1 = interner.literal_string("1");
+            let key_2 = interner.literal_string("2");
+            let length = interner.literal_string("length");
+            assert!(members.contains(&key_0));
+            assert!(members.contains(&key_1));
+            assert!(members.contains(&key_2));
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&length));
         }
         other => panic!("Expected union, got {:?}", other),
     }

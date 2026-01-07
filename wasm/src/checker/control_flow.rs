@@ -637,6 +637,78 @@ impl<'a> FlowAnalyzer<'a> {
             }
         }
 
+        if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            if let Some(bin) = self.arena.get_binary_expr(node) {
+                if self.is_assignment_operator(bin.operator_token) {
+                    return self.assignment_affects_reference(bin.left, target);
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION
+            || node.kind == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION
+        {
+            if let Some(lit) = self.arena.get_literal_expr(node) {
+                for &elem in &lit.elements.nodes {
+                    if elem.is_none() {
+                        continue;
+                    }
+                    if self.assignment_affects_reference(elem, target) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::PROPERTY_ASSIGNMENT {
+            if let Some(prop) = self.arena.get_property_assignment(node) {
+                if self.assignment_affects_reference(prop.initializer, target) {
+                    return true;
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT {
+            if let Some(prop) = self.arena.get_shorthand_property(node) {
+                if self.assignment_affects_reference(prop.name, target) {
+                    return true;
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::SPREAD_ELEMENT
+            || node.kind == syntax_kind_ext::SPREAD_ASSIGNMENT
+        {
+            if let Some(spread) = self.arena.get_spread(node) {
+                if self.assignment_affects_reference(spread.expression, target) {
+                    return true;
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+            || node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+        {
+            if let Some(pattern) = self.arena.get_binding_pattern(node) {
+                for &elem in &pattern.elements.nodes {
+                    if elem.is_none() {
+                        continue;
+                    }
+                    if self.assignment_affects_reference(elem, target) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        if node.kind == syntax_kind_ext::BINDING_ELEMENT {
+            if let Some(binding) = self.arena.get_binding_element(node) {
+                if self.assignment_affects_reference(binding.name, target) {
+                    return true;
+                }
+            }
+        }
+
         false
     }
 

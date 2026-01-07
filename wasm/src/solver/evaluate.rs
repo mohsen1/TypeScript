@@ -509,6 +509,39 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         keys
     }
 
+    fn append_tuple_indices(
+        &self,
+        elements: &[TupleElement],
+        base: usize,
+        out: &mut Vec<TypeId>,
+    ) -> Option<usize> {
+        let mut index = base;
+
+        for element in elements {
+            if element.rest {
+                match self.interner.lookup(element.type_id) {
+                    Some(TypeKey::Tuple(rest_elements)) => {
+                        let rest_elements = self.interner.tuple_list(rest_elements);
+                        match self.append_tuple_indices(&rest_elements, index, out) {
+                            Some(next) => {
+                                index = next;
+                                continue;
+                            }
+                            None => return None,
+                        }
+                    }
+                    Some(TypeKey::Array(_)) => return None,
+                    _ => return None,
+                }
+            } else {
+                out.push(self.interner.literal_string(&index.to_string()));
+                index += 1;
+            }
+        }
+
+        Some(index)
+    }
+
     fn intersect_keyof_sets(&self, key_sets: &[TypeId]) -> Option<TypeId> {
         let mut parsed_sets = Vec::with_capacity(key_sets.len());
         for &key_set in key_sets {
@@ -659,6 +692,65 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         self.interner.union2(type_id, TypeId::UNDEFINED)
     }
 
+    fn rest_element_type(&self, type_id: TypeId) -> TypeId {
+        match self.interner.lookup(type_id) {
+            Some(TypeKey::Array(elem)) => elem,
+            Some(TypeKey::Tuple(elements)) => {
+                let elements = self.interner.tuple_list(elements);
+                let types: Vec<TypeId> = elements
+                    .iter()
+                    .map(|e| self.tuple_element_type(e))
+                    .collect();
+                if types.is_empty() {
+                    TypeId::NEVER
+                } else {
+                    self.interner.union(types)
+                }
+            }
+            _ => type_id,
+        }
+    }
+
+    fn tuple_element_type(&self, element: &TupleElement) -> TypeId {
+        let mut type_id = if element.rest {
+            self.rest_element_type(element.type_id)
+        } else {
+            element.type_id
+        };
+
+        if element.optional {
+            type_id = self.interner.union2(type_id, TypeId::UNDEFINED);
+        }
+
+        type_id
+    }
+
+    fn tuple_index_literal(&self, elements: &[TupleElement], idx: usize) -> Option<TypeId> {
+        let mut logical_idx = 0usize;
+
+        for element in elements {
+            if element.rest {
+                match self.interner.lookup(element.type_id) {
+                    Some(TypeKey::Tuple(rest_elements)) => {
+                        let rest_elements = self.interner.tuple_list(rest_elements);
+                        let inner_idx = idx.saturating_sub(logical_idx);
+                        return self.tuple_index_literal(&rest_elements, inner_idx);
+                    }
+                    _ => {
+                        return Some(self.tuple_element_type(element));
+                    }
+                }
+            }
+
+            if logical_idx == idx {
+                return Some(self.tuple_element_type(element));
+            }
+            logical_idx += 1;
+        }
+
+        None
+    }
+
     /// Evaluate index access on a tuple type
     fn evaluate_tuple_index(&self, elements: &[TupleElement], index_type: TypeId) -> TypeId {
         if let Some(TypeKey::Union(members)) = self.interner.lookup(index_type) {
@@ -679,20 +771,11 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         // If index is a literal number, return the specific element
         if let Some(TypeKey::Literal(LiteralValue::Number(n))) = self.interner.lookup(index_type) {
             let idx = n.0 as usize;
-            if idx < elements.len() {
-                return elements[idx].type_id;
-            }
-            // Check for rest element
-            if let Some(last) = elements.last() {
-                if last.rest {
-                    return last.type_id;
-                }
-            }
-            return TypeId::UNDEFINED;
+            return self.tuple_index_literal(elements, idx).unwrap_or(TypeId::UNDEFINED);
         }
 
         if index_type == TypeId::STRING {
-            let mut types: Vec<TypeId> = elements.iter().map(|e| e.type_id).collect();
+            let mut types: Vec<TypeId> = elements.iter().map(|e| self.tuple_element_type(e)).collect();
             types.extend(self.array_member_types());
             if types.is_empty() {
                 return TypeId::NEVER;
@@ -705,18 +788,10 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             if self.is_numeric_property_name(name) {
                 let name_str = self.interner.resolve_atom_ref(name);
                 if let Ok(idx) = name_str.as_ref().parse::<usize>() {
-                    if idx < elements.len() {
-                        return elements[idx].type_id;
-                    }
-                    if let Some(last) = elements.last() {
-                        if last.rest {
-                            return last.type_id;
-                        }
-                    }
-                    return TypeId::UNDEFINED;
+                    return self.tuple_index_literal(elements, idx).unwrap_or(TypeId::UNDEFINED);
                 }
 
-                let all_types: Vec<TypeId> = elements.iter().map(|e| e.type_id).collect();
+                let all_types: Vec<TypeId> = elements.iter().map(|e| self.tuple_element_type(e)).collect();
                 if all_types.is_empty() {
                     return TypeId::NEVER;
                 }
@@ -737,7 +812,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
         // If index is number, return union of all element types
         if index_type == TypeId::NUMBER {
-            let all_types: Vec<TypeId> = elements.iter().map(|e| e.type_id).collect();
+            let all_types: Vec<TypeId> = elements.iter().map(|e| self.tuple_element_type(e)).collect();
             if all_types.is_empty() {
                 return TypeId::NEVER;
             }
@@ -934,9 +1009,8 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             }
             TypeKey::Tuple(elements) => {
                 let elements = self.interner.tuple_list(elements);
-                let mut key_types: Vec<TypeId> = (0..elements.len())
-                    .map(|i| self.interner.literal_string(&i.to_string()))
-                    .collect();
+                let mut key_types: Vec<TypeId> = Vec::new();
+                self.append_tuple_indices(&elements, 0, &mut key_types);
                 let mut array_keys = self.array_keyof_keys();
                 key_types.append(&mut array_keys);
                 if key_types.is_empty() {
