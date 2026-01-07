@@ -39,6 +39,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Missing import: use import type in type positions (and skip type-only for values)
    - [x] Signature help: fix active parameter detection (between arguments)
    - [x] Signature help: pick overload by argument count
+   - [x] Signature help: select constructor overloads for `new`
 
 2. **Extend AST Coverage** (if needed)
    - [x] Traverse template expressions in LSP resolver for references/completions
@@ -57,7 +58,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
 #### Testing
 
 Latest run:
-- `./wasm/test.sh` ❌ (`src/emitter_transform_integration_tests.rs` `test_two_phase_emission_commonjs_auto_detect_exports`; pre-existing on rust)
+- `./wasm/test.sh` ❌ (`src/emitter_transform_integration_tests.rs` `test_two_phase_emission_commonjs_auto_detect_exports`, `test_two_phase_emission_commonjs_multi_export_vars`; pre-existing on rust)
 
 ## Quick Reference
 
