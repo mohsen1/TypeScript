@@ -534,9 +534,7 @@ impl<'a> CallEvaluator<'a> {
                 self.constrain_types(ctx, var_map, s_elem, t_elem);
             }
             (Some(TypeKey::Tuple(ref s_elems)), Some(TypeKey::Tuple(ref t_elems))) => {
-                for (s_elem, t_elem) in s_elems.iter().zip(t_elems.iter()) {
-                    self.constrain_types(ctx, var_map, s_elem.type_id, t_elem.type_id);
-                }
+                self.constrain_tuple_types(ctx, var_map, s_elems, t_elems);
             }
             (Some(TypeKey::Function(ref s_fn)), Some(TypeKey::Function(ref t_fn))) => {
                 // Contravariant parameters: target_param <: source_param
@@ -602,6 +600,41 @@ impl<'a> CallEvaluator<'a> {
                     target_idx += 1;
                 }
             }
+        }
+    }
+
+    fn constrain_tuple_types(
+        &self,
+        ctx: &mut InferenceContext,
+        var_map: &FxHashMap<TypeId, crate::solver::infer::InferenceVar>,
+        source: &[TupleElement],
+        target: &[TupleElement],
+    ) {
+        for (i, t_elem) in target.iter().enumerate() {
+            if t_elem.rest {
+                let rest_elem_type = self.rest_element_type(t_elem.type_id);
+                for s_elem in source.iter().skip(i) {
+                    if s_elem.rest {
+                        self.constrain_types(ctx, var_map, s_elem.type_id, t_elem.type_id);
+                    } else {
+                        self.constrain_types(ctx, var_map, s_elem.type_id, rest_elem_type);
+                    }
+                }
+                return;
+            }
+
+            let Some(s_elem) = source.get(i) else {
+                if t_elem.optional {
+                    continue;
+                }
+                return;
+            };
+
+            if s_elem.rest {
+                return;
+            }
+
+            self.constrain_types(ctx, var_map, s_elem.type_id, t_elem.type_id);
         }
     }
 
