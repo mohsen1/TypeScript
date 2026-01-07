@@ -20,11 +20,12 @@
 
 use crate::binder::{FlowNode, FlowNodeId, flow_flags};
 use crate::interner::Atom;
-use crate::parser::thin_node::{BinaryExprData, ThinNodeArena};
+use crate::parser::thin_node::{BinaryExprData, CallExprData, ThinNodeArena};
 use crate::parser::{NodeIndex, syntax_kind_ext};
 use crate::scanner::SyntaxKind;
-use crate::solver::{LiteralValue, TypeId, TypeInterner, TypeKey, NarrowingContext};
+use crate::solver::{LiteralValue, ParamInfo, TypeId, TypeInterner, TypeKey, TypePredicate, TypePredicateTarget, NarrowingContext};
 use crate::thin_binder::ThinBinderState;
+use rustc_hash::FxHashMap;
 use std::borrow::Cow;
 
 /// Flow analyzer for control flow-based type narrowing.
@@ -35,6 +36,7 @@ pub struct FlowAnalyzer<'a> {
     arena: &'a ThinNodeArena,
     binder: &'a ThinBinderState,
     interner: &'a TypeInterner,
+    node_types: Option<&'a FxHashMap<u32, TypeId>>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -45,6 +47,12 @@ enum PropertyPresence {
     Unknown,
 }
 
+#[derive(Clone)]
+struct PredicateSignature {
+    predicate: TypePredicate,
+    params: Vec<ParamInfo>,
+}
+
 impl<'a> FlowAnalyzer<'a> {
     /// Create a new FlowAnalyzer.
     pub fn new(
@@ -52,7 +60,16 @@ impl<'a> FlowAnalyzer<'a> {
         binder: &'a ThinBinderState,
         interner: &'a TypeInterner,
     ) -> Self {
-        Self { arena, binder, interner }
+        Self { arena, binder, interner, node_types: None }
+    }
+
+    pub fn with_node_types(
+        arena: &'a ThinNodeArena,
+        binder: &'a ThinBinderState,
+        interner: &'a TypeInterner,
+        node_types: &'a FxHashMap<u32, TypeId>,
+    ) -> Self {
+        Self { arena, binder, interner, node_types: Some(node_types) }
     }
 
     /// Get the narrowed type of a symbol at a specific flow node.
@@ -345,6 +362,14 @@ impl<'a> FlowAnalyzer<'a> {
                 }
             }
 
+            k if k == syntax_kind_ext::CALL_EXPRESSION => {
+                if let Some(call) = self.arena.get_call_expr(cond_node) {
+                    if let Some(narrowed) = self.narrow_by_call_predicate(type_id, call, target, is_true_branch) {
+                        return narrowed;
+                    }
+                }
+            }
+
             // Truthiness check: if (x)
             _ => {
                 if self.is_matching_reference(condition_idx, target) {
@@ -477,6 +502,100 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         None
+    }
+
+    fn narrow_by_call_predicate(
+        &self,
+        type_id: TypeId,
+        call: &CallExprData,
+        target: NodeIndex,
+        is_true_branch: bool,
+    ) -> Option<TypeId> {
+        let node_types = self.node_types?;
+        let callee_type = *node_types.get(&call.expression.0)?;
+        let signature = self.predicate_signature_for_type(callee_type)?;
+        let predicate_target = self.predicate_target_expression(call, &signature.predicate, &signature.params)?;
+
+        if !self.is_matching_reference(predicate_target, target) {
+            return None;
+        }
+
+        Some(self.apply_type_predicate_narrowing(type_id, &signature.predicate, is_true_branch))
+    }
+
+    fn predicate_signature_for_type(&self, callee_type: TypeId) -> Option<PredicateSignature> {
+        let key = self.interner.lookup(callee_type)?;
+
+        match key {
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(shape_id);
+                let predicate = shape.type_predicate.clone()?;
+                Some(PredicateSignature {
+                    predicate,
+                    params: shape.params.clone(),
+                })
+            }
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(shape_id);
+                if shape.call_signatures.len() != 1 {
+                    return None;
+                }
+                let sig = &shape.call_signatures[0];
+                let predicate = sig.type_predicate.clone()?;
+                Some(PredicateSignature {
+                    predicate,
+                    params: sig.params.clone(),
+                })
+            }
+            _ => None,
+        }
+    }
+
+    fn predicate_target_expression(
+        &self,
+        call: &CallExprData,
+        predicate: &TypePredicate,
+        params: &[ParamInfo],
+    ) -> Option<NodeIndex> {
+        match predicate.target {
+            TypePredicateTarget::Identifier(name) => {
+                let param_index = params.iter().position(|param| param.name == Some(name))?;
+                let args = call.arguments.as_ref()?.nodes.as_slice();
+                args.get(param_index).copied()
+            }
+            TypePredicateTarget::This => {
+                let callee_node = self.arena.get(call.expression)?;
+                let access = self.arena.get_access_expr(callee_node)?;
+                Some(access.expression)
+            }
+        }
+    }
+
+    fn apply_type_predicate_narrowing(
+        &self,
+        type_id: TypeId,
+        predicate: &TypePredicate,
+        is_true_branch: bool,
+    ) -> TypeId {
+        if predicate.asserts && !is_true_branch {
+            return type_id;
+        }
+
+        let narrowing = NarrowingContext::new(self.interner);
+
+        if let Some(predicate_type) = predicate.type_id {
+            if is_true_branch {
+                return narrowing.narrow_to_type(type_id, predicate_type);
+            }
+            return narrowing.narrow_excluding_type(type_id, predicate_type);
+        }
+
+        if is_true_branch {
+            let narrowed = narrowing.narrow_excluding_type(type_id, TypeId::NULL);
+            return narrowing.narrow_excluding_type(narrowed, TypeId::UNDEFINED);
+        }
+
+        self.narrow_to_falsy(type_id)
     }
 
     fn narrow_by_instanceof(

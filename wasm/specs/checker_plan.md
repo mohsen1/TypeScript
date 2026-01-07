@@ -53,7 +53,7 @@ Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (in
 - [x] Implement `instanceof` and `in` operator narrowing
   - Respect structural/object checks and report safe narrowings only.
   - Add tests for primitive/object and union cases.
-- [ ] Use user-defined type predicate signatures in flow narrowing
+- [x] Use user-defined type predicate signatures in flow narrowing
   - Narrow based on call expressions returning `x is T` or `asserts x is T`.
   - Add tests for predicate functions and alias references.
 - [ ] Track assignment/mutation flow to widen/clear stale narrowings
