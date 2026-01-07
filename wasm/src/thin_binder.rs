@@ -1080,7 +1080,8 @@ impl ThinBinderState {
                             if self.has_static_modifier(arena, &method.modifiers) {
                                 flags |= symbol_flags::STATIC;
                             }
-                            self.declare_symbol(name, flags, idx, false);
+                            let sym_id = self.declare_symbol(name, flags, idx, false);
+                            self.node_symbols.insert(method.name.0, sym_id);
                         }
                         self.bind_callable_body(arena, &method.parameters, method.body, idx);
                     }
@@ -1095,7 +1096,8 @@ impl ThinBinderState {
                             if self.has_static_modifier(arena, &prop.modifiers) {
                                 flags |= symbol_flags::STATIC;
                             }
-                            self.declare_symbol(name, flags, idx, false);
+                            let sym_id = self.declare_symbol(name, flags, idx, false);
+                            self.node_symbols.insert(prop.name.0, sym_id);
                         }
                     }
                 }
@@ -1113,7 +1115,8 @@ impl ThinBinderState {
                             if self.has_static_modifier(arena, &accessor.modifiers) {
                                 flags |= symbol_flags::STATIC;
                             }
-                            self.declare_symbol(name, flags, idx, false);
+                            let sym_id = self.declare_symbol(name, flags, idx, false);
+                            self.node_symbols.insert(accessor.name.0, sym_id);
                         }
                         self.bind_callable_body(arena, &accessor.parameters, accessor.body, idx);
                     }

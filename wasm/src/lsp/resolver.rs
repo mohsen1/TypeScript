@@ -871,6 +871,15 @@ impl<'a> ScopeWalker<'a> {
     /// are complex and would require tracking function scope boundaries during traversal.
     /// The ThinBinder handles hoisting correctly during the binding phase.
     fn register_local_declarations(&mut self, container: NodeIndex) {
+        if let Some(node) = self.arena.get(container) {
+            if node.kind == syntax_kind_ext::CLASS_DECLARATION
+                || node.kind == syntax_kind_ext::CLASS_EXPRESSION
+            {
+                // Class members are not lexically scoped identifiers.
+                return;
+            }
+        }
+
         // Iterate over direct children to find declarations
         self.for_each_child(container, |walker, child_idx| {
             // Check if this child has a symbol associated in the binder

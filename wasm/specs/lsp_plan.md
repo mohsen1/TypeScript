@@ -57,6 +57,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Bind and traverse destructuring patterns for definitions/references
    - [x] Bind class member bodies (methods/accessors/constructors) for local resolution
    - [x] Record class member declarations for definition lookups
+   - [x] Avoid treating class members as lexical locals in LSP resolution
    - [x] Add import/export handling for cross-file navigation
 
 3. **Multi-File Support**
@@ -70,7 +71,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
 #### Testing
 
 Latest run:
-- `./wasm/test.sh` ❌ (build error: missing `type_predicate` in `src/solver/operations.rs` and `src/solver/operations_tests.rs`; pre-existing on rust after sync)
+- `./wasm/test.sh` ❌ (`src/emitter_parity_tests.rs` `test_parity_commonjs_export`; pre-existing on rust)
 
 ## Quick Reference
 
