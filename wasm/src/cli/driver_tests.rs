@@ -190,6 +190,16 @@ fn compile_with_declaration_map_emits_map_outputs() {
     assert!(map_path.is_file());
     let dts_contents = std::fs::read_to_string(&dts_path).expect("read d.ts output");
     assert!(dts_contents.contains("sourceMappingURL=index.d.ts.map"));
+    let map_contents = std::fs::read_to_string(&map_path).expect("read map output");
+    let map_json: Value = serde_json::from_str(&map_contents).expect("parse map json");
+    let mappings = map_json
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    assert!(
+        mappings.contains(',') || mappings.contains(';'),
+        "expected non-trivial mappings, got: {mappings}"
+    );
 }
 
 #[test]
