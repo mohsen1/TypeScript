@@ -5374,6 +5374,130 @@ if (typeof obj["prop"] === "string") {
 }
 
 #[test]
+fn test_flow_narrowing_applies_across_element_to_property_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let obj: { prop: string | number } = { prop: "ok" };
+if (typeof obj["prop"] === "string") {
+    obj.prop.toUpperCase();
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Expected no 2339 when element access narrows property access, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_flow_narrowing_applies_across_property_to_element_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let obj: { prop: string | number } = { prop: "ok" };
+if (typeof obj.prop === "string") {
+    obj["prop"].toUpperCase();
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&2339),
+        "Expected no 2339 when property access narrows element access, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_flow_narrowing_cleared_by_cross_property_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let obj: { prop: string | number } = { prop: "ok" };
+if (typeof obj["prop"] === "string") {
+    obj.prop.toUpperCase();
+    obj.prop = 1;
+    obj["prop"].toUpperCase();
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = codes.iter().filter(|&&code| code == 2339).count();
+    assert_eq!(
+        count,
+        1,
+        "Expected one 2339 after cross property assignment clears narrowing, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_flow_narrowing_cleared_by_cross_element_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let obj: { prop: string | number } = { prop: "ok" };
+if (typeof obj.prop === "string") {
+    obj["prop"].toUpperCase();
+    obj["prop"] = 1;
+    obj.prop.toUpperCase();
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = codes.iter().filter(|&&code| code == 2339).count();
+    assert_eq!(
+        count,
+        1,
+        "Expected one 2339 after cross element assignment clears narrowing, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_flow_narrowing_cleared_by_property_base_assignment() {
     use crate::thin_parser::ThinParserState;
 
