@@ -88,6 +88,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Contextual typing skips `this` parameter when indexing args
   - [x] Test: Contextual typing unions callable overloads
   - [x] Test: Contextual typing for variable initializers with annotations
+  - [x] Test: Contextual typing selects overloads by call arity
 
 ### Phase 4: Generic Types
 - [x] Implement type parameter lowering

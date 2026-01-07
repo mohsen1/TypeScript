@@ -161,6 +161,45 @@ fn test_contextual_callable_overload_union() {
 }
 
 #[test]
+fn test_contextual_callable_overload_by_arity() {
+    let interner = TypeInterner::new();
+
+    let call_sig_a = CallSignature {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+    };
+
+    let call_sig_b = CallSignature {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::NUMBER, optional: false, rest: false },
+            ParamInfo { name: Some(interner.intern_string("y")), type_id: TypeId::BOOLEAN, optional: false, rest: false },
+        ],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+    };
+
+    let callable = interner.callable(CallableShape {
+        call_signatures: vec![call_sig_a, call_sig_b],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+
+    let ctx = ContextualTypeContext::with_expected(&interner, callable);
+
+    assert_eq!(ctx.get_parameter_type_for_call(0, 1), Some(TypeId::STRING));
+    assert_eq!(ctx.get_parameter_type_for_call(1, 1), None);
+    assert_eq!(ctx.get_parameter_type_for_call(0, 2), Some(TypeId::NUMBER));
+    assert_eq!(ctx.get_parameter_type_for_call(1, 2), Some(TypeId::BOOLEAN));
+}
+
+#[test]
 fn test_contextual_function_rest_parameter() {
     let interner = TypeInterner::new();
 

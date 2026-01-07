@@ -1364,9 +1364,10 @@ impl<'a> ThinCheckerState<'a> {
         // Create contextual context from callee type
         let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, callee_type);
 
+        let arg_count = args.len();
         for (i, &arg_idx) in args.iter().enumerate() {
             // Determine expected type for this argument
-            let expected_type = ctx_helper.get_parameter_type(i);
+            let expected_type = ctx_helper.get_parameter_type_for_call(i, arg_count);
 
             // Set contextual type for the argument
             let prev_context = self.ctx.contextual_type;

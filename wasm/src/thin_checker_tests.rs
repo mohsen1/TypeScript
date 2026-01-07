@@ -1130,6 +1130,36 @@ const handler: (x: string) => void = (x) => {
 }
 
 #[test]
+fn test_contextual_typing_overload_by_arity() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function register(cb: (x: string) => void): void;
+function register(cb: (x: number, y: boolean) => void, flag: boolean): void;
+function register(cb: unknown, flag?: boolean) {}
+
+register((x) => {
+    let y: string = x;
+});
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(!codes.contains(&2322),
+        "Did not expect error 2322 for overload-by-arity contextual typing, got: {:?}",
+        codes);
+}
+
+#[test]
 fn test_contextual_typing_for_object_properties() {
     use crate::solver::ContextualTypeContext;
 
