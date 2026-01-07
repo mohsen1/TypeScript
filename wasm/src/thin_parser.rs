@@ -228,16 +228,20 @@ impl ThinParserState {
         }
     }
 
+    fn parse_error_at(&mut self, start: u32, length: u32, message: &str, code: u32) {
+        self.parse_diagnostics.push(ParseDiagnostic {
+            start,
+            length,
+            message: message.to_string(),
+            code,
+        });
+    }
+
     /// Report parse error at current token with specific error code
     pub fn parse_error_at_current_token(&mut self, message: &str, code: u32) {
         let start = self.scanner.get_token_start() as u32;
         let end = self.scanner.get_token_end() as u32;
-        self.parse_diagnostics.push(ParseDiagnostic {
-            start,
-            length: end - start,
-            message: message.to_string(),
-            code,
-        });
+        self.parse_error_at(start, end - start, message, code);
     }
 
     // =========================================================================
@@ -5295,7 +5299,7 @@ impl ThinParserState {
         // Capture end position BEFORE consuming the token
         let end_pos = self.token_end();
         let text = self.scanner.get_token_value_ref().to_string();
-        self.report_invalid_numeric_separator(&text);
+        self.report_invalid_numeric_separator();
         let value = if text.as_bytes().contains(&b'_') {
             let mut sanitized = String::with_capacity(text.len());
             for &byte in text.as_bytes() {
@@ -5323,7 +5327,7 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         let end_pos = self.token_end();
         let text = self.scanner.get_token_value_ref().to_string();
-        self.report_invalid_numeric_separator(&text);
+        self.report_invalid_numeric_separator();
         self.next_token();
 
         self.arena.add_literal(
@@ -5334,23 +5338,28 @@ impl ThinParserState {
         )
     }
 
-    fn report_invalid_numeric_separator(&mut self, text: &str) {
+    fn report_invalid_numeric_separator(&mut self) {
         if (self.scanner.get_token_flags() & TokenFlags::ContainsInvalidSeparator as u32) == 0 {
             return;
         }
 
         use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
-        let has_consecutive = text.as_bytes().windows(2).any(|window| window == b"__");
-        if has_consecutive {
-            self.parse_error_at_current_token(
+        let (message, code) = if self.scanner.invalid_separator_is_consecutive() {
+            (
                 diagnostic_messages::MULTIPLE_CONSECUTIVE_NUMERIC_SEPARATORS_NOT_PERMITTED,
                 diagnostic_codes::MULTIPLE_CONSECUTIVE_NUMERIC_SEPARATORS_NOT_PERMITTED,
-            );
+            )
         } else {
-            self.parse_error_at_current_token(
+            (
                 diagnostic_messages::NUMERIC_SEPARATORS_NOT_ALLOWED_HERE,
                 diagnostic_codes::NUMERIC_SEPARATORS_NOT_ALLOWED_HERE,
-            );
+            )
+        };
+
+        if let Some(pos) = self.scanner.get_invalid_separator_pos() {
+            self.parse_error_at(pos as u32, 1, message, code);
+        } else {
+            self.parse_error_at_current_token(message, code);
         }
     }
 

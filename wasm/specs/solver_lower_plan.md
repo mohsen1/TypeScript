@@ -27,6 +27,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - Numeric separators are accepted for numeric and bigint literals
   - [x] Scanner flags invalid numeric separators for diagnostics
   - [x] Parser emits diagnostics for invalid numeric separators (6188/6189)
+  - [x] Diagnostics highlight the invalid numeric separator position
 - [x] Parse and lower `unique symbol` type operator
 - [x] Tests for basic lowering
   - Test: `number` annotation -> Intrinsic(Number)

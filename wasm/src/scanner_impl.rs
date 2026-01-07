@@ -57,6 +57,8 @@ pub struct ScannerSnapshot {
     pub token_value: String,
     pub token_flags: u32,
     pub token_atom: Atom,
+    pub token_invalid_separator_pos: Option<usize>,
+    pub token_invalid_separator_is_consecutive: bool,
 }
 
 /// The scanner state that holds the current position and token information.
@@ -82,6 +84,10 @@ pub struct ScannerState {
     token_value: String,
     /// Token flags
     token_flags: u32,
+    /// First invalid numeric separator position, if any (byte offset)
+    token_invalid_separator_pos: Option<usize>,
+    /// Whether the first invalid numeric separator is consecutive
+    token_invalid_separator_is_consecutive: bool,
     /// Whether to skip trivia (whitespace, comments)
     skip_trivia: bool,
     /// String interner for identifier deduplication
@@ -109,6 +115,8 @@ impl ScannerState {
             token: SyntaxKind::Unknown,
             token_value: String::new(),
             token_flags: 0,
+            token_invalid_separator_pos: None,
+            token_invalid_separator_is_consecutive: false,
             skip_trivia,
             interner,
             token_atom: Atom::NONE,
@@ -318,6 +326,8 @@ impl ScannerState {
     pub fn scan(&mut self) -> SyntaxKind {
         self.full_start_pos = self.pos;
         self.token_flags = 0;
+        self.token_invalid_separator_pos = None;
+        self.token_invalid_separator_is_consecutive = false;
         self.token_atom = Atom::NONE; // Reset atom for non-identifier tokens
 
         loop {
@@ -1043,6 +1053,10 @@ impl ScannerState {
                 self.token_flags |= TokenFlags::ContainsSeparator as u32;
                 if !saw_digit || prev_separator {
                     self.token_flags |= TokenFlags::ContainsInvalidSeparator as u32;
+                    if self.token_invalid_separator_pos.is_none() {
+                        self.token_invalid_separator_pos = Some(self.pos);
+                        self.token_invalid_separator_is_consecutive = prev_separator;
+                    }
                 }
                 prev_separator = true;
                 self.pos += 1;
@@ -1059,6 +1073,10 @@ impl ScannerState {
 
         if prev_separator {
             self.token_flags |= TokenFlags::ContainsInvalidSeparator as u32;
+            if self.token_invalid_separator_pos.is_none() {
+                self.token_invalid_separator_pos = Some(self.pos.saturating_sub(1));
+                self.token_invalid_separator_is_consecutive = false;
+            }
         }
     }
 
@@ -1927,6 +1945,8 @@ impl ScannerState {
             token_value: self.token_value.clone(),
             token_flags: self.token_flags,
             token_atom: self.token_atom,
+            token_invalid_separator_pos: self.token_invalid_separator_pos,
+            token_invalid_separator_is_consecutive: self.token_invalid_separator_is_consecutive,
         }
     }
 
@@ -1939,6 +1959,8 @@ impl ScannerState {
         self.token_value = snapshot.token_value;
         self.token_flags = snapshot.token_flags;
         self.token_atom = snapshot.token_atom;
+        self.token_invalid_separator_pos = snapshot.token_invalid_separator_pos;
+        self.token_invalid_separator_is_consecutive = snapshot.token_invalid_separator_is_consecutive;
     }
 
     /// Get the interned atom for the current identifier token.
@@ -1946,6 +1968,14 @@ impl ScannerState {
     /// This enables O(1) string comparison for identifiers.
     pub fn get_token_atom(&self) -> Atom {
         self.token_atom
+    }
+
+    pub fn get_invalid_separator_pos(&self) -> Option<usize> {
+        self.token_invalid_separator_pos
+    }
+
+    pub fn invalid_separator_is_consecutive(&self) -> bool {
+        self.token_invalid_separator_is_consecutive
     }
 
     /// Resolve an atom back to its string value.

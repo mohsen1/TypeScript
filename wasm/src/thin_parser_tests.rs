@@ -23,36 +23,42 @@ fn test_thin_parser_simple_expression() {
 
 #[test]
 fn test_thin_parser_numeric_separator_invalid_diagnostic() {
+    let source = "let x = 1_;";
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
-        "let x = 1_;".to_string(),
+        source.to_string(),
     );
     parser.parse_source_file();
 
     let diagnostics = parser.get_diagnostics();
-    assert!(
-        diagnostics.iter().any(|diag| diag.code == diagnostic_codes::NUMERIC_SEPARATORS_NOT_ALLOWED_HERE),
-        "Expected numeric separator diagnostic, got: {:?}",
-        diagnostics
-    );
+    let diag = diagnostics
+        .iter()
+        .find(|diag| diag.code == diagnostic_codes::NUMERIC_SEPARATORS_NOT_ALLOWED_HERE)
+        .expect(&format!("Expected numeric separator diagnostic, got: {:?}", diagnostics));
+    let underscore_pos = source.find('_').expect("underscore not found") as u32;
+    assert_eq!(diag.start, underscore_pos);
+    assert_eq!(diag.length, 1);
 }
 
 #[test]
 fn test_thin_parser_numeric_separator_consecutive_diagnostic() {
+    let source = "let x = 1__0;";
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
-        "let x = 1__0;".to_string(),
+        source.to_string(),
     );
     parser.parse_source_file();
 
     let diagnostics = parser.get_diagnostics();
-    assert!(
-        diagnostics.iter().any(|diag| {
+    let diag = diagnostics
+        .iter()
+        .find(|diag| {
             diag.code == diagnostic_codes::MULTIPLE_CONSECUTIVE_NUMERIC_SEPARATORS_NOT_PERMITTED
-        }),
-        "Expected consecutive separator diagnostic, got: {:?}",
-        diagnostics
-    );
+        })
+        .expect(&format!("Expected consecutive separator diagnostic, got: {:?}", diagnostics));
+    let underscore_pos = source.find("__").expect("double underscore not found") as u32 + 1;
+    assert_eq!(diag.start, underscore_pos);
+    assert_eq!(diag.length, 1);
 }
 
 #[test]
