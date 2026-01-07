@@ -602,8 +602,14 @@ impl<'a> FlowAnalyzer<'a> {
 
     fn assignment_affects_reference(&self, left: NodeIndex, target: NodeIndex) -> bool {
         let left = self.skip_parenthesized(left);
+        let target = self.skip_parenthesized(target);
         if self.is_matching_reference(left, target) {
             return true;
+        }
+        if let Some(base) = self.reference_base(target) {
+            if self.assignment_affects_reference(left, base) {
+                return true;
+            }
         }
 
         let Some(node) = self.arena.get(left) else {
@@ -1567,11 +1573,97 @@ impl<'a> FlowAnalyzer<'a> {
         Some(out)
     }
 
-    /// Check if two references point to the same symbol.
+    /// Check if two references point to the same symbol or property access chain.
     fn is_matching_reference(&self, a: NodeIndex, b: NodeIndex) -> bool {
         let sym_a = self.reference_symbol(a);
         let sym_b = self.reference_symbol(b);
-        sym_a.is_some() && sym_a == sym_b
+        if sym_a.is_some() && sym_a == sym_b {
+            return true;
+        }
+
+        self.is_matching_property_reference(a, b)
+    }
+
+    fn is_matching_property_reference(&self, a: NodeIndex, b: NodeIndex) -> bool {
+        let Some((a_base, a_name)) = self.property_reference(a) else {
+            return false;
+        };
+        let Some((b_base, b_name)) = self.property_reference(b) else {
+            return false;
+        };
+        if a_name != b_name {
+            return false;
+        }
+        self.is_matching_reference(a_base, b_base)
+    }
+
+    fn property_reference(&self, idx: NodeIndex) -> Option<(NodeIndex, &str)> {
+        let idx = self.skip_parenthesized(idx);
+        let node = self.arena.get(idx)?;
+
+        if node.kind == syntax_kind_ext::NON_NULL_EXPRESSION {
+            let unary = self.arena.get_unary_expr_ex(node)?;
+            return self.property_reference(unary.expression);
+        }
+
+        if node.kind == syntax_kind_ext::TYPE_ASSERTION
+            || node.kind == syntax_kind_ext::AS_EXPRESSION
+            || node.kind == syntax_kind_ext::SATISFIES_EXPRESSION
+        {
+            let assertion = self.arena.get_type_assertion(node)?;
+            return self.property_reference(assertion.expression);
+        }
+
+        if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+            let access = self.arena.get_access_expr(node)?;
+            if access.question_dot_token {
+                return None;
+            }
+            let name_node = self.arena.get(access.name_or_argument)?;
+            let ident = self.arena.get_identifier(name_node)?;
+            return Some((access.expression, ident.escaped_text.as_str()));
+        }
+
+        if node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION {
+            let access = self.arena.get_access_expr(node)?;
+            if access.question_dot_token {
+                return None;
+            }
+            let name = self.literal_string_from_node(access.name_or_argument)?;
+            return Some((access.expression, name));
+        }
+
+        None
+    }
+
+    fn reference_base(&self, idx: NodeIndex) -> Option<NodeIndex> {
+        let idx = self.skip_parenthesized(idx);
+        let node = self.arena.get(idx)?;
+
+        if node.kind == syntax_kind_ext::NON_NULL_EXPRESSION {
+            let unary = self.arena.get_unary_expr_ex(node)?;
+            return self.reference_base(unary.expression);
+        }
+
+        if node.kind == syntax_kind_ext::TYPE_ASSERTION
+            || node.kind == syntax_kind_ext::AS_EXPRESSION
+            || node.kind == syntax_kind_ext::SATISFIES_EXPRESSION
+        {
+            let assertion = self.arena.get_type_assertion(node)?;
+            return self.reference_base(assertion.expression);
+        }
+
+        if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+            || node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION
+        {
+            let access = self.arena.get_access_expr(node)?;
+            if access.question_dot_token {
+                return None;
+            }
+            return Some(access.expression);
+        }
+
+        None
     }
 
     fn reference_symbol(&self, idx: NodeIndex) -> Option<SymbolId> {
