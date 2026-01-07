@@ -1172,8 +1172,10 @@ impl<'a> ThinCheckerState<'a> {
         use rustc_hash::FxHashMap;
 
         struct MethodAggregate {
-            signatures: Vec<CallSignature>,
-            optional: bool,
+            overload_signatures: Vec<CallSignature>,
+            impl_signatures: Vec<CallSignature>,
+            overload_optional: bool,
+            impl_optional: bool,
         }
 
         struct AccessorAggregate {
@@ -1231,11 +1233,18 @@ impl<'a> ThinCheckerState<'a> {
                     let name_atom = self.ctx.types.intern_string(&name);
                     let signature = self.call_signature_from_method(method);
                     let entry = methods.entry(name_atom).or_insert(MethodAggregate {
-                        signatures: Vec::new(),
-                        optional: false,
+                        overload_signatures: Vec::new(),
+                        impl_signatures: Vec::new(),
+                        overload_optional: false,
+                        impl_optional: false,
                     });
-                    entry.signatures.push(signature);
-                    entry.optional |= method.question_token;
+                    if method.body.is_none() {
+                        entry.overload_signatures.push(signature);
+                        entry.overload_optional |= method.question_token;
+                    } else {
+                        entry.impl_signatures.push(signature);
+                        entry.impl_optional |= method.question_token;
+                    }
                 }
                 k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
                     let Some(accessor) = self.ctx.arena.get_accessor(member_node) else {
@@ -1335,15 +1344,23 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         for (name, method) in methods {
+            let (signatures, optional) = if !method.overload_signatures.is_empty() {
+                (method.overload_signatures, method.overload_optional)
+            } else {
+                (method.impl_signatures, method.impl_optional)
+            };
+            if signatures.is_empty() {
+                continue;
+            }
             let type_id = self.ctx.types.callable(CallableShape {
-                call_signatures: method.signatures,
+                call_signatures: signatures,
                 construct_signatures: Vec::new(),
                 properties: Vec::new(),
             });
             properties.insert(name, PropertyInfo {
                 name,
                 type_id,
-                optional: method.optional,
+                optional,
                 readonly: false,
                 is_method: true,
             });
