@@ -22,8 +22,8 @@ Note:
 Pick the most doable and impactful
 
 1. Integrate LoweringPass into public API (lib.rs exports) [done]
-2. Implement remaining directive handlers (arrow, async, modules) [partial: arrow/async done; AMD/UMD/System wrappers added]
-3. Deprecate old API, make transforms required [partial: emit/emitModern now use two-phase pipeline; LoweringPass handles CommonJS auto-detect]
+2. Implement remaining directive handlers (arrow, async, modules) [partial: arrow/async done; AMD/UMD/System wrappers auto-lower in legacy ThinPrinter]
+3. Deprecate old API, make transforms required [partial: emit/emitModern now use two-phase pipeline; ThinPrinter auto-runs LoweringPass for source files]
 
 
 4. Expand transform system to more node types
