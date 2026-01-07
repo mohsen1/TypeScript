@@ -24,6 +24,7 @@ rustc-hash = "2.0"  # Fast hashing for integer keys (FxHashMap)
 rayon = "1.10"  # Parallel iteration for multi-file parsing
 memchr = "2.7"  # SIMD byte searching for string escaping
 walkdir = "2.5"
+smallvec = "1.13"
 # Phase 7.5: Query-based Structural Solver
 # salsa = "0.25"  # Query-based incremental computation - disabled for now (requires nightly)
 ena = "0.14"  # Union-Find for type unification
