@@ -1059,6 +1059,51 @@ fn test_contextual_typing_for_function_parameters() {
 }
 
 #[test]
+fn test_contextual_typing_skips_this_parameter() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+    use crate::parser::syntax_kind_ext;
+
+    let source = r#"
+function takesHandler(fn: (this: { value: number }, x: string) => void) {}
+takesHandler(function(this: { value: number }, x) {
+    let y: number = x;
+});
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+    let expr_stmt_idx = source_file.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::EXPRESSION_STATEMENT))
+        .expect("expression statement");
+    let expr_stmt = arena.get_expression_statement(arena.get(expr_stmt_idx).expect("expr stmt node"))
+        .expect("expr stmt data");
+    let call_idx = expr_stmt.expression;
+    let call_expr = arena.get_call_expr(arena.get(call_idx).expect("call node")).expect("call expr");
+    let args = call_expr.arguments.as_ref().expect("call arguments");
+    let func_idx = *args.nodes.first().expect("function argument");
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.get_type_of_node(call_idx);
+
+    let func_type = checker.get_type_of_node(func_idx);
+    let Some(TypeKey::Function(shape)) = checker.ctx.types.lookup(func_type) else {
+        panic!("expected function type for argument");
+    };
+    assert!(shape.this_type.is_some(), "expected this type on contextual function");
+    assert_eq!(shape.params.len(), 1, "expected single parameter besides this");
+    assert_eq!(shape.params[0].type_id, TypeId::STRING, "expected contextual string parameter");
+}
+
+#[test]
 fn test_contextual_typing_for_object_properties() {
     use crate::solver::ContextualTypeContext;
 

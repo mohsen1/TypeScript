@@ -1693,7 +1693,8 @@ impl<'a> ThinCheckerState<'a> {
             None
         };
 
-        for (i, &param_idx) in func.parameters.nodes.iter().enumerate() {
+        let mut contextual_index = 0;
+        for &param_idx in func.parameters.nodes.iter() {
             if let Some(param_node) = self.ctx.arena.get(param_idx) {
                 if let Some(param) = self.ctx.arena.get_parameter(param_node) {
                     // Get parameter name
@@ -1723,7 +1724,7 @@ impl<'a> ThinCheckerState<'a> {
                     } else {
                         // Infer from contextual type
                         if let Some(ref helper) = ctx_helper {
-                            helper.get_parameter_type(i).unwrap_or(TypeId::ANY)
+                            helper.get_parameter_type(contextual_index).unwrap_or(TypeId::ANY)
                         } else {
                             TypeId::ANY
                         }
@@ -1748,6 +1749,7 @@ impl<'a> ThinCheckerState<'a> {
                         rest,
                     });
                     param_types.push(Some(type_id));
+                    contextual_index += 1;
                 }
             }
         }

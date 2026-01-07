@@ -85,6 +85,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: `this` parameter stored separately for function and call signatures
   - [x] Test: `this` parameter variance in subtype checks
   - [x] Test: Contextual typing for callable signatures (params/return/this)
+  - [x] Test: Contextual typing skips `this` parameter when indexing args
 
 ### Phase 4: Generic Types
 - [x] Implement type parameter lowering
