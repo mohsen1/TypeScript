@@ -823,6 +823,21 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_node_default(node, idx);
             }
 
+            TransformDirective::ES5VariableDeclarationList { decl_list } => {
+                if let Some(list_node) = self.arena.get(decl_list) {
+                    self.emit_variable_declaration_list_es5(list_node);
+                    return;
+                }
+
+                self.emit_node_default(node, idx);
+            }
+
+            TransformDirective::ES5TemplateLiteral { .. } => {
+                if !self.emit_template_literal_es5(node, idx) {
+                    self.emit_node_default(node, idx);
+                }
+            }
+
             TransformDirective::ModuleWrapper {
                 format,
                 dependencies,
@@ -1100,6 +1115,21 @@ impl<'a> ThinPrinter<'a> {
                         self.emit_object_literal_es5(&literal.elements.nodes);
                         return;
                     }
+                }
+
+                self.emit_chained_previous(node, idx, directives, index);
+            }
+            TransformDirective::ES5VariableDeclarationList { decl_list } => {
+                if let Some(list_node) = self.arena.get(*decl_list) {
+                    self.emit_variable_declaration_list_es5(list_node);
+                    return;
+                }
+
+                self.emit_chained_previous(node, idx, directives, index);
+            }
+            TransformDirective::ES5TemplateLiteral { .. } => {
+                if self.emit_template_literal_es5(node, idx) {
+                    return;
                 }
 
                 self.emit_chained_previous(node, idx, directives, index);
@@ -2998,27 +3028,30 @@ impl<'a> ThinPrinter<'a> {
         self.write(keyword);
         self.write(" ");
 
-        // For ES5, check if any declaration uses destructuring
-        if self.ctx.target_es5 {
-            let mut first = true;
-            for &decl_idx in &decl_list.declarations.nodes {
-                let Some(decl_node) = self.arena.get(decl_idx) else { continue };
-                let Some(decl) = self.arena.get_variable_declaration(decl_node) else { continue };
+        self.emit_comma_separated(&decl_list.declarations.nodes);
+    }
 
-                if self.is_binding_pattern(decl.name) && !decl.initializer.is_none() {
-                    // ES5 destructuring transform
-                    self.emit_es5_destructuring(decl_idx, &mut first);
-                } else {
-                    // Normal variable declaration
-                    if !first {
-                        self.write(", ");
-                    }
-                    first = false;
-                    self.emit(decl_idx);
+    fn emit_variable_declaration_list_es5(&mut self, node: &ThinNode) {
+        let Some(decl_list) = self.arena.get_variable(node) else {
+            return;
+        };
+
+        self.write("var ");
+
+        let mut first = true;
+        for &decl_idx in &decl_list.declarations.nodes {
+            let Some(decl_node) = self.arena.get(decl_idx) else { continue };
+            let Some(decl) = self.arena.get_variable_declaration(decl_node) else { continue };
+
+            if self.is_binding_pattern(decl.name) && !decl.initializer.is_none() {
+                self.emit_es5_destructuring(decl_idx, &mut first);
+            } else {
+                if !first {
+                    self.write(", ");
                 }
+                first = false;
+                self.emit(decl_idx);
             }
-        } else {
-            self.emit_comma_separated(&decl_list.declarations.nodes);
         }
     }
 
@@ -5486,17 +5519,16 @@ impl<'a> ThinPrinter<'a> {
     // Template Literals
     // =========================================================================
 
-    fn emit_tagged_template_expression(&mut self, node: &ThinNode, idx: NodeIndex) {
+    fn emit_tagged_template_expression(&mut self, node: &ThinNode, _idx: NodeIndex) {
         let Some(tagged) = self.arena.get_tagged_template(node) else {
             return;
         };
 
-        if !self.ctx.target_es5 {
-            self.emit_expression(tagged.tag);
-            self.emit(tagged.template);
-            return;
-        }
+        self.emit_expression(tagged.tag);
+        self.emit(tagged.template);
+    }
 
+    fn emit_tagged_template_expression_es5(&mut self, tagged: &crate::parser::thin_node::TaggedTemplateData, idx: NodeIndex) {
         let Some(parts) = self.collect_template_parts(tagged.template) else {
             self.emit_expression(tagged.tag);
             self.emit(tagged.template);
@@ -5528,11 +5560,6 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        if self.ctx.target_es5 {
-            self.emit_template_expression_es5(tpl);
-            return;
-        }
-
         // Emit the template head (opening backtick and initial text)
         self.emit(tpl.head);
 
@@ -5544,14 +5571,36 @@ impl<'a> ThinPrinter<'a> {
 
     fn emit_no_substitution_template(&mut self, node: &ThinNode) {
         if let Some(lit) = self.arena.get_literal(node) {
-            if self.ctx.target_es5 {
-                self.emit_string_literal_text(&lit.text);
-                return;
-            }
-
             self.write("`");
             self.write(&lit.text);
             self.write("`");
+        }
+    }
+
+    fn emit_template_literal_es5(&mut self, node: &ThinNode, idx: NodeIndex) -> bool {
+        match node.kind {
+            k if k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 => {
+                if let Some(lit) = self.arena.get_literal(node) {
+                    self.emit_string_literal_text(&lit.text);
+                    return true;
+                }
+                false
+            }
+            k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
+                if let Some(tpl) = self.arena.get_template_expr(node) {
+                    self.emit_template_expression_es5(tpl);
+                    return true;
+                }
+                false
+            }
+            k if k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION => {
+                if let Some(tagged) = self.arena.get_tagged_template(node) {
+                    self.emit_tagged_template_expression_es5(tagged, idx);
+                    return true;
+                }
+                false
+            }
+            _ => false,
         }
     }
 
