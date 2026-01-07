@@ -488,6 +488,11 @@ impl<'a> LoweringPass<'a> {
                 );
                 return;
             }
+
+            if export_node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
+                self.lower_variable_statement(export_node, export_decl.export_clause, true);
+                return;
+            }
         }
 
         self.visit(export_decl.export_clause);
@@ -683,14 +688,24 @@ impl<'a> LoweringPass<'a> {
 
     /// Visit a variable statement
     fn visit_variable_statement(&mut self, node: &ThinNode, idx: NodeIndex) {
+        self.lower_variable_statement(node, idx, false);
+    }
+
+    fn lower_variable_statement(
+        &mut self,
+        node: &ThinNode,
+        idx: NodeIndex,
+        force_export: bool,
+    ) {
         let Some(var_stmt) = self.arena.get_variable(node) else {
             return;
         };
 
-        if self.is_commonjs()
-            && self.has_export_modifier(&var_stmt.modifiers)
+        let is_exported = self.is_commonjs()
             && !self.has_export_assignment
-        {
+            && (force_export || self.has_export_modifier(&var_stmt.modifiers));
+
+        if is_exported {
             let export_names = self.collect_variable_names(&var_stmt.declarations);
             if !export_names.is_empty() {
                 self.transforms.insert(
@@ -1129,6 +1144,21 @@ mod tests {
 
         // CommonJS module should add export transform
         assert!(!transforms.is_empty(), "Expected CommonJS export transform");
+    }
+
+    #[test]
+    fn test_lowering_pass_commonjs_export_vars() {
+        let (arena, root) = parse("export const a = 1, b = 2;");
+        let mut ctx = EmitContext::default();
+        ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+        let lowering = LoweringPass::new(&arena, &ctx);
+        let transforms = lowering.run(root);
+
+        assert!(
+            !transforms.is_empty(),
+            "Expected CommonJS export transform for variables"
+        );
     }
 
     #[test]

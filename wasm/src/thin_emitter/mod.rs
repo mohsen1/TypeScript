@@ -4364,6 +4364,16 @@ impl<'a> ThinPrinter<'a> {
 
         // Check if export_clause contains a declaration (export const x, export function f, etc.)
         if let Some(clause_node) = self.arena.get(export.export_clause) {
+            let clause_kind = clause_node.kind;
+            let is_decl = clause_kind == syntax_kind_ext::VARIABLE_STATEMENT
+                || clause_kind == syntax_kind_ext::FUNCTION_DECLARATION
+                || clause_kind == syntax_kind_ext::CLASS_DECLARATION;
+
+            if is_decl && self.transforms.has_transform(export.export_clause) {
+                self.emit(export.export_clause);
+                return;
+            }
+
             match clause_node.kind {
                 // export const/let/var x = ...
                 k if k == syntax_kind_ext::VARIABLE_STATEMENT => {

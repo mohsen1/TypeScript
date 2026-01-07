@@ -54,6 +54,7 @@ Pick the most doable and impactful
 29. ThinEmitter: apply TransformDirective::Chain composition [done]
 30. LoweringPass: compose ES5/CommonJS transforms with Chain [done]
 31. LoweringPass: handle export-declared functions and async detection [done]
+32. Export declarations: CommonJS transforms for vars and transform-aware emission [done]
 
 
 ## Quick Reference
