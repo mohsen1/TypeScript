@@ -249,9 +249,17 @@ impl<'a> NarrowingContext<'a> {
 
         // If source is a union, filter members
         if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
-            let matching: Vec<TypeId> = members.iter()
-                .filter(|&&m| self.is_assignable_to(m, target_type))
-                .copied()
+            let matching: Vec<TypeId> = members
+                .iter()
+                .filter_map(|&member| {
+                    if let Some(narrowed) = self.narrow_type_param(member, target_type) {
+                        return Some(narrowed);
+                    }
+                    if self.is_assignable_to(member, target_type) {
+                        return Some(member);
+                    }
+                    None
+                })
                 .collect();
 
             if matching.is_empty() {
@@ -261,6 +269,10 @@ impl<'a> NarrowingContext<'a> {
             } else {
                 return self.interner.union(matching);
             }
+        }
+
+        if let Some(narrowed) = self.narrow_type_param(source_type, target_type) {
+            return narrowed;
         }
 
         // Check if source is assignable to target
@@ -354,6 +366,30 @@ impl<'a> NarrowingContext<'a> {
                 .unwrap_or(false),
             _ => false,
         }
+    }
+
+    fn narrow_type_param(&self, source: TypeId, target: TypeId) -> Option<TypeId> {
+        let info = match self.interner.lookup(source) {
+            Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info,
+            _ => return None,
+        };
+
+        let constraint = info.constraint.unwrap_or(TypeId::UNKNOWN);
+        if constraint == source {
+            return None;
+        }
+
+        let narrowed_constraint = if constraint == TypeId::UNKNOWN {
+            target
+        } else {
+            self.narrow_to_type(constraint, target)
+        };
+
+        if narrowed_constraint == TypeId::NEVER {
+            return None;
+        }
+
+        Some(self.interner.intersection(vec![source, narrowed_constraint]))
     }
 
     /// Simple assignability check for narrowing purposes.

@@ -276,6 +276,49 @@ fn test_narrow_by_typeof_unknown_object() {
 }
 
 #[test]
+fn test_narrow_by_typeof_type_param_with_union_constraint() {
+    let interner = TypeInterner::new();
+    let constraint = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(constraint),
+        default: None,
+    }));
+    let union = interner.union(vec![param, TypeId::BOOLEAN]);
+
+    let narrowed = narrow_by_typeof(&interner, union, "string");
+    let expected = interner.intersection(vec![param, TypeId::STRING]);
+    assert_eq!(narrowed, expected);
+}
+
+#[test]
+fn test_narrow_by_typeof_type_param_with_non_overlapping_constraint() {
+    let interner = TypeInterner::new();
+    let param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::NUMBER),
+        default: None,
+    }));
+
+    let narrowed = narrow_by_typeof(&interner, param, "string");
+    assert_eq!(narrowed, TypeId::NEVER);
+}
+
+#[test]
+fn test_narrow_by_typeof_unconstrained_type_param() {
+    let interner = TypeInterner::new();
+    let param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    }));
+
+    let narrowed = narrow_by_typeof(&interner, param, "string");
+    let expected = interner.intersection(vec![param, TypeId::STRING]);
+    assert_eq!(narrowed, expected);
+}
+
+#[test]
 fn test_narrow_by_typeof_branded_string_intersection() {
     let interner = TypeInterner::new();
 
