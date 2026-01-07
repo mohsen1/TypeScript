@@ -65,7 +65,7 @@ This is what do we mean by "managing"
 
 0. Pull origin/rust into TypeScript (the main repo) to have the latest changes
 1. Check all track panes before anything else; if any are waiting or stalled, respond and unblock.
-2. Keep five tracks active; never allow an idle track. If a track is complete, immediately replace it with a new active plan that advances the project.
+2. Keep five tracks active; never allow an idle track. If a track is complete or blocked, immediately replace it with a new active plan that advances the project; if there are fewer than five active plans, create new ones on the spot.
 3. Quick risk scan:
    - `rg -n "TODO|FIXME|HACK|XXX" wasm/src`
    - Spot-check high-risk areas: `interner.rs`, `solver/intern.rs`, `thin_emitter/mod.rs`,
