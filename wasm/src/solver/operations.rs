@@ -23,6 +23,7 @@ use crate::solver::types::*;
 use crate::solver::{
     apparent_primitive_member_kind,
     evaluate_conditional,
+    evaluate_index_access,
     evaluate_mapped,
     ApparentMemberKind,
     TypeDatabase,
@@ -670,6 +671,18 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     if let (TemplateSpan::Type(s_type), TemplateSpan::Type(t_type)) = (s_span, t_span) {
                         self.constrain_types(ctx, var_map, *s_type, *t_type);
                     }
+                }
+            }
+            (Some(TypeKey::IndexAccess(s_obj, s_idx)), _) => {
+                let evaluated = evaluate_index_access(self.interner, s_obj, s_idx);
+                if evaluated != source {
+                    self.constrain_types(ctx, var_map, evaluated, target);
+                }
+            }
+            (_, Some(TypeKey::IndexAccess(t_obj, t_idx))) => {
+                let evaluated = evaluate_index_access(self.interner, t_obj, t_idx);
+                if evaluated != target {
+                    self.constrain_types(ctx, var_map, source, evaluated);
                 }
             }
             (Some(TypeKey::Conditional(ref cond)), _) => {
