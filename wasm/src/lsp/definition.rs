@@ -240,6 +240,31 @@ mod definition_tests {
     }
 
     #[test]
+    fn test_goto_definition_class_method_local() {
+        let source = "class Foo {\n  method() {\n    const value = 1;\n    return value;\n  }\n}";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let line_map = LineMap::build(source);
+
+        // Position at the 'value' usage (line 3)
+        let position = Position::new(3, 11);
+
+        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let definitions = goto_def.get_definition(root, position);
+
+        assert!(definitions.is_some(), "Should find definition for method local");
+        if let Some(defs) = definitions {
+            assert!(!defs.is_empty(), "Should have at least one definition");
+            assert_eq!(defs[0].range.start.line, 2, "Definition should be on line 2");
+        }
+    }
+
+    #[test]
     fn test_goto_definition_not_found() {
         let source = "const x = 1;";
         let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

@@ -55,6 +55,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Traverse JSX nodes in LSP resolver for references/completions
    - [x] Add more expression/type nodes in resolver (await/yield/as/tagged templates, type annotations)
    - [x] Bind and traverse destructuring patterns for definitions/references
+   - [x] Bind class member bodies (methods/accessors/constructors) for local resolution
    - [x] Add import/export handling for cross-file navigation
 
 3. **Multi-File Support**

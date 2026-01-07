@@ -443,4 +443,27 @@ mod references_tests {
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find parameter declaration and usage");
     }
+
+    #[test]
+    fn test_find_references_class_method_local() {
+        let source = "class Foo {\n  method() {\n    const value = 1;\n    return value;\n  }\n}";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let line_map = LineMap::build(source);
+
+        // Position at the 'value' usage (line 3)
+        let position = Position::new(3, 11);
+
+        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let references = find_refs.find_references(root, position);
+
+        assert!(references.is_some(), "Should find references for method local");
+        let refs = references.unwrap();
+        assert!(refs.len() >= 2, "Should find declaration and usage");
+    }
 }

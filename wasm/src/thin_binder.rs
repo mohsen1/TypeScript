@@ -1019,6 +1019,26 @@ impl ThinBinderState {
         }
     }
 
+    fn bind_callable_body(
+        &mut self,
+        arena: &ThinNodeArena,
+        parameters: &NodeList,
+        body: NodeIndex,
+        idx: NodeIndex,
+    ) {
+        self.enter_scope(ContainerKind::Function, idx);
+
+        for &param_idx in &parameters.nodes {
+            self.bind_parameter(arena, param_idx);
+        }
+
+        if !body.is_none() {
+            self.bind_node(arena, body);
+        }
+
+        self.exit_scope();
+    }
+
     fn bind_class_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
         if let Some(class) = arena.get_class(node) {
             if let Some(name) = self.get_identifier_name(arena, class.name) {
@@ -1064,6 +1084,7 @@ impl ThinBinderState {
                             self.current_scope.set(name.to_string(), sym_id);
                             self.node_symbols.insert(idx.0, sym_id);
                         }
+                        self.bind_callable_body(arena, &method.parameters, method.body, idx);
                     }
                 }
                 k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
@@ -1082,10 +1103,34 @@ impl ThinBinderState {
                         }
                     }
                 }
+                k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                    if let Some(accessor) = arena.get_accessor(node) {
+                        if let Some(name) = self.get_identifier_name(arena, accessor.name) {
+                            let mut flags = if node.kind == syntax_kind_ext::GET_ACCESSOR {
+                                symbol_flags::GET_ACCESSOR
+                            } else {
+                                symbol_flags::SET_ACCESSOR
+                            };
+                            if self.has_abstract_modifier(arena, &accessor.modifiers) {
+                                flags |= symbol_flags::ABSTRACT;
+                            }
+                            if self.has_static_modifier(arena, &accessor.modifiers) {
+                                flags |= symbol_flags::STATIC;
+                            }
+                            let sym_id = self.symbols.alloc(flags, name.to_string());
+                            self.current_scope.set(name.to_string(), sym_id);
+                            self.node_symbols.insert(idx.0, sym_id);
+                        }
+                        self.bind_callable_body(arena, &accessor.parameters, accessor.body, idx);
+                    }
+                }
                 k if k == syntax_kind_ext::CONSTRUCTOR => {
                     let sym_id = self.symbols.alloc(symbol_flags::CONSTRUCTOR, "constructor".to_string());
                     self.current_scope.set("constructor".to_string(), sym_id);
                     self.node_symbols.insert(idx.0, sym_id);
+                    if let Some(ctor) = arena.get_constructor(node) {
+                        self.bind_callable_body(arena, &ctor.parameters, ctor.body, idx);
+                    }
                 }
                 _ => {}
             }
