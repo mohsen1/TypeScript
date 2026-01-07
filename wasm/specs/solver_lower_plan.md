@@ -149,6 +149,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: checker element access handles numeric string indices
   - [x] Test: checker element access respects index signatures
   - [x] Test: checker element access reports missing index signature (7053)
+  - [x] Test: checker element access unions literal key types
 - [x] Parser: fix interface member parsing to track progress by token position (avoid skipping consecutive identifiers)
 - [x] Perf: avoid extra String clone when lowering negative bigint literals
 - [x] Perf: avoid extra allocation when normalizing bigint leading zeros

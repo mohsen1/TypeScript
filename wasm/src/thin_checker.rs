@@ -1738,8 +1738,20 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         }
 
+        let index_type = self.get_type_of_node(access.name_or_argument);
         let literal_string = self.get_literal_string_from_node(access.name_or_argument);
         let numeric_string_index = literal_string.and_then(|name| self.get_numeric_index_from_string(name));
+
+        if let Some(keys) = self.get_literal_string_keys_from_type(index_type) {
+            if keys.len() > 1 {
+                if let Some(result_type) = self.get_element_access_type_for_literal_keys(object_type, &keys) {
+                    return result_type;
+                }
+                self.error_no_index_signature_at(index_type, object_type, access.name_or_argument);
+                return TypeId::ANY;
+            }
+        }
+
         if let Some(property_name) = literal_string {
             if numeric_string_index.is_none() {
                 let evaluator = PropertyAccessEvaluator::new(self.ctx.types);
@@ -1755,7 +1767,10 @@ impl<'a> ThinCheckerState<'a> {
                         }
                     }
                     PropertyAccessResult::IsUnknown => TypeId::ANY,
-                    PropertyAccessResult::PropertyNotFound { .. } => TypeId::ANY,
+                    PropertyAccessResult::PropertyNotFound { .. } => {
+                        self.error_no_index_signature_at(index_type, object_type, access.name_or_argument);
+                        TypeId::ANY
+                    }
                 };
             }
         }
@@ -1763,7 +1778,6 @@ impl<'a> ThinCheckerState<'a> {
         // Get the index type
         let literal_index = self.get_literal_index_from_node(access.name_or_argument)
             .or(numeric_string_index);
-        let index_type = self.get_type_of_node(access.name_or_argument);
         let result_type = self.get_element_access_type(object_type, index_type, literal_index);
 
         if self.should_report_no_index_signature(object_type, index_type, literal_index) {
@@ -1920,6 +1934,79 @@ impl<'a> ThinCheckerState<'a> {
             return None;
         }
         Some(parsed as usize)
+    }
+
+    fn get_literal_string_keys_from_type(&self, index_type: TypeId) -> Option<Vec<Atom>> {
+        use crate::solver::{LiteralValue, TypeKey};
+
+        match self.ctx.types.lookup(index_type)? {
+            TypeKey::Literal(LiteralValue::String(atom)) => Some(vec![atom]),
+            TypeKey::Union(members) => {
+                let mut keys = Vec::with_capacity(members.len());
+                for &member in members.iter() {
+                    match self.ctx.types.lookup(member) {
+                        Some(TypeKey::Literal(LiteralValue::String(atom))) => keys.push(atom),
+                        _ => return None,
+                    }
+                }
+                Some(keys)
+            }
+            _ => None,
+        }
+    }
+
+    fn get_element_access_type_for_literal_keys(
+        &mut self,
+        object_type: TypeId,
+        keys: &[Atom],
+    ) -> Option<TypeId> {
+        use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
+
+        if keys.is_empty() {
+            return None;
+        }
+
+        let numeric_as_index = self.is_array_like_type(object_type);
+        let evaluator = PropertyAccessEvaluator::new(self.ctx.types);
+        let mut types = Vec::with_capacity(keys.len());
+
+        for &key in keys {
+            let name = self.ctx.types.resolve_atom(key);
+            if numeric_as_index {
+                if let Some(index) = self.get_numeric_index_from_string(&name) {
+                    let element_type = self.get_element_access_type(object_type, TypeId::NUMBER, Some(index));
+                    types.push(element_type);
+                    continue;
+                }
+            }
+
+            match evaluator.resolve_property_access(object_type, &name) {
+                PropertyAccessResult::Success { type_id, .. } => types.push(type_id),
+                PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
+                    types.push(property_type.unwrap_or(TypeId::ANY));
+                }
+                PropertyAccessResult::IsUnknown => types.push(TypeId::ANY),
+                PropertyAccessResult::PropertyNotFound { .. } => return None,
+            }
+        }
+
+        if types.len() == 1 {
+            Some(types[0])
+        } else {
+            Some(self.ctx.types.union(types))
+        }
+    }
+
+    fn is_array_like_type(&self, object_type: TypeId) -> bool {
+        use crate::solver::TypeKey;
+
+        match self.ctx.types.lookup(object_type) {
+            Some(TypeKey::Array(_) | TypeKey::Tuple(_)) => true,
+            Some(TypeKey::ReadonlyType(inner)) => self.is_array_like_type(inner),
+            Some(TypeKey::Union(members)) => members.iter().all(|member| self.is_array_like_type(*member)),
+            Some(TypeKey::Intersection(members)) => members.iter().any(|member| self.is_array_like_type(*member)),
+            _ => false,
+        }
     }
 
     fn should_report_no_index_signature(
