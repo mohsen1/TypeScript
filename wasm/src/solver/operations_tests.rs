@@ -93,6 +93,64 @@ fn test_call_argument_type_mismatch() {
 }
 
 #[test]
+fn test_call_rest_parameter_type_match() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    // function(...args: number[]): string
+    let rest_array = interner.array(TypeId::NUMBER);
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: rest_array,
+            optional: false,
+            rest: true,
+        }],
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let result = evaluator.resolve_call(func, &[TypeId::NUMBER, TypeId::NUMBER]);
+    match result {
+        CallResult::Success(ret) => assert_eq!(ret, TypeId::STRING),
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_call_rest_parameter_type_mismatch() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    // function(...args: number[]): string
+    let rest_array = interner.array(TypeId::NUMBER);
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: rest_array,
+            optional: false,
+            rest: true,
+        }],
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let result = evaluator.resolve_call(func, &[TypeId::NUMBER, TypeId::STRING]);
+    match result {
+        CallResult::ArgumentTypeMismatch { index, expected, actual } => {
+            assert_eq!(index, 1);
+            assert_eq!(expected, TypeId::NUMBER);
+            assert_eq!(actual, TypeId::STRING);
+        }
+        _ => panic!("Expected ArgumentTypeMismatch, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_property_access_object() {
     let interner = TypeInterner::new();
     let evaluator = PropertyAccessEvaluator::new(&interner);

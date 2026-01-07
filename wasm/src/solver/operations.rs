@@ -144,13 +144,16 @@ impl<'a> CallEvaluator<'a> {
         }
 
         // Check argument types
+        let rest_param = func.params.last().filter(|param| param.rest);
         for (i, arg_type) in arg_types.iter().enumerate() {
-            if i >= func.params.len() {
+            let param = if i < func.params.len() {
+                &func.params[i]
+            } else if let Some(rest) = rest_param {
+                rest
+            } else {
                 // Rest parameter or excess args already handled by count check
                 break;
-            }
-
-            let param = &func.params[i];
+            };
             let param_type = if param.rest {
                 // For rest parameters, unwrap the array type
                 match self.interner.lookup(param.type_id) {
