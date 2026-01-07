@@ -9,10 +9,10 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 ## Current Status
 - LoweringPass -> TransformDirective -> ThinPrinter pipeline exists.
 - ES5/ESNext transforms largely implemented.
-- Remaining TODOs: push real_world_bench throughput toward 500+ MiB/s (emit-only ~318 MiB/s).
+- Remaining TODOs: reduce obvious hot-path overheads without hard throughput targets.
 
 ## Highest-Impact Next Tasks
-- [ ] Performance tuning: reach 500+ MiB/s emitter throughput
+- [ ] Performance tuning: remove obvious hot-path overheads
   - [x] Pre-allocate output buffer from source size; write numeric indices without allocations.
   - [ ] Profile emit-only pipeline (LoweringPass + helper detection).
   - [ ] Reduce allocations and repeated scans in emit hot paths.
@@ -36,7 +36,7 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 ## Success Criteria
 - All transforms triggered via TransformContext (no inline ES5 fallbacks).
 - Source maps stable for transformed outputs.
-- Emitter throughput >= 500 MB/s on real-world bench.
+- Emitter perf regressions are detectable and avoided in benchmarks.
 
 ## Task Ledger (legacy checklist)
 

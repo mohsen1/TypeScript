@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
-use crate::binder::SymbolTable;
+use crate::binder::{symbol_flags, SymbolId, SymbolTable};
 use crate::checker::TypeCache;
 use crate::checker::types::diagnostics::{Diagnostic, DiagnosticCategory};
 use crate::cli::args::CliArgs;
@@ -23,6 +23,7 @@ use crate::thin_parser::ParseDiagnostic;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
 use crate::thin_emitter::{ModuleKind, ThinPrinter};
+use crate::solver::TypeFormatter;
 use rustc_hash::FxHasher;
 
 #[derive(Debug, Clone)]
@@ -38,6 +39,7 @@ pub(crate) struct CompilationCache {
     dependencies: HashMap<PathBuf, HashSet<PathBuf>>,
     reverse_dependencies: HashMap<PathBuf, HashSet<PathBuf>>,
     diagnostics: HashMap<PathBuf, Vec<Diagnostic>>,
+    export_hashes: HashMap<PathBuf, u64>,
 }
 
 struct BindCacheEntry {
@@ -55,6 +57,19 @@ impl CompilationCache {
             self.type_caches.remove(&path);
             self.bind_cache.remove(&path);
             self.diagnostics.remove(&path);
+            self.export_hashes.remove(&path);
+        }
+    }
+
+    pub(crate) fn invalidate_paths<I>(&mut self, paths: I)
+    where
+        I: IntoIterator<Item = PathBuf>,
+    {
+        for path in paths {
+            self.type_caches.remove(&path);
+            self.bind_cache.remove(&path);
+            self.diagnostics.remove(&path);
+            self.export_hashes.remove(&path);
         }
     }
 
@@ -64,6 +79,7 @@ impl CompilationCache {
         self.dependencies.clear();
         self.reverse_dependencies.clear();
         self.diagnostics.clear();
+        self.export_hashes.clear();
     }
 
     #[cfg(test)]
@@ -79,6 +95,11 @@ impl CompilationCache {
     #[cfg(test)]
     pub(crate) fn diagnostics_len(&self) -> usize {
         self.diagnostics.len()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn export_hash(&self, path: &Path) -> Option<u64> {
+        self.export_hashes.get(path).copied()
     }
 
     pub(crate) fn update_dependencies(&mut self, dependencies: HashMap<PathBuf, HashSet<PathBuf>>) {
@@ -141,6 +162,28 @@ pub(crate) fn compile_with_cache_and_changes(
     cache: &mut CompilationCache,
     changed_paths: &[PathBuf],
 ) -> Result<CompilationResult> {
+    let canonical_paths: Vec<PathBuf> = changed_paths
+        .iter()
+        .map(|path| canonicalize_or_owned(path))
+        .collect();
+    let mut old_hashes = HashMap::new();
+    for path in &canonical_paths {
+        if let Some(&hash) = cache.export_hashes.get(path) {
+            old_hashes.insert(path.clone(), hash);
+        }
+    }
+
+    cache.invalidate_paths(canonical_paths.iter().cloned());
+    let result = compile_inner(args, cwd, Some(cache), Some(&canonical_paths))?;
+
+    let exports_changed = canonical_paths.iter().any(|path| {
+        old_hashes.get(path).copied() != cache.export_hashes.get(path).copied()
+    });
+    if !exports_changed {
+        return Ok(result);
+    }
+
+    cache.invalidate_paths_with_dependents(canonical_paths.into_iter());
     compile_inner(args, cwd, Some(cache), Some(changed_paths))
 }
 
@@ -1248,21 +1291,190 @@ fn collect_diagnostics(
         checker.check_source_file(file.source_file);
         file_diagnostics.extend(std::mem::take(&mut checker.ctx.diagnostics));
         diagnostics.extend(file_diagnostics.clone());
+        let export_hash = compute_export_hash(program, file, file_idx, &mut checker);
 
         if let Some(cache) = cache.as_deref_mut() {
             cache
                 .type_caches
                 .insert(file_path.clone(), checker.extract_cache());
-            cache.diagnostics.insert(file_path, file_diagnostics);
+            cache
+                .diagnostics
+                .insert(file_path.clone(), file_diagnostics);
+            cache.export_hashes.insert(file_path, export_hash);
         }
     }
 
     if let Some(cache) = cache {
         cache.type_caches.retain(|path, _| used_paths.contains(path));
         cache.diagnostics.retain(|path, _| used_paths.contains(path));
+        cache
+            .export_hashes
+            .retain(|path, _| used_paths.contains(path));
     }
 
     diagnostics
+}
+
+fn compute_export_hash(
+    program: &MergedProgram,
+    file: &BoundFile,
+    file_idx: usize,
+    checker: &mut ThinCheckerState,
+) -> u64 {
+    let mut formatter = TypeFormatter::with_symbols(&program.type_interner, &program.symbols);
+    let mut hasher = FxHasher::default();
+
+    if let Some(file_locals) = program.file_locals.get(file_idx) {
+        let mut exports: Vec<(&String, SymbolId)> = file_locals
+            .iter()
+            .filter_map(|(name, &sym_id)| {
+                is_exported_symbol(&program.symbols, sym_id).then_some((name, sym_id))
+            })
+            .collect();
+        exports.sort_by(|left, right| left.0.cmp(right.0));
+
+        for (name, sym_id) in exports {
+            name.hash(&mut hasher);
+            let type_id = checker.get_type_of_symbol(sym_id);
+            let type_str = formatter.format(type_id);
+            type_str.hash(&mut hasher);
+        }
+    }
+
+    let mut export_signatures = Vec::new();
+    collect_export_signatures(file, checker, &mut formatter, &mut export_signatures);
+    export_signatures.sort();
+    for signature in export_signatures {
+        signature.hash(&mut hasher);
+    }
+
+    hasher.finish()
+}
+
+fn is_exported_symbol(symbols: &crate::binder::SymbolArena, sym_id: SymbolId) -> bool {
+    let Some(symbol) = symbols.get(sym_id) else {
+        return false;
+    };
+    symbol.is_exported || (symbol.flags & symbol_flags::EXPORT_VALUE) != 0
+}
+
+fn collect_export_signatures(
+    file: &BoundFile,
+    checker: &mut ThinCheckerState,
+    formatter: &mut TypeFormatter,
+    signatures: &mut Vec<String>,
+) {
+    let arena = &file.arena;
+    let Some(node) = arena.get(file.source_file) else {
+        return;
+    };
+    let Some(source) = arena.get_source_file(node) else {
+        return;
+    };
+
+    for &stmt_idx in &source.statements.nodes {
+        let Some(stmt) = arena.get(stmt_idx) else {
+            continue;
+        };
+
+        if let Some(export_decl) = arena.get_export_decl(stmt) {
+            if export_decl.is_default_export {
+                if let Some(signature) =
+                    export_default_signature(export_decl.export_clause, checker, formatter)
+                {
+                    signatures.push(signature);
+                }
+                continue;
+            }
+
+            if export_decl.module_specifier.is_none() {
+                continue;
+            }
+
+            let module_spec = arena
+                .get_literal_text(export_decl.module_specifier)
+                .unwrap_or("")
+                .to_string();
+            if export_decl.export_clause.is_none() {
+                signatures.push(format!(
+                    "{}*|{}",
+                    export_type_prefix(export_decl.is_type_only),
+                    module_spec
+                ));
+                continue;
+            }
+
+            let clause_node = export_decl.export_clause;
+            let clause_node_ref = arena.get(clause_node);
+            if let Some(named) = clause_node_ref.and_then(|node| arena.get_named_imports(node)) {
+                let mut specifiers = Vec::new();
+                for &spec_idx in &named.elements.nodes {
+                    let Some(spec_node) = arena.get(spec_idx) else {
+                        continue;
+                    };
+                    let Some(spec) = arena.get_specifier(spec_node) else {
+                        continue;
+                    };
+                    let name = arena.get_identifier_text(spec.name).unwrap_or("");
+                    if spec.property_name.is_none() {
+                        specifiers.push(name.to_string());
+                    } else {
+                        let property = arena.get_identifier_text(spec.property_name).unwrap_or("");
+                        specifiers.push(format!("{} as {}", property, name));
+                    }
+                }
+                specifiers.sort();
+                signatures.push(format!(
+                    "{}{{{}}}|{}",
+                    export_type_prefix(export_decl.is_type_only),
+                    specifiers.join(","),
+                    module_spec
+                ));
+            } else if let Some(name) = arena.get_identifier_text(clause_node) {
+                signatures.push(format!(
+                    "{}* as {}|{}",
+                    export_type_prefix(export_decl.is_type_only),
+                    name,
+                    module_spec
+                ));
+            }
+
+            continue;
+        }
+
+        if let Some(export_assignment) = arena.get_export_assignment(stmt) {
+            if !export_assignment.expression.is_none() {
+                let type_id = checker.get_type_of_node(export_assignment.expression);
+                let type_str = formatter.format(type_id);
+                signatures.push(format!("export=:{type_str}"));
+            }
+        }
+    }
+}
+
+fn export_default_signature(
+    export_clause: NodeIndex,
+    checker: &mut ThinCheckerState,
+    formatter: &mut TypeFormatter,
+) -> Option<String> {
+    if export_clause.is_none() {
+        return None;
+    }
+    let type_id = if let Some(sym_id) = checker.ctx.binder.get_node_symbol(export_clause) {
+        checker.get_type_of_symbol(sym_id)
+    } else {
+        checker.get_type_of_node(export_clause)
+    };
+    let type_str = formatter.format(type_id);
+    Some(format!("default:{type_str}"))
+}
+
+fn export_type_prefix(is_type_only: bool) -> &'static str {
+    if is_type_only {
+        "type:"
+    } else {
+        ""
+    }
 }
 
 fn parse_diagnostic_to_checker(file_name: &str, diagnostic: &ParseDiagnostic) -> Diagnostic {

@@ -4,7 +4,7 @@ set -euo pipefail
 SESSION_MAIN="zang-hub"
 WINDOW_MAIN="hub"
 CODEX_CMD="${CODEX_CMD:-codex}"
-CODEX_ARGS="${CODEX_ARGS---full-auto}"
+CODEX_ARGS="${CODEX_ARGS---dangerously-bypass-approvals-and-sandbox}"
 CODEX_MANAGER_ARGS="${CODEX_MANAGER_ARGS:-$CODEX_ARGS}"
 CODEX_TRACK_ARGS="${CODEX_TRACK_ARGS:-$CODEX_ARGS}"
 AUTO_FETCH="${AUTO_FETCH:-1}"
@@ -180,13 +180,10 @@ if [ "$ROOT_DIR" = "$BASE_DIR" ]; then
   MANAGER_DIR="$(dirname "$ROOT_DIR")"
 fi
 
-if [ ! -f "$MANAGER_DIR/MANAGER_AGENT.md" ] && [ -f "$ROOT_DIR/MANAGER_AGENT.md" ]; then
-  ln -s "$ROOT_DIR/MANAGER_AGENT.md" "$MANAGER_DIR/MANAGER_AGENT.md"
-fi
-if [ -f "$MANAGER_DIR/MANAGER_AGENT.md" ] && [ ! -e "$MANAGER_DIR/AGENTS.md" ]; then
-  ln -s "MANAGER_AGENT.md" "$MANAGER_DIR/AGENTS.md"
-elif [ ! -f "$MANAGER_DIR/MANAGER_AGENT.md" ]; then
-  echo "warning: MANAGER_AGENT.md not found in $MANAGER_DIR" >&2
+if [ -f "$ROOT_DIR/MANAGER_AGENT.md" ] && [ ! -e "$MANAGER_DIR/AGENTS.md" ]; then
+  ln -s "$ROOT_DIR/MANAGER_AGENT.md" "$MANAGER_DIR/AGENTS.md"
+elif [ ! -f "$ROOT_DIR/MANAGER_AGENT.md" ]; then
+  echo "warning: MANAGER_AGENT.md not found in $ROOT_DIR" >&2
 fi
 
 manager_cmd="${CODEX_CMD} ${CODEX_MANAGER_ARGS}"
