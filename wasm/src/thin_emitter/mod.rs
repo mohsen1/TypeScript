@@ -344,19 +344,20 @@ impl Default for PrinterOptions {
 
 #[derive(Default)]
 struct ParamTransformPlan {
-    destructures: Vec<ParamDestructure>,
+    params: Vec<ParamTransform>,
     rest: Option<RestParamTransform>,
 }
 
 impl ParamTransformPlan {
     fn has_transforms(&self) -> bool {
-        !self.destructures.is_empty() || self.rest.is_some()
+        !self.params.is_empty() || self.rest.is_some()
     }
 }
 
-struct ParamDestructure {
-    temp_name: String,
-    pattern: NodeIndex,
+struct ParamTransform {
+    name: String,
+    pattern: Option<NodeIndex>,
+    initializer: Option<NodeIndex>,
 }
 
 struct RestParamTransform {
@@ -2381,17 +2382,27 @@ impl<'a> ThinPrinter<'a> {
             if self.is_binding_pattern(param.name) {
                 let temp_name = self.get_temp_var_name();
                 self.write(&temp_name);
-                plan.destructures.push(ParamDestructure {
-                    temp_name,
-                    pattern: param.name,
+                plan.params.push(ParamTransform {
+                    name: temp_name,
+                    pattern: Some(param.name),
+                    initializer: if param.initializer.is_none() {
+                        None
+                    } else {
+                        Some(param.initializer)
+                    },
                 });
             } else {
                 self.emit(param.name);
-            }
-
-            if !param.initializer.is_none() {
-                self.write(" = ");
-                self.emit(param.initializer);
+                if !param.initializer.is_none() {
+                    let name = self.get_identifier_text(param.name);
+                    if !name.is_empty() {
+                        plan.params.push(ParamTransform {
+                            name,
+                            pattern: None,
+                            initializer: Some(param.initializer),
+                        });
+                    }
+                }
             }
         }
 
@@ -2788,6 +2799,20 @@ impl<'a> ThinPrinter<'a> {
     }
 
     fn emit_param_prologue(&mut self, transforms: &ParamTransformPlan) {
+        for param in &transforms.params {
+            if let Some(initializer) = param.initializer {
+                self.emit_param_default_assignment(&param.name, initializer);
+            }
+            if let Some(pattern) = param.pattern {
+                let mut started = false;
+                self.emit_param_binding_assignments(pattern, &param.name, &mut started);
+                if started {
+                    self.write(";");
+                    self.write_line();
+                }
+            }
+        }
+
         if let Some(rest) = &transforms.rest {
             if !rest.name.is_empty() {
                 self.write("var ");
@@ -2815,22 +2840,30 @@ impl<'a> ThinPrinter<'a> {
                 self.write("];");
                 self.write_line();
             }
-        }
 
-        let mut started = false;
-        for destructure in &transforms.destructures {
-            self.emit_param_binding_assignments(destructure.pattern, &destructure.temp_name, &mut started);
-        }
-        if let Some(rest) = &transforms.rest {
             if let Some(pattern) = rest.pattern {
+                let mut started = false;
                 self.emit_param_binding_assignments(pattern, &rest.name, &mut started);
+                if started {
+                    self.write(";");
+                    self.write_line();
+                }
             }
         }
+    }
 
-        if started {
-            self.write(";");
-            self.write_line();
+    fn emit_param_default_assignment(&mut self, name: &str, initializer: NodeIndex) {
+        if name.is_empty() {
+            return;
         }
+        self.write("if (");
+        self.write(name);
+        self.write(" === void 0) { ");
+        self.write(name);
+        self.write(" = ");
+        self.emit_expression(initializer);
+        self.write("; }");
+        self.write_line();
     }
 
     fn emit_param_binding_assignments(
@@ -2895,11 +2928,28 @@ impl<'a> ThinPrinter<'a> {
         }
 
         self.emit_param_assignment_prefix(started);
-        self.write(&binding_name);
-        self.write(" = ");
-        self.write(temp_name);
-        self.write(".");
-        self.write(&prop_name);
+        if !elem.initializer.is_none() {
+            let value_name = self.get_temp_var_name();
+            self.write(&value_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write(".");
+            self.write(&prop_name);
+            self.write(", ");
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(&value_name);
+            self.write(" === void 0 ? ");
+            self.emit_expression(elem.initializer);
+            self.write(" : ");
+            self.write(&value_name);
+        } else {
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write(".");
+            self.write(&prop_name);
+        }
     }
 
     fn emit_param_array_binding_element(
@@ -2926,12 +2976,30 @@ impl<'a> ThinPrinter<'a> {
         }
 
         self.emit_param_assignment_prefix(started);
-        self.write(&binding_name);
-        self.write(" = ");
-        self.write(temp_name);
-        self.write("[");
-        self.write(&index.to_string());
-        self.write("]");
+        if !elem.initializer.is_none() {
+            let value_name = self.get_temp_var_name();
+            self.write(&value_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write("[");
+            self.write(&index.to_string());
+            self.write("]");
+            self.write(", ");
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(&value_name);
+            self.write(" === void 0 ? ");
+            self.emit_expression(elem.initializer);
+            self.write(" : ");
+            self.write(&value_name);
+        } else {
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write("[");
+            self.write(&index.to_string());
+            self.write("]");
+        }
     }
 
     fn emit_param_object_rest_element(

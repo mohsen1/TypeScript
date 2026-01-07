@@ -191,6 +191,80 @@ fn test_thin_emit_function_destructured_param_es5() {
 }
 
 #[test]
+fn test_thin_emit_function_default_param_es5() {
+    let source = "function foo(a = 1) { return a; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function foo(a)"),
+        "Expected default parameter to be removed from signature: {}",
+        output
+    );
+    assert!(
+        output.contains("if (a === void 0) { a = 1; }"),
+        "Expected default parameter assignment in ES5 output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_thin_emit_function_destructured_default_param_es5() {
+    let source = "function foo({ x } = {}, y = x) { return y; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    let default_idx = output.find("if (_a === void 0) { _a = {}; }");
+    let destructure_idx = output.find("var x = _a.x");
+    let y_default_idx = output.find("if (y === void 0) { y = x; }");
+    assert!(
+        default_idx.is_some() && destructure_idx.is_some() && y_default_idx.is_some(),
+        "Expected default/destructure/default sequence in ES5 output: {}",
+        output
+    );
+    assert!(
+        default_idx.unwrap() < destructure_idx.unwrap(),
+        "Expected destructuring to follow parameter default: {}",
+        output
+    );
+    assert!(
+        destructure_idx.unwrap() < y_default_idx.unwrap(),
+        "Expected second default to follow destructuring: {}",
+        output
+    );
+}
+
+#[test]
+fn test_thin_emit_function_destructured_binding_default_es5() {
+    let source = "function foo({ x = 1 }) { return x; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_b = _a.x"),
+        "Expected temp binding value for defaulted destructure: {}",
+        output
+    );
+    assert!(
+        output.contains("x = _b === void 0 ? 1 : _b"),
+        "Expected default value assignment for binding element: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_function_rest_param_es5() {
     let source = "function foo(a, ...rest) { return rest.length; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -213,6 +287,28 @@ fn test_thin_emit_function_rest_param_es5() {
     assert!(
         output.contains("arguments.length"),
         "Expected rest parameter loop over arguments in ES5 output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_thin_emit_class_method_default_param_es5() {
+    let source = "class Foo { method(a = 1) { return a; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("prototype.method"),
+        "Expected ES5 prototype method emit: {}",
+        output
+    );
+    assert!(
+        output.contains("if (a === void 0) { a = 1; }"),
+        "Expected default parameter assignment in ES5 output: {}",
         output
     );
 }

@@ -47,6 +47,7 @@ Pick the most doable and impactful
 22. Expand transform system: ES5 for-of directive [done]
 23. ES5 emit: object/array rest destructuring with __rest helper [done]
 24. ES5 emit: downlevel rest parameters in functions/methods [done]
+25. ES5 emit: downlevel default parameters in functions/methods [done]
 
 
 ## Quick Reference

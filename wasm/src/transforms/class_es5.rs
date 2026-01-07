@@ -30,9 +30,10 @@ use crate::scanner::SyntaxKind;
 use crate::transforms::arrow_es5::contains_this_reference;
 use crate::transforms::private_fields_es5::{PrivateFieldInfo, collect_private_fields, is_private_identifier};
 
-struct ParamDestructure {
-    temp_name: String,
-    pattern: NodeIndex,
+struct ParamTransform {
+    name: String,
+    pattern: Option<NodeIndex>,
+    initializer: Option<NodeIndex>,
 }
 
 struct RestParamTransform {
@@ -42,13 +43,13 @@ struct RestParamTransform {
 }
 
 struct ParamTransformPlan {
-    destructures: Vec<ParamDestructure>,
+    params: Vec<ParamTransform>,
     rest: Option<RestParamTransform>,
 }
 
 impl ParamTransformPlan {
     fn is_empty(&self) -> bool {
-        self.destructures.is_empty() && self.rest.is_none()
+        self.params.is_empty() && self.rest.is_none()
     }
 }
 
@@ -947,7 +948,7 @@ impl<'a> ClassES5Emitter<'a> {
 
         self.write_indent();
         let mut param_transforms = ParamTransformPlan {
-            destructures: Vec::new(),
+            params: Vec::new(),
             rest: None,
         };
         if is_getter {
@@ -1147,7 +1148,7 @@ impl<'a> ClassES5Emitter<'a> {
     
     fn emit_parameters(&mut self, params: &NodeList) -> ParamTransformPlan {
         let mut plan = ParamTransformPlan {
-            destructures: Vec::new(),
+            params: Vec::new(),
             rest: None,
         };
         let mut first = true;
@@ -1182,18 +1183,47 @@ impl<'a> ClassES5Emitter<'a> {
             if self.is_binding_pattern(param_data.name) {
                 let temp_name = self.get_temp_var_name();
                 self.write(&temp_name);
-                plan.destructures.push(ParamDestructure {
-                    temp_name,
-                    pattern: param_data.name,
+                plan.params.push(ParamTransform {
+                    name: temp_name,
+                    pattern: Some(param_data.name),
+                    initializer: if param_data.initializer.is_none() {
+                        None
+                    } else {
+                        Some(param_data.initializer)
+                    },
                 });
             } else {
                 self.emit_binding_name(param_data.name);
+                if !param_data.initializer.is_none() {
+                    let name = self.get_identifier_text(param_data.name);
+                    if !name.is_empty() {
+                        plan.params.push(ParamTransform {
+                            name,
+                            pattern: None,
+                            initializer: Some(param_data.initializer),
+                        });
+                    }
+                }
             }
         }
         plan
     }
 
     fn emit_param_destructuring_prologue(&mut self, transforms: &ParamTransformPlan) {
+        for param in &transforms.params {
+            if let Some(initializer) = param.initializer {
+                self.emit_param_default_assignment(&param.name, initializer);
+            }
+            if let Some(pattern) = param.pattern {
+                let mut started = false;
+                self.emit_param_binding_assignments(pattern, &param.name, &mut started);
+                if started {
+                    self.write(";");
+                    self.write_line();
+                }
+            }
+        }
+
         if let Some(rest) = &transforms.rest {
             if !rest.name.is_empty() {
                 self.write_indent();
@@ -1223,22 +1253,31 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write("];");
                 self.write_line();
             }
-        }
 
-        let mut started = false;
-        for destructure in &transforms.destructures {
-            self.emit_param_binding_assignments(destructure.pattern, &destructure.temp_name, &mut started);
-        }
-        if let Some(rest) = &transforms.rest {
             if let Some(pattern) = rest.pattern {
+                let mut started = false;
                 self.emit_param_binding_assignments(pattern, &rest.name, &mut started);
+                if started {
+                    self.write(";");
+                    self.write_line();
+                }
             }
         }
+    }
 
-        if started {
-            self.write(";");
-            self.write_line();
+    fn emit_param_default_assignment(&mut self, name: &str, initializer: NodeIndex) {
+        if name.is_empty() {
+            return;
         }
+        self.write_indent();
+        self.write("if (");
+        self.write(name);
+        self.write(" === void 0) { ");
+        self.write(name);
+        self.write(" = ");
+        self.emit_expression(initializer);
+        self.write("; }");
+        self.write_line();
     }
 
     fn emit_param_binding_assignments(
@@ -1303,11 +1342,28 @@ impl<'a> ClassES5Emitter<'a> {
         }
 
         self.emit_param_assignment_prefix(started);
-        self.write(&binding_name);
-        self.write(" = ");
-        self.write(temp_name);
-        self.write(".");
-        self.write(&prop_name);
+        if !elem.initializer.is_none() {
+            let value_name = self.get_temp_var_name();
+            self.write(&value_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write(".");
+            self.write(&prop_name);
+            self.write(", ");
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(&value_name);
+            self.write(" === void 0 ? ");
+            self.emit_expression(elem.initializer);
+            self.write(" : ");
+            self.write(&value_name);
+        } else {
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write(".");
+            self.write(&prop_name);
+        }
     }
 
     fn emit_param_array_binding_element(
@@ -1334,12 +1390,30 @@ impl<'a> ClassES5Emitter<'a> {
         }
 
         self.emit_param_assignment_prefix(started);
-        self.write(&binding_name);
-        self.write(" = ");
-        self.write(temp_name);
-        self.write("[");
-        self.write(&index.to_string());
-        self.write("]");
+        if !elem.initializer.is_none() {
+            let value_name = self.get_temp_var_name();
+            self.write(&value_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write("[");
+            self.write(&index.to_string());
+            self.write("]");
+            self.write(", ");
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(&value_name);
+            self.write(" === void 0 ? ");
+            self.emit_expression(elem.initializer);
+            self.write(" : ");
+            self.write(&value_name);
+        } else {
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write("[");
+            self.write(&index.to_string());
+            self.write("]");
+        }
     }
 
     fn emit_param_object_rest_element(
