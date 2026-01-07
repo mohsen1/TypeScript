@@ -429,6 +429,22 @@ fn test_lower_readonly_type_operator() {
 }
 
 #[test]
+fn test_lower_array_type_reference() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = Array<string>;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Array(element) => {
+            assert_eq!(element, TypeId::STRING);
+        }
+        _ => panic!("Expected array type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_conditional_type_with_infer() {
     let (arena, type_idx) =
         parse_type_alias_type_node("type T = string extends infer R ? string : never;");

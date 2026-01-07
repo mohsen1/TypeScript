@@ -1827,6 +1827,19 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_type_ref(node) {
+            if let Some(name_node) = self.arena.get(data.type_name) {
+                if let Some(ident) = self.arena.get_identifier(name_node) {
+                    if ident.escaped_text == "Array" {
+                        let elem_type = data.type_arguments
+                            .as_ref()
+                            .and_then(|args| args.nodes.first().copied())
+                            .map(|idx| self.lower_type(idx))
+                            .unwrap_or(TypeId::ANY);
+                        return self.interner.array(elem_type);
+                    }
+                }
+            }
+
             // For now, just lower the type name as an identifier
             let base_type = self.lower_type(data.type_name);
             if let Some(args) = &data.type_arguments {

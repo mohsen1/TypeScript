@@ -386,9 +386,12 @@ impl<'a> ThinCheckerState<'a> {
                     "bigint" => return TypeId::BIGINT,
                     "symbol" => return TypeId::SYMBOL,
                     "Array" => {
-                        // Array<T> - get type argument
-                        // TODO: Handle generic Array type
-                        return self.ctx.types.array(TypeId::ANY);
+                        let elem_type = type_ref.type_arguments
+                            .as_ref()
+                            .and_then(|args| args.nodes.first().copied())
+                            .map(|idx| self.get_type_from_type_node(idx))
+                            .unwrap_or(TypeId::ANY);
+                        return self.ctx.types.array(elem_type);
                     }
                     name => {
                         // Look up user-defined types from symbol table
