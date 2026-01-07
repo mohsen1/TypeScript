@@ -858,6 +858,7 @@ impl ThinBinderState {
             // Property access / element access
             k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
                 || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
+                self.record_flow(idx);
                 if let Some(access) = arena.get_access_expr(node) {
                     self.bind_node(arena, access.expression);
                     self.bind_node(arena, access.name_or_argument);

@@ -5122,6 +5122,86 @@ x;
 }
 
 #[test]
+fn test_flow_narrowing_applies_for_namespace_alias_member() {
+    use crate::thin_parser::ThinParserState;
+    use crate::parser::syntax_kind_ext;
+
+    let source = r#"
+namespace Ns {
+    export let value: string | number;
+}
+import Alias = Ns;
+if (typeof Alias.value === "string") {
+    Alias.value;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    let if_idx = source_file.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::IF_STATEMENT))
+        .expect("if statement");
+    let if_node = arena.get(if_idx).expect("if node");
+    let if_data = arena.get_if_statement(if_node).expect("if data");
+
+    let then_node = arena.get(if_data.then_statement).expect("then node");
+    let block = arena.get_block(then_node).expect("then block");
+    let expr_stmt_idx = block.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::EXPRESSION_STATEMENT))
+        .expect("expression statement");
+    let expr_stmt = arena.get_expression_statement(arena.get(expr_stmt_idx).expect("expr node"))
+        .expect("expression data");
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let narrowed = checker.get_type_of_node(expr_stmt.expression);
+    assert_eq!(narrowed, TypeId::STRING);
+}
+
+#[test]
+fn test_flow_narrowing_cleared_by_namespace_member_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Ns {
+    export let value: string | number;
+}
+import Alias = Ns;
+if (typeof Alias.value === "string") {
+    Ns.value = 1;
+    Alias.value.toUpperCase();
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2339),
+        "Expected error 2339 after namespace member assignment clears narrowing, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_parameter_identifier_type_from_symbol_cache() {
     use crate::thin_parser::ThinParserState;
     use crate::parser::syntax_kind_ext;

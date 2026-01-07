@@ -120,6 +120,9 @@ Status: Active
   - Avoid applying false-condition narrowing after loop exits that can break early.
   - Add focused tests for while/for loop exit behavior.
   - Add focused test for do-while loop exit behavior.
+- [x] Resolve namespace alias members in flow narrowing/clearing
+  - Allow `typeof Alias.value` to narrow namespace members in true branches.
+  - Clear narrowings when namespace members are reassigned via aliases.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
