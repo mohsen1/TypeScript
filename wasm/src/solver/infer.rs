@@ -748,6 +748,44 @@ impl<'a> InferenceContext<'a> {
         }
     }
 
+    fn is_subtype_with_method_variance(
+        &self,
+        source: TypeId,
+        target: TypeId,
+        allow_bivariant: bool,
+    ) -> bool {
+        if !allow_bivariant {
+            return self.is_subtype(source, target);
+        }
+
+        let source_key = self.interner.lookup(source);
+        let target_key = self.interner.lookup(target);
+
+        match (source_key.as_ref(), target_key.as_ref()) {
+            (Some(TypeKey::Function(s_fn)), Some(TypeKey::Function(t_fn))) => {
+                return self.function_like_subtype_of_with_variance(
+                    &s_fn.params,
+                    s_fn.return_type,
+                    &t_fn.params,
+                    t_fn.return_type,
+                    true,
+                );
+            }
+            (Some(TypeKey::Callable(s_callable)), Some(TypeKey::Callable(t_callable))) => {
+                return self.callable_subtype_of_with_variance(s_callable, t_callable, true);
+            }
+            (Some(TypeKey::Function(s_fn)), Some(TypeKey::Callable(t_callable))) => {
+                return self.function_subtype_callable_with_variance(s_fn, t_callable, true);
+            }
+            (Some(TypeKey::Callable(s_callable)), Some(TypeKey::Function(t_fn))) => {
+                return self.callable_subtype_function_with_variance(s_callable, t_fn, true);
+            }
+            _ => {}
+        }
+
+        self.is_subtype(source, target)
+    }
+
     fn object_subtype_of(&self, source: &[PropertyInfo], target: &[PropertyInfo]) -> bool {
         for t_prop in target {
             let s_prop = source.iter().find(|p| p.name == t_prop.name);
@@ -756,9 +794,16 @@ impl<'a> InferenceContext<'a> {
                     if sp.optional && !t_prop.optional {
                         return false;
                     }
+                    if sp.readonly && !t_prop.readonly {
+                        return false;
+                    }
                     let source_type = self.optional_property_type(sp);
                     let target_type = self.optional_property_type(t_prop);
-                    if !self.is_subtype(source_type, target_type) {
+                    if !self.is_subtype_with_method_variance(
+                        source_type,
+                        target_type,
+                        t_prop.is_method,
+                    ) {
                         return false;
                     }
                 }
@@ -786,6 +831,9 @@ impl<'a> InferenceContext<'a> {
 
         if let Some(t_string_idx) = &target.string_index {
             if let Some(s_string_idx) = &source.string_index {
+                if s_string_idx.readonly && !t_string_idx.readonly {
+                    return false;
+                }
                 if !self.is_subtype(s_string_idx.value_type, t_string_idx.value_type) {
                     return false;
                 }
@@ -795,6 +843,9 @@ impl<'a> InferenceContext<'a> {
         if let Some(t_number_idx) = &target.number_index {
             match &source.number_index {
                 Some(s_number_idx) => {
+                    if s_number_idx.readonly && !t_number_idx.readonly {
+                        return false;
+                    }
                     if !self.is_subtype(s_number_idx.value_type, t_number_idx.value_type) {
                         return false;
                     }
@@ -828,14 +879,20 @@ impl<'a> InferenceContext<'a> {
             let prop_type = self.optional_property_type(prop);
 
             if let Some(number_idx) = number_index {
-                if self.is_numeric_property_name(prop.name)
-                    && !self.is_subtype(prop_type, number_idx.value_type)
-                {
-                    return false;
+                if self.is_numeric_property_name(prop.name) {
+                    if !number_idx.readonly && prop.readonly {
+                        return false;
+                    }
+                    if !self.is_subtype(prop_type, number_idx.value_type) {
+                        return false;
+                    }
                 }
             }
 
             if let Some(string_idx) = string_index {
+                if !string_idx.readonly && prop.readonly {
+                    return false;
+                }
                 if !self.is_subtype(prop_type, string_idx.value_type) {
                     return false;
                 }
@@ -855,8 +912,12 @@ impl<'a> InferenceContext<'a> {
         }
     }
 
-    fn are_parameters_compatible(&self, source: TypeId, target: TypeId) -> bool {
-        self.is_subtype(target, source)
+    fn are_parameters_compatible(&self, source: TypeId, target: TypeId, bivariant: bool) -> bool {
+        if bivariant {
+            self.is_subtype(target, source) || self.is_subtype(source, target)
+        } else {
+            self.is_subtype(target, source)
+        }
     }
 
     fn is_numeric_property_name(&self, name: Atom) -> bool {
@@ -928,6 +989,23 @@ impl<'a> InferenceContext<'a> {
         target_params: &[ParamInfo],
         target_return: TypeId,
     ) -> bool {
+        self.function_like_subtype_of_with_variance(
+            source_params,
+            source_return,
+            target_params,
+            target_return,
+            false,
+        )
+    }
+
+    fn function_like_subtype_of_with_variance(
+        &self,
+        source_params: &[ParamInfo],
+        source_return: TypeId,
+        target_params: &[ParamInfo],
+        target_return: TypeId,
+        bivariant: bool,
+    ) -> bool {
         if !self.is_subtype(source_return, target_return) {
             return false;
         }
@@ -953,7 +1031,7 @@ impl<'a> InferenceContext<'a> {
         for i in 0..fixed_compare {
             let s_param = &source_params[i];
             let t_param = &target_params[i];
-            if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
+            if !self.are_parameters_compatible(s_param.type_id, t_param.type_id, bivariant) {
                 return false;
             }
         }
@@ -964,7 +1042,7 @@ impl<'a> InferenceContext<'a> {
 
             for i in target_fixed..source_fixed {
                 let s_param = &source_params[i];
-                if !self.are_parameters_compatible(s_param.type_id, rest_elem) {
+                if !self.are_parameters_compatible(s_param.type_id, rest_elem, bivariant) {
                     return false;
                 }
             }
@@ -972,7 +1050,7 @@ impl<'a> InferenceContext<'a> {
             if source_has_rest {
                 let s_rest = source_params.last().unwrap();
                 let s_rest_elem = self.rest_element_type(s_rest.type_id);
-                if !self.are_parameters_compatible(s_rest_elem, rest_elem) {
+                if !self.are_parameters_compatible(s_rest_elem, rest_elem, bivariant) {
                     return false;
                 }
             }
@@ -994,20 +1072,35 @@ impl<'a> InferenceContext<'a> {
         )
     }
 
-    fn call_signature_subtype_of(&self, source: &CallSignature, target: &CallSignature) -> bool {
-        self.function_like_subtype_of(
+    fn call_signature_subtype_of(
+        &self,
+        source: &CallSignature,
+        target: &CallSignature,
+        bivariant: bool,
+    ) -> bool {
+        self.function_like_subtype_of_with_variance(
             &source.params,
             source.return_type,
             &target.params,
             target.return_type,
+            bivariant,
         )
     }
 
     fn callable_subtype_of(&self, source: &CallableShape, target: &CallableShape) -> bool {
+        self.callable_subtype_of_with_variance(source, target, false)
+    }
+
+    fn callable_subtype_of_with_variance(
+        &self,
+        source: &CallableShape,
+        target: &CallableShape,
+        bivariant: bool,
+    ) -> bool {
         for t_sig in &target.call_signatures {
             let mut found = false;
             for s_sig in &source.call_signatures {
-                if self.call_signature_subtype_of(s_sig, t_sig) {
+                if self.call_signature_subtype_of(s_sig, t_sig, bivariant) {
                     found = true;
                     break;
                 }
@@ -1020,7 +1113,7 @@ impl<'a> InferenceContext<'a> {
         for t_sig in &target.construct_signatures {
             let mut found = false;
             for s_sig in &source.construct_signatures {
-                if self.call_signature_subtype_of(s_sig, t_sig) {
+                if self.call_signature_subtype_of(s_sig, t_sig, bivariant) {
                     found = true;
                     break;
                 }
@@ -1034,12 +1127,22 @@ impl<'a> InferenceContext<'a> {
     }
 
     fn function_subtype_callable(&self, source: &FunctionShape, target: &CallableShape) -> bool {
+        self.function_subtype_callable_with_variance(source, target, false)
+    }
+
+    fn function_subtype_callable_with_variance(
+        &self,
+        source: &FunctionShape,
+        target: &CallableShape,
+        bivariant: bool,
+    ) -> bool {
         for t_sig in &target.call_signatures {
-            if !self.function_like_subtype_of(
+            if !self.function_like_subtype_of_with_variance(
                 &source.params,
                 source.return_type,
                 &t_sig.params,
                 t_sig.return_type,
+                bivariant,
             ) {
                 return false;
             }
@@ -1048,12 +1151,22 @@ impl<'a> InferenceContext<'a> {
     }
 
     fn callable_subtype_function(&self, source: &CallableShape, target: &FunctionShape) -> bool {
+        self.callable_subtype_function_with_variance(source, target, false)
+    }
+
+    fn callable_subtype_function_with_variance(
+        &self,
+        source: &CallableShape,
+        target: &FunctionShape,
+        bivariant: bool,
+    ) -> bool {
         for s_sig in &source.call_signatures {
-            if self.function_like_subtype_of(
+            if self.function_like_subtype_of_with_variance(
                 &s_sig.params,
                 s_sig.return_type,
                 &target.params,
                 target.return_type,
+                bivariant,
             ) {
                 return true;
             }
