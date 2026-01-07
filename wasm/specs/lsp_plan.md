@@ -45,6 +45,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Extract variable: avoid name collisions in scope
    - [x] Extract variable: avoid cross-scope extractions
    - [x] Extract variable: parenthesize comma expressions
+   - [x] Extract variable: block TDZ declarations after insertion
 
 2. **Extend AST Coverage** (if needed)
    - [x] Traverse template expressions in LSP resolver for references/completions
