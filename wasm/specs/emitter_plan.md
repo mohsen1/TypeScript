@@ -9,7 +9,7 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 ## Current Status
 - LoweringPass -> TransformDirective -> ThinPrinter pipeline exists.
 - ES5/ESNext transforms largely implemented.
-- Remaining TODOs: call/construct signature type parameters, class heritage plumbing, lingering inline ES5 paths.
+- Remaining TODOs: class heritage plumbing, lingering inline ES5 paths.
 
 ## Highest-Impact Next Tasks
 - [ ] Finish transform-only pipeline
@@ -18,7 +18,7 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 - [ ] Plumb class heritage in LoweringPass
   - Fill `TransformDirective::ES5Class.heritage` or drop unused field.
   - Add regression tests for `extends` + private fields + helper injection.
-- [ ] Emit type parameters for call/construct signatures
+- [x] Emit type parameters for call/construct signatures
   - Implement in `emit_call_signature` and `emit_construct_signature`.
   - Add `.d.ts` tests for generic interface signatures.
 - [ ] Validate module wrapper + export transforms

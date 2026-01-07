@@ -73,6 +73,16 @@ fn test_interface_with_methods() {
 }
 
 #[test]
+fn test_interface_generic_call_construct_signatures() {
+    let source = "export interface Factory { <T>(value: T): T; new <T>(value: T): Factory<T>; }";
+    let output = emit_declaration(source);
+    assert!(output.contains("interface Factory"), "Should contain interface Factory: {}", output);
+    assert!(output.contains("<T>("), "Should contain generic call signature: {}", output);
+    assert!(output.contains("new <T>("), "Should contain generic construct signature: {}", output);
+    assert!(output.contains("Factory<T>"), "Should contain Factory<T> return type: {}", output);
+}
+
+#[test]
 fn test_generic_interface() {
     let output = emit_declaration("export interface Container<T> { value: T; }");
     assert!(output.contains("interface Container"), "Should contain interface Container: {}", output);

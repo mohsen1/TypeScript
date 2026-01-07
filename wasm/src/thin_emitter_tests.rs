@@ -5,6 +5,7 @@ use crate::thin_emitter::ThinPrinter;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
 use crate::solver::TypeInterner;
+use crate::parser::syntax_kind_ext;
 
 #[test]
 fn test_thin_printer_creation() {
@@ -980,6 +981,78 @@ fn test_thin_emit_construct_signature() {
     let output = printer.get_output();
     // For JavaScript emit, interface should NOT be in output
     assert!(!output.contains("interface"), "JavaScript output should NOT contain 'interface': {}", output);
+}
+
+#[test]
+fn test_thin_emit_generic_call_construct_signatures() {
+    let source = "interface Factory { <T>(value: T): T; new <T>(value: T): Factory<T>; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = &parser.arena;
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    let mut call_sig = None;
+    let mut construct_sig = None;
+
+    for &stmt_idx in &source_file.statements.nodes {
+        let Some(stmt_node) = arena.get(stmt_idx) else {
+            continue;
+        };
+        if stmt_node.kind != syntax_kind_ext::INTERFACE_DECLARATION {
+            continue;
+        }
+        let iface = arena.get_interface(stmt_node).expect("expected interface data");
+        for &member_idx in &iface.members.nodes {
+            let Some(member_node) = arena.get(member_idx) else {
+                continue;
+            };
+            if member_node.kind == syntax_kind_ext::CALL_SIGNATURE {
+                call_sig = Some(member_idx);
+            } else if member_node.kind == syntax_kind_ext::CONSTRUCT_SIGNATURE {
+                construct_sig = Some(member_idx);
+            }
+        }
+    }
+
+    let call_sig = call_sig.expect("expected call signature");
+    let construct_sig = construct_sig.expect("expected construct signature");
+
+    let mut printer = ThinPrinter::new(arena);
+    printer.emit(call_sig);
+    let output = printer.get_output();
+    assert!(
+        output.contains("<T>("),
+        "Expected call signature type params in output: {}",
+        output
+    );
+    assert!(
+        output.contains("value: T"),
+        "Expected call signature parameter types in output: {}",
+        output
+    );
+    assert!(
+        output.contains("): T"),
+        "Expected call signature return type in output: {}",
+        output
+    );
+
+    let mut printer = ThinPrinter::new(arena);
+    printer.emit(construct_sig);
+    let output = printer.get_output();
+    assert!(
+        output.contains("new <T>("),
+        "Expected construct signature type params in output: {}",
+        output
+    );
+    assert!(
+        output.contains("Factory<T>"),
+        "Expected construct signature return type in output: {}",
+        output
+    );
 }
 
 #[test]

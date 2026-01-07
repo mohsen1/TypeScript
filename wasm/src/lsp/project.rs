@@ -22,6 +22,7 @@ use crate::thin_binder::ThinBinderState;
 use crate::thin_parser::ThinParserState;
 use crate::lsp::definition::GoToDefinition;
 use crate::lsp::references::FindReferences;
+use crate::lsp::rename::TextEdit;
 use crate::lsp::position::{LineMap, Position, Location, Range};
 
 enum ImportKind {
@@ -475,6 +476,27 @@ impl ProjectFile {
     }
 }
 
+fn apply_text_edits(source: &str, line_map: &LineMap, edits: &[TextEdit]) -> Option<String> {
+    let mut edits_with_offsets = Vec::with_capacity(edits.len());
+    for edit in edits {
+        let start = line_map.position_to_offset(edit.range.start, source)? as usize;
+        let end = line_map.position_to_offset(edit.range.end, source)? as usize;
+        if start > end || end > source.len() {
+            return None;
+        }
+        edits_with_offsets.push((start, end, edit));
+    }
+
+    edits_with_offsets.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
+
+    let mut result = source.to_string();
+    for (start, end, edit) in edits_with_offsets {
+        result.replace_range(start..end, &edit.new_text);
+    }
+
+    Some(result)
+}
+
 /// Multi-file container for LSP operations.
 pub struct Project {
     files: FxHashMap<String, ProjectFile>,
@@ -497,6 +519,29 @@ impl Project {
     pub fn set_file(&mut self, file_name: String, source_text: String) {
         let file = ProjectFile::new(file_name.clone(), source_text);
         self.files.insert(file_name, file);
+    }
+
+    /// Update an existing file by applying incremental text edits.
+    pub fn update_file(&mut self, file_name: &str, edits: &[TextEdit]) -> Option<()> {
+        if edits.is_empty() {
+            return Some(());
+        }
+
+        let (updated_source, unchanged) = {
+            let file = self.files.get(file_name)?;
+            let source = file.source_text();
+            let updated = apply_text_edits(source, file.line_map(), edits)?;
+            let unchanged = updated == source;
+            (updated, unchanged)
+        };
+
+        if unchanged {
+            return Some(());
+        }
+
+        let file = ProjectFile::new(file_name.to_string(), updated_source);
+        self.files.insert(file_name.to_string(), file);
+        Some(())
     }
 
     /// Remove a file from the project.
