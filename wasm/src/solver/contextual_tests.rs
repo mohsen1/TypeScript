@@ -91,6 +91,33 @@ fn test_contextual_function_return() {
 }
 
 #[test]
+fn test_contextual_callable_signature() {
+    let interner = TypeInterner::new();
+
+    let call_sig = CallSignature {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
+        ],
+        this_type: Some(TypeId::BOOLEAN),
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+    };
+
+    let callable = interner.callable(CallableShape {
+        call_signatures: vec![call_sig],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+
+    let ctx = ContextualTypeContext::with_expected(&interner, callable);
+
+    assert_eq!(ctx.get_parameter_type(0), Some(TypeId::STRING));
+    assert_eq!(ctx.get_return_type(), Some(TypeId::NUMBER));
+    assert_eq!(ctx.get_this_type(), Some(TypeId::BOOLEAN));
+}
+
+#[test]
 fn test_contextual_function_rest_parameter() {
     let interner = TypeInterner::new();
 

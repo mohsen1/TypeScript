@@ -567,6 +567,7 @@ fn test_resolve_bounds_with_assignability_bivariant_function_property() {
     let lower_fn = interner.function(FunctionShape {
         type_params: Vec::new(),
         params: vec![narrow_param],
+        this_type: None,
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
@@ -574,6 +575,7 @@ fn test_resolve_bounds_with_assignability_bivariant_function_property() {
     let upper_fn = interner.function(FunctionShape {
         type_params: Vec::new(),
         params: vec![wide_param],
+        this_type: None,
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,

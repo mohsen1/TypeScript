@@ -129,6 +129,11 @@ impl<'a> ContextualTypeContext<'a> {
 
         match key {
             TypeKey::Function(shape) => Some(shape.return_type),
+            TypeKey::Callable(shape) => {
+                // Use the first call signature for contextual typing
+                // TODO: Support overload selection based on argument count if available
+                shape.call_signatures.first().map(|sig| sig.return_type)
+            }
             TypeKey::Union(members) => {
                 let return_types: Vec<TypeId> = members.iter()
                     .filter_map(|&m| {
