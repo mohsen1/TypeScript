@@ -1275,6 +1275,46 @@ impl<'a> ThinCheckerState<'a> {
                         entry.setter = Some(setter_type);
                     }
                 }
+                k if k == syntax_kind_ext::CONSTRUCTOR => {
+                    let Some(ctor) = self.ctx.arena.get_constructor(member_node) else {
+                        continue;
+                    };
+                    if ctor.body.is_none() {
+                        continue;
+                    }
+                    for &param_idx in &ctor.parameters.nodes {
+                        let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                            continue;
+                        };
+                        let Some(param) = self.ctx.arena.get_parameter(param_node) else {
+                            continue;
+                        };
+                        if !self.has_parameter_property_modifier(&param.modifiers) {
+                            continue;
+                        }
+                        let Some(name) = self.get_property_name(param.name) else {
+                            continue;
+                        };
+                        let name_atom = self.ctx.types.intern_string(&name);
+                        if properties.contains_key(&name_atom) {
+                            continue;
+                        }
+                        let type_id = if !param.type_annotation.is_none() {
+                            self.get_type_from_type_node(param.type_annotation)
+                        } else if !param.initializer.is_none() {
+                            self.get_type_of_node(param.initializer)
+                        } else {
+                            TypeId::ANY
+                        };
+                        properties.insert(name_atom, PropertyInfo {
+                            name: name_atom,
+                            type_id,
+                            optional: param.question_token,
+                            readonly: self.has_readonly_modifier(&param.modifiers),
+                            is_method: false,
+                        });
+                    }
+                }
                 _ => {}
             }
         }
@@ -4457,6 +4497,25 @@ impl<'a> ThinCheckerState<'a> {
             for &mod_idx in &mods.nodes {
                 if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
                     if mod_node.kind == SyntaxKind::ReadonlyKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if modifiers include a parameter property keyword.
+    fn has_parameter_property_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::PublicKeyword as u16
+                        || mod_node.kind == SyntaxKind::PrivateKeyword as u16
+                        || mod_node.kind == SyntaxKind::ProtectedKeyword as u16
+                        || mod_node.kind == SyntaxKind::ReadonlyKeyword as u16
+                    {
                         return true;
                     }
                 }
