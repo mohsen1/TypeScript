@@ -149,6 +149,9 @@ Status: Active
   - Use numeric literal keys (e.g. `idx: 0`) to narrow `arr[idx]`.
   - Clear narrowing when computed numeric element assignments occur.
   - Risk: numeric keys are stringified for flow matching and may differ from JS `ToString` for exotic literals.
+- [x] Infer const literal key types for computed element access
+  - Treat `const key = "prop"` / `const idx = 0` as literal key types in flow narrowing.
+  - Risk: literal inference only covers simple literal initializers (no const context propagation).
 
 ## Baseline / Validation
 - `./wasm/test.sh`

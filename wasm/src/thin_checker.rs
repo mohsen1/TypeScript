@@ -2927,6 +2927,15 @@ impl<'a> ThinCheckerState<'a> {
                         if !var_decl.type_annotation.is_none() {
                             return self.get_type_from_type_node(var_decl.type_annotation);
                         }
+                        if !var_decl.initializer.is_none()
+                            && self.is_const_variable_declaration(value_decl)
+                        {
+                            if let Some(literal_type) =
+                                self.literal_type_from_initializer(var_decl.initializer)
+                            {
+                                return literal_type;
+                            }
+                        }
                         // Fall back to inferring from initializer
                         if !var_decl.initializer.is_none() {
                             return self.get_type_of_node(var_decl.initializer);
@@ -2957,6 +2966,68 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         TypeId::ANY
+    }
+
+    fn is_const_variable_declaration(&self, var_decl_idx: NodeIndex) -> bool {
+        use crate::parser::node_flags;
+
+        let Some(ext) = self.ctx.arena.get_extended(var_decl_idx) else {
+            return false;
+        };
+        let parent_idx = ext.parent;
+        if parent_idx.is_none() {
+            return false;
+        }
+        let Some(parent_node) = self.ctx.arena.get(parent_idx) else {
+            return false;
+        };
+        if parent_node.kind != syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+            return false;
+        }
+        (parent_node.flags as u32) & node_flags::CONST != 0
+    }
+
+    fn literal_type_from_initializer(&self, idx: NodeIndex) -> Option<TypeId> {
+        use crate::scanner::SyntaxKind;
+
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return None;
+        };
+
+        match node.kind {
+            k if k == SyntaxKind::StringLiteral as u16
+                || k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 =>
+            {
+                let lit = self.ctx.arena.get_literal(node)?;
+                Some(self.ctx.types.literal_string(&lit.text))
+            }
+            k if k == SyntaxKind::NumericLiteral as u16 => {
+                let lit = self.ctx.arena.get_literal(node)?;
+                lit.value.map(|value| self.ctx.types.literal_number(value))
+            }
+            k if k == SyntaxKind::TrueKeyword as u16 => Some(self.ctx.types.literal_boolean(true)),
+            k if k == SyntaxKind::FalseKeyword as u16 => Some(self.ctx.types.literal_boolean(false)),
+            k if k == SyntaxKind::NullKeyword as u16 => Some(TypeId::NULL),
+            k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION => {
+                let unary = self.ctx.arena.get_unary_expr(node)?;
+                let op = unary.operator;
+                if op != SyntaxKind::MinusToken as u16 && op != SyntaxKind::PlusToken as u16 {
+                    return None;
+                }
+                let operand = unary.operand;
+                let Some(operand_node) = self.ctx.arena.get(operand) else {
+                    return None;
+                };
+                if operand_node.kind != SyntaxKind::NumericLiteral as u16 {
+                    return None;
+                }
+                let lit = self.ctx.arena.get_literal(operand_node)?;
+                let value = lit.value?;
+                let value = if op == SyntaxKind::MinusToken as u16 { -value } else { value };
+                Some(self.ctx.types.literal_number(value))
+            }
+            _ => None,
+        }
     }
 
     /// Get type of binary expression.
@@ -5585,6 +5656,13 @@ impl<'a> ThinCheckerState<'a> {
                     declared_type
                 } else {
                     // No type annotation - use inferred type from initializer
+                    if checker.is_const_variable_declaration(decl_idx) {
+                        if let Some(literal_type) =
+                            checker.literal_type_from_initializer(var_decl.initializer)
+                        {
+                            return literal_type;
+                        }
+                    }
                     init_type
                 }
             } else {
