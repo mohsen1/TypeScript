@@ -72,6 +72,7 @@ impl<'a> ScopeWalker<'a> {
                 || k == syntax_kind_ext::CONSTRUCTOR
                 || k == syntax_kind_ext::GET_ACCESSOR
                 || k == syntax_kind_ext::SET_ACCESSOR
+                || k == syntax_kind_ext::CLASS_STATIC_BLOCK_DECLARATION
                 || k == syntax_kind_ext::FOR_STATEMENT
                 || k == syntax_kind_ext::FOR_IN_STATEMENT
                 || k == syntax_kind_ext::FOR_OF_STATEMENT
@@ -118,6 +119,13 @@ impl<'a> ScopeWalker<'a> {
                 }
             }
             k if k == syntax_kind_ext::BLOCK => {
+                if let Some(block) = self.arena.get_block(node) {
+                    for &stmt in &block.statements.nodes {
+                        if let Some(res) = f(self, stmt) { return Some(res); }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::CLASS_STATIC_BLOCK_DECLARATION => {
                 if let Some(block) = self.arena.get_block(node) {
                     for &stmt in &block.statements.nodes {
                         if let Some(res) = f(self, stmt) { return Some(res); }

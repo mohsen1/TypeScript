@@ -594,7 +594,8 @@ impl ThinBinderState {
 
             // Await/yield expressions
             k if k == syntax_kind_ext::AWAIT_EXPRESSION
-                || k == syntax_kind_ext::YIELD_EXPRESSION => {
+                || k == syntax_kind_ext::YIELD_EXPRESSION
+                || k == syntax_kind_ext::NON_NULL_EXPRESSION => {
                 if node.has_data() {
                     if let Some(unary) = arena.unary_exprs_ex.get(node.data_index as usize) {
                         self.bind_node(arena, unary.expression);
@@ -1286,6 +1287,15 @@ impl ThinBinderState {
                     self.declare_symbol("constructor", symbol_flags::CONSTRUCTOR, idx, false);
                     if let Some(ctor) = arena.get_constructor(node) {
                         self.bind_callable_body(arena, &ctor.parameters, ctor.body, idx);
+                    }
+                }
+                k if k == syntax_kind_ext::CLASS_STATIC_BLOCK_DECLARATION => {
+                    if let Some(block) = arena.get_block(node) {
+                        self.enter_scope(ContainerKind::Block, idx);
+                        for &stmt_idx in &block.statements.nodes {
+                            self.bind_node(arena, stmt_idx);
+                        }
+                        self.exit_scope();
                     }
                 }
                 _ => {}

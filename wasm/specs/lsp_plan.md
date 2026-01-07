@@ -62,6 +62,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Bind class expressions in initializers for local resolution
    - [x] Find references for class names in class scopes/expressions
    - [x] Bind nested function/class expressions inside complex initializers
+   - [x] Bind class static blocks for local resolution
    - [x] Add import/export handling for cross-file navigation
 
 3. **Multi-File Support**
@@ -75,7 +76,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
 #### Testing
 
 Latest run:
-- `./wasm/test.sh` ❌ (build errors: missing `this_type` in `src/solver/infer_tests.rs`; pre-existing on rust)
+- `./wasm/test.sh` ❌ (`src/emitter_parity_tests.rs` `test_parity_commonjs_export`; pre-existing on rust)
 
 ## Quick Reference
 
