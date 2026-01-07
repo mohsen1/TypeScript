@@ -54,6 +54,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Tuple indexing now unions optional elements with undefined.
 - [x] Resolve tuple rest index element types
   - Tuple indexing now returns rest element types instead of rest containers.
+- [x] Expand keyof for tuples with rest tuples
+  - Tuple keyof now includes indices from rest tuple expansions.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.

@@ -509,6 +509,39 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         keys
     }
 
+    fn append_tuple_indices(
+        &self,
+        elements: &[TupleElement],
+        base: usize,
+        out: &mut Vec<TypeId>,
+    ) -> Option<usize> {
+        let mut index = base;
+
+        for element in elements {
+            if element.rest {
+                match self.interner.lookup(element.type_id) {
+                    Some(TypeKey::Tuple(rest_elements)) => {
+                        let rest_elements = self.interner.tuple_list(rest_elements);
+                        match self.append_tuple_indices(&rest_elements, index, out) {
+                            Some(next) => {
+                                index = next;
+                                continue;
+                            }
+                            None => return None,
+                        }
+                    }
+                    Some(TypeKey::Array(_)) => return None,
+                    _ => return None,
+                }
+            } else {
+                out.push(self.interner.literal_string(&index.to_string()));
+                index += 1;
+            }
+        }
+
+        Some(index)
+    }
+
     fn intersect_keyof_sets(&self, key_sets: &[TypeId]) -> Option<TypeId> {
         let mut parsed_sets = Vec::with_capacity(key_sets.len());
         for &key_set in key_sets {
@@ -976,9 +1009,8 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             }
             TypeKey::Tuple(elements) => {
                 let elements = self.interner.tuple_list(elements);
-                let mut key_types: Vec<TypeId> = (0..elements.len())
-                    .map(|i| self.interner.literal_string(&i.to_string()))
-                    .collect();
+                let mut key_types: Vec<TypeId> = Vec::new();
+                self.append_tuple_indices(&elements, 0, &mut key_types);
                 let mut array_keys = self.array_keyof_keys();
                 key_types.append(&mut array_keys);
                 if key_types.is_empty() {
