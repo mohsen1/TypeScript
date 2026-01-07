@@ -624,9 +624,9 @@ impl<'a> InferenceContext<'a> {
             return members.iter().all(|&member| self.is_subtype(source, member));
         }
 
-        // Check union membership
+        // Target union: S <: (A | B) if S <: A or S <: B
         if let Some(TypeKey::Union(members)) = target_key.as_ref() {
-            return members.contains(&source);
+            return members.iter().any(|&member| self.is_subtype(source, member));
         }
 
         false
