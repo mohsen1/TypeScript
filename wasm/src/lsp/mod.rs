@@ -19,6 +19,7 @@
 pub mod position;
 pub mod utils;
 pub mod resolver;
+pub mod jsdoc;
 pub mod definition;
 pub mod references;
 pub mod completions;
