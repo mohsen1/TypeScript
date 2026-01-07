@@ -70,6 +70,9 @@ Status: Active
   - Handle assignment patterns like `[x = 1] = ...` and `{ y: x = 1 } = ...`.
   - Add focused tests for default initializer and alias patterns.
   - Risk: still conservative for nested initializer side effects.
+- [x] Re-enable namespace member tests
+  - Remove stale TODO suppression.
+  - Add focused tests for missing namespace value members.
 
 ## Baseline / Validation
 - `./wasm/test.sh`

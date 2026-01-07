@@ -13,6 +13,7 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 Status: Complete
 
 ## Highest-Impact Next Tasks
+- [x] Emit minimal source maps for no-transform JS output (ThinPrinter mapping + CLI output map).
 - [ ] Shrink `thin_emitter/mod.rs` for maintainability
   - [x] Extract comment utilities + comment/output helpers into modules (keep API stable).
   - [x] Extract module wrapper emission helpers into a submodule (keep API stable).
