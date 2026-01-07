@@ -55,6 +55,22 @@ fn test_export_assignment() {
 }
 
 #[test]
+fn test_export_default_function() {
+    let source = "export default function add(a: number, b: number): number { return a + b; }";
+    let output = emit_declaration(source);
+    assert!(
+        output.contains("export default function add"),
+        "Should emit export default function: {}",
+        output
+    );
+    assert!(
+        output.contains(": number"),
+        "Should include return type: {}",
+        output
+    );
+}
+
+#[test]
 fn test_type_only_named_export_reexport() {
     let source = "export type { Foo } from './foo'; export { type Bar as Baz } from './bar';";
     let output = emit_declaration(source);
