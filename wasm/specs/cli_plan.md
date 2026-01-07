@@ -25,6 +25,7 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Type predicate parsing now accepts keyword identifiers (`symbol is Symbol`) as predicate parameters.
 - Statement parsing now treats `namespace`/`module` as expressions when not followed by a declaration name (e.g., `namespace = x`).
 - Statement parsing now treats `type` as an identifier in expression statements (e.g., `type.prop = value`).
+- Latest parse gap from bench run: `src/compiler/checker.ts:8505` (TS1005: `)` expected).
 - Latest attempt: `npm install --no-save --no-package-lock typescript @types/node`, `cargo build --release --bin tsz`, `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` → tsz failed before timing; tsc not run.
 - Bench harness update: fixed BSD `/usr/bin/time -l` parsing in `wasm/bench_cli.sh` so elapsed time is read from the `real` token.
 - Synthetic benchmark (1000-file project in `/tmp/tsz_bench_large` with minimal `globals.d.ts`): `./wasm/bench_cli.sh --repo /tmp/tsz_bench_large --tsconfig tsconfig.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` → tsz avg 0.170s best 0.170s max_rss 19.6 MiB; tsc avg 0.200s best 0.200s max_rss 141.3 MiB. Next: run on real repo once optional chaining + lib parsing land.
@@ -99,7 +100,7 @@ Tests run in this state:
 - `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` (failed: tsz diagnostics on optional chaining + lib .d.ts parsing).
 - `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` (failed again: tsz exits with diagnostics; no timings).
 - `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (failed: tsz diagnostics; parse gap in spread call arguments).
-- `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (failed: tsz diagnostics; parse gaps remain in builder/checker sources).
+- `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (failed: tsz diagnostics; first parse error at `src/compiler/checker.ts:8505` (TS1005 `)` expected)).
 - `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (failed: tsz diagnostics; remaining parse gaps now in checker.ts, starting around `WriteTypeParametersInQualifiedName` and later keyword identifier statements).
 - `./wasm/bench_cli.sh --repo /tmp/tsz_bench_large --tsconfig tsconfig.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` (tsz avg 0.170s best 0.170s max_rss 19.6 MiB; tsc avg 0.200s best 0.200s max_rss 141.3 MiB).
 - `python3 bench/generate_synth_project.py --count 1000` (generated local `bench/synth`).
