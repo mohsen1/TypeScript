@@ -348,7 +348,7 @@ impl<'a> TypeFormatter<'a> {
             related: Vec::new(),
         };
 
-        // Render related diagnostics.
+        // Render related diagnostics, falling back to the primary span.
         let fallback_span = pending.span.clone()
             .unwrap_or_else(|| SourceSpan::new("<unknown>", 0, 0));
         for related in &pending.related {
@@ -446,17 +446,39 @@ impl<'a> TypeFormatter<'a> {
         match key {
             TypeKey::Intrinsic(kind) => self.format_intrinsic(*kind),
             TypeKey::Literal(lit) => self.format_literal(lit),
-            TypeKey::Object(props) => self.format_object(props.as_slice()),
-            TypeKey::ObjectWithIndex(shape) => self.format_object_with_index(shape),
-            TypeKey::Union(members) => self.format_union(members.as_slice()),
-            TypeKey::Intersection(members) => self.format_intersection(members.as_slice()),
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(*shape_id);
+                self.format_object(shape.properties.as_slice())
+            }
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(*shape_id);
+                self.format_object_with_index(shape.as_ref())
+            }
+            TypeKey::Union(members) => {
+                let members = self.interner.type_list(*members);
+                self.format_union(members.as_ref())
+            }
+            TypeKey::Intersection(members) => {
+                let members = self.interner.type_list(*members);
+                self.format_intersection(members.as_ref())
+            }
             TypeKey::Array(elem) => format!("{}[]", self.format(*elem)),
-            TypeKey::Tuple(elements) => self.format_tuple(elements.as_slice()),
-            TypeKey::Function(shape) => self.format_function(shape),
-            TypeKey::Callable(shape) => self.format_callable(shape),
+            TypeKey::Tuple(elements) => {
+                let elements = self.interner.tuple_list(*elements);
+                self.format_tuple(elements.as_ref())
+            }
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(*shape_id);
+                self.format_function(shape.as_ref())
+            }
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(*shape_id);
+                self.format_callable(shape.as_ref())
+            }
             TypeKey::TypeParameter(info) => self.atom(info.name).to_string(),
             TypeKey::Ref(sym) => format!("Ref({})", sym.0),
             TypeKey::Application(app) => {
+                let app = self.interner.type_application(*app);
                 let args: Vec<String> = app.args.iter()
                     .map(|&arg| self.format(arg))
                     .collect();
@@ -467,7 +489,10 @@ impl<'a> TypeFormatter<'a> {
             TypeKey::IndexAccess(obj, idx) => {
                 format!("{}[{}]", self.format(*obj), self.format(*idx))
             }
-            TypeKey::TemplateLiteral(spans) => self.format_template_literal(spans.as_slice()),
+            TypeKey::TemplateLiteral(spans) => {
+                let spans = self.interner.template_list(*spans);
+                self.format_template_literal(spans.as_ref())
+            }
             TypeKey::TypeQuery(sym) => format!("typeof Ref({})", sym.0),
             TypeKey::KeyOf(operand) => format!("keyof {}", self.format(*operand)),
             TypeKey::ReadonlyType(inner) => format!("readonly {}", self.format(*inner)),
@@ -968,7 +993,7 @@ impl SubtypeFailureReason {
                     vec![(*source_type).into(), target.into()],
                 );
                 for member in target_union_members.iter().take(UNION_MEMBER_DIAGNOSTIC_LIMIT) {
-                    diag = diag.with_related(PendingDiagnostic::error(
+                    diag.related.push(PendingDiagnostic::error(
                         codes::TYPE_NOT_ASSIGNABLE,
                         vec![(*source_type).into(), (*member).into()],
                     ));

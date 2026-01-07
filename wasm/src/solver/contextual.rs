@@ -62,12 +62,17 @@ impl<'a> ContextualTypeContext<'a> {
         let key = self.interner.lookup(expected)?;
 
         match key {
-            TypeKey::Function(shape) => self.get_parameter_type_from_params(&shape.params, index),
-            TypeKey::Callable(shape) => {
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(shape_id);
+                self.get_parameter_type_from_params(&shape.params, index)
+            }
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(shape_id);
                 self.get_parameter_type_from_signatures(&shape.call_signatures, index)
             }
             // For union of function types, try to find common parameter type
             TypeKey::Union(members) => {
+                let members = self.interner.type_list(members);
                 let param_types: Vec<TypeId> = members.iter()
                     .filter_map(|&m| {
                         let ctx = ContextualTypeContext::with_expected(self.interner, m);
@@ -94,11 +99,20 @@ impl<'a> ContextualTypeContext<'a> {
         let key = self.interner.lookup(expected)?;
 
         match key {
-            TypeKey::Function(shape) => self.get_parameter_type_from_params(&shape.params, index),
-            TypeKey::Callable(shape) => {
-                self.get_parameter_type_from_signatures_for_call(&shape.call_signatures, index, arg_count)
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(shape_id);
+                self.get_parameter_type_from_params(&shape.params, index)
+            }
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(shape_id);
+                self.get_parameter_type_from_signatures_for_call(
+                    &shape.call_signatures,
+                    index,
+                    arg_count,
+                )
             }
             TypeKey::Union(members) => {
+                let members = self.interner.type_list(members);
                 let param_types: Vec<TypeId> = members.iter()
                     .filter_map(|&m| {
                         let ctx = ContextualTypeContext::with_expected(self.interner, m);
@@ -124,9 +138,13 @@ impl<'a> ContextualTypeContext<'a> {
         let key = self.interner.lookup(expected)?;
 
         match key {
-            TypeKey::Function(shape) => shape.this_type,
-            TypeKey::Callable(shape) => self.get_this_type_from_signatures(&shape.call_signatures),
+            TypeKey::Function(shape_id) => self.interner.function_shape(shape_id).this_type,
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(shape_id);
+                self.get_this_type_from_signatures(&shape.call_signatures)
+            }
             TypeKey::Union(members) => {
+                let members = self.interner.type_list(members);
                 let this_types: Vec<TypeId> = members.iter()
                     .filter_map(|&m| {
                         let ctx = ContextualTypeContext::with_expected(self.interner, m);
@@ -152,11 +170,13 @@ impl<'a> ContextualTypeContext<'a> {
         let key = self.interner.lookup(expected)?;
 
         match key {
-            TypeKey::Function(shape) => Some(shape.return_type),
-            TypeKey::Callable(shape) => {
+            TypeKey::Function(shape_id) => Some(self.interner.function_shape(shape_id).return_type),
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(shape_id);
                 self.get_return_type_from_signatures(&shape.call_signatures)
             }
             TypeKey::Union(members) => {
+                let members = self.interner.type_list(members);
                 let return_types: Vec<TypeId> = members.iter()
                     .filter_map(|&m| {
                         let ctx = ContextualTypeContext::with_expected(self.interner, m);
@@ -189,7 +209,7 @@ impl<'a> ContextualTypeContext<'a> {
         match key {
             TypeKey::Array(elem) => Some(elem),
             TypeKey::Tuple(elements) => {
-                // For tuple, return union of all element types
+                let elements = self.interner.tuple_list(elements);
                 if elements.is_empty() {
                     None
                 } else {
@@ -208,10 +228,10 @@ impl<'a> ContextualTypeContext<'a> {
 
         match key {
             TypeKey::Tuple(elements) => {
+                let elements = self.interner.tuple_list(elements);
                 if index < elements.len() {
                     Some(elements[index].type_id)
                 } else if let Some(last) = elements.last() {
-                    // Rest element
                     if last.rest {
                         Some(last.type_id)
                     } else {
@@ -237,8 +257,9 @@ impl<'a> ContextualTypeContext<'a> {
         let key = self.interner.lookup(expected)?;
 
         match key {
-            TypeKey::Object(props) => {
-                for prop in &props {
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                for prop in &shape.properties {
                     if self.interner.resolve_atom(prop.name) == name {
                         return Some(prop.type_id);
                     }
@@ -246,6 +267,7 @@ impl<'a> ContextualTypeContext<'a> {
                 None
             }
             TypeKey::Union(members) => {
+                let members = self.interner.type_list(members);
                 let prop_types: Vec<TypeId> = members.iter()
                     .filter_map(|&m| {
                         let ctx = ContextualTypeContext::with_expected(self.interner, m);

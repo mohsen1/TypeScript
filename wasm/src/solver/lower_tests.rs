@@ -488,7 +488,8 @@ fn test_lower_array_type_reference_respects_resolver() {
     let type_id = lowering.lower_type(type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Application(app) => {
+        TypeKey::Application(app_id) => {
+            let app = interner.type_application(app_id);
             assert_eq!(app.args, vec![TypeId::STRING]);
             match interner.lookup(app.base) {
                 Some(TypeKey::Ref(SymbolRef(sym_id))) => assert_eq!(sym_id, 1),
@@ -521,7 +522,8 @@ fn test_lower_readonly_array_type_reference_respects_resolver() {
     let type_id = lowering.lower_type(type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Application(app) => {
+        TypeKey::Application(app_id) => {
+            let app = interner.type_application(app_id);
             assert_eq!(app.args, vec![TypeId::STRING]);
             match interner.lookup(app.base) {
                 Some(TypeKey::Ref(SymbolRef(sym_id))) => assert_eq!(sym_id, 2),
@@ -635,10 +637,13 @@ fn test_lower_conditional_distributive_flag() {
     let type_id = lowering.lower_type(func_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => match interner.lookup(shape.return_type) {
-            Some(TypeKey::Conditional(cond)) => assert!(cond.is_distributive),
-            other => panic!("Expected conditional return type, got {:?}", other),
-        },
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
+            match interner.lookup(shape.return_type) {
+                Some(TypeKey::Conditional(cond)) => assert!(cond.is_distributive),
+                other => panic!("Expected conditional return type, got {:?}", other),
+            }
+        }
         _ => panic!("Expected function type, got {:?}", key),
     }
 }
@@ -653,10 +658,13 @@ fn test_lower_conditional_non_distributive_flag() {
     let type_id = lowering.lower_type(func_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => match interner.lookup(shape.return_type) {
-            Some(TypeKey::Conditional(cond)) => assert!(!cond.is_distributive),
-            other => panic!("Expected conditional return type, got {:?}", other),
-        },
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
+            match interner.lookup(shape.return_type) {
+                Some(TypeKey::Conditional(cond)) => assert!(!cond.is_distributive),
+                other => panic!("Expected conditional return type, got {:?}", other),
+            }
+        }
         _ => panic!("Expected function type, got {:?}", key),
     }
 }
@@ -900,7 +908,8 @@ fn test_lower_function_type_with_type_parameter() {
     // Verify it's a function type
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             // Should have 1 type parameter named "T"
             assert_eq!(shape.type_params.len(), 1, "Expected 1 type parameter");
             assert_eq!(interner.resolve_atom(shape.type_params[0].name).as_str(), "T");
@@ -920,7 +929,8 @@ fn test_lower_function_type_with_type_predicate_return() {
     let type_id = lowering.lower_type(func_type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             assert_eq!(shape.return_type, TypeId::BOOLEAN);
             let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
             assert!(!predicate.asserts);
@@ -945,7 +955,8 @@ fn test_lower_function_type_with_this_predicate_return() {
     let type_id = lowering.lower_type(func_type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             assert_eq!(shape.return_type, TypeId::BOOLEAN);
             let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
             assert!(!predicate.asserts);
@@ -968,7 +979,8 @@ fn test_lower_function_type_with_asserts_predicate_return() {
     let type_id = lowering.lower_type(func_type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             assert_eq!(shape.return_type, TypeId::VOID);
             let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
             assert!(predicate.asserts);
@@ -993,7 +1005,8 @@ fn test_lower_function_type_with_asserts_this_predicate_return() {
     let type_id = lowering.lower_type(func_type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             assert_eq!(shape.return_type, TypeId::VOID);
             let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
             assert!(predicate.asserts);
@@ -1016,7 +1029,8 @@ fn test_lower_function_type_with_asserts_this_predicate_without_is() {
     let type_id = lowering.lower_type(func_type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             assert_eq!(shape.return_type, TypeId::VOID);
             let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
             assert!(predicate.asserts);
@@ -1039,7 +1053,8 @@ fn test_lower_function_type_with_asserts_predicate_without_is() {
     let type_id = lowering.lower_type(func_type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             assert_eq!(shape.return_type, TypeId::VOID);
             let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
             assert!(predicate.asserts);
@@ -1064,7 +1079,8 @@ fn test_lower_function_type_with_this_param_separate() {
     let type_id = lowering.lower_type(func_type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             assert_eq!(shape.this_type, Some(TypeId::ANY));
             assert_eq!(shape.params.len(), 1);
             assert_eq!(shape.params[0].type_id, TypeId::STRING);
@@ -1084,7 +1100,8 @@ fn test_lower_function_type_parameter_usage() {
     let type_id = lowering.lower_type(func_type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             assert_eq!(shape.params.len(), 1);
             assert_eq!(shape.params[0].type_id, shape.return_type);
 
@@ -1112,7 +1129,8 @@ fn test_lower_function_type_with_constrained_type_parameter() {
 
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             assert_eq!(shape.type_params.len(), 1);
             assert_eq!(interner.resolve_atom(shape.type_params[0].name).as_str(), "T");
             // Should have a constraint
@@ -1133,7 +1151,8 @@ fn test_lower_constrained_type_parameter_usage() {
     let type_id = lowering.lower_type(func_type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             let param_key = interner.lookup(shape.params[0].type_id).expect("Type should exist");
             match param_key {
                 TypeKey::TypeParameter(info) => {
@@ -1158,7 +1177,8 @@ fn test_lower_function_type_with_default_type_parameter() {
 
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             assert_eq!(shape.type_params.len(), 1);
             assert_eq!(interner.resolve_atom(shape.type_params[0].name).as_str(), "T");
             assert!(shape.type_params[0].constraint.is_none());
@@ -1183,7 +1203,8 @@ fn test_lower_function_type_with_multiple_type_parameters() {
 
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             assert_eq!(shape.type_params.len(), 3, "Expected 3 type parameters");
             assert_eq!(interner.resolve_atom(shape.type_params[0].name).as_str(), "T");
             assert_eq!(interner.resolve_atom(shape.type_params[1].name).as_str(), "U");
@@ -1205,7 +1226,8 @@ fn test_lower_function_type_with_constraint_and_default() {
 
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             assert_eq!(shape.type_params.len(), 1);
             assert_eq!(interner.resolve_atom(shape.type_params[0].name).as_str(), "T");
             // Should have both constraint and default
@@ -1228,7 +1250,8 @@ fn test_lower_function_type_no_type_parameters() {
 
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             assert_eq!(shape.type_params.len(), 0, "Expected no type parameters");
         }
         _ => panic!("Expected Function type, got {:?}", key),
@@ -1246,6 +1269,7 @@ fn test_lower_tuple_type_metadata() {
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
         TypeKey::Tuple(elements) => {
+            let elements = interner.tuple_list(elements);
             assert_eq!(elements.len(), 3);
 
             let first = &elements[0];
@@ -1283,7 +1307,8 @@ fn test_lower_union_type_normalization() {
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
         TypeKey::Union(members) => {
-            assert_eq!(members, vec![TypeId::NUMBER, TypeId::STRING]);
+            let members = interner.type_list(members);
+            assert_eq!(members.as_ref(), [TypeId::NUMBER, TypeId::STRING]);
         }
         _ => panic!("Expected Union type, got {:?}", key),
     }
@@ -1309,7 +1334,8 @@ fn test_lower_function_parameter_names() {
     let type_id = lowering.lower_type(func_type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             assert_eq!(shape.params.len(), 2);
             assert_eq!(shape.params[0].name.map(|a| interner.resolve_atom(a)), Some("x".to_string()));
             assert_eq!(shape.params[0].type_id, TypeId::STRING);
@@ -1334,7 +1360,8 @@ fn test_lower_function_rest_parameter() {
     let type_id = lowering.lower_type(func_type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             assert_eq!(shape.params.len(), 1);
             let param = &shape.params[0];
             assert_eq!(param.name.map(|a| interner.resolve_atom(a)), Some("args".to_string()));
@@ -1374,10 +1401,12 @@ fn test_lower_generic_type_reference_uses_type_parameter_args() {
     let type_id = lowering.lower_type(func_type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = interner.function_shape(shape_id);
             let return_key = interner.lookup(shape.return_type).expect("Type should exist");
             match return_key {
-                TypeKey::Application(app) => {
+                TypeKey::Application(app_id) => {
+                    let app = interner.type_application(app_id);
                     let base_key = interner.lookup(app.base).expect("Type should exist");
                     match base_key {
                         TypeKey::Ref(SymbolRef(1)) => {}
@@ -1421,7 +1450,8 @@ fn test_lower_type_reference_with_arguments() {
     let type_id = lowering.lower_type(type_ref_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Application(app) => {
+        TypeKey::Application(app_id) => {
+            let app = interner.type_application(app_id);
             assert_eq!(app.args, vec![TypeId::STRING]);
             match interner.lookup(app.base) {
                 Some(TypeKey::Ref(SymbolRef(sym_id))) => assert_eq!(sym_id, 1),
@@ -1445,9 +1475,10 @@ fn test_lower_type_query_uses_value_resolver() {
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
         TypeKey::Union(members) => {
+            let members = interner.type_list(members);
             let mut saw_ref = false;
             let mut saw_query = false;
-            for member in members {
+            for &member in members.iter() {
                 match interner.lookup(member) {
                     Some(TypeKey::Ref(SymbolRef(sym_id))) => {
                         assert_eq!(sym_id, 1);
@@ -1489,7 +1520,8 @@ fn test_lower_type_query_with_type_arguments() {
     let type_id = lowering.lower_type(type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Application(app) => {
+        TypeKey::Application(app_id) => {
+            let app = interner.type_application(app_id);
             assert_eq!(app.args, vec![TypeId::STRING]);
             match interner.lookup(app.base) {
                 Some(TypeKey::TypeQuery(SymbolRef(sym_id))) => assert_eq!(sym_id, 2),
@@ -1511,6 +1543,7 @@ fn test_lower_template_literal_type_spans() {
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
         TypeKey::TemplateLiteral(spans) => {
+            let spans = interner.template_list(spans);
             assert_eq!(spans.len(), 3);
             match spans[0] {
                 TemplateSpan::Text(atom) => assert_eq!(interner.resolve_atom(atom), "hello"),
@@ -1575,15 +1608,20 @@ fn test_lower_type_literal_object_properties() {
     let type_id = lowering.lower_type(literal_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Object(properties) => {
-            let foo = properties.iter()
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
+            let foo = shape
+                .properties
+                .iter()
                 .find(|prop| interner.resolve_atom(prop.name) == "foo")
                 .expect("Expected foo property");
             assert_eq!(foo.type_id, TypeId::STRING);
             assert!(foo.optional);
             assert!(foo.readonly);
 
-            let bar = properties.iter()
+            let bar = shape
+                .properties
+                .iter()
                 .find(|prop| interner.resolve_atom(prop.name) == "bar")
                 .expect("Expected bar property");
             assert_eq!(bar.type_id, TypeId::NUMBER);
@@ -1605,20 +1643,28 @@ fn test_lower_type_literal_nested_object() {
     let type_id = lowering.lower_type(literal_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Object(properties) => {
-            let config = properties.iter()
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
+            let config = shape
+                .properties
+                .iter()
                 .find(|prop| interner.resolve_atom(prop.name) == "config")
                 .expect("Expected config property");
 
             match interner.lookup(config.type_id) {
-                Some(TypeKey::Object(nested)) => {
-                    let enabled = nested.iter()
+                Some(TypeKey::Object(nested_id)) => {
+                    let nested = interner.object_shape(nested_id);
+                    let enabled = nested
+                        .properties
+                        .iter()
                         .find(|prop| interner.resolve_atom(prop.name) == "enabled")
                         .expect("Expected enabled property");
                     assert_eq!(enabled.type_id, TypeId::BOOLEAN);
                     assert!(!enabled.optional);
 
-                    let retries = nested.iter()
+                    let retries = nested
+                        .properties
+                        .iter()
                         .find(|prop| interner.resolve_atom(prop.name) == "retries")
                         .expect("Expected retries property");
                     assert_eq!(retries.type_id, TypeId::NUMBER);
@@ -1640,7 +1686,8 @@ fn test_lower_type_literal_call_signature() {
     let type_id = lowering.lower_type(literal_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Callable(callable) => {
+        TypeKey::Callable(callable_id) => {
+            let callable = interner.callable_shape(callable_id);
             assert_eq!(callable.call_signatures.len(), 1);
             assert_eq!(callable.construct_signatures.len(), 0);
             assert_eq!(callable.properties.len(), 1);
@@ -1660,7 +1707,8 @@ fn test_lower_type_literal_call_signature_this_param() {
     let type_id = lowering.lower_type(literal_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Callable(callable) => {
+        TypeKey::Callable(callable_id) => {
+            let callable = interner.callable_shape(callable_id);
             assert_eq!(callable.call_signatures.len(), 1);
             let sig = &callable.call_signatures[0];
             assert_eq!(sig.this_type, Some(TypeId::ANY));
@@ -1680,7 +1728,8 @@ fn test_lower_type_literal_call_signature_type_predicate() {
     let type_id = lowering.lower_type(literal_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Callable(callable) => {
+        TypeKey::Callable(callable_id) => {
+            let callable = interner.callable_shape(callable_id);
             assert_eq!(callable.call_signatures.len(), 1);
             let sig = &callable.call_signatures[0];
             assert_eq!(sig.return_type, TypeId::BOOLEAN);
@@ -1707,7 +1756,8 @@ fn test_lower_type_literal_call_signature_asserts_predicate_without_is() {
     let type_id = lowering.lower_type(literal_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Callable(callable) => {
+        TypeKey::Callable(callable_id) => {
+            let callable = interner.callable_shape(callable_id);
             assert_eq!(callable.call_signatures.len(), 1);
             let sig = &callable.call_signatures[0];
             assert_eq!(sig.return_type, TypeId::VOID);
@@ -1736,15 +1786,16 @@ fn test_lower_type_literal_overloaded_call_signatures() {
     let type_id = lowering.lower_type(literal_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Callable(shape) => {
-            assert_eq!(shape.call_signatures.len(), 2);
+        TypeKey::Callable(callable_id) => {
+            let callable = interner.callable_shape(callable_id);
+            assert_eq!(callable.call_signatures.len(), 2);
 
-            let first = &shape.call_signatures[0];
+            let first = &callable.call_signatures[0];
             assert_eq!(first.params.len(), 1);
             assert_eq!(first.params[0].type_id, TypeId::STRING);
             assert_eq!(first.return_type, TypeId::NUMBER);
 
-            let second = &shape.call_signatures[1];
+            let second = &callable.call_signatures[1];
             assert_eq!(second.params.len(), 1);
             assert_eq!(second.params[0].type_id, TypeId::NUMBER);
             assert_eq!(second.return_type, TypeId::STRING);
@@ -1762,7 +1813,8 @@ fn test_lower_type_literal_construct_signature() {
     let type_id = lowering.lower_type(literal_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Callable(callable) => {
+        TypeKey::Callable(callable_id) => {
+            let callable = interner.callable_shape(callable_id);
             assert_eq!(callable.call_signatures.len(), 0);
             assert_eq!(callable.construct_signatures.len(), 1);
         }
@@ -1779,10 +1831,11 @@ fn test_lower_type_literal_index_signature() {
     let type_id = lowering.lower_type(literal_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::ObjectWithIndex(shape) => {
+        TypeKey::ObjectWithIndex(shape_id) => {
+            let shape = interner.object_shape(shape_id);
             assert_eq!(shape.properties.len(), 1);
             assert_eq!(interner.resolve_atom(shape.properties[0].name), "foo");
-            let string_index = shape.string_index.expect("Expected string index signature");
+            let string_index = shape.string_index.as_ref().expect("Expected string index signature");
             assert_eq!(string_index.key_type, TypeId::STRING);
             assert_eq!(string_index.value_type, TypeId::NUMBER);
         }
@@ -1822,10 +1875,11 @@ fn test_lower_interface_merges_properties() {
     let type_id = lowering.lower_interface_declarations(&declarations);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Object(properties) => {
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
             let mut found_a = None;
             let mut found_b = None;
-            for prop in &properties {
+            for prop in &shape.properties {
                 match interner.resolve_atom(prop.name).as_str() {
                     "a" => found_a = Some(prop),
                     "b" => found_b = Some(prop),
@@ -1854,8 +1908,10 @@ fn test_lower_interface_conflicting_property_types() {
     let type_id = lowering.lower_interface_declarations(&declarations);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Object(properties) => {
-            let prop = properties
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
+            let prop = shape
+                .properties
                 .iter()
                 .find(|prop| interner.resolve_atom(prop.name) == "a")
                 .expect("Expected property a");
@@ -1875,16 +1931,21 @@ fn test_lower_interface_method_overload_accumulates() {
     let type_id = lowering.lower_interface_declarations(&declarations);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Object(properties) => {
-            let prop = properties
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
+            let prop = shape
+                .properties
                 .iter()
                 .find(|prop| interner.resolve_atom(prop.name) == "bar")
                 .expect("Expected property bar");
             let prop_key = interner.lookup(prop.type_id).expect("Type should exist");
             match prop_key {
-                TypeKey::Callable(callable) => {
+                TypeKey::Callable(callable_id) => {
+                    let callable = interner.callable_shape(callable_id);
                     assert_eq!(callable.call_signatures.len(), 2);
-                    let mut combos: Vec<(TypeId, TypeId)> = callable.call_signatures.iter()
+                    let mut combos: Vec<(TypeId, TypeId)> = callable
+                        .call_signatures
+                        .iter()
                         .map(|sig| (sig.params[0].type_id, sig.return_type))
                         .collect();
                     combos.sort_by_key(|(param, _)| param.0);

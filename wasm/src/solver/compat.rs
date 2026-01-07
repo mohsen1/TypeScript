@@ -1,15 +1,17 @@
 //! TypeScript compatibility layer for assignability rules.
 
-use crate::solver::intern::TypeInterner;
 use crate::solver::subtype::{NoopResolver, SubtypeChecker, SubtypeFailureReason, TypeResolver};
 use crate::solver::types::{PropertyInfo, TypeId, TypeKey};
-use crate::solver::AssignabilityChecker;
+use crate::solver::{AssignabilityChecker, TypeDatabase};
 use rustc_hash::FxHashMap;
+
+#[cfg(test)]
+use crate::solver::TypeInterner;
 
 /// Compatibility checker that applies TypeScript's unsound rules
 /// before delegating to the structural subtype engine.
 pub struct CompatChecker<'a, R: TypeResolver = NoopResolver> {
-    interner: &'a TypeInterner,
+    interner: &'a dyn TypeDatabase,
     subtype: SubtypeChecker<'a, R>,
     strict_function_types: bool,
     strict_null_checks: bool,
@@ -20,7 +22,7 @@ pub struct CompatChecker<'a, R: TypeResolver = NoopResolver> {
 
 impl<'a> CompatChecker<'a, NoopResolver> {
     /// Create a new compatibility checker without a resolver.
-    pub fn new(interner: &'a TypeInterner) -> CompatChecker<'a, NoopResolver> {
+    pub fn new(interner: &'a dyn TypeDatabase) -> CompatChecker<'a, NoopResolver> {
         CompatChecker {
             interner,
             subtype: SubtypeChecker::new(interner),
@@ -35,7 +37,7 @@ impl<'a> CompatChecker<'a, NoopResolver> {
 
 impl<'a, R: TypeResolver> CompatChecker<'a, R> {
     /// Create a new compatibility checker with a resolver.
-    pub fn with_resolver(interner: &'a TypeInterner, resolver: &'a R) -> Self {
+    pub fn with_resolver(interner: &'a dyn TypeDatabase, resolver: &'a R) -> Self {
         CompatChecker {
             interner,
             subtype: SubtypeChecker::with_resolver(interner, resolver),
@@ -123,6 +125,41 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         result
     }
 
+    fn is_assignable_strict(&mut self, source: TypeId, target: TypeId) -> bool {
+        if source == target {
+            return true;
+        }
+        if source == TypeId::ANY || target == TypeId::ANY {
+            return true;
+        }
+        if !self.strict_null_checks && (source == TypeId::NULL || source == TypeId::UNDEFINED) {
+            return true;
+        }
+        if target == TypeId::UNKNOWN {
+            return true;
+        }
+        if source == TypeId::NEVER || source == TypeId::ERROR || target == TypeId::ERROR {
+            return true;
+        }
+        if source == TypeId::UNKNOWN {
+            return false;
+        }
+        if self.is_empty_object_target(target) {
+            return self.is_assignable_to_empty_object(source);
+        }
+
+        let prev = self.subtype.strict_function_types;
+        self.subtype.strict_function_types = true;
+        self.subtype.allow_void_return = true;
+        self.subtype.allow_bivariant_rest = true;
+        self.subtype.exact_optional_property_types = self.exact_optional_property_types;
+        self.subtype.strict_null_checks = self.strict_null_checks;
+        self.subtype.no_unchecked_indexed_access = self.no_unchecked_indexed_access;
+        let result = self.subtype.is_subtype_of(source, target);
+        self.subtype.strict_function_types = prev;
+        result
+    }
+
     /// Explain why `source` is not assignable to `target` using TS compatibility rules.
     pub fn explain_failure(&mut self, source: TypeId, target: TypeId) -> Option<SubtypeFailureReason> {
         if source == target || source == TypeId::ANY || target == TypeId::ANY || target == TypeId::UNKNOWN {
@@ -161,17 +198,19 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
             None => return false,
         };
 
-        let target_props = match &target_key {
-            TypeKey::Object(props) => props.as_slice(),
-            TypeKey::ObjectWithIndex(shape) => {
+        let target_shape = match &target_key {
+            TypeKey::Object(shape_id) => self.interner.object_shape(*shape_id),
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(*shape_id);
                 if shape.string_index.is_some() || shape.number_index.is_some() {
                     return false;
                 }
-                shape.properties.as_slice()
+                shape
             }
             _ => return false,
         };
 
+        let target_props = target_shape.properties.as_slice();
         if target_props.is_empty() || target_props.iter().any(|prop| !prop.optional) {
             return false;
         }
@@ -190,13 +229,20 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         };
 
         match &source_key {
-            TypeKey::Object(props) => !self.has_common_property(props.as_slice(), target_props),
-            TypeKey::ObjectWithIndex(shape) => {
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(*shape_id);
                 !self.has_common_property(shape.properties.as_slice(), target_props)
             }
-            TypeKey::Union(members) => members
-                .iter()
-                .any(|member| self.violates_weak_type_with_target_props(*member, target_props)),
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(*shape_id);
+                !self.has_common_property(shape.properties.as_slice(), target_props)
+            }
+            TypeKey::Union(members) => {
+                let members = self.interner.type_list(*members);
+                members
+                    .iter()
+                    .any(|member| self.violates_weak_type_with_target_props(*member, target_props))
+            }
             _ => false,
         }
     }
@@ -223,9 +269,15 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
 
     fn is_empty_object_target(&self, target: TypeId) -> bool {
         match self.interner.lookup(target) {
-            Some(TypeKey::Object(props)) => props.is_empty(),
-            Some(TypeKey::ObjectWithIndex(shape)) => {
-                shape.properties.is_empty() && shape.string_index.is_none() && shape.number_index.is_none()
+            Some(TypeKey::Object(shape_id)) => {
+                let shape = self.interner.object_shape(shape_id);
+                shape.properties.is_empty()
+            }
+            Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                let shape = self.interner.object_shape(shape_id);
+                shape.properties.is_empty()
+                    && shape.string_index.is_none()
+                    && shape.number_index.is_none()
             }
             _ => false,
         }
@@ -254,12 +306,18 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         };
 
         match &key {
-            TypeKey::Union(members) => members
-                .iter()
-                .all(|member| self.is_assignable_to_empty_object(*member)),
-            TypeKey::Intersection(members) => members
-                .iter()
-                .any(|member| self.is_assignable_to_empty_object(*member)),
+            TypeKey::Union(members) => {
+                let members = self.interner.type_list(*members);
+                members
+                    .iter()
+                    .all(|member| self.is_assignable_to_empty_object(*member))
+            }
+            TypeKey::Intersection(members) => {
+                let members = self.interner.type_list(*members);
+                members
+                    .iter()
+                    .any(|member| self.is_assignable_to_empty_object(*member))
+            }
             TypeKey::TypeParameter(param) => match param.constraint {
                 Some(constraint) => self.is_assignable_to_empty_object(constraint),
                 None => false,
@@ -272,6 +330,10 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
 impl<'a, R: TypeResolver> AssignabilityChecker for CompatChecker<'a, R> {
     fn is_assignable_to(&mut self, source: TypeId, target: TypeId) -> bool {
         self.is_assignable(source, target)
+    }
+
+    fn is_assignable_to_strict(&mut self, source: TypeId, target: TypeId) -> bool {
+        self.is_assignable_strict(source, target)
     }
 }
 

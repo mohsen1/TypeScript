@@ -181,10 +181,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     /// Check if `source` is assignable to `target`.
-    /// In TypeScript, assignability is slightly looser than strict subtyping.
+    /// This is a strict structural check; use CompatChecker for TypeScript assignability rules.
     pub fn is_assignable_to(&mut self, source: TypeId, target: TypeId) -> bool {
-        // For now, treat assignability the same as subtyping
-        // TODO: Handle bivariant function parameters, any, etc.
         self.is_subtype_of(source, target)
     }
 
@@ -293,11 +291,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         if let Some(shape) = self.apparent_primitive_shape_for_key(&source_key) {
             match &target_key {
-                TypeKey::Object(t_props) => {
-                    return self.check_object_subtype(&shape.properties, t_props);
+                TypeKey::Object(t_shape_id) => {
+                    let t_shape = self.interner.object_shape(*t_shape_id);
+                    return self.check_object_subtype(&shape.properties, &t_shape.properties);
                 }
-                TypeKey::ObjectWithIndex(t_shape) => {
-                    return self.check_object_with_index_subtype(&shape, t_shape);
+                TypeKey::ObjectWithIndex(t_shape_id) => {
+                    let t_shape = self.interner.object_shape(*t_shape_id);
+                    return self.check_object_with_index_subtype(&shape, &t_shape);
                 }
                 _ => {}
             }
@@ -341,7 +341,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             // Union source: all members must be subtypes of target
             (TypeKey::Union(members), _) => {
-                for &member in members {
+                let members = self.interner.type_list(*members);
+                for &member in members.iter() {
                     if !self.check_subtype(member, target).is_true() {
                         return SubtypeResult::False;
                     }
@@ -352,11 +353,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             // Union target: source must be subtype of at least one member
             (_, TypeKey::Union(members)) => {
                 if matches!(source_key, TypeKey::KeyOf(_))
-                    && self.union_includes_keyof_primitives(members)
+                    && self.union_includes_keyof_primitives(*members)
                 {
                     return SubtypeResult::True;
                 }
-                for &member in members {
+                let members = self.interner.type_list(*members);
+                for &member in members.iter() {
                     if self.check_subtype(source, member).is_true() {
                         return SubtypeResult::True;
                     }
@@ -366,7 +368,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             // Intersection source: source is subtype if any constituent is
             (TypeKey::Intersection(members), _) => {
-                for &member in members {
+                let members = self.interner.type_list(*members);
+                for &member in members.iter() {
                     if self.check_subtype(member, target).is_true() {
                         return SubtypeResult::True;
                     }
@@ -376,7 +379,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             // Intersection target: all members must be satisfied
             (_, TypeKey::Intersection(members)) => {
-                for &member in members {
+                let members = self.interner.type_list(*members);
+                for &member in members.iter() {
                     if !self.check_subtype(source, member).is_true() {
                         return SubtypeResult::False;
                     }
@@ -416,13 +420,16 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             // Tuple to tuple
             (TypeKey::Tuple(s_elems), TypeKey::Tuple(t_elems)) => {
-                self.check_tuple_subtype(s_elems, t_elems)
+                let s_elems = self.interner.tuple_list(*s_elems);
+                let t_elems = self.interner.tuple_list(*t_elems);
+                self.check_tuple_subtype(&s_elems, &t_elems)
             }
 
             // Tuple to array
             (TypeKey::Tuple(elems), TypeKey::Array(t_elem)) => {
                 // Tuple is subtype of array if all elements are subtypes
-                for elem in elems {
+                let elems = self.interner.tuple_list(*elems);
+                for elem in elems.iter() {
                     if elem.rest {
                         let expansion = self.expand_tuple_rest(elem.type_id);
                         for fixed in expansion.fixed {
@@ -447,45 +454,60 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             // Array to tuple (variadic tuples with no required fixed elements only)
             (TypeKey::Array(s_elem), TypeKey::Tuple(t_elems)) => {
-                self.check_array_to_tuple_subtype(*s_elem, t_elems)
+                let t_elems = self.interner.tuple_list(*t_elems);
+                self.check_array_to_tuple_subtype(*s_elem, &t_elems)
             }
 
             // Object to object
-            (TypeKey::Object(s_props), TypeKey::Object(t_props)) => {
-                self.check_object_subtype(s_props, t_props)
+            (TypeKey::Object(s_shape_id), TypeKey::Object(t_shape_id)) => {
+                let s_shape = self.interner.object_shape(*s_shape_id);
+                let t_shape = self.interner.object_shape(*t_shape_id);
+                self.check_object_subtype(&s_shape.properties, &t_shape.properties)
             }
 
             // Object with index to object with index
-            (TypeKey::ObjectWithIndex(s_shape), TypeKey::ObjectWithIndex(t_shape)) => {
-                self.check_object_with_index_subtype(s_shape, t_shape)
+            (TypeKey::ObjectWithIndex(s_shape_id), TypeKey::ObjectWithIndex(t_shape_id)) => {
+                let s_shape = self.interner.object_shape(*s_shape_id);
+                let t_shape = self.interner.object_shape(*t_shape_id);
+                self.check_object_with_index_subtype(&s_shape, &t_shape)
             }
 
             // Object with index to simple object (index signatures can satisfy missing properties)
-            (TypeKey::ObjectWithIndex(s_shape), TypeKey::Object(t_props)) => {
-                self.check_object_with_index_to_object(s_shape, t_props)
+            (TypeKey::ObjectWithIndex(s_shape_id), TypeKey::Object(t_shape_id)) => {
+                let s_shape = self.interner.object_shape(*s_shape_id);
+                let t_shape = self.interner.object_shape(*t_shape_id);
+                self.check_object_with_index_to_object(&s_shape, &t_shape.properties)
             }
 
             // Simple object to object with index
-            (TypeKey::Object(s_props), TypeKey::ObjectWithIndex(t_shape)) => {
+            (TypeKey::Object(s_shape_id), TypeKey::ObjectWithIndex(t_shape_id)) => {
                 // All source properties must satisfy target's index signature
-                self.check_object_to_indexed(s_props, t_shape)
+                let s_shape = self.interner.object_shape(*s_shape_id);
+                let t_shape = self.interner.object_shape(*t_shape_id);
+                self.check_object_to_indexed(&s_shape.properties, &t_shape)
             }
 
             // Function to function
-            (TypeKey::Function(s_fn), TypeKey::Function(t_fn)) => {
-                self.check_function_subtype(s_fn, t_fn)
+            (TypeKey::Function(s_fn_id), TypeKey::Function(t_fn_id)) => {
+                let s_fn = self.interner.function_shape(*s_fn_id);
+                let t_fn = self.interner.function_shape(*t_fn_id);
+                self.check_function_subtype(&s_fn, &t_fn)
             }
 
             // Callable to callable (overloaded signatures)
-            (TypeKey::Callable(s_callable), TypeKey::Callable(t_callable)) => {
-                self.check_callable_subtype(s_callable, t_callable)
+            (TypeKey::Callable(s_callable_id), TypeKey::Callable(t_callable_id)) => {
+                let s_callable = self.interner.callable_shape(*s_callable_id);
+                let t_callable = self.interner.callable_shape(*t_callable_id);
+                self.check_callable_subtype(&s_callable, &t_callable)
             }
 
             // Function to callable (single signature to overloaded)
-            (TypeKey::Function(s_fn), TypeKey::Callable(t_callable)) => {
+            (TypeKey::Function(s_fn_id), TypeKey::Callable(t_callable_id)) => {
                 // A single function can match a callable if it satisfies all target call signatures
+                let s_fn = self.interner.function_shape(*s_fn_id);
+                let t_callable = self.interner.callable_shape(*t_callable_id);
                 for t_sig in &t_callable.call_signatures {
-                    if !self.check_call_signature_subtype_fn(s_fn, t_sig).is_true() {
+                    if !self.check_call_signature_subtype_fn(&s_fn, t_sig).is_true() {
                         return SubtypeResult::False;
                     }
                 }
@@ -493,10 +515,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             }
 
             // Callable to function (overloaded to single)
-            (TypeKey::Callable(s_callable), TypeKey::Function(t_fn)) => {
+            (TypeKey::Callable(s_callable_id), TypeKey::Function(t_fn_id)) => {
                 // At least one source signature must match the target function
+                let s_callable = self.interner.callable_shape(*s_callable_id);
+                let t_fn = self.interner.function_shape(*t_fn_id);
                 for s_sig in &s_callable.call_signatures {
-                    if self.check_call_signature_subtype_to_fn(s_sig, t_fn).is_true() {
+                    if self.check_call_signature_subtype_to_fn(s_sig, &t_fn).is_true() {
                         return SubtypeResult::True;
                     }
                 }
@@ -504,7 +528,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             }
 
             // Generic application to application
-            (TypeKey::Application(s_app), TypeKey::Application(t_app)) => {
+            (TypeKey::Application(s_app_id), TypeKey::Application(t_app_id)) => {
+                let s_app = self.interner.type_application(*s_app_id);
+                let t_app = self.interner.type_application(*t_app_id);
                 if s_app.args.len() != t_app.args.len() {
                     SubtypeResult::False
                 } else if !self.check_subtype(s_app.base, t_app.base).is_true() {
@@ -704,12 +730,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         self.check_subtype(left, right).is_true() && self.check_subtype(right, left).is_true()
     }
 
-    fn union_includes_keyof_primitives(&self, members: &[TypeId]) -> bool {
+    fn union_includes_keyof_primitives(&self, members: TypeListId) -> bool {
+        let members = self.interner.type_list(members);
         let mut has_string = false;
         let mut has_number = false;
         let mut has_symbol = false;
 
-        for &member in members {
+        for &member in members.iter() {
             match member {
                 TypeId::STRING => has_string = true,
                 TypeId::NUMBER => has_number = true,
@@ -1420,8 +1447,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 variadic: Some(elem),
             },
             Some(TypeKey::Tuple(elements)) => {
+                let elements = self.interner.tuple_list(elements);
                 let mut fixed = Vec::new();
-                for elem in elements {
+                for elem in elements.iter() {
                     if elem.rest {
                         let inner = self.expand_tuple_rest(elem.type_id);
                         fixed.extend(inner.fixed);
@@ -1825,11 +1853,18 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     ) -> Option<SubtypeFailureReason> {
         if let Some(shape) = self.apparent_primitive_shape_for_key(source_key) {
             match target_key {
-                TypeKey::Object(t_props) => {
-                    return self.explain_object_failure(source, target, &shape.properties, t_props);
+                TypeKey::Object(t_shape_id) => {
+                    let t_shape = self.interner.object_shape(*t_shape_id);
+                    return self.explain_object_failure(
+                        source,
+                        target,
+                        &shape.properties,
+                        &t_shape.properties,
+                    );
                 }
-                TypeKey::ObjectWithIndex(t_shape) => {
-                    return self.explain_indexed_object_failure(source, target, &shape, t_shape);
+                TypeKey::ObjectWithIndex(t_shape_id) => {
+                    let t_shape = self.interner.object_shape(*t_shape_id);
+                    return self.explain_indexed_object_failure(source, target, &shape, &t_shape);
                 }
                 _ => {}
             }
@@ -1837,29 +1872,43 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         match (source_key, target_key) {
             // Object to object - find the specific missing/mismatched property
-            (TypeKey::Object(s_props), TypeKey::Object(t_props)) => {
-                self.explain_object_failure(source, target, s_props, t_props)
+            (TypeKey::Object(s_shape_id), TypeKey::Object(t_shape_id)) => {
+                let s_shape = self.interner.object_shape(*s_shape_id);
+                let t_shape = self.interner.object_shape(*t_shape_id);
+                self.explain_object_failure(source, target, &s_shape.properties, &t_shape.properties)
             }
 
             // Object with index to object with index
-            (TypeKey::ObjectWithIndex(s_shape), TypeKey::ObjectWithIndex(t_shape)) => {
-                self.explain_indexed_object_failure(source, target, s_shape, t_shape)
+            (TypeKey::ObjectWithIndex(s_shape_id), TypeKey::ObjectWithIndex(t_shape_id)) => {
+                let s_shape = self.interner.object_shape(*s_shape_id);
+                let t_shape = self.interner.object_shape(*t_shape_id);
+                self.explain_indexed_object_failure(source, target, &s_shape, &t_shape)
             }
 
             // Object with index to object
-            (TypeKey::ObjectWithIndex(s_shape), TypeKey::Object(t_props)) => {
-                self.explain_object_with_index_to_object_failure(source, target, s_shape, t_props)
+            (TypeKey::ObjectWithIndex(s_shape_id), TypeKey::Object(t_shape_id)) => {
+                let s_shape = self.interner.object_shape(*s_shape_id);
+                let t_shape = self.interner.object_shape(*t_shape_id);
+                self.explain_object_with_index_to_object_failure(
+                    source,
+                    target,
+                    &s_shape,
+                    &t_shape.properties,
+                )
             }
 
             // Simple object to indexed object
-            (TypeKey::Object(s_props), TypeKey::ObjectWithIndex(t_shape)) => {
-                // First check properties
-                if let Some(reason) = self.explain_object_failure(source, target, s_props, &t_shape.properties) {
+            (TypeKey::Object(s_shape_id), TypeKey::ObjectWithIndex(t_shape_id)) => {
+                let s_shape = self.interner.object_shape(*s_shape_id);
+                let t_shape = self.interner.object_shape(*t_shape_id);
+                if let Some(reason) =
+                    self.explain_object_failure(source, target, &s_shape.properties, &t_shape.properties)
+                {
                     return Some(reason);
                 }
                 // Then check index signature constraints
                 if let Some(ref string_idx) = t_shape.string_index {
-                    for prop in s_props {
+                    for prop in &s_shape.properties {
                         let prop_type = self.optional_property_type(prop);
                         if !self.check_subtype(prop_type, string_idx.value_type).is_true() {
                             return Some(SubtypeFailureReason::IndexSignatureMismatch {
@@ -1874,8 +1923,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             }
 
             // Function to function
-            (TypeKey::Function(s_fn), TypeKey::Function(t_fn)) => {
-                self.explain_function_failure(s_fn, t_fn)
+            (TypeKey::Function(s_fn_id), TypeKey::Function(t_fn_id)) => {
+                let s_fn = self.interner.function_shape(*s_fn_id);
+                let t_fn = self.interner.function_shape(*t_fn_id);
+                self.explain_function_failure(&s_fn, &t_fn)
             }
 
             // Array to array
@@ -1892,16 +1943,17 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             // Tuple to tuple
             (TypeKey::Tuple(s_elems), TypeKey::Tuple(t_elems)) => {
-                self.explain_tuple_failure(s_elems, t_elems)
+                let s_elems = self.interner.tuple_list(*s_elems);
+                let t_elems = self.interner.tuple_list(*t_elems);
+                self.explain_tuple_failure(&s_elems, &t_elems)
             }
 
             // Union target - source must match at least one member
             (_, TypeKey::Union(members)) => {
-                // If none match, explain which member was closest
-                // For now, just report that no member matches
+                let members = self.interner.type_list(*members);
                 Some(SubtypeFailureReason::NoUnionMemberMatches {
                     source_type: source,
-                    target_union_members: members.clone(),
+                    target_union_members: members.as_ref().to_vec(),
                 })
             }
 

@@ -4,7 +4,6 @@
 //! an interning table. The actual structure is stored in `TypeKey`.
 
 use serde::Serialize;
-use std::sync::Arc;
 use crate::interner::Atom;
 
 /// A lightweight handle to an interned type.
@@ -52,6 +51,34 @@ impl TypeId {
     }
 }
 
+/// Interned list of TypeId values (e.g., unions/intersections).
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TypeListId(pub u32);
+
+/// Interned object shape (properties + index signatures).
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ObjectShapeId(pub u32);
+
+/// Interned tuple element list.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TupleListId(pub u32);
+
+/// Interned function shape.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct FunctionShapeId(pub u32);
+
+/// Interned callable shape.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CallableShapeId(pub u32);
+
+/// Interned type application (Base<Args>).
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TypeApplicationId(pub u32);
+
+/// Interned template literal span list.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TemplateLiteralId(pub u32);
+
 /// The structural "shape" of a type.
 /// This is the key used for interning - structurally identical types
 /// will have the same TypeKey and therefore the same TypeId.
@@ -64,33 +91,30 @@ pub enum TypeKey {
     Literal(LiteralValue),
 
     /// Object type with sorted property list for structural identity
-    /// Vec is sorted by property name for consistent hashing
-    Object(Vec<PropertyInfo>),
+    Object(ObjectShapeId),
 
     /// Object type with index signatures
     /// For objects like { [key: string]: number, foo: string }
-    ObjectWithIndex(ObjectShape),
+    ObjectWithIndex(ObjectShapeId),
 
     /// Union type (A | B | C)
-    /// Vec is sorted by TypeId for consistent hashing
-    Union(Vec<TypeId>),
+    Union(TypeListId),
 
     /// Intersection type (A & B & C)
-    /// Vec is sorted by TypeId for consistent hashing
-    Intersection(Vec<TypeId>),
+    Intersection(TypeListId),
 
     /// Array type
     Array(TypeId),
 
     /// Tuple type
-    Tuple(Vec<TupleElement>),
+    Tuple(TupleListId),
 
     /// Function type
-    Function(FunctionShape),
+    Function(FunctionShapeId),
 
     /// Callable type with overloaded signatures
     /// For interfaces with call/construct signatures
-    Callable(CallableShape),
+    Callable(CallableShapeId),
 
     /// Type parameter (generic)
     TypeParameter(TypeParamInfo),
@@ -100,7 +124,7 @@ pub enum TypeKey {
     Ref(SymbolRef),
 
     /// Generic type application (Base<Args>)
-    Application(TypeApplication),
+    Application(TypeApplicationId),
 
     /// Conditional type (T extends U ? X : Y)
     Conditional(Box<ConditionalType>),
@@ -112,7 +136,7 @@ pub enum TypeKey {
     IndexAccess(TypeId, TypeId),
 
     /// Template literal type (`hello${string}world`)
-    TemplateLiteral(Vec<TemplateSpan>),
+    TemplateLiteral(TemplateLiteralId),
 
     /// Type query (typeof expression in type position)
     TypeQuery(SymbolRef),

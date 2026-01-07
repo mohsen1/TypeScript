@@ -559,10 +559,20 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Resolve a qualified name or identifier to a symbol ID.
     fn resolve_qualified_symbol(&self, idx: NodeIndex) -> Option<SymbolId> {
+        let mut visited_aliases = Vec::new();
+        self.resolve_qualified_symbol_inner(idx, &mut visited_aliases)
+    }
+
+    fn resolve_qualified_symbol_inner(
+        &self,
+        idx: NodeIndex,
+        visited_aliases: &mut Vec<SymbolId>,
+    ) -> Option<SymbolId> {
         let node = self.ctx.arena.get(idx)?;
 
         if node.kind == SyntaxKind::Identifier as u16 {
-            return self.resolve_identifier_symbol(idx);
+            let sym_id = self.resolve_identifier_symbol(idx)?;
+            return self.resolve_alias_symbol(sym_id, visited_aliases);
         }
 
         if node.kind != syntax_kind_ext::QUALIFIED_NAME {
@@ -570,14 +580,43 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         let qn = self.ctx.arena.get_qualified_name(node)?;
-        let left_sym = self.resolve_qualified_symbol(qn.left)?;
+        let left_sym = self.resolve_qualified_symbol_inner(qn.left, visited_aliases)?;
+        let left_sym = self.resolve_alias_symbol(left_sym, visited_aliases)?;
         let right_name = self.ctx.arena.get(qn.right)
             .and_then(|node| self.ctx.arena.get_identifier(node))
             .map(|ident| ident.escaped_text.as_str())?;
 
         let left_symbol = self.ctx.binder.get_symbol(left_sym)?;
         let exports = left_symbol.exports.as_ref()?;
-        exports.get(right_name)
+        let member_sym = exports.get(right_name)?;
+        self.resolve_alias_symbol(member_sym, visited_aliases)
+    }
+
+    fn resolve_alias_symbol(
+        &self,
+        sym_id: SymbolId,
+        visited_aliases: &mut Vec<SymbolId>,
+    ) -> Option<SymbolId> {
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        if symbol.flags & symbol_flags::ALIAS == 0 {
+            return Some(sym_id);
+        }
+        if visited_aliases.iter().any(|&seen| seen == sym_id) {
+            return None;
+        }
+        visited_aliases.push(sym_id);
+
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            *symbol.declarations.first()?
+        };
+        let decl_node = self.ctx.arena.get(decl_idx)?;
+        if decl_node.kind == syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
+            let import = self.ctx.arena.get_import_decl(decl_node)?;
+            return self.resolve_qualified_symbol_inner(import.module_specifier, visited_aliases);
+        }
+        None
     }
 
     fn entity_name_text(&self, idx: NodeIndex) -> Option<String> {
@@ -721,7 +760,9 @@ impl<'a> ThinCheckerState<'a> {
                 }
 
                 // Not found - report TS2694
-                self.error_namespace_no_export(&symbol.escaped_name, &right_name, qn.right);
+                let namespace_name = self.entity_name_text(qn.left)
+                    .unwrap_or_else(|| symbol.escaped_name.clone());
+                self.error_namespace_no_export(&namespace_name, &right_name, qn.right);
                 return TypeId::ERROR;
             }
         }
@@ -1333,7 +1374,8 @@ impl<'a> ThinCheckerState<'a> {
                             let base_type = self.get_type_of_node(type_idx);
 
                             // If the base type is callable, merge its signatures
-                            if let Some(TypeKey::Callable(base_shape)) = self.ctx.types.lookup(base_type) {
+                            if let Some(TypeKey::Callable(base_shape_id)) = self.ctx.types.lookup(base_type) {
+                                let base_shape = self.ctx.types.callable_shape(base_shape_id);
                                 call_signatures.extend(base_shape.call_signatures.iter().cloned());
                                 construct_signatures.extend(base_shape.construct_signatures.iter().cloned());
                                 properties.extend(base_shape.properties.iter().cloned());
@@ -1598,7 +1640,9 @@ impl<'a> ThinCheckerState<'a> {
         let base_key = self.ctx.types.lookup(base);
 
         match (derived_key, base_key) {
-            (Some(TypeKey::Callable(derived_shape)), Some(TypeKey::Callable(base_shape))) => {
+            (Some(TypeKey::Callable(derived_shape_id)), Some(TypeKey::Callable(base_shape_id))) => {
+                let derived_shape = self.ctx.types.callable_shape(derived_shape_id);
+                let base_shape = self.ctx.types.callable_shape(base_shape_id);
                 let mut call_signatures = derived_shape.call_signatures.clone();
                 call_signatures.extend(base_shape.call_signatures.iter().cloned());
                 let mut construct_signatures = derived_shape.construct_signatures.clone();
@@ -1610,15 +1654,9 @@ impl<'a> ThinCheckerState<'a> {
                     properties,
                 })
             }
-            (Some(TypeKey::Callable(derived_shape)), Some(TypeKey::Object(base_props))) => {
-                let properties = self.merge_properties(&derived_shape.properties, &base_props);
-                self.ctx.types.callable(CallableShape {
-                    call_signatures: derived_shape.call_signatures.clone(),
-                    construct_signatures: derived_shape.construct_signatures.clone(),
-                    properties,
-                })
-            }
-            (Some(TypeKey::Callable(derived_shape)), Some(TypeKey::ObjectWithIndex(base_shape))) => {
+            (Some(TypeKey::Callable(derived_shape_id)), Some(TypeKey::Object(base_shape_id))) => {
+                let derived_shape = self.ctx.types.callable_shape(derived_shape_id);
+                let base_shape = self.ctx.types.object_shape(base_shape_id);
                 let properties = self.merge_properties(&derived_shape.properties, &base_shape.properties);
                 self.ctx.types.callable(CallableShape {
                     call_signatures: derived_shape.call_signatures.clone(),
@@ -1626,15 +1664,19 @@ impl<'a> ThinCheckerState<'a> {
                     properties,
                 })
             }
-            (Some(TypeKey::Object(derived_props)), Some(TypeKey::Callable(base_shape))) => {
-                let properties = self.merge_properties(&derived_props, &base_shape.properties);
+            (Some(TypeKey::Callable(derived_shape_id)), Some(TypeKey::ObjectWithIndex(base_shape_id))) => {
+                let derived_shape = self.ctx.types.callable_shape(derived_shape_id);
+                let base_shape = self.ctx.types.object_shape(base_shape_id);
+                let properties = self.merge_properties(&derived_shape.properties, &base_shape.properties);
                 self.ctx.types.callable(CallableShape {
-                    call_signatures: base_shape.call_signatures.clone(),
-                    construct_signatures: base_shape.construct_signatures.clone(),
+                    call_signatures: derived_shape.call_signatures.clone(),
+                    construct_signatures: derived_shape.construct_signatures.clone(),
                     properties,
                 })
             }
-            (Some(TypeKey::ObjectWithIndex(derived_shape)), Some(TypeKey::Callable(base_shape))) => {
+            (Some(TypeKey::Object(derived_shape_id)), Some(TypeKey::Callable(base_shape_id))) => {
+                let derived_shape = self.ctx.types.object_shape(derived_shape_id);
+                let base_shape = self.ctx.types.callable_shape(base_shape_id);
                 let properties = self.merge_properties(&derived_shape.properties, &base_shape.properties);
                 self.ctx.types.callable(CallableShape {
                     call_signatures: base_shape.call_signatures.clone(),
@@ -1642,27 +1684,45 @@ impl<'a> ThinCheckerState<'a> {
                     properties,
                 })
             }
-            (Some(TypeKey::Object(derived_props)), Some(TypeKey::Object(base_props))) => {
-                let properties = self.merge_properties(&derived_props, &base_props);
+            (Some(TypeKey::ObjectWithIndex(derived_shape_id)), Some(TypeKey::Callable(base_shape_id))) => {
+                let derived_shape = self.ctx.types.object_shape(derived_shape_id);
+                let base_shape = self.ctx.types.callable_shape(base_shape_id);
+                let properties = self.merge_properties(&derived_shape.properties, &base_shape.properties);
+                self.ctx.types.callable(CallableShape {
+                    call_signatures: base_shape.call_signatures.clone(),
+                    construct_signatures: base_shape.construct_signatures.clone(),
+                    properties,
+                })
+            }
+            (Some(TypeKey::Object(derived_shape_id)), Some(TypeKey::Object(base_shape_id))) => {
+                let derived_shape = self.ctx.types.object_shape(derived_shape_id);
+                let base_shape = self.ctx.types.object_shape(base_shape_id);
+                let properties = self.merge_properties(&derived_shape.properties, &base_shape.properties);
                 self.ctx.types.object(properties)
             }
-            (Some(TypeKey::Object(derived_props)), Some(TypeKey::ObjectWithIndex(base_shape))) => {
-                let properties = self.merge_properties(&derived_props, &base_shape.properties);
+            (Some(TypeKey::Object(derived_shape_id)), Some(TypeKey::ObjectWithIndex(base_shape_id))) => {
+                let derived_shape = self.ctx.types.object_shape(derived_shape_id);
+                let base_shape = self.ctx.types.object_shape(base_shape_id);
+                let properties = self.merge_properties(&derived_shape.properties, &base_shape.properties);
                 self.ctx.types.object_with_index(ObjectShape {
                     properties,
                     string_index: base_shape.string_index.clone(),
                     number_index: base_shape.number_index.clone(),
                 })
             }
-            (Some(TypeKey::ObjectWithIndex(derived_shape)), Some(TypeKey::Object(base_props))) => {
-                let properties = self.merge_properties(&derived_shape.properties, &base_props);
+            (Some(TypeKey::ObjectWithIndex(derived_shape_id)), Some(TypeKey::Object(base_shape_id))) => {
+                let derived_shape = self.ctx.types.object_shape(derived_shape_id);
+                let base_shape = self.ctx.types.object_shape(base_shape_id);
+                let properties = self.merge_properties(&derived_shape.properties, &base_shape.properties);
                 self.ctx.types.object_with_index(ObjectShape {
                     properties,
                     string_index: derived_shape.string_index.clone(),
                     number_index: derived_shape.number_index.clone(),
                 })
             }
-            (Some(TypeKey::ObjectWithIndex(derived_shape)), Some(TypeKey::ObjectWithIndex(base_shape))) => {
+            (Some(TypeKey::ObjectWithIndex(derived_shape_id)), Some(TypeKey::ObjectWithIndex(base_shape_id))) => {
+                let derived_shape = self.ctx.types.object_shape(derived_shape_id);
+                let base_shape = self.ctx.types.object_shape(base_shape_id);
                 let properties = self.merge_properties(&derived_shape.properties, &base_shape.properties);
                 self.ctx.types.object_with_index(ObjectShape {
                     properties,
@@ -2175,8 +2235,9 @@ impl<'a> ThinCheckerState<'a> {
                 let base_instance_type = instantiate_type(self.ctx.types, base_instance_type, &substitution);
                 self.pop_type_parameters(base_type_param_updates);
 
-                if let Some(TypeKey::Object(base_props)) = self.ctx.types.lookup(base_instance_type) {
-                    for base_prop in base_props.iter() {
+                if let Some(TypeKey::Object(base_shape_id)) = self.ctx.types.lookup(base_instance_type) {
+                    let base_shape = self.ctx.types.object_shape(base_shape_id);
+                    for base_prop in base_shape.properties.iter() {
                         properties.entry(base_prop.name).or_insert_with(|| base_prop.clone());
                     }
                 }
@@ -2850,7 +2911,8 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         let construct_type = match self.ctx.types.lookup(constructor_type) {
-            Some(TypeKey::Callable(shape)) => {
+            Some(TypeKey::Callable(shape_id)) => {
+                let shape = self.ctx.types.callable_shape(shape_id);
                 if shape.construct_signatures.is_empty() {
                     None
                 } else {
@@ -2947,11 +3009,17 @@ impl<'a> ThinCheckerState<'a> {
             }
             // Union type - check if ANY constituent is abstract
             TypeKey::Union(members) => {
-                members.iter().any(|&member| self.type_contains_abstract_class(member))
+                let members = self.ctx.types.type_list(members);
+                members
+                    .iter()
+                    .any(|&member| self.type_contains_abstract_class(member))
             }
             // Intersection type - check if ANY constituent is abstract
             TypeKey::Intersection(members) => {
-                members.iter().any(|&member| self.type_contains_abstract_class(member))
+                let members = self.ctx.types.type_list(members);
+                members
+                    .iter()
+                    .any(|&member| self.type_contains_abstract_class(member))
             }
             _ => false,
         }
@@ -3206,6 +3274,7 @@ impl<'a> ThinCheckerState<'a> {
         match object_key {
             Some(TypeKey::Array(element)) => element,
             Some(TypeKey::Tuple(elements)) => {
+                let elements = self.ctx.types.tuple_list(elements);
                 let literal_index = literal_index.or_else(|| {
                     match self.ctx.types.lookup(index_type) {
                         Some(TypeKey::Literal(LiteralValue::Number(num))) => {
@@ -3236,7 +3305,8 @@ impl<'a> ThinCheckerState<'a> {
                     self.ctx.types.union(element_types)
                 }
             }
-            Some(TypeKey::ObjectWithIndex(shape)) => {
+            Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                let shape = self.ctx.types.object_shape(shape_id);
                 if literal_index.is_some() {
                     if let Some(number_index) = shape.number_index.as_ref() {
                         return number_index.value_type;
@@ -3266,8 +3336,9 @@ impl<'a> ThinCheckerState<'a> {
                 TypeId::ANY
             }
             Some(TypeKey::Union(members)) => {
+                let members = self.ctx.types.type_list(members);
                 let mut member_types = Vec::with_capacity(members.len());
-                for member in members {
+                for &member in members.iter() {
                     member_types.push(self.get_element_access_type(member, index_type, literal_index));
                 }
                 if member_types.is_empty() {
@@ -3293,6 +3364,7 @@ impl<'a> ThinCheckerState<'a> {
                 (None, Some(TypeId::UNDEFINED))
             }
             TypeKey::Union(members) => {
+                let members = self.ctx.types.type_list(members);
                 let mut non_null = Vec::with_capacity(members.len());
                 let mut nullish = Vec::new();
 
@@ -3420,6 +3492,7 @@ impl<'a> ThinCheckerState<'a> {
             TypeKey::Literal(LiteralValue::String(atom)) => Some((vec![atom], Vec::new())),
             TypeKey::Literal(LiteralValue::Number(num)) => Some((Vec::new(), vec![num.0])),
             TypeKey::Union(members) => {
+                let members = self.ctx.types.type_list(members);
                 let mut string_keys = Vec::with_capacity(members.len());
                 let mut number_keys = Vec::new();
                 for &member in members.iter() {
@@ -3508,8 +3581,18 @@ impl<'a> ThinCheckerState<'a> {
         match self.ctx.types.lookup(object_type) {
             Some(TypeKey::Array(_) | TypeKey::Tuple(_)) => true,
             Some(TypeKey::ReadonlyType(inner)) => self.is_array_like_type(inner),
-            Some(TypeKey::Union(members)) => members.iter().all(|member| self.is_array_like_type(*member)),
-            Some(TypeKey::Intersection(members)) => members.iter().any(|member| self.is_array_like_type(*member)),
+            Some(TypeKey::Union(members)) => {
+                let members = self.ctx.types.type_list(members);
+                members
+                    .iter()
+                    .all(|member| self.is_array_like_type(*member))
+            }
+            Some(TypeKey::Intersection(members)) => {
+                let members = self.ctx.types.type_list(members);
+                members
+                    .iter()
+                    .any(|member| self.is_array_like_type(*member))
+            }
             _ => false,
         }
     }
@@ -3555,6 +3638,7 @@ impl<'a> ThinCheckerState<'a> {
             TypeKey::Literal(LiteralValue::String(_)) => Some((true, false)),
             TypeKey::Literal(LiteralValue::Number(_)) => Some((false, true)),
             TypeKey::Union(members) => {
+                let members = self.ctx.types.type_list(members);
                 let mut wants_string = false;
                 let mut wants_number = false;
                 for &member in members.iter() {
@@ -3578,19 +3662,26 @@ impl<'a> ThinCheckerState<'a> {
 
         match object_key {
             Some(TypeKey::Array(_)) | Some(TypeKey::Tuple(_)) => wants_number,
-            Some(TypeKey::ObjectWithIndex(shape)) => {
+            Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                let shape = self.ctx.types.object_shape(*shape_id);
                 let has_string = shape.string_index.is_some();
                 let has_number = shape.number_index.is_some();
                 (wants_string && has_string) || (wants_number && (has_number || has_string))
             }
-            Some(TypeKey::Union(members)) => members.iter().all(|member| {
-                let key = self.ctx.types.lookup(*member);
-                self.is_element_indexable_key(&key, wants_string, wants_number)
-            }),
-            Some(TypeKey::Intersection(members)) => members.iter().any(|member| {
-                let key = self.ctx.types.lookup(*member);
-                self.is_element_indexable_key(&key, wants_string, wants_number)
-            }),
+            Some(TypeKey::Union(members)) => {
+                let members = self.ctx.types.type_list(*members);
+                members.iter().all(|member| {
+                    let key = self.ctx.types.lookup(*member);
+                    self.is_element_indexable_key(&key, wants_string, wants_number)
+                })
+            }
+            Some(TypeKey::Intersection(members)) => {
+                let members = self.ctx.types.type_list(*members);
+                members.iter().any(|member| {
+                    let key = self.ctx.types.lookup(*member);
+                    self.is_element_indexable_key(&key, wants_string, wants_number)
+                })
+            }
             Some(TypeKey::Literal(LiteralValue::String(_))) => wants_number,
             Some(TypeKey::Intrinsic(IntrinsicKind::String)) => wants_number,
             _ => false,
@@ -3791,7 +3882,10 @@ impl<'a> ThinCheckerState<'a> {
 
         let tuple_context = match self.ctx.contextual_type {
             Some(ctx_type) => match self.ctx.types.lookup(ctx_type) {
-                Some(TypeKey::Tuple(elements)) => Some(elements.clone()),
+                Some(TypeKey::Tuple(elements)) => {
+                    let elements = self.ctx.types.tuple_list(elements);
+                    Some(elements.as_ref().to_vec())
+                }
                 _ => None,
             },
             None => None,
@@ -5025,19 +5119,22 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::TypeKey;
 
         // Get the properties of both types
-        let source_props = match self.ctx.types.lookup(source) {
-            Some(TypeKey::Object(props)) => props,
+        let source_shape = match self.ctx.types.lookup(source) {
+            Some(TypeKey::Object(shape_id)) => self.ctx.types.object_shape(shape_id),
             _ => return,
         };
 
-        let target_props = match self.ctx.types.lookup(target) {
-            Some(TypeKey::Object(props)) => props,
+        let target_shape = match self.ctx.types.lookup(target) {
+            Some(TypeKey::Object(shape_id)) => self.ctx.types.object_shape(shape_id),
             _ => return,
         };
+
+        let source_props = source_shape.properties.as_slice();
+        let target_props = target_shape.properties.as_slice();
 
         // Check for excess properties in source that don't exist in target
         // This is the "freshness" or "strict object literal" check
-        for source_prop in &source_props {
+        for source_prop in source_props {
             let exists_in_target = target_props.iter().any(|p| p.name == source_prop.name);
             if !exists_in_target {
                 let prop_name = self.ctx.types.resolve_atom(source_prop.name);
@@ -5279,15 +5376,17 @@ impl<'a> ThinCheckerState<'a> {
                 }
                 self.is_property_readonly(inner, prop_name)
             }
-            Some(TypeKey::Object(props)) => {
-                for prop in props.iter() {
+            Some(TypeKey::Object(shape_id)) => {
+                let shape = self.ctx.types.object_shape(shape_id);
+                for prop in shape.properties.iter() {
                     if self.ctx.types.resolve_atom(prop.name) == prop_name {
                         return prop.readonly;
                     }
                 }
                 false
             }
-            Some(TypeKey::ObjectWithIndex(shape)) => {
+            Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                let shape = self.ctx.types.object_shape(shape_id);
                 for prop in shape.properties.iter() {
                     if self.ctx.types.resolve_atom(prop.name) == prop_name {
                         return prop.readonly;
@@ -5307,10 +5406,12 @@ impl<'a> ThinCheckerState<'a> {
                 false
             }
             Some(TypeKey::Union(types)) => {
+                let types = self.ctx.types.type_list(types);
                 // Property is readonly if any union member is readonly
                 types.iter().any(|t| self.is_property_readonly(*t, prop_name))
             }
             Some(TypeKey::Intersection(types)) => {
+                let types = self.ctx.types.type_list(types);
                 // Property is readonly if readonly in any intersection member
                 types.iter().any(|t| self.is_property_readonly(*t, prop_name))
             }
@@ -5335,16 +5436,23 @@ impl<'a> ThinCheckerState<'a> {
                 }
                 self.is_readonly_index_signature(inner, wants_string, wants_number)
             }
-            Some(TypeKey::ObjectWithIndex(shape)) => {
+            Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                let shape = self.ctx.types.object_shape(shape_id);
                 (wants_string && shape.string_index.as_ref().is_some_and(|idx| idx.readonly))
                     || (wants_number && shape.number_index.as_ref().is_some_and(|idx| idx.readonly))
             }
-            Some(TypeKey::Union(types)) => types
-                .iter()
-                .any(|t| self.is_readonly_index_signature(*t, wants_string, wants_number)),
-            Some(TypeKey::Intersection(types)) => types
-                .iter()
-                .any(|t| self.is_readonly_index_signature(*t, wants_string, wants_number)),
+            Some(TypeKey::Union(types)) => {
+                let types = self.ctx.types.type_list(types);
+                types
+                    .iter()
+                    .any(|t| self.is_readonly_index_signature(*t, wants_string, wants_number))
+            }
+            Some(TypeKey::Intersection(types)) => {
+                let types = self.ctx.types.type_list(types);
+                types
+                    .iter()
+                    .any(|t| self.is_readonly_index_signature(*t, wants_string, wants_number))
+            }
             _ => false,
         }
     }
@@ -7715,7 +7823,8 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check for union types that include void/undefined
         if let Some(TypeKey::Union(members)) = self.ctx.types.lookup(return_type) {
-            for &member in &members {
+            let members = self.ctx.types.type_list(members);
+            for &member in members.iter() {
                 if member == TypeId::VOID || member == TypeId::UNDEFINED {
                     return false;
                 }
