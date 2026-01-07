@@ -847,6 +847,69 @@ fn compile_resolves_node_modules_types_versions_env_overrides_tsconfig() {
 }
 
 #[test]
+fn compile_resolves_node_modules_types_versions_cli_overrides_env_and_tsconfig() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "noEmitOnError": true,
+            "typesVersionsCompilerVersion": "6.0"
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { widget } from 'pkg/feature/widget'; export { widget };",
+    );
+    write_file(
+        &base.join("node_modules/pkg/package.json"),
+        r#"{
+          "typesVersions": {
+            ">=7.2": {
+              "feature/*": ["types/v72/feature/*"]
+            },
+            ">=7.1": {
+              "feature/*": ["types/v71/feature/*"]
+            },
+            ">=6.0": {
+              "feature/*": ["types/v6/feature/*"]
+            }
+          }
+        }"#,
+    );
+    write_file(
+        &base.join("node_modules/pkg/types/v72/feature/widget.d.ts"),
+        "export const widget = ;",
+    );
+    write_file(
+        &base.join("node_modules/pkg/types/v71/feature/widget.d.ts"),
+        "export const widget = 1;",
+    );
+    write_file(
+        &base.join("node_modules/pkg/types/v6/feature/widget.d.ts"),
+        "export const widget = 1;",
+    );
+
+    let mut args = default_args();
+    args.types_versions_compiler_version = Some("7.2".to_string());
+    let result = with_types_versions_env(Some("7.1"), || {
+        compile(&args, base).expect("compile should succeed")
+    });
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("node_modules/pkg/types/v72/feature/widget.d.ts")));
+    assert!(!base.join("dist/src/index.js").is_file());
+}
+
+#[test]
 fn compile_resolves_node_modules_types_versions_invalid_override_falls_back() {
     let temp = TempDir::new().expect("temp dir");
     let base = &temp.path;
