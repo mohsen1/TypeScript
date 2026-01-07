@@ -935,12 +935,14 @@ fn test_two_phase_emission_es5_async_function() {
 
     let output = printer.get_output();
     assert!(
-        output.contains("__awaiter"),
-        "ES5 async output should contain '__awaiter'"
+        output.contains("var __awaiter"),
+        "ES5 async output should contain '__awaiter' helper: {}",
+        output
     );
     assert!(
-        output.contains("__generator"),
-        "ES5 async output should contain '__generator'"
+        output.contains("var __generator"),
+        "ES5 async output should contain '__generator' helper: {}",
+        output
     );
 }
 
