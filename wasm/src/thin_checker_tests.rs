@@ -4817,6 +4817,96 @@ for (; typeof x === "string"; ) {
 }
 
 #[test]
+fn test_flow_narrowing_not_applied_in_for_of_body() {
+    use crate::thin_parser::ThinParserState;
+    use crate::parser::syntax_kind_ext;
+
+    let source = r#"
+let x: string | number;
+for (const value of [x]) {
+    x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    let for_idx = source_file.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::FOR_OF_STATEMENT))
+        .expect("for-of statement");
+    let for_node = arena.get(for_idx).expect("for-of node");
+    let for_data = arena.get_for_in_of(for_node).expect("for-of data");
+
+    let body_node = arena.get(for_data.statement).expect("for-of body");
+    let block = arena.get_block(body_node).expect("for-of block");
+    let expr_stmt_idx = block.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::EXPRESSION_STATEMENT))
+        .expect("inner expression statement");
+    let expr_stmt = arena.get_expression_statement(arena.get(expr_stmt_idx).expect("inner expr node"))
+        .expect("inner expression data");
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let inner_type = checker.get_type_of_node(expr_stmt.expression);
+    let expected = checker.ctx.types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(inner_type, expected);
+}
+
+#[test]
+fn test_flow_narrowing_not_applied_in_for_in_body() {
+    use crate::thin_parser::ThinParserState;
+    use crate::parser::syntax_kind_ext;
+
+    let source = r#"
+let x: string | number;
+for (const key in { a: x }) {
+    x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    let for_idx = source_file.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::FOR_IN_STATEMENT))
+        .expect("for-in statement");
+    let for_node = arena.get(for_idx).expect("for-in node");
+    let for_data = arena.get_for_in_of(for_node).expect("for-in data");
+
+    let body_node = arena.get(for_data.statement).expect("for-in body");
+    let block = arena.get_block(body_node).expect("for-in block");
+    let expr_stmt_idx = block.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::EXPRESSION_STATEMENT))
+        .expect("inner expression statement");
+    let expr_stmt = arena.get_expression_statement(arena.get(expr_stmt_idx).expect("inner expr node"))
+        .expect("inner expression data");
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let inner_type = checker.get_type_of_node(expr_stmt.expression);
+    let expected = checker.ctx.types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(inner_type, expected);
+}
+
+#[test]
 fn test_flow_narrowing_not_applied_in_do_while_body() {
     use crate::thin_parser::ThinParserState;
 

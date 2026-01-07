@@ -111,6 +111,8 @@ Status: Active
   - Narrow within `for` condition bodies and keep iterator loops conservative.
   - Add focused flow tests for `for` condition narrowing.
   - Risk: loop exit narrowing remains conservative (no fixed point for assignments).
+- [x] Add flow tests for `for-in`/`for-of` loop bodies
+  - Ensure iterator loop headers do not narrow unrelated variables.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
