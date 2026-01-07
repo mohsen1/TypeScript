@@ -708,13 +708,15 @@ impl<'a> LoweringPass<'a> {
             None
         };
 
+        let heritage = self.get_extends_heritage(&class.heritage_clauses);
+
         // Determine the base transform
         let base_directive = if self.ctx.target_es5 {
             // ES5 class transform
             TransformDirective::ES5Class {
                 class_node: idx,
                 class_name: class_name.clone(),
-                heritage: None, // TODO: Handle heritage clauses
+                heritage,
                 members: class.members.nodes.clone(),
             }
         } else {
@@ -1118,6 +1120,20 @@ impl<'a> LoweringPass<'a> {
                 .map(|n| n.kind == SyntaxKind::DefaultKeyword as u16)
                 .unwrap_or(false)
         })
+    }
+
+    fn get_extends_heritage(&self, heritage_clauses: &Option<NodeList>) -> Option<NodeIndex> {
+        let clauses = heritage_clauses.as_ref()?;
+
+        for &clause_idx in &clauses.nodes {
+            let clause_node = self.arena.get(clause_idx)?;
+            let heritage = self.arena.get_heritage(clause_node)?;
+            if heritage.token == SyntaxKind::ExtendsKeyword as u16 {
+                return Some(clause_idx);
+            }
+        }
+
+        None
     }
 
     /// Check if a function has the 'async' modifier

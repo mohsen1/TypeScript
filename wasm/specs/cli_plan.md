@@ -20,7 +20,7 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
   - [ ] baseUrl
   - [ ] paths
   - [x] rootDir
-  - [ ] jsx
+  - [x] jsx (preserve/react-native)
   - [ ] sourceMap
   - [ ] declarationMap
   - [x] noEmitOnError
