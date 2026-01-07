@@ -932,6 +932,23 @@ fn test_no_unchecked_indexed_access_primitive_index() {
 }
 
 #[test]
+fn test_no_unchecked_indexed_access_array_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let index_access = interner.intern(TypeKey::IndexAccess(string_array, TypeId::NUMBER));
+    let string_or_undefined = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+
+    assert!(checker.is_assignable(index_access, TypeId::STRING));
+
+    checker.set_no_unchecked_indexed_access(true);
+
+    assert!(!checker.is_assignable(index_access, TypeId::STRING));
+    assert!(checker.is_assignable(index_access, string_or_undefined));
+}
+
+#[test]
 fn test_correlated_union_index_access_assignable() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);

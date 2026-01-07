@@ -87,6 +87,23 @@ fn test_union_subtyping() {
 }
 
 #[test]
+fn test_no_unchecked_indexed_access_array_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let index_access = interner.intern(TypeKey::IndexAccess(string_array, TypeId::NUMBER));
+
+    assert!(checker.is_subtype_of(index_access, TypeId::STRING));
+
+    checker.no_unchecked_indexed_access = true;
+    assert!(!checker.is_subtype_of(index_access, TypeId::STRING));
+
+    let string_or_undefined = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    assert!(checker.is_subtype_of(index_access, string_or_undefined));
+}
+
+#[test]
 fn test_correlated_union_index_access_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);

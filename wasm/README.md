@@ -39,9 +39,9 @@ The current `ThinNodeArena` makes in-place mutation difficult.
 Last updated: 2026-01-07
 
 - Overall: Migration is active; Rust/WASM compiler is under construction and not production-ready.
-- Tracks: CLI parser gained coverage for spread call args, keyword identifiers, and as/satisfies precedence but bench still hits a TS1005 parse gap at `checker.ts:8505`; emitter added JSX namespaced attribute parity tests (including member elements); checker now supports namespace element access flow narrowing + type-only diagnostics; LSP added scope cache reuse tests across edits and files; solver added TS_UNSOUNDNESS coverage for mapped type key remap and `keyof` intersections.
+- Tracks: CLI parser now suppresses speculative type-argument diagnostics (relational `<` with parenthesized RHS) but bench moved to a new TS1005 `=>` expected gap at `checker.ts:15885`; emitter added JSX boolean attribute parity tests (element + member element); checker now clears flow narrowing after property/element assignment and base reassignment; LSP added cache reuse tests for hover→references/rename after edit across files; solver added TS_UNSOUNDNESS coverage for error poisoning and correlated union index access.
 - Baselines (`tests/cases`, first 100): compiler errors 60/77 (77.9%) pass, JS 40/76 (52.6%) pass; conformance errors 18/90 (20.0%) pass, JS 1/88 (1.1%) pass (no new run).
-- Risk: CLI bench blocked by the remaining parser gap at `checker.ts:8505`; ES module imports still resolve to `any`; source maps remain minimal; parser/arena child enumeration TODOs remain; conformance baseline pass rates are low.
+- Risk: CLI bench blocked by the remaining parser gap at `checker.ts:15885`; ES module imports still resolve to `any`; source maps remain minimal; parser/arena child enumeration TODOs remain; conformance baseline pass rates are low.
 - Next focus: close remaining parser gaps to run full CLI benches, push assignability/member lookup into solver to end split-brain typing, ship `.d.ts` visibility + re-export handling with ES5 downlevel and full source maps, tighten LSP incremental parse to avoid full rebinds, and retire legacy AST with arena memory-hygiene checks.
 
 ## Status
