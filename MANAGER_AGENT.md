@@ -12,6 +12,14 @@ wait 1 second, then Enter).
 If a pane is actively working (e.g., last lines show "Updating", "Analyzing", "Running", or
 similar progress), do not send messages; wait and re-check later.
 
+Pane status heuristics (use capture-pane -S -80):
+- Busy/working: last lines show "Running", "Compiling", "Analyzing", "Updating", "Working",
+  "Benchmark", streaming logs, or test output that is still advancing.
+- Idle/waiting: last lines are a summary, "Next steps", a question ("If you want me to...",
+  "Pick one"), or a lone prompt ("›") with no active progress, or no output for 60s.
+- If unsure: wait 30s and re-check before sending a message.
+- When idle: send one clear directive and wait; avoid repeated nudges.
+
 ## Workspace layout
 - Main repo: `TypeScript` (branch: `rust`).
 - Track worktrees: `TypeScript-emitter-track`, `TypeScript-cli-track`, `TypeScript-lsp-track`,

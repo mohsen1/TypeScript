@@ -202,7 +202,7 @@ impl CompilationCache {
 }
 
 pub fn compile(args: &CliArgs, cwd: &Path) -> Result<CompilationResult> {
-    compile_inner(args, cwd, None, None)
+    compile_inner(args, cwd, None, None, None)
 }
 
 pub(crate) fn compile_with_cache(
@@ -210,7 +210,7 @@ pub(crate) fn compile_with_cache(
     cwd: &Path,
     cache: &mut CompilationCache,
 ) -> Result<CompilationResult> {
-    compile_inner(args, cwd, Some(cache), None)
+    compile_inner(args, cwd, Some(cache), None, None)
 }
 
 pub(crate) fn compile_with_cache_and_changes(
@@ -231,7 +231,7 @@ pub(crate) fn compile_with_cache_and_changes(
     }
 
     cache.invalidate_paths(canonical_paths.iter().cloned());
-    let result = compile_inner(args, cwd, Some(cache), Some(&canonical_paths))?;
+    let result = compile_inner(args, cwd, Some(cache), Some(&canonical_paths), None)?;
 
     let exports_changed = canonical_paths.iter().any(|path| {
         old_hashes.get(path).copied() != cache.export_hashes.get(path).copied()
@@ -240,8 +240,15 @@ pub(crate) fn compile_with_cache_and_changes(
         return Ok(result);
     }
 
+    let dependents = cache.collect_dependents(canonical_paths.iter().cloned());
     cache.invalidate_paths_with_dependents_symbols(canonical_paths.into_iter());
-    compile_inner(args, cwd, Some(cache), Some(changed_paths))
+    compile_inner(
+        args,
+        cwd,
+        Some(cache),
+        Some(changed_paths),
+        Some(&dependents),
+    )
 }
 
 fn compile_inner(
@@ -249,6 +256,7 @@ fn compile_inner(
     cwd: &Path,
     mut cache: Option<&mut CompilationCache>,
     changed_paths: Option<&[PathBuf]>,
+    forced_dirty_paths: Option<&HashSet<PathBuf>>,
 ) -> Result<CompilationResult> {
     let cwd = canonicalize_or_owned(cwd);
     let tsconfig_path = resolve_tsconfig_path(&cwd, args.project.as_deref())?;
@@ -337,6 +345,18 @@ fn compile_inner(
         .iter()
         .any(|diag| diag.category == DiagnosticCategory::Error);
     let should_emit = !(resolved.no_emit || (resolved.no_emit_on_error && has_error));
+
+    let mut dirty_paths = dirty_paths;
+    if let Some(forced) = forced_dirty_paths {
+        match &mut dirty_paths {
+            Some(existing) => {
+                existing.extend(forced.iter().cloned());
+            }
+            None => {
+                dirty_paths = Some(forced.iter().cloned().collect());
+            }
+        }
+    }
 
     let emitted_files = if !should_emit {
         Vec::new()
