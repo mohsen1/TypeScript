@@ -79,6 +79,8 @@ Status: Active
   - Ensure namespace value access reports TS2339 for non-exported members.
 - [x] Expand namespace member error coverage for nested values
   - Add coverage for missing nested namespace value members.
+- [x] Enforce type-only namespace members in value position
+  - Report TS2693 when accessing interface/type alias exports as values.
 
 ## Baseline / Validation
 - `./wasm/test.sh`

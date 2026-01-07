@@ -3203,6 +3203,42 @@ impl<'a> ThinCheckerState<'a> {
         Some(self.get_type_of_symbol(member_id))
     }
 
+    fn namespace_has_type_only_member(&self, object_type: TypeId, property_name: &str) -> bool {
+        use crate::solver::{SymbolRef, TypeKey};
+
+        let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(object_type) else {
+            return false;
+        };
+
+        let symbol = match self.ctx.binder.get_symbol(SymbolId(sym_id)) {
+            Some(symbol) => symbol,
+            None => return false,
+        };
+
+        if symbol.flags & symbol_flags::MODULE == 0 {
+            return false;
+        }
+
+        let exports = match symbol.exports.as_ref() {
+            Some(exports) => exports,
+            None => return false,
+        };
+
+        let member_id = match exports.get(property_name) {
+            Some(member_id) => member_id,
+            None => return false,
+        };
+
+        let member_symbol = match self.ctx.binder.get_symbol(member_id) {
+            Some(member_symbol) => member_symbol,
+            None => return false,
+        };
+
+        let has_value = (member_symbol.flags & (symbol_flags::VALUE | symbol_flags::ALIAS)) != 0;
+        let has_type = (member_symbol.flags & symbol_flags::TYPE) != 0;
+        has_type && !has_value
+    }
+
     /// Get type of property access expression.
     fn get_type_of_property_access(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
@@ -3252,6 +3288,10 @@ impl<'a> ThinCheckerState<'a> {
 
             if let Some(member_type) = self.resolve_namespace_value_member(object_type, property_name) {
                 return member_type;
+            }
+            if self.namespace_has_type_only_member(object_type, property_name) {
+                self.error_type_only_value_at(property_name, access.name_or_argument);
+                return TypeId::ERROR;
             }
 
             // Use PropertyAccessEvaluator to resolve the property access
@@ -4920,6 +4960,27 @@ impl<'a> ThinCheckerState<'a> {
             let message = format!("Namespace '{}' has no exported member '{}'.", namespace_name, member_name);
             self.ctx.diagnostics.push(Diagnostic {
                 code: 2694,
+                category: DiagnosticCategory::Error,
+                message_text: message,
+                start: loc.start,
+                length: loc.length(),
+                file: self.ctx.file_name.clone(),
+                related_information: Vec::new(),
+            });
+        }
+    }
+
+    /// Report TS2693: Symbol only refers to a type, but is used as a value.
+    pub fn error_type_only_value_at(&mut self, name: &str, idx: NodeIndex) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+
+        if let Some(loc) = self.get_source_location(idx) {
+            let message = format_message(
+                diagnostic_messages::ONLY_REFERS_TO_A_TYPE_BUT_IS_BEING_USED_AS_A_VALUE_HERE,
+                &[name],
+            );
+            self.ctx.diagnostics.push(Diagnostic {
+                code: diagnostic_codes::ONLY_REFERS_TO_A_TYPE_BUT_IS_BEING_USED_AS_A_VALUE_HERE,
                 category: DiagnosticCategory::Error,
                 message_text: message,
                 start: loc.start,

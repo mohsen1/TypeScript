@@ -89,6 +89,8 @@ pub mod diagnostic_messages {
     pub const PROPERTY_MISSING: &str = "Property '{0}' is missing in type '{1}'.";
     pub const PROPERTY_MISSING_BUT_REQUIRED: &str = "Property '{0}' is missing in type '{1}' but required in type '{2}'.";
     pub const TYPES_OF_PROPERTY_INCOMPATIBLE: &str = "Types of property '{0}' are incompatible.";
+    pub const ONLY_REFERS_TO_A_TYPE_BUT_IS_BEING_USED_AS_A_VALUE_HERE: &str =
+        "'{0}' only refers to a type, but is being used as a value here.";
 
     // Function/call errors
     pub const EXPECTED_ARGUMENTS: &str = "Expected {0} arguments, but got {1}.";
@@ -194,6 +196,7 @@ pub mod diagnostic_codes {
     pub const TYPES_OF_PROPERTY_INCOMPATIBLE: u32 = 2326;
     pub const PROPERTY_DOES_NOT_EXIST_ON_TYPE: u32 = 2339;
     pub const TYPE_HAS_NO_PROPERTY: u32 = 2339;
+    pub const ONLY_REFERS_TO_A_TYPE_BUT_IS_BEING_USED_AS_A_VALUE_HERE: u32 = 2693;
 
     // Function/call errors
     pub const ARGUMENT_NOT_ASSIGNABLE_TO_PARAMETER: u32 = 2345;
