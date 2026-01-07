@@ -1296,6 +1296,25 @@ fn test_project_scope_cache_reuse_hover_to_signature_help() {
 }
 
 #[test]
+fn test_project_scope_cache_reuse_hover_to_references() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "const value = 1;\nvalue;\n".to_string());
+    let position = Position::new(1, 0);
+
+    assert!(project.get_hover("a.ts", position).is_some());
+    assert!(project.find_references("a.ts", position).is_some());
+
+    let timing = project
+        .performance()
+        .timing(ProjectRequestKind::References)
+        .expect("Expected timing data for references");
+
+    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover");
+    assert_eq!(timing.scope_misses, 0, "Expected references to reuse cached scope");
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 
