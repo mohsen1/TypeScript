@@ -3003,6 +3003,40 @@ const second = tup[1];
 }
 
 #[test]
+fn test_checker_tuple_optional_element_access_includes_undefined() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::{TypeId, TypeKey};
+
+    let source = r#"
+const tup: [string?] = ["a"];
+const first = tup[0];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let first_sym = binder.file_locals.get("first").expect("first should exist");
+    let first_type = checker.get_type_of_symbol(first_sym);
+    let first_key = types.lookup(first_type).expect("first type should exist");
+    match first_key {
+        TypeKey::Union(members) => {
+            let members = types.type_list(members);
+            assert!(members.contains(&TypeId::STRING));
+            assert!(members.contains(&TypeId::UNDEFINED));
+        }
+        _ => panic!("Expected union type for first, got {:?}", first_key),
+    }
+}
+
+#[test]
 fn test_checker_lowers_element_access_string_literal_property() {
     use crate::thin_parser::ThinParserState;
 
