@@ -9,7 +9,7 @@ fn test_parse_single_file() {
 
     assert_eq!(result.file_name, "test.ts");
     assert!(!result.source_file.is_none());
-    assert!(result.errors.is_empty());
+    assert!(result.parse_diagnostics.is_empty());
 }
 
 #[test]
@@ -25,7 +25,7 @@ fn test_parse_multiple_files_parallel() {
     assert_eq!(results.len(), 3);
     for result in &results {
         assert!(!result.source_file.is_none());
-        assert!(result.errors.is_empty());
+        assert!(result.parse_diagnostics.is_empty());
     }
 }
 
@@ -60,7 +60,7 @@ fn test_parallel_parsing_consistency() {
     let first_node_count = results[0].arena.len();
     for result in &results {
         assert_eq!(result.arena.len(), first_node_count);
-        assert!(result.errors.is_empty());
+        assert!(result.parse_diagnostics.is_empty());
     }
 }
 
@@ -104,7 +104,7 @@ fn test_bind_single_file() {
 
     assert_eq!(result.file_name, "test.ts");
     assert!(!result.source_file.is_none());
-    assert!(result.parse_errors.is_empty());
+    assert!(result.parse_diagnostics.is_empty());
     // Should have symbols for x and foo
     assert!(result.file_locals.has("x"));
     assert!(result.file_locals.has("foo"));
@@ -159,7 +159,7 @@ fn test_parallel_binding_consistency() {
     for result in &results {
         assert!(result.file_locals.has("x"));
         assert!(result.file_locals.has("add"));
-        assert!(result.parse_errors.is_empty());
+        assert!(result.parse_diagnostics.is_empty());
     }
 }
 
