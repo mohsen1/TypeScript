@@ -142,15 +142,17 @@ impl ProjectFile {
         provider.get_signature_help(self.root, position, &mut self.type_cache)
     }
 
-    pub fn get_completions(&self, position: Position) -> Option<Vec<CompletionItem>> {
-        let provider = Completions::new(
+    pub fn get_completions(&mut self, position: Position) -> Option<Vec<CompletionItem>> {
+        let provider = Completions::new_with_types(
             self.parser.get_arena(),
             &self.binder,
             &self.line_map,
+            &self.type_interner,
             self.parser.get_source_text(),
+            self.file_name.clone(),
         );
 
-        provider.get_completions(self.root, position)
+        provider.get_completions_with_cache(self.root, position, &mut self.type_cache)
     }
 
     fn node_location(&self, node_idx: NodeIndex) -> Option<Location> {
@@ -629,8 +631,8 @@ impl Project {
     }
 
     /// Completions within a single file.
-    pub fn get_completions(&self, file_name: &str, position: Position) -> Option<Vec<CompletionItem>> {
-        let file = self.files.get(file_name)?;
+    pub fn get_completions(&mut self, file_name: &str, position: Position) -> Option<Vec<CompletionItem>> {
+        let file = self.files.get_mut(file_name)?;
         file.get_completions(position)
     }
 
