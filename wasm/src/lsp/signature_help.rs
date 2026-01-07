@@ -12,6 +12,7 @@ use crate::lsp::utils::find_node_at_offset;
 use crate::thin_checker::ThinCheckerState;
 use crate::scanner_impl::ScannerState;
 use crate::scanner::SyntaxKind;
+use crate::comments::{get_jsdoc_content, get_leading_comments_from_cache, is_jsdoc_comment};
 
 /// Represents a parameter in a signature.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -133,7 +134,13 @@ impl<'a> SignatureHelpProvider<'a> {
         let callee_type = checker.get_type_of_symbol(symbol_id);
 
         // 6. Extract signatures from the type
-        let signatures = self.get_signatures_from_type(callee_type, &checker, call_kind);
+        let mut signatures = self.get_signatures_from_type(callee_type, &checker, call_kind);
+
+        if let Some(doc) = self.signature_documentation_for_symbol(root, symbol_id) {
+            for sig in &mut signatures {
+                sig.info.documentation = Some(doc.clone());
+            }
+        }
 
         // Extract and save the updated cache for future queries
         *type_cache = Some(checker.extract_cache());
@@ -408,6 +415,61 @@ impl<'a> SignatureHelpProvider<'a> {
 
         best_idx as u32
     }
+
+    fn signature_documentation_for_symbol(
+        &self,
+        root: NodeIndex,
+        symbol_id: crate::binder::SymbolId,
+    ) -> Option<String> {
+        let symbol = self.binder.get_symbol(symbol_id)?;
+        let mut decls = Vec::new();
+        if !symbol.value_declaration.is_none() {
+            decls.push(symbol.value_declaration);
+        }
+        decls.extend(symbol.declarations.iter().copied());
+
+        for decl in decls {
+            if decl.is_none() {
+                continue;
+            }
+            let doc = self.get_documentation(root, decl);
+            if !doc.is_empty() {
+                return Some(doc);
+            }
+        }
+
+        None
+    }
+
+    /// Extract JSDoc comments preceding a node.
+    /// Uses cached comment ranges from SourceFileData for O(log N) performance.
+    fn get_documentation(&self, root: NodeIndex, node_idx: NodeIndex) -> String {
+        let Some(node) = self.arena.get(node_idx) else { return String::new() };
+
+        let comments = if let Some(root_node) = self.arena.get(root) {
+            if let Some(sf_data) = self.arena.get_source_file(root_node) {
+                &sf_data.comments
+            } else {
+                return String::new();
+            }
+        } else {
+            return String::new();
+        };
+
+        let leading_comments = get_leading_comments_from_cache(comments, node.pos, self.source_text);
+        let mut docs = Vec::new();
+
+        for comment in leading_comments.iter().rev() {
+            if is_jsdoc_comment(comment, self.source_text) {
+                docs.push(get_jsdoc_content(comment, self.source_text));
+            } else if !docs.is_empty() {
+                break;
+            }
+        }
+
+        docs.reverse();
+        docs.join("\n\n")
+    }
 }
 
 #[cfg(test)]
@@ -667,5 +729,40 @@ mod signature_help_tests {
             second_active.label.contains("b: string"),
             "Second new should select two-arg overload"
         );
+    }
+
+    #[test]
+    fn test_signature_help_includes_jsdoc() {
+        let source = "/** Adds two numbers. */\nfunction add(a: number, b: number): number { return a + b; }\nadd(1, 2);";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let interner = TypeInterner::new();
+        let line_map = LineMap::build(source);
+
+        let provider = SignatureHelpProvider::new(
+            parser.get_arena(),
+            &binder,
+            &line_map,
+            &interner,
+            source,
+            "test.ts".to_string(),
+        );
+
+        let pos = Position::new(2, 6); // At "1"
+        let mut cache = None;
+        let help = provider.get_signature_help(root, pos, &mut cache);
+        assert!(help.is_some(), "Should find signature help");
+
+        let help = help.unwrap();
+        assert!(!help.signatures.is_empty(), "Should have signatures");
+        let doc = help.signatures[help.active_signature as usize]
+            .documentation
+            .clone()
+            .unwrap_or_default();
+        assert_eq!(doc, "Adds two numbers.");
     }
 }
