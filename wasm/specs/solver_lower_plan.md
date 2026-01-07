@@ -56,6 +56,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Nested objects
   - [x] Test: Union/intersection normalization
   - [x] Test: Tuple optional/rest/named elements
+  - [x] Test: Conditional type with infer (including constraint)
 
 ### Phase 3: Function Signatures
 - [x] Implement function type lowering

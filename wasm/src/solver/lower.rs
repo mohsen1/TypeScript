@@ -1506,20 +1506,13 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_infer_type(node) {
-            // Get the type parameter name
+            if let Some(info) = self.lower_type_parameter(data.type_parameter) {
+                return self.interner.intern(TypeKey::Infer(info));
+            }
+
+            // Fallback: synthesize a name if the node isn't a type parameter.
             let name = if let Some(tp_node) = self.arena.get(data.type_parameter) {
-                // Type parameter node should have an identifier
-                if let Some(tp_data) = self.arena.get_type_parameter(tp_node) {
-                    if let Some(name_node) = self.arena.get(tp_data.name) {
-                        if let Some(id_data) = self.arena.get_identifier(name_node) {
-                            self.interner.intern_string(&id_data.escaped_text)
-                        } else {
-                            self.interner.intern_string("infer")
-                        }
-                    } else {
-                        self.interner.intern_string("infer")
-                    }
-                } else if let Some(id_data) = self.arena.get_identifier(tp_node) {
+                if let Some(id_data) = self.arena.get_identifier(tp_node) {
                     self.interner.intern_string(&id_data.escaped_text)
                 } else {
                     self.interner.intern_string("infer")
