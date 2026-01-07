@@ -647,6 +647,25 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             (Some(TypeKey::KeyOf(s_inner)), Some(TypeKey::KeyOf(t_inner))) => {
                 self.constrain_types(ctx, var_map, t_inner, s_inner);
             }
+            (Some(TypeKey::TemplateLiteral(s_spans)), Some(TypeKey::TemplateLiteral(t_spans))) => {
+                if s_spans.len() != t_spans.len() {
+                    return;
+                }
+
+                for (s_span, t_span) in s_spans.iter().zip(t_spans.iter()) {
+                    match (s_span, t_span) {
+                        (TemplateSpan::Text(s_text), TemplateSpan::Text(t_text)) if s_text == t_text => {}
+                        (TemplateSpan::Type(_), TemplateSpan::Type(_)) => {}
+                        _ => return,
+                    }
+                }
+
+                for (s_span, t_span) in s_spans.iter().zip(t_spans.iter()) {
+                    if let (TemplateSpan::Type(s_type), TemplateSpan::Type(t_type)) = (s_span, t_span) {
+                        self.constrain_types(ctx, var_map, *s_type, *t_type);
+                    }
+                }
+            }
             (Some(TypeKey::Union(ref s_members)), _) => {
                 for &member in s_members {
                     self.constrain_types(ctx, var_map, member, target);
