@@ -1785,6 +1785,35 @@ fn test_keyof_deferred_not_subtype_of_string_number_union() {
 }
 
 #[test]
+fn test_intersection_reduction_disjoint_discriminant_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let kind = interner.intern_string("kind");
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: kind,
+        type_id: interner.literal_string("a"),
+        write_type: interner.literal_string("a"),
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: kind,
+        type_id: interner.literal_string("b"),
+        write_type: interner.literal_string("b"),
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+
+    assert!(checker.is_subtype_of(intersection, TypeId::NEVER));
+    assert!(checker.is_subtype_of(intersection, TypeId::STRING));
+}
+
+#[test]
 fn test_mapped_type_key_remap_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
