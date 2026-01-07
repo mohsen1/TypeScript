@@ -64,6 +64,7 @@ Pick the most doable and impactful
 39. CommonJS: emit side-effect imports as require() [done]
 40. Module wrappers: skip type-only import/export dependencies [done]
 41. Module auto-detect: ignore type-only/ambient exports for wrapper/preamble [done]
+42. Import equals: emit JS and ignore internal aliases in module auto-detect [done]
 
 
 ## Quick Reference
