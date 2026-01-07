@@ -344,9 +344,25 @@ impl<'a> LoweringPass<'a> {
                     self.visit(cond.when_false);
                 }
             }
-            k if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION
-                || k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION =>
-            {
+            k if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION => {
+                if let Some(lit) = self.arena.get_literal_expr(node) {
+                    if self.ctx.target_es5
+                        && self.needs_es5_object_literal_transform(&lit.elements.nodes)
+                    {
+                        self.transforms.insert(
+                            idx,
+                            TransformDirective::ES5ObjectLiteral {
+                                object_literal: idx,
+                            },
+                        );
+                    }
+
+                    for &elem in &lit.elements.nodes {
+                        self.visit(elem);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION => {
                 if let Some(lit) = self.arena.get_literal_expr(node) {
                     for &elem in &lit.elements.nodes {
                         self.visit(elem);
@@ -1047,6 +1063,48 @@ impl<'a> LoweringPass<'a> {
                 .map(|n| n.kind == SyntaxKind::AsyncKeyword as u16)
                 .unwrap_or(false)
         })
+    }
+
+    fn needs_es5_object_literal_transform(&self, elements: &[NodeIndex]) -> bool {
+        elements.iter().any(|&idx| {
+            self.is_computed_property_member(idx) || self.is_spread_element(idx)
+        })
+    }
+
+    fn is_computed_property_member(&self, idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(idx) else {
+            return false;
+        };
+
+        let name_idx = match node.kind {
+            k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
+                self.arena.get_property_assignment(node).map(|p| p.name)
+            }
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                self.arena.get_method_decl(node).map(|m| m.name)
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                self.arena.get_accessor(node).map(|a| a.name)
+            }
+            _ => None,
+        };
+
+        if let Some(name_idx) = name_idx {
+            if let Some(name_node) = self.arena.get(name_idx) {
+                return name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME;
+            }
+        }
+
+        false
+    }
+
+    fn is_spread_element(&self, idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(idx) else {
+            return false;
+        };
+
+        node.kind == syntax_kind_ext::SPREAD_ASSIGNMENT
+            || node.kind == syntax_kind_ext::SPREAD_ELEMENT
     }
 
     /// Get identifier text from a node index

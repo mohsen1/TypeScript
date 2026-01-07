@@ -804,6 +804,17 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_node_default(node, idx);
             }
 
+            TransformDirective::ES5ObjectLiteral { object_literal } => {
+                if let Some(literal_node) = self.arena.get(object_literal) {
+                    if let Some(literal) = self.arena.get_literal_expr(literal_node) {
+                        self.emit_object_literal_es5(&literal.elements.nodes);
+                        return;
+                    }
+                }
+
+                self.emit_node_default(node, idx);
+            }
+
             TransformDirective::ModuleWrapper {
                 format,
                 dependencies,
@@ -1064,6 +1075,16 @@ impl<'a> ThinPrinter<'a> {
                             self.emit_for_of_statement_es5(for_in_of);
                             return;
                         }
+                    }
+                }
+
+                self.emit_chained_previous(node, idx, directives, index);
+            }
+            TransformDirective::ES5ObjectLiteral { object_literal } => {
+                if let Some(literal_node) = self.arena.get(*object_literal) {
+                    if let Some(literal) = self.arena.get_literal_expr(literal_node) {
+                        self.emit_object_literal_es5(&literal.elements.nodes);
+                        return;
                     }
                 }
 
@@ -1949,11 +1970,7 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        // Check if we need ES5 computed property transform
-        if self.ctx.target_es5 && self.has_computed_property_in_object(&obj.elements.nodes) {
-            self.emit_object_literal_es5(&obj.elements.nodes);
-            return;
-        }
+        // ES5 computed/spread lowering is handled via TransformDirective::ES5ObjectLiteral.
 
         // Multi-line format for object literals with multiple properties
         if obj.elements.nodes.len() > 1 {
@@ -1975,24 +1992,6 @@ impl<'a> ThinPrinter<'a> {
             self.emit(obj.elements.nodes[0]);
             self.write(" }");
         }
-    }
-
-    /// Check if any property in the object literal has a computed property name
-    fn has_computed_property_in_object(&self, elements: &[NodeIndex]) -> bool {
-        for &idx in elements {
-            if self.is_computed_property_member(idx) {
-                return true;
-            }
-            // Also check for spread elements which need ES5 transform
-            if let Some(node) = self.arena.get(idx) {
-                if node.kind == syntax_kind_ext::SPREAD_ASSIGNMENT
-                    || node.kind == syntax_kind_ext::SPREAD_ELEMENT
-                {
-                    return true;
-                }
-            }
-        }
-        false
     }
 
     /// Check if a property member has a computed property name
