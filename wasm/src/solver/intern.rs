@@ -346,6 +346,7 @@ impl TypeInterner {
                     default: None,
                 },
                 constraint: TypeId::ERROR,
+                name_type: None,
                 template: TypeId::ERROR,
                 readonly_modifier: None,
                 optional_modifier: None,

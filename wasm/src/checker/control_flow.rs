@@ -18,7 +18,7 @@
 //! }
 //! ```
 
-use crate::binder::{FlowNode, FlowNodeId, flow_flags};
+use crate::binder::{FlowNode, FlowNodeId, flow_flags, symbol_flags, SymbolId};
 use crate::interner::Atom;
 use crate::parser::thin_node::{BinaryExprData, CallExprData, ThinNodeArena};
 use crate::parser::{NodeIndex, syntax_kind_ext};
@@ -1574,10 +1574,82 @@ impl<'a> FlowAnalyzer<'a> {
         sym_a.is_some() && sym_a == sym_b
     }
 
-    fn reference_symbol(&self, idx: NodeIndex) -> Option<crate::binder::SymbolId> {
+    fn reference_symbol(&self, idx: NodeIndex) -> Option<SymbolId> {
+        let mut visited = Vec::new();
+        self.reference_symbol_inner(idx, &mut visited)
+    }
+
+    fn reference_symbol_inner(
+        &self,
+        idx: NodeIndex,
+        visited: &mut Vec<SymbolId>,
+    ) -> Option<SymbolId> {
         let idx = self.skip_parenthesized(idx);
-        self.binder.get_node_symbol(idx)
+        if let Some(sym_id) = self.binder.get_node_symbol(idx)
             .or_else(|| self.binder.resolve_identifier(self.arena, idx))
+        {
+            return self.resolve_alias_symbol(sym_id, visited);
+        }
+
+        let node = self.arena.get(idx)?;
+        if node.kind == syntax_kind_ext::QUALIFIED_NAME {
+            let qn = self.arena.get_qualified_name(node)?;
+            return self.resolve_namespace_member(qn.left, qn.right, visited);
+        }
+
+        if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+            let access = self.arena.get_access_expr(node)?;
+            if access.question_dot_token {
+                return None;
+            }
+            return self.resolve_namespace_member(access.expression, access.name_or_argument, visited);
+        }
+
+        None
+    }
+
+    fn resolve_namespace_member(
+        &self,
+        left: NodeIndex,
+        right: NodeIndex,
+        visited: &mut Vec<SymbolId>,
+    ) -> Option<SymbolId> {
+        let left_sym = self.reference_symbol_inner(left, visited)?;
+        let left_sym = self.resolve_alias_symbol(left_sym, visited)?;
+        let right_name = self.arena.get(right)
+            .and_then(|node| self.arena.get_identifier(node))
+            .map(|ident| ident.escaped_text.as_str())?;
+        let left_symbol = self.binder.get_symbol(left_sym)?;
+        let exports = left_symbol.exports.as_ref()?;
+        let member_sym = exports.get(right_name)?;
+        self.resolve_alias_symbol(member_sym, visited)
+    }
+
+    fn resolve_alias_symbol(
+        &self,
+        sym_id: SymbolId,
+        visited: &mut Vec<SymbolId>,
+    ) -> Option<SymbolId> {
+        let symbol = self.binder.get_symbol(sym_id)?;
+        if symbol.flags & symbol_flags::ALIAS == 0 {
+            return Some(sym_id);
+        }
+        if visited.iter().any(|&seen| seen == sym_id) {
+            return None;
+        }
+        visited.push(sym_id);
+
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            *symbol.declarations.first()?
+        };
+        let decl_node = self.arena.get(decl_idx)?;
+        if decl_node.kind != syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
+            return None;
+        }
+        let import = self.arena.get_import_decl(decl_node)?;
+        self.reference_symbol_inner(import.module_specifier, visited)
     }
 }
 

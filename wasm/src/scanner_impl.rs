@@ -1467,6 +1467,7 @@ impl ScannerState {
                 }
             }
             self.token_value = self.substring(self.token_start, self.pos);
+            self.token_atom = self.interner.intern(self.token_value.as_str());
         }
         self.token
     }

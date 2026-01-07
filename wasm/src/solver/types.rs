@@ -380,6 +380,7 @@ pub struct ConditionalType {
 pub struct MappedType {
     pub type_param: TypeParamInfo,
     pub constraint: TypeId,
+    pub name_type: Option<TypeId>,
     pub template: TypeId,
     pub readonly_modifier: Option<MappedModifier>,
     pub optional_modifier: Option<MappedModifier>,

@@ -1798,3 +1798,62 @@ fn test_rest_unknown_callable_target_from_callable() {
 
     assert!(checker.is_assignable(source, target));
 }
+
+#[test]
+fn test_mapped_type_key_remap_filters_keys() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let prop_a = PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    };
+    let prop_b = PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    };
+    let obj = interner.object(vec![prop_a.clone(), prop_b.clone()]);
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: Some(keys),
+        default: None,
+    };
+    let key_param_id = interner.intern(TypeKey::TypeParameter(key_param.clone()));
+
+    let name_type = interner.conditional(ConditionalType {
+        check_type: key_param_id,
+        extends_type: key_a,
+        true_type: TypeId::NEVER,
+        false_type: key_param_id,
+        is_distributive: true,
+    });
+    let template = interner.intern(TypeKey::IndexAccess(obj, key_param_id));
+
+    let mapped = interner.mapped(MappedType {
+        type_param: key_param,
+        constraint: keys,
+        name_type: Some(name_type),
+        template,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let expected = interner.object(vec![prop_b]);
+    let requires_a = interner.object(vec![prop_a]);
+
+    assert!(checker.is_assignable(mapped, expected));
+    assert!(!checker.is_assignable(mapped, requires_a));
+}

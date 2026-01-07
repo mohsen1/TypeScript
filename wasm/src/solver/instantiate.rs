@@ -382,6 +382,7 @@ impl<'a> TypeInstantiator<'a> {
                         default: mapped.type_param.default.map(|d| self.instantiate(d)),
                     },
                     constraint: self.instantiate(mapped.constraint),
+                    name_type: mapped.name_type.map(|t| self.instantiate(t)),
                     template: self.instantiate(mapped.template),
                     readonly_modifier: mapped.readonly_modifier,
                     optional_modifier: mapped.optional_modifier,

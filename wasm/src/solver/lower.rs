@@ -1485,6 +1485,9 @@ impl<'a> TypeLowering<'a> {
                     self.collect_infer_bindings(default, visited);
                 }
                 self.collect_infer_bindings(mapped.constraint, visited);
+                if let Some(name_type) = mapped.name_type {
+                    self.collect_infer_bindings(name_type, visited);
+                }
                 self.collect_infer_bindings(mapped.template, visited);
             }
             TypeKey::IndexAccess(obj, idx) => {
@@ -1524,11 +1527,17 @@ impl<'a> TypeLowering<'a> {
             self.push_type_param_scope();
             let type_param_id = self.interner.intern(TypeKey::TypeParameter(type_param.clone()));
             self.add_type_param_binding(type_param.name, type_param_id);
+            let name_type = if data.name_type != NodeIndex::NONE {
+                Some(self.lower_type(data.name_type))
+            } else {
+                None
+            };
             let template = self.lower_type(data.type_node);
             self.pop_type_param_scope();
             let mapped = MappedType {
                 type_param,
                 constraint,
+                name_type,
                 template,
                 readonly_modifier: self.lower_mapped_modifier(data.readonly_token, SyntaxKind::ReadonlyKeyword as u16),
                 optional_modifier: self.lower_mapped_modifier(data.question_token, SyntaxKind::QuestionToken as u16),
