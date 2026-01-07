@@ -6,6 +6,15 @@ The goal is a correct, fast, drop-in replacement for `tsc`, with both native and
 TypeScript is intentionally unsound. Zang keeps a sound core solver and layers a compatibility
 engine on top to match TypeScript behavior while preserving correctness where possible.
 
+## Project Direction
+
+> This is a very high level project direction coming from project's manager's boss.
+
+- Don't get too bugged down with performance. lets ship something first that works. 
+- I saw emitter/mod.rs is a giant file. smaller files are better
+- I want to see `test/cases` baseline pass rates in manager report
+
+
 ## Executive Summary (Manager report)
 Last updated: 2026-01-07
 
