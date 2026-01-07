@@ -637,6 +637,14 @@ impl<'a> FlowAnalyzer<'a> {
             }
         }
 
+        if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            if let Some(bin) = self.arena.get_binary_expr(node) {
+                if self.is_assignment_operator(bin.operator_token) {
+                    return self.assignment_affects_reference(bin.left, target);
+                }
+            }
+        }
+
         if node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION
             || node.kind == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION
         {

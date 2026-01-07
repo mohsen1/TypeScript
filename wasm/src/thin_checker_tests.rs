@@ -3746,8 +3746,6 @@ var x: string;
         "Expected no error 2403 for top-level variable redeclaration with same type, got: {:?}", codes);
 }
 
-// TODO: Re-enable once namespace member checking is fully working
-// #[test]
 #[test]
 fn test_namespace_member_not_found() {
     use crate::thin_parser::ThinParserState;
@@ -3774,6 +3772,39 @@ var p: foo.NotExist;
 
     // Should produce error 2694: Namespace 'foo' has no exported member 'NotExist'
     assert!(codes.contains(&2694), "Expected error 2694 for namespace member not found, got: {:?}", codes);
+}
+
+#[test]
+fn test_namespace_value_member_missing_errors() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace NS {
+    export const ok = 1;
+}
+import Alias = NS;
+const bad = NS.missing;
+const badAlias = Alias.missing;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let missing_count = codes.iter().filter(|&&code| code == 2339).count();
+    assert_eq!(
+        missing_count,
+        2,
+        "Expected two 2339 errors for missing namespace value members, got: {:?}",
+        codes
+    );
 }
 
 #[test]
