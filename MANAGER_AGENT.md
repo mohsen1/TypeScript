@@ -54,8 +54,6 @@ Useful commands:
 - worker-4 -> `TypeScript/wasm/specs/worker-4_plan.md`
 - worker-5 -> `TypeScript/wasm/specs/worker-5_plan.md`
 
-Domain plans (emitter/cli/lsp/checker/solver) remain as backlogs and reference material, not worker assignments.
-
 ## Naming
 - Project name: Codename Zang (Zang = Persian for rust).
 - CLI binary: `tsz`.
