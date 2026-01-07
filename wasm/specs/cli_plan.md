@@ -9,7 +9,8 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 ## Current Status
 - Args/tsconfig parsing, globbing, compile + emit work.
 - Watch mode implemented with notify + debounce.
-- No incremental compile or module-resolution parity yet.
+- Incremental compile in place (cache reuse + export-hash dependent invalidation); still missing symbol-level invalidation.
+- Module resolution supports node/bundler + exports/conditions basics; parity still incomplete.
 
 ## Current Investigation Notes (Incremental export hash)
 Summary of the incremental work (export hash fixed):
