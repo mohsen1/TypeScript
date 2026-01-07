@@ -188,6 +188,25 @@ fn resolve_compiler_options_rejects_unsupported_jsx() {
 }
 
 #[test]
+fn resolve_compiler_options_rejects_paths_without_base_url() {
+    let config = parse_tsconfig(
+        r#"{
+          "compilerOptions": {
+            "paths": {
+              "@app/*": ["src/*"]
+            }
+          }
+        }"#,
+    )
+    .expect("should parse config");
+
+    let err = resolve_compiler_options(config.compiler_options.as_ref())
+        .expect_err("paths without baseUrl should error");
+    let message = err.to_string();
+    assert!(message.contains("compilerOptions.paths"), "{message}");
+}
+
+#[test]
 fn resolve_compiler_options_resolves_lib_files() {
     let lib_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../src/lib");
     if !lib_dir.is_dir() {

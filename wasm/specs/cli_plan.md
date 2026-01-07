@@ -17,8 +17,8 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
   - Reuse `TypeCache` in `ThinCheckerState::with_cache`.
   - Invalidate affected symbols only.
 - [ ] Expand tsconfig support
-  - [ ] baseUrl
-  - [ ] paths
+  - [x] baseUrl
+  - [x] paths
   - [x] rootDir
   - [x] jsx (preserve/react-native)
   - [ ] sourceMap
@@ -29,8 +29,8 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
   - `--project` accepts file or directory
   - `extends` chain already supported
 - [ ] Module resolution parity
-  - Support Node16/NodeNext resolution and `.d.ts` lookup.
-  - Improve path mapping + extension inference.
+  - [x] Resolve relative + baseUrl/paths imports with TS extension inference.
+  - [ ] Support Node16/NodeNext resolution and `.d.ts` lookup.
 - [ ] Benchmark harness
   - Script for `tsz` vs `tsc` on large repos with timing + memory stats.
 
