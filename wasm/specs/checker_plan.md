@@ -101,6 +101,9 @@ Status: Active
 - [x] Report TS2304 for unknown qualified names in `typeof` type queries
   - Error when `typeof Missing.Member` references an unknown base identifier.
   - Add focused tests for unknown qualified `typeof` names.
+- [x] Report TS2694 for missing namespace members in `typeof` type queries
+  - Error when `typeof Ns.Missing` references a namespace member that is not exported.
+  - Add focused tests for missing namespace members in `typeof`.
 - [x] Report TS2749 for value-only symbols in type positions
   - Error on local value names, functions, and namespace symbols used as types.
   - Add coverage for namespace alias chains and namespace-as-type usage.

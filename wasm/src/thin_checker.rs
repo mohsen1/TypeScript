@@ -661,6 +661,49 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    fn report_type_query_missing_member(&mut self, idx: NodeIndex) -> bool {
+        let node = match self.ctx.arena.get(idx) {
+            Some(node) => node,
+            None => return false,
+        };
+        if node.kind != syntax_kind_ext::QUALIFIED_NAME {
+            return false;
+        }
+        let qn = match self.ctx.arena.get_qualified_name(node) {
+            Some(qn) => qn,
+            None => return false,
+        };
+
+        let left_sym = match self.resolve_qualified_symbol(qn.left) {
+            Some(sym) => sym,
+            None => return false,
+        };
+        let left_symbol = match self.ctx.binder.get_symbol(left_sym) {
+            Some(symbol) => symbol,
+            None => return false,
+        };
+        let exports = match left_symbol.exports.as_ref() {
+            Some(exports) => exports,
+            None => return false,
+        };
+        let right_name = match self.ctx.arena.get(qn.right)
+            .and_then(|node| self.ctx.arena.get_identifier(node))
+            .map(|ident| ident.escaped_text.clone())
+        {
+            Some(name) => name,
+            None => return false,
+        };
+
+        if exports.has(&right_name) {
+            return false;
+        }
+
+        let namespace_name = self.entity_name_text(qn.left)
+            .unwrap_or_else(|| left_symbol.escaped_name.clone());
+        self.error_namespace_no_export(&namespace_name, &right_name, qn.right);
+        true
+    }
+
     fn resolve_alias_symbol(
         &self,
         sym_id: SymbolId,
@@ -928,6 +971,9 @@ impl<'a> ThinCheckerState<'a> {
                     self.error_cannot_find_name_at(&missing_name, missing_idx);
                     return TypeId::ERROR;
                 }
+            }
+            if self.report_type_query_missing_member(type_query.expr_name) {
+                return TypeId::ERROR;
             }
             // Not found - fall back to hash (for forward compatibility)
             use std::hash::{Hash, Hasher};

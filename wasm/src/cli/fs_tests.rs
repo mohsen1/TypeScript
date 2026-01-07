@@ -60,6 +60,7 @@ fn discover_files_defaults_exclude_common_dirs() {
         include: None,
         exclude: None,
         out_dir: Some(PathBuf::from("dist")),
+        follow_links: false,
     };
 
     let files = discover_ts_files(&options).expect("should discover files");
@@ -84,6 +85,7 @@ fn discover_files_with_include_exclude() {
         include: Some(vec!["src/**/*.ts".to_string()]),
         exclude: Some(vec!["**/*.spec.ts".to_string(), "src/nested".to_string()]),
         out_dir: None,
+        follow_links: false,
     };
 
     let files = discover_ts_files(&options).expect("should discover files");
@@ -106,6 +108,7 @@ fn discover_files_includes_explicit_files() {
         include: Some(vec!["src/**/*.ts".to_string()]),
         exclude: Some(vec!["src/**".to_string()]),
         out_dir: None,
+        follow_links: false,
     };
 
     let files = discover_ts_files(&options).expect("should discover files");
@@ -124,9 +127,41 @@ fn discover_files_missing_explicit_file_errors() {
         include: None,
         exclude: None,
         out_dir: None,
+        follow_links: false,
     };
 
     let err = discover_ts_files(&options).expect_err("missing file should error");
     let message = err.to_string();
     assert!(message.contains("file not found"), "{message}");
+}
+
+#[cfg(unix)]
+#[test]
+fn discover_files_follow_links_when_enabled() {
+    use std::os::unix::fs::symlink;
+
+    let base = TempDir::new().expect("temp dir");
+    let external = TempDir::new().expect("external dir");
+
+    write_file(&external.path.join("linked.ts"), "export const linked = 1;");
+    let link_path = base.path.join("linked");
+    symlink(&external.path, &link_path).expect("create symlink");
+
+    let mut options = FileDiscoveryOptions {
+        base_dir: base.path.clone(),
+        files: Vec::new(),
+        include: Some(vec!["linked/**/*.ts".to_string()]),
+        exclude: None,
+        out_dir: None,
+        follow_links: false,
+    };
+
+    let files = discover_ts_files(&options).expect("discover without links");
+    assert!(files.is_empty(), "expected no files without follow_links");
+
+    options.follow_links = true;
+    let files = discover_ts_files(&options).expect("discover with links");
+    let expected = std::fs::canonicalize(external.path.join("linked.ts"))
+        .unwrap_or_else(|_| external.path.join("linked.ts"));
+    assert_eq!(files, vec![expected]);
 }
