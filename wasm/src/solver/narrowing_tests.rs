@@ -276,6 +276,34 @@ fn test_narrow_by_typeof_unknown_object() {
 }
 
 #[test]
+fn test_narrow_by_typeof_unknown_function() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    let narrowed = narrow_by_typeof(&interner, TypeId::UNKNOWN, "function");
+    assert_eq!(narrowed, ctx.function_type());
+}
+
+#[test]
+fn test_narrow_by_typeof_object_function() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    let narrowed = narrow_by_typeof(&interner, TypeId::OBJECT, "function");
+    assert_eq!(narrowed, ctx.function_type());
+}
+
+#[test]
+fn test_narrow_by_typeof_empty_object_function() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    let empty_object = interner.object(vec![]);
+    let narrowed = narrow_by_typeof(&interner, empty_object, "function");
+    assert_eq!(narrowed, ctx.function_type());
+}
+
+#[test]
 fn test_narrow_by_typeof_negation_function() {
     let interner = TypeInterner::new();
     let ctx = NarrowingContext::new(&interner);
@@ -460,6 +488,7 @@ fn test_narrow_by_typeof_function_type_param_with_non_function_constraint() {
 #[test]
 fn test_narrow_by_typeof_function_unconstrained_type_param() {
     let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
     let param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
         name: interner.intern_string("T"),
         constraint: None,
@@ -467,7 +496,8 @@ fn test_narrow_by_typeof_function_unconstrained_type_param() {
     }));
 
     let narrowed = narrow_by_typeof(&interner, param, "function");
-    assert_eq!(narrowed, param);
+    let expected = interner.intersection(vec![param, ctx.function_type()]);
+    assert_eq!(narrowed, expected);
 }
 
 #[test]

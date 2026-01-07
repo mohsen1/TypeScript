@@ -54,6 +54,8 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Extract variable: wrap JSX child replacements in expression braces
    - [x] Extract variable: fix JSX spans/parents for child selections
    - [x] Extract variable: keep comma expressions parenthesized when selected
+   - [x] Extract variable: preserve parenthesized selections on replacement
+   - [x] Extract variable: fix parenthesized expression end spans
    - [x] Rename: normalize private identifiers (`#name`)
 
 2. **Extend AST Coverage** (if needed)

@@ -1167,9 +1167,33 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    fn get_class_instance_type(&mut self, class: &crate::parser::thin_node::ClassData) -> TypeId {
-        use crate::solver::{CallSignature, CallableShape, PropertyInfo};
+    fn get_class_instance_type(
+        &mut self,
+        class_idx: NodeIndex,
+        class: &crate::parser::thin_node::ClassData,
+    ) -> TypeId {
+        use rustc_hash::FxHashSet;
+
+        let mut visited = FxHashSet::default();
+        self.get_class_instance_type_inner(class_idx, class, &mut visited)
+    }
+
+    fn get_class_instance_type_inner(
+        &mut self,
+        class_idx: NodeIndex,
+        class: &crate::parser::thin_node::ClassData,
+        visited: &mut rustc_hash::FxHashSet<crate::binder::SymbolId>,
+    ) -> TypeId {
+        use crate::solver::{CallSignature, CallableShape, PropertyInfo, TypeKey, TypeSubstitution, instantiate_type};
         use rustc_hash::FxHashMap;
+        use crate::scanner::SyntaxKind;
+
+        let current_sym = self.ctx.binder.get_node_symbol(class_idx);
+        if let Some(sym_id) = current_sym {
+            if !visited.insert(sym_id) {
+                return TypeId::ANY;
+            }
+        }
 
         struct MethodAggregate {
             overload_signatures: Vec<CallSignature>,
@@ -1366,15 +1390,119 @@ impl<'a> ThinCheckerState<'a> {
             });
         }
 
+        // Merge base class instance properties (derived members take precedence).
+        if let Some(ref heritage_clauses) = class.heritage_clauses {
+            for &clause_idx in &heritage_clauses.nodes {
+                let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
+                    continue;
+                };
+                let Some(heritage) = self.ctx.arena.get_heritage_clause(clause_node) else {
+                    continue;
+                };
+                if heritage.token != SyntaxKind::ExtendsKeyword as u16 {
+                    continue;
+                }
+                let Some(&type_idx) = heritage.types.nodes.first() else {
+                    break;
+                };
+                let Some(type_node) = self.ctx.arena.get(type_idx) else {
+                    break;
+                };
+
+                let (expr_idx, type_arguments) = if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
+                    (expr_type_args.expression, expr_type_args.type_arguments.as_ref())
+                } else {
+                    (type_idx, None)
+                };
+
+                let Some(base_sym_id) = self.resolve_heritage_symbol(expr_idx) else {
+                    break;
+                };
+                if visited.contains(&base_sym_id) {
+                    break;
+                }
+                let Some(base_symbol) = self.ctx.binder.get_symbol(base_sym_id) else {
+                    break;
+                };
+
+                let mut base_class_idx = None;
+                for &decl_idx in &base_symbol.declarations {
+                    if let Some(node) = self.ctx.arena.get(decl_idx) {
+                        if self.ctx.arena.get_class(node).is_some() {
+                            base_class_idx = Some(decl_idx);
+                            break;
+                        }
+                    }
+                }
+                if base_class_idx.is_none() && !base_symbol.value_declaration.is_none() {
+                    let decl_idx = base_symbol.value_declaration;
+                    if let Some(node) = self.ctx.arena.get(decl_idx) {
+                        if self.ctx.arena.get_class(node).is_some() {
+                            base_class_idx = Some(decl_idx);
+                        }
+                    }
+                }
+                let Some(base_class_idx) = base_class_idx else {
+                    break;
+                };
+                let Some(base_node) = self.ctx.arena.get(base_class_idx) else {
+                    break;
+                };
+                let Some(base_class) = self.ctx.arena.get_class(base_node) else {
+                    break;
+                };
+
+                let mut type_args = Vec::new();
+                if let Some(args) = type_arguments {
+                    for &arg_idx in &args.nodes {
+                        type_args.push(self.get_type_from_type_node(arg_idx));
+                    }
+                }
+
+                let (base_type_params, base_type_param_updates) =
+                    self.push_type_parameters(&base_class.type_parameters);
+
+                if type_args.len() < base_type_params.len() {
+                    for param in base_type_params.iter().skip(type_args.len()) {
+                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                        type_args.push(fallback);
+                    }
+                }
+                if type_args.len() > base_type_params.len() {
+                    type_args.truncate(base_type_params.len());
+                }
+
+                let base_instance_type = self.get_class_instance_type_inner(base_class_idx, base_class, visited);
+                let substitution = TypeSubstitution::from_args(&base_type_params, &type_args);
+                let base_instance_type = instantiate_type(self.ctx.types, base_instance_type, &substitution);
+                self.pop_type_parameters(base_type_param_updates);
+
+                if let Some(TypeKey::Object(base_props)) = self.ctx.types.lookup(base_instance_type) {
+                    for base_prop in base_props.iter() {
+                        properties.entry(base_prop.name).or_insert_with(|| base_prop.clone());
+                    }
+                }
+
+                break;
+            }
+        }
+
         let props: Vec<PropertyInfo> = properties.into_values().collect();
+        if let Some(sym_id) = current_sym {
+            visited.remove(&sym_id);
+        }
         self.ctx.types.object(props)
     }
 
-    fn get_class_constructor_type(&mut self, class: &crate::parser::thin_node::ClassData) -> TypeId {
+    fn get_class_constructor_type(
+        &mut self,
+        class_idx: NodeIndex,
+        class: &crate::parser::thin_node::ClassData,
+    ) -> TypeId {
         use crate::solver::{CallSignature, CallableShape};
 
         let (_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
-        let instance_type = self.get_class_instance_type(class);
+        let instance_type = self.get_class_instance_type(class_idx, class);
 
         let mut has_overloads = false;
         for &member_idx in &class.members.nodes {
@@ -1719,7 +1847,7 @@ impl<'a> ThinCheckerState<'a> {
             if !decl_idx.is_none() {
                 if let Some(node) = self.ctx.arena.get(decl_idx) {
                     if let Some(class) = self.ctx.arena.get_class(node) {
-                        return self.get_class_constructor_type(class);
+                        return self.get_class_constructor_type(decl_idx, class);
                     }
                 }
             }

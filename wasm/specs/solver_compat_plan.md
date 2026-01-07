@@ -342,6 +342,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Narrow constrained type parameters for typeof "function" and negation
 - [x] Tests for function typeof narrowing on type params
 
+### Phase 67: Typeof Function Top Types
+- [x] Narrow unknown/object/empty object to function supertype for typeof "function"
+- [x] Tests for function typeof narrowing with top types
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

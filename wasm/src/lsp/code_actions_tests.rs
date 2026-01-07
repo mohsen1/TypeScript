@@ -217,6 +217,46 @@ fn test_extract_variable_parenthesizes_comma_expression_with_parens() {
 }
 
 #[test]
+fn test_extract_variable_preserves_parenthesized_replacement() {
+    let source = "const value = (foo + bar) * baz;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let range = range_for_substring(source, &line_map, "(foo + bar)");
+    let actions = provider.provide_code_actions(
+        root,
+        range,
+        CodeActionContext {
+            diagnostics: Vec::new(),
+            only: None,
+            import_candidates: Vec::new(),
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    assert_eq!(edits.len(), 2);
+
+    assert!(edits[0].new_text.contains("const extracted = (foo + bar);"));
+    assert_eq!(edits[1].new_text, "(extracted)");
+}
+
+#[test]
 fn test_extract_variable_jsx_child_wraps_expression() {
     let source = "const view = <div><Foo /></div>;\n";
     let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());

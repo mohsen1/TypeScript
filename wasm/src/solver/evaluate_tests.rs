@@ -503,6 +503,42 @@ fn test_index_access_object_with_number_index_signature() {
 }
 
 #[test]
+fn test_index_access_object_with_number_index_signature_no_unchecked() {
+    let interner = TypeInterner::new();
+
+    let obj = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::BOOLEAN,
+            readonly: false,
+        }),
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let mut evaluator = TypeEvaluator::new(&interner);
+    evaluator.set_no_unchecked_indexed_access(true);
+
+    let result = evaluator.evaluate_index_access(obj, TypeId::NUMBER);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+
+    let zero = interner.literal_number(0.0);
+    let result = evaluator.evaluate_index_access(obj, zero);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+
+    let zero_str = interner.literal_string("0");
+    let result = evaluator.evaluate_index_access(obj, zero_str);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_index_access_resolves_ref() {
     use crate::solver::{TypeEnvironment, SymbolRef};
 
