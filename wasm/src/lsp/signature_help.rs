@@ -277,8 +277,9 @@ impl<'a> SignatureHelpProvider<'a> {
                         let func_shape = FunctionShape {
                             type_params: sig.type_params.clone(),
                             params: sig.params.clone(),
+                            this_type: sig.this_type,
                             return_type: sig.return_type,
-                            type_predicate: None,
+                            type_predicate: sig.type_predicate.clone(),
                             is_constructor: false,
                         };
                         sigs.push(self.signature_candidate(&func_shape, checker, false));
@@ -290,8 +291,9 @@ impl<'a> SignatureHelpProvider<'a> {
                         let func_shape = FunctionShape {
                             type_params: sig.type_params.clone(),
                             params: sig.params.clone(),
+                            this_type: sig.this_type,
                             return_type: sig.return_type,
-                            type_predicate: None,
+                            type_predicate: sig.type_predicate.clone(),
                             is_constructor: true,
                         };
                         sigs.push(self.signature_candidate(&func_shape, checker, true));

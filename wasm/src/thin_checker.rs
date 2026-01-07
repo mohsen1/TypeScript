@@ -660,6 +660,8 @@ impl<'a> ThinCheckerState<'a> {
 
         // Build parameter info
         let mut params = Vec::new();
+        let mut this_type = None;
+        let this_atom = self.ctx.types.intern_string("this");
         for &param_idx in &func_type.parameters.nodes {
             if let Some(param_node) = self.ctx.arena.get(param_idx) {
                 if let Some(param) = self.ctx.arena.get_parameter(param_node) {
@@ -680,6 +682,15 @@ impl<'a> ThinCheckerState<'a> {
                     } else {
                         TypeId::ANY
                     };
+
+                    if let Some(name_atom) = name {
+                        if name_atom == this_atom {
+                            if this_type.is_none() {
+                                this_type = Some(type_id);
+                            }
+                            continue;
+                        }
+                    }
 
                     let optional = param.question_token || !param.initializer.is_none();
                     let rest = param.dot_dot_dot_token;
@@ -705,6 +716,7 @@ impl<'a> ThinCheckerState<'a> {
         let shape = FunctionShape {
             type_params: Vec::new(), // TODO: Handle type parameters
             params,
+            this_type,
             return_type,
             type_predicate: None,
             is_constructor: false,
@@ -768,7 +780,7 @@ impl<'a> ThinCheckerState<'a> {
             if member_node.kind == CALL_SIGNATURE {
                 // Extract call signature
                 if let Some(sig) = self.ctx.arena.get_signature(member_node) {
-                    let params = self.extract_params_from_signature(sig);
+                    let (params, this_type) = self.extract_params_from_signature(sig);
                     let return_type = if !sig.type_annotation.is_none() {
                         self.get_type_of_node(sig.type_annotation)
                     } else {
@@ -778,6 +790,7 @@ impl<'a> ThinCheckerState<'a> {
                     call_signatures.push(SolverCallSignature {
                         type_params: Vec::new(), // TODO: Handle type parameters
                         params,
+                        this_type,
                         return_type,
                         type_predicate: None,
                     });
@@ -785,7 +798,7 @@ impl<'a> ThinCheckerState<'a> {
             } else if member_node.kind == CONSTRUCT_SIGNATURE {
                 // Extract construct signature
                 if let Some(sig) = self.ctx.arena.get_signature(member_node) {
-                    let params = self.extract_params_from_signature(sig);
+                    let (params, this_type) = self.extract_params_from_signature(sig);
                     let return_type = if !sig.type_annotation.is_none() {
                         self.get_type_of_node(sig.type_annotation)
                     } else {
@@ -795,6 +808,7 @@ impl<'a> ThinCheckerState<'a> {
                     construct_signatures.push(SolverCallSignature {
                         type_params: Vec::new(),
                         params,
+                        this_type,
                         return_type,
                         type_predicate: None,
                     });
@@ -842,17 +856,24 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     /// Helper to extract parameters from a SignatureData.
-    fn extract_params_from_signature(&mut self, sig: &crate::parser::thin_node::SignatureData) -> Vec<crate::solver::ParamInfo> {
+    fn extract_params_from_signature(
+        &mut self,
+        sig: &crate::parser::thin_node::SignatureData,
+    ) -> (Vec<crate::solver::ParamInfo>, Option<TypeId>) {
         use crate::solver::ParamInfo;
         use std::sync::Arc;
 
         let Some(ref params_list) = sig.parameters else {
-            return Vec::new();
+            return (Vec::new(), None);
         };
 
-        params_list.nodes.iter().filter_map(|&param_idx| {
-            let param_node = self.ctx.arena.get(param_idx)?;
-            let param = self.ctx.arena.get_parameter(param_node)?;
+        let mut params = Vec::new();
+        let mut this_type = None;
+        let this_atom = self.ctx.types.intern_string("this");
+
+        for &param_idx in &params_list.nodes {
+            let Some(param_node) = self.ctx.arena.get(param_idx) else { continue };
+            let Some(param) = self.ctx.arena.get_parameter(param_node) else { continue };
 
             let name: Option<Atom> = if let Some(name_node) = self.ctx.arena.get(param.name) {
                 if let Some(name_data) = self.ctx.arena.get_identifier(name_node) {
@@ -873,8 +894,19 @@ impl<'a> ThinCheckerState<'a> {
             let optional = param.question_token || !param.initializer.is_none();
             let rest = param.dot_dot_dot_token;
 
-            Some(ParamInfo { name, type_id, optional, rest })
-        }).collect()
+            if let Some(name_atom) = name {
+                if name_atom == this_atom {
+                    if this_type.is_none() {
+                        this_type = Some(type_id);
+                    }
+                    continue;
+                }
+            }
+
+            params.push(ParamInfo { name, type_id, optional, rest });
+        }
+
+        (params, this_type)
     }
 
     // =========================================================================
@@ -991,6 +1023,7 @@ impl<'a> ThinCheckerState<'a> {
         let call_sig = CallSignature {
             type_params: vec![],
             params: vec![description_param],
+            this_type: None,
             return_type: TypeId::SYMBOL,
             type_predicate: None,
         };
@@ -1649,6 +1682,9 @@ impl<'a> ThinCheckerState<'a> {
 
         // Collect parameter info using solver's ParamInfo struct
         let mut params = Vec::new();
+        let mut param_types: Vec<Option<TypeId>> = Vec::new();
+        let mut this_type = None;
+        let this_atom = self.ctx.types.intern_string("this");
 
         // Setup contextual typing context if available
         let ctx_helper = if let Some(ctx_type) = self.ctx.contextual_type {
@@ -1685,6 +1721,16 @@ impl<'a> ThinCheckerState<'a> {
                         }
                     };
 
+                    if let Some(name_atom) = name {
+                        if name_atom == this_atom {
+                            if this_type.is_none() {
+                                this_type = Some(type_id);
+                            }
+                            param_types.push(None);
+                            continue;
+                        }
+                    }
+
                     // Check if optional or has initializer
                     let optional = param.question_token || !param.initializer.is_none();
                     let rest = param.dot_dot_dot_token;
@@ -1695,6 +1741,7 @@ impl<'a> ThinCheckerState<'a> {
                         optional,
                         rest,
                     });
+                    param_types.push(Some(type_id));
                 }
             }
         }
@@ -1724,8 +1771,9 @@ impl<'a> ThinCheckerState<'a> {
                         if let Some(name_node) = self.ctx.arena.get(param.name) {
                             if let Some(name_data) = self.ctx.arena.get_identifier(name_node) {
                                 // Use type from params which already includes contextual typing
-                                let param_type = params.get(i).map(|p| p.type_id).unwrap_or(TypeId::ANY);
-                                self.add_local(name_data.escaped_text.clone(), param_type);
+                                if let Some(param_type) = param_types.get(i).and_then(|t| *t) {
+                                    self.add_local(name_data.escaped_text.clone(), param_type);
+                                }
                             }
                         }
                     }
@@ -1742,6 +1790,7 @@ impl<'a> ThinCheckerState<'a> {
         let shape = FunctionShape {
             type_params: Vec::new(), // TODO: Handle type parameters
             params,
+            this_type,
             return_type,
             type_predicate: None,
             is_constructor: false,
@@ -4429,7 +4478,7 @@ impl<'a> ThinCheckerState<'a> {
         if member_node.kind == METHOD_SIGNATURE {
             // For method signatures, build a function type
             if let Some(sig) = self.ctx.arena.get_signature(member_node) {
-                let params = self.extract_params_from_signature(sig);
+                let (params, this_type) = self.extract_params_from_signature(sig);
                 let return_type = if !sig.type_annotation.is_none() {
                     self.get_type_from_type_node(sig.type_annotation)
                 } else {
@@ -4439,6 +4488,7 @@ impl<'a> ThinCheckerState<'a> {
                 let shape = FunctionShape {
                     type_params: Vec::new(),
                     params,
+                    this_type,
                     return_type,
                     type_predicate: None,
                     is_constructor: false,

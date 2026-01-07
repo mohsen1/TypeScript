@@ -84,7 +84,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
     pub fn infer_call_signature(&mut self, sig: &CallSignature, arg_types: &[TypeId]) -> TypeId {
         let func = FunctionShape {
             params: sig.params.clone(),
+            this_type: sig.this_type,
             return_type: sig.return_type,
+            type_predicate: sig.type_predicate.clone(),
             type_params: sig.type_params.clone(),
             type_predicate: sig.type_predicate.clone(),
             is_constructor: false,
@@ -780,7 +782,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             // Convert CallSignature to FunctionShape
             let func = FunctionShape {
                 params: sig.params.clone(),
+                this_type: sig.this_type,
                 return_type: sig.return_type,
+                type_predicate: sig.type_predicate.clone(),
                 type_params: sig.type_params.clone(),
                 type_predicate: sig.type_predicate.clone(),
                 is_constructor: false,
@@ -1143,6 +1147,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
         };
         self.interner.function(FunctionShape {
             params: vec![rest_param],
+            this_type: None,
             return_type,
             type_params: Vec::new(),
             type_predicate: None,

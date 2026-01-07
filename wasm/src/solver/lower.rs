@@ -642,6 +642,36 @@ impl<'a> TypeLowering<'a> {
             .map(|ident| self.interner.intern_string(&ident.escaped_text))
     }
 
+    fn lower_params_with_this(&self, params: &NodeList) -> (Vec<ParamInfo>, Option<TypeId>) {
+        let mut lowered = Vec::new();
+        let mut this_type = None;
+
+        for &idx in &params.nodes {
+            let Some(param_node) = self.arena.get(idx) else { continue };
+            let Some(param_data) = self.arena.get_parameter(param_node) else { continue };
+
+            if let Some(name_node) = self.arena.get(param_data.name) {
+                if let Some(id_data) = self.arena.get_identifier(name_node) {
+                    if id_data.escaped_text == "this" {
+                        if this_type.is_none() {
+                            this_type = Some(self.lower_type(param_data.type_annotation));
+                        }
+                        continue;
+                    }
+                }
+            }
+
+            lowered.push(ParamInfo {
+                name: self.lower_parameter_name(param_data.name),
+                type_id: self.lower_type(param_data.type_annotation),
+                optional: param_data.question_token,
+                rest: param_data.dot_dot_dot_token,
+            });
+        }
+
+        (lowered, this_type)
+    }
+
     fn lower_return_type(&self, node_idx: NodeIndex) -> (TypeId, Option<TypePredicate>) {
         if node_idx == NodeIndex::NONE {
             return (TypeId::ANY, None);
@@ -667,30 +697,17 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_function_type(node) {
-            let (type_params, (params, return_type, type_predicate)) = self.with_type_params(&data.type_parameters, || {
-                let params: Vec<ParamInfo> = data.parameters.nodes.iter()
-                    .filter_map(|&idx| {
-                        if let Some(param_node) = self.arena.get(idx) {
-                            if let Some(param_data) = self.arena.get_parameter(param_node) {
-                                return Some(ParamInfo {
-                                    name: self.lower_parameter_name(param_data.name),
-                                    type_id: self.lower_type(param_data.type_annotation),
-                                    optional: param_data.question_token,
-                                    rest: param_data.dot_dot_dot_token,
-                                });
-                            }
-                        }
-                        None
-                    })
-                    .collect();
+            let (type_params, (params, this_type, return_type, type_predicate)) = self.with_type_params(&data.type_parameters, || {
+                let (params, this_type) = self.lower_params_with_this(&data.parameters);
 
                 let (return_type, type_predicate) = self.lower_return_type(data.type_annotation);
-                (params, return_type, type_predicate)
+                (params, this_type, return_type, type_predicate)
             });
 
             let shape = FunctionShape {
                 type_params,
                 params,
+                this_type,
                 return_type,
                 type_predicate,
                 is_constructor: false,
@@ -913,48 +930,41 @@ impl<'a> TypeLowering<'a> {
     }
 
     fn lower_call_signature(&self, sig: &SignatureData) -> CallSignature {
-        let (type_params, (params, return_type, type_predicate)) = self.with_type_params(&sig.type_parameters, || {
-            let params = self.lower_signature_params(sig);
+        let (type_params, (params, this_type, return_type, type_predicate)) = self.with_type_params(&sig.type_parameters, || {
+            let (params, this_type) = self.lower_signature_params(sig);
             let (return_type, type_predicate) = self.lower_return_type(sig.type_annotation);
-            (params, return_type, type_predicate)
+            (params, this_type, return_type, type_predicate)
         });
 
         CallSignature {
             type_params,
             params,
+            this_type,
             return_type,
             type_predicate,
         }
     }
 
     fn lower_method_signature(&self, sig: &SignatureData) -> TypeId {
-        let (type_params, (params, return_type, type_predicate)) = self.with_type_params(&sig.type_parameters, || {
-            let params = self.lower_signature_params(sig);
+        let (type_params, (params, this_type, return_type, type_predicate)) = self.with_type_params(&sig.type_parameters, || {
+            let (params, this_type) = self.lower_signature_params(sig);
             let (return_type, type_predicate) = self.lower_return_type(sig.type_annotation);
-            (params, return_type, type_predicate)
+            (params, this_type, return_type, type_predicate)
         });
 
         self.interner.function(FunctionShape {
             type_params,
             params,
+            this_type,
             return_type,
             type_predicate,
             is_constructor: false,
         })
     }
 
-    fn lower_signature_params(&self, sig: &SignatureData) -> Vec<ParamInfo> {
-        let Some(params) = &sig.parameters else { return Vec::new() };
-        params.nodes.iter().filter_map(|&idx| {
-            let param_node = self.arena.get(idx)?;
-            let param_data = self.arena.get_parameter(param_node)?;
-            Some(ParamInfo {
-                name: self.lower_parameter_name(param_data.name),
-                type_id: self.lower_type(param_data.type_annotation),
-                optional: param_data.question_token,
-                rest: param_data.dot_dot_dot_token,
-            })
-        }).collect()
+    fn lower_signature_params(&self, sig: &SignatureData) -> (Vec<ParamInfo>, Option<TypeId>) {
+        let Some(params) = &sig.parameters else { return (Vec::new(), None) };
+        self.lower_params_with_this(params)
     }
 
     fn lower_signature_name(&self, node_idx: NodeIndex) -> Option<Atom> {
@@ -2108,30 +2118,17 @@ impl<'a> TypeLowering<'a> {
 
         // Constructor types use the same data structure as function types
         if let Some(data) = self.arena.get_function_type(node) {
-            let (type_params, (params, return_type, type_predicate)) = self.with_type_params(&data.type_parameters, || {
-                let params: Vec<ParamInfo> = data.parameters.nodes.iter()
-                    .filter_map(|&idx| {
-                        if let Some(param_node) = self.arena.get(idx) {
-                            if let Some(param_data) = self.arena.get_parameter(param_node) {
-                                return Some(ParamInfo {
-                                    name: self.lower_parameter_name(param_data.name),
-                                    type_id: self.lower_type(param_data.type_annotation),
-                                    optional: param_data.question_token,
-                                    rest: param_data.dot_dot_dot_token,
-                                });
-                            }
-                        }
-                        None
-                    })
-                    .collect();
+            let (type_params, (params, this_type, return_type, type_predicate)) = self.with_type_params(&data.type_parameters, || {
+                let (params, this_type) = self.lower_params_with_this(&data.parameters);
 
                 let (return_type, type_predicate) = self.lower_return_type(data.type_annotation);
-                (params, return_type, type_predicate)
+                (params, this_type, return_type, type_predicate)
             });
 
             let shape = FunctionShape {
                 type_params,
                 params,
+                this_type,
                 return_type,
                 type_predicate,
                 is_constructor: true, // Mark as constructor

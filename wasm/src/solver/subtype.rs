@@ -810,6 +810,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     fn apparent_method_type(&mut self, return_type: TypeId) -> TypeId {
         self.interner.function(FunctionShape {
             params: Vec::new(),
+            this_type: None,
             return_type,
             type_params: Vec::new(),
             type_predicate: None,
@@ -1107,6 +1108,19 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
     }
 
+    fn are_this_parameters_compatible(
+        &mut self,
+        source_type: Option<TypeId>,
+        target_type: Option<TypeId>,
+    ) -> bool {
+        if source_type.is_none() && target_type.is_none() {
+            return true;
+        }
+        let source_type = source_type.unwrap_or(TypeId::ANY);
+        let target_type = target_type.unwrap_or(TypeId::ANY);
+        self.are_parameters_compatible(source_type, target_type)
+    }
+
     /// Check return type compatibility with void special-casing.
     fn check_return_compat(&mut self, source_return: TypeId, target_return: TypeId) -> SubtypeResult {
         if self.allow_void_return && target_return == TypeId::VOID {
@@ -1165,6 +1179,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         // Return type is covariant
         if !self.check_return_compat(source.return_type, target.return_type).is_true() {
+            return SubtypeResult::False;
+        }
+
+        if !self.are_this_parameters_compatible(source.this_type, target.this_type) {
             return SubtypeResult::False;
         }
 
@@ -1388,6 +1406,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::False;
         }
 
+        if !self.are_this_parameters_compatible(source.this_type, target.this_type) {
+            return SubtypeResult::False;
+        }
+
         // Check if target has a rest parameter
         let target_has_rest = target.params.last().map_or(false, |p| p.rest);
         let source_has_rest = source.params.last().map_or(false, |p| p.rest);
@@ -1449,6 +1471,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     fn check_call_signature_subtype_fn(&mut self, source: &FunctionShape, target: &CallSignature) -> SubtypeResult {
         // Return type is covariant
         if !self.check_return_compat(source.return_type, target.return_type).is_true() {
+            return SubtypeResult::False;
+        }
+
+        if !self.are_this_parameters_compatible(source.this_type, target.this_type) {
             return SubtypeResult::False;
         }
 

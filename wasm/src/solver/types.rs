@@ -267,6 +267,7 @@ pub enum TypePredicateTarget {
 pub struct FunctionShape {
     pub type_params: Vec<TypeParamInfo>,
     pub params: Vec<ParamInfo>,
+    pub this_type: Option<TypeId>,
     pub return_type: TypeId,
     pub type_predicate: Option<TypePredicate>,
     pub is_constructor: bool,
@@ -278,6 +279,7 @@ pub struct FunctionShape {
 pub struct CallSignature {
     pub type_params: Vec<TypeParamInfo>,
     pub params: Vec<ParamInfo>,
+    pub this_type: Option<TypeId>,
     pub return_type: TypeId,
     pub type_predicate: Option<TypePredicate>,
 }

@@ -69,6 +69,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - Store signature: params (Vec<Param>), return type (TypeId)
   - [x] Type predicates lower to boolean/void return types
   - [x] Preserve type predicate metadata in function/call signatures
+  - [x] Treat `this` parameters as separate `this_type` (not in params list)
 - [x] Handle optional and rest parameters
   - `(x?: string)` -> Param { optional: true }
   - `(...args: string[])` -> Param { rest: true, type: Array<string> }
@@ -81,6 +82,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: `asserts this` predicate without type
   - [x] Test: `asserts x` predicate without type (captures predicate metadata)
   - [x] Test: Call signature type predicates in type literals
+  - [x] Test: `this` parameter stored separately for function and call signatures
 
 ### Phase 4: Generic Types
 - [x] Implement type parameter lowering

@@ -128,6 +128,7 @@ impl<'a> TypeInstantiator<'a> {
             .type_predicate
             .as_ref()
             .map(|predicate| self.instantiate_type_predicate(predicate));
+        let this_type = sig.this_type.map(|type_id| self.instantiate(type_id));
         let type_params: Vec<TypeParamInfo> = sig.type_params.iter()
             .map(|tp| TypeParamInfo {
                 name: tp.name,
@@ -150,6 +151,7 @@ impl<'a> TypeInstantiator<'a> {
         CallSignature {
             type_params,
             params,
+            this_type,
             return_type,
             type_predicate,
         }
@@ -288,6 +290,7 @@ impl<'a> TypeInstantiator<'a> {
                     .type_predicate
                     .as_ref()
                     .map(|predicate| self.instantiate_type_predicate(predicate));
+                let this_type = shape.this_type.map(|type_id| self.instantiate(type_id));
                 let instantiated_type_params: Vec<TypeParamInfo> = shape.type_params.iter()
                     .map(|tp| TypeParamInfo {
                         name: tp.name,
@@ -310,6 +313,7 @@ impl<'a> TypeInstantiator<'a> {
                 self.interner.function(FunctionShape {
                     type_params: instantiated_type_params,
                     params: instantiated_params,
+                    this_type,
                     return_type: instantiated_return,
                     type_predicate,
                     is_constructor: shape.is_constructor,

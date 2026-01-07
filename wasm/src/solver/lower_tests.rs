@@ -952,6 +952,26 @@ fn test_lower_function_type_with_asserts_predicate_without_is() {
 }
 
 #[test]
+fn test_lower_function_type_with_this_param_separate() {
+    let (arena, func_type_idx) = parse_type_alias("type F = (this: any, x: string) => number;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.this_type, Some(TypeId::ANY));
+            assert_eq!(shape.params.len(), 1);
+            assert_eq!(shape.params[0].type_id, TypeId::STRING);
+            let name = shape.params[0].name.expect("Expected parameter name");
+            assert_eq!(interner.resolve_atom(name).as_str(), "x");
+        }
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_function_type_parameter_usage() {
     let (arena, func_type_idx) = parse_type_alias("type F = <T>(x: T) => T;");
     let interner = TypeInterner::new();
@@ -1522,6 +1542,26 @@ fn test_lower_type_literal_call_signature() {
             assert_eq!(callable.properties.len(), 1);
             assert_eq!(interner.resolve_atom(callable.properties[0].name), "foo");
             assert_eq!(callable.properties[0].type_id, TypeId::STRING);
+        }
+        _ => panic!("Expected Callable type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_call_signature_this_param() {
+    let (arena, literal_idx) = parse_type_literal("type T = { (this: any, x: string): number; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Callable(callable) => {
+            assert_eq!(callable.call_signatures.len(), 1);
+            let sig = &callable.call_signatures[0];
+            assert_eq!(sig.this_type, Some(TypeId::ANY));
+            assert_eq!(sig.params.len(), 1);
+            assert_eq!(sig.params[0].type_id, TypeId::STRING);
         }
         _ => panic!("Expected Callable type, got {:?}", key),
     }

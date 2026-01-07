@@ -84,6 +84,7 @@ fn test_format_function_type() {
         params: vec![
             ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
         ],
+        this_type: None,
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,

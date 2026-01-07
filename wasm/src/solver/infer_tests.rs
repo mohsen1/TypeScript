@@ -980,6 +980,7 @@ fn test_resolve_bounds_function_subtype() {
     let lower = interner.function(FunctionShape {
         type_params: Vec::new(),
         params: vec![source_param],
+        this_type: None,
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
@@ -987,6 +988,7 @@ fn test_resolve_bounds_function_subtype() {
     let upper = interner.function(FunctionShape {
         type_params: Vec::new(),
         params: vec![target_param],
+        this_type: None,
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
@@ -1023,6 +1025,7 @@ fn test_resolve_bounds_callable_subtype() {
         call_signatures: vec![CallSignature {
             type_params: Vec::new(),
             params: vec![source_param],
+            this_type: None,
             return_type: TypeId::NUMBER,
             type_predicate: None,
         }],
@@ -1033,6 +1036,7 @@ fn test_resolve_bounds_callable_subtype() {
         call_signatures: vec![CallSignature {
             type_params: Vec::new(),
             params: vec![target_param],
+            this_type: None,
             return_type: TypeId::NUMBER,
             type_predicate: None,
         }],
@@ -1070,6 +1074,7 @@ fn test_resolve_bounds_function_to_callable() {
     let lower = interner.function(FunctionShape {
         type_params: Vec::new(),
         params: vec![source_param],
+        this_type: None,
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,
@@ -1078,6 +1083,7 @@ fn test_resolve_bounds_function_to_callable() {
         call_signatures: vec![CallSignature {
             type_params: Vec::new(),
             params: vec![target_param],
+            this_type: None,
             return_type: TypeId::NUMBER,
             type_predicate: None,
         }],
@@ -1116,6 +1122,7 @@ fn test_resolve_bounds_callable_to_function() {
         call_signatures: vec![CallSignature {
             type_params: Vec::new(),
             params: vec![source_param],
+            this_type: None,
             return_type: TypeId::NUMBER,
             type_predicate: None,
         }],
@@ -1125,6 +1132,7 @@ fn test_resolve_bounds_callable_to_function() {
     let upper = interner.function(FunctionShape {
         type_params: Vec::new(),
         params: vec![target_param],
+        this_type: None,
         return_type: TypeId::NUMBER,
         type_predicate: None,
         is_constructor: false,

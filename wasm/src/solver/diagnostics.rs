@@ -563,14 +563,16 @@ impl<'a> TypeFormatter<'a> {
     }
 
     fn format_function(&mut self, shape: &FunctionShape) -> String {
-        let params: Vec<String> = shape.params.iter()
-            .map(|p| {
-                let name = p.name.map(|atom| self.interner.resolve_atom(atom)).unwrap_or_else(|| "_".to_string());
-                let optional = if p.optional { "?" } else { "" };
-                let rest = if p.rest { "..." } else { "" };
-                format!("{}{}{}: {}", rest, name, optional, self.format(p.type_id))
-            })
-            .collect();
+        let mut params: Vec<String> = Vec::new();
+        if let Some(this_type) = shape.this_type {
+            params.push(format!("this: {}", self.format(this_type)));
+        }
+        params.extend(shape.params.iter().map(|p| {
+            let name = p.name.map(|atom| self.interner.resolve_atom(atom)).unwrap_or_else(|| "_".to_string());
+            let optional = if p.optional { "?" } else { "" };
+            let rest = if p.rest { "..." } else { "" };
+            format!("{}{}{}: {}", rest, name, optional, self.format(p.type_id))
+        }));
         let arrow = if shape.is_constructor { "new " } else { "" };
         format!("{}({}) => {}", arrow, params.join(", "), self.format(shape.return_type))
     }
@@ -590,12 +592,14 @@ impl<'a> TypeFormatter<'a> {
     }
 
     fn format_call_signature(&mut self, sig: &CallSignature, is_construct: bool) -> String {
-        let params: Vec<String> = sig.params.iter()
-            .map(|p| {
-                let name = p.name.map(|atom| self.interner.resolve_atom(atom)).unwrap_or_else(|| "_".to_string());
-                format!("{}: {}", name, self.format(p.type_id))
-            })
-            .collect();
+        let mut params: Vec<String> = Vec::new();
+        if let Some(this_type) = sig.this_type {
+            params.push(format!("this: {}", self.format(this_type)));
+        }
+        params.extend(sig.params.iter().map(|p| {
+            let name = p.name.map(|atom| self.interner.resolve_atom(atom)).unwrap_or_else(|| "_".to_string());
+            format!("{}: {}", name, self.format(p.type_id))
+        }));
         let prefix = if is_construct { "new " } else { "" };
         format!("{}({}): {}", prefix, params.join(", "), self.format(sig.return_type))
     }

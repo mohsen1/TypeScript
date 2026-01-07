@@ -68,6 +68,7 @@ fn test_function_bivariance_default() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -81,6 +82,7 @@ fn test_function_bivariance_default() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -105,6 +107,7 @@ fn test_function_variance_strict() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -118,6 +121,7 @@ fn test_function_variance_strict() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -143,6 +147,7 @@ fn test_method_bivariance_even_strict() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -156,6 +161,7 @@ fn test_method_bivariance_even_strict() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -197,6 +203,7 @@ fn test_function_property_stays_strict() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -210,6 +217,7 @@ fn test_function_property_stays_strict() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -244,6 +252,7 @@ fn test_function_return_covariance() {
 
     let returns_dog = interner.function(FunctionShape {
         params: Vec::new(),
+        this_type: None,
         return_type: dog,
         type_params: Vec::new(),
         type_predicate: None,
@@ -252,6 +261,7 @@ fn test_function_return_covariance() {
 
     let returns_animal = interner.function(FunctionShape {
         params: Vec::new(),
+        this_type: None,
         return_type: animal,
         type_params: Vec::new(),
         type_predicate: None,
@@ -269,6 +279,7 @@ fn test_void_return_assignability() {
 
     let returns_number = interner.function(FunctionShape {
         params: Vec::new(),
+        this_type: None,
         return_type: TypeId::NUMBER,
         type_params: Vec::new(),
         type_predicate: None,
@@ -277,6 +288,7 @@ fn test_void_return_assignability() {
 
     let returns_void = interner.function(FunctionShape {
         params: Vec::new(),
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -317,6 +329,7 @@ fn test_explain_failure_parameter_mismatch_strict() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -330,6 +343,7 @@ fn test_explain_failure_parameter_mismatch_strict() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -433,6 +447,7 @@ fn test_rest_any_bivariant_even_strict() {
             optional: false,
             rest: true,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -446,6 +461,7 @@ fn test_rest_any_bivariant_even_strict() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -469,6 +485,7 @@ fn test_rest_unknown_bivariant_even_strict() {
             optional: false,
             rest: true,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -482,6 +499,7 @@ fn test_rest_unknown_bivariant_even_strict() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -504,6 +522,7 @@ fn test_rest_any_still_checks_return_type() {
             optional: false,
             rest: true,
         }],
+        this_type: None,
         return_type: TypeId::NUMBER,
         type_params: Vec::new(),
         type_predicate: None,
@@ -517,6 +536,7 @@ fn test_rest_any_still_checks_return_type() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::STRING,
         type_params: Vec::new(),
         type_predicate: None,
@@ -540,6 +560,7 @@ fn test_explain_failure_skips_rest_unknown() {
             optional: false,
             rest: true,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -561,6 +582,7 @@ fn test_explain_failure_skips_rest_unknown() {
                 rest: false,
             },
         ],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -583,6 +605,7 @@ fn test_explain_failure_reports_rest_mismatch() {
             optional: false,
             rest: true,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -604,6 +627,7 @@ fn test_explain_failure_reports_rest_mismatch() {
                 rest: false,
             },
         ],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -631,6 +655,7 @@ fn test_empty_object_accepts_non_nullish() {
 
     let func = interner.function(FunctionShape {
         params: Vec::new(),
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -727,6 +752,7 @@ fn test_object_keyword_accepts_non_primitives() {
 
     let func = interner.function(FunctionShape {
         params: Vec::new(),
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -753,6 +779,7 @@ fn test_apparent_string_members_assignable() {
     let to_upper = interner.intern_string("toUpperCase");
     let to_upper_type = interner.function(FunctionShape {
         params: Vec::new(),
+        this_type: None,
         return_type: TypeId::STRING,
         type_params: Vec::new(),
         type_predicate: None,
@@ -807,6 +834,7 @@ fn test_apparent_number_method_assignable() {
     let to_fixed = interner.intern_string("toFixed");
     let to_fixed_type = interner.function(FunctionShape {
         params: Vec::new(),
+        this_type: None,
         return_type: TypeId::STRING,
         type_params: Vec::new(),
         type_predicate: None,
@@ -832,6 +860,7 @@ fn test_apparent_boolean_members_assignable() {
     let to_string = interner.intern_string("toString");
     let to_string_type = interner.function(FunctionShape {
         params: Vec::new(),
+        this_type: None,
         return_type: TypeId::STRING,
         type_params: Vec::new(),
         type_predicate: None,
@@ -857,6 +886,7 @@ fn test_apparent_bigint_members_assignable() {
     let value_of = interner.intern_string("valueOf");
     let value_of_type = interner.function(FunctionShape {
         params: Vec::new(),
+        this_type: None,
         return_type: TypeId::BIGINT,
         type_params: Vec::new(),
         type_predicate: None,
@@ -884,6 +914,7 @@ fn test_apparent_symbol_members_assignable() {
     let description_type = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
     let to_string_type = interner.function(FunctionShape {
         params: Vec::new(),
+        this_type: None,
         return_type: TypeId::STRING,
         type_params: Vec::new(),
         type_predicate: None,
@@ -1089,6 +1120,7 @@ fn test_rest_any_callable_target_from_function() {
                 optional: false,
                 rest: true,
             }],
+            this_type: None,
             return_type: TypeId::VOID,
             type_predicate: None,
             type_params: Vec::new(),
@@ -1104,6 +1136,7 @@ fn test_rest_any_callable_target_from_function() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::VOID,
         type_params: Vec::new(),
         type_predicate: None,
@@ -1128,6 +1161,7 @@ fn test_rest_unknown_callable_target_from_callable() {
                 optional: false,
                 rest: true,
             }],
+            this_type: None,
             return_type: TypeId::VOID,
             type_predicate: None,
             type_params: Vec::new(),
@@ -1144,6 +1178,7 @@ fn test_rest_unknown_callable_target_from_callable() {
                 optional: false,
                 rest: false,
             }],
+            this_type: None,
             return_type: TypeId::VOID,
             type_predicate: None,
             type_params: Vec::new(),
