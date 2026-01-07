@@ -9,8 +9,8 @@ use crate::solver::TypeInterner;
 use crate::lsp::position::{Position, Range, LineMap};
 use crate::lsp::utils::find_node_at_offset;
 use crate::lsp::resolver::{ScopeCache, ScopeCacheStats, ScopeWalker};
+use crate::lsp::jsdoc::{jsdoc_for_node, parse_jsdoc};
 use crate::thin_checker::ThinCheckerState;
-use crate::comments::{get_comment_ranges, get_leading_comments, get_jsdoc_content, is_jsdoc_comment, get_leading_comments_from_cache};
 
 /// Information returned for a hover request.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -144,10 +144,11 @@ impl<'a> HoverProvider<'a> {
         };
 
         let documentation = if !decl_node_idx.is_none() {
-            self.get_documentation(root, decl_node_idx)
+            jsdoc_for_node(self.arena, root, decl_node_idx, self.source_text)
         } else {
             String::new()
         };
+        let documentation = self.format_jsdoc_for_hover(&documentation);
 
         // 6. Build response
         let mut contents = Vec::new();
@@ -156,7 +157,7 @@ impl<'a> HoverProvider<'a> {
         contents.push(format!("```typescript\n{}\n```", declaration_str));
 
         // Documentation paragraph
-        if !documentation.is_empty() {
+        if let Some(documentation) = documentation {
             contents.push(documentation);
         }
 
@@ -171,47 +172,45 @@ impl<'a> HoverProvider<'a> {
         })
     }
 
-    /// Extract JSDoc comments preceding a node.
-    /// Uses cached comment ranges from SourceFileData for O(log N) performance
-    /// instead of O(N) rescanning on every hover.
-    fn get_documentation(&self, root: NodeIndex, node_idx: NodeIndex) -> String {
-        let Some(node) = self.arena.get(node_idx) else { return String::new() };
+    fn format_jsdoc_for_hover(&self, doc: &str) -> Option<String> {
+        if doc.is_empty() {
+            return None;
+        }
 
-        // OPTIMIZATION: Use cached comments from SourceFileData instead of rescanning
-        let comments = if let Some(root_node) = self.arena.get(root) {
-            if let Some(sf_data) = self.arena.get_source_file(root_node) {
-                &sf_data.comments
-            } else {
-                // Fallback: if root is not a source file, rescan (shouldn't happen in LSP)
-                return String::new();
-            }
-        } else {
-            return String::new();
-        };
+        let parsed = parse_jsdoc(doc);
+        if parsed.is_empty() {
+            return Some(doc.to_string());
+        }
 
-        // Get comments immediately before the node start position
-        let leading_comments = get_leading_comments_from_cache(comments, node.pos, self.source_text);
-
-        // Collect only the JSDoc comments immediately preceding the node
-        // (not all JSDoc comments in the file up to this point)
-        let mut relevant_docs = Vec::new();
-
-        // Iterate backwards from the node
-        for comment in leading_comments.iter().rev() {
-            if is_jsdoc_comment(comment, self.source_text) {
-                relevant_docs.push(get_jsdoc_content(comment, self.source_text));
-            } else {
-                // If we hit a non-JSDoc comment, stop collecting
-                // (once we have docs and encounter non-doc content, that's a break)
-                if !relevant_docs.is_empty() {
-                    break;
-                }
+        let mut sections = Vec::new();
+        if let Some(summary) = parsed.summary.as_ref() {
+            if !summary.is_empty() {
+                sections.push(summary.clone());
             }
         }
 
-        // Restore order (we collected backwards)
-        relevant_docs.reverse();
-        relevant_docs.join("\n\n")
+        if !parsed.params.is_empty() {
+            let mut names: Vec<&String> = parsed.params.keys().collect();
+            names.sort();
+            let mut lines = Vec::new();
+            lines.push("Parameters:".to_string());
+            for name in names {
+                let desc = parsed.params.get(name).map(|s| s.as_str()).unwrap_or("");
+                if desc.is_empty() {
+                    lines.push(format!("- `{}`", name));
+                } else {
+                    lines.push(format!("- `{}` {}", name, desc));
+                }
+            }
+            sections.push(lines.join("\n"));
+        }
+
+        let formatted = sections.join("\n\n");
+        if formatted.is_empty() {
+            Some(doc.to_string())
+        } else {
+            Some(formatted)
+        }
     }
 
     /// Helper to get a human-readable kind string for the symbol.
@@ -282,6 +281,38 @@ mod hover_tests {
             // Check that we have a range
             assert!(info.range.is_some(), "Should have range");
         }
+    }
+
+    #[test]
+    fn test_hover_jsdoc_summary_and_params() {
+        let source = "/**\n * Adds two numbers.\n * @param a First number.\n * @param b Second number.\n */\nfunction add(a: number, b: number): number { return a + b; }\nadd(1, 2);";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let interner = TypeInterner::new();
+        let line_map = LineMap::build(source);
+
+        let provider = HoverProvider::new(
+            parser.get_arena(),
+            &binder,
+            &line_map,
+            &interner,
+            source,
+            "test.ts".to_string()
+        );
+
+        let pos = Position::new(6, 0);
+        let mut cache = None;
+        let info = provider.get_hover(root, pos, &mut cache).expect("Expected hover info");
+
+        let doc = info.contents.iter().find(|c| c.contains("Adds two numbers.")).cloned().unwrap_or_default();
+        assert!(doc.contains("Adds two numbers."));
+        assert!(doc.contains("Parameters:"));
+        assert!(doc.contains("`a` First number."));
+        assert!(doc.contains("`b` Second number."));
     }
 
     #[test]

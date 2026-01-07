@@ -528,6 +528,8 @@ impl<'a> ThinPrinter<'a> {
     /// Set the source text (for detecting single-line constructs).
     pub fn set_source_text(&mut self, text: &'a str) {
         self.source_text = Some(text);
+        let estimated = text.len().saturating_mul(3) / 2;
+        self.writer.ensure_output_capacity(estimated);
     }
 
     /// Check if a node spans a single line in the source.
@@ -717,6 +719,11 @@ impl<'a> ThinPrinter<'a> {
     /// Write a space.
     pub(super) fn write_space(&mut self) {
         self.writer.write_space();
+    }
+
+    /// Write an unsigned integer.
+    pub(super) fn write_usize(&mut self, value: usize) {
+        self.writer.write_usize(value);
     }
 
     /// Write a semicolon (respecting options).
@@ -2461,12 +2468,11 @@ impl<'a> ThinPrinter<'a> {
             }
             k if k == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT => {
                 if let Some(shorthand) = self.arena.get_shorthand_property(node) {
-                    let name = self.get_identifier_text(shorthand.name);
                     self.write(temp_var);
                     self.write(".");
-                    self.write(&name);
+                    self.write_identifier_text(shorthand.name);
                     self.write(" = ");
-                    self.write(&name);
+                    self.write_identifier_text(shorthand.name);
                 }
             }
             k if k == syntax_kind_ext::METHOD_DECLARATION => {
@@ -2541,9 +2547,8 @@ impl<'a> ThinPrinter<'a> {
             }
         } else if name_node.kind == SyntaxKind::Identifier as u16 {
             // Regular identifier: _a.name
-            let name = self.get_identifier_text(name_idx);
             self.write(".");
-            self.write(&name);
+            self.write_identifier_text(name_idx);
         } else if name_node.kind == SyntaxKind::StringLiteral as u16 {
             // String literal: _a["name"]
             if let Some(lit) = self.arena.get_literal(name_node) {
@@ -2571,9 +2576,8 @@ impl<'a> ThinPrinter<'a> {
                 self.emit(computed.expression);
             }
         } else if name_node.kind == SyntaxKind::Identifier as u16 {
-            let name = self.get_identifier_text(name_idx);
             self.write("\"");
-            self.write(&name);
+            self.write_identifier_text(name_idx);
             self.write("\"");
         } else if name_node.kind == SyntaxKind::StringLiteral as u16 {
             if let Some(lit) = self.arena.get_literal(name_node) {
@@ -3491,15 +3495,14 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        let binding_name = self.get_identifier_text(elem.name);
-        if binding_name.is_empty() {
+        if !self.has_identifier_text(elem.name) {
             return;
         }
 
         if elem.initializer.is_none() {
             // Emit: , bindingName = temp.propName
             self.write(", ");
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.emit_assignment_target_es5(key_idx, temp_name);
         } else {
@@ -3509,7 +3512,7 @@ impl<'a> ThinPrinter<'a> {
             self.write(" = ");
             self.emit_assignment_target_es5(key_idx, temp_name);
             self.write(", ");
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.write(&value_name);
             self.write(" === void 0 ? ");
@@ -3536,7 +3539,7 @@ impl<'a> ThinPrinter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
 
             if !elem.initializer.is_none() {
@@ -3554,19 +3557,18 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        let binding_name = self.get_identifier_text(elem.name);
-        if binding_name.is_empty() {
+        if !self.has_identifier_text(elem.name) {
             return;
         }
 
         if elem.initializer.is_none() {
             // Emit: , bindingName = temp[index]
             self.write(", ");
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
         } else {
             let value_name = self.get_temp_var_name();
@@ -3575,10 +3577,10 @@ impl<'a> ThinPrinter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
             self.write(", ");
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.write(&value_name);
             self.write(" === void 0 ? ");
@@ -3639,7 +3641,7 @@ impl<'a> ThinPrinter<'a> {
                 self.write("for (var ");
                 self.write(&iter_name);
                 self.write(" = ");
-                self.write(&rest.index.to_string());
+                self.write_usize(rest.index);
                 self.write("; ");
                 self.write(&iter_name);
                 self.write(" < arguments.length; ");
@@ -3649,7 +3651,7 @@ impl<'a> ThinPrinter<'a> {
                 self.write("[");
                 self.write(&iter_name);
                 self.write(" - ");
-                self.write(&rest.index.to_string());
+                self.write_usize(rest.index);
                 self.write("] = arguments[");
                 self.write(&iter_name);
                 self.write("];");
@@ -3757,8 +3759,7 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        let binding_name = self.get_identifier_text(elem.name);
-        if binding_name.is_empty() {
+        if !self.has_identifier_text(elem.name) {
             return;
         }
 
@@ -3769,7 +3770,7 @@ impl<'a> ThinPrinter<'a> {
             self.write(" = ");
             self.emit_assignment_target_es5(key_idx, temp_name);
             self.write(", ");
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.write(&value_name);
             self.write(" === void 0 ? ");
@@ -3777,7 +3778,7 @@ impl<'a> ThinPrinter<'a> {
             self.write(" : ");
             self.write(&value_name);
         } else {
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.emit_assignment_target_es5(key_idx, temp_name);
         }
@@ -3808,7 +3809,7 @@ impl<'a> ThinPrinter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
 
             if !elem.initializer.is_none() {
@@ -3826,8 +3827,7 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        let binding_name = self.get_identifier_text(elem.name);
-        if binding_name.is_empty() {
+        if !self.has_identifier_text(elem.name) {
             return;
         }
 
@@ -3838,10 +3838,10 @@ impl<'a> ThinPrinter<'a> {
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
             self.write(", ");
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.write(&value_name);
             self.write(" === void 0 ? ");
@@ -3849,11 +3849,11 @@ impl<'a> ThinPrinter<'a> {
             self.write(" : ");
             self.write(&value_name);
         } else {
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
-            self.write(&index.to_string());
+            self.write_usize(index);
             self.write("]");
         }
     }
@@ -3908,16 +3908,15 @@ impl<'a> ThinPrinter<'a> {
         if let Some(ref name) = rest_temp {
             self.write(name);
         } else {
-            let binding_name = self.get_identifier_text(rest_target);
-            if binding_name.is_empty() {
+            if !self.has_identifier_text(rest_target) {
                 return;
             }
-            self.write(&binding_name);
+            self.write_identifier_text(rest_target);
         }
         self.write(" = ");
         self.write(temp_name);
         self.write(".slice(");
-        self.write(&index.to_string());
+        self.write_usize(index);
         self.write(")");
 
         if let Some(ref name) = rest_temp {
@@ -3977,16 +3976,15 @@ impl<'a> ThinPrinter<'a> {
         if let Some(ref name) = rest_temp {
             self.write(name);
         } else {
-            let binding_name = self.get_identifier_text(rest_target);
-            if binding_name.is_empty() {
+            if !self.has_identifier_text(rest_target) {
                 return;
             }
-            self.write(&binding_name);
+            self.write_identifier_text(rest_target);
         }
         self.write(" = ");
         self.write(temp_name);
         self.write(".slice(");
-        self.write(&index.to_string());
+        self.write_usize(index);
         self.write(")");
 
         if let Some(ref name) = rest_temp {
@@ -4062,6 +4060,18 @@ impl<'a> ThinPrinter<'a> {
         }
 
         self.emit_expression(key_idx);
+    }
+
+    fn has_identifier_text(&self, idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(idx) else { return false };
+        self.arena.get_identifier(node).is_some()
+    }
+
+    fn write_identifier_text(&mut self, idx: NodeIndex) {
+        let Some(node) = self.arena.get(idx) else { return };
+        if let Some(ident) = self.arena.get_identifier(node) {
+            self.write(&ident.escaped_text);
+        }
     }
 
     /// Get identifier text from a node index

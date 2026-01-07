@@ -6,15 +6,12 @@
 use crate::parser::thin_node::{ThinNodeArena, CallExprData};
 use crate::parser::{NodeIndex, syntax_kind_ext};
 use crate::thin_binder::ThinBinderState;
-use crate::solver::{TypeInterner, TypeId, TypeKey, FunctionShape, CallableShape};
+use crate::solver::{TypeInterner, TypeId, TypeKey, FunctionShape};
 use crate::lsp::position::{Position, LineMap};
 use crate::lsp::utils::find_node_at_offset;
 use crate::lsp::resolver::{ScopeCache, ScopeCacheStats};
+use crate::lsp::jsdoc::{jsdoc_for_node, parse_jsdoc, ParsedJsdoc};
 use crate::thin_checker::ThinCheckerState;
-use crate::scanner_impl::ScannerState;
-use crate::scanner::SyntaxKind;
-use crate::comments::{get_jsdoc_content, get_leading_comments_from_cache, is_jsdoc_comment};
-use std::collections::HashMap;
 
 /// Represents a parameter in a signature.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -365,7 +362,7 @@ impl<'a> SignatureHelpProvider<'a> {
             let param_label = format!("{}{}{}: {}", rest, name, optional, type_str);
             parameters.push(ParameterInformation {
                 label: param_label.clone(),
-                documentation: None, // TODO: Extract JSDoc for params
+                documentation: None,
             });
 
             param_labels.push(param_label);
@@ -378,7 +375,7 @@ impl<'a> SignatureHelpProvider<'a> {
 
         SignatureInformation {
             label,
-            documentation: None, // TODO: Extract JSDoc for function
+            documentation: None,
             parameters,
         }
     }
@@ -476,11 +473,11 @@ impl<'a> SignatureHelpProvider<'a> {
             if decl.is_none() {
                 continue;
             }
-            let doc = self.get_documentation(root, decl);
+            let doc = jsdoc_for_node(self.arena, root, decl, self.source_text);
             if doc.is_empty() {
                 continue;
             }
-            let parsed = self.parse_jsdoc(&doc);
+            let parsed = parse_jsdoc(&doc);
             if parsed.is_empty() {
                 continue;
             }
@@ -490,150 +487,6 @@ impl<'a> SignatureHelpProvider<'a> {
         None
     }
 
-    /// Extract JSDoc comments preceding a node.
-    /// Uses cached comment ranges from SourceFileData for O(log N) performance.
-    fn get_documentation(&self, root: NodeIndex, node_idx: NodeIndex) -> String {
-        let Some(node) = self.arena.get(node_idx) else { return String::new() };
-
-        let comments = if let Some(root_node) = self.arena.get(root) {
-            if let Some(sf_data) = self.arena.get_source_file(root_node) {
-                &sf_data.comments
-            } else {
-                return String::new();
-            }
-        } else {
-            return String::new();
-        };
-
-        let leading_comments = get_leading_comments_from_cache(comments, node.pos, self.source_text);
-        let mut docs = Vec::new();
-
-        for comment in leading_comments.iter().rev() {
-            if is_jsdoc_comment(comment, self.source_text) {
-                docs.push(get_jsdoc_content(comment, self.source_text));
-            } else if !docs.is_empty() {
-                break;
-            }
-        }
-
-        docs.reverse();
-        docs.join("\n\n")
-    }
-
-    fn parse_jsdoc(&self, doc: &str) -> ParsedJsdoc {
-        let mut summary_lines = Vec::new();
-        let mut params = HashMap::new();
-        let mut current_param: Option<String> = None;
-        let mut current_desc = String::new();
-        let mut in_tags = false;
-
-        for line in doc.lines() {
-            let trimmed = line.trim();
-            if trimmed.is_empty() {
-                if !in_tags {
-                    summary_lines.push(String::new());
-                }
-                continue;
-            }
-
-            if trimmed.starts_with('@') {
-                in_tags = true;
-                if let Some(name) = current_param.take() {
-                    let desc = current_desc.trim().to_string();
-                    if !desc.is_empty() {
-                        params.insert(name, desc);
-                    }
-                    current_desc.clear();
-                }
-
-                if let Some((name, desc)) = self.parse_param_tag(trimmed) {
-                    current_param = Some(name);
-                    current_desc = desc;
-                }
-                continue;
-            }
-
-            if let Some(_) = current_param {
-                if !current_desc.is_empty() {
-                    current_desc.push(' ');
-                }
-                current_desc.push_str(trimmed);
-            } else if !in_tags {
-                summary_lines.push(trimmed.to_string());
-            }
-        }
-
-        if let Some(name) = current_param {
-            let desc = current_desc.trim().to_string();
-            if !desc.is_empty() {
-                params.insert(name, desc);
-            }
-        }
-
-        let summary = summary_lines
-            .join("\n")
-            .trim()
-            .to_string();
-
-        ParsedJsdoc {
-            summary: if summary.is_empty() { None } else { Some(summary) },
-            params,
-        }
-    }
-
-    fn parse_param_tag(&self, line: &str) -> Option<(String, String)> {
-        let rest = line.strip_prefix("@param")?.trim();
-        if rest.is_empty() {
-            return None;
-        }
-
-        let rest = if rest.starts_with('{') {
-            if let Some(end) = rest.find('}') {
-                rest[end + 1..].trim()
-            } else {
-                rest
-            }
-        } else {
-            rest
-        };
-
-        let mut parts = rest.splitn(2, char::is_whitespace);
-        let name_raw = parts.next()?.trim();
-        if name_raw.is_empty() {
-            return None;
-        }
-        let desc = parts.next().unwrap_or("").trim().to_string();
-        let name = self.normalize_param_name(name_raw);
-        if name.is_empty() {
-            return None;
-        }
-        Some((name, desc))
-    }
-
-    fn normalize_param_name(&self, name: &str) -> String {
-        let trimmed = name.trim();
-        let mut name = if trimmed.starts_with('[') && trimmed.ends_with(']') && trimmed.len() > 2 {
-            &trimmed[1..trimmed.len() - 1]
-        } else {
-            trimmed
-        };
-        if let Some(eq) = name.find('=') {
-            name = &name[..eq];
-        }
-        name.trim().to_string()
-    }
-}
-
-#[derive(Clone, Debug)]
-struct ParsedJsdoc {
-    summary: Option<String>,
-    params: HashMap<String, String>,
-}
-
-impl ParsedJsdoc {
-    fn is_empty(&self) -> bool {
-        self.summary.is_none() && self.params.is_empty()
-    }
 }
 
 #[cfg(test)]

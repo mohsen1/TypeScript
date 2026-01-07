@@ -112,9 +112,16 @@ impl WatchState {
         changed_paths: Option<Vec<PathBuf>>,
     ) -> Result<()> {
         let changed_paths_ref = changed_paths.as_deref();
-        self.invalidate_caches(changed_paths_ref);
+        let needs_full_rebuild = changed_paths_ref
+            .map(|paths| self.needs_full_rebuild(paths))
+            .unwrap_or(false);
+        if needs_full_rebuild {
+            self.type_cache.clear();
+        }
 
-        let result = if let Some(changed_paths) = changed_paths_ref {
+        let result = if needs_full_rebuild || changed_paths_ref.is_none() {
+            driver::compile_with_cache(args, cwd, &mut self.type_cache)
+        } else if let Some(changed_paths) = changed_paths_ref {
             driver::compile_with_cache_and_changes(args, cwd, &mut self.type_cache, changed_paths)
         } else {
             driver::compile_with_cache(args, cwd, &mut self.type_cache)
@@ -143,27 +150,11 @@ impl WatchState {
         Ok(())
     }
 
-    fn invalidate_caches(&mut self, changed_paths: Option<&[PathBuf]>) {
-        let Some(paths) = changed_paths else {
-            return;
-        };
-
-        let mut clear_cache = false;
-        let mut normalized = Vec::with_capacity(paths.len());
-
-        for path in paths {
-            let path = canonicalize_or_owned(path);
-            if self.is_config_path(&path) {
-                clear_cache = true;
-            }
-            normalized.push(path);
-        }
-
-        if clear_cache {
-            self.type_cache.clear();
-        } else {
-            self.type_cache.invalidate_paths_with_dependents(normalized);
-        }
+    fn needs_full_rebuild(&self, paths: &[PathBuf]) -> bool {
+        paths
+            .iter()
+            .map(|path| canonicalize_or_owned(path))
+            .any(|path| self.is_config_path(&path))
     }
 
     fn is_config_path(&self, path: &Path) -> bool {

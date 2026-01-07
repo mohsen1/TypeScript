@@ -6,6 +6,14 @@ The goal is a correct, fast, drop-in replacement for `tsc`, with both native and
 TypeScript is intentionally unsound. Zang keeps a sound core solver and layers a compatibility
 engine on top to match TypeScript behavior while preserving correctness where possible.
 
+## Executive Summary (Manager report)
+Last updated: 2026-01-07
+
+- Overall: Migration is active; Rust/WASM compiler is under construction and not production-ready.
+- Tracks: Emitter optimizations landed (fewer name clones) with new tests; solver is stabilizing its POD TypeKey + interner; CLI incremental and tsconfig gaps remain.
+- Risk: LSP signature help still lacks JSDoc extraction; several parser/arena TODOs remain; CLI incremental invalidation and map outputs are incomplete.
+- Next focus: Remove obvious emitter hot-path overheads, finish CLI incremental invalidation and map outputs, and close LSP JSDoc + parser TODOs.
+
 ## Status
 This project is not ready for general use yet. The interface and distribution are in progress.
 

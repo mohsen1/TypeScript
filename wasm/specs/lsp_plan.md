@@ -9,7 +9,7 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
 ## Current Status
 - Major features implemented (definitions, references, rename, organize imports, extract variable, signature help).
 - Incremental updates reuse arena/binder; type/scope caches are per-file and reset on edit.
-- Remaining TODOs: none.
+- Remaining TODOs: JSDoc extraction for signature help/hover.
 
 ## Highest-Impact Next Tasks
 - [x] Incremental file updates
@@ -31,6 +31,7 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
   - [x] Reuse scope cache for rename operations.
 - [x] Cross-file rename
   - [x] Project-level rename builds workspace edits from multi-file references.
+  - [x] Preserve local alias names when renaming exported symbols.
 - [x] Diff-based incremental parsing
   - [x] Reparse from the first affected statement and reuse prefix nodes.
 
