@@ -73,6 +73,8 @@ Status: Active
 - [x] Re-enable namespace member tests
   - Remove stale TODO suppression.
   - Add focused tests for missing namespace value members.
+- [x] Expand namespace member tests for alias resolution
+  - Add coverage for missing members through nested namespace aliases.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
