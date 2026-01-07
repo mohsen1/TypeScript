@@ -66,6 +66,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Bind loop/switch condition expressions for local resolution
    - [x] Bind export assignment expressions for local resolution
    - [x] Bind labeled/with statements for local resolution
+   - [x] Hoist `var` declarations in LSP resolver scopes
    - [x] Bind class static blocks for local resolution
    - [x] Add import/export handling for cross-file navigation
 
@@ -80,7 +81,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
 #### Testing
 
 Latest run:
-- `./wasm/test.sh` ❌ (`src/emitter_parity_tests.rs` `test_parity_commonjs_export`; pre-existing on rust, still failing)
+- `./wasm/test.sh` ❌ (`lib_tests::test_get_code_actions_with_context_missing_import` `cannot call wasm-bindgen imported functions on non-wasm targets`)
 
 ## Quick Reference
 
