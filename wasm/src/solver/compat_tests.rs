@@ -872,6 +872,67 @@ fn test_apparent_string_members_include_substr_and_locale_compare() {
 }
 
 #[test]
+fn test_apparent_string_members_include_legacy_and_unicode() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let normalize = interner.intern_string("normalize");
+    let is_well_formed = interner.intern_string("isWellFormed");
+    let fontcolor = interner.intern_string("fontcolor");
+
+    let normalize_type = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let is_well_formed_type = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::BOOLEAN,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let fontcolor_type = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let target = interner.object(vec![
+        PropertyInfo {
+            name: normalize,
+            type_id: normalize_type,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: is_well_formed,
+            type_id: is_well_formed_type,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: fontcolor,
+            type_id: fontcolor_type,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    assert!(checker.is_assignable(TypeId::STRING, target));
+}
+
+#[test]
 fn test_apparent_string_members_reject_mismatch() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);

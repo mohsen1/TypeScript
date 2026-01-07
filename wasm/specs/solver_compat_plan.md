@@ -225,6 +225,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Add missing ES5 string methods (localeCompare, substr) to apparent members
 - [x] Tests for localeCompare/substr apparent members
 
+### Phase 39: DOM/ES2024 String Apparent Members
+- [x] Add missing legacy/modern string methods from lib.d.ts (HTML methods, normalize, well-formed)
+- [x] Tests for legacy/modern string apparent members
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

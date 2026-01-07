@@ -12,15 +12,31 @@ pub struct ApparentMember {
 }
 
 const STRING_METHODS_RETURN_STRING: &[&str] = &[
+    "anchor",
     "at",
+    "big",
+    "blink",
+    "bold",
     "charAt",
     "concat",
+    "fixed",
+    "fontcolor",
+    "fontsize",
+    "italics",
+    "link",
+    "normalize",
     "padEnd",
     "padStart",
     "repeat",
+    "replace",
+    "replaceAll",
     "slice",
+    "small",
+    "strike",
+    "sub",
     "substr",
     "substring",
+    "sup",
     "toLocaleLowerCase",
     "toLocaleUpperCase",
     "toLowerCase",
@@ -28,10 +44,11 @@ const STRING_METHODS_RETURN_STRING: &[&str] = &[
     "toUpperCase",
     "trim",
     "trimEnd",
+    "trimLeft",
+    "trimRight",
     "trimStart",
+    "toWellFormed",
     "valueOf",
-    "replace",
-    "replaceAll",
 ];
 const STRING_METHODS_RETURN_NUMBER: &[&str] = &[
     "charCodeAt",
@@ -41,7 +58,7 @@ const STRING_METHODS_RETURN_NUMBER: &[&str] = &[
     "localeCompare",
     "search",
 ];
-const STRING_METHODS_RETURN_BOOLEAN: &[&str] = &["endsWith", "includes", "startsWith"];
+const STRING_METHODS_RETURN_BOOLEAN: &[&str] = &["endsWith", "includes", "isWellFormed", "startsWith"];
 const STRING_METHODS_RETURN_ANY: &[&str] = &["match", "matchAll"];
 const STRING_METHODS_RETURN_STRING_ARRAY: &[&str] = &["split"];
 
