@@ -750,6 +750,125 @@ fn test_apparent_number_method_assignable() {
 }
 
 #[test]
+fn test_apparent_boolean_members_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let to_string = interner.intern_string("toString");
+    let to_string_type = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let target = interner.object(vec![PropertyInfo {
+        name: to_string,
+        type_id: to_string_type,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(checker.is_assignable(TypeId::BOOLEAN, target));
+}
+
+#[test]
+fn test_apparent_bigint_members_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let value_of = interner.intern_string("valueOf");
+    let value_of_type = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: TypeId::BIGINT,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let target = interner.object(vec![PropertyInfo {
+        name: value_of,
+        type_id: value_of_type,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(checker.is_assignable(TypeId::BIGINT, target));
+}
+
+#[test]
+fn test_apparent_symbol_members_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let description = interner.intern_string("description");
+    let to_string = interner.intern_string("toString");
+    let description_type = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    let to_string_type = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let target = interner.object(vec![
+        PropertyInfo {
+            name: description,
+            type_id: description_type,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: to_string,
+            type_id: to_string_type,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    assert!(checker.is_assignable(TypeId::SYMBOL, target));
+}
+
+#[test]
+fn test_apparent_string_number_index_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let target = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+
+    assert!(checker.is_assignable(TypeId::STRING, target));
+}
+
+#[test]
+fn test_apparent_string_rejects_string_index_signature() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let target = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    assert!(!checker.is_assignable(TypeId::STRING, target));
+}
+
+#[test]
 fn test_optional_property_allows_undefined() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);

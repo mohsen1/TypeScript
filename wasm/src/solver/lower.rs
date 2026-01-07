@@ -1165,14 +1165,8 @@ impl<'a> TypeLowering<'a> {
                                 k if k == SyntaxKind::BigIntLiteral as u16 => {
                                     if let Some(lit_data) = self.arena.get_literal(operand_node) {
                                         let text = lit_data.text.strip_suffix('n').unwrap_or(&lit_data.text);
-                                        if op == SyntaxKind::MinusToken as u16 {
-                                            let mut value = String::with_capacity(text.len() + 1);
-                                            value.push('-');
-                                            value.push_str(text);
-                                            self.interner.literal_bigint(&value)
-                                        } else {
-                                            self.interner.literal_bigint(text)
-                                        }
+                                        let negative = op == SyntaxKind::MinusToken as u16;
+                                        self.interner.literal_bigint_with_sign(negative, text)
                                     } else {
                                         TypeId::BIGINT
                                     }

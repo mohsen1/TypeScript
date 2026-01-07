@@ -107,7 +107,7 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Return callable types for built-in primitive/array methods
 - [x] Apply apparent primitive members during object assignability checks
 - [x] Tests for primitive method property access and literal string properties
-- [x] Tests for primitive-to-object assignability
+- [x] Tests for primitive-to-object assignability and index signature cases
 
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
