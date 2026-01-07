@@ -1,6 +1,7 @@
 use super::FlowAnalyzer;
 use crate::solver::{PropertyInfo, TypeId, TypeInterner};
 use crate::thin_binder::ThinBinderState;
+use crate::thin_checker::ThinCheckerState;
 use crate::thin_parser::ThinParserState;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::NodeIndex;
@@ -335,6 +336,133 @@ if ("a" in x) {
 
     let narrowed_then = analyzer.get_flow_type(ident_then, union, flow_then);
     assert_eq!(narrowed_then, type_a);
+
+    let narrowed_else = analyzer.get_flow_type(ident_else, union, flow_else);
+    assert_eq!(narrowed_else, union);
+}
+
+#[test]
+fn test_user_defined_type_predicate_narrows_branches() {
+    let source = r#"
+function isString(x: string | number): x is string {
+  return typeof x === "string";
+}
+let x: string | number;
+if (isString(x)) {
+  x;
+} else {
+  x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
+
+    let ident_then = get_if_branch_expression(arena, root, 2, true);
+    let ident_else = get_if_branch_expression(arena, root, 2, false);
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let flow_then = binder.get_node_flow(ident_then).expect("flow then");
+    let flow_else = binder.get_node_flow(ident_else).expect("flow else");
+
+    let narrowed_then = analyzer.get_flow_type(ident_then, union, flow_then);
+    assert_eq!(narrowed_then, TypeId::STRING);
+
+    let narrowed_else = analyzer.get_flow_type(ident_else, union, flow_else);
+    assert_eq!(narrowed_else, TypeId::NUMBER);
+}
+
+#[test]
+fn test_user_defined_type_predicate_alias_narrows() {
+    let source = r#"
+function isString(x: string | number): x is string {
+  return typeof x === "string";
+}
+const guard = isString;
+let x: string | number;
+if (guard(x)) {
+  x;
+} else {
+  x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
+
+    let ident_then = get_if_branch_expression(arena, root, 3, true);
+    let ident_else = get_if_branch_expression(arena, root, 3, false);
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let flow_then = binder.get_node_flow(ident_then).expect("flow then");
+    let flow_else = binder.get_node_flow(ident_else).expect("flow else");
+
+    let narrowed_then = analyzer.get_flow_type(ident_then, union, flow_then);
+    assert_eq!(narrowed_then, TypeId::STRING);
+
+    let narrowed_else = analyzer.get_flow_type(ident_else, union, flow_else);
+    assert_eq!(narrowed_else, TypeId::NUMBER);
+}
+
+#[test]
+fn test_asserts_type_predicate_narrows_true_branch() {
+    let source = r#"
+function assertString(x: string | number): asserts x is string {
+  if (typeof x !== "string") throw new Error("nope");
+}
+let x: string | number;
+if (assertString(x)) {
+  x;
+} else {
+  x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
+
+    let ident_then = get_if_branch_expression(arena, root, 2, true);
+    let ident_else = get_if_branch_expression(arena, root, 2, false);
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let flow_then = binder.get_node_flow(ident_then).expect("flow then");
+    let flow_else = binder.get_node_flow(ident_else).expect("flow else");
+
+    let narrowed_then = analyzer.get_flow_type(ident_then, union, flow_then);
+    assert_eq!(narrowed_then, TypeId::STRING);
 
     let narrowed_else = analyzer.get_flow_type(ident_else, union, flow_else);
     assert_eq!(narrowed_else, union);
