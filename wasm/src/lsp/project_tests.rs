@@ -547,6 +547,76 @@ fn test_project_update_file_append_preserves_prefix_symbol() {
 }
 
 #[test]
+fn test_project_update_file_append_multiple_statements_preserves_prefix_symbol() {
+    let mut project = Project::new();
+    let source = "const alpha = 1;\n";
+    project.set_file("a.ts".to_string(), source.to_string());
+
+    let alpha_symbol_before = {
+        let file = project.file("a.ts").unwrap();
+        let arena = file.arena();
+        let root = file.root();
+        let source_node = arena.get(root).unwrap();
+        let source_file = arena.get_source_file(source_node).unwrap();
+        let stmt_idx = source_file.statements.nodes[0];
+        let stmt_node = arena.get(stmt_idx).unwrap();
+        let var_stmt = arena.get_variable(stmt_node).unwrap();
+        let decl_list_idx = var_stmt.declarations.nodes[0];
+        let decl_list_node = arena.get(decl_list_idx).unwrap();
+        let decl_list = arena.get_variable(decl_list_node).unwrap();
+        let decl_idx = decl_list.declarations.nodes[0];
+        let decl_node = arena.get(decl_idx).unwrap();
+        let decl = arena.get_variable_declaration(decl_node).unwrap();
+        let name_idx = decl.name;
+        file.binder()
+            .get_node_symbol(name_idx)
+            .expect("Expected symbol for alpha")
+    };
+
+    let edit = {
+        let file = project.file("a.ts").unwrap();
+        let source = file.source_text();
+        let end = source.len() as u32;
+        let pos = file.line_map().offset_to_position(end, source);
+        let range = Range::new(pos, pos);
+        TextEdit::new(range, "const beta = 2;\nconst gamma = 3;\n".to_string())
+    };
+    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+
+    let alpha_symbol_after = {
+        let file = project.file("a.ts").unwrap();
+        let arena = file.arena();
+        let root = file.root();
+        let source_node = arena.get(root).unwrap();
+        let source_file = arena.get_source_file(source_node).unwrap();
+        let stmt_idx = source_file.statements.nodes[0];
+        let stmt_node = arena.get(stmt_idx).unwrap();
+        let var_stmt = arena.get_variable(stmt_node).unwrap();
+        let decl_list_idx = var_stmt.declarations.nodes[0];
+        let decl_list_node = arena.get(decl_list_idx).unwrap();
+        let decl_list = arena.get_variable(decl_list_node).unwrap();
+        let decl_idx = decl_list.declarations.nodes[0];
+        let decl_node = arena.get(decl_idx).unwrap();
+        let decl = arena.get_variable_declaration(decl_node).unwrap();
+        let name_idx = decl.name;
+        file.binder()
+            .get_node_symbol(name_idx)
+            .expect("Expected symbol for alpha after append")
+    };
+
+    let file = project.file("a.ts").unwrap();
+    assert_eq!(
+        file.source_text(),
+        "const alpha = 1;\nconst beta = 2;\nconst gamma = 3;\n"
+    );
+    assert_eq!(alpha_symbol_before, alpha_symbol_after);
+    let locals = &file.binder().file_locals;
+    assert!(locals.has("alpha"));
+    assert!(locals.has("beta"));
+    assert!(locals.has("gamma"));
+}
+
+#[test]
 fn test_project_update_file_remove_suffix_preserves_prefix_symbol() {
     let mut project = Project::new();
     let source = "const alpha = 1;\nconst beta = 2;\n";
