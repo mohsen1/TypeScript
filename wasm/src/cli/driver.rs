@@ -289,6 +289,7 @@ fn compile_inner(
     let declaration_dir = normalize_output_dir(&base_dir, resolved.declaration_dir.clone());
     let base_url = normalize_base_url(&base_dir, resolved.base_url.clone());
     resolved.base_url = base_url;
+    resolved.type_roots = normalize_type_roots(&base_dir, resolved.type_roots.clone());
 
     let discovery = build_discovery_options(
         args,
@@ -298,10 +299,12 @@ fn compile_inner(
         out_dir.as_deref(),
     )?;
     let mut file_paths = discover_ts_files(&discovery)?;
-    if !resolved.lib_files.is_empty() {
+    let type_files = collect_type_root_files(&base_dir, &resolved);
+    if !resolved.lib_files.is_empty() || !type_files.is_empty() {
         let mut merged = std::collections::BTreeSet::new();
         merged.extend(file_paths.into_iter());
         merged.extend(resolved.lib_files.iter().cloned());
+        merged.extend(type_files);
         file_paths = merged.into_iter().collect();
     }
     if file_paths.is_empty() {
@@ -732,6 +735,140 @@ fn build_discovery_options(
     };
 
     Ok(FileDiscoveryOptions::from_tsconfig(tsconfig_path, config, out_dir))
+}
+
+fn collect_type_root_files(base_dir: &Path, options: &ResolvedCompilerOptions) -> Vec<PathBuf> {
+    let roots = match options.type_roots.as_ref() {
+        Some(roots) => roots.clone(),
+        None => default_type_roots(base_dir),
+    };
+    if roots.is_empty() {
+        return Vec::new();
+    }
+
+    let mut files = std::collections::BTreeSet::new();
+    if let Some(types) = options.types.as_ref() {
+        for name in types {
+            if let Some(entry) = resolve_type_package_from_roots(name, &roots, options) {
+                files.insert(entry);
+            }
+        }
+        return files.into_iter().collect();
+    }
+
+    for root in roots {
+        for package_root in collect_type_packages_from_root(&root) {
+            if let Some(entry) = resolve_type_package_entry(&package_root, options) {
+                files.insert(entry);
+            }
+        }
+    }
+
+    files.into_iter().collect()
+}
+
+fn resolve_type_package_from_roots(
+    name: &str,
+    roots: &[PathBuf],
+    options: &ResolvedCompilerOptions,
+) -> Option<PathBuf> {
+    let candidates = type_package_candidates(name);
+    if candidates.is_empty() {
+        return None;
+    }
+
+    for root in roots {
+        for candidate in &candidates {
+            let package_root = root.join(candidate);
+            if !package_root.is_dir() {
+                continue;
+            }
+            if let Some(entry) = resolve_type_package_entry(&package_root, options) {
+                return Some(entry);
+            }
+        }
+    }
+
+    None
+}
+
+fn type_package_candidates(name: &str) -> Vec<String> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        return Vec::new();
+    }
+
+    let normalized = trimmed.replace('\\', "/");
+    let mut candidates = Vec::new();
+
+    if let Some(stripped) = normalized.strip_prefix("@types/") {
+        if !stripped.is_empty() {
+            candidates.push(stripped.to_string());
+        }
+    }
+
+    if !candidates.iter().any(|value| value == &normalized) {
+        candidates.push(normalized);
+    }
+
+    candidates
+}
+
+fn collect_type_packages_from_root(root: &Path) -> Vec<PathBuf> {
+    let mut packages = Vec::new();
+    let entries = match std::fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(_) => return packages,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        if name.starts_with('.') {
+            continue;
+        }
+        if name.starts_with('@') {
+            if let Ok(scope_entries) = std::fs::read_dir(&path) {
+                for scope_entry in scope_entries.flatten() {
+                    let scope_path = scope_entry.path();
+                    if scope_path.is_dir() {
+                        packages.push(scope_path);
+                    }
+                }
+            }
+            continue;
+        }
+        packages.push(path);
+    }
+
+    packages
+}
+
+fn resolve_type_package_entry(
+    package_root: &Path,
+    options: &ResolvedCompilerOptions,
+) -> Option<PathBuf> {
+    let package_json = read_package_json(&package_root.join("package.json"));
+    let package_type = package_type_from_json(package_json.as_ref());
+    let resolved = resolve_package_root(package_root, package_json.as_ref(), options, package_type)?;
+    if is_declaration_file(&resolved) {
+        Some(resolved)
+    } else {
+        None
+    }
+}
+
+fn default_type_roots(base_dir: &Path) -> Vec<PathBuf> {
+    let candidate = base_dir.join("node_modules").join("@types");
+    if candidate.is_dir() {
+        vec![canonicalize_or_owned(&candidate)]
+    } else {
+        Vec::new()
+    }
 }
 
 fn read_source_files(
@@ -2976,6 +3113,26 @@ pub(crate) fn normalize_root_dir(base_dir: &Path, dir: Option<PathBuf>) -> Optio
         };
         canonicalize_or_owned(&resolved)
     })
+}
+
+fn normalize_type_roots(base_dir: &Path, roots: Option<Vec<PathBuf>>) -> Option<Vec<PathBuf>> {
+    let roots = match roots {
+        Some(roots) => roots,
+        None => return None,
+    };
+    let mut normalized = Vec::new();
+    for root in roots {
+        let resolved = if root.is_absolute() {
+            root
+        } else {
+            base_dir.join(root)
+        };
+        let resolved = canonicalize_or_owned(&resolved);
+        if resolved.is_dir() {
+            normalized.push(resolved);
+        }
+    }
+    Some(normalized)
 }
 
 fn canonicalize_or_owned(path: &Path) -> PathBuf {
