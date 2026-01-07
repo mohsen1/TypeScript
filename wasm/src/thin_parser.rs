@@ -92,6 +92,17 @@ impl ThinParserState {
         }
     }
 
+    pub fn reset(&mut self, file_name: String, source_text: String) {
+        self.file_name = file_name;
+        self.scanner.set_text(source_text, None, None);
+        self.arena.clear();
+        self.context_flags = 0;
+        self.current_token = SyntaxKind::Unknown;
+        self.parse_diagnostics.clear();
+        self.node_count = 0;
+        self.recursion_depth = 0;
+    }
+
     /// Maximum recursion depth to prevent stack overflow on deeply nested code
     const MAX_RECURSION_DEPTH: u32 = 1000;
 

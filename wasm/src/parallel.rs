@@ -27,6 +27,7 @@
 //! ```
 
 use rayon::prelude::*;
+use std::sync::Arc;
 use crate::thin_parser::{ParseDiagnostic, ThinParserState};
 use crate::thin_binder::ThinBinderState;
 use crate::binder::{SymbolArena, SymbolTable, SymbolId};
@@ -116,7 +117,7 @@ pub struct BindResult {
     /// The parsed source file node index
     pub source_file: NodeIndex,
     /// The arena containing all nodes
-    pub arena: ThinNodeArena,
+    pub arena: Arc<ThinNodeArena>,
     /// Symbols created in this file
     pub symbols: SymbolArena,
     /// File-level symbol table (exports, declarations)
@@ -154,7 +155,7 @@ pub fn parse_and_bind_parallel(files: Vec<(String, String)>) -> Vec<BindResult> 
             BindResult {
                 file_name,
                 source_file,
-                arena,
+                arena: Arc::new(arena),
                 symbols: binder.symbols,
                 file_locals: binder.file_locals,
                 node_symbols: binder.node_symbols,
@@ -177,7 +178,7 @@ pub fn parse_and_bind_single(file_name: String, source_text: String) -> BindResu
     BindResult {
         file_name,
         source_file,
-        arena,
+        arena: Arc::new(arena),
         symbols: binder.symbols,
         file_locals: binder.file_locals,
         node_symbols: binder.node_symbols,
@@ -228,7 +229,7 @@ pub struct BoundFile {
     /// The parsed source file node index
     pub source_file: NodeIndex,
     /// The arena containing all nodes (owned by this file)
-    pub arena: ThinNodeArena,
+    pub arena: Arc<ThinNodeArena>,
     /// Node-to-symbol mapping (symbol IDs are global after merge)
     pub node_symbols: FxHashMap<u32, SymbolId>,
     /// Parse diagnostics
@@ -264,6 +265,11 @@ pub struct MergedProgram {
 /// # Returns
 /// MergedProgram with unified symbol space
 pub fn merge_bind_results(results: Vec<BindResult>) -> MergedProgram {
+    let refs: Vec<&BindResult> = results.iter().collect();
+    merge_bind_results_ref(&refs)
+}
+
+pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
     // Calculate total symbols needed
     let total_symbols: usize = results.iter().map(|r| r.symbols.len()).sum();
 
@@ -286,9 +292,9 @@ pub fn merge_bind_results(results: Vec<BindResult>) -> MergedProgram {
 
         // Remap node_symbols to use global IDs
         let mut remapped_node_symbols = FxHashMap::default();
-        for (node_idx, old_sym_id) in result.node_symbols {
-            if let Some(&new_sym_id) = id_remap.get(&old_sym_id) {
-                remapped_node_symbols.insert(node_idx, new_sym_id);
+        for (node_idx, old_sym_id) in result.node_symbols.iter() {
+            if let Some(&new_sym_id) = id_remap.get(old_sym_id) {
+                remapped_node_symbols.insert(*node_idx, new_sym_id);
             }
         }
 
@@ -305,11 +311,11 @@ pub fn merge_bind_results(results: Vec<BindResult>) -> MergedProgram {
         file_locals_list.push(remapped_file_locals);
 
         files.push(BoundFile {
-            file_name: result.file_name,
+            file_name: result.file_name.clone(),
             source_file: result.source_file,
-            arena: result.arena,
+            arena: Arc::clone(&result.arena),
             node_symbols: remapped_node_symbols,
-            parse_diagnostics: result.parse_diagnostics,
+            parse_diagnostics: result.parse_diagnostics.clone(),
         });
     }
 

@@ -9,22 +9,28 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 ## Current Status
 - LoweringPass -> TransformDirective -> ThinPrinter pipeline exists.
 - ES5/ESNext transforms largely implemented.
-- Remaining TODOs: class heritage plumbing, lingering inline ES5 paths.
+- Remaining TODOs: push real_world_bench throughput toward 500+ MiB/s (emit-only ~318 MiB/s).
 
 ## Highest-Impact Next Tasks
-- [ ] Finish transform-only pipeline
-  - Remove or gate `ctx.target_es5` inline paths in `thin_emitter/mod.rs`.
-  - Ensure LoweringPass emits directives for all ES5 transforms (class, arrow, async, template, params, object literal).
-- [ ] Plumb class heritage in LoweringPass
+- [ ] Performance tuning: reach 500+ MiB/s emitter throughput
+  - Profile emit-only pipeline (LoweringPass + helper detection).
+  - Reduce allocations and repeated scans in emit hot paths.
+- [x] Finish transform-only pipeline
+  - [x] Remove or gate `ctx.target_es5` inline paths in `thin_emitter/mod.rs`.
+  - [x] Ensure LoweringPass emits directives for all ES5 transforms (class, arrow, async, template, params, object literal).
+- [x] Plumb class heritage in LoweringPass
   - Fill `TransformDirective::ES5Class.heritage` or drop unused field.
   - Add regression tests for `extends` + private fields + helper injection.
 - [x] Emit type parameters for call/construct signatures
   - Implement in `emit_call_signature` and `emit_construct_signature`.
   - Add `.d.ts` tests for generic interface signatures.
-- [ ] Validate module wrapper + export transforms
-  - Add parity tests for CommonJS/AMD/UMD wrappers and re-exports.
-- [ ] Performance check
+- [x] Validate module wrapper + export transforms
+  - Add parity tests for AMD/UMD/System wrappers and re-exports.
+- [x] Performance check
   - Run `./wasm/bench.sh real_world_bench` and track throughput deltas.
+  - Results (real_world_bench):
+    - checker_ts_full_pipeline thrpt: 57.766–58.824 MiB/s (regression ~2.6–5.0%).
+    - checker_ts_emit_only thrpt: 317.28–318.59 MiB/s (improvement ~1.4–4.1%).
 
 ## Success Criteria
 - All transforms triggered via TransformContext (no inline ES5 fallbacks).
@@ -88,6 +94,7 @@ Next Steps: Cleanup. Remove the legacy inline transformation logic from ThinPrin
 48. ES5 emit: move template literal downleveling behind TransformDirective [done]
 49. ES5 emit: move variable destructuring downleveling behind TransformDirective [done]
 50. ES5 emit: move function parameter downleveling behind TransformDirective [done]
+51. LoweringPass: gate export name extraction for non-exported declarations [done]
 
 ## Quick Reference
 

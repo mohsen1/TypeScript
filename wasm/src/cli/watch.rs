@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use crate::cli::args::CliArgs;
 use crate::cli::config::{resolve_compiler_options, ResolvedCompilerOptions};
-use crate::cli::driver;
+use crate::cli::driver::{self, CompilationCache};
 use crate::cli::fs::{is_ts_file, DEFAULT_EXCLUDES};
 use crate::cli::reporter::Reporter;
 
@@ -21,7 +21,7 @@ pub fn run(args: &CliArgs, cwd: &Path) -> Result<()> {
     let mut reporter = Reporter::new(color);
     let mut state = WatchState::new(args, &cwd);
 
-    state.compile_and_report(args, &cwd, &mut reporter)?;
+    state.compile_and_report(args, &cwd, &mut reporter, None)?;
 
     let (tx, rx) = mpsc::channel();
     let mut watcher = RecommendedWatcher::new(tx, Config::default())
@@ -43,8 +43,8 @@ pub fn run(args: &CliArgs, cwd: &Path) -> Result<()> {
             }
         }
 
-        if state.debouncer.flush_ready(Instant::now()).is_some() {
-            state.compile_and_report(args, &cwd, &mut reporter)?;
+        if let Some(changed) = state.debouncer.flush_ready(Instant::now()) {
+            state.compile_and_report(args, &cwd, &mut reporter, Some(changed))?;
         }
     }
 }
@@ -54,6 +54,7 @@ struct WatchState {
     watch_roots: Vec<PathBuf>,
     filter: WatchFilter,
     debouncer: Debouncer,
+    type_cache: CompilationCache,
 }
 
 impl WatchState {
@@ -61,23 +62,31 @@ impl WatchState {
         let ProjectState {
             base_dir,
             resolved,
+            tsconfig_path,
         } = load_project_state(args, cwd).unwrap_or_else(|err| {
             eprintln!("{err}");
             ProjectState {
                 base_dir: canonicalize_or_owned(cwd),
                 resolved: ResolvedCompilerOptions::default(),
+                tsconfig_path: None,
             }
         });
 
         let explicit_files = resolve_explicit_files(&base_dir, &args.files);
         let watch_roots = collect_watch_roots(&base_dir, explicit_files.as_ref());
         let ignore_dirs = compute_ignore_dirs(&base_dir, &resolved);
+        let project_config = if args.project.is_some() {
+            tsconfig_path.clone()
+        } else {
+            None
+        };
 
         WatchState {
             base_dir,
             watch_roots,
-            filter: WatchFilter::new(explicit_files, ignore_dirs),
+            filter: WatchFilter::new(explicit_files, ignore_dirs, project_config),
             debouncer: Debouncer::new(DEFAULT_DEBOUNCE),
+            type_cache: CompilationCache::default(),
         }
     }
 
@@ -88,7 +97,7 @@ impl WatchState {
 
         let now = Instant::now();
         for path in event.paths {
-            let path = normalize_event_path(&self.base_dir, &path);
+            let path = canonicalize_or_owned(&normalize_event_path(&self.base_dir, &path));
             if self.filter.should_record(&path) {
                 self.debouncer.record_at(now, path);
             }
@@ -100,8 +109,11 @@ impl WatchState {
         args: &CliArgs,
         cwd: &Path,
         reporter: &mut Reporter,
+        changed_paths: Option<Vec<PathBuf>>,
     ) -> Result<()> {
-        match driver::compile(args, cwd) {
+        self.invalidate_caches(changed_paths);
+
+        match driver::compile_with_cache(args, cwd, &mut self.type_cache) {
             Ok(result) => {
                 if !result.diagnostics.is_empty() {
                     let output = reporter.render(&result.diagnostics);
@@ -116,9 +128,43 @@ impl WatchState {
 
         if let Ok(project) = load_project_state(args, cwd) {
             self.filter.ignore_dirs = compute_ignore_dirs(&project.base_dir, &project.resolved);
+            if args.project.is_some() {
+                self.filter.project_config = project.tsconfig_path;
+            }
         }
 
         Ok(())
+    }
+
+    fn invalidate_caches(&mut self, changed_paths: Option<Vec<PathBuf>>) {
+        let Some(paths) = changed_paths else {
+            return;
+        };
+
+        let mut clear_cache = false;
+        let mut normalized = Vec::with_capacity(paths.len());
+
+        for path in paths {
+            let path = canonicalize_or_owned(&path);
+            if self.is_config_path(&path) {
+                clear_cache = true;
+            }
+            normalized.push(path);
+        }
+
+        if clear_cache {
+            self.type_cache.clear();
+        } else {
+            self.type_cache.invalidate_paths(normalized);
+        }
+    }
+
+    fn is_config_path(&self, path: &Path) -> bool {
+        if let Some(project_config) = &self.filter.project_config {
+            path == project_config
+        } else {
+            is_tsconfig_path(path)
+        }
     }
 
     fn update_emitted(&mut self, emitted_files: Vec<PathBuf>) {
@@ -134,10 +180,11 @@ impl WatchState {
 struct ProjectState {
     base_dir: PathBuf,
     resolved: ResolvedCompilerOptions,
+    tsconfig_path: Option<PathBuf>,
 }
 
 fn load_project_state(args: &CliArgs, cwd: &Path) -> Result<ProjectState> {
-    let tsconfig_path = driver::find_tsconfig(cwd);
+    let tsconfig_path = driver::resolve_tsconfig_path(cwd, args.project.as_deref())?;
     let config = driver::load_config(tsconfig_path.as_deref())?;
 
     let mut resolved =
@@ -147,7 +194,11 @@ fn load_project_state(args: &CliArgs, cwd: &Path) -> Result<ProjectState> {
     let base_dir = driver::config_base_dir(cwd, tsconfig_path.as_deref());
     let base_dir = canonicalize_or_owned(&base_dir);
 
-    Ok(ProjectState { base_dir, resolved })
+    Ok(ProjectState {
+        base_dir,
+        resolved,
+        tsconfig_path,
+    })
 }
 
 fn compute_ignore_dirs(base_dir: &Path, resolved: &ResolvedCompilerOptions) -> Vec<PathBuf> {
@@ -242,17 +293,20 @@ pub(crate) struct WatchFilter {
     explicit_files: Option<HashSet<PathBuf>>,
     ignore_dirs: Vec<PathBuf>,
     last_emitted: HashSet<PathBuf>,
+    project_config: Option<PathBuf>,
 }
 
 impl WatchFilter {
     pub(crate) fn new(
         explicit_files: Option<HashSet<PathBuf>>,
         ignore_dirs: Vec<PathBuf>,
+        project_config: Option<PathBuf>,
     ) -> Self {
         WatchFilter {
             explicit_files,
             ignore_dirs,
             last_emitted: HashSet::new(),
+            project_config,
         }
     }
 
@@ -271,16 +325,20 @@ impl WatchFilter {
             return false;
         }
 
+        if let Some(project_config) = &self.project_config {
+            if path == project_config {
+                return true;
+            }
+        } else if is_tsconfig_path(path) {
+            return true;
+        }
+
         if self.ignore_dirs.iter().any(|dir| path.starts_with(dir)) {
             return false;
         }
 
         if is_default_excluded(path) {
             return false;
-        }
-
-        if is_tsconfig_path(path) {
-            return true;
         }
 
         if !is_ts_file(path) {

@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
 use crate::thin_emitter::{ModuleKind, PrinterOptions, ScriptTarget};
@@ -28,6 +28,18 @@ pub struct CompilerOptions {
     #[serde(default)]
     pub module: Option<String>,
     #[serde(default)]
+    pub module_resolution: Option<String>,
+    #[serde(default)]
+    pub jsx: Option<String>,
+    #[serde(default)]
+    pub lib: Option<Vec<String>>,
+    #[serde(default)]
+    pub base_url: Option<String>,
+    #[serde(default)]
+    pub paths: Option<HashMap<String, Vec<String>>>,
+    #[serde(default)]
+    pub root_dir: Option<String>,
+    #[serde(default)]
     pub out_dir: Option<String>,
     #[serde(default)]
     pub declaration: Option<bool>,
@@ -37,6 +49,8 @@ pub struct CompilerOptions {
     pub strict: Option<bool>,
     #[serde(default)]
     pub no_emit: Option<bool>,
+    #[serde(default)]
+    pub no_emit_on_error: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -48,10 +62,81 @@ pub struct CheckerOptions {
 pub struct ResolvedCompilerOptions {
     pub printer: PrinterOptions,
     pub checker: CheckerOptions,
+    pub jsx: Option<JsxEmit>,
+    pub lib_files: Vec<PathBuf>,
+    pub module_resolution: Option<ModuleResolutionKind>,
+    pub base_url: Option<PathBuf>,
+    pub paths: Option<Vec<PathMapping>>,
+    pub root_dir: Option<PathBuf>,
     pub out_dir: Option<PathBuf>,
     pub declaration_dir: Option<PathBuf>,
     pub emit_declarations: bool,
     pub no_emit: bool,
+    pub no_emit_on_error: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JsxEmit {
+    Preserve,
+    ReactNative,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModuleResolutionKind {
+    Node,
+    Node16,
+    NodeNext,
+    Bundler,
+}
+
+#[derive(Debug, Clone)]
+pub struct PathMapping {
+    pub(crate) pattern: String,
+    pub(crate) prefix: String,
+    pub(crate) suffix: String,
+    pub(crate) targets: Vec<String>,
+}
+
+impl PathMapping {
+    pub(crate) fn match_specifier(&self, specifier: &str) -> Option<String> {
+        if !self.pattern.contains('*') {
+            return if self.pattern == specifier {
+                Some(String::new())
+            } else {
+                None
+            };
+        }
+
+        if !specifier.starts_with(&self.prefix) || !specifier.ends_with(&self.suffix) {
+            return None;
+        }
+
+        let start = self.prefix.len();
+        let end = specifier.len().saturating_sub(self.suffix.len());
+        if end < start {
+            return None;
+        }
+
+        Some(specifier[start..end].to_string())
+    }
+
+    pub(crate) fn specificity(&self) -> usize {
+        self.prefix.len() + self.suffix.len()
+    }
+}
+
+impl ResolvedCompilerOptions {
+    pub(crate) fn effective_module_resolution(&self) -> ModuleResolutionKind {
+        if let Some(resolution) = self.module_resolution {
+            return resolution;
+        }
+
+        match self.printer.module {
+            ModuleKind::Node16 => ModuleResolutionKind::Node16,
+            ModuleKind::NodeNext => ModuleResolutionKind::NodeNext,
+            _ => ModuleResolutionKind::Node,
+        }
+    }
 }
 
 impl Default for ResolvedCompilerOptions {
@@ -59,10 +144,17 @@ impl Default for ResolvedCompilerOptions {
         ResolvedCompilerOptions {
             printer: PrinterOptions::default(),
             checker: CheckerOptions::default(),
+            jsx: None,
+            lib_files: Vec::new(),
+            module_resolution: None,
+            base_url: None,
+            paths: None,
+            root_dir: None,
             out_dir: None,
             declaration_dir: None,
             emit_declarations: false,
             no_emit: false,
+            no_emit_on_error: false,
         }
     }
 }
@@ -79,6 +171,48 @@ pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<Res
 
     if let Some(module) = options.module.as_deref() {
         resolved.printer.module = parse_module_kind(module)?;
+    }
+
+    if let Some(module_resolution) = options.module_resolution.as_deref() {
+        let value = module_resolution.trim();
+        if !value.is_empty() {
+            resolved.module_resolution = Some(parse_module_resolution(value)?);
+        }
+    }
+
+    if let Some(jsx) = options.jsx.as_deref() {
+        resolved.jsx = Some(parse_jsx_emit(jsx)?);
+    }
+
+    if let Some(lib_list) = options.lib.as_ref() {
+        resolved.lib_files = resolve_lib_files(lib_list)?;
+    }
+
+    let base_url = options.base_url.as_deref().map(str::trim);
+    if let Some(base_url) = base_url {
+        if !base_url.is_empty() {
+            resolved.base_url = Some(PathBuf::from(base_url));
+        }
+    }
+
+    if let Some(paths) = options.paths.as_ref() {
+        let has_base_url = options
+            .base_url
+            .as_deref()
+            .map(|value| !value.trim().is_empty())
+            .unwrap_or(false);
+        if !has_base_url {
+            bail!("compilerOptions.paths requires compilerOptions.baseUrl");
+        }
+        if !paths.is_empty() {
+            resolved.paths = Some(build_path_mappings(paths));
+        }
+    }
+
+    if let Some(root_dir) = options.root_dir.as_deref() {
+        if !root_dir.is_empty() {
+            resolved.root_dir = Some(PathBuf::from(root_dir));
+        }
     }
 
     if let Some(out_dir) = options.out_dir.as_deref() {
@@ -103,6 +237,10 @@ pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<Res
 
     if let Some(no_emit) = options.no_emit {
         resolved.no_emit = no_emit;
+    }
+
+    if let Some(no_emit_on_error) = options.no_emit_on_error {
+        resolved.no_emit_on_error = no_emit_on_error;
     }
 
     Ok(resolved)
@@ -179,11 +317,18 @@ fn merge_compiler_options(base: CompilerOptions, child: CompilerOptions) -> Comp
     CompilerOptions {
         target: child.target.or(base.target),
         module: child.module.or(base.module),
+        module_resolution: child.module_resolution.or(base.module_resolution),
+        jsx: child.jsx.or(base.jsx),
+        lib: child.lib.or(base.lib),
+        base_url: child.base_url.or(base.base_url),
+        paths: child.paths.or(base.paths),
+        root_dir: child.root_dir.or(base.root_dir),
         out_dir: child.out_dir.or(base.out_dir),
         declaration: child.declaration.or(base.declaration),
         declaration_dir: child.declaration_dir.or(base.declaration_dir),
         strict: child.strict.or(base.strict),
         no_emit: child.no_emit.or(base.no_emit),
+        no_emit_on_error: child.no_emit_on_error.or(base.no_emit_on_error),
     }
 }
 
@@ -225,6 +370,187 @@ fn parse_module_kind(value: &str) -> Result<ModuleKind> {
     };
 
     Ok(module)
+}
+
+fn parse_module_resolution(value: &str) -> Result<ModuleResolutionKind> {
+    let normalized = normalize_option(value);
+    let resolution = match normalized.as_str() {
+        "node" | "node10" => ModuleResolutionKind::Node,
+        "node16" => ModuleResolutionKind::Node16,
+        "nodenext" => ModuleResolutionKind::NodeNext,
+        "bundler" => ModuleResolutionKind::Bundler,
+        _ => bail!("unsupported compilerOptions.moduleResolution '{}'", value),
+    };
+
+    Ok(resolution)
+}
+
+fn parse_jsx_emit(value: &str) -> Result<JsxEmit> {
+    let normalized = normalize_option(value);
+    let jsx = match normalized.as_str() {
+        "preserve" => JsxEmit::Preserve,
+        "reactnative" => JsxEmit::ReactNative,
+        _ => bail!("unsupported compilerOptions.jsx '{}'", value),
+    };
+
+    Ok(jsx)
+}
+
+fn build_path_mappings(paths: &HashMap<String, Vec<String>>) -> Vec<PathMapping> {
+    let mut mappings = Vec::new();
+    for (pattern, targets) in paths {
+        if targets.is_empty() {
+            continue;
+        }
+        let pattern = normalize_path_pattern(pattern);
+        let targets = targets.iter().map(|target| normalize_path_pattern(target)).collect();
+        let (prefix, suffix) = split_path_pattern(&pattern);
+        mappings.push(PathMapping {
+            pattern,
+            prefix,
+            suffix,
+            targets,
+        });
+    }
+    mappings.sort_by(|left, right| {
+        right
+            .specificity()
+            .cmp(&left.specificity())
+            .then_with(|| right.pattern.len().cmp(&left.pattern.len()))
+            .then_with(|| left.pattern.cmp(&right.pattern))
+    });
+    mappings
+}
+
+fn normalize_path_pattern(value: &str) -> String {
+    value.trim().replace('\\', "/")
+}
+
+fn split_path_pattern(pattern: &str) -> (String, String) {
+    match pattern.find('*') {
+        Some(star_idx) => {
+            let (prefix, rest) = pattern.split_at(star_idx);
+            (prefix.to_string(), rest[1..].to_string())
+        }
+        None => (pattern.to_string(), String::new()),
+    }
+}
+
+fn resolve_lib_files(lib_list: &[String]) -> Result<Vec<PathBuf>> {
+    if lib_list.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let lib_dir = default_lib_dir()?;
+    let lib_map = build_lib_map(&lib_dir)?;
+    let mut resolved = Vec::new();
+    let mut pending: VecDeque<String> = lib_list
+        .iter()
+        .map(|value| normalize_lib_name(value))
+        .collect();
+    let mut visited = HashSet::new();
+
+    while let Some(lib_name) = pending.pop_front() {
+        if lib_name.is_empty() || !visited.insert(lib_name.clone()) {
+            continue;
+        }
+
+        let path = lib_map
+            .get(&lib_name)
+            .ok_or_else(|| anyhow!("unsupported compilerOptions.lib '{}'", lib_name))?
+            .clone();
+        resolved.push(path.clone());
+
+        let contents = std::fs::read_to_string(&path)
+            .with_context(|| format!("failed to read lib file {}", path.display()))?;
+        for reference in extract_lib_references(&contents) {
+            pending.push_back(reference);
+        }
+    }
+
+    Ok(resolved)
+}
+
+fn default_lib_dir() -> Result<PathBuf> {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let candidate = manifest_dir.join("..").join("src").join("lib");
+    if candidate.is_dir() {
+        Ok(canonicalize_or_owned(&candidate))
+    } else {
+        bail!("lib directory not found at {}", candidate.display());
+    }
+}
+
+fn build_lib_map(lib_dir: &Path) -> Result<HashMap<String, PathBuf>> {
+    let mut map = HashMap::new();
+    for entry in std::fs::read_dir(lib_dir)
+        .with_context(|| format!("failed to read lib directory {}", lib_dir.display()))?
+    {
+        let entry = entry?;
+        let path = entry.path();
+        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if !file_name.ends_with(".d.ts") {
+            continue;
+        }
+
+        let stem = file_name.trim_end_matches(".d.ts");
+        let stem = stem.strip_suffix(".generated").unwrap_or(stem);
+        let key = normalize_lib_name(stem);
+        map.insert(key, canonicalize_or_owned(&path));
+    }
+
+    Ok(map)
+}
+
+fn extract_lib_references(source: &str) -> Vec<String> {
+    let mut refs = Vec::new();
+    for line in source.lines() {
+        let line = line.trim_start();
+        if !line.starts_with("///") {
+            if line.is_empty() {
+                continue;
+            }
+            break;
+        }
+        if let Some(value) = parse_reference_lib_value(line) {
+            refs.push(normalize_lib_name(value));
+        }
+    }
+    refs
+}
+
+fn parse_reference_lib_value(line: &str) -> Option<&str> {
+    let mut offset = 0;
+    let bytes = line.as_bytes();
+    while let Some(idx) = line[offset..].find("lib=") {
+        let start = offset + idx;
+        if start > 0 {
+            let prev = bytes[start - 1];
+            if !prev.is_ascii_whitespace() && prev != b'<' {
+                offset = start + 4;
+                continue;
+            }
+        }
+        let quote = *bytes.get(start + 4)?;
+        if quote != b'"' && quote != b'\'' {
+            offset = start + 4;
+            continue;
+        }
+        let rest = &line[start + 5..];
+        let end = rest.find(quote as char)?;
+        return Some(&rest[..end]);
+    }
+    None
+}
+
+fn normalize_lib_name(value: &str) -> String {
+    value.trim().to_ascii_lowercase()
+}
+
+fn canonicalize_or_owned(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
 fn normalize_option(value: &str) -> String {

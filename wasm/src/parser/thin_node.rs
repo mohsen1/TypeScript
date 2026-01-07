@@ -1050,6 +1050,110 @@ impl ThinNodeArena {
         arena
     }
 
+    pub fn clear(&mut self) {
+        macro_rules! clear_vecs {
+            ($($field:ident),+ $(,)?) => {
+                $(self.$field.clear();)+
+            };
+        }
+
+        clear_vecs!(
+            nodes,
+            identifiers,
+            qualified_names,
+            computed_properties,
+            literals,
+            binary_exprs,
+            unary_exprs,
+            call_exprs,
+            access_exprs,
+            conditional_exprs,
+            literal_exprs,
+            parenthesized,
+            unary_exprs_ex,
+            type_assertions,
+            template_exprs,
+            template_spans,
+            tagged_templates,
+            functions,
+            classes,
+            interfaces,
+            type_aliases,
+            enums,
+            enum_members,
+            modules,
+            module_blocks,
+            signatures,
+            index_signatures,
+            property_decls,
+            method_decls,
+            constructors,
+            accessors,
+            parameters,
+            type_parameters,
+            decorators,
+            heritage_clauses,
+            expr_with_type_args,
+            if_statements,
+            loops,
+            blocks,
+            variables,
+            return_data,
+            expr_statements,
+            switch_data,
+            case_clauses,
+            try_data,
+            catch_clauses,
+            labeled_data,
+            jump_data,
+            with_data,
+            type_refs,
+            composite_types,
+            function_types,
+            type_queries,
+            type_literals,
+            array_types,
+            tuple_types,
+            wrapped_types,
+            conditional_types,
+            infer_types,
+            type_operators,
+            indexed_access_types,
+            mapped_types,
+            literal_types,
+            template_literal_types,
+            named_tuple_members,
+            type_predicates,
+            import_decls,
+            import_clauses,
+            named_imports,
+            specifiers,
+            export_decls,
+            export_assignments,
+            import_attributes,
+            import_attribute,
+            binding_patterns,
+            binding_elements,
+            property_assignments,
+            shorthand_properties,
+            spread_data,
+            variable_declarations,
+            for_in_of,
+            jsx_elements,
+            jsx_opening,
+            jsx_closing,
+            jsx_fragments,
+            jsx_attributes,
+            jsx_attribute,
+            jsx_spread_attributes,
+            jsx_expressions,
+            jsx_text,
+            jsx_namespaced_names,
+            source_files,
+            extended_info,
+        );
+    }
+
     // ============================================================================
     // Parent Mapping Helpers
     // ============================================================================
@@ -1675,12 +1779,21 @@ impl ThinNodeArena {
 
     /// Add a loop node (for/while/do)
     pub fn add_loop(&mut self, kind: u16, pos: u32, end: u32, data: LoopData) -> NodeIndex {
+        let initializer = data.initializer;
+        let condition = data.condition;
+        let incrementor = data.incrementor;
+        let statement = data.statement;
         let data_index = self.loops.len() as u32;
         self.loops.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent(initializer, parent);
+        self.set_parent(condition, parent);
+        self.set_parent(incrementor, parent);
+        self.set_parent(statement, parent);
+        parent
     }
 
     /// Add a variable statement/declaration list node

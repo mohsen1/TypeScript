@@ -8,24 +8,27 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
 
 ## Current Status
 - Major features implemented (definitions, references, rename, organize imports, extract variable, signature help).
-- Remaining TODOs: JSDoc extraction, operator precedence in extract variable.
-- No incremental reparse or type cache reuse between edits.
+- Incremental updates reuse arena/binder; type/scope caches are per-file and reset on edit.
+- Remaining TODOs: full diff-based incremental parsing, cross-file rename.
 
 ## Highest-Impact Next Tasks
-- [ ] Incremental file updates
+- [x] Incremental file updates
   - [x] Add `Project::update_file` that applies LSP edits and re-parses.
-  - [ ] Reuse parsed arena + binder where possible.
-  - [ ] Cache `TypeCache` per file for hover/completions/diagnostics.
-- [ ] JSDoc extraction for signature help/hover
-  - Parse JSDoc blocks and attach to `SignatureInformation` and `Hover`.
-- [ ] Extract variable precedence fix
-  - Wrap selected expressions to preserve semantics.
-  - Add tests around binary/conditional expressions.
-- [ ] Type-aware completions
-  - Add member completions using `ThinCheckerState` + `format_type`.
-  - Include auto-import suggestions from project export index.
-- [ ] Performance instrumentation
+  - [x] Reuse parsed arena + binder where possible.
+  - [x] Cache `TypeCache` per file for hover/signature help.
+  - [x] Extend caches for type-aware completions.
+  - [x] Extend caches for diagnostics.
+- [x] JSDoc extraction for signature help/hover
+  - [x] Parse JSDoc blocks and attach to `SignatureInformation` and `Hover`.
+- [x] Extract variable precedence fix
+  - [x] Wrap selected expressions to preserve semantics.
+  - [x] Add tests around binary/conditional expressions.
+- [x] Type-aware completions
+  - [x] Add member completions using `ThinCheckerState` + `format_type`.
+  - [x] Include auto-import suggestions from project export index.
+- [x] Performance instrumentation
   - Measure per-request timing and memoize scope walkers.
+  - [x] Reuse scope cache for rename operations.
 
 ## Success Criteria
 - Edits <50ms for medium projects.

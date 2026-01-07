@@ -81,6 +81,25 @@ impl ThinBinderState {
         }
     }
 
+    pub fn reset(&mut self) {
+        self.symbols.clear();
+        self.current_scope.clear();
+        self.scope_stack.clear();
+        self.file_locals.clear();
+        self.flow_nodes.clear();
+        self.unreachable_flow = self.flow_nodes.alloc(flow_flags::UNREACHABLE);
+        self.current_flow = FlowNodeId::NONE;
+        self.scope_chain.clear();
+        self.current_scope_idx = 0;
+        self.node_symbols.clear();
+        self.node_flow.clear();
+        self.hoisted_vars.clear();
+        self.hoisted_functions.clear();
+        self.scopes.clear();
+        self.node_scope_ids.clear();
+        self.current_scope_id = ScopeId::NONE;
+    }
+
     /// Create a ThinBinderState from existing bound state.
     ///
     /// This is used for type checking after parallel binding and symbol merging.

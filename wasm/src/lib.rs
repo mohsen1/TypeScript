@@ -137,6 +137,7 @@ use crate::thin_emitter::{ModuleKind, PrinterOptions, ScriptTarget, ThinPrinter}
 use crate::transform_context::TransformContext;
 use crate::solver::TypeInterner;
 use crate::lsp::position::{LineMap, Position, Range};
+use crate::lsp::resolver::ScopeCache;
 use crate::lsp::{
     GoToDefinition, FindReferences, Completions, HoverProvider, SignatureHelpProvider,
     DocumentSymbolProvider, RenameProvider, SemanticTokensProvider, CodeActionProvider,
@@ -217,6 +218,9 @@ pub struct ThinParser {
     /// Persistent cache for type checking results across LSP queries.
     /// Invalidated when the file changes.
     type_cache: Option<checker::TypeCache>,
+    /// Persistent cache for scope resolution across LSP queries.
+    /// Invalidated when the file changes.
+    scope_cache: ScopeCache,
 }
 
 #[wasm_bindgen]
@@ -231,6 +235,7 @@ impl ThinParser {
             type_interner: TypeInterner::new(),
             line_map: None,
             type_cache: None,
+            scope_cache: ScopeCache::default(),
         }
     }
 
@@ -243,6 +248,7 @@ impl ThinParser {
         self.line_map = None;
         self.binder = None;
         self.type_cache = None;  // Invalidate type cache when file changes
+        self.scope_cache.clear();
         idx.0
     }
 
@@ -285,6 +291,7 @@ impl ThinParser {
             });
 
             self.binder = Some(binder);
+            self.scope_cache.clear();
             serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
         } else {
             r#"{"error": "Source file not parsed"}"#.to_string()
@@ -537,7 +544,7 @@ impl ThinParser {
         let provider = GoToDefinition::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
         let pos = Position::new(line, character);
 
-        let result = provider.get_definition(root, pos);
+        let result = provider.get_definition_with_scope_cache(root, pos, &mut self.scope_cache, None);
         Ok(serde_wasm_bindgen::to_value(&result)?)
     }
 
@@ -556,7 +563,7 @@ impl ThinParser {
         let provider = FindReferences::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
         let pos = Position::new(line, character);
 
-        let result = provider.find_references(root, pos);
+        let result = provider.find_references_with_scope_cache(root, pos, &mut self.scope_cache, None);
         Ok(serde_wasm_bindgen::to_value(&result)?)
     }
 
@@ -570,11 +577,25 @@ impl ThinParser {
         let binder = self.binder.as_ref().unwrap();
         let line_map = self.line_map.as_ref().unwrap();
         let source_text = self.parser.get_source_text();
+        let file_name = self.parser.get_file_name().to_string();
 
-        let provider = Completions::new(self.parser.get_arena(), binder, line_map, source_text);
+        let provider = Completions::new_with_types(
+            self.parser.get_arena(),
+            binder,
+            line_map,
+            &self.type_interner,
+            source_text,
+            file_name,
+        );
         let pos = Position::new(line, character);
 
-        let result = provider.get_completions(root, pos);
+        let result = provider.get_completions_with_caches(
+            root,
+            pos,
+            &mut self.type_cache,
+            &mut self.scope_cache,
+            None,
+        );
         Ok(serde_wasm_bindgen::to_value(&result)?)
     }
 
@@ -600,7 +621,13 @@ impl ThinParser {
         );
         let pos = Position::new(line, character);
 
-        let result = provider.get_hover(root, pos, &mut self.type_cache);
+        let result = provider.get_hover_with_scope_cache(
+            root,
+            pos,
+            &mut self.type_cache,
+            &mut self.scope_cache,
+            None,
+        );
         Ok(serde_wasm_bindgen::to_value(&result)?)
     }
 
@@ -626,7 +653,13 @@ impl ThinParser {
         );
         let pos = Position::new(line, character);
 
-        let result = provider.get_signature_help(root, pos, &mut self.type_cache);
+        let result = provider.get_signature_help_with_scope_cache(
+            root,
+            pos,
+            &mut self.type_cache,
+            &mut self.scope_cache,
+            None,
+        );
         Ok(serde_wasm_bindgen::to_value(&result)?)
     }
 
@@ -695,7 +728,7 @@ impl ThinParser {
         let provider = RenameProvider::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
         let pos = Position::new(line, character);
 
-        match provider.provide_rename_edits(root, pos, new_name) {
+        match provider.provide_rename_edits_with_scope_cache(root, pos, new_name, &mut self.scope_cache) {
             Ok(edit) => Ok(serde_wasm_bindgen::to_value(&edit)?),
             Err(e) => Err(JsValue::from_str(&e)),
         }

@@ -135,6 +135,105 @@ fn test_project_update_file_refreshes_cross_file_references() {
 }
 
 #[test]
+fn test_project_hover_includes_jsdoc() {
+    let mut project = Project::new();
+    let source = "/** The answer */\nconst x = 42;\nx;";
+    project.set_file("a.ts".to_string(), source.to_string());
+
+    let info = project
+        .get_hover("a.ts", Position::new(2, 0))
+        .expect("Expected hover info");
+
+    assert!(info.contents.iter().any(|content| content.contains("The answer")));
+}
+
+#[test]
+fn test_project_signature_help_includes_jsdoc() {
+    let mut project = Project::new();
+    let source = "/** Adds two numbers. */\nfunction add(a: number, b: number): number { return a + b; }\nadd(1, 2);";
+    project.set_file("a.ts".to_string(), source.to_string());
+
+    let pos = {
+        let file = project.file("a.ts").unwrap();
+        range_for_substring(file.source_text(), file.line_map(), "1").start
+    };
+
+    let help = project
+        .get_signature_help("a.ts", pos)
+        .expect("Expected signature help");
+
+    let doc = help.signatures[help.active_signature as usize]
+        .documentation
+        .clone()
+        .unwrap_or_default();
+    assert_eq!(doc, "Adds two numbers.");
+}
+
+#[test]
+fn test_project_completions_auto_import_named() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "export const foo = 1;\n".to_string());
+    project.set_file("b.ts".to_string(), "foo;\n".to_string());
+
+    let items = project
+        .get_completions("b.ts", Position::new(0, 1))
+        .expect("Expected completions");
+
+    let has_auto_import = items.iter().any(|item| {
+        if item.label != "foo" {
+            return false;
+        }
+        let detail = item.detail.as_deref().unwrap_or("");
+        let doc = item.documentation.as_deref().unwrap_or("");
+        detail.contains("auto-import") && detail.contains("./a") && doc.contains("import { foo } from \"./a\";")
+    });
+
+    assert!(has_auto_import, "Should include auto-import completion for foo");
+}
+
+#[test]
+fn test_project_diagnostics_cached() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "const value: string = 1;\n".to_string());
+
+    let diagnostics = project
+        .get_diagnostics("a.ts")
+        .expect("Expected diagnostics");
+    assert!(!diagnostics.is_empty(), "Should report diagnostics");
+    assert_eq!(diagnostics[0].severity, Some(DiagnosticSeverity::Error));
+
+    let diagnostics_again = project
+        .get_diagnostics("a.ts")
+        .expect("Expected diagnostics on cached run");
+    assert_eq!(diagnostics_again.len(), diagnostics.len());
+}
+
+#[test]
+fn test_project_performance_scope_cache_hits_definition() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "const value = 1;\nvalue;\n".to_string());
+    let position = Position::new(1, 0);
+
+    let _ = project.get_definition("a.ts", position);
+    let first = project
+        .performance()
+        .timing(ProjectRequestKind::Definition)
+        .expect("Expected timing data for definition");
+
+    let _ = project.get_definition("a.ts", position);
+    let second = project
+        .performance()
+        .timing(ProjectRequestKind::Definition)
+        .expect("Expected timing data for definition");
+
+    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
+    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 

@@ -51,5 +51,5 @@ pub use code_actions::{
     ImportCandidateKind,
 };
 pub use position::{Position, Location, SourceLocation, Range};
-pub use project::{Project, ProjectFile};
+pub use project::{Project, ProjectFile, ProjectPerformance, ProjectRequestKind, ProjectRequestTiming};
 pub use diagnostics::{LspDiagnostic, DiagnosticSeverity};

@@ -375,6 +375,36 @@ struct TemplateParts {
     expressions: Vec<NodeIndex>,
 }
 
+enum EmitDirective {
+    Identity,
+    ES5Class { class_node: NodeIndex },
+    ES5ClassExpression { class_node: NodeIndex },
+    ES5Namespace { namespace_node: NodeIndex },
+    ES5Enum { enum_node: NodeIndex },
+    CommonJSExport {
+        names: Vec<String>,
+        is_default: bool,
+        inner: Box<EmitDirective>,
+    },
+    CommonJSExportDefaultExpr,
+    CommonJSExportDefaultClassES5 { class_node: NodeIndex },
+    ES5ArrowFunction {
+        arrow_node: NodeIndex,
+        captures_this: bool,
+    },
+    ES5AsyncFunction { function_node: NodeIndex },
+    ES5ForOf { for_of_node: NodeIndex },
+    ES5ObjectLiteral { object_literal: NodeIndex },
+    ES5VariableDeclarationList { decl_list: NodeIndex },
+    ES5FunctionParameters { function_node: NodeIndex },
+    ES5TemplateLiteral,
+    ModuleWrapper {
+        format: crate::transform_context::ModuleFormat,
+        dependencies: Vec<String>,
+    },
+    Chain(Vec<EmitDirective>),
+}
+
 // =============================================================================
 // ThinPrinter
 // =============================================================================
@@ -711,25 +741,114 @@ impl<'a> ThinPrinter<'a> {
     // Transform Application (Phase 2 Architecture)
     // =========================================================================
 
+    fn emit_directive_from_transform(directive: &TransformDirective) -> EmitDirective {
+        match directive {
+            TransformDirective::Identity => EmitDirective::Identity,
+            TransformDirective::ES5Class { class_node, .. } => {
+                EmitDirective::ES5Class { class_node: *class_node }
+            }
+            TransformDirective::ES5ClassExpression { class_node } => {
+                EmitDirective::ES5ClassExpression { class_node: *class_node }
+            }
+            TransformDirective::ES5Namespace { namespace_node } => {
+                EmitDirective::ES5Namespace {
+                    namespace_node: *namespace_node,
+                }
+            }
+            TransformDirective::ES5Enum { enum_node } => {
+                EmitDirective::ES5Enum { enum_node: *enum_node }
+            }
+            TransformDirective::CommonJSExport {
+                names,
+                is_default,
+                inner,
+            } => EmitDirective::CommonJSExport {
+                names: names.clone(),
+                is_default: *is_default,
+                inner: Box::new(Self::emit_directive_from_transform(inner.as_ref())),
+            },
+            TransformDirective::CommonJSExportDefaultExpr => EmitDirective::CommonJSExportDefaultExpr,
+            TransformDirective::CommonJSExportDefaultClassES5 { class_node } => {
+                EmitDirective::CommonJSExportDefaultClassES5 {
+                    class_node: *class_node,
+                }
+            }
+            TransformDirective::ES5ArrowFunction {
+                arrow_node,
+                captures_this,
+            } => EmitDirective::ES5ArrowFunction {
+                arrow_node: *arrow_node,
+                captures_this: *captures_this,
+            },
+            TransformDirective::ES5AsyncFunction { function_node } => {
+                EmitDirective::ES5AsyncFunction {
+                    function_node: *function_node,
+                }
+            }
+            TransformDirective::ES5ForOf { for_of_node } => {
+                EmitDirective::ES5ForOf {
+                    for_of_node: *for_of_node,
+                }
+            }
+            TransformDirective::ES5ObjectLiteral { object_literal } => {
+                EmitDirective::ES5ObjectLiteral {
+                    object_literal: *object_literal,
+                }
+            }
+            TransformDirective::ES5VariableDeclarationList { decl_list } => {
+                EmitDirective::ES5VariableDeclarationList { decl_list: *decl_list }
+            }
+            TransformDirective::ES5FunctionParameters { function_node } => {
+                EmitDirective::ES5FunctionParameters {
+                    function_node: *function_node,
+                }
+            }
+            TransformDirective::ES5TemplateLiteral { .. } => EmitDirective::ES5TemplateLiteral,
+            TransformDirective::ModuleWrapper {
+                format,
+                dependencies,
+                ..
+            } => EmitDirective::ModuleWrapper {
+                format: *format,
+                dependencies: dependencies.clone(),
+            },
+            TransformDirective::Chain(directives) => {
+                let mut flattened = Vec::new();
+                Self::flatten_emit_chain(directives.as_slice(), &mut flattened);
+                EmitDirective::Chain(flattened)
+            }
+        }
+    }
+
+    fn flatten_emit_chain(directives: &[TransformDirective], out: &mut Vec<EmitDirective>) {
+        for directive in directives {
+            match directive {
+                TransformDirective::Chain(inner) => {
+                    Self::flatten_emit_chain(inner.as_slice(), out);
+                }
+                other => out.push(Self::emit_directive_from_transform(other)),
+            }
+        }
+    }
+
     /// Apply a transform directive to a node.
     /// This is called when a node has an entry in the TransformContext.
     fn apply_transform(&mut self, node: &ThinNode, idx: NodeIndex) {
-        use crate::transform_context::TransformDirective;
-
-        // Clone the directive to avoid borrow checker issues
-        let Some(directive) = self.transforms.get(idx).cloned() else {
+        let Some(directive) = self.transforms.get(idx) else {
             // No transform, emit normally (should not happen if has_transform returned true)
             self.emit_node_default(node, idx);
             return;
         };
 
+        let directive = Self::emit_directive_from_transform(directive);
+
         match directive {
-            TransformDirective::Identity => {
+            EmitDirective::Identity => {
                 // No transformation needed, emit as-is
                 self.emit_node_default(node, idx);
             }
 
-            TransformDirective::ES5Class { class_node, .. } => {
+            EmitDirective::ES5Class { class_node } => {
                 // Delegate to existing ClassES5Emitter
                 let mut es5_emitter = ClassES5Emitter::new(self.arena);
                 es5_emitter.set_indent_level(self.writer.indent_level());
@@ -739,40 +858,43 @@ impl<'a> ThinPrinter<'a> {
                 let es5_output = es5_emitter.emit_class(class_node);
                 self.write(&es5_output);
             }
+            EmitDirective::ES5ClassExpression { class_node } => {
+                self.emit_class_expression_es5(class_node);
+            }
 
-            TransformDirective::ES5Namespace { namespace_node } => {
+            EmitDirective::ES5Namespace { namespace_node } => {
                 let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
                 let output = ns_emitter.emit_namespace(namespace_node);
                 self.write(&output);
             }
 
-            TransformDirective::ES5Enum { enum_node } => {
+            EmitDirective::ES5Enum { enum_node } => {
                 let mut enum_emitter = EnumES5Emitter::new(self.arena);
                 enum_emitter.set_indent_level(self.writer.indent_level());
                 let output = enum_emitter.emit_enum(enum_node);
                 self.write(&output);
             }
 
-            TransformDirective::CommonJSExport {
+            EmitDirective::CommonJSExport {
                 names,
                 is_default,
                 inner,
             } => {
                 let export_name = names.first().map(|name| name.as_str());
                 self.emit_commonjs_export(names.as_slice(), is_default, |this| {
-                    this.emit_commonjs_inner(node, idx, &inner, export_name);
+                    this.emit_commonjs_inner(node, idx, inner.as_ref(), export_name);
                 });
             }
 
-            TransformDirective::CommonJSExportDefaultExpr => {
+            EmitDirective::CommonJSExportDefaultExpr => {
                 self.emit_commonjs_default_export_expr(node, idx);
             }
 
-            TransformDirective::CommonJSExportDefaultClassES5 { class_node } => {
+            EmitDirective::CommonJSExportDefaultClassES5 { class_node } => {
                 self.emit_commonjs_default_export_class_es5(class_node);
             }
 
-            TransformDirective::ES5ArrowFunction {
+            EmitDirective::ES5ArrowFunction {
                 arrow_node,
                 captures_this,
             } => {
@@ -786,7 +908,7 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_node_default(node, idx);
             }
 
-            TransformDirective::ES5AsyncFunction { function_node } => {
+            EmitDirective::ES5AsyncFunction { function_node } => {
                 if let Some(func_node) = self.arena.get(function_node) {
                     if let Some(func) = self.arena.get_function(func_node) {
                         let func_name = if !func.name.is_none() {
@@ -803,7 +925,7 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_node_default(node, idx);
             }
 
-            TransformDirective::ES5ForOf { for_of_node } => {
+            EmitDirective::ES5ForOf { for_of_node } => {
                 if let Some(for_of_node) = self.arena.get(for_of_node) {
                     if let Some(for_in_of) = self.arena.get_for_in_of(for_of_node) {
                         if !for_in_of.await_modifier {
@@ -816,7 +938,7 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_node_default(node, idx);
             }
 
-            TransformDirective::ES5ObjectLiteral { object_literal } => {
+            EmitDirective::ES5ObjectLiteral { object_literal } => {
                 if let Some(literal_node) = self.arena.get(object_literal) {
                     if let Some(literal) = self.arena.get_literal_expr(literal_node) {
                         self.emit_object_literal_es5(&literal.elements.nodes);
@@ -827,7 +949,7 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_node_default(node, idx);
             }
 
-            TransformDirective::ES5VariableDeclarationList { decl_list } => {
+            EmitDirective::ES5VariableDeclarationList { decl_list } => {
                 if let Some(list_node) = self.arena.get(decl_list) {
                     self.emit_variable_declaration_list_es5(list_node);
                     return;
@@ -836,7 +958,7 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_node_default(node, idx);
             }
 
-            TransformDirective::ES5FunctionParameters { function_node } => {
+            EmitDirective::ES5FunctionParameters { function_node } => {
                 if let Some(func_node) = self.arena.get(function_node) {
                     match func_node.kind {
                         k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
@@ -854,27 +976,26 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_node_default(node, idx);
             }
 
-            TransformDirective::ES5TemplateLiteral { .. } => {
+            EmitDirective::ES5TemplateLiteral => {
                 if !self.emit_template_literal_es5(node, idx) {
                     self.emit_node_default(node, idx);
                 }
             }
 
-            TransformDirective::ModuleWrapper {
+            EmitDirective::ModuleWrapper {
                 format,
                 dependencies,
-                ..
             } => {
                 if let Some(source) = self.arena.get_source_file(node) {
-                    self.emit_module_wrapper(&format, &dependencies, node, source);
+                    self.emit_module_wrapper(&format, dependencies.as_slice(), node, source);
                     return;
                 }
 
                 self.emit_node_default(node, idx);
             }
 
-            TransformDirective::Chain(directives) => {
-                self.emit_chained_directives(node, idx, directives);
+            EmitDirective::Chain(directives) => {
+                self.emit_chained_directives(node, idx, directives.as_slice());
             }
         }
     }
@@ -973,11 +1094,11 @@ impl<'a> ThinPrinter<'a> {
         &mut self,
         node: &ThinNode,
         idx: NodeIndex,
-        inner: &TransformDirective,
+        inner: &EmitDirective,
         export_name: Option<&str>,
     ) {
         match inner {
-            TransformDirective::ES5Class { class_node, .. } => {
+            EmitDirective::ES5Class { class_node } => {
                 let mut es5_emitter = ClassES5Emitter::new(self.arena);
                 es5_emitter.set_indent_level(self.writer.indent_level());
                 if let Some(source_text) = self.source_text {
@@ -986,18 +1107,21 @@ impl<'a> ThinPrinter<'a> {
                 let es5_output = es5_emitter.emit_class(*class_node);
                 self.write(&es5_output);
             }
-            TransformDirective::ES5Namespace { namespace_node } => {
+            EmitDirective::ES5ClassExpression { class_node } => {
+                self.emit_class_expression_es5(*class_node);
+            }
+            EmitDirective::ES5Namespace { namespace_node } => {
                 let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
                 let output = ns_emitter.emit_namespace(*namespace_node);
                 self.write(&output);
             }
-            TransformDirective::ES5Enum { enum_node } => {
+            EmitDirective::ES5Enum { enum_node } => {
                 let mut enum_emitter = EnumES5Emitter::new(self.arena);
                 enum_emitter.set_indent_level(self.writer.indent_level());
                 let output = enum_emitter.emit_enum(*enum_node);
                 self.write(&output);
             }
-            TransformDirective::ES5AsyncFunction { function_node } => {
+            EmitDirective::ES5AsyncFunction { function_node } => {
                 if let Some(func_node) = self.arena.get(*function_node) {
                     if let Some(func) = self.arena.get_function(func_node) {
                         if !func.name.is_none() {
@@ -1009,7 +1133,7 @@ impl<'a> ThinPrinter<'a> {
                     }
                 }
             }
-            TransformDirective::ES5ArrowFunction {
+            EmitDirective::ES5ArrowFunction {
                 arrow_node,
                 captures_this,
             } => {
@@ -1019,7 +1143,7 @@ impl<'a> ThinPrinter<'a> {
                     }
                 }
             }
-            TransformDirective::ES5FunctionParameters { function_node } => {
+            EmitDirective::ES5FunctionParameters { function_node } => {
                 if let Some(func_node) = self.arena.get(*function_node) {
                     match func_node.kind {
                         k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
@@ -1032,11 +1156,11 @@ impl<'a> ThinPrinter<'a> {
                     }
                 }
             }
-            TransformDirective::Identity => {
+            EmitDirective::Identity => {
                 self.emit_node_default(node, idx);
             }
-            TransformDirective::Chain(directives) => {
-                self.emit_chained_directives(node, idx, directives.clone());
+            EmitDirective::Chain(directives) => {
+                self.emit_chained_directives(node, idx, directives.as_slice());
             }
             _ => {
                 self.emit_node_default(node, idx);
@@ -1048,33 +1172,30 @@ impl<'a> ThinPrinter<'a> {
         &mut self,
         node: &ThinNode,
         idx: NodeIndex,
-        directives: Vec<TransformDirective>,
+        directives: &[EmitDirective],
     ) {
-        let mut flattened = Vec::new();
-        Self::flatten_chain(directives, &mut flattened);
-
-        if flattened.is_empty() {
+        if directives.is_empty() {
             self.emit_node_default(node, idx);
             return;
         }
 
-        let last = flattened.len() - 1;
-        self.emit_chained_directive(node, idx, &flattened, last);
+        let last = directives.len() - 1;
+        self.emit_chained_directive(node, idx, directives, last);
     }
 
     fn emit_chained_directive(
         &mut self,
         node: &ThinNode,
         idx: NodeIndex,
-        directives: &[TransformDirective],
+        directives: &[EmitDirective],
         index: usize,
     ) {
         let directive = &directives[index];
         match directive {
-            TransformDirective::Identity => {
+            EmitDirective::Identity => {
                 self.emit_chained_previous(node, idx, directives, index);
             }
-            TransformDirective::ES5Class { class_node, .. } => {
+            EmitDirective::ES5Class { class_node } => {
                 let mut es5_emitter = ClassES5Emitter::new(self.arena);
                 es5_emitter.set_indent_level(self.writer.indent_level());
                 if let Some(source_text) = self.source_text {
@@ -1083,18 +1204,22 @@ impl<'a> ThinPrinter<'a> {
                 let es5_output = es5_emitter.emit_class(*class_node);
                 self.write(&es5_output);
             }
-            TransformDirective::ES5Namespace { namespace_node } => {
-                let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
+            EmitDirective::ES5ClassExpression { class_node } => {
+                self.emit_class_expression_es5(*class_node);
+            }
+            EmitDirective::ES5Namespace { namespace_node } => {
+                let mut ns_emitter =
+                    NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
                 let output = ns_emitter.emit_namespace(*namespace_node);
                 self.write(&output);
             }
-            TransformDirective::ES5Enum { enum_node } => {
+            EmitDirective::ES5Enum { enum_node } => {
                 let mut enum_emitter = EnumES5Emitter::new(self.arena);
                 enum_emitter.set_indent_level(self.writer.indent_level());
                 let output = enum_emitter.emit_enum(*enum_node);
                 self.write(&output);
             }
-            TransformDirective::CommonJSExport {
+            EmitDirective::CommonJSExport {
                 names,
                 is_default,
                 inner,
@@ -1102,13 +1227,13 @@ impl<'a> ThinPrinter<'a> {
                 let export_name = names.first().map(|name| name.as_str());
                 self.emit_commonjs_export(names.as_slice(), *is_default, |this| {
                     if index == 0 {
-                        this.emit_commonjs_inner(node, idx, inner, export_name);
+                        this.emit_commonjs_inner(node, idx, inner.as_ref(), export_name);
                     } else {
                         this.emit_chained_directive(node, idx, directives, index - 1);
                     }
                 });
             }
-            TransformDirective::CommonJSExportDefaultExpr => {
+            EmitDirective::CommonJSExportDefaultExpr => {
                 self.emit_commonjs_default_export_assignment(|this| {
                     if index == 0 {
                         this.emit_commonjs_default_export_expr_inner(node, idx);
@@ -1117,10 +1242,10 @@ impl<'a> ThinPrinter<'a> {
                     }
                 });
             }
-            TransformDirective::CommonJSExportDefaultClassES5 { class_node } => {
+            EmitDirective::CommonJSExportDefaultClassES5 { class_node } => {
                 self.emit_commonjs_default_export_class_es5(*class_node);
             }
-            TransformDirective::ES5ArrowFunction {
+            EmitDirective::ES5ArrowFunction {
                 arrow_node,
                 captures_this,
             } => {
@@ -1133,7 +1258,7 @@ impl<'a> ThinPrinter<'a> {
 
                 self.emit_chained_previous(node, idx, directives, index);
             }
-            TransformDirective::ES5AsyncFunction { function_node } => {
+            EmitDirective::ES5AsyncFunction { function_node } => {
                 if let Some(func_node) = self.arena.get(*function_node) {
                     if let Some(func) = self.arena.get_function(func_node) {
                         let func_name = if !func.name.is_none() {
@@ -1149,7 +1274,7 @@ impl<'a> ThinPrinter<'a> {
 
                 self.emit_chained_previous(node, idx, directives, index);
             }
-            TransformDirective::ES5ForOf { for_of_node } => {
+            EmitDirective::ES5ForOf { for_of_node } => {
                 if let Some(for_of_node) = self.arena.get(*for_of_node) {
                     if let Some(for_in_of) = self.arena.get_for_in_of(for_of_node) {
                         if !for_in_of.await_modifier {
@@ -1161,7 +1286,7 @@ impl<'a> ThinPrinter<'a> {
 
                 self.emit_chained_previous(node, idx, directives, index);
             }
-            TransformDirective::ES5ObjectLiteral { object_literal } => {
+            EmitDirective::ES5ObjectLiteral { object_literal } => {
                 if let Some(literal_node) = self.arena.get(*object_literal) {
                     if let Some(literal) = self.arena.get_literal_expr(literal_node) {
                         self.emit_object_literal_es5(&literal.elements.nodes);
@@ -1171,7 +1296,7 @@ impl<'a> ThinPrinter<'a> {
 
                 self.emit_chained_previous(node, idx, directives, index);
             }
-            TransformDirective::ES5VariableDeclarationList { decl_list } => {
+            EmitDirective::ES5VariableDeclarationList { decl_list } => {
                 if let Some(list_node) = self.arena.get(*decl_list) {
                     self.emit_variable_declaration_list_es5(list_node);
                     return;
@@ -1179,7 +1304,7 @@ impl<'a> ThinPrinter<'a> {
 
                 self.emit_chained_previous(node, idx, directives, index);
             }
-            TransformDirective::ES5FunctionParameters { function_node } => {
+            EmitDirective::ES5FunctionParameters { function_node } => {
                 if let Some(func_node) = self.arena.get(*function_node) {
                     match func_node.kind {
                         k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
@@ -1196,27 +1321,26 @@ impl<'a> ThinPrinter<'a> {
 
                 self.emit_chained_previous(node, idx, directives, index);
             }
-            TransformDirective::ES5TemplateLiteral { .. } => {
+            EmitDirective::ES5TemplateLiteral => {
                 if self.emit_template_literal_es5(node, idx) {
                     return;
                 }
 
                 self.emit_chained_previous(node, idx, directives, index);
             }
-            TransformDirective::ModuleWrapper {
+            EmitDirective::ModuleWrapper {
                 format,
                 dependencies,
-                ..
             } => {
                 if let Some(source) = self.arena.get_source_file(node) {
-                    self.emit_module_wrapper(&format, dependencies.as_slice(), node, source);
+                    self.emit_module_wrapper(format, dependencies.as_slice(), node, source);
                     return;
                 }
 
                 self.emit_chained_previous(node, idx, directives, index);
             }
-            TransformDirective::Chain(nested) => {
-                self.emit_chained_directives(node, idx, nested.clone());
+            EmitDirective::Chain(nested) => {
+                self.emit_chained_directives(node, idx, nested.as_slice());
             }
         }
     }
@@ -1225,27 +1349,13 @@ impl<'a> ThinPrinter<'a> {
         &mut self,
         node: &ThinNode,
         idx: NodeIndex,
-        directives: &[TransformDirective],
+        directives: &[EmitDirective],
         index: usize,
     ) {
         if index == 0 {
             self.emit_node_default(node, idx);
         } else {
             self.emit_chained_directive(node, idx, directives, index - 1);
-        }
-    }
-
-    fn flatten_chain(
-        directives: Vec<TransformDirective>,
-        out: &mut Vec<TransformDirective>,
-    ) {
-        for directive in directives {
-            match directive {
-                TransformDirective::Chain(inner) => {
-                    Self::flatten_chain(inner, out);
-                }
-                other => out.push(other),
-            }
         }
     }
 
@@ -1456,7 +1566,10 @@ impl<'a> ThinPrinter<'a> {
     /// Emit a node.
     fn emit_node(&mut self, node: &ThinNode, idx: NodeIndex) {
         // Phase 2 Architecture: Check transform directives first
-        if self.transforms.has_transform(idx) {
+        if !self.transforms.is_empty()
+            && Self::kind_may_have_transform(node.kind)
+            && self.transforms.has_transform(idx)
+        {
             self.apply_transform(node, idx);
             return;
         }
@@ -1464,6 +1577,27 @@ impl<'a> ThinPrinter<'a> {
         // No transform, emit using default logic
         let kind = node.kind;
         self.emit_node_by_kind(node, idx, kind);
+    }
+
+    fn kind_may_have_transform(kind: u16) -> bool {
+        matches!(
+            kind,
+            k if k == syntax_kind_ext::SOURCE_FILE
+                || k == syntax_kind_ext::CLASS_DECLARATION
+                || k == syntax_kind_ext::CLASS_EXPRESSION
+                || k == syntax_kind_ext::MODULE_DECLARATION
+                || k == syntax_kind_ext::ENUM_DECLARATION
+                || k == syntax_kind_ext::FUNCTION_DECLARATION
+                || k == syntax_kind_ext::FUNCTION_EXPRESSION
+                || k == syntax_kind_ext::ARROW_FUNCTION
+                || k == syntax_kind_ext::VARIABLE_STATEMENT
+                || k == syntax_kind_ext::VARIABLE_DECLARATION_LIST
+                || k == syntax_kind_ext::FOR_OF_STATEMENT
+                || k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION
+                || k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION
+                || k == syntax_kind_ext::TEMPLATE_EXPRESSION
+                || k == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+        )
     }
 
     /// Emit a node by kind using default logic (no transforms).
@@ -4230,6 +4364,57 @@ impl<'a> ThinPrinter<'a> {
         self.emit_class_es6(node, idx);
     }
 
+    /// Emit an ES5-compatible class expression by wrapping the class IIFE in an expression.
+    fn emit_class_expression_es5(&mut self, class_node: NodeIndex) {
+        let Some(node) = self.arena.get(class_node) else {
+            return;
+        };
+        let Some(class_data) = self.arena.get_class(node) else {
+            return;
+        };
+
+        let mut es5_emitter = ClassES5Emitter::new(self.arena);
+        es5_emitter.set_indent_level(0);
+        if let Some(source_text) = self.source_text {
+            es5_emitter.set_source_text(source_text);
+        }
+
+        let (class_name, es5_output) = if !class_data.name.is_none() {
+            let candidate = self.get_identifier_text(class_data.name);
+            if candidate.is_empty() || !is_valid_identifier_name(&candidate) {
+                let temp_name = self.get_temp_var_name();
+                let output = es5_emitter.emit_class_with_name(class_node, &temp_name);
+                (temp_name, output)
+            } else {
+                let output = es5_emitter.emit_class(class_node);
+                (candidate, output)
+            }
+        } else {
+            let temp_name = self.get_temp_var_name();
+            let output = es5_emitter.emit_class_with_name(class_node, &temp_name);
+            (temp_name, output)
+        };
+
+        self.write("(function () {");
+        self.write_line();
+        self.increase_indent();
+
+        for line in es5_output.lines() {
+            if !line.is_empty() {
+                self.write(line);
+            }
+            self.write_line();
+        }
+
+        self.write("return ");
+        self.write(&class_name);
+        self.write(";");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("})()");
+    }
+
     /// Emit a class using ES6 native class syntax (no transforms).
     /// This is the pure emission logic that can be reused by both the old API
     /// and the new transform system.
@@ -6429,23 +6614,41 @@ impl<'a> ThinPrinter<'a> {
             self.detect_commonjs_helpers(&source.statements, &mut helpers);
         }
 
-        // Detect ES5 class helpers
-        if self.ctx.target_es5 && self.needs_extends_helper(&source.statements) {
-            helpers.extends = true;
-        }
+        let has_es5_transforms = self.has_es5_transforms();
+        if has_es5_transforms {
+            if self.transforms.helpers_populated() {
+                let es5_helpers = self.transforms.helpers();
+                helpers.extends |= es5_helpers.extends;
+                helpers.values |= es5_helpers.values;
+                helpers.rest |= es5_helpers.rest;
+                helpers.awaiter |= es5_helpers.awaiter;
+                helpers.generator |= es5_helpers.generator;
+                helpers.make_template_object |= es5_helpers.make_template_object;
+                helpers.class_private_field_get |= es5_helpers.class_private_field_get;
+                helpers.class_private_field_set |= es5_helpers.class_private_field_set;
+            } else {
+                if self.needs_extends_helper(&source.statements) {
+                    helpers.extends = true;
+                }
 
-        if self.ctx.target_es5 && self.needs_values_helper() {
-            helpers.values = true;
-        }
-        if self.ctx.target_es5 && self.needs_rest_helper() {
-            helpers.rest = true;
-        }
-        if self.ctx.target_es5 && self.needs_async_helpers() {
-            helpers.awaiter = true;
-            helpers.generator = true;
-        }
-        if self.ctx.target_es5 && self.needs_make_template_object_helper() {
-            helpers.make_template_object = true;
+                if self.needs_values_helper() {
+                    helpers.values = true;
+                }
+                if self.needs_rest_helper() {
+                    helpers.rest = true;
+                }
+                if self.needs_async_helpers() {
+                    helpers.awaiter = true;
+                    helpers.generator = true;
+                }
+                if self.needs_make_template_object_helper() {
+                    helpers.make_template_object = true;
+                }
+                if self.needs_class_private_field_helpers() {
+                    helpers.class_private_field_get = true;
+                    helpers.class_private_field_set = true;
+                }
+            }
         }
 
         // Emit all needed helpers
@@ -6455,7 +6658,7 @@ impl<'a> ThinPrinter<'a> {
             // emit_helpers() already adds newlines, no need to add more
         }
 
-        if self.ctx.target_es5 {
+        if has_es5_transforms && helpers.make_template_object {
             let template_vars = self.collect_tagged_template_vars();
             if !template_vars.is_empty() {
                 self.write("var ");
@@ -6919,12 +7122,191 @@ impl<'a> ThinPrinter<'a> {
 
     /// Check if any class in the statements (recursively) extends another class
     fn needs_extends_helper(&self, statements: &NodeList) -> bool {
+        if let Some(needed) = self.needs_extends_helper_from_transforms() {
+            return needed;
+        }
+
         for &stmt_idx in &statements.nodes {
             if self.statement_needs_extends(stmt_idx) {
                 return true;
             }
         }
         false
+    }
+
+    fn needs_extends_helper_from_transforms(&self) -> Option<bool> {
+        let mut saw_class = false;
+        for (_, directive) in self.transforms.iter() {
+            if let Some(needed) = self.directive_needs_extends_helper(directive) {
+                saw_class = true;
+                if needed {
+                    return Some(true);
+                }
+            }
+        }
+
+        if saw_class {
+            Some(false)
+        } else {
+            None
+        }
+    }
+
+    fn directive_needs_extends_helper(&self, directive: &TransformDirective) -> Option<bool> {
+        match directive {
+            TransformDirective::ES5Class {
+                class_node,
+                heritage,
+                ..
+            } => {
+                if heritage.is_some() {
+                    return Some(true);
+                }
+                Some(self.class_has_extends_node(*class_node))
+            }
+            TransformDirective::ES5ClassExpression { class_node } => {
+                Some(self.class_has_extends_node(*class_node))
+            }
+            TransformDirective::CommonJSExportDefaultClassES5 { class_node } => {
+                Some(self.class_has_extends_node(*class_node))
+            }
+            TransformDirective::CommonJSExport { inner, .. } => {
+                self.directive_needs_extends_helper(inner)
+            }
+            TransformDirective::Chain(directives) => {
+                let mut saw_class = false;
+                for directive in directives {
+                    if let Some(needed) = self.directive_needs_extends_helper(directive) {
+                        saw_class = true;
+                        if needed {
+                            return Some(true);
+                        }
+                    }
+                }
+
+                if saw_class {
+                    Some(false)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn class_has_extends_node(&self, class_idx: NodeIndex) -> bool {
+        let Some(class_node) = self.arena.get(class_idx) else {
+            return false;
+        };
+        let Some(class_data) = self.arena.get_class(class_node) else {
+            return false;
+        };
+        self.class_has_extends(&class_data.heritage_clauses)
+    }
+
+    fn needs_class_private_field_helpers(&self) -> bool {
+        for (_, directive) in self.transforms.iter() {
+            if self.directive_has_private_members(directive) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn directive_has_private_members(&self, directive: &TransformDirective) -> bool {
+        match directive {
+            TransformDirective::ES5Class { class_node, .. } => {
+                self.class_has_private_members(*class_node)
+            }
+            TransformDirective::ES5ClassExpression { class_node } => {
+                self.class_has_private_members(*class_node)
+            }
+            TransformDirective::CommonJSExportDefaultClassES5 { class_node } => {
+                self.class_has_private_members(*class_node)
+            }
+            TransformDirective::CommonJSExport { inner, .. } => {
+                self.directive_has_private_members(inner)
+            }
+            TransformDirective::Chain(directives) => {
+                directives.iter().any(|directive| self.directive_has_private_members(directive))
+            }
+            _ => false,
+        }
+    }
+
+    fn class_has_private_members(&self, class_idx: NodeIndex) -> bool {
+        let Some(class_node) = self.arena.get(class_idx) else {
+            return false;
+        };
+        let Some(class_data) = self.arena.get_class(class_node) else {
+            return false;
+        };
+
+        for &member_idx in &class_data.members.nodes {
+            let Some(member_node) = self.arena.get(member_idx) else { continue };
+
+            match member_node.kind {
+                k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                    if let Some(prop) = self.arena.get_property_decl(member_node) {
+                        if crate::transforms::private_fields_es5::is_private_identifier(
+                            self.arena,
+                            prop.name,
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                    if let Some(method) = self.arena.get_method_decl(member_node) {
+                        if crate::transforms::private_fields_es5::is_private_identifier(
+                            self.arena,
+                            method.name,
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                    if let Some(accessor) = self.arena.get_accessor(member_node) {
+                        if crate::transforms::private_fields_es5::is_private_identifier(
+                            self.arena,
+                            accessor.name,
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        false
+    }
+
+    fn has_es5_transforms(&self) -> bool {
+        self.transforms
+            .iter()
+            .any(|(_, directive)| Self::directive_has_es5(directive))
+    }
+
+    fn directive_has_es5(directive: &TransformDirective) -> bool {
+        match directive {
+            TransformDirective::ES5Class { .. }
+            | TransformDirective::ES5ClassExpression { .. }
+            | TransformDirective::ES5Namespace { .. }
+            | TransformDirective::ES5Enum { .. }
+            | TransformDirective::ES5ArrowFunction { .. }
+            | TransformDirective::ES5AsyncFunction { .. }
+            | TransformDirective::ES5ForOf { .. }
+            | TransformDirective::ES5ObjectLiteral { .. }
+            | TransformDirective::ES5VariableDeclarationList { .. }
+            | TransformDirective::ES5FunctionParameters { .. }
+            | TransformDirective::ES5TemplateLiteral { .. }
+            | TransformDirective::CommonJSExportDefaultClassES5 { .. } => true,
+            TransformDirective::CommonJSExport { inner, .. } => Self::directive_has_es5(inner),
+            TransformDirective::Chain(directives) => directives.iter().any(Self::directive_has_es5),
+            _ => false,
+        }
     }
 
     fn needs_values_helper(&self) -> bool {
@@ -6990,10 +7372,29 @@ impl<'a> ThinPrinter<'a> {
     }
 
     fn collect_tagged_template_vars(&self) -> Vec<String> {
+        if self.transforms.helpers_populated() {
+            return self.collect_tagged_template_vars_from_transforms();
+        }
+
         let mut vars = Vec::new();
         for (idx, node) in self.arena.nodes.iter().enumerate() {
             if node.kind == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION {
                 vars.push(self.tagged_template_var_name(NodeIndex(idx as u32)));
+            }
+        }
+        vars
+    }
+
+    fn collect_tagged_template_vars_from_transforms(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+        for (&idx, directive) in self.transforms.iter() {
+            if !matches!(directive, TransformDirective::ES5TemplateLiteral { .. }) {
+                continue;
+            }
+
+            let Some(node) = self.arena.get(idx) else { continue };
+            if node.kind == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION {
+                vars.push(self.tagged_template_var_name(idx));
             }
         }
         vars
