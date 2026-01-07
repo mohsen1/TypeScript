@@ -3968,6 +3968,44 @@ const viaAlias = Alias.value;
 }
 
 #[test]
+fn test_namespace_value_member_alias_missing_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Outer {
+    export namespace Inner {
+        export const value = 1;
+    }
+}
+import Alias = Outer.Inner;
+const ok = Alias.value;
+const bad = Alias.missing;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let missing_count = codes.iter().filter(|&&code| code == 2339).count();
+    assert_eq!(
+        missing_count,
+        1,
+        "Expected one 2339 error for missing namespace alias member, got: {:?}",
+        codes
+    );
+
+    let ok_sym = binder.file_locals.get("ok").expect("ok should exist");
+    assert_eq!(checker.get_type_of_symbol(ok_sym), TypeId::NUMBER);
+}
+
+#[test]
 fn test_deep_binary_expression_type_check() {
     use crate::thin_parser::ThinParserState;
 
