@@ -159,6 +159,33 @@ fn test_error_poisoning_assignability() {
 }
 
 #[test]
+fn test_base_constraint_assignability_compat() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+    let u_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+    let v_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("V"),
+        constraint: Some(TypeId::NUMBER),
+        default: None,
+    }));
+
+    assert!(checker.is_assignable(t_param, TypeId::STRING));
+    assert!(!checker.is_assignable(t_param, TypeId::NUMBER));
+    assert!(!checker.is_assignable(t_param, u_param));
+    assert!(!checker.is_assignable(t_param, v_param));
+}
+
+#[test]
 fn test_function_bivariance_default() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
