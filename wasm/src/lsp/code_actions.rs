@@ -1767,6 +1767,24 @@ impl<'a> CodeActionProvider<'a> {
                     }
                 }
             }
+            k if k == syntax_kind_ext::JSX_ELEMENT => {
+                if let Some(jsx) = self.arena.get_jsx_element(node) {
+                    self.collect_identifier_uses_in_jsx_opening(jsx.opening_element, out);
+                    for &child in &jsx.children.nodes {
+                        self.collect_identifier_uses_in_jsx_child(child, out);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::JSX_SELF_CLOSING_ELEMENT => {
+                self.collect_identifier_uses_in_jsx_opening(expr_idx, out);
+            }
+            k if k == syntax_kind_ext::JSX_FRAGMENT => {
+                if let Some(fragment) = self.arena.get_jsx_fragment(node) {
+                    for &child in &fragment.children.nodes {
+                        self.collect_identifier_uses_in_jsx_child(child, out);
+                    }
+                }
+            }
             k if k == syntax_kind_ext::FUNCTION_EXPRESSION
                 || k == syntax_kind_ext::ARROW_FUNCTION
                 || k == syntax_kind_ext::CLASS_EXPRESSION => {
@@ -1822,6 +1840,125 @@ impl<'a> CodeActionProvider<'a> {
                 self.collect_identifier_uses_in_expression(computed.expression, out);
             }
         }
+    }
+
+    fn collect_identifier_uses_in_jsx_opening(
+        &self,
+        opening_idx: NodeIndex,
+        out: &mut Vec<NodeIndex>,
+    ) {
+        let Some(opening_node) = self.arena.get(opening_idx) else {
+            return;
+        };
+        let Some(opening) = self.arena.get_jsx_opening(opening_node) else {
+            return;
+        };
+
+        self.collect_identifier_uses_in_jsx_tag_name(opening.tag_name, out);
+        self.collect_identifier_uses_in_jsx_attributes(opening.attributes, out);
+    }
+
+    fn collect_identifier_uses_in_jsx_tag_name(&self, tag_idx: NodeIndex, out: &mut Vec<NodeIndex>) {
+        let Some(tag_node) = self.arena.get(tag_idx) else {
+            return;
+        };
+
+        match tag_node.kind {
+            k if k == SyntaxKind::Identifier as u16 => {
+                if let Some(name) = self.arena.get_identifier_text(tag_idx) {
+                    if Self::jsx_tag_is_component(name) {
+                        out.push(tag_idx);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::JSX_NAMESPACED_NAME => {
+                // Namespaced JSX names are intrinsic; skip to avoid false TDZ positives.
+            }
+            _ => {
+                self.collect_identifier_uses_in_expression(tag_idx, out);
+            }
+        }
+    }
+
+    fn collect_identifier_uses_in_jsx_attributes(
+        &self,
+        attrs_idx: NodeIndex,
+        out: &mut Vec<NodeIndex>,
+    ) {
+        let Some(attrs_node) = self.arena.get(attrs_idx) else {
+            return;
+        };
+        let Some(attrs) = self.arena.get_jsx_attributes(attrs_node) else {
+            return;
+        };
+
+        for &prop in &attrs.properties.nodes {
+            let Some(prop_node) = self.arena.get(prop) else {
+                continue;
+            };
+            match prop_node.kind {
+                k if k == syntax_kind_ext::JSX_ATTRIBUTE => {
+                    if let Some(attr) = self.arena.get_jsx_attribute(prop_node) {
+                        if attr.initializer.is_none() {
+                            continue;
+                        }
+                        self.collect_identifier_uses_in_jsx_attribute_initializer(attr.initializer, out);
+                    }
+                }
+                k if k == syntax_kind_ext::JSX_SPREAD_ATTRIBUTE => {
+                    if let Some(spread) = self.arena.get_jsx_spread_attribute(prop_node) {
+                        self.collect_identifier_uses_in_expression(spread.expression, out);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn collect_identifier_uses_in_jsx_attribute_initializer(
+        &self,
+        init_idx: NodeIndex,
+        out: &mut Vec<NodeIndex>,
+    ) {
+        let Some(init_node) = self.arena.get(init_idx) else {
+            return;
+        };
+
+        if init_node.kind == syntax_kind_ext::JSX_EXPRESSION {
+            if let Some(expr) = self.arena.get_jsx_expression(init_node) {
+                self.collect_identifier_uses_in_expression(expr.expression, out);
+            }
+            return;
+        }
+
+        self.collect_identifier_uses_in_expression(init_idx, out);
+    }
+
+    fn collect_identifier_uses_in_jsx_child(&self, child_idx: NodeIndex, out: &mut Vec<NodeIndex>) {
+        let Some(child_node) = self.arena.get(child_idx) else {
+            return;
+        };
+
+        match child_node.kind {
+            k if k == syntax_kind_ext::JSX_EXPRESSION => {
+                if let Some(expr) = self.arena.get_jsx_expression(child_node) {
+                    self.collect_identifier_uses_in_expression(expr.expression, out);
+                }
+            }
+            k if k == syntax_kind_ext::JSX_ELEMENT
+                || k == syntax_kind_ext::JSX_SELF_CLOSING_ELEMENT
+                || k == syntax_kind_ext::JSX_FRAGMENT => {
+                self.collect_identifier_uses_in_expression(child_idx, out);
+            }
+            _ => {}
+        }
+    }
+
+    fn jsx_tag_is_component(name: &str) -> bool {
+        name.chars()
+            .next()
+            .map(|ch| ch.is_ascii_uppercase())
+            .unwrap_or(false)
     }
 
     fn find_enclosing_scope_id(&self, node_idx: NodeIndex) -> Option<ScopeId> {
@@ -1919,6 +2056,9 @@ impl<'a> CodeActionProvider<'a> {
             || kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION
             || kind == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
             || kind == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION
+            || kind == syntax_kind_ext::JSX_ELEMENT
+            || kind == syntax_kind_ext::JSX_SELF_CLOSING_ELEMENT
+            || kind == syntax_kind_ext::JSX_FRAGMENT
     }
 
     /// Check if an expression is extractable (not all expressions should be extracted).
