@@ -9,12 +9,12 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 ## Current Status
 - LoweringPass -> TransformDirective -> ThinPrinter pipeline exists.
 - ES5/ESNext transforms largely implemented.
-- Remaining TODOs: verify LoweringPass emits directives for all ES5 transforms; run perf bench.
+- Remaining TODOs: run perf bench.
 
 ## Highest-Impact Next Tasks
-- [ ] Finish transform-only pipeline
+- [x] Finish transform-only pipeline
   - [x] Remove or gate `ctx.target_es5` inline paths in `thin_emitter/mod.rs`.
-  - Ensure LoweringPass emits directives for all ES5 transforms (class, arrow, async, template, params, object literal).
+  - [x] Ensure LoweringPass emits directives for all ES5 transforms (class, arrow, async, template, params, object literal).
 - [x] Plumb class heritage in LoweringPass
   - Fill `TransformDirective::ES5Class.heritage` or drop unused field.
   - Add regression tests for `extends` + private fields + helper injection.

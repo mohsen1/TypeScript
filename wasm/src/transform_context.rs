@@ -59,6 +59,13 @@ pub enum TransformDirective {
         members: Vec<NodeIndex>,
     },
 
+    /// ES5 Class Expression: Transform class expression to IIFE expression.
+    /// Uses a synthetic name for anonymous classes to preserve semantics.
+    ES5ClassExpression {
+        /// Original class expression node index
+        class_node: NodeIndex,
+    },
+
     /// ES5 Namespace: Transform namespace to IIFE pattern
     ES5Namespace {
         /// Original namespace node index

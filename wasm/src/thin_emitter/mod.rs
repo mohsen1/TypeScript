@@ -739,6 +739,9 @@ impl<'a> ThinPrinter<'a> {
                 let es5_output = es5_emitter.emit_class(class_node);
                 self.write(&es5_output);
             }
+            TransformDirective::ES5ClassExpression { class_node } => {
+                self.emit_class_expression_es5(class_node);
+            }
 
             TransformDirective::ES5Namespace { namespace_node } => {
                 let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
@@ -986,6 +989,9 @@ impl<'a> ThinPrinter<'a> {
                 let es5_output = es5_emitter.emit_class(*class_node);
                 self.write(&es5_output);
             }
+            TransformDirective::ES5ClassExpression { class_node } => {
+                self.emit_class_expression_es5(*class_node);
+            }
             TransformDirective::ES5Namespace { namespace_node } => {
                 let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
                 let output = ns_emitter.emit_namespace(*namespace_node);
@@ -1082,6 +1088,9 @@ impl<'a> ThinPrinter<'a> {
                 }
                 let es5_output = es5_emitter.emit_class(*class_node);
                 self.write(&es5_output);
+            }
+            TransformDirective::ES5ClassExpression { class_node } => {
+                self.emit_class_expression_es5(*class_node);
             }
             TransformDirective::ES5Namespace { namespace_node } => {
                 let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
@@ -4230,6 +4239,57 @@ impl<'a> ThinPrinter<'a> {
         self.emit_class_es6(node, idx);
     }
 
+    /// Emit an ES5-compatible class expression by wrapping the class IIFE in an expression.
+    fn emit_class_expression_es5(&mut self, class_node: NodeIndex) {
+        let Some(node) = self.arena.get(class_node) else {
+            return;
+        };
+        let Some(class_data) = self.arena.get_class(node) else {
+            return;
+        };
+
+        let mut es5_emitter = ClassES5Emitter::new(self.arena);
+        es5_emitter.set_indent_level(0);
+        if let Some(source_text) = self.source_text {
+            es5_emitter.set_source_text(source_text);
+        }
+
+        let (class_name, es5_output) = if !class_data.name.is_none() {
+            let candidate = self.get_identifier_text(class_data.name);
+            if candidate.is_empty() || !is_valid_identifier_name(&candidate) {
+                let temp_name = self.get_temp_var_name();
+                let output = es5_emitter.emit_class_with_name(class_node, &temp_name);
+                (temp_name, output)
+            } else {
+                let output = es5_emitter.emit_class(class_node);
+                (candidate, output)
+            }
+        } else {
+            let temp_name = self.get_temp_var_name();
+            let output = es5_emitter.emit_class_with_name(class_node, &temp_name);
+            (temp_name, output)
+        };
+
+        self.write("(function () {");
+        self.write_line();
+        self.increase_indent();
+
+        for line in es5_output.lines() {
+            if !line.is_empty() {
+                self.write(line);
+            }
+            self.write_line();
+        }
+
+        self.write("return ");
+        self.write(&class_name);
+        self.write(";");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("})()");
+    }
+
     /// Emit a class using ES6 native class syntax (no transforms).
     /// This is the pure emission logic that can be reused by both the old API
     /// and the new transform system.
@@ -6967,6 +7027,9 @@ impl<'a> ThinPrinter<'a> {
                 }
                 Some(self.class_has_extends_node(*class_node))
             }
+            TransformDirective::ES5ClassExpression { class_node } => {
+                Some(self.class_has_extends_node(*class_node))
+            }
             TransformDirective::CommonJSExportDefaultClassES5 { class_node } => {
                 Some(self.class_has_extends_node(*class_node))
             }
@@ -7016,6 +7079,9 @@ impl<'a> ThinPrinter<'a> {
     fn directive_has_private_members(&self, directive: &TransformDirective) -> bool {
         match directive {
             TransformDirective::ES5Class { class_node, .. } => {
+                self.class_has_private_members(*class_node)
+            }
+            TransformDirective::ES5ClassExpression { class_node } => {
                 self.class_has_private_members(*class_node)
             }
             TransformDirective::CommonJSExportDefaultClassES5 { class_node } => {
@@ -7089,6 +7155,7 @@ impl<'a> ThinPrinter<'a> {
     fn directive_has_es5(directive: &TransformDirective) -> bool {
         match directive {
             TransformDirective::ES5Class { .. }
+            | TransformDirective::ES5ClassExpression { .. }
             | TransformDirective::ES5Namespace { .. }
             | TransformDirective::ES5Enum { .. }
             | TransformDirective::ES5ArrowFunction { .. }

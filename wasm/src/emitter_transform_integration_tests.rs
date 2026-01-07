@@ -56,6 +56,58 @@ fn test_two_phase_emission_es5_class() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_expression() {
+    let source = "const C = class { method() { return 1; } };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut class_expr_idx = None;
+    for (idx, node) in arena.nodes.iter().enumerate() {
+        if node.kind == syntax_kind_ext::CLASS_EXPRESSION {
+            class_expr_idx = Some(NodeIndex(idx as u32));
+            break;
+        }
+    }
+
+    let class_expr_idx = class_expr_idx.expect("expected class expression");
+    let directive = transforms
+        .get(class_expr_idx)
+        .expect("expected transform directive for class expression");
+    assert!(
+        matches!(directive, TransformDirective::ES5ClassExpression { .. }),
+        "LoweringPass should generate ES5ClassExpression transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var C ="),
+        "ES5 class expression should downlevel to var assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("(function () {"),
+        "ES5 class expression should emit IIFE: {}",
+        output
+    );
+    assert!(
+        !output.contains("class {"),
+        "ES5 class expression should not emit ES6 class syntax: {}",
+        output
+    );
+}
+
+#[test]
 fn test_lowering_pass_es5_class_heritage_clause() {
     let source = "class Base {} class Derived extends Base {}";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

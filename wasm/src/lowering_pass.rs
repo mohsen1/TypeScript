@@ -262,6 +262,12 @@ impl<'a> LoweringPass<'a> {
             }
             k if k == syntax_kind_ext::CLASS_EXPRESSION => {
                 if let Some(class_data) = self.arena.get_class(node) {
+                    if self.ctx.target_es5 {
+                        self.transforms.insert(
+                            idx,
+                            TransformDirective::ES5ClassExpression { class_node: idx },
+                        );
+                    }
                     if let Some(mods) = &class_data.modifiers {
                         for &mod_idx in &mods.nodes {
                             self.visit(mod_idx);
