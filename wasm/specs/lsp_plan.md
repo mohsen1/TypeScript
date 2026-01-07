@@ -37,6 +37,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Missing import: merge named imports into existing declarations
    - [x] Missing import: merge default imports into existing declarations
    - [x] Missing import: use import type in type positions (and skip type-only for values)
+   - [x] Signature help: fix active parameter detection (between arguments)
 
 2. **Extend AST Coverage** (if needed)
    - [x] Traverse template expressions in LSP resolver for references/completions
