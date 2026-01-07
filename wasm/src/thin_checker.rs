@@ -930,6 +930,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of identifier, with control flow analysis for narrowing.
     fn get_type_of_identifier(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::binder::symbol_flags;
+
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
         };
@@ -944,15 +946,26 @@ impl<'a> ThinCheckerState<'a> {
         // NEW STATELESS APPROACH: Query binder's persistent scope system
         // This enables lazy checking without traversal-order dependency
         if let Some(sym_id) = self.ctx.binder.resolve_identifier(self.ctx.arena, idx) {
-            // Get the declared type of the symbol
-            let declared_type = self.get_type_of_symbol(sym_id);
-            if declared_type != TypeId::ANY {
-                return self.apply_flow_narrowing(idx, declared_type);
+            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                let is_class_member = (symbol.flags
+                    & (symbol_flags::PROPERTY
+                        | symbol_flags::METHOD
+                        | symbol_flags::GET_ACCESSOR
+                        | symbol_flags::SET_ACCESSOR
+                        | symbol_flags::CONSTRUCTOR))
+                    != 0;
+                if !is_class_member {
+                    // Get the declared type of the symbol
+                    let declared_type = self.get_type_of_symbol(sym_id);
+                    if declared_type != TypeId::ANY {
+                        return self.apply_flow_narrowing(idx, declared_type);
+                    }
+                    if let Some(local_type) = self.lookup_local(name) {
+                        return self.apply_flow_narrowing(idx, local_type);
+                    }
+                    return declared_type;
+                }
             }
-            if let Some(local_type) = self.lookup_local(name) {
-                return self.apply_flow_narrowing(idx, local_type);
-            }
-            return declared_type;
         }
 
         // Check local scopes first to get the declared type
@@ -970,7 +983,6 @@ impl<'a> ThinCheckerState<'a> {
         // But skip class members (PROPERTY/METHOD) - they need "this." prefix
         if let Some(sym_id) = self.ctx.binder.get_symbols().find_by_name(name) {
             if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
-                use crate::binder::symbol_flags;
                 // Only use this fallback for classes, functions, variables - not class members
                 let is_class_member = (symbol.flags & symbol_flags::PROPERTY) != 0
                     || (symbol.flags & symbol_flags::METHOD) != 0;
@@ -1701,6 +1713,24 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
+        let mut has_type_param_scope = false;
+        if let Some(ref type_params) = func.type_parameters {
+            self.push_local_scope();
+            has_type_param_scope = true;
+            for &tp_idx in &type_params.nodes {
+                if let Some(tp_node) = self.ctx.arena.get(tp_idx) {
+                    if let Some(tp) = self.ctx.arena.get_type_parameter(tp_node) {
+                        if let Some(name_node) = self.ctx.arena.get(tp.name) {
+                            if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                                // Add type parameter as a type (use ANY as placeholder)
+                                self.add_local(ident.escaped_text.clone(), TypeId::ANY);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // Collect parameter info using solver's ParamInfo struct
         let mut params = Vec::new();
         let mut param_types: Vec<Option<TypeId>> = Vec::new();
@@ -1825,7 +1855,11 @@ impl<'a> ThinCheckerState<'a> {
             is_constructor: false,
         };
 
-        self.ctx.types.function(shape)
+        let function_type = self.ctx.types.function(shape);
+        if has_type_param_scope {
+            self.pop_local_scope();
+        }
+        function_type
     }
 
     /// Get type of array literal.

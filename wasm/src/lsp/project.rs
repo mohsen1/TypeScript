@@ -826,11 +826,12 @@ impl Project {
             }
 
             let Some(bindings_node) = arena.get(clause.named_bindings) else { continue; };
-            if bindings_node.kind != SyntaxKind::Identifier as u16 {
+            if bindings_node.kind != syntax_kind_ext::NAMESPACE_IMPORT {
                 continue;
             }
 
-            if let Some(name) = arena.get_identifier_text(clause.named_bindings) {
+            let Some(bindings) = arena.get_named_imports(bindings_node) else { continue; };
+            if let Some(name) = arena.get_identifier_text(bindings.name) {
                 names.push(name.to_string());
             }
         }

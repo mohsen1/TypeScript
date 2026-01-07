@@ -82,7 +82,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
 #### Testing
 
 Latest run:
-- `./wasm/test.sh` ❌ (`lib_tests::test_get_code_actions_with_context_missing_import` `cannot call wasm-bindgen imported functions on non-wasm targets`)
+- `./wasm/test.sh` ✅
 
 ## Quick Reference
 

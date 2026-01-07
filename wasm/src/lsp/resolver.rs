@@ -155,14 +155,9 @@ impl<'a> ScopeWalker<'a> {
                     }
                 }
             }
-            k if k == syntax_kind_ext::BLOCK => {
-                if let Some(block) = self.arena.get_block(node) {
-                    for &stmt in &block.statements.nodes {
-                        if let Some(res) = f(self, stmt) { return Some(res); }
-                    }
-                }
-            }
-            k if k == syntax_kind_ext::CLASS_STATIC_BLOCK_DECLARATION => {
+            k if k == syntax_kind_ext::BLOCK
+                || k == syntax_kind_ext::CLASS_STATIC_BLOCK_DECLARATION
+                || k == syntax_kind_ext::CASE_BLOCK => {
                 if let Some(block) = self.arena.get_block(node) {
                     for &stmt in &block.statements.nodes {
                         if let Some(res) = f(self, stmt) { return Some(res); }

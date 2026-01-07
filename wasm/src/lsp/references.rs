@@ -3,11 +3,12 @@
 //! Given a position in the source, finds all references to the symbol at that position.
 
 use crate::parser::thin_node::ThinNodeArena;
-use crate::parser::NodeIndex;
+use crate::parser::{NodeIndex, syntax_kind_ext};
 use crate::thin_binder::ThinBinderState;
 use crate::lsp::position::{Position, Location, LineMap, Range};
 use crate::lsp::utils::find_node_at_offset;
 use crate::lsp::resolver::ScopeWalker;
+use crate::scanner::SyntaxKind;
 
 /// Find References provider.
 ///
@@ -60,10 +61,10 @@ impl<'a> FindReferences<'a> {
         }
 
         // 3. Resolve the node to a symbol
-        let mut walker = ScopeWalker::new(self.arena, self.binder);
-        let symbol_id = walker.resolve_node(root, node_idx)?;
+        let symbol_id = self.resolve_symbol(root, node_idx)?;
 
         // 4. Find all references to this symbol
+        let mut walker = ScopeWalker::new(self.arena, self.binder);
         let ref_nodes = walker.find_references(root, symbol_id);
 
         // 5. Also include the declarations
@@ -106,10 +107,10 @@ impl<'a> FindReferences<'a> {
         }
 
         // Resolve the node to a symbol
-        let mut walker = ScopeWalker::new(self.arena, self.binder);
-        let symbol_id = walker.resolve_node(root, node_idx)?;
+        let symbol_id = self.resolve_symbol(root, node_idx)?;
 
         // Find all references to this symbol
+        let mut walker = ScopeWalker::new(self.arena, self.binder);
         let ref_nodes = walker.find_references(root, symbol_id);
 
         // Also include the declarations
@@ -151,10 +152,10 @@ impl<'a> FindReferences<'a> {
             return None;
         }
 
-        let mut walker = ScopeWalker::new(self.arena, self.binder);
-        let symbol_id = walker.resolve_node(root, node_idx)?;
+        let symbol_id = self.resolve_symbol(root, node_idx)?;
 
         // Find all references (usages only, not declarations)
+        let mut walker = ScopeWalker::new(self.arena, self.binder);
         let ref_nodes = walker.find_references(root, symbol_id);
 
         // Convert to Locations
@@ -177,6 +178,53 @@ impl<'a> FindReferences<'a> {
         } else {
             Some(locations)
         }
+    }
+
+    fn resolve_symbol(&self, root: NodeIndex, node_idx: NodeIndex) -> Option<crate::binder::SymbolId> {
+        let mut walker = ScopeWalker::new(self.arena, self.binder);
+        if let Some(symbol_id) = walker.resolve_node(root, node_idx) {
+            return Some(symbol_id);
+        }
+
+        let tag_idx = self.tagged_template_tag(node_idx)?;
+        let mut walker = ScopeWalker::new(self.arena, self.binder);
+        walker.resolve_node(root, tag_idx)
+    }
+
+    fn tagged_template_tag(&self, node_idx: NodeIndex) -> Option<NodeIndex> {
+        let node = self.arena.get(node_idx)?;
+        let is_template_node = matches!(
+            node.kind,
+            k if k == syntax_kind_ext::TEMPLATE_EXPRESSION
+                || k == syntax_kind_ext::TEMPLATE_SPAN
+                || k == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+                || k == SyntaxKind::TemplateHead as u16
+                || k == SyntaxKind::TemplateMiddle as u16
+                || k == SyntaxKind::TemplateTail as u16
+        );
+
+        if !is_template_node {
+            return None;
+        }
+
+        let mut current = node_idx;
+        while let Some(ext) = self.arena.get_extended(current) {
+            let parent = ext.parent;
+            if parent.is_none() {
+                break;
+            }
+            let parent_node = self.arena.get(parent)?;
+            if parent_node.kind == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION {
+                return self
+                    .arena
+                    .tagged_templates
+                    .get(parent_node.data_index as usize)
+                    .map(|tagged| tagged.tag);
+            }
+            current = parent;
+        }
+
+        None
     }
 }
 

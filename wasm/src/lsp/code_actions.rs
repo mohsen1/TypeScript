@@ -25,7 +25,6 @@ use crate::thin_binder::ThinBinderState;
 use crate::lsp::position::{Position, Range, LineMap};
 use crate::lsp::diagnostics::LspDiagnostic;
 use crate::lsp::rename::{WorkspaceEdit, TextEdit};
-use crate::lsp::resolver::ScopeWalker;
 use crate::lsp::utils::find_node_at_offset;
 use crate::scanner::SyntaxKind;
 use rustc_hash::FxHashSet;
@@ -717,6 +716,27 @@ impl<'a> CodeActionProvider<'a> {
 
     fn import_decl_range(&self, node: &crate::parser::thin_node::ThinNode) -> (Range, String) {
         let mut end = node.end;
+        if let Some(import_decl) = self.arena.get_import_decl(node) {
+            if let Some(module_node) = self.arena.get(import_decl.module_specifier) {
+                end = module_node.end;
+                if let Some(rest) = self.source.get(end as usize..) {
+                    let mut offset = 0usize;
+                    for &byte in rest.as_bytes() {
+                        if byte.is_ascii_whitespace() {
+                            if byte == b'\n' || byte == b'\r' {
+                                break;
+                            }
+                            offset += 1;
+                            continue;
+                        }
+                        if byte == b';' {
+                            end += (offset + 1) as u32;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
         let mut trailing = String::new();
         if let Some(rest) = self.source.get(end as usize..) {
             if rest.starts_with("\r\n") {
@@ -743,12 +763,41 @@ impl<'a> CodeActionProvider<'a> {
             return None;
         }
         let node = self.arena.get(node_idx)?;
-        if node.kind != SyntaxKind::Identifier as u16 {
-            return None;
+        if node.kind == SyntaxKind::Identifier as u16 {
+            let name = self.arena.get_identifier_text(node_idx)?.to_string();
+            let usage = self.import_usage_for_node(node_idx);
+            return Some((name, usage));
         }
-        let name = self.arena.get_identifier_text(node_idx)?.to_string();
-        let usage = self.import_usage_for_node(node_idx);
+
+        let name = self.missing_name_from_diag(diag)?;
+        let usage = self
+            .find_identifier_usage_by_name(&name)
+            .unwrap_or(ImportUsage::Value);
         Some((name, usage))
+    }
+
+    fn missing_name_from_diag(&self, diag: &LspDiagnostic) -> Option<String> {
+        let message = diag.message.as_str();
+        let start = message.find('\'')?;
+        let rest = &message[start + 1..];
+        let end = rest.find('\'')?;
+        Some(rest[..end].to_string())
+    }
+
+    fn find_identifier_usage_by_name(&self, name: &str) -> Option<ImportUsage> {
+        for (idx, node) in self.arena.nodes.iter().enumerate() {
+            if node.kind != SyntaxKind::Identifier as u16 {
+                continue;
+            }
+            let node_idx = NodeIndex(idx as u32);
+            let Some(text) = self.arena.get_identifier_text(node_idx) else {
+                continue;
+            };
+            if text == name {
+                return Some(self.import_usage_for_node(node_idx));
+            }
+        }
+        None
     }
 
     fn import_usage_for_node(&self, node_idx: NodeIndex) -> ImportUsage {
@@ -769,6 +818,12 @@ impl<'a> CodeActionProvider<'a> {
                 return ImportUsage::Value;
             }
 
+            if parent_node.kind == syntax_kind_ext::HERITAGE_CLAUSE {
+                if let Some(usage) = self.import_usage_for_heritage_clause(parent_idx) {
+                    return usage;
+                }
+            }
+
             if parent_node.kind == syntax_kind_ext::EXPRESSION_WITH_TYPE_ARGUMENTS {
                 if let Some(usage) = self.import_usage_in_heritage(parent_idx) {
                     return usage;
@@ -787,16 +842,20 @@ impl<'a> CodeActionProvider<'a> {
 
     fn import_usage_in_heritage(&self, expr_idx: NodeIndex) -> Option<ImportUsage> {
         let parent_idx = self.arena.get_extended(expr_idx)?.parent;
-        if parent_idx.is_none() {
+        self.import_usage_for_heritage_clause(parent_idx)
+    }
+
+    fn import_usage_for_heritage_clause(&self, clause_idx: NodeIndex) -> Option<ImportUsage> {
+        if clause_idx.is_none() {
             return None;
         }
-        let parent_node = self.arena.get(parent_idx)?;
-        if parent_node.kind != syntax_kind_ext::HERITAGE_CLAUSE {
+        let clause_node = self.arena.get(clause_idx)?;
+        if clause_node.kind != syntax_kind_ext::HERITAGE_CLAUSE {
             return None;
         }
 
-        let heritage = self.arena.get_heritage_clause(parent_node)?;
-        let container_idx = self.arena.get_extended(parent_idx)?.parent;
+        let heritage = self.arena.get_heritage_clause(clause_node)?;
+        let container_idx = self.arena.get_extended(clause_idx)?.parent;
         if container_idx.is_none() {
             return None;
         }
@@ -1092,7 +1151,18 @@ impl<'a> CodeActionProvider<'a> {
 
         if let Some(&last) = elements.last() {
             let last_node = self.arena.get(last)?;
-            let between = self.source.get(last_node.end as usize..close_offset as usize)?;
+            let last_spec = self.arena.get_specifier(last_node)?;
+            let last_ident = if !last_spec.name.is_none() {
+                last_spec.name
+            } else {
+                last_spec.property_name
+            };
+            let last_end = self
+                .arena
+                .get(last_ident)
+                .map(|node| node.end)
+                .unwrap_or(last_node.end);
+            let between = self.source.get(last_end as usize..close_offset as usize)?;
             let trimmed = between.trim_start();
             if trimmed.contains("//") || trimmed.contains("/*") {
                 return None;
@@ -1100,7 +1170,7 @@ impl<'a> CodeActionProvider<'a> {
             let had_trailing_comma = trimmed.starts_with(',');
             let mut edits = Vec::new();
             if !had_trailing_comma {
-                let last_pos = self.line_map.offset_to_position(last_node.end, self.source);
+                let last_pos = self.line_map.offset_to_position(last_end, self.source);
                 edits.push(TextEdit {
                     range: Range::new(last_pos, last_pos),
                     new_text: ",".to_string(),
@@ -1327,14 +1397,29 @@ impl<'a> CodeActionProvider<'a> {
 
         if let Some(&last) = elements.last() {
             let last_node = self.arena.get(last)?;
-            let between = self.source.get(last_node.end as usize..close_offset as usize)?;
+            let last_end = if last_node.kind == syntax_kind_ext::PROPERTY_ASSIGNMENT {
+                self.arena
+                    .get_property_assignment(last_node)
+                    .and_then(|prop| {
+                        let tail = if prop.initializer.is_none() {
+                            prop.name
+                        } else {
+                            prop.initializer
+                        };
+                        self.arena.get(tail).map(|node| node.end)
+                    })
+                    .unwrap_or(last_node.end)
+            } else {
+                last_node.end
+            };
+            let between = self.source.get(last_end as usize..close_offset as usize)?;
             let trimmed = between.trim_start();
             if trimmed.contains("//") || trimmed.contains("/*") {
                 return None;
             }
             let had_trailing_comma = trimmed.starts_with(',');
             if !had_trailing_comma {
-                let last_pos = self.line_map.offset_to_position(last_node.end, self.source);
+                let last_pos = self.line_map.offset_to_position(last_end, self.source);
                 edits.push(TextEdit {
                     range: Range::new(last_pos, last_pos),
                     new_text: ",".to_string(),
@@ -1490,7 +1575,7 @@ impl<'a> CodeActionProvider<'a> {
         if !self.expression_and_statement_share_scope(expr_idx, stmt_idx) {
             return None;
         }
-        if self.extraction_has_tdz_violation(root, expr_idx, stmt_idx) {
+        if self.extraction_has_tdz_violation(expr_idx, stmt_idx) {
             return None;
         }
 
@@ -1499,8 +1584,7 @@ impl<'a> CodeActionProvider<'a> {
 
         // TODO: Preserve operator precedence (wrap in parentheses when needed).
         // 6. Extract the selected text (snap to node boundaries)
-        let node_start = expr_node.pos;
-        let node_end = expr_node.end;
+        let (node_start, node_end) = self.expression_text_span(expr_idx, expr_node);
         let selected_text = self.source.get(node_start as usize..node_end as usize)?;
         let initializer_text = self.format_extracted_initializer(expr_node, selected_text);
         let replacement_range = Range::new(
@@ -1578,6 +1662,59 @@ impl<'a> CodeActionProvider<'a> {
         selected_text.to_string()
     }
 
+    fn expression_text_span(&self, expr_idx: NodeIndex, expr_node: &ThinNode) -> (u32, u32) {
+        let mut start = expr_node.pos;
+        let mut end = expr_node.end;
+
+        if expr_node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            if let Some(binary) = self.arena.get_binary_expr(expr_node) {
+                start = self
+                    .arena
+                    .get(binary.left)
+                    .map(|node| node.pos)
+                    .unwrap_or(start);
+                end = self
+                    .arena
+                    .get(binary.right)
+                    .map(|node| node.end)
+                    .unwrap_or(end);
+            }
+        }
+
+        if expr_node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+            if let Some(access) = self.arena.get_access_expr(expr_node) {
+                if let Some(name_node) = self.arena.get(access.name_or_argument) {
+                    end = name_node.end;
+                }
+            }
+        }
+
+        if let Some(ext) = self.arena.get_extended(expr_idx) {
+            if let Some(parent_node) = self.arena.get(ext.parent) {
+                if parent_node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+                    let parent_start = parent_node.pos as usize;
+                    let parent_end = parent_node.end as usize;
+                    if let Some(slice) = self.source.get(parent_start..parent_end) {
+                        if let Some(open_rel) = slice.find('(') {
+                            let open_pos = parent_node.pos + open_rel as u32;
+                            if start <= open_pos {
+                                start = open_pos.saturating_add(1);
+                            }
+                        }
+                        if let Some(close_rel) = slice.rfind(')') {
+                            let close_pos = parent_node.pos + close_rel as u32;
+                            if end > close_pos {
+                                end = close_pos;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        (start, end)
+    }
+
     fn needs_parentheses_for_extraction(&self, expr_node: &ThinNode) -> bool {
         if expr_node.kind == syntax_kind_ext::BINARY_EXPRESSION {
             if let Some(binary) = self.arena.get_binary_expr(expr_node) {
@@ -1600,7 +1737,7 @@ impl<'a> CodeActionProvider<'a> {
         expr_scope == stmt_scope
     }
 
-    fn extraction_has_tdz_violation(&self, root: NodeIndex, expr_idx: NodeIndex, stmt_idx: NodeIndex) -> bool {
+    fn extraction_has_tdz_violation(&self, expr_idx: NodeIndex, stmt_idx: NodeIndex) -> bool {
         let stmt_node = match self.arena.get(stmt_idx) {
             Some(node) => node,
             None => return false,
@@ -1614,9 +1751,8 @@ impl<'a> CodeActionProvider<'a> {
         }
 
         let mut seen_symbols = FxHashSet::default();
-        let mut walker = ScopeWalker::new(self.arena, self.binder);
         for ident_idx in identifiers {
-            let Some(sym_id) = walker.resolve_node(root, ident_idx) else {
+            let Some(sym_id) = self.binder.resolve_identifier(self.arena, ident_idx) else {
                 continue;
             };
             if !seen_symbols.insert(sym_id) {
@@ -2065,6 +2201,9 @@ impl<'a> CodeActionProvider<'a> {
     fn is_extractable_expression(&self, kind: u16) -> bool {
         // Don't extract simple literals or identifiers - not useful
         !(kind == SyntaxKind::Identifier as u16
+            || kind == SyntaxKind::StringLiteral as u16
+            || kind == SyntaxKind::NumericLiteral as u16
+            || kind == SyntaxKind::BigIntLiteral as u16
             || kind == SyntaxKind::TrueKeyword as u16
             || kind == SyntaxKind::FalseKeyword as u16
             || kind == SyntaxKind::NullKeyword as u16)

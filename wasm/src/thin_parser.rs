@@ -3792,8 +3792,15 @@ impl ThinParserState {
     /// Supports multiple declarations for regular for: for (let x = 0, y = 1; ...)
     /// Single declaration for for-in/for-of: for (let x in/of ...)
     fn parse_for_variable_declaration(&mut self) -> NodeIndex {
+        use crate::parser::node_flags;
+
         let start_pos = self.token_pos();
-        let _decl_keyword = self.token();
+        let decl_keyword = self.token();
+        let flags: u16 = match decl_keyword {
+            SyntaxKind::LetKeyword => node_flags::LET as u16,
+            SyntaxKind::ConstKeyword => node_flags::CONST as u16,
+            _ => 0,
+        };
         self.next_token(); // consume var/let/const
 
         let mut declarations = Vec::new();
@@ -3850,7 +3857,7 @@ impl ThinParserState {
         let declarations_list = self.make_node_list(declarations);
         let end_pos = self.token_end();
 
-        self.arena.add_variable(
+        self.arena.add_variable_with_flags(
             syntax_kind_ext::VARIABLE_DECLARATION_LIST,
             start_pos,
             end_pos,
@@ -3858,6 +3865,7 @@ impl ThinParserState {
                 modifiers: None,
                 declarations: declarations_list,
             },
+            flags,
         )
     }
 

@@ -1,5 +1,6 @@
 use super::*;
 use serde_json::{json, Value};
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsValue;
 
 use crate::checker::types::diagnostics::diagnostic_codes::CANNOT_FIND_NAME;
@@ -368,6 +369,7 @@ fn test_print_type_sizes() {
     eprintln!("   Type is OK: already boxed, 48 bytes = 1.33 types/cache-line\n");
 }
 
+#[cfg(target_arch = "wasm32")]
 #[test]
 fn test_get_code_actions_with_context_missing_import() {
     let mut parser = ThinParser::new("b.ts".to_string(), "foo();\n".to_string());

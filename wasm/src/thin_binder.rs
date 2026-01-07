@@ -215,6 +215,17 @@ impl ThinBinderState {
         }
     }
 
+    fn sync_current_scope_to_persistent(&mut self) {
+        if self.current_scope_id.is_none() {
+            return;
+        }
+        if let Some(persistent_scope) = self.scopes.get_mut(self.current_scope_id.0 as usize) {
+            for (name, &sym_id) in self.current_scope.iter() {
+                persistent_scope.table.set(name.clone(), sym_id);
+            }
+        }
+    }
+
     /// Bind a source file using ThinNodeArena.
     pub fn bind_source_file(&mut self, arena: &ThinNodeArena, root: NodeIndex) {
         // Initialize scope chain with source file scope (legacy)
@@ -249,6 +260,8 @@ impl ThinBinderState {
                 }
             }
         }
+
+        self.sync_current_scope_to_persistent();
 
         // Store file locals
         self.file_locals = std::mem::take(&mut self.current_scope);
@@ -1039,14 +1052,7 @@ impl ThinBinderState {
         }
 
         // Copy current scope to persistent scope before popping
-        if !self.current_scope_id.is_none() {
-            if let Some(persistent_scope) = self.scopes.get_mut(self.current_scope_id.0 as usize) {
-                // Merge current_scope into persistent scope
-                for (name, &sym_id) in self.current_scope.iter() {
-                    persistent_scope.table.set(name.clone(), sym_id);
-                }
-            }
-        }
+        self.sync_current_scope_to_persistent();
 
         self.pop_scope();
         if let Some(ctx) = self.scope_chain.get(self.current_scope_idx) {
@@ -1075,9 +1081,20 @@ impl ThinBinderState {
 
     fn bind_variable_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
         if let Some(decl) = arena.get_variable_declaration(node) {
+            let mut decl_flags = node.flags as u32;
+            if (decl_flags & (node_flags::LET | node_flags::CONST)) == 0 {
+                if let Some(ext) = arena.get_extended(idx) {
+                    if let Some(parent_node) = arena.get(ext.parent) {
+                        if parent_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+                            decl_flags |= parent_node.flags as u32;
+                        }
+                    }
+                }
+            }
+            let is_block_scoped = (decl_flags & (node_flags::LET | node_flags::CONST)) != 0;
             if let Some(name) = self.get_identifier_name(arena, decl.name) {
                 // Determine if block-scoped (let/const) or function-scoped (var)
-                let flags = if (node.flags as u32 & (node_flags::LET | node_flags::CONST)) != 0 {
+                let flags = if is_block_scoped {
                     symbol_flags::BLOCK_SCOPED_VARIABLE
                 } else {
                     symbol_flags::FUNCTION_SCOPED_VARIABLE
@@ -1089,7 +1106,7 @@ impl ThinBinderState {
                 let sym_id = self.declare_symbol(name, flags, idx, is_exported);
                 self.node_symbols.insert(decl.name.0, sym_id);
             } else {
-                let flags = if (node.flags as u32 & (node_flags::LET | node_flags::CONST)) != 0 {
+                let flags = if is_block_scoped {
                     symbol_flags::BLOCK_SCOPED_VARIABLE
                 } else {
                     symbol_flags::FUNCTION_SCOPED_VARIABLE
@@ -1612,6 +1629,9 @@ impl ThinBinderState {
                         let sym_id = self.symbols.alloc(symbol_flags::ALIAS, name.to_string());
                         self.current_scope.set(name.to_string(), sym_id);
                         self.node_symbols.insert(export.export_clause.0, sym_id);
+                    } else if export.is_default_export {
+                        // export default <expression> should still bind inner locals.
+                        self.bind_node(arena, export.export_clause);
                     }
                 }
             }

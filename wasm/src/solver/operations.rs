@@ -1296,6 +1296,13 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
     /// Resolve properties on symbol primitive type.
     fn resolve_symbol_primitive_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
+        if prop_name == "toString" || prop_name == "valueOf" {
+            return PropertyAccessResult::Success {
+                type_id: TypeId::ANY,
+                from_index_signature: false,
+            };
+        }
+
         self.resolve_apparent_property(IntrinsicKind::Symbol, TypeId::SYMBOL, prop_name, prop_atom)
     }
 
