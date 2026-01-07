@@ -522,6 +522,21 @@ impl ThinBinderState {
                 self.bind_try_statement(arena, node, idx);
             }
 
+            // Labeled statement
+            k if k == syntax_kind_ext::LABELED_STATEMENT => {
+                if let Some(labeled) = arena.get_labeled_statement(node) {
+                    self.bind_node(arena, labeled.statement);
+                }
+            }
+
+            // With statement
+            k if k == syntax_kind_ext::WITH_STATEMENT => {
+                if let Some(with_stmt) = arena.get_with_statement(node) {
+                    self.bind_node(arena, with_stmt.expression);
+                    self.bind_node(arena, with_stmt.then_statement);
+                }
+            }
+
             // Import declarations
             k if k == syntax_kind_ext::IMPORT_DECLARATION => {
                 self.bind_import_declaration(arena, node, idx);
