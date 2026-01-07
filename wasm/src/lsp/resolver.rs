@@ -9,6 +9,26 @@ use crate::parser::{NodeIndex, syntax_kind_ext, node_flags};
 use crate::scanner::SyntaxKind;
 use crate::binder::{SymbolId, SymbolTable};
 use crate::thin_binder::ThinBinderState;
+use rustc_hash::FxHashMap;
+use std::collections::hash_map::Entry;
+
+#[derive(Debug, Default, Clone)]
+pub struct ScopeCacheStats {
+    pub hits: u32,
+    pub misses: u32,
+}
+
+impl ScopeCacheStats {
+    fn record_hit(&mut self) {
+        self.hits = self.hits.saturating_add(1);
+    }
+
+    fn record_miss(&mut self) {
+        self.misses = self.misses.saturating_add(1);
+    }
+}
+
+pub type ScopeCache = FxHashMap<u32, Vec<SymbolTable>>;
 
 /// A lightweight scope chain reconstructed on demand.
 ///
@@ -81,6 +101,15 @@ impl<'a> ScopeWalker<'a> {
         None
     }
 
+    fn resolve_name_in_scopes(scopes: &[SymbolTable], name: &str) -> Option<SymbolId> {
+        for scope in scopes.iter().rev() {
+            if let Some(id) = scope.get(name) {
+                return Some(id);
+            }
+        }
+        None
+    }
+
     /// Check if a node creates a new scope.
     fn node_creates_scope(&self, node_idx: NodeIndex) -> bool {
         let Some(node) = self.arena.get(node_idx) else { return false; };
@@ -134,6 +163,42 @@ impl<'a> ScopeWalker<'a> {
 
         // Otherwise, we need to walk the tree to build scope context
         self.walk_to_node(root, target, &mut Vec::new())
+    }
+
+    pub fn resolve_node_cached(
+        &mut self,
+        root: NodeIndex,
+        target: NodeIndex,
+        cache: &mut ScopeCache,
+        mut stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<SymbolId> {
+        if let Some(&sym_id) = self.binder.node_symbols.get(&target.0) {
+            return Some(sym_id);
+        }
+
+        let node = self.arena.get(target)?;
+        if node.kind == SyntaxKind::PrivateIdentifier as u16 {
+            return self.binder.resolve_identifier(self.arena, target);
+        }
+        if node.kind != SyntaxKind::Identifier as u16 {
+            return None;
+        }
+
+        let name = self.arena.get_identifier_text(target)?;
+        if let Some(scopes) = cache.get(&target.0) {
+            if let Some(stats) = stats.as_deref_mut() {
+                stats.record_hit();
+            }
+            return Self::resolve_name_in_scopes(scopes, name);
+        }
+
+        let scopes = self.get_scope_chain(root, target);
+        let symbol_id = Self::resolve_name_in_scopes(&scopes, name);
+        cache.insert(target.0, scopes);
+        if let Some(stats) = stats.as_deref_mut() {
+            stats.record_miss();
+        }
+        symbol_id
     }
 
     /// Iterate over direct children of a node using proper typed accessors.
@@ -1238,6 +1303,30 @@ impl<'a> ScopeWalker<'a> {
         let mut found_stack = None;
         self.walk_for_scope(root, target, &mut found_stack);
         found_stack.unwrap_or_else(|| self.scope_stack.clone())
+    }
+
+    pub fn get_scope_chain_cached<'b>(
+        &'b mut self,
+        root: NodeIndex,
+        target: NodeIndex,
+        cache: &'b mut ScopeCache,
+        mut stats: Option<&mut ScopeCacheStats>,
+    ) -> &'b [SymbolTable] {
+        match cache.entry(target.0) {
+            Entry::Occupied(entry) => {
+                if let Some(stats) = stats.as_deref_mut() {
+                    stats.record_hit();
+                }
+                entry.into_mut().as_slice()
+            }
+            Entry::Vacant(entry) => {
+                let scopes = self.get_scope_chain(root, target);
+                if let Some(stats) = stats.as_deref_mut() {
+                    stats.record_miss();
+                }
+                entry.insert(scopes).as_slice()
+            }
+        }
     }
 
     /// Walk the AST to find a target node and capture its scope stack.

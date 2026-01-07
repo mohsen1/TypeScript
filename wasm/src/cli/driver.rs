@@ -2,24 +2,28 @@ use anyhow::{bail, Context, Result};
 use rayon::prelude::*;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use crate::binder::SymbolTable;
+use crate::checker::TypeCache;
 use crate::checker::types::diagnostics::{Diagnostic, DiagnosticCategory};
 use crate::cli::args::CliArgs;
 use crate::cli::config::{
-    load_tsconfig, resolve_compiler_options, JsxEmit, PathMapping, ResolvedCompilerOptions, TsConfig,
+    load_tsconfig, resolve_compiler_options, JsxEmit, ModuleResolutionKind, PathMapping,
+    ResolvedCompilerOptions, TsConfig,
 };
 use crate::cli::fs::{discover_ts_files, is_ts_file, FileDiscoveryOptions};
 use crate::declaration_emitter::DeclarationEmitter;
-use crate::parallel::{self, BoundFile, MergedProgram};
+use crate::parallel::{self, BindResult, BoundFile, MergedProgram};
 use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
 use crate::parser::NodeIndex;
 use crate::thin_parser::ThinParserState;
 use crate::thin_parser::ParseDiagnostic;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
-use crate::thin_emitter::ThinPrinter;
+use crate::thin_emitter::{ModuleKind, ThinPrinter};
+use rustc_hash::FxHasher;
 
 #[derive(Debug, Clone)]
 pub struct CompilationResult {
@@ -27,7 +31,107 @@ pub struct CompilationResult {
     pub emitted_files: Vec<PathBuf>,
 }
 
+#[derive(Default)]
+pub(crate) struct CompilationCache {
+    type_caches: HashMap<PathBuf, TypeCache>,
+    bind_cache: HashMap<PathBuf, BindCacheEntry>,
+    dependencies: HashMap<PathBuf, HashSet<PathBuf>>,
+    reverse_dependencies: HashMap<PathBuf, HashSet<PathBuf>>,
+}
+
+struct BindCacheEntry {
+    hash: u64,
+    bind_result: BindResult,
+}
+
+impl CompilationCache {
+    pub(crate) fn invalidate_paths_with_dependents<I>(&mut self, paths: I)
+    where
+        I: IntoIterator<Item = PathBuf>,
+    {
+        let affected = self.collect_dependents(paths);
+        for path in affected {
+            self.type_caches.remove(&path);
+            self.bind_cache.remove(&path);
+        }
+    }
+
+    pub(crate) fn clear(&mut self) {
+        self.type_caches.clear();
+        self.bind_cache.clear();
+        self.dependencies.clear();
+        self.reverse_dependencies.clear();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.type_caches.len()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn bind_len(&self) -> usize {
+        self.bind_cache.len()
+    }
+
+    pub(crate) fn update_dependencies(&mut self, dependencies: HashMap<PathBuf, HashSet<PathBuf>>) {
+        let mut reverse = HashMap::new();
+        for (source, deps) in &dependencies {
+            for dep in deps {
+                reverse
+                    .entry(dep.clone())
+                    .or_insert_with(HashSet::new)
+                    .insert(source.clone());
+            }
+        }
+        self.dependencies = dependencies;
+        self.reverse_dependencies = reverse;
+    }
+
+    fn collect_dependents<I>(&self, paths: I) -> HashSet<PathBuf>
+    where
+        I: IntoIterator<Item = PathBuf>,
+    {
+        let mut pending = VecDeque::new();
+        let mut affected = HashSet::new();
+
+        for path in paths {
+            if affected.insert(path.clone()) {
+                pending.push_back(path);
+            }
+        }
+
+        while let Some(path) = pending.pop_front() {
+            let Some(dependents) = self.reverse_dependencies.get(&path) else {
+                continue;
+            };
+            for dependent in dependents {
+                if affected.insert(dependent.clone()) {
+                    pending.push_back(dependent.clone());
+                }
+            }
+        }
+
+        affected
+    }
+}
+
 pub fn compile(args: &CliArgs, cwd: &Path) -> Result<CompilationResult> {
+    compile_inner(args, cwd, None)
+}
+
+pub(crate) fn compile_with_cache(
+    args: &CliArgs,
+    cwd: &Path,
+    cache: &mut CompilationCache,
+) -> Result<CompilationResult> {
+    compile_inner(args, cwd, Some(cache))
+}
+
+fn compile_inner(
+    args: &CliArgs,
+    cwd: &Path,
+    mut cache: Option<&mut CompilationCache>,
+) -> Result<CompilationResult> {
     let cwd = canonicalize_or_owned(cwd);
     let tsconfig_path = resolve_tsconfig_path(&cwd, args.project.as_deref())?;
     let config = load_config(tsconfig_path.as_deref())?;
@@ -61,14 +165,24 @@ pub fn compile(args: &CliArgs, cwd: &Path) -> Result<CompilationResult> {
         bail!("no input files found");
     }
 
-    let sources = read_source_files(&file_paths, &base_dir, &resolved)?;
-    let compile_inputs: Vec<(String, String)> = sources
-        .into_iter()
-        .map(|source| (source.path.to_string_lossy().into_owned(), source.text))
-        .collect();
+    let SourceReadResult {
+        sources,
+        dependencies,
+    } = read_source_files(&file_paths, &base_dir, &resolved)?;
+    if let Some(cache) = cache.as_deref_mut() {
+        cache.update_dependencies(dependencies);
+    }
 
-    let program = parallel::compile_files(compile_inputs);
-    let mut diagnostics = collect_diagnostics(&program);
+    let program = if let Some(cache) = cache.as_deref_mut() {
+        build_program_with_cache(sources, cache)
+    } else {
+        let compile_inputs: Vec<(String, String)> = sources
+            .into_iter()
+            .map(|source| (source.path.to_string_lossy().into_owned(), source.text))
+            .collect();
+        parallel::compile_files(compile_inputs)
+    };
+    let mut diagnostics = collect_diagnostics(&program, cache);
     diagnostics.sort_by(|left, right| {
         left.file
             .cmp(&right.file)
@@ -101,16 +215,163 @@ pub fn compile(args: &CliArgs, cwd: &Path) -> Result<CompilationResult> {
     })
 }
 
+struct SourceMeta {
+    path: PathBuf,
+    file_name: String,
+    hash: u64,
+    cached_ok: bool,
+}
+
+fn build_program_with_cache(
+    sources: Vec<SourceFile>,
+    cache: &mut CompilationCache,
+) -> MergedProgram {
+    let mut meta = Vec::with_capacity(sources.len());
+    let mut to_parse = Vec::new();
+
+    for source in sources {
+        let hash = hash_text(&source.text);
+        let file_name = source.path.to_string_lossy().into_owned();
+        let cached_ok = cache
+            .bind_cache
+            .get(&source.path)
+            .map(|entry| entry.hash == hash)
+            .unwrap_or(false);
+
+        if !cached_ok {
+            to_parse.push((file_name.clone(), source.text));
+        }
+
+        meta.push(SourceMeta {
+            path: source.path,
+            file_name,
+            hash,
+            cached_ok,
+        });
+    }
+
+    let parsed_results = if to_parse.is_empty() {
+        Vec::new()
+    } else {
+        parallel::parse_and_bind_parallel(to_parse)
+    };
+
+    let mut parsed_map: HashMap<String, BindResult> = parsed_results
+        .into_iter()
+        .map(|result| (result.file_name.clone(), result))
+        .collect();
+
+    for entry in &meta {
+        if entry.cached_ok {
+            continue;
+        }
+
+        let result = parsed_map
+            .remove(&entry.file_name)
+            .unwrap_or_else(|| {
+                panic!("missing parse result for {}", entry.file_name);
+            });
+        cache.bind_cache.insert(
+            entry.path.clone(),
+            BindCacheEntry {
+                hash: entry.hash,
+                bind_result: result,
+            },
+        );
+    }
+
+    let mut current_paths = HashSet::with_capacity(meta.len());
+    for entry in &meta {
+        current_paths.insert(entry.path.clone());
+    }
+    cache
+        .bind_cache
+        .retain(|path, _| current_paths.contains(path));
+
+    let mut ordered = Vec::with_capacity(meta.len());
+    for entry in &meta {
+        let Some(cached) = cache.bind_cache.get(&entry.path) else {
+            continue;
+        };
+        ordered.push(&cached.bind_result);
+    }
+
+    parallel::merge_bind_results_ref(&ordered)
+}
+
+fn hash_text(text: &str) -> u64 {
+    let mut hasher = FxHasher::default();
+    text.hash(&mut hasher);
+    hasher.finish()
+}
+
 #[derive(Debug, Clone)]
 struct SourceFile {
     path: PathBuf,
     text: String,
 }
 
+struct SourceReadResult {
+    sources: Vec<SourceFile>,
+    dependencies: HashMap<PathBuf, HashSet<PathBuf>>,
+}
+
 #[derive(Debug, Clone)]
 struct OutputFile {
     path: PathBuf,
     contents: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PackageType {
+    Module,
+    CommonJs,
+}
+
+#[derive(Default)]
+struct ModuleResolutionCache {
+    package_type_by_dir: HashMap<PathBuf, Option<PackageType>>,
+}
+
+impl ModuleResolutionCache {
+    fn package_type_for_dir(&mut self, dir: &Path, base_dir: &Path) -> Option<PackageType> {
+        let mut current = dir;
+        let mut visited = Vec::new();
+
+        loop {
+            if let Some(value) = self.package_type_by_dir.get(current).copied() {
+                for path in visited {
+                    self.package_type_by_dir.insert(path, value);
+                }
+                return value;
+            }
+
+            visited.push(current.to_path_buf());
+
+            if let Some(package_json) = read_package_json(&current.join("package.json")) {
+                let value = package_type_from_json(Some(&package_json));
+                for path in visited {
+                    self.package_type_by_dir.insert(path, value);
+                }
+                return value;
+            }
+
+            if current == base_dir {
+                for path in visited {
+                    self.package_type_by_dir.insert(path, None);
+                }
+                return None;
+            }
+
+            let Some(parent) = current.parent() else {
+                for path in visited {
+                    self.package_type_by_dir.insert(path, None);
+                }
+                return None;
+            };
+            current = parent;
+        }
+    }
 }
 
 pub(crate) fn find_tsconfig(cwd: &Path) -> Option<PathBuf> {
@@ -194,10 +455,12 @@ fn read_source_files(
     paths: &[PathBuf],
     base_dir: &Path,
     options: &ResolvedCompilerOptions,
-) -> Result<Vec<SourceFile>> {
+) -> Result<SourceReadResult> {
     let mut sources = HashMap::new();
+    let mut dependencies: HashMap<PathBuf, HashSet<PathBuf>> = HashMap::new();
     let mut seen = HashSet::new();
     let mut pending = VecDeque::new();
+    let mut resolution_cache = ModuleResolutionCache::default();
 
     for path in paths {
         let canonical = canonicalize_or_owned(path);
@@ -211,10 +474,14 @@ fn read_source_files(
             .with_context(|| format!("failed to read {}", path.display()))?;
         let specifiers = collect_module_specifiers_from_text(&path, &text);
         sources.insert(path.clone(), text);
+        let entry = dependencies.entry(path.clone()).or_insert_with(HashSet::new);
 
         for specifier in specifiers {
-            if let Some(resolved) = resolve_module_specifier(&path, &specifier, options, base_dir) {
+            if let Some(resolved) =
+                resolve_module_specifier(&path, &specifier, options, base_dir, &mut resolution_cache)
+            {
                 let canonical = canonicalize_or_owned(&resolved);
+                entry.insert(canonical.clone());
                 if seen.insert(canonical.clone()) {
                     pending.push_back(canonical);
                 }
@@ -227,7 +494,10 @@ fn read_source_files(
         .map(|(path, text)| SourceFile { path, text })
         .collect();
     list.sort_by(|left, right| left.path.to_string_lossy().cmp(&right.path.to_string_lossy()));
-    Ok(list)
+    Ok(SourceReadResult {
+        sources: list,
+        dependencies,
+    })
 }
 
 fn collect_module_specifiers_from_text(path: &Path, text: &str) -> Vec<String> {
@@ -275,6 +545,7 @@ fn resolve_module_specifier(
     module_specifier: &str,
     options: &ResolvedCompilerOptions,
     base_dir: &Path,
+    resolution_cache: &mut ModuleResolutionCache,
 ) -> Option<PathBuf> {
     let specifier = module_specifier.trim();
     if specifier.is_empty() {
@@ -283,14 +554,26 @@ fn resolve_module_specifier(
     let specifier = specifier.replace('\\', "/");
     let mut candidates = Vec::new();
 
+    let resolution = options.effective_module_resolution();
+    let from_dir = from_file.parent().unwrap_or(base_dir);
+    let package_type = match resolution {
+        ModuleResolutionKind::Node16 | ModuleResolutionKind::NodeNext => {
+            resolution_cache.package_type_for_dir(from_dir, base_dir)
+        }
+        _ => None,
+    };
+
     let mut allow_node_modules = false;
 
     if Path::new(&specifier).is_absolute() {
-        candidates.extend(expand_module_path_candidates(&PathBuf::from(specifier.as_str())));
+        candidates.extend(expand_module_path_candidates(
+            &PathBuf::from(specifier.as_str()),
+            options,
+            package_type,
+        ));
     } else if specifier.starts_with('.') {
-        let from_dir = from_file.parent().unwrap_or(base_dir);
         let joined = from_dir.join(&specifier);
-        candidates.extend(expand_module_path_candidates(&joined));
+        candidates.extend(expand_module_path_candidates(&joined, options, package_type));
     } else if let Some(base_url) = options.base_url.as_ref() {
         allow_node_modules = true;
         if let Some(paths) = options.paths.as_ref() {
@@ -302,13 +585,17 @@ fn resolve_module_specifier(
                     } else {
                         base_url.join(substituted)
                     };
-                    candidates.extend(expand_module_path_candidates(&path));
+                    candidates.extend(expand_module_path_candidates(&path, options, package_type));
                 }
             }
         }
 
         if candidates.is_empty() {
-            candidates.extend(expand_module_path_candidates(&base_url.join(&specifier)));
+            candidates.extend(expand_module_path_candidates(
+                &base_url.join(&specifier),
+                options,
+                package_type,
+            ));
         }
     } else {
         allow_node_modules = true;
@@ -321,7 +608,7 @@ fn resolve_module_specifier(
     }
 
     if allow_node_modules {
-        return resolve_node_module_specifier(from_file, &specifier, base_dir);
+        return resolve_node_module_specifier(from_file, &specifier, base_dir, options);
     }
 
     None
@@ -371,20 +658,60 @@ fn substitute_path_target(target: &str, wildcard: &str) -> String {
     }
 }
 
-fn expand_module_path_candidates(path: &Path) -> Vec<PathBuf> {
+fn expand_module_path_candidates(
+    path: &Path,
+    options: &ResolvedCompilerOptions,
+    package_type: Option<PackageType>,
+) -> Vec<PathBuf> {
     let base = normalize_path(path);
-    if base.extension().is_some() {
+    if let Some(extension) = base.extension().and_then(|ext| ext.to_str()) {
+        let resolution = options.effective_module_resolution();
+        if matches!(
+            resolution,
+            ModuleResolutionKind::Node16 | ModuleResolutionKind::NodeNext
+        ) {
+            if let Some(rewritten) = node16_extension_substitution(&base, extension) {
+                return rewritten;
+            }
+        }
         return vec![base];
     }
 
+    let extensions = extension_candidates_for_resolution(options, package_type);
     let mut candidates = Vec::new();
-    for ext in TS_EXTENSION_CANDIDATES {
+    for ext in extensions {
         candidates.push(base.with_extension(ext));
     }
-    for ext in TS_EXTENSION_CANDIDATES {
+    for ext in extensions {
         candidates.push(base.join("index").with_extension(ext));
     }
     candidates
+}
+
+fn node16_extension_substitution(path: &Path, extension: &str) -> Option<Vec<PathBuf>> {
+    let replacements: &[&str] = match extension {
+        "js" => &["ts", "tsx", "d.ts"],
+        "jsx" => &["tsx", "d.ts"],
+        "mjs" => &["mts", "d.mts"],
+        "cjs" => &["cts", "d.cts"],
+        _ => return None,
+    };
+
+    Some(replacements.iter().map(|ext| path.with_extension(ext)).collect())
+}
+
+fn extension_candidates_for_resolution(
+    options: &ResolvedCompilerOptions,
+    package_type: Option<PackageType>,
+) -> &'static [&'static str] {
+    match options.effective_module_resolution() {
+        ModuleResolutionKind::Node16 | ModuleResolutionKind::NodeNext => match package_type {
+            Some(PackageType::Module) => &NODE16_MODULE_EXTENSION_CANDIDATES,
+            Some(PackageType::CommonJs) => &NODE16_COMMONJS_EXTENSION_CANDIDATES,
+            None => &TS_EXTENSION_CANDIDATES,
+        },
+        _ => &TS_EXTENSION_CANDIDATES,
+    }
 }
 
 fn normalize_path(path: &Path) -> PathBuf {
@@ -408,6 +735,12 @@ fn normalize_path(path: &Path) -> PathBuf {
 }
 
 const TS_EXTENSION_CANDIDATES: [&str; 7] = ["ts", "tsx", "d.ts", "mts", "cts", "d.mts", "d.cts"];
+const NODE16_MODULE_EXTENSION_CANDIDATES: [&str; 7] = [
+    "mts", "d.mts", "ts", "tsx", "d.ts", "cts", "d.cts",
+];
+const NODE16_COMMONJS_EXTENSION_CANDIDATES: [&str; 7] = [
+    "cts", "d.cts", "ts", "tsx", "d.ts", "mts", "d.mts",
+];
 
 #[derive(Debug, Deserialize)]
 struct PackageJson {
@@ -419,26 +752,83 @@ struct PackageJson {
     main: Option<String>,
     #[serde(default)]
     module: Option<String>,
+    #[serde(default, rename = "type")]
+    package_type: Option<String>,
     #[serde(default)]
     exports: Option<serde_json::Value>,
+}
+
+fn export_conditions(options: &ResolvedCompilerOptions) -> Vec<&'static str> {
+    let resolution = options.effective_module_resolution();
+    let mut conditions = Vec::new();
+    push_condition(&mut conditions, "types");
+
+    match resolution {
+        ModuleResolutionKind::Bundler => push_condition(&mut conditions, "browser"),
+        ModuleResolutionKind::Node | ModuleResolutionKind::Node16 | ModuleResolutionKind::NodeNext => {
+            push_condition(&mut conditions, "node");
+        }
+    }
+
+    match options.printer.module {
+        ModuleKind::CommonJS | ModuleKind::AMD | ModuleKind::UMD | ModuleKind::System => {
+            push_condition(&mut conditions, "require");
+        }
+        ModuleKind::ES2015
+        | ModuleKind::ES2020
+        | ModuleKind::ES2022
+        | ModuleKind::ESNext
+        | ModuleKind::Node16
+        | ModuleKind::NodeNext => {
+            push_condition(&mut conditions, "import");
+        }
+        _ => {}
+    }
+
+    push_condition(&mut conditions, "default");
+    match resolution {
+        ModuleResolutionKind::Bundler => {
+            push_condition(&mut conditions, "import");
+            push_condition(&mut conditions, "require");
+            push_condition(&mut conditions, "node");
+        }
+        ModuleResolutionKind::Node | ModuleResolutionKind::Node16 | ModuleResolutionKind::NodeNext => {
+            push_condition(&mut conditions, "import");
+            push_condition(&mut conditions, "require");
+            push_condition(&mut conditions, "browser");
+        }
+    }
+
+    conditions
+}
+
+fn push_condition(conditions: &mut Vec<&'static str>, condition: &'static str) {
+    if !conditions.iter().any(|&value| value == condition) {
+        conditions.push(condition);
+    }
 }
 
 fn resolve_node_module_specifier(
     from_file: &Path,
     module_specifier: &str,
     base_dir: &Path,
+    options: &ResolvedCompilerOptions,
 ) -> Option<PathBuf> {
     let (package_name, subpath) = split_package_specifier(module_specifier)?;
+    let conditions = export_conditions(options);
     let mut current = from_file.parent().unwrap_or(base_dir);
 
     loop {
         let package_root = current.join("node_modules").join(&package_name);
         if package_root.is_dir() {
-            let resolved = if let Some(subpath) = subpath.as_deref() {
-                resolve_package_entry(&package_root, subpath)
-            } else {
-                resolve_package_root(&package_root)
-            };
+            let package_json = read_package_json(&package_root.join("package.json"));
+            let resolved = resolve_package_specifier(
+                &package_root,
+                subpath.as_deref(),
+                package_json.as_ref(),
+                &conditions,
+                options,
+            );
             if resolved.is_some() {
                 return resolved;
             }
@@ -454,6 +844,37 @@ fn resolve_node_module_specifier(
     }
 
     None
+}
+
+fn resolve_package_specifier(
+    package_root: &Path,
+    subpath: Option<&str>,
+    package_json: Option<&PackageJson>,
+    conditions: &[&str],
+    options: &ResolvedCompilerOptions,
+) -> Option<PathBuf> {
+    let package_type = package_type_from_json(package_json);
+    if let Some(package_json) = package_json {
+        if let Some(exports) = package_json.exports.as_ref() {
+            let subpath_key = match subpath {
+                Some(value) => format!("./{}", value),
+                None => ".".to_string(),
+            };
+            if let Some(target) = resolve_exports_subpath(exports, &subpath_key, conditions) {
+                if let Some(resolved) =
+                    resolve_package_entry(package_root, &target, options, package_type)
+                {
+                    return Some(resolved);
+                }
+            }
+        }
+    }
+
+    if let Some(subpath) = subpath {
+        return resolve_package_entry(package_root, subpath, options, package_type);
+    }
+
+    resolve_package_root(package_root, package_json, options, package_type)
 }
 
 fn split_package_specifier(specifier: &str) -> Option<(String, Option<String>)> {
@@ -473,12 +894,15 @@ fn split_package_specifier(specifier: &str) -> Option<(String, Option<String>)> 
     Some((first.to_string(), subpath))
 }
 
-fn resolve_package_root(package_root: &Path) -> Option<PathBuf> {
-    let package_json_path = package_root.join("package.json");
-    let package_json = read_package_json(&package_json_path);
+fn resolve_package_root(
+    package_root: &Path,
+    package_json: Option<&PackageJson>,
+    options: &ResolvedCompilerOptions,
+    package_type: Option<PackageType>,
+) -> Option<PathBuf> {
     let mut candidates = Vec::new();
 
-    if let Some(package_json) = package_json.as_ref() {
+    if let Some(package_json) = package_json {
         candidates = collect_package_entry_candidates(package_json);
     }
 
@@ -487,7 +911,9 @@ fn resolve_package_root(package_root: &Path) -> Option<PathBuf> {
     }
 
     for entry in candidates {
-        if let Some(resolved) = resolve_package_entry(package_root, &entry) {
+        if let Some(resolved) =
+            resolve_package_entry(package_root, &entry, options, package_type)
+        {
             return Some(resolved);
         }
     }
@@ -495,7 +921,12 @@ fn resolve_package_root(package_root: &Path) -> Option<PathBuf> {
     None
 }
 
-fn resolve_package_entry(package_root: &Path, entry: &str) -> Option<PathBuf> {
+fn resolve_package_entry(
+    package_root: &Path,
+    entry: &str,
+    options: &ResolvedCompilerOptions,
+    package_type: Option<PackageType>,
+) -> Option<PathBuf> {
     let entry = entry.trim();
     if entry.is_empty() {
         return None;
@@ -507,13 +938,26 @@ fn resolve_package_entry(package_root: &Path, entry: &str) -> Option<PathBuf> {
         package_root.join(entry)
     };
 
-    for candidate in expand_module_path_candidates(&path) {
+    for candidate in expand_module_path_candidates(&path, options, package_type) {
         if candidate.is_file() && is_ts_file(&candidate) {
             return Some(canonicalize_or_owned(&candidate));
         }
     }
 
     None
+}
+
+fn package_type_from_json(package_json: Option<&PackageJson>) -> Option<PackageType> {
+    let Some(package_json) = package_json else {
+        return None;
+    };
+
+    match package_json.package_type.as_deref() {
+        Some("module") => Some(PackageType::Module),
+        Some("commonjs") => Some(PackageType::CommonJs),
+        Some(_) => None,
+        None => Some(PackageType::CommonJs),
+    }
 }
 
 fn read_package_json(path: &Path) -> Option<PackageJson> {
@@ -536,14 +980,6 @@ fn collect_package_entry_candidates(package_json: &PackageJson) -> Vec<String> {
         }
     }
 
-    if let Some(exports) = package_json.exports.as_ref() {
-        if let Some(entry) = extract_exports_path(exports) {
-            if seen.insert(entry.clone()) {
-                candidates.push(entry);
-            }
-        }
-    }
-
     for value in [
         package_json.module.as_ref(),
         package_json.main.as_ref(),
@@ -558,45 +994,173 @@ fn collect_package_entry_candidates(package_json: &PackageJson) -> Vec<String> {
     candidates
 }
 
-fn extract_exports_path(exports: &serde_json::Value) -> Option<String> {
+fn resolve_exports_subpath(
+    exports: &serde_json::Value,
+    subpath_key: &str,
+    conditions: &[&str],
+) -> Option<String> {
     match exports {
-        serde_json::Value::String(value) => Some(value.clone()),
+        serde_json::Value::String(value) => {
+            if subpath_key == "." {
+                Some(value.clone())
+            } else {
+                None
+            }
+        }
+        serde_json::Value::Array(list) => {
+            for entry in list {
+                if let Some(resolved) = resolve_exports_subpath(entry, subpath_key, conditions) {
+                    return Some(resolved);
+                }
+            }
+            None
+        }
         serde_json::Value::Object(map) => {
-            if let Some(entry) = map.get(".") {
-                if let Some(path) = extract_exports_path(entry) {
-                    return Some(path);
+            let has_subpath_keys = map.keys().any(|key| key.starts_with('.'));
+            if has_subpath_keys {
+                if let Some(value) = map.get(subpath_key) {
+                    if let Some(target) = resolve_exports_target(value, conditions) {
+                        return Some(target);
+                    }
+                }
+
+                let mut best_match: Option<(usize, String, &serde_json::Value)> = None;
+                for (key, value) in map {
+                    let Some(wildcard) = match_exports_subpath(key, subpath_key) else {
+                        continue;
+                    };
+                    let specificity = key.len();
+                    let is_better = match &best_match {
+                        None => true,
+                        Some((best_len, _, _)) => specificity > *best_len,
+                    };
+                    if is_better {
+                        best_match = Some((specificity, wildcard, value));
+                    }
+                }
+
+                if let Some((_, wildcard, value)) = best_match {
+                    if let Some(target) = resolve_exports_target(value, conditions) {
+                        return Some(apply_exports_subpath(&target, &wildcard));
+                    }
+                }
+
+                None
+            } else if subpath_key == "." {
+                resolve_exports_target(exports, conditions)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn resolve_exports_target(
+    target: &serde_json::Value,
+    conditions: &[&str],
+) -> Option<String> {
+    match target {
+        serde_json::Value::String(value) => Some(value.clone()),
+        serde_json::Value::Array(list) => {
+            for entry in list {
+                if let Some(resolved) = resolve_exports_target(entry, conditions) {
+                    return Some(resolved);
                 }
             }
-
-            for key in ["types", "default", "import", "require"] {
-                if let Some(value) = map.get(key).and_then(|value| value.as_str()) {
-                    return Some(value.to_string());
+            None
+        }
+        serde_json::Value::Object(map) => {
+            for condition in conditions {
+                if let Some(value) = map.get(*condition) {
+                    if let Some(resolved) = resolve_exports_target(value, conditions) {
+                        return Some(resolved);
+                    }
                 }
             }
-
             None
         }
         _ => None,
     }
 }
 
-fn collect_diagnostics(program: &MergedProgram) -> Vec<Diagnostic> {
+fn match_exports_subpath(pattern: &str, subpath_key: &str) -> Option<String> {
+    if !pattern.contains('*') {
+        return None;
+    }
+    let pattern = pattern.strip_prefix("./")?;
+    let subpath = subpath_key.strip_prefix("./")?;
+
+    let star = pattern.find('*')?;
+    let (prefix, suffix) = pattern.split_at(star);
+    let suffix = &suffix[1..];
+
+    if !subpath.starts_with(prefix) || !subpath.ends_with(suffix) {
+        return None;
+    }
+
+    let start = prefix.len();
+    let end = subpath.len().saturating_sub(suffix.len());
+    if end < start {
+        return None;
+    }
+
+    Some(subpath[start..end].to_string())
+}
+
+fn apply_exports_subpath(target: &str, wildcard: &str) -> String {
+    if target.contains('*') {
+        target.replace('*', wildcard)
+    } else {
+        target.to_string()
+    }
+}
+
+fn collect_diagnostics(
+    program: &MergedProgram,
+    cache: Option<&mut CompilationCache>,
+) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
+    let mut used_paths = HashSet::new();
+    let mut cache = cache;
 
     for (file_idx, file) in program.files.iter().enumerate() {
+        let file_path = PathBuf::from(&file.file_name);
+        used_paths.insert(file_path.clone());
         for parse_diagnostic in &file.parse_diagnostics {
             diagnostics.push(parse_diagnostic_to_checker(&file.file_name, parse_diagnostic));
         }
 
         let binder = create_binder_from_bound_file(file, program, file_idx);
-        let mut checker = ThinCheckerState::new(
-            &file.arena,
-            &binder,
-            &program.type_interner,
-            file.file_name.clone(),
-        );
+        let cached = cache
+            .as_deref_mut()
+            .and_then(|cache| cache.type_caches.remove(&file_path));
+        let mut checker = if let Some(cached) = cached {
+            ThinCheckerState::with_cache(
+                &file.arena,
+                &binder,
+                &program.type_interner,
+                file.file_name.clone(),
+                cached,
+            )
+        } else {
+            ThinCheckerState::new(
+                &file.arena,
+                &binder,
+                &program.type_interner,
+                file.file_name.clone(),
+            )
+        };
         checker.check_source_file(file.source_file);
         diagnostics.extend(std::mem::take(&mut checker.ctx.diagnostics));
+
+        if let Some(cache) = cache.as_deref_mut() {
+            cache.type_caches.insert(file_path, checker.extract_cache());
+        }
+    }
+
+    if let Some(cache) = cache {
+        cache.type_caches.retain(|path, _| used_paths.contains(path));
     }
 
     diagnostics

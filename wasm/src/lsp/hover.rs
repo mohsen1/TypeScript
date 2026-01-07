@@ -8,7 +8,7 @@ use crate::thin_binder::ThinBinderState;
 use crate::solver::TypeInterner;
 use crate::lsp::position::{Position, Range, LineMap};
 use crate::lsp::utils::find_node_at_offset;
-use crate::lsp::resolver::ScopeWalker;
+use crate::lsp::resolver::{ScopeCache, ScopeCacheStats, ScopeWalker};
 use crate::thin_checker::ThinCheckerState;
 use crate::comments::{get_comment_ranges, get_leading_comments, get_jsdoc_content, is_jsdoc_comment, get_leading_comments_from_cache};
 
@@ -63,6 +63,28 @@ impl<'a> HoverProvider<'a> {
         position: Position,
         type_cache: &mut Option<crate::checker::TypeCache>,
     ) -> Option<HoverInfo> {
+        self.get_hover_internal(root, position, type_cache, None, None)
+    }
+
+    pub fn get_hover_with_scope_cache(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        type_cache: &mut Option<crate::checker::TypeCache>,
+        scope_cache: &mut ScopeCache,
+        scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<HoverInfo> {
+        self.get_hover_internal(root, position, type_cache, Some(scope_cache), scope_stats)
+    }
+
+    fn get_hover_internal(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        type_cache: &mut Option<crate::checker::TypeCache>,
+        scope_cache: Option<&mut ScopeCache>,
+        mut scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<HoverInfo> {
         // 1. Find node at position
         let offset = self.line_map.position_to_offset(position, self.source_text)?;
         let node_idx = find_node_at_offset(self.arena, offset);
@@ -74,7 +96,11 @@ impl<'a> HoverProvider<'a> {
         // 2. Resolve symbol using ScopeWalker
         // We use ScopeWalker to handle local scopes correctly
         let mut walker = ScopeWalker::new(self.arena, self.binder);
-        let symbol_id = walker.resolve_node(root, node_idx)?;
+        let symbol_id = if let Some(scope_cache) = scope_cache {
+            walker.resolve_node_cached(root, node_idx, scope_cache, scope_stats.as_deref_mut())?
+        } else {
+            walker.resolve_node(root, node_idx)?
+        };
         let symbol = self.binder.symbols.get(symbol_id)?;
 
         // 3. Compute Type Information
@@ -136,8 +162,8 @@ impl<'a> HoverProvider<'a> {
 
         // Calculate range for the hovered identifier
         let node = self.arena.get(node_idx)?;
-            let start = self.line_map.offset_to_position(node.pos, self.source_text);
-            let end = self.line_map.offset_to_position(node.end, self.source_text);
+        let start = self.line_map.offset_to_position(node.pos, self.source_text);
+        let end = self.line_map.offset_to_position(node.end, self.source_text);
 
         Some(HoverInfo {
             contents,

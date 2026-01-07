@@ -45,6 +45,7 @@ use crate::scanner::SyntaxKind;
 use crate::transform_context::{ModuleFormat, TransformContext, TransformDirective};
 use crate::thin_emitter::ModuleKind;
 use crate::transforms::arrow_es5::contains_this_reference;
+use crate::transforms::private_fields_es5::is_private_identifier;
 
 /// Lowering pass - Phase 1 of emission
 ///
@@ -74,6 +75,7 @@ impl<'a> LoweringPass<'a> {
         self.init_module_state(source_file);
         self.visit(source_file);
         self.maybe_wrap_module(source_file);
+        self.transforms.mark_helpers_populated();
         self.transforms
     }
 
@@ -203,6 +205,18 @@ impl<'a> LoweringPass<'a> {
             }
             k if k == syntax_kind_ext::METHOD_DECLARATION => {
                 if let Some(method) = self.arena.get_method_decl(node) {
+                    if self.ctx.target_es5 {
+                        if let Some(mods) = &method.modifiers {
+                            if mods.nodes.iter().any(|&mod_idx| {
+                                self.arena
+                                    .get(mod_idx)
+                                    .map(|n| n.kind == SyntaxKind::AsyncKeyword as u16)
+                                    .unwrap_or(false)
+                            }) {
+                                self.mark_async_helpers();
+                            }
+                        }
+                    }
                     if let Some(mods) = &method.modifiers {
                         for &mod_idx in &mods.nodes {
                             self.visit(mod_idx);
@@ -267,6 +281,8 @@ impl<'a> LoweringPass<'a> {
                             idx,
                             TransformDirective::ES5ClassExpression { class_node: idx },
                         );
+                        let heritage = self.get_extends_heritage(&class_data.heritage_clauses);
+                        self.mark_class_helpers(idx, heritage);
                     }
                     if let Some(mods) = &class_data.modifiers {
                         for &mod_idx in &mods.nodes {
@@ -295,6 +311,20 @@ impl<'a> LoweringPass<'a> {
                 || k == syntax_kind_ext::ARRAY_BINDING_PATTERN =>
             {
                 if let Some(pattern) = self.arena.get_binding_pattern(node) {
+                    if self.ctx.target_es5
+                        && node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                        && pattern.elements.nodes.iter().any(|&elem_idx| {
+                            let Some(elem_node) = self.arena.get(elem_idx) else {
+                                return false;
+                            };
+                            self.arena
+                                .get_binding_element(elem_node)
+                                .map(|elem| elem.dot_dot_dot_token)
+                                .unwrap_or(false)
+                        })
+                    {
+                        self.transforms.helpers_mut().rest = true;
+                    }
                     for &elem in &pattern.elements.nodes {
                         self.visit(elem);
                     }
@@ -339,6 +369,7 @@ impl<'a> LoweringPass<'a> {
                             template_node: idx,
                         },
                     );
+                    self.transforms.helpers_mut().make_template_object = true;
                 }
                 if let Some(tagged) = self.arena.get_tagged_template(node) {
                     self.visit(tagged.tag);
@@ -514,6 +545,7 @@ impl<'a> LoweringPass<'a> {
                 idx,
                 TransformDirective::ES5ForOf { for_of_node: idx },
             );
+            self.transforms.helpers_mut().values = true;
         }
 
         self.visit(for_in_of.initializer);
@@ -581,6 +613,9 @@ impl<'a> LoweringPass<'a> {
                         let class_name = self.get_identifier_text(class.name);
                         if !Self::is_valid_identifier_name(&class_name) {
                             let directive = if self.ctx.target_es5 {
+                                let heritage =
+                                    self.get_extends_heritage(&class.heritage_clauses);
+                                self.mark_class_helpers(export_decl.export_clause, heritage);
                                 TransformDirective::CommonJSExportDefaultClassES5 {
                                     class_node: export_decl.export_clause,
                                 }
@@ -647,13 +682,14 @@ impl<'a> LoweringPass<'a> {
     }
 
     fn commonjs_default_export_function_directive(
-        &self,
+        &mut self,
         function_node: NodeIndex,
         func: &crate::parser::thin_node::FunctionData,
     ) -> TransformDirective {
         let mut directives = Vec::new();
         if self.ctx.target_es5 {
             if func.is_async {
+                self.mark_async_helpers();
                 directives.push(TransformDirective::ES5AsyncFunction { function_node });
             } else if self.function_parameters_need_es5_transform(&func.parameters) {
                 directives.push(TransformDirective::ES5FunctionParameters { function_node });
@@ -707,40 +743,42 @@ impl<'a> LoweringPass<'a> {
             self.has_default_modifier(&class.modifiers)
         };
 
-        // Get class name for export
-        let class_name = if !class.name.is_none() {
+        // Get class name only if we might need it for exports.
+        let class_name = if is_exported && !class.name.is_none() {
             Some(self.get_identifier_text(class.name))
         } else {
             None
         };
 
         let heritage = self.get_extends_heritage(&class.heritage_clauses);
+        if self.ctx.target_es5 {
+            self.mark_class_helpers(idx, heritage);
+        }
 
         // Determine the base transform
         let base_directive = if self.ctx.target_es5 {
             // ES5 class transform
-            TransformDirective::ES5Class {
-                class_node: idx,
-                class_name: class_name.clone(),
-                heritage,
-                members: class.members.nodes.clone(),
-            }
+            TransformDirective::ES5Class { class_node: idx, heritage }
         } else {
             // No transform needed for ES6+ targets
             TransformDirective::Identity
         };
 
         // Wrap with CommonJS export if needed
-        let final_directive = if is_exported && class_name.is_some() {
-            let export_directive = TransformDirective::CommonJSExport {
-                names: vec![class_name.unwrap()],
-                is_default,
-                inner: Box::new(TransformDirective::Identity),
-            };
+        let final_directive = if is_exported {
+            if let Some(export_name) = class_name {
+                let export_directive = TransformDirective::CommonJSExport {
+                    names: vec![export_name],
+                    is_default,
+                    inner: Box::new(TransformDirective::Identity),
+                };
 
-            match base_directive {
-                TransformDirective::Identity => export_directive,
-                other => TransformDirective::Chain(vec![other, export_directive]),
+                match base_directive {
+                    TransformDirective::Identity => export_directive,
+                    other => TransformDirective::Chain(vec![other, export_directive]),
+                }
+            } else {
+                base_directive
             }
         } else {
             base_directive
@@ -787,7 +825,7 @@ impl<'a> LoweringPass<'a> {
             self.has_default_modifier(&func.modifiers)
         };
 
-        let func_name = if !func.name.is_none() {
+        let func_name = if is_exported && !func.name.is_none() {
             Some(self.get_identifier_text(func.name))
         } else {
             None
@@ -795,6 +833,7 @@ impl<'a> LoweringPass<'a> {
 
         // Check if this is an async function targeting ES5
         let base_directive = if self.ctx.target_es5 && self.has_async_modifier(idx) {
+            self.mark_async_helpers();
             TransformDirective::ES5AsyncFunction { function_node: idx }
         } else if self.ctx.target_es5 && self.function_parameters_need_es5_transform(&func.parameters) {
             TransformDirective::ES5FunctionParameters { function_node: idx }
@@ -802,16 +841,20 @@ impl<'a> LoweringPass<'a> {
             TransformDirective::Identity
         };
 
-        let final_directive = if is_exported && func_name.is_some() {
-            let export_directive = TransformDirective::CommonJSExport {
-                names: vec![func_name.unwrap()],
-                is_default,
-                inner: Box::new(TransformDirective::Identity),
-            };
+        let final_directive = if is_exported {
+            if let Some(export_name) = func_name {
+                let export_directive = TransformDirective::CommonJSExport {
+                    names: vec![export_name],
+                    is_default,
+                    inner: Box::new(TransformDirective::Identity),
+                };
 
-            match base_directive {
-                TransformDirective::Identity => export_directive,
-                other => TransformDirective::Chain(vec![other, export_directive]),
+                match base_directive {
+                    TransformDirective::Identity => export_directive,
+                    other => TransformDirective::Chain(vec![other, export_directive]),
+                }
+            } else {
+                base_directive
             }
         } else {
             base_directive
@@ -854,7 +897,7 @@ impl<'a> LoweringPass<'a> {
             is_exported = true;
         }
 
-        let enum_name = if !enum_decl.name.is_none() {
+        let enum_name = if is_exported && !enum_decl.name.is_none() {
             Some(self.get_identifier_text(enum_decl.name))
         } else {
             None
@@ -866,16 +909,20 @@ impl<'a> LoweringPass<'a> {
             TransformDirective::Identity
         };
 
-        let final_directive = if is_exported && enum_name.is_some() {
-            let export_directive = TransformDirective::CommonJSExport {
-                names: vec![enum_name.unwrap()],
-                is_default: false,
-                inner: Box::new(TransformDirective::Identity),
-            };
+        let final_directive = if is_exported {
+            if let Some(export_name) = enum_name {
+                let export_directive = TransformDirective::CommonJSExport {
+                    names: vec![export_name],
+                    is_default: false,
+                    inner: Box::new(TransformDirective::Identity),
+                };
 
-            match base_directive {
-                TransformDirective::Identity => export_directive,
-                other => TransformDirective::Chain(vec![other, export_directive]),
+                match base_directive {
+                    TransformDirective::Identity => export_directive,
+                    other => TransformDirective::Chain(vec![other, export_directive]),
+                }
+            } else {
+                base_directive
             }
         } else {
             base_directive
@@ -919,7 +966,11 @@ impl<'a> LoweringPass<'a> {
             is_exported = true;
         }
 
-        let module_name = self.get_module_root_name(module_decl.name);
+        let module_name = if is_exported {
+            self.get_module_root_name(module_decl.name)
+        } else {
+            None
+        };
 
         let base_directive = if self.ctx.target_es5 {
             TransformDirective::ES5Namespace { namespace_node: idx }
@@ -927,16 +978,20 @@ impl<'a> LoweringPass<'a> {
             TransformDirective::Identity
         };
 
-        let final_directive = if is_exported && module_name.is_some() {
-            let export_directive = TransformDirective::CommonJSExport {
-                names: vec![module_name.unwrap()],
-                is_default: false,
-                inner: Box::new(TransformDirective::Identity),
-            };
+        let final_directive = if is_exported {
+            if let Some(export_name) = module_name {
+                let export_directive = TransformDirective::CommonJSExport {
+                    names: vec![export_name],
+                    is_default: false,
+                    inner: Box::new(TransformDirective::Identity),
+                };
 
-            match base_directive {
-                TransformDirective::Identity => export_directive,
-                other => TransformDirective::Chain(vec![other, export_directive]),
+                match base_directive {
+                    TransformDirective::Identity => export_directive,
+                    other => TransformDirective::Chain(vec![other, export_directive]),
+                }
+            } else {
+                base_directive
             }
         } else {
             base_directive
@@ -968,6 +1023,10 @@ impl<'a> LoweringPass<'a> {
                     captures_this,
                 },
             );
+
+            if arrow.is_async {
+                self.mark_async_helpers();
+            }
         }
 
         for &param_idx in &arrow.parameters.nodes {
@@ -1025,6 +1084,7 @@ impl<'a> LoweringPass<'a> {
 
         if self.ctx.target_es5 {
             if func.is_async {
+                self.mark_async_helpers();
                 self.transforms.insert(
                     idx,
                     TransformDirective::ES5AsyncFunction { function_node: idx },
@@ -1166,6 +1226,67 @@ impl<'a> LoweringPass<'a> {
                 .map(|n| n.kind == SyntaxKind::AsyncKeyword as u16)
                 .unwrap_or(false)
         })
+    }
+
+    fn mark_async_helpers(&mut self) {
+        let helpers = self.transforms.helpers_mut();
+        helpers.awaiter = true;
+        helpers.generator = true;
+    }
+
+    fn mark_class_helpers(&mut self, class_node: NodeIndex, heritage: Option<NodeIndex>) {
+        if heritage.is_some() {
+            self.transforms.helpers_mut().extends = true;
+        }
+
+        let Some(class_node) = self.arena.get(class_node) else {
+            return;
+        };
+        let Some(class_data) = self.arena.get_class(class_node) else {
+            return;
+        };
+
+        if self.class_has_private_members(class_data) {
+            let helpers = self.transforms.helpers_mut();
+            helpers.class_private_field_get = true;
+            helpers.class_private_field_set = true;
+        }
+    }
+
+    fn class_has_private_members(
+        &self,
+        class_data: &crate::parser::thin_node::ClassData,
+    ) -> bool {
+        for &member_idx in &class_data.members.nodes {
+            let Some(member_node) = self.arena.get(member_idx) else { continue };
+
+            match member_node.kind {
+                k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                    if let Some(prop) = self.arena.get_property_decl(member_node) {
+                        if is_private_identifier(self.arena, prop.name) {
+                            return true;
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                    if let Some(method) = self.arena.get_method_decl(member_node) {
+                        if is_private_identifier(self.arena, method.name) {
+                            return true;
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                    if let Some(accessor) = self.arena.get_accessor(member_node) {
+                        if is_private_identifier(self.arena, accessor.name) {
+                            return true;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        false
     }
 
     fn needs_es5_object_literal_transform(&self, elements: &[NodeIndex]) -> bool {
@@ -1815,6 +1936,21 @@ mod tests {
         assert!(
             !transforms.is_empty(),
             "Expected CommonJS export transform for variables"
+        );
+    }
+
+    #[test]
+    fn test_lowering_pass_commonjs_non_export_function_no_transforms() {
+        let (arena, root) = parse("function foo() {}");
+        let mut ctx = EmitContext::default();
+        ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+        let lowering = LoweringPass::new(&arena, &ctx);
+        let transforms = lowering.run(root);
+
+        assert!(
+            transforms.is_empty(),
+            "Non-exported functions should not add CommonJS transforms"
         );
     }
 

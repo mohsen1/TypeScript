@@ -18,7 +18,7 @@ use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
-use crate::binder::{SymbolId, symbol_flags};
+use crate::binder::{ScopeId, SymbolId, symbol_flags};
 use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeId, TypeInterner, ContextualTypeContext};
 use crate::checker::types::diagnostics::{
@@ -99,27 +99,41 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     // =========================================================================
-    // Scope Management (delegated to CheckerContext)
+    // Symbol Type Caching
     // =========================================================================
 
-    /// Push a new local scope onto the stack.
-    pub fn push_local_scope(&mut self) {
-        self.ctx.push_local_scope();
+    /// Cache a computed symbol type for stateless lookup.
+    fn cache_symbol_type(&mut self, sym_id: SymbolId, type_id: TypeId) {
+        self.ctx.symbol_types.insert(sym_id, type_id);
     }
 
-    /// Pop the current local scope from the stack.
-    pub fn pop_local_scope(&mut self) {
-        self.ctx.pop_local_scope();
-    }
+    fn cache_parameter_types(
+        &mut self,
+        params: &[NodeIndex],
+        param_types: Option<&[Option<TypeId>]>,
+    ) {
+        for (i, &param_idx) in params.iter().enumerate() {
+            let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                continue;
+            };
+            let Some(param) = self.ctx.arena.get_parameter(param_node) else {
+                continue;
+            };
 
-    /// Add a local variable to the current scope.
-    pub fn add_local(&mut self, name: String, type_id: TypeId) {
-        self.ctx.add_local(name, type_id);
-    }
+            let type_id = if let Some(types) = param_types {
+                types.get(i).and_then(|t| *t)
+            } else if !param.type_annotation.is_none() {
+                Some(self.get_type_from_type_node(param.type_annotation))
+            } else {
+                Some(TypeId::ANY)
+            };
 
-    /// Look up a local variable in all scopes.
-    pub fn lookup_local(&self, name: &str) -> Option<TypeId> {
-        self.ctx.lookup_local(name)
+            if let Some(type_id) = type_id {
+                if let Some(sym_id) = self.ctx.binder.get_node_symbol(param_idx) {
+                    self.cache_symbol_type(sym_id, type_id);
+                }
+            }
+        }
     }
 
     /// Push an expected return type onto the stack (when entering a function).
@@ -163,6 +177,71 @@ impl<'a> ThinCheckerState<'a> {
     /// Get the symbol by name from file locals.
     pub fn get_symbol_by_name(&self, name: &str) -> Option<SymbolId> {
         self.ctx.binder.file_locals.get(name)
+    }
+
+    fn is_class_member_symbol(flags: u32) -> bool {
+        (flags
+            & (symbol_flags::PROPERTY
+                | symbol_flags::METHOD
+                | symbol_flags::GET_ACCESSOR
+                | symbol_flags::SET_ACCESSOR
+                | symbol_flags::CONSTRUCTOR))
+            != 0
+    }
+
+    fn find_enclosing_scope(&self, node_idx: NodeIndex) -> Option<ScopeId> {
+        let mut current = node_idx;
+        while !current.is_none() {
+            if let Some(&scope_id) = self.ctx.binder.node_scope_ids.get(&current.0) {
+                return Some(scope_id);
+            }
+            if let Some(ext) = self.ctx.arena.get_extended(current) {
+                current = ext.parent;
+            } else {
+                break;
+            }
+        }
+
+        if !self.ctx.binder.scopes.is_empty() {
+            Some(ScopeId(0))
+        } else {
+            None
+        }
+    }
+
+    fn resolve_identifier_symbol(&self, idx: NodeIndex) -> Option<SymbolId> {
+        let node = self.ctx.arena.get(idx)?;
+        let name = self.ctx.arena.get_identifier(node)?.escaped_text.as_str();
+        let mut scope_id = self.find_enclosing_scope(idx)?;
+
+        while !scope_id.is_none() {
+            if let Some(scope) = self.ctx.binder.scopes.get(scope_id.0 as usize) {
+                if let Some(sym_id) = scope.table.get(name) {
+                    if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                        if !Self::is_class_member_symbol(symbol.flags) {
+                            return Some(sym_id);
+                        }
+                    } else {
+                        return Some(sym_id);
+                    }
+                }
+                scope_id = scope.parent;
+            } else {
+                break;
+            }
+        }
+
+        if let Some(sym_id) = self.ctx.binder.file_locals.get(name) {
+            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                if !Self::is_class_member_symbol(symbol.flags) {
+                    return Some(sym_id);
+                }
+            } else {
+                return Some(sym_id);
+            }
+        }
+
+        None
     }
 
     // =========================================================================
@@ -337,6 +416,11 @@ impl<'a> ThinCheckerState<'a> {
                 self.get_type_from_function_type(idx)
             }
 
+            // Type literal ({ a: number; b(): string; })
+            k if k == syntax_kind_ext::TYPE_LITERAL => {
+                self.get_type_from_type_literal(idx)
+            }
+
             // Type query (typeof X) - returns the type of X
             k if k == syntax_kind_ext::TYPE_QUERY => {
                 self.get_type_from_type_query(idx)
@@ -398,8 +482,8 @@ impl<'a> ThinCheckerState<'a> {
                 if has_type_args {
                     let is_builtin_array = name == "Array" || name == "ReadonlyArray";
                     if !is_builtin_array
-                        && self.lookup_local(name).is_none()
-                        && !self.has_named_type_symbol(name)
+                        && self.lookup_type_parameter(name).is_none()
+                        && self.resolve_identifier_symbol(type_name_idx).is_none()
                     {
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
@@ -416,7 +500,7 @@ impl<'a> ThinCheckerState<'a> {
                 }
 
                 if name == "Array" || name == "ReadonlyArray" {
-                    if let Some(type_id) = self.resolve_named_type_reference(name) {
+                    if let Some(type_id) = self.resolve_named_type_reference(name, type_name_idx) {
                         return type_id;
                     }
                     let elem_type = type_ref.type_arguments
@@ -448,7 +532,7 @@ impl<'a> ThinCheckerState<'a> {
                     _ => {}
                 }
 
-                if let Some(type_id) = self.resolve_named_type_reference(name) {
+                if let Some(type_id) = self.resolve_named_type_reference(name, type_name_idx) {
                     return type_id;
                 }
                 self.error_cannot_find_name_at(name, type_name_idx);
@@ -459,28 +543,12 @@ impl<'a> ThinCheckerState<'a> {
         TypeId::ANY
     }
 
-    fn resolve_named_type_reference(&mut self, name: &str) -> Option<TypeId> {
+    fn resolve_named_type_reference(&mut self, name: &str, name_idx: NodeIndex) -> Option<TypeId> {
         if let Some(type_id) = self.lookup_type_parameter(name) {
             return Some(type_id);
         }
-        // Check local scopes first (includes type parameters)
-        if let Some(type_id) = self.lookup_local(name) {
-            return Some(type_id);
-        }
-        // Check file locals
-        if let Some(sym_id) = self.ctx.binder.file_locals.get(name) {
+        if let Some(sym_id) = self.resolve_identifier_symbol(name_idx) {
             return Some(self.get_type_of_symbol(sym_id));
-        }
-        // Check all symbols (excluding class members)
-        if let Some(sym_id) = self.ctx.binder.get_symbols().find_by_name(name) {
-            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
-                use crate::binder::symbol_flags;
-                let is_class_member = (symbol.flags & symbol_flags::PROPERTY) != 0
-                    || (symbol.flags & symbol_flags::METHOD) != 0;
-                if !is_class_member {
-                    return Some(self.get_type_of_symbol(sym_id));
-                }
-            }
         }
         None
     }
@@ -489,26 +557,12 @@ impl<'a> ThinCheckerState<'a> {
         self.ctx.type_parameter_scope.get(name).copied()
     }
 
-    fn has_named_type_symbol(&self, name: &str) -> bool {
-        if self.ctx.binder.file_locals.get(name).is_some() {
-            return true;
-        }
-        if let Some(sym_id) = self.ctx.binder.get_symbols().find_by_name(name) {
-            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
-                let is_class_member = (symbol.flags & symbol_flags::PROPERTY) != 0
-                    || (symbol.flags & symbol_flags::METHOD) != 0;
-                return !is_class_member;
-            }
-        }
-        false
-    }
-
     /// Resolve a qualified name or identifier to a symbol ID.
     fn resolve_qualified_symbol(&self, idx: NodeIndex) -> Option<SymbolId> {
         let node = self.ctx.arena.get(idx)?;
 
         if node.kind == SyntaxKind::Identifier as u16 {
-            return self.ctx.binder.resolve_identifier(self.ctx.arena, idx);
+            return self.resolve_identifier_symbol(idx);
         }
 
         if node.kind != syntax_kind_ext::QUALIFIED_NAME {
@@ -548,7 +602,7 @@ impl<'a> ThinCheckerState<'a> {
         let node = self.ctx.arena.get(idx)?;
 
         if node.kind == SyntaxKind::Identifier as u16 {
-            return self.ctx.binder.resolve_identifier(self.ctx.arena, idx);
+            return self.resolve_identifier_symbol(idx);
         }
 
         if node.kind == syntax_kind_ext::QUALIFIED_NAME {
@@ -685,16 +739,7 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(ident) = self.ctx.arena.get_identifier(node) {
             let name = &ident.escaped_text;
 
-            // Check local scopes
-            if let Some(type_id) = self.lookup_local(name) {
-                return type_id;
-            }
-            // Check file locals
-            if let Some(sym_id) = self.ctx.binder.file_locals.get(name) {
-                return self.get_type_of_symbol(sym_id);
-            }
-            // Check all symbols
-            if let Some(sym_id) = self.ctx.binder.get_symbols().find_by_name(name) {
+            if let Some(sym_id) = self.resolve_identifier_symbol(idx) {
                 return self.get_type_of_symbol(sym_id);
             }
 
@@ -802,6 +847,388 @@ impl<'a> ThinCheckerState<'a> {
         lowering.lower_type(idx)
     }
 
+    fn get_type_from_type_node_in_type_literal(&mut self, idx: NodeIndex) -> TypeId {
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        if node.kind == syntax_kind_ext::TYPE_REFERENCE {
+            return self.get_type_from_type_reference_in_type_literal(idx);
+        }
+        if node.kind == syntax_kind_ext::TYPE_QUERY {
+            return self.get_type_from_type_query(idx);
+        }
+        if node.kind == syntax_kind_ext::UNION_TYPE {
+            if let Some(composite) = self.ctx.arena.get_composite_type(node) {
+                let members = composite.types.nodes.iter()
+                    .map(|&member_idx| self.get_type_from_type_node_in_type_literal(member_idx))
+                    .collect::<Vec<_>>();
+                return self.ctx.types.union(members);
+            }
+            return TypeId::ERROR;
+        }
+        if node.kind == syntax_kind_ext::ARRAY_TYPE {
+            if let Some(array_type) = self.ctx.arena.get_array_type(node) {
+                let elem_type = self.get_type_from_type_node_in_type_literal(array_type.element_type);
+                return self.ctx.types.array(elem_type);
+            }
+            return self.ctx.types.array(TypeId::ANY);
+        }
+        if node.kind == syntax_kind_ext::TYPE_LITERAL {
+            return self.get_type_from_type_literal(idx);
+        }
+
+        self.get_type_from_type_node(idx)
+    }
+
+    fn get_type_from_type_reference_in_type_literal(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::{SymbolRef, TypeKey};
+
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        let Some(type_ref) = self.ctx.arena.get_type_ref(node) else {
+            return TypeId::ANY;
+        };
+
+        let type_name_idx = type_ref.type_name;
+        let has_type_args = type_ref.type_arguments
+            .as_ref()
+            .map_or(false, |args| !args.nodes.is_empty());
+
+        if let Some(name_node) = self.ctx.arena.get(type_name_idx) {
+            if name_node.kind == syntax_kind_ext::QUALIFIED_NAME {
+                let Some(sym_id) = self.resolve_qualified_symbol(type_name_idx) else {
+                    let _ = self.resolve_qualified_name(type_name_idx);
+                    return TypeId::ERROR;
+                };
+                let base_type = self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)));
+                if has_type_args {
+                    let type_args = type_ref.type_arguments.as_ref()
+                        .map(|args| args.nodes.iter()
+                            .map(|&arg_idx| self.get_type_from_type_node_in_type_literal(arg_idx))
+                            .collect::<Vec<_>>())
+                        .unwrap_or_default();
+                    return self.ctx.types.application(base_type, type_args);
+                }
+                return base_type;
+            }
+        }
+
+        if let Some(name_node) = self.ctx.arena.get(type_name_idx) {
+            if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                let name = ident.escaped_text.as_str();
+
+                if has_type_args {
+                    let is_builtin_array = name == "Array" || name == "ReadonlyArray";
+                    let type_param = self.lookup_type_parameter(name);
+                    let sym_id = self.resolve_identifier_symbol(type_name_idx);
+
+                    if is_builtin_array && type_param.is_none() && sym_id.is_none() {
+                        let elem_type = type_ref.type_arguments
+                            .as_ref()
+                            .and_then(|args| args.nodes.first().copied())
+                            .map(|idx| self.get_type_from_type_node_in_type_literal(idx))
+                            .unwrap_or(TypeId::ANY);
+                        let array_type = self.ctx.types.array(elem_type);
+                        if name == "ReadonlyArray" {
+                            return self.ctx.types.intern(TypeKey::ReadonlyType(array_type));
+                        }
+                        return array_type;
+                    }
+
+                    if !is_builtin_array && type_param.is_none() && sym_id.is_none() {
+                        self.error_cannot_find_name_at(name, type_name_idx);
+                        return TypeId::ERROR;
+                    }
+
+                    let base_type = if let Some(type_param) = type_param {
+                        type_param
+                    } else if let Some(sym_id) = sym_id {
+                        self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)))
+                    } else {
+                        TypeId::ERROR
+                    };
+
+                    let type_args = type_ref.type_arguments.as_ref()
+                        .map(|args| args.nodes.iter()
+                            .map(|&arg_idx| self.get_type_from_type_node_in_type_literal(arg_idx))
+                            .collect::<Vec<_>>())
+                        .unwrap_or_default();
+                    return self.ctx.types.application(base_type, type_args);
+                }
+
+                if name == "Array" || name == "ReadonlyArray" {
+                    if let Some(sym_id) = self.resolve_identifier_symbol(type_name_idx) {
+                        return self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)));
+                    }
+                    if let Some(type_param) = self.lookup_type_parameter(name) {
+                        return type_param;
+                    }
+                    let elem_type = type_ref.type_arguments
+                        .as_ref()
+                        .and_then(|args| args.nodes.first().copied())
+                        .map(|idx| self.get_type_from_type_node_in_type_literal(idx))
+                        .unwrap_or(TypeId::ANY);
+                    let array_type = self.ctx.types.array(elem_type);
+                    if name == "ReadonlyArray" {
+                        return self.ctx.types.intern(TypeKey::ReadonlyType(array_type));
+                    }
+                    return array_type;
+                }
+
+                match name {
+                    "number" => return TypeId::NUMBER,
+                    "string" => return TypeId::STRING,
+                    "boolean" => return TypeId::BOOLEAN,
+                    "void" => return TypeId::VOID,
+                    "any" => return TypeId::ANY,
+                    "never" => return TypeId::NEVER,
+                    "unknown" => return TypeId::UNKNOWN,
+                    "undefined" => return TypeId::UNDEFINED,
+                    "null" => return TypeId::NULL,
+                    "object" => return TypeId::OBJECT,
+                    "bigint" => return TypeId::BIGINT,
+                    "symbol" => return TypeId::SYMBOL,
+                    _ => {}
+                }
+
+                if let Some(type_param) = self.lookup_type_parameter(name) {
+                    return type_param;
+                }
+                if let Some(sym_id) = self.resolve_identifier_symbol(type_name_idx) {
+                    return self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)));
+                }
+
+                self.error_cannot_find_name_at(name, type_name_idx);
+                return TypeId::ERROR;
+            }
+        }
+
+        TypeId::ANY
+    }
+
+    fn extract_params_from_signature_in_type_literal(
+        &mut self,
+        sig: &crate::parser::thin_node::SignatureData,
+    ) -> (Vec<crate::solver::ParamInfo>, Option<TypeId>) {
+        let Some(ref params_list) = sig.parameters else {
+            return (Vec::new(), None);
+        };
+
+        self.extract_params_from_parameter_list_in_type_literal(params_list)
+    }
+
+    fn extract_params_from_parameter_list_in_type_literal(
+        &mut self,
+        params_list: &crate::parser::NodeList,
+    ) -> (Vec<crate::solver::ParamInfo>, Option<TypeId>) {
+        use crate::solver::ParamInfo;
+
+        let mut params = Vec::new();
+        let mut this_type = None;
+        let this_atom = self.ctx.types.intern_string("this");
+
+        for &param_idx in &params_list.nodes {
+            let Some(param_node) = self.ctx.arena.get(param_idx) else { continue };
+            let Some(param) = self.ctx.arena.get_parameter(param_node) else { continue };
+
+            let name: Option<Atom> = if let Some(name_node) = self.ctx.arena.get(param.name) {
+                if let Some(name_data) = self.ctx.arena.get_identifier(name_node) {
+                    Some(self.ctx.types.intern_string(&name_data.escaped_text))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let type_id = if !param.type_annotation.is_none() {
+                self.get_type_from_type_node_in_type_literal(param.type_annotation)
+            } else {
+                TypeId::ANY
+            };
+
+            let optional = param.question_token || !param.initializer.is_none();
+            let rest = param.dot_dot_dot_token;
+
+            if let Some(name_atom) = name {
+                if name_atom == this_atom {
+                    if this_type.is_none() {
+                        this_type = Some(type_id);
+                    }
+                    continue;
+                }
+            }
+
+            params.push(ParamInfo { name, type_id, optional, rest });
+        }
+
+        (params, this_type)
+    }
+
+    /// Get type from a type literal node ({ x: T }).
+    fn get_type_from_type_literal(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::parser::syntax_kind_ext::{CALL_SIGNATURE, CONSTRUCT_SIGNATURE, METHOD_SIGNATURE, PROPERTY_SIGNATURE};
+        use crate::solver::{CallSignature, CallableShape, FunctionShape, IndexSignature, ObjectShape, PropertyInfo};
+
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::ANY;
+        };
+
+        let Some(data) = self.ctx.arena.get_type_literal(node) else {
+            return TypeId::ANY;
+        };
+
+        let mut properties = Vec::new();
+        let mut call_signatures = Vec::new();
+        let mut construct_signatures = Vec::new();
+        let mut string_index = None;
+        let mut number_index = None;
+
+        for &member_idx in &data.members.nodes {
+            let Some(member) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+
+            if let Some(sig) = self.ctx.arena.get_signature(member) {
+                match member.kind {
+                    CALL_SIGNATURE => {
+                        let (type_params, type_param_updates) = self.push_type_parameters(&sig.type_parameters);
+                        let (params, this_type) = self.extract_params_from_signature_in_type_literal(sig);
+                        let return_type = if !sig.type_annotation.is_none() {
+                            self.get_type_from_type_node_in_type_literal(sig.type_annotation)
+                        } else {
+                            TypeId::ANY
+                        };
+                        call_signatures.push(CallSignature {
+                            type_params,
+                            params,
+                            this_type,
+                            return_type,
+                            type_predicate: None,
+                        });
+                        self.pop_type_parameters(type_param_updates);
+                    }
+                    CONSTRUCT_SIGNATURE => {
+                        let (type_params, type_param_updates) = self.push_type_parameters(&sig.type_parameters);
+                        let (params, this_type) = self.extract_params_from_signature_in_type_literal(sig);
+                        let return_type = if !sig.type_annotation.is_none() {
+                            self.get_type_from_type_node_in_type_literal(sig.type_annotation)
+                        } else {
+                            TypeId::ANY
+                        };
+                        construct_signatures.push(CallSignature {
+                            type_params,
+                            params,
+                            this_type,
+                            return_type,
+                            type_predicate: None,
+                        });
+                        self.pop_type_parameters(type_param_updates);
+                    }
+                    METHOD_SIGNATURE | PROPERTY_SIGNATURE => {
+                        let Some(name) = self.get_property_name(sig.name) else {
+                            continue;
+                        };
+                        let name_atom = self.ctx.types.intern_string(&name);
+
+                        if member.kind == METHOD_SIGNATURE {
+                            let (type_params, type_param_updates) = self.push_type_parameters(&sig.type_parameters);
+                            let (params, this_type) = self.extract_params_from_signature_in_type_literal(sig);
+                            let return_type = if !sig.type_annotation.is_none() {
+                                self.get_type_from_type_node_in_type_literal(sig.type_annotation)
+                            } else {
+                                TypeId::ANY
+                            };
+                            let shape = FunctionShape {
+                                type_params,
+                                params,
+                                this_type,
+                                return_type,
+                                type_predicate: None,
+                                is_constructor: false,
+                            };
+                            self.pop_type_parameters(type_param_updates);
+                            properties.push(PropertyInfo {
+                                name: name_atom,
+                                type_id: self.ctx.types.function(shape),
+                                optional: sig.question_token,
+                                readonly: self.has_readonly_modifier(&sig.modifiers),
+                                is_method: true,
+                            });
+                        } else {
+                            let type_id = if !sig.type_annotation.is_none() {
+                                self.get_type_from_type_node_in_type_literal(sig.type_annotation)
+                            } else {
+                                TypeId::ANY
+                            };
+                            properties.push(PropertyInfo {
+                                name: name_atom,
+                                type_id,
+                                optional: sig.question_token,
+                                readonly: self.has_readonly_modifier(&sig.modifiers),
+                                is_method: false,
+                            });
+                        }
+                    }
+                    _ => {}
+                }
+                continue;
+            }
+
+            if let Some(index_sig) = self.ctx.arena.get_index_signature(member) {
+                let param_idx = index_sig.parameters.nodes.first().copied().unwrap_or(NodeIndex::NONE);
+                let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                    continue;
+                };
+                let Some(param_data) = self.ctx.arena.get_parameter(param_node) else {
+                    continue;
+                };
+                let key_type = if !param_data.type_annotation.is_none() {
+                    self.get_type_from_type_node_in_type_literal(param_data.type_annotation)
+                } else {
+                    TypeId::ANY
+                };
+                let value_type = if !index_sig.type_annotation.is_none() {
+                    self.get_type_from_type_node_in_type_literal(index_sig.type_annotation)
+                } else {
+                    TypeId::ANY
+                };
+                let readonly = self.has_readonly_modifier(&index_sig.modifiers);
+                let info = IndexSignature {
+                    key_type,
+                    value_type,
+                    readonly,
+                };
+                if key_type == TypeId::NUMBER {
+                    number_index = Some(info);
+                } else {
+                    string_index = Some(info);
+                }
+            }
+        }
+
+        if !call_signatures.is_empty() || !construct_signatures.is_empty() {
+            return self.ctx.types.callable(CallableShape {
+                call_signatures,
+                construct_signatures,
+                properties,
+            });
+        }
+
+        if string_index.is_some() || number_index.is_some() {
+            return self.ctx.types.object_with_index(ObjectShape {
+                properties,
+                string_index,
+                number_index,
+            });
+        }
+
+        self.ctx.types.object(properties)
+    }
+
     fn lower_type_parameter_info(&mut self, idx: NodeIndex) -> Option<(crate::solver::TypeParamInfo, String)> {
         let node = self.ctx.arena.get(idx)?;
         let data = self.ctx.arena.get_type_parameter(node)?;
@@ -874,8 +1301,7 @@ impl<'a> ThinCheckerState<'a> {
     /// to build a callable type if the interface has call signatures.
     fn get_type_of_interface(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{CallSignature as SolverCallSignature, CallableShape, PropertyInfo, TypeKey};
-        use crate::parser::syntax_kind_ext::{CALL_SIGNATURE, CONSTRUCT_SIGNATURE, PROPERTY_SIGNATURE, METHOD_SIGNATURE, HERITAGE_CLAUSE, EXPRESSION_WITH_TYPE_ARGUMENTS};
-        use std::sync::Arc;
+        use crate::parser::syntax_kind_ext::{CALL_SIGNATURE, CONSTRUCT_SIGNATURE, PROPERTY_SIGNATURE, METHOD_SIGNATURE, HERITAGE_CLAUSE};
 
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
@@ -884,6 +1310,9 @@ impl<'a> ThinCheckerState<'a> {
         let Some(interface) = self.ctx.arena.get_interface(node) else {
             return TypeId::ANY;
         };
+
+        let (_interface_type_params, interface_type_param_updates) =
+            self.push_type_parameters(&interface.type_parameters);
 
         let mut call_signatures: Vec<SolverCallSignature> = Vec::new();
         let mut construct_signatures: Vec<SolverCallSignature> = Vec::new();
@@ -924,6 +1353,7 @@ impl<'a> ThinCheckerState<'a> {
             if member_node.kind == CALL_SIGNATURE {
                 // Extract call signature
                 if let Some(sig) = self.ctx.arena.get_signature(member_node) {
+                    let (type_params, type_param_updates) = self.push_type_parameters(&sig.type_parameters);
                     let (params, this_type) = self.extract_params_from_signature(sig);
                     let return_type = if !sig.type_annotation.is_none() {
                         self.get_type_of_node(sig.type_annotation)
@@ -932,16 +1362,18 @@ impl<'a> ThinCheckerState<'a> {
                     };
 
                     call_signatures.push(SolverCallSignature {
-                        type_params: Vec::new(), // TODO: Handle type parameters
+                        type_params,
                         params,
                         this_type,
                         return_type,
                         type_predicate: None,
                     });
+                    self.pop_type_parameters(type_param_updates);
                 }
             } else if member_node.kind == CONSTRUCT_SIGNATURE {
                 // Extract construct signature
                 if let Some(sig) = self.ctx.arena.get_signature(member_node) {
+                    let (type_params, type_param_updates) = self.push_type_parameters(&sig.type_parameters);
                     let (params, this_type) = self.extract_params_from_signature(sig);
                     let return_type = if !sig.type_annotation.is_none() {
                         self.get_type_of_node(sig.type_annotation)
@@ -950,12 +1382,13 @@ impl<'a> ThinCheckerState<'a> {
                     };
 
                     construct_signatures.push(SolverCallSignature {
-                        type_params: Vec::new(),
+                        type_params,
                         params,
                         this_type,
                         return_type,
                         type_predicate: None,
                     });
+                    self.pop_type_parameters(type_param_updates);
                 }
             } else if member_node.kind == PROPERTY_SIGNATURE || member_node.kind == METHOD_SIGNATURE {
                 // Extract property
@@ -981,22 +1414,21 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // If we have call signatures, build a callable type
-        if !call_signatures.is_empty() || !construct_signatures.is_empty() {
+        let result = if !call_signatures.is_empty() || !construct_signatures.is_empty() {
             let shape = CallableShape {
                 call_signatures,
                 construct_signatures,
                 properties,
             };
-            return self.ctx.types.callable(shape);
-        }
+            self.ctx.types.callable(shape)
+        } else if !properties.is_empty() {
+            self.ctx.types.object(properties)
+        } else {
+            TypeId::ANY
+        };
 
-        // Otherwise, just return an object type with the properties
-        if !properties.is_empty() {
-            return self.ctx.types.object(properties);
-        }
-
-        TypeId::ANY
+        self.pop_type_parameters(interface_type_param_updates);
+        result
     }
 
     fn merge_interface_heritage_types(
@@ -1047,6 +1479,12 @@ impl<'a> ThinCheckerState<'a> {
 
                     let (expr_idx, type_arguments) = if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
                         (expr_type_args.expression, expr_type_args.type_arguments.as_ref())
+                    } else if type_node.kind == syntax_kind_ext::TYPE_REFERENCE {
+                        if let Some(type_ref) = self.ctx.arena.get_type_ref(type_node) {
+                            (type_ref.type_name, type_ref.type_arguments.as_ref())
+                        } else {
+                            (type_idx, None)
+                        }
                     } else {
                         (type_idx, None)
                     };
@@ -1834,8 +2272,6 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of identifier, with control flow analysis for narrowing.
     fn get_type_of_identifier(&mut self, idx: NodeIndex) -> TypeId {
-        use crate::binder::symbol_flags;
-
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
         };
@@ -1844,56 +2280,12 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
-        // LEGACY FALLBACK: Try old methods for backward compatibility during transition
         let name = &ident.escaped_text;
 
-        // NEW STATELESS APPROACH: Query binder's persistent scope system
-        // This enables lazy checking without traversal-order dependency
-        if let Some(sym_id) = self.ctx.binder.resolve_identifier(self.ctx.arena, idx) {
-            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
-                let is_class_member = (symbol.flags
-                    & (symbol_flags::PROPERTY
-                        | symbol_flags::METHOD
-                        | symbol_flags::GET_ACCESSOR
-                        | symbol_flags::SET_ACCESSOR
-                        | symbol_flags::CONSTRUCTOR))
-                    != 0;
-                if !is_class_member {
-                    // Get the declared type of the symbol
-                    let declared_type = self.get_type_of_symbol(sym_id);
-                    if declared_type != TypeId::ANY {
-                        return self.apply_flow_narrowing(idx, declared_type);
-                    }
-                    if let Some(local_type) = self.lookup_local(name) {
-                        return self.apply_flow_narrowing(idx, local_type);
-                    }
-                    return declared_type;
-                }
-            }
-        }
-
-        // Check local scopes first to get the declared type
-        if let Some(declared_type) = self.lookup_local(name) {
-            // Apply control flow analysis to narrow the type
+        // Resolve via binder persistent scopes for stateless lookup.
+        if let Some(sym_id) = self.resolve_identifier_symbol(idx) {
+            let declared_type = self.get_type_of_symbol(sym_id);
             return self.apply_flow_narrowing(idx, declared_type);
-        }
-
-        // Check file locals
-        if let Some(sym_id) = self.ctx.binder.file_locals.get(name) {
-            return self.get_type_of_symbol(sym_id);
-        }
-
-        // Check all symbols by name (handles nested scopes like classes in IIFEs)
-        // But skip class members (PROPERTY/METHOD) - they need "this." prefix
-        if let Some(sym_id) = self.ctx.binder.get_symbols().find_by_name(name) {
-            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
-                // Only use this fallback for classes, functions, variables - not class members
-                let is_class_member = (symbol.flags & symbol_flags::PROPERTY) != 0
-                    || (symbol.flags & symbol_flags::METHOD) != 0;
-                if !is_class_member {
-                    return self.get_type_of_symbol(sym_id);
-                }
-            }
         }
 
         // Intrinsic names - use constant TypeIds
@@ -1944,7 +2336,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Returns a callable type with signature: `Symbol(description?: string | number): symbol`
     /// Note: Symbol cannot be constructed with `new`, so no construct signatures.
     fn get_symbol_constructor_type(&self) -> TypeId {
-        use crate::solver::{CallSignature, CallableShape, ParamInfo};
+        use crate::solver::{FunctionShape, ParamInfo};
 
         // Parameter: description?: string | number
         let description_param_type = self.ctx.types.union(vec![TypeId::STRING, TypeId::NUMBER]);
@@ -1955,23 +2347,17 @@ impl<'a> ThinCheckerState<'a> {
             rest: false,
         };
 
-        // Call signature: (description?: string | number) => symbol
-        let call_sig = CallSignature {
+        // Function shape: (description?: string | number) => symbol
+        let shape = FunctionShape {
             type_params: vec![],
             params: vec![description_param],
             this_type: None,
             return_type: TypeId::SYMBOL,
             type_predicate: None,
+            is_constructor: false,
         };
 
-        // Callable shape (no construct signatures - can't use `new Symbol()`)
-        let shape = CallableShape {
-            call_signatures: vec![call_sig],
-            construct_signatures: vec![],
-            properties: vec![], // Could add Symbol.for, Symbol.keyFor, etc. later
-        };
-
-        self.ctx.types.callable(shape)
+        self.ctx.types.function(shape)
     }
 
     /// Apply control flow narrowing to a type at a specific identifier usage.
@@ -2153,16 +2539,10 @@ impl<'a> ThinCheckerState<'a> {
             if !decl_idx.is_none() {
                 if let Some(node) = self.ctx.arena.get(decl_idx) {
                     if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
-                        // Use TypeLowering with type parameter scope for generic aliases.
-                        let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
-                        let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
-                        let lowering = TypeLowering::with_resolvers(
-                            self.ctx.arena,
-                            self.ctx.types,
-                            &type_resolver,
-                            &value_resolver,
-                        );
-                        return lowering.lower_type_alias_declaration(type_alias);
+                        let (_params, updates) = self.push_type_parameters(&type_alias.type_parameters);
+                        let alias_type = self.get_type_from_type_node(type_alias.type_node);
+                        self.pop_type_parameters(updates);
+                        return alias_type;
                     }
                 }
             }
@@ -2181,28 +2561,6 @@ impl<'a> ThinCheckerState<'a> {
                         // Fall back to inferring from initializer
                         if !var_decl.initializer.is_none() {
                             return self.get_type_of_node(var_decl.initializer);
-                        }
-                    }
-                }
-            }
-            return TypeId::ANY;
-        }
-
-        // Parameter - get type from annotation
-        if flags & symbol_flags::FUNCTION_SCOPED_VARIABLE != 0 {
-            if !value_decl.is_none() {
-                if let Some(node) = self.ctx.arena.get(value_decl) {
-                        if let Some(param) = self.ctx.arena.get_parameter(node) {
-                        if !param.type_annotation.is_none() {
-                            let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
-                            let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
-                            let lowering = TypeLowering::with_resolvers(
-                                self.ctx.arena,
-                                self.ctx.types,
-                                &type_resolver,
-                                &value_resolver,
-                            );
-                            return lowering.lower_type(param.type_annotation);
                         }
                     }
                 }
@@ -3384,23 +3742,7 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check the function body (for type errors within the body)
         if !func.body.is_none() {
-            self.push_local_scope();
-
-            // Add parameters to local scope using the already-computed types (including contextual)
-            for (i, &param_idx) in func.parameters.nodes.iter().enumerate() {
-                if let Some(param_node) = self.ctx.arena.get(param_idx) {
-                    if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                        if let Some(name_node) = self.ctx.arena.get(param.name) {
-                            if let Some(name_data) = self.ctx.arena.get_identifier(name_node) {
-                                // Use type from params which already includes contextual typing
-                                if let Some(param_type) = param_types.get(i).and_then(|t| *t) {
-                                    self.add_local(name_data.escaped_text.clone(), param_type);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            self.cache_parameter_types(&func.parameters.nodes, Some(&param_types));
 
             if func.type_annotation.is_none() {
                 let return_context = ctx_helper.as_ref().and_then(|helper| helper.get_return_type());
@@ -3410,7 +3752,6 @@ impl<'a> ThinCheckerState<'a> {
             self.push_return_type(return_type);
             self.check_statement(func.body);
             self.pop_return_type();
-            self.pop_local_scope();
         }
 
         // Create function type using TypeInterner
@@ -3936,6 +4277,10 @@ impl<'a> ThinCheckerState<'a> {
                 // are resolved via binder (for abstract class detection)
                 return self.get_type_from_union_type(idx);
             }
+            if node.kind == syntax_kind_ext::TYPE_LITERAL {
+                // Type literals should use checker resolution so type parameters resolve correctly.
+                return self.get_type_from_type_literal(idx);
+            }
         }
 
         // Use TypeLowering which handles all type nodes
@@ -4339,10 +4684,6 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         if let Some(sf) = self.ctx.arena.get_source_file(node) {
-            // Push file-level scope for top-level variables
-            // This enables variable redeclaration checking (TS2403) and type tracking
-            self.push_local_scope();
-
             // Type check each top-level statement
             for &stmt_idx in &sf.statements.nodes {
                 self.check_statement(stmt_idx);
@@ -4354,8 +4695,6 @@ impl<'a> ThinCheckerState<'a> {
             // Check for export assignment with other exports (2309)
             self.check_export_assignment(&sf.statements.nodes);
 
-            // Pop file-level scope
-            self.pop_local_scope();
         }
     }
 
@@ -4392,14 +4731,11 @@ impl<'a> ThinCheckerState<'a> {
             }
             syntax_kind_ext::BLOCK => {
                 if let Some(block) = self.ctx.arena.get_block(node) {
-                    // Push a new scope for block-scoped variables (let/const)
-                    self.push_local_scope();
                     for &inner_stmt in &block.statements.nodes {
                         self.check_statement(inner_stmt);
                     }
                     // Check for function overload implementations in blocks
                     self.check_function_implementations(&block.statements.nodes);
-                    self.pop_local_scope();
                 }
             }
             syntax_kind_ext::FUNCTION_DECLARATION => {
@@ -4428,8 +4764,6 @@ impl<'a> ThinCheckerState<'a> {
 
                     // Check function body if present
                     if !func.body.is_none() {
-                        self.push_local_scope();
-
                         // Get declared return type
                         let return_type = if !func.type_annotation.is_none() {
                             self.get_type_of_node(func.type_annotation)
@@ -4438,24 +4772,7 @@ impl<'a> ThinCheckerState<'a> {
                         };
                         self.push_return_type(return_type);
 
-                        // Add parameters to local scope
-                        for &param_idx in &func.parameters.nodes {
-                            if let Some(param_node) = self.ctx.arena.get(param_idx) {
-                                if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                                    // Get parameter name
-                                    if let Some(name_node) = self.ctx.arena.get(param.name) {
-                                        if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
-                                            let param_type = if !param.type_annotation.is_none() {
-                                                self.get_type_of_node(param.type_annotation)
-                                            } else {
-                                                TypeId::ANY
-                                            };
-                                            self.add_local(ident.escaped_text.clone(), param_type);
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        self.cache_parameter_types(&func.parameters.nodes, None);
 
                         self.check_statement(func.body);
 
@@ -4475,7 +4792,6 @@ impl<'a> ThinCheckerState<'a> {
                         }
 
                         self.pop_return_type();
-                        self.pop_local_scope();
                     }
 
                     self.pop_type_parameters(type_param_updates);
@@ -4489,8 +4805,6 @@ impl<'a> ThinCheckerState<'a> {
             }
             syntax_kind_ext::FOR_STATEMENT => {
                 if let Some(loop_data) = self.ctx.arena.get_loop(node) {
-                    // Push scope for loop variables (e.g., for (let i = 0; ...))
-                    self.push_local_scope();
                     if !loop_data.initializer.is_none() {
                         // Check if initializer is a variable declaration list
                         if let Some(init_node) = self.ctx.arena.get(loop_data.initializer) {
@@ -4508,13 +4822,10 @@ impl<'a> ThinCheckerState<'a> {
                         self.get_type_of_node(loop_data.incrementor);
                     }
                     self.check_statement(loop_data.statement);
-                    self.pop_local_scope();
                 }
             }
             syntax_kind_ext::FOR_IN_STATEMENT | syntax_kind_ext::FOR_OF_STATEMENT => {
                 if let Some(for_data) = self.ctx.arena.get_for_in_of(node) {
-                    // Push scope for loop variable
-                    self.push_local_scope();
                     // Check if initializer is a variable declaration
                     if let Some(init_node) = self.ctx.arena.get(for_data.initializer) {
                         if init_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
@@ -4525,7 +4836,6 @@ impl<'a> ThinCheckerState<'a> {
                     }
                     self.get_type_of_node(for_data.expression);
                     self.check_statement(for_data.statement);
-                    self.pop_local_scope();
                 }
             }
             syntax_kind_ext::TRY_STATEMENT => {
@@ -4683,21 +4993,19 @@ impl<'a> ThinCheckerState<'a> {
             declared_type
         };
 
-        // Check for variable redeclaration in the current scope (TS2403)
-        // Note: This applies specifically to 'var' merging where types must match.
-        // let/const duplicates are caught earlier by the binder (TS2451).
-        if let Some(ref name) = var_name {
-            if let Some(prev_type) = self.ctx.lookup_local_in_current_scope(name) {
-                // Types must be identical for subsequent declarations
-                if !self.are_types_identical(final_type, prev_type) {
-                    self.error_subsequent_variable_declaration(name, prev_type, final_type, decl_idx);
+        if let Some(sym_id) = self.ctx.binder.get_node_symbol(decl_idx) {
+            // Check for variable redeclaration in the current scope (TS2403).
+            // Note: This applies specifically to 'var' merging where types must match.
+            // let/const duplicates are caught earlier by the binder (TS2451).
+            if let Some(prev_type) = self.ctx.symbol_types.get(&sym_id).copied() {
+                if let Some(ref name) = var_name {
+                    if !self.are_types_identical(final_type, prev_type) {
+                        self.error_subsequent_variable_declaration(name, prev_type, final_type, decl_idx);
+                    }
                 }
+            } else {
+                self.cache_symbol_type(sym_id, final_type);
             }
-        }
-
-        // Add variable to local scope (if we're inside a function/method)
-        if let Some(name) = var_name {
-            self.add_local(name, final_type);
         }
     }
 
@@ -4806,27 +5114,18 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     /// Get the class name from an expression, if it's a class instance.
-    fn get_class_name_from_expression(&self, expr_idx: NodeIndex) -> Option<String> {
+    fn get_class_name_from_expression(&mut self, expr_idx: NodeIndex) -> Option<String> {
         let Some(node) = self.ctx.arena.get(expr_idx) else {
             return None;
         };
 
         // If it's a simple identifier, look up its type from the binder
-        if let Some(ident) = self.ctx.arena.get_identifier(node) {
-            let var_name = &ident.escaped_text;
-
-            // Look up the variable in local scopes
-            if let Some(type_id) = self.lookup_local(var_name) {
-                // Check if this type is a class instance - the type would be stored
-                // We need to trace back to the class name
+        if self.ctx.arena.get_identifier(node).is_some() {
+            if let Some(sym_id) = self.resolve_identifier_symbol(expr_idx) {
+                let type_id = self.get_type_of_symbol(sym_id);
                 if let Some(class_name) = self.get_class_name_from_type(type_id) {
                     return Some(class_name);
                 }
-                // If get_class_name_from_type returns None, fall through to check file_locals
-            }
-
-            // Check file_locals for the variable binding
-            if let Some(sym_id) = self.ctx.binder.file_locals.get(var_name) {
                 if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
                     // Get the value declaration and check if it's a variable with new Class()
                     if !symbol.value_declaration.is_none() {
@@ -5245,25 +5544,7 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // Push a scope for type parameters
-        self.push_local_scope();
         let (_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
-
-        // Add type parameters to scope
-        if let Some(ref type_params) = class.type_parameters {
-            for &tp_idx in &type_params.nodes {
-                if let Some(tp_node) = self.ctx.arena.get(tp_idx) {
-                    if let Some(tp) = self.ctx.arena.get_type_parameter(tp_node) {
-                        if let Some(name_node) = self.ctx.arena.get(tp.name) {
-                            if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
-                                // Add type parameter as a type (use ANY as placeholder)
-                                self.add_local(ident.escaped_text.clone(), TypeId::ANY);
-                            }
-                        }
-                    }
-                }
-            }
-        }
 
         // Collect class name and static members for error 2662 suggestions
         let class_name = if !class.name.is_none() {
@@ -5321,7 +5602,6 @@ impl<'a> ThinCheckerState<'a> {
         self.ctx.enclosing_class = prev_enclosing_class;
 
         self.pop_type_parameters(type_param_updates);
-        self.pop_local_scope();
     }
 
     /// Check an interface declaration.
@@ -5355,25 +5635,6 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // Push a scope for type parameters
-        self.push_local_scope();
-
-        // Add type parameters to scope
-        if let Some(ref type_params) = iface.type_parameters {
-            for &tp_idx in &type_params.nodes {
-                if let Some(tp_node) = self.ctx.arena.get(tp_idx) {
-                    if let Some(tp) = self.ctx.arena.get_type_parameter(tp_node) {
-                        if let Some(name_node) = self.ctx.arena.get(tp.name) {
-                            if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
-                                // Add type parameter as a type (use ANY as placeholder)
-                                self.add_local(ident.escaped_text.clone(), TypeId::ANY);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
         let (_type_params, type_param_updates) = self.push_type_parameters(&iface.type_parameters);
 
         // Check each interface member for parameter properties
@@ -5385,7 +5646,6 @@ impl<'a> ThinCheckerState<'a> {
         self.check_interface_extension_compatibility(stmt_idx, &iface);
 
         self.pop_type_parameters(type_param_updates);
-        self.pop_local_scope();
     }
 
     /// Check if a node has the `declare` modifier.
@@ -7246,9 +7506,6 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // Enter a new local scope for the method body
-        self.push_local_scope();
-
         // Get declared return type
         let return_type = if !method.type_annotation.is_none() {
             self.get_type_from_type_node(method.type_annotation)
@@ -7257,23 +7514,7 @@ impl<'a> ThinCheckerState<'a> {
         };
         self.push_return_type(return_type);
 
-        // Add parameters to local scope
-        for &param_idx in &method.parameters.nodes {
-            if let Some(param_node) = self.ctx.arena.get(param_idx) {
-                if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                    if let Some(name_node) = self.ctx.arena.get(param.name) {
-                        if let Some(name_data) = self.ctx.arena.get_identifier(name_node) {
-                            let param_type = if !param.type_annotation.is_none() {
-                                self.get_type_from_type_node(param.type_annotation)
-                            } else {
-                                TypeId::ANY
-                            };
-                            self.add_local(name_data.escaped_text.clone(), param_type);
-                        }
-                    }
-                }
-            }
-        }
+        self.cache_parameter_types(&method.parameters.nodes, None);
 
         // Check for parameter properties (error 2369)
         // Parameter properties are only allowed in constructors, not in methods
@@ -7301,7 +7542,6 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         self.pop_return_type();
-        self.pop_local_scope();
     }
 
     /// Check a constructor declaration.
@@ -7347,28 +7587,9 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // Enter a new local scope for the constructor body
-        self.push_local_scope();
-
         // Constructors don't have explicit return types
 
-        // Add parameters to local scope
-        for &param_idx in &ctor.parameters.nodes {
-            if let Some(param_node) = self.ctx.arena.get(param_idx) {
-                if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                    if let Some(name_node) = self.ctx.arena.get(param.name) {
-                        if let Some(name_data) = self.ctx.arena.get_identifier(name_node) {
-                            let param_type = if !param.type_annotation.is_none() {
-                                self.get_type_from_type_node(param.type_annotation)
-                            } else {
-                                TypeId::ANY
-                            };
-                            self.add_local(name_data.escaped_text.clone(), param_type);
-                        }
-                    }
-                }
-            }
-        }
+        self.cache_parameter_types(&ctor.parameters.nodes, None);
 
         // Set in_constructor flag for abstract property checks (error 2715)
         if let Some(ref mut class_info) = self.ctx.enclosing_class {
@@ -7384,8 +7605,6 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(ref mut class_info) = self.ctx.enclosing_class {
             class_info.in_constructor = false;
         }
-
-        self.pop_local_scope();
     }
 
     /// Check an accessor declaration (getter/setter).
@@ -7414,9 +7633,6 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // Enter a new local scope for the accessor body
-        self.push_local_scope();
-
         // For getters, get return type from annotation
         // For setters, return type is void
         let return_type = if node.kind == syntax_kind_ext::GET_ACCESSOR {
@@ -7430,23 +7646,7 @@ impl<'a> ThinCheckerState<'a> {
         };
         self.push_return_type(return_type);
 
-        // Add parameters to local scope (for setters)
-        for &param_idx in &accessor.parameters.nodes {
-            if let Some(param_node) = self.ctx.arena.get(param_idx) {
-                if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                    if let Some(name_node) = self.ctx.arena.get(param.name) {
-                        if let Some(name_data) = self.ctx.arena.get_identifier(name_node) {
-                            let param_type = if !param.type_annotation.is_none() {
-                                self.get_type_from_type_node(param.type_annotation)
-                            } else {
-                                TypeId::ANY
-                            };
-                            self.add_local(name_data.escaped_text.clone(), param_type);
-                        }
-                    }
-                }
-            }
-        }
+        self.cache_parameter_types(&accessor.parameters.nodes, None);
 
         // Check for parameter properties (error 2369)
         // Parameter properties are only allowed in constructors, not in accessors
@@ -7463,7 +7663,6 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         self.pop_return_type();
-        self.pop_local_scope();
     }
 
     /// Check setter parameter constraints (1052, 1053).

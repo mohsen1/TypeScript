@@ -13,9 +13,10 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
-  - Cache parsed arenas + binder results per file.
-  - Reuse `TypeCache` in `ThinCheckerState::with_cache`.
-  - Invalidate affected symbols only.
+  - [x] Cache parsed arenas + binder results per file.
+  - [x] Reuse `TypeCache` in `ThinCheckerState::with_cache`.
+  - [x] Invalidate dependent files via module graph.
+  - [ ] Invalidate affected symbols only.
 - [ ] Expand tsconfig support
   - [x] baseUrl
   - [x] paths
@@ -31,7 +32,9 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - [ ] Module resolution parity
   - [x] Resolve relative + baseUrl/paths imports with TS extension inference.
   - [x] Resolve bare specifiers via node_modules package.json entries + index fallback.
-  - [ ] Support Node16/NodeNext exports conditions + subpath exports.
+  - [x] Support exports subpath mapping + basic condition selection (types/import/require/default).
+  - [x] Expand exports conditions (node/browser) + moduleResolution-specific ordering.
+  - [x] Honor package.json `type` + Node16/NodeNext extension rules.
 - [ ] Benchmark harness
   - Script for `tsz` vs `tsc` on large repos with timing + memory stats.
 

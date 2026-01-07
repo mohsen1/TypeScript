@@ -423,6 +423,15 @@ const f = new Foo();
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
+    eprintln!("=== debug Box ===");
+    if let Some(box_sym) = binder.file_locals.get("Box") {
+        let box_type = checker.get_type_of_symbol(box_sym);
+        eprintln!("Box type id: {:?}", box_type);
+        eprintln!("Box type key: {:?}", types.lookup(box_type));
+    } else {
+        eprintln!("Box symbol missing");
+    }
+
     let f_sym = binder.file_locals.get("f").expect("f should exist");
     let f_type = checker.get_type_of_symbol(f_sym);
     let f_key = types.lookup(f_type).expect("f type should exist");
@@ -2546,6 +2555,112 @@ const f: <T>(value: T) => T = (value) => value;
 }
 
 #[test]
+fn test_interface_generic_call_signature_uses_type_params() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+interface Callable {
+    <T>(value: T): T;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let callable_sym = binder.file_locals.get("Callable").expect("Callable should exist");
+    let callable_type = checker.get_type_of_symbol(callable_sym);
+    let callable_key = types.lookup(callable_type).expect("Callable type should exist");
+    match callable_key {
+        TypeKey::Callable(shape) => {
+            assert_eq!(shape.call_signatures.len(), 1);
+            let sig = &shape.call_signatures[0];
+            assert_eq!(sig.type_params.len(), 1);
+            assert_eq!(types.resolve_atom(sig.type_params[0].name), "T");
+            assert_eq!(sig.params.len(), 1);
+
+            let param_key = types.lookup(sig.params[0].type_id).expect("Param type should exist");
+            match param_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected param type to be type parameter, got {:?}", param_key),
+            }
+
+            let return_key = types.lookup(sig.return_type).expect("Return type should exist");
+            match return_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected return type to be type parameter, got {:?}", return_key),
+            }
+        }
+        _ => panic!("Expected Callable to be Callable type, got {:?}", callable_key),
+    }
+}
+
+#[test]
+fn test_interface_generic_construct_signature_uses_type_params() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+interface Factory {
+    new <T>(value: T): T;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let factory_sym = binder.file_locals.get("Factory").expect("Factory should exist");
+    let factory_type = checker.get_type_of_symbol(factory_sym);
+    let factory_key = types.lookup(factory_type).expect("Factory type should exist");
+    match factory_key {
+        TypeKey::Callable(shape) => {
+            assert_eq!(shape.construct_signatures.len(), 1);
+            let sig = &shape.construct_signatures[0];
+            assert_eq!(sig.type_params.len(), 1);
+            assert_eq!(types.resolve_atom(sig.type_params[0].name), "T");
+            assert_eq!(sig.params.len(), 1);
+
+            let param_key = types.lookup(sig.params[0].type_id).expect("Param type should exist");
+            match param_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected param type to be type parameter, got {:?}", param_key),
+            }
+
+            let return_key = types.lookup(sig.return_type).expect("Return type should exist");
+            match return_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected return type to be type parameter, got {:?}", return_key),
+            }
+        }
+        _ => panic!("Expected Factory to be Callable type, got {:?}", factory_key),
+    }
+}
+
+#[test]
 fn test_checker_lowers_generic_function_declaration_uses_type_params() {
     use crate::thin_parser::ThinParserState;
     use crate::solver::TypeKey;
@@ -3665,4 +3780,93 @@ fn test_deep_binary_expression_type_check() {
     checker.check_source_file(root);
 
     assert!(checker.ctx.diagnostics.is_empty());
+}
+
+#[test]
+fn test_scoped_identifier_resolution_uses_binder_scopes() {
+    use crate::thin_parser::ThinParserState;
+    use crate::parser::syntax_kind_ext;
+
+    let source = r#"
+let x = 1;
+{
+    let x = "hi";
+    x;
+}
+x;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    let block_idx = source_file.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::BLOCK))
+        .expect("block statement");
+    let block = arena.get_block(arena.get(block_idx).expect("block node")).expect("block data");
+    let inner_expr_idx = block.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::EXPRESSION_STATEMENT))
+        .expect("inner expression statement");
+    let inner_expr = arena.get_expression_statement(arena.get(inner_expr_idx).expect("inner expr node"))
+        .expect("inner expression data");
+
+    let outer_expr_idx = source_file.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::EXPRESSION_STATEMENT))
+        .expect("outer expression statement");
+    let outer_expr = arena.get_expression_statement(arena.get(outer_expr_idx).expect("outer expr node"))
+        .expect("outer expression data");
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let inner_type = checker.get_type_of_node(inner_expr.expression);
+    let outer_type = checker.get_type_of_node(outer_expr.expression);
+
+    assert_eq!(inner_type, TypeId::STRING);
+    assert_eq!(outer_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_parameter_identifier_type_from_symbol_cache() {
+    use crate::thin_parser::ThinParserState;
+    use crate::parser::syntax_kind_ext;
+
+    let source = r#"
+function f(x: number) { return x; }
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+    let func_idx = source_file.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::FUNCTION_DECLARATION))
+        .expect("function declaration");
+    let func_node = arena.get(func_idx).expect("function node");
+    let func = arena.get_function(func_node).expect("function data");
+
+    let body_node = arena.get(func.body).expect("function body");
+    let block = arena.get_block(body_node).expect("function block");
+    let return_idx = *block.statements.nodes.first().expect("return statement");
+    let return_node = arena.get(return_idx).expect("return node");
+    let return_data = arena.get_return_statement(return_node).expect("return data");
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let param_type = checker.get_type_of_node(return_data.expression);
+    assert_eq!(param_type, TypeId::NUMBER);
 }

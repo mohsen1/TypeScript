@@ -7,7 +7,7 @@ use crate::parser::NodeIndex;
 use crate::thin_binder::ThinBinderState;
 use crate::lsp::position::{Position, Location, LineMap, Range};
 use crate::lsp::utils::find_node_at_offset;
-use crate::lsp::resolver::ScopeWalker;
+use crate::lsp::resolver::{ScopeCache, ScopeCacheStats, ScopeWalker};
 
 /// Go-to-Definition provider.
 ///
@@ -49,6 +49,26 @@ impl<'a> GoToDefinition<'a> {
     ///
     /// Returns None if no symbol is found at the position.
     pub fn get_definition(&self, root: NodeIndex, position: Position) -> Option<Vec<Location>> {
+        self.get_definition_internal(root, position, None, None)
+    }
+
+    pub fn get_definition_with_scope_cache(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        scope_cache: &mut ScopeCache,
+        scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<Vec<Location>> {
+        self.get_definition_internal(root, position, Some(scope_cache), scope_stats)
+    }
+
+    fn get_definition_internal(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        scope_cache: Option<&mut ScopeCache>,
+        mut scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<Vec<Location>> {
         // 1. Convert position to byte offset
         let offset = self.line_map.position_to_offset(position, self.source_text)?;
 
@@ -60,7 +80,11 @@ impl<'a> GoToDefinition<'a> {
 
         // 3. Resolve the node to a symbol
         let mut walker = ScopeWalker::new(self.arena, self.binder);
-        let symbol_id = walker.resolve_node(root, node_idx)?;
+        let symbol_id = if let Some(scope_cache) = scope_cache {
+            walker.resolve_node_cached(root, node_idx, scope_cache, scope_stats.as_deref_mut())?
+        } else {
+            walker.resolve_node(root, node_idx)?
+        };
 
         // 4. Get the symbol's declarations
         let symbol = self.binder.symbols.get(symbol_id)?;
@@ -92,13 +116,37 @@ impl<'a> GoToDefinition<'a> {
     ///
     /// This is useful when you already have the node index from another operation.
     pub fn get_definition_for_node(&self, root: NodeIndex, node_idx: NodeIndex) -> Option<Vec<Location>> {
+        self.get_definition_for_node_internal(root, node_idx, None, None)
+    }
+
+    pub fn get_definition_for_node_with_scope_cache(
+        &self,
+        root: NodeIndex,
+        node_idx: NodeIndex,
+        scope_cache: &mut ScopeCache,
+        scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<Vec<Location>> {
+        self.get_definition_for_node_internal(root, node_idx, Some(scope_cache), scope_stats)
+    }
+
+    fn get_definition_for_node_internal(
+        &self,
+        root: NodeIndex,
+        node_idx: NodeIndex,
+        scope_cache: Option<&mut ScopeCache>,
+        mut scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<Vec<Location>> {
         if node_idx.is_none() {
             return None;
         }
 
         // Resolve the node to a symbol
         let mut walker = ScopeWalker::new(self.arena, self.binder);
-        let symbol_id = walker.resolve_node(root, node_idx)?;
+        let symbol_id = if let Some(scope_cache) = scope_cache {
+            walker.resolve_node_cached(root, node_idx, scope_cache, scope_stats.as_deref_mut())?
+        } else {
+            walker.resolve_node(root, node_idx)?
+        };
 
         // Get the symbol's declarations
         let symbol = self.binder.symbols.get(symbol_id)?;

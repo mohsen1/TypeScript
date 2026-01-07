@@ -10,6 +10,7 @@ use crate::thin_binder::ThinBinderState;
 use crate::lsp::position::{Position, Range, LineMap};
 use crate::lsp::utils::find_node_at_offset;
 use crate::lsp::references::FindReferences;
+use crate::lsp::resolver::ScopeCache;
 use crate::scanner::{self, SyntaxKind};
 
 /// A single text edit.
@@ -103,6 +104,26 @@ impl<'a> RenameProvider<'a> {
         position: Position,
         new_name: String,
     ) -> Result<WorkspaceEdit, String> {
+        self.provide_rename_edits_internal(root, position, new_name, None)
+    }
+
+    pub fn provide_rename_edits_with_scope_cache(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        new_name: String,
+        scope_cache: &mut ScopeCache,
+    ) -> Result<WorkspaceEdit, String> {
+        self.provide_rename_edits_internal(root, position, new_name, Some(scope_cache))
+    }
+
+    fn provide_rename_edits_internal(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        new_name: String,
+        scope_cache: Option<&mut ScopeCache>,
+    ) -> Result<WorkspaceEdit, String> {
         let node_idx = self
             .rename_target_node(position)
             .ok_or_else(|| "You cannot rename this element.".to_string())?;
@@ -120,8 +141,13 @@ impl<'a> RenameProvider<'a> {
         );
 
         // We use find_references which includes the definition
-        let locations = finder.find_references(root, position)
-            .ok_or_else(|| "Could not find symbol to rename".to_string())?;
+        let locations = if let Some(scope_cache) = scope_cache {
+            finder
+                .find_references_with_scope_cache(root, position, scope_cache, None)
+        } else {
+            finder.find_references(root, position)
+        }
+        .ok_or_else(|| "Could not find symbol to rename".to_string())?;
 
         // 4. Convert locations to TextEdits
         let mut workspace_edit = WorkspaceEdit::new();
@@ -252,6 +278,7 @@ mod rename_tests {
     use crate::thin_parser::ThinParserState;
     use crate::thin_binder::ThinBinderState;
     use crate::lsp::position::LineMap;
+    use crate::lsp::resolver::ScopeCache;
 
     #[test]
     fn test_rename_variable() {
@@ -288,6 +315,32 @@ mod rename_tests {
         for edit in edits {
             assert_eq!(edit.new_text, "newName");
         }
+    }
+
+    #[test]
+    fn test_rename_uses_scope_cache() {
+        let source = "let value = 1;\nvalue;";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let line_map = LineMap::build(source);
+        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+
+        let mut scope_cache = ScopeCache::default();
+        let pos = Position::new(1, 0);
+
+        let result = rename_provider.provide_rename_edits_with_scope_cache(
+            root,
+            pos,
+            "next".to_string(),
+            &mut scope_cache,
+        );
+        assert!(result.is_ok(), "Rename should succeed with scope cache");
+        assert!(!scope_cache.is_empty(), "Expected scope cache to populate for rename");
     }
 
     #[test]
