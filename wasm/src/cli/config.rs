@@ -30,6 +30,8 @@ pub struct CompilerOptions {
     #[serde(default)]
     pub module_resolution: Option<String>,
     #[serde(default)]
+    pub types_versions_compiler_version: Option<String>,
+    #[serde(default)]
     pub jsx: Option<String>,
     #[serde(default)]
     pub lib: Option<Vec<String>>,
@@ -190,6 +192,15 @@ pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<Res
         }
     }
 
+    if let Some(types_versions_compiler_version) =
+        options.types_versions_compiler_version.as_deref()
+    {
+        let value = types_versions_compiler_version.trim();
+        if !value.is_empty() {
+            resolved.types_versions_compiler_version = Some(value.to_string());
+        }
+    }
+
     if let Some(jsx) = options.jsx.as_deref() {
         resolved.jsx = Some(parse_jsx_emit(jsx)?);
     }
@@ -336,6 +347,9 @@ fn merge_compiler_options(base: CompilerOptions, child: CompilerOptions) -> Comp
         target: child.target.or(base.target),
         module: child.module.or(base.module),
         module_resolution: child.module_resolution.or(base.module_resolution),
+        types_versions_compiler_version: child
+            .types_versions_compiler_version
+            .or(base.types_versions_compiler_version),
         jsx: child.jsx.or(base.jsx),
         lib: child.lib.or(base.lib),
         base_url: child.base_url.or(base.base_url),
