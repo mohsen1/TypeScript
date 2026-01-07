@@ -5308,6 +5308,72 @@ if (typeof Alias.value === "string") {
 }
 
 #[test]
+fn test_flow_narrowing_cleared_by_property_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let obj: { prop: string | number } = { prop: "ok" };
+if (typeof obj.prop === "string") {
+    obj.prop.toUpperCase();
+    obj.prop = 1;
+    obj.prop.toUpperCase();
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = codes.iter().filter(|&&code| code == 2339).count();
+    assert_eq!(
+        count,
+        1,
+        "Expected one 2339 after property assignment clears narrowing, got: {:?}",
+        codes
+    );
+}
+
+#[test]
+fn test_flow_narrowing_cleared_by_element_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let obj: { prop: string | number } = { prop: "ok" };
+if (typeof obj["prop"] === "string") {
+    obj["prop"].toUpperCase();
+    obj["prop"] = 1;
+    obj["prop"].toUpperCase();
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = codes.iter().filter(|&&code| code == 2339).count();
+    assert_eq!(
+        count,
+        1,
+        "Expected one 2339 after element assignment clears narrowing, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_flow_narrowing_cleared_by_property_base_assignment() {
     use crate::thin_parser::ThinParserState;
 
