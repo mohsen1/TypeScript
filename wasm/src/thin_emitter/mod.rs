@@ -823,6 +823,15 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_node_default(node, idx);
             }
 
+            TransformDirective::ES5VariableDeclarationList { decl_list } => {
+                if let Some(list_node) = self.arena.get(decl_list) {
+                    self.emit_variable_declaration_list_es5(list_node);
+                    return;
+                }
+
+                self.emit_node_default(node, idx);
+            }
+
             TransformDirective::ES5TemplateLiteral { .. } => {
                 if !self.emit_template_literal_es5(node, idx) {
                     self.emit_node_default(node, idx);
@@ -1106,6 +1115,14 @@ impl<'a> ThinPrinter<'a> {
                         self.emit_object_literal_es5(&literal.elements.nodes);
                         return;
                     }
+                }
+
+                self.emit_chained_previous(node, idx, directives, index);
+            }
+            TransformDirective::ES5VariableDeclarationList { decl_list } => {
+                if let Some(list_node) = self.arena.get(*decl_list) {
+                    self.emit_variable_declaration_list_es5(list_node);
+                    return;
                 }
 
                 self.emit_chained_previous(node, idx, directives, index);
@@ -3011,27 +3028,30 @@ impl<'a> ThinPrinter<'a> {
         self.write(keyword);
         self.write(" ");
 
-        // For ES5, check if any declaration uses destructuring
-        if self.ctx.target_es5 {
-            let mut first = true;
-            for &decl_idx in &decl_list.declarations.nodes {
-                let Some(decl_node) = self.arena.get(decl_idx) else { continue };
-                let Some(decl) = self.arena.get_variable_declaration(decl_node) else { continue };
+        self.emit_comma_separated(&decl_list.declarations.nodes);
+    }
 
-                if self.is_binding_pattern(decl.name) && !decl.initializer.is_none() {
-                    // ES5 destructuring transform
-                    self.emit_es5_destructuring(decl_idx, &mut first);
-                } else {
-                    // Normal variable declaration
-                    if !first {
-                        self.write(", ");
-                    }
-                    first = false;
-                    self.emit(decl_idx);
+    fn emit_variable_declaration_list_es5(&mut self, node: &ThinNode) {
+        let Some(decl_list) = self.arena.get_variable(node) else {
+            return;
+        };
+
+        self.write("var ");
+
+        let mut first = true;
+        for &decl_idx in &decl_list.declarations.nodes {
+            let Some(decl_node) = self.arena.get(decl_idx) else { continue };
+            let Some(decl) = self.arena.get_variable_declaration(decl_node) else { continue };
+
+            if self.is_binding_pattern(decl.name) && !decl.initializer.is_none() {
+                self.emit_es5_destructuring(decl_idx, &mut first);
+            } else {
+                if !first {
+                    self.write(", ");
                 }
+                first = false;
+                self.emit(decl_idx);
             }
-        } else {
-            self.emit_comma_separated(&decl_list.declarations.nodes);
         }
     }
 

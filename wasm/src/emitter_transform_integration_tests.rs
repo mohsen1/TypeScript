@@ -350,6 +350,46 @@ fn test_lowering_pass_es5_template_literal_directive() {
 }
 
 #[test]
+fn test_lowering_pass_es5_variable_declaration_list_directive() {
+    let source = "let { x, y } = obj;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let stmt_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected variable statement");
+    let stmt_node = arena.get(stmt_idx).expect("expected variable node");
+    let var_stmt = arena
+        .get_variable(stmt_node)
+        .expect("expected variable statement data");
+    let decl_list_idx = *var_stmt
+        .declarations
+        .nodes
+        .first()
+        .expect("expected declaration list");
+
+    let directive = transforms.get(decl_list_idx);
+    assert!(
+        matches!(
+            directive,
+            Some(TransformDirective::ES5VariableDeclarationList { .. })
+        ),
+        "LoweringPass should emit ES5VariableDeclarationList directive for destructuring"
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_object_literal_computed() {
     let source = "const obj = { a: 1, [key]: 2 };";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -378,6 +418,34 @@ fn test_two_phase_emission_es5_object_literal_computed() {
     assert!(
         !output.contains("[key]:"),
         "ES5 output should not keep computed property syntax: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_variable_destructuring() {
+    let source = "let { x, y } = obj;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var _a = obj"),
+        "ES5 output should introduce temp for destructuring: {}",
+        output
+    );
+    assert!(
+        output.contains("x = _a.x"),
+        "ES5 output should assign destructured properties: {}",
         output
     );
 }

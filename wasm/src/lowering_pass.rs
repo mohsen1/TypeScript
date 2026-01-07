@@ -129,6 +129,14 @@ impl<'a> LoweringPass<'a> {
             }
             k if k == syntax_kind_ext::VARIABLE_DECLARATION_LIST => {
                 if let Some(decl_list) = self.arena.get_variable(node) {
+                    if self.ctx.target_es5
+                        && self.decl_list_needs_es5_destructuring(decl_list)
+                    {
+                        self.transforms.insert(
+                            idx,
+                            TransformDirective::ES5VariableDeclarationList { decl_list: idx },
+                        );
+                    }
                     for &decl in &decl_list.declarations.nodes {
                         self.visit(decl);
                     }
@@ -1114,6 +1122,29 @@ impl<'a> LoweringPass<'a> {
             node.kind == syntax_kind_ext::METHOD_DECLARATION
                 || node.kind == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT
         })
+    }
+
+    fn decl_list_needs_es5_destructuring(
+        &self,
+        decl_list: &crate::parser::thin_node::VariableData,
+    ) -> bool {
+        decl_list.declarations.nodes.iter().any(|&decl_idx| {
+            let Some(decl_node) = self.arena.get(decl_idx) else {
+                return false;
+            };
+            let Some(decl) = self.arena.get_variable_declaration(decl_node) else {
+                return false;
+            };
+
+            !decl.initializer.is_none() && self.is_binding_pattern_idx(decl.name)
+        })
+    }
+
+    fn is_binding_pattern_idx(&self, idx: NodeIndex) -> bool {
+        self.arena.get(idx).map(|node| {
+            node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                || node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+        }).unwrap_or(false)
     }
 
     fn is_computed_property_member(&self, idx: NodeIndex) -> bool {
