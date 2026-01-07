@@ -409,6 +409,32 @@ impl<'a> ScopeWalker<'a> {
                     if let Some(res) = f(self, prop.initializer) { return Some(res); }
                 }
             }
+            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                || k == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
+                if let Some(pattern) = self.arena.get_binding_pattern(node) {
+                    for &elem in &pattern.elements.nodes {
+                        if elem.is_none() {
+                            continue;
+                        }
+                        if let Some(res) = f(self, elem) { return Some(res); }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::BINDING_ELEMENT => {
+                if let Some(binding) = self.arena.get_binding_element(node) {
+                    if !binding.property_name.is_none() {
+                        if let Some(prop_node) = self.arena.get(binding.property_name) {
+                            if prop_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+                                if let Some(res) = f(self, binding.property_name) { return Some(res); }
+                            }
+                        }
+                    }
+                    if let Some(res) = f(self, binding.name) { return Some(res); }
+                    if !binding.initializer.is_none() {
+                        if let Some(res) = f(self, binding.initializer) { return Some(res); }
+                    }
+                }
+            }
             k if k == syntax_kind_ext::COMPUTED_PROPERTY_NAME => {
                 if let Some(computed) = self.arena.get_computed_property(node) {
                     if let Some(res) = f(self, computed.expression) { return Some(res); }
@@ -853,6 +879,16 @@ impl<'a> ScopeWalker<'a> {
 
             // For VariableStatement, recurse into it to find VariableDeclarationList
             if let Some(node) = walker.arena.get(child_idx) {
+                if node.kind == syntax_kind_ext::VARIABLE_DECLARATION {
+                    if let Some(decl) = walker.arena.get_variable_declaration(node) {
+                        walker.register_binding_declarations(decl.name);
+                    }
+                }
+                if node.kind == syntax_kind_ext::PARAMETER {
+                    if let Some(param) = walker.arena.get_parameter(node) {
+                        walker.register_binding_declarations(param.name);
+                    }
+                }
                 if node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
                     walker.for_each_child(child_idx, |w, list_idx| {
                         // Inside VariableStatement is VariableDeclarationList
@@ -863,6 +899,11 @@ impl<'a> ScopeWalker<'a> {
                                     if let Some(&sym_id) = w2.binder.node_symbols.get(&decl_idx.0) {
                                         if let Some(symbol) = w2.binder.symbols.get(sym_id) {
                                             w2.declare_local(symbol.escaped_name.clone(), sym_id);
+                                        }
+                                    }
+                                    if let Some(decl_node) = w2.arena.get(decl_idx) {
+                                        if let Some(decl) = w2.arena.get_variable_declaration(decl_node) {
+                                            w2.register_binding_declarations(decl.name);
                                         }
                                     }
                                     None::<()>
@@ -899,6 +940,11 @@ impl<'a> ScopeWalker<'a> {
                                 w.declare_local(symbol.escaped_name.clone(), sym_id);
                             }
                         }
+                        if let Some(decl_node) = w.arena.get(decl_idx) {
+                            if let Some(decl) = w.arena.get_variable_declaration(decl_node) {
+                                w.register_binding_declarations(decl.name);
+                            }
+                        }
                         None::<()> // Continue iteration
                     });
                 }
@@ -906,6 +952,43 @@ impl<'a> ScopeWalker<'a> {
 
             None::<()> // Continue iteration
         });
+    }
+
+    fn register_binding_declarations(&mut self, name_idx: NodeIndex) {
+        if name_idx.is_none() {
+            return;
+        }
+
+        if let Some(&sym_id) = self.binder.node_symbols.get(&name_idx.0) {
+            if let Some(symbol) = self.binder.symbols.get(sym_id) {
+                self.declare_local(symbol.escaped_name.clone(), sym_id);
+            }
+            return;
+        }
+
+        let Some(node) = self.arena.get(name_idx) else {
+            return;
+        };
+
+        match node.kind {
+            k if k == syntax_kind_ext::BINDING_ELEMENT => {
+                if let Some(binding) = self.arena.get_binding_element(node) {
+                    self.register_binding_declarations(binding.name);
+                }
+            }
+            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                || k == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
+                if let Some(pattern) = self.arena.get_binding_pattern(node) {
+                    for &elem in &pattern.elements.nodes {
+                        if elem.is_none() {
+                            continue;
+                        }
+                        self.register_binding_declarations(elem);
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 
     /// Get the scope chain (symbol tables) active at the target node.

@@ -54,6 +54,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Traverse template expressions in LSP resolver for references/completions
    - [x] Traverse JSX nodes in LSP resolver for references/completions
    - [x] Add more expression/type nodes in resolver (await/yield/as/tagged templates, type annotations)
+   - [x] Bind and traverse destructuring patterns for definitions/references
    - [x] Add import/export handling for cross-file navigation
 
 3. **Multi-File Support**
@@ -67,7 +68,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
 #### Testing
 
 Latest run:
-- `./wasm/test.sh` ❌ (`src/emitter_transform_integration_tests.rs` `test_two_phase_emission_commonjs_auto_detect_exports`, `test_two_phase_emission_commonjs_multi_export_vars`; pre-existing on rust)
+- `./wasm/test.sh` ❌ (`src/emitter_transform_integration_tests.rs` `test_two_phase_emission_commonjs_auto_detect_exports`; pre-existing on rust)
 
 ## Quick Reference
 
