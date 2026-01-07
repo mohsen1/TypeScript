@@ -30,7 +30,7 @@ use crate::thin_checker::ThinCheckerState;
 use crate::thin_parser::ThinParserState;
 use crate::lsp::definition::GoToDefinition;
 use crate::lsp::references::FindReferences;
-use crate::lsp::rename::TextEdit;
+use crate::lsp::rename::{RenameProvider, TextEdit, WorkspaceEdit};
 use crate::lsp::position::{LineMap, Position, Location, Range};
 
 enum ImportKind {
@@ -1472,6 +1472,42 @@ impl Project {
             .record(ProjectRequestKind::References, start.elapsed(), scope_stats);
 
         result
+    }
+
+    /// Rename a symbol across files in the project.
+    pub fn get_rename_edits(
+        &mut self,
+        file_name: &str,
+        position: Position,
+        new_name: String,
+    ) -> Result<WorkspaceEdit, String> {
+        let normalized_name = {
+            let file = self
+                .files
+                .get(file_name)
+                .ok_or_else(|| "You cannot rename this element.".to_string())?;
+            let provider = RenameProvider::new(
+                file.parser.get_arena(),
+                &file.binder,
+                &file.line_map,
+                file.file_name.clone(),
+                file.parser.get_source_text(),
+            );
+            provider.normalize_rename_at_position(position, &new_name)?
+        };
+
+        let locations = self
+            .find_references(file_name, position)
+            .ok_or_else(|| "Could not find symbol to rename".to_string())?;
+        let mut workspace_edit = WorkspaceEdit::new();
+        for location in locations {
+            workspace_edit.add_edit(
+                location.file_path,
+                TextEdit::new(location.range, normalized_name.clone()),
+            );
+        }
+
+        Ok(workspace_edit)
     }
 
     fn definition_from_import(&self, file: &ProjectFile, position: Position) -> Option<Vec<Location>> {
