@@ -21,12 +21,17 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - String literals: `"hello"` -> `TypeKey::Literal(atom)`
   - Number literals: `42` -> special handling (store as Atom? or separate pool?)
   - Boolean literals: `true`, `false`
+  - Hex/binary/octal numeric literals map to numeric literal types
+  - BigInt literals normalize base prefixes to decimal
+  - BigInt literals with base prefixes are tokenized in the scanner
 - [x] Tests for basic lowering
   - Test: `number` annotation -> Intrinsic(Number)
   - Test: `"hello"` -> Literal with correct Atom
   - Test: Verify deduplication (same type -> same TypeId)
   - [x] Add BigInt literal type test once `123n` parses in type position
   - [x] Test: Negative numeric and bigint literal types
+  - [x] Test: Hex/binary/octal numeric literal types
+  - [x] Test: Hex/binary/octal bigint literal types (normalized)
 
 ### Phase 2: Complex Type Structures
 - [x] Implement object type lowering
@@ -101,6 +106,8 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: typeof value references in interfaces (qualified and unqualified)
   - [x] Test: typeof lowering uses value resolver (type vs value space)
 - [x] Parser: fix interface member parsing to track progress by token position (avoid skipping consecutive identifiers)
+- [x] Perf: avoid extra String clone when lowering negative bigint literals
+- [x] Perf: avoid extra allocation when normalizing bigint leading zeros
 
 ## Architecture Notes
 - All strings MUST go through interner.intern_string() -> Atom

@@ -12,7 +12,7 @@
 use std::collections::HashSet;
 use crate::interner::Atom;
 use crate::solver::types::*;
-use crate::solver::TypeDatabase;
+use crate::solver::{apparent_primitive_members, ApparentMemberKind, TypeDatabase};
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -268,6 +268,18 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             Some(k) => k,
             None => return SubtypeResult::False,
         };
+
+        if let Some(shape) = self.apparent_primitive_shape_for_key(&source_key) {
+            match &target_key {
+                TypeKey::Object(t_props) => {
+                    return self.check_object_subtype(&shape.properties, t_props);
+                }
+                TypeKey::ObjectWithIndex(t_shape) => {
+                    return self.check_object_with_index_subtype(&shape, t_shape);
+                }
+                _ => {}
+            }
+        }
 
         // =========================================================================
         // Structural checks
@@ -641,6 +653,81 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             }
             _ => false,
         }
+    }
+
+    fn apparent_primitive_shape_for_key(&mut self, key: &TypeKey) -> Option<ObjectShape> {
+        let kind = self.apparent_primitive_kind(key)?;
+        Some(self.apparent_primitive_shape(kind))
+    }
+
+    fn apparent_primitive_kind(&self, key: &TypeKey) -> Option<IntrinsicKind> {
+        match key {
+            TypeKey::Intrinsic(kind) => match kind {
+                IntrinsicKind::String
+                | IntrinsicKind::Number
+                | IntrinsicKind::Boolean
+                | IntrinsicKind::Bigint
+                | IntrinsicKind::Symbol => Some(*kind),
+                _ => None,
+            },
+            TypeKey::Literal(literal) => match literal {
+                LiteralValue::String(_) => Some(IntrinsicKind::String),
+                LiteralValue::Number(_) => Some(IntrinsicKind::Number),
+                LiteralValue::BigInt(_) => Some(IntrinsicKind::Bigint),
+                LiteralValue::Boolean(_) => Some(IntrinsicKind::Boolean),
+            },
+            _ => None,
+        }
+    }
+
+    fn apparent_primitive_shape(&mut self, kind: IntrinsicKind) -> ObjectShape {
+        let members = apparent_primitive_members(self.interner, kind);
+        let mut properties = Vec::with_capacity(members.len());
+
+        for member in members {
+            let name = self.interner.intern_string(member.name);
+            match member.kind {
+                ApparentMemberKind::Value(type_id) => properties.push(PropertyInfo {
+                    name,
+                    type_id,
+                    optional: false,
+                    readonly: false,
+                    is_method: false,
+                }),
+                ApparentMemberKind::Method(return_type) => properties.push(PropertyInfo {
+                    name,
+                    type_id: self.apparent_method_type(return_type),
+                    optional: false,
+                    readonly: false,
+                    is_method: true,
+                }),
+            }
+        }
+
+        let number_index = if kind == IntrinsicKind::String {
+            Some(IndexSignature {
+                key_type: TypeId::NUMBER,
+                value_type: TypeId::STRING,
+                readonly: true,
+            })
+        } else {
+            None
+        };
+
+        ObjectShape {
+            properties,
+            string_index: None,
+            number_index,
+        }
+    }
+
+    fn apparent_method_type(&mut self, return_type: TypeId) -> TypeId {
+        self.interner.function(FunctionShape {
+            params: Vec::new(),
+            return_type,
+            type_params: Vec::new(),
+            is_constructor: false,
+        })
     }
 
     /// Check literal to intrinsic subtyping
@@ -1371,6 +1458,18 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         source_key: &TypeKey,
         target_key: &TypeKey,
     ) -> Option<SubtypeFailureReason> {
+        if let Some(shape) = self.apparent_primitive_shape_for_key(source_key) {
+            match target_key {
+                TypeKey::Object(t_props) => {
+                    return self.explain_object_failure(source, target, &shape.properties, t_props);
+                }
+                TypeKey::ObjectWithIndex(t_shape) => {
+                    return self.explain_indexed_object_failure(source, target, &shape, t_shape);
+                }
+                _ => {}
+            }
+        }
+
         match (source_key, target_key) {
             // Object to object - find the specific missing/mismatched property
             (TypeKey::Object(s_props), TypeKey::Object(t_props)) => {
@@ -1518,13 +1617,27 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         // Check string index signature
         if let Some(ref t_string_idx) = target_shape.string_index {
-            if let Some(ref s_string_idx) = source_shape.string_index {
-                if !self.check_subtype(s_string_idx.value_type, t_string_idx.value_type).is_true() {
-                    return Some(SubtypeFailureReason::IndexSignatureMismatch {
-                        index_kind: "string",
-                        source_value_type: s_string_idx.value_type,
-                        target_value_type: t_string_idx.value_type,
-                    });
+            match &source_shape.string_index {
+                Some(s_string_idx) => {
+                    if !self.check_subtype(s_string_idx.value_type, t_string_idx.value_type).is_true() {
+                        return Some(SubtypeFailureReason::IndexSignatureMismatch {
+                            index_kind: "string",
+                            source_value_type: s_string_idx.value_type,
+                            target_value_type: t_string_idx.value_type,
+                        });
+                    }
+                }
+                None => {
+                    for prop in &source_shape.properties {
+                        let prop_type = self.optional_property_type(prop);
+                        if !self.check_subtype(prop_type, t_string_idx.value_type).is_true() {
+                            return Some(SubtypeFailureReason::IndexSignatureMismatch {
+                                index_kind: "string",
+                                source_value_type: prop_type,
+                                target_value_type: t_string_idx.value_type,
+                            });
+                        }
+                    }
                 }
             }
         }

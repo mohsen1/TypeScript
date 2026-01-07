@@ -199,6 +199,19 @@ impl TypeInterner {
         self.intern(TypeKey::Literal(LiteralValue::BigInt(atom)))
     }
 
+    /// Intern a literal bigint type, allowing a sign prefix without extra clones.
+    pub fn literal_bigint_with_sign(&self, negative: bool, digits: &str) -> TypeId {
+        if !negative {
+            return self.literal_bigint(digits);
+        }
+
+        let mut value = String::with_capacity(digits.len() + 1);
+        value.push('-');
+        value.push_str(digits);
+        let atom = self.string_interner.write().unwrap().intern_owned(value);
+        self.intern(TypeKey::Literal(LiteralValue::BigInt(atom)))
+    }
+
     /// Intern a union type, normalizing and deduplicating members
     pub fn union(&self, mut members: Vec<TypeId>) -> TypeId {
         // Flatten nested unions

@@ -85,6 +85,11 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Respect type parameter shadowing in instantiation scopes
 - [x] Use FxHashMap for substitution and inference maps
 - [x] Infer generics for callable overload signatures
+- [x] Validate rest parameter argument types in call resolution
+- [x] Treat rest parameters as optional for min argument count
+- [x] Validate generic call argument count and non-generic params
+- [x] Validate generic calls after inference for defaulted params
+- [x] Use FxHashSet in inference visited/dedup
 
 ## Architecture Notes
 - Use `ena` crate for union-find data structure

@@ -20,12 +20,12 @@
 
 use crate::interner::Atom;
 use crate::solver::types::*;
-use crate::solver::TypeDatabase;
+use crate::solver::{apparent_primitive_member_kind, ApparentMemberKind, TypeDatabase};
 use crate::solver::subtype::SubtypeChecker;
 use crate::solver::diagnostics::PendingDiagnostic;
 use crate::solver::infer::InferenceContext;
 use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 // =============================================================================
 // Function Call Resolution
@@ -112,13 +112,8 @@ impl<'a> CallEvaluator<'a> {
 
     /// Resolve a call to a simple function type.
     fn resolve_function_call(&mut self, func: &FunctionShape, arg_types: &[TypeId]) -> CallResult {
-        // Handle generic functions
-        if !func.type_params.is_empty() {
-            return self.resolve_generic_call(func, arg_types);
-        }
-
         // Check argument count
-        let min_args = func.params.iter().filter(|p| !p.optional).count();
+        let min_args = func.params.iter().filter(|p| !p.optional && !p.rest).count();
         let max_args = if func.params.iter().any(|p| p.rest) {
             None
         } else {
@@ -143,31 +138,13 @@ impl<'a> CallEvaluator<'a> {
             }
         }
 
-        // Check argument types
-        for (i, arg_type) in arg_types.iter().enumerate() {
-            if i >= func.params.len() {
-                // Rest parameter or excess args already handled by count check
-                break;
-            }
+        // Handle generic functions
+        if !func.type_params.is_empty() {
+            return self.resolve_generic_call(func, arg_types);
+        }
 
-            let param = &func.params[i];
-            let param_type = if param.rest {
-                // For rest parameters, unwrap the array type
-                match self.interner.lookup(param.type_id) {
-                    Some(TypeKey::Array(elem)) => elem,
-                    _ => param.type_id,
-                }
-            } else {
-                param.type_id
-            };
-
-            if !self.subtype.is_assignable_to(*arg_type, param_type) {
-                return CallResult::ArgumentTypeMismatch {
-                    index: i,
-                    expected: param_type,
-                    actual: *arg_type,
-                };
-            }
+        if let Some(result) = self.check_argument_types(&func.params, arg_types) {
+            return result;
         }
 
         CallResult::Success(func.return_type)
@@ -227,6 +204,17 @@ impl<'a> CallEvaluator<'a> {
                 param.type_id
             };
 
+            let mut visited = FxHashSet::default();
+            if !self.type_contains_placeholder(target_type, &var_map, &mut visited)
+                && !self.subtype.is_assignable_to(arg_type, target_type)
+            {
+                return CallResult::ArgumentTypeMismatch {
+                    index: i,
+                    expected: target_type,
+                    actual: arg_type,
+                };
+            }
+
             // arg_type <: target_type
             self.constrain_types(&mut infer_ctx, &var_map, arg_type, target_type);
         }
@@ -261,8 +249,190 @@ impl<'a> CallEvaluator<'a> {
             }
         }
 
+        let instantiated_params: Vec<ParamInfo> = func.params.iter().map(|p| {
+            ParamInfo {
+                name: p.name.clone(),
+                type_id: instantiate_type(self.interner, p.type_id, &final_subst),
+                optional: p.optional,
+                rest: p.rest,
+            }
+        }).collect();
+        if let Some(result) = self.check_argument_types(&instantiated_params, arg_types) {
+            return result;
+        }
+
         let return_type = instantiate_type(self.interner, func.return_type, &final_subst);
         CallResult::Success(return_type)
+    }
+
+    fn check_argument_types(&mut self, params: &[ParamInfo], arg_types: &[TypeId]) -> Option<CallResult> {
+        let rest_param = params.last().filter(|param| param.rest);
+        for (i, arg_type) in arg_types.iter().enumerate() {
+            let param = if i < params.len() {
+                &params[i]
+            } else if let Some(rest) = rest_param {
+                rest
+            } else {
+                // Rest parameter or excess args already handled by count check
+                break;
+            };
+            let param_type = if param.rest {
+                // For rest parameters, unwrap the array type
+                match self.interner.lookup(param.type_id) {
+                    Some(TypeKey::Array(elem)) => elem,
+                    _ => param.type_id,
+                }
+            } else {
+                param.type_id
+            };
+
+            if !self.subtype.is_assignable_to(*arg_type, param_type) {
+                return Some(CallResult::ArgumentTypeMismatch {
+                    index: i,
+                    expected: param_type,
+                    actual: *arg_type,
+                });
+            }
+        }
+        None
+    }
+
+    fn type_contains_placeholder(
+        &self,
+        ty: TypeId,
+        var_map: &FxHashMap<TypeId, crate::solver::infer::InferenceVar>,
+        visited: &mut FxHashSet<TypeId>,
+    ) -> bool {
+        if var_map.contains_key(&ty) {
+            return true;
+        }
+        if !visited.insert(ty) {
+            return false;
+        }
+
+        let key = match self.interner.lookup(ty) {
+            Some(key) => key,
+            None => return false,
+        };
+
+        match key {
+            TypeKey::Array(elem) => self.type_contains_placeholder(elem, var_map, visited),
+            TypeKey::Tuple(elements) => elements
+                .iter()
+                .any(|elem| self.type_contains_placeholder(elem.type_id, var_map, visited)),
+            TypeKey::Union(members) | TypeKey::Intersection(members) => members
+                .iter()
+                .any(|&member| self.type_contains_placeholder(member, var_map, visited)),
+            TypeKey::Object(props) => props
+                .iter()
+                .any(|prop| self.type_contains_placeholder(prop.type_id, var_map, visited)),
+            TypeKey::ObjectWithIndex(shape) => {
+                shape
+                    .properties
+                    .iter()
+                    .any(|prop| self.type_contains_placeholder(prop.type_id, var_map, visited))
+                    || shape.string_index.as_ref().is_some_and(|idx| {
+                        self.type_contains_placeholder(idx.key_type, var_map, visited)
+                            || self.type_contains_placeholder(idx.value_type, var_map, visited)
+                    })
+                    || shape.number_index.as_ref().is_some_and(|idx| {
+                        self.type_contains_placeholder(idx.key_type, var_map, visited)
+                            || self.type_contains_placeholder(idx.value_type, var_map, visited)
+                    })
+            }
+            TypeKey::Application(app) => {
+                self.type_contains_placeholder(app.base, var_map, visited)
+                    || app.args.iter().any(|&arg| self.type_contains_placeholder(arg, var_map, visited))
+            }
+            TypeKey::Function(shape) => {
+                shape.type_params.iter().any(|tp| {
+                    tp.constraint
+                        .is_some_and(|constraint| self.type_contains_placeholder(constraint, var_map, visited))
+                        || tp.default
+                            .is_some_and(|default| self.type_contains_placeholder(default, var_map, visited))
+                }) || shape
+                    .params
+                    .iter()
+                    .any(|param| self.type_contains_placeholder(param.type_id, var_map, visited))
+                    || self.type_contains_placeholder(shape.return_type, var_map, visited)
+            }
+            TypeKey::Callable(shape) => {
+                let in_call = shape.call_signatures.iter().any(|sig| {
+                    sig.type_params.iter().any(|tp| {
+                        tp.constraint.is_some_and(|constraint| {
+                            self.type_contains_placeholder(constraint, var_map, visited)
+                        }) || tp.default.is_some_and(|default| {
+                            self.type_contains_placeholder(default, var_map, visited)
+                        })
+                    }) || sig
+                        .params
+                        .iter()
+                        .any(|param| self.type_contains_placeholder(param.type_id, var_map, visited))
+                        || self.type_contains_placeholder(sig.return_type, var_map, visited)
+                });
+                if in_call {
+                    return true;
+                }
+                let in_construct = shape.construct_signatures.iter().any(|sig| {
+                    sig.type_params.iter().any(|tp| {
+                        tp.constraint.is_some_and(|constraint| {
+                            self.type_contains_placeholder(constraint, var_map, visited)
+                        }) || tp.default.is_some_and(|default| {
+                            self.type_contains_placeholder(default, var_map, visited)
+                        })
+                    }) || sig
+                        .params
+                        .iter()
+                        .any(|param| self.type_contains_placeholder(param.type_id, var_map, visited))
+                        || self.type_contains_placeholder(sig.return_type, var_map, visited)
+                });
+                if in_construct {
+                    return true;
+                }
+                shape
+                    .properties
+                    .iter()
+                    .any(|prop| self.type_contains_placeholder(prop.type_id, var_map, visited))
+            }
+            TypeKey::Conditional(cond) => {
+                self.type_contains_placeholder(cond.check_type, var_map, visited)
+                    || self.type_contains_placeholder(cond.extends_type, var_map, visited)
+                    || self.type_contains_placeholder(cond.true_type, var_map, visited)
+                    || self.type_contains_placeholder(cond.false_type, var_map, visited)
+            }
+            TypeKey::Mapped(mapped) => {
+                mapped
+                    .type_param
+                    .constraint
+                    .is_some_and(|constraint| self.type_contains_placeholder(constraint, var_map, visited))
+                    || mapped
+                        .type_param
+                        .default
+                        .is_some_and(|default| self.type_contains_placeholder(default, var_map, visited))
+                    || self.type_contains_placeholder(mapped.constraint, var_map, visited)
+                    || self.type_contains_placeholder(mapped.template, var_map, visited)
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                self.type_contains_placeholder(obj, var_map, visited)
+                    || self.type_contains_placeholder(idx, var_map, visited)
+            }
+            TypeKey::KeyOf(operand) | TypeKey::ReadonlyType(operand) => {
+                self.type_contains_placeholder(operand, var_map, visited)
+            }
+            TypeKey::TemplateLiteral(spans) => spans.iter().any(|span| match span {
+                TemplateSpan::Text(_) => false,
+                TemplateSpan::Type(inner) => self.type_contains_placeholder(*inner, var_map, visited),
+            }),
+            TypeKey::TypeParameter(_)
+            | TypeKey::Infer(_)
+            | TypeKey::Intrinsic(_)
+            | TypeKey::Literal(_)
+            | TypeKey::Ref(_)
+            | TypeKey::TypeQuery(_)
+            | TypeKey::UniqueSymbol(_)
+            | TypeKey::ThisType
+            | TypeKey::Error => false,
+        }
     }
 
     /// Structural walker to collect constraints: source <: target
@@ -742,95 +912,49 @@ impl<'a> PropertyAccessEvaluator<'a> {
         }
     }
 
-    /// Resolve properties on string type.
-    fn resolve_string_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
-        match prop_name {
-            "length" => PropertyAccessResult::Success {
-                type_id: TypeId::NUMBER,
+    fn resolve_apparent_property(
+        &self,
+        kind: IntrinsicKind,
+        owner_type: TypeId,
+        prop_name: &str,
+        prop_atom: Atom,
+    ) -> PropertyAccessResult {
+        match apparent_primitive_member_kind(self.interner, kind, prop_name) {
+            Some(ApparentMemberKind::Value(type_id)) => PropertyAccessResult::Success {
+                type_id,
                 from_index_signature: false,
             },
-            "at" | "charAt" | "concat" | "padEnd" | "padStart" | "repeat" | "slice" |
-            "substring" | "toLocaleLowerCase" | "toLocaleUpperCase" | "toLowerCase" |
-            "toString" | "toUpperCase" | "trim" | "trimEnd" | "trimStart" | "valueOf" => {
-                self.method_result(TypeId::STRING)
-            }
-            "charCodeAt" | "codePointAt" | "indexOf" | "lastIndexOf" | "search" => {
-                self.method_result(TypeId::NUMBER)
-            }
-            "endsWith" | "includes" | "startsWith" => {
-                self.method_result(TypeId::BOOLEAN)
-            }
-            "match" | "matchAll" => self.method_result(TypeId::ANY),
-            "replace" | "replaceAll" => self.method_result(TypeId::STRING),
-            "split" => {
-                let array_type = self.interner.array(TypeId::STRING);
-                self.method_result(array_type)
-            }
-            _ => PropertyAccessResult::PropertyNotFound {
-                type_id: TypeId::STRING,
+            Some(ApparentMemberKind::Method(return_type)) => self.method_result(return_type),
+            None => PropertyAccessResult::PropertyNotFound {
+                type_id: owner_type,
                 property_name: prop_atom,
             },
         }
+    }
+
+    /// Resolve properties on string type.
+    fn resolve_string_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
+        self.resolve_apparent_property(IntrinsicKind::String, TypeId::STRING, prop_name, prop_atom)
     }
 
     /// Resolve properties on number type.
     fn resolve_number_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
-        match prop_name {
-            "toExponential" | "toFixed" | "toLocaleString" | "toPrecision" | "toString" => {
-                self.method_result(TypeId::STRING)
-            }
-            "valueOf" => self.method_result(TypeId::NUMBER),
-            _ => PropertyAccessResult::PropertyNotFound {
-                type_id: TypeId::NUMBER,
-                property_name: prop_atom,
-            },
-        }
+        self.resolve_apparent_property(IntrinsicKind::Number, TypeId::NUMBER, prop_name, prop_atom)
     }
 
     /// Resolve properties on boolean type.
     fn resolve_boolean_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
-        match prop_name {
-            "toLocaleString" | "toString" => self.method_result(TypeId::STRING),
-            "valueOf" => self.method_result(TypeId::BOOLEAN),
-            _ => PropertyAccessResult::PropertyNotFound {
-                type_id: TypeId::BOOLEAN,
-                property_name: prop_atom,
-            },
-        }
+        self.resolve_apparent_property(IntrinsicKind::Boolean, TypeId::BOOLEAN, prop_name, prop_atom)
     }
 
     /// Resolve properties on bigint type.
     fn resolve_bigint_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
-        match prop_name {
-            "toLocaleString" | "toString" => self.method_result(TypeId::STRING),
-            "valueOf" => self.method_result(TypeId::BIGINT),
-            _ => PropertyAccessResult::PropertyNotFound {
-                type_id: TypeId::BIGINT,
-                property_name: prop_atom,
-            },
-        }
+        self.resolve_apparent_property(IntrinsicKind::Bigint, TypeId::BIGINT, prop_name, prop_atom)
     }
 
     /// Resolve properties on symbol primitive type.
     fn resolve_symbol_primitive_property(&self, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
-        match prop_name {
-            // Symbol.prototype.description: string | undefined
-            "description" => {
-                let union = self.interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
-                PropertyAccessResult::Success {
-                    type_id: union,
-                    from_index_signature: false,
-                }
-            }
-            // Symbol.prototype.toString(): string
-            // Symbol.prototype.valueOf(): symbol
-            "toString" => self.method_result(TypeId::STRING),
-            "valueOf" => self.method_result(TypeId::SYMBOL),
-            _ => PropertyAccessResult::PropertyNotFound {
-                type_id: TypeId::SYMBOL,
-                property_name: prop_atom,
-            },
-        }
+        self.resolve_apparent_property(IntrinsicKind::Symbol, TypeId::SYMBOL, prop_name, prop_atom)
     }
 
     /// Resolve properties on array type.

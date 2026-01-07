@@ -44,6 +44,19 @@ pub struct SignatureHelp {
     pub active_parameter: u32,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CallKind {
+    Call,
+    New,
+}
+
+struct SignatureCandidate {
+    info: SignatureInformation,
+    required_params: usize,
+    total_params: usize,
+    has_rest: bool,
+}
+
 pub struct SignatureHelpProvider<'a> {
     arena: &'a ThinNodeArena,
     binder: &'a ThinBinderState,
@@ -90,7 +103,7 @@ impl<'a> SignatureHelpProvider<'a> {
         let leaf_node = find_node_at_offset(self.arena, offset);
 
         // 2. Walk up to find the nearest CallExpression or NewExpression
-        let (call_node_idx, call_expr) = self.find_containing_call(leaf_node)?;
+        let (call_node_idx, call_expr, call_kind) = self.find_containing_call(leaf_node)?;
 
         // 3. Determine active parameter by counting commas
         let active_parameter = self.determine_active_parameter(call_node_idx, call_expr, offset);
@@ -120,7 +133,7 @@ impl<'a> SignatureHelpProvider<'a> {
         let callee_type = checker.get_type_of_symbol(symbol_id);
 
         // 6. Extract signatures from the type
-        let signatures = self.get_signatures_from_type(callee_type, &checker);
+        let signatures = self.get_signatures_from_type(callee_type, &checker, call_kind);
 
         // Extract and save the updated cache for future queries
         *type_cache = Some(checker.extract_cache());
@@ -129,25 +142,37 @@ impl<'a> SignatureHelpProvider<'a> {
             return None;
         }
 
+        let arg_count = call_expr
+            .arguments
+            .as_ref()
+            .map(|args| args.nodes.len())
+            .unwrap_or(0);
+        let active_signature = self.select_active_signature(&signatures, arg_count, active_parameter);
+
         Some(SignatureHelp {
-            signatures,
-            active_signature: 0, // TODO: logic to select best overload based on args
+            signatures: signatures.into_iter().map(|sig| sig.info).collect(),
+            active_signature,
             active_parameter,
         })
     }
 
     /// Walk up the AST to find the call expression containing the cursor.
-    fn find_containing_call(&self, start_node: NodeIndex) -> Option<(NodeIndex, &'a CallExprData)> {
+    fn find_containing_call(&self, start_node: NodeIndex) -> Option<(NodeIndex, &'a CallExprData, CallKind)> {
         let mut current = start_node;
 
         // Safety limit to prevent infinite loops
         let mut depth = 0;
         while !current.is_none() && depth < 100 {
             if let Some(node) = self.arena.get(current) {
-                if node.kind == syntax_kind_ext::CALL_EXPRESSION ||
-                   node.kind == syntax_kind_ext::NEW_EXPRESSION {
+                if node.kind == syntax_kind_ext::CALL_EXPRESSION
+                    || node.kind == syntax_kind_ext::NEW_EXPRESSION {
                     if let Some(data) = self.arena.get_call_expr(node) {
-                        return Some((current, data));
+                        let kind = if node.kind == syntax_kind_ext::NEW_EXPRESSION {
+                            CallKind::New
+                        } else {
+                            CallKind::Call
+                        };
+                        return Some((current, data, kind));
                     }
                 }
 
@@ -191,13 +216,13 @@ impl<'a> SignatureHelpProvider<'a> {
             };
 
             // If cursor is before this argument's start, we're between args
-            // Return the index of the previous argument (or 0 for the first gap)
+            // Treat it as the next argument.
             if cursor_offset < arg_node.pos {
-                return index.max(1) as u32 - 1;
+                return index as u32;
             }
 
             // If cursor is within this argument's range, return this index
-            if cursor_offset >= arg_node.pos && cursor_offset <= arg_node.end {
+            if cursor_offset >= arg_node.pos && cursor_offset < arg_node.end {
                 return index as u32;
             }
         }
@@ -207,7 +232,12 @@ impl<'a> SignatureHelpProvider<'a> {
     }
 
     /// Extract signature information from a TypeId.
-    fn get_signatures_from_type(&self, type_id: TypeId, checker: &ThinCheckerState) -> Vec<SignatureInformation> {
+    fn get_signatures_from_type(
+        &self,
+        type_id: TypeId,
+        checker: &ThinCheckerState,
+        call_kind: CallKind,
+    ) -> Vec<SignatureCandidate> {
         let key = match self.interner.lookup(type_id) {
             Some(k) => k,
             None => return vec![],
@@ -216,31 +246,38 @@ impl<'a> SignatureHelpProvider<'a> {
         match key {
             // Single function signature
             TypeKey::Function(shape) => {
-                vec![self.format_signature(&shape, checker, false)]
+                vec![self.signature_candidate(&shape, checker, false)]
             }
             // Overloaded signatures
             TypeKey::Callable(shape) => {
                 let mut sigs = Vec::new();
-                // Add call signatures
-                for sig in &shape.call_signatures {
-                    // Convert CallSignature to FunctionShape for formatting
-                    let func_shape = FunctionShape {
-                        type_params: sig.type_params.clone(),
-                        params: sig.params.clone(),
-                        return_type: sig.return_type,
-                        is_constructor: false,
-                    };
-                    sigs.push(self.format_signature(&func_shape, checker, false));
+                let include_call = call_kind == CallKind::Call || shape.construct_signatures.is_empty();
+                let include_construct = call_kind == CallKind::New || shape.call_signatures.is_empty();
+
+                if include_call {
+                    // Add call signatures
+                    for sig in &shape.call_signatures {
+                        // Convert CallSignature to FunctionShape for formatting
+                        let func_shape = FunctionShape {
+                            type_params: sig.type_params.clone(),
+                            params: sig.params.clone(),
+                            return_type: sig.return_type,
+                            is_constructor: false,
+                        };
+                        sigs.push(self.signature_candidate(&func_shape, checker, false));
+                    }
                 }
-                // Add construct signatures
-                for sig in &shape.construct_signatures {
-                    let func_shape = FunctionShape {
-                        type_params: sig.type_params.clone(),
-                        params: sig.params.clone(),
-                        return_type: sig.return_type,
-                        is_constructor: true,
-                    };
-                    sigs.push(self.format_signature(&func_shape, checker, true));
+                if include_construct {
+                    // Add construct signatures
+                    for sig in &shape.construct_signatures {
+                        let func_shape = FunctionShape {
+                            type_params: sig.type_params.clone(),
+                            params: sig.params.clone(),
+                            return_type: sig.return_type,
+                            is_constructor: true,
+                        };
+                        sigs.push(self.signature_candidate(&func_shape, checker, true));
+                    }
                 }
                 sigs
             }
@@ -248,7 +285,7 @@ impl<'a> SignatureHelpProvider<'a> {
             TypeKey::Union(members) => {
                 let mut sigs = Vec::new();
                 for member in members {
-                    sigs.extend(self.get_signatures_from_type(member, checker));
+                    sigs.extend(self.get_signatures_from_type(member, checker, call_kind));
                 }
                 sigs
             }
@@ -300,6 +337,77 @@ impl<'a> SignatureHelpProvider<'a> {
             parameters,
         }
     }
+
+    fn signature_candidate(
+        &self,
+        shape: &FunctionShape,
+        checker: &ThinCheckerState,
+        is_constructor: bool,
+    ) -> SignatureCandidate {
+        let (required_params, total_params, has_rest) = self.signature_meta(&shape.params);
+        SignatureCandidate {
+            info: self.format_signature(shape, checker, is_constructor),
+            required_params,
+            total_params,
+            has_rest,
+        }
+    }
+
+    fn signature_meta(&self, params: &[crate::solver::ParamInfo]) -> (usize, usize, bool) {
+        let required_params = params.iter().filter(|param| !param.optional && !param.rest).count();
+        let total_params = params.len();
+        let has_rest = params.iter().any(|param| param.rest);
+        (required_params, total_params, has_rest)
+    }
+
+    fn select_active_signature(
+        &self,
+        signatures: &[SignatureCandidate],
+        arg_count: usize,
+        active_parameter: u32,
+    ) -> u32 {
+        if signatures.is_empty() {
+            return 0;
+        }
+
+        let desired = if arg_count == 0 {
+            0
+        } else {
+            arg_count.max(active_parameter as usize + 1)
+        };
+
+        let mut best_idx = 0usize;
+        let mut best_score = usize::MAX;
+        let mut best_rest_penalty = usize::MAX;
+        let mut best_total_params = usize::MAX;
+
+        for (idx, sig) in signatures.iter().enumerate() {
+            let min_params = sig.required_params;
+            let max_params = if sig.has_rest { usize::MAX } else { sig.total_params };
+            let score = if desired < min_params {
+                min_params - desired
+            } else if desired > max_params {
+                desired - max_params
+            } else {
+                0
+            };
+            let rest_penalty = if sig.has_rest { 1 } else { 0 };
+
+            if score < best_score
+                || (score == best_score && rest_penalty < best_rest_penalty)
+                || (score == best_score
+                    && rest_penalty == best_rest_penalty
+                    && sig.total_params < best_total_params)
+            {
+                best_idx = idx;
+                best_score = score;
+                best_rest_penalty = rest_penalty;
+                best_total_params = sig.total_params;
+            }
+        }
+
+        best_idx as u32
+    }
 }
 
 #[cfg(test)]
@@ -311,7 +419,6 @@ mod signature_help_tests {
     use crate::lsp::position::LineMap;
 
     #[test]
-    #[ignore] // TODO: Debug cursor position detection with multiple arguments
     fn test_signature_help_simple() {
         // function add(x: number, y: number): number { return x + y; }
         // add(1, 2|);
@@ -453,11 +560,63 @@ mod signature_help_tests {
             assert_eq!(h.active_parameter, 1, "Should be on second parameter");
         }
 
+        // Test cursor between comma and second argument
+        let pos_between = Position::new(1, 10); // Between "," and "2"
+        let help_between = provider.get_signature_help(root, pos_between, &mut cache);
+        if let Some(h) = help_between {
+            assert_eq!(h.active_parameter, 1, "Should be on second parameter");
+        }
+
         // Test cursor at third argument
         let pos3 = Position::new(1, 14); // At "3"
         let help3 = provider.get_signature_help(root, pos3, &mut cache);
         if let Some(h) = help3 {
             assert_eq!(h.active_parameter, 2, "Should be on third parameter");
         }
+    }
+
+    #[test]
+    fn test_signature_help_overload_selection() {
+        let source = "interface Fn {\n  (a: number): void;\n  (a: number, b: string): void;\n}\ndeclare const fn: Fn;\nfn(1);\nfn(1, \"x\");";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let interner = TypeInterner::new();
+        let line_map = LineMap::build(source);
+
+        let provider = SignatureHelpProvider::new(
+            parser.get_arena(),
+            &binder,
+            &line_map,
+            &interner,
+            source,
+            "test.ts".to_string(),
+        );
+
+        let mut cache = None;
+        let pos_first = Position::new(5, 3); // At "1"
+        let help_first = provider.get_signature_help(root, pos_first, &mut cache);
+        assert!(help_first.is_some(), "Should find signature help for first call");
+        let first = help_first.unwrap();
+        assert!(first.signatures.len() >= 2, "Expected overload signatures");
+        let first_active = &first.signatures[first.active_signature as usize];
+        assert!(
+            !first_active.label.contains("b: string"),
+            "First call should select single-arg overload"
+        );
+
+        let pos_second = Position::new(6, 6); // At "\"x\""
+        let help_second = provider.get_signature_help(root, pos_second, &mut cache);
+        assert!(help_second.is_some(), "Should find signature help for second call");
+        let second = help_second.unwrap();
+        assert!(second.signatures.len() >= 2, "Expected overload signatures");
+        let second_active = &second.signatures[second.active_signature as usize];
+        assert!(
+            second_active.label.contains("b: string"),
+            "Second call should select two-arg overload"
+        );
     }
 }

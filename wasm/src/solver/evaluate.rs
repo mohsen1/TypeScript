@@ -12,7 +12,7 @@
 //! - Supports distributivity for naked type parameters in unions
 
 use crate::solver::types::*;
-use crate::solver::TypeDatabase;
+use crate::solver::{apparent_primitive_members, TypeDatabase};
 use crate::solver::subtype::{SubtypeChecker, TypeResolver, NoopResolver};
 use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
 
@@ -365,6 +365,29 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
                 self.interner.union(key_types)
             }
+            TypeKey::Intrinsic(kind) => match kind {
+                IntrinsicKind::Any => {
+                    // keyof any = string | number | symbol
+                    self.interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::SYMBOL])
+                }
+                IntrinsicKind::Unknown => {
+                    // keyof unknown = never
+                    TypeId::NEVER
+                }
+                IntrinsicKind::String
+                | IntrinsicKind::Number
+                | IntrinsicKind::Boolean
+                | IntrinsicKind::Bigint
+                | IntrinsicKind::Symbol => self.apparent_primitive_keyof(kind),
+                _ => self.interner.intern(TypeKey::KeyOf(operand)),
+            },
+            TypeKey::Literal(literal) => {
+                if let Some(kind) = self.apparent_literal_kind(&literal) {
+                    self.apparent_primitive_keyof(kind)
+                } else {
+                    self.interner.intern(TypeKey::KeyOf(operand))
+                }
+            }
             TypeKey::Union(members) => {
                 // keyof (A | B) = keyof A & keyof B
                 let key_sets: Vec<TypeId> = members.iter()
@@ -379,14 +402,6 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     .map(|&m| self.evaluate_keyof(m))
                     .collect();
                 self.interner.union(key_sets)
-            }
-            TypeKey::Intrinsic(IntrinsicKind::Any) => {
-                // keyof any = string | number | symbol
-                self.interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::SYMBOL])
-            }
-            TypeKey::Intrinsic(IntrinsicKind::Unknown) => {
-                // keyof unknown = never
-                TypeId::NEVER
             }
             // For other types (type parameters, etc.), keep as KeyOf (deferred)
             _ => self.interner.intern(TypeKey::KeyOf(operand)),
@@ -436,6 +451,28 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             }
             // Can't extract literals from other types
             _ => None,
+        }
+    }
+
+    fn apparent_literal_kind(&self, literal: &LiteralValue) -> Option<IntrinsicKind> {
+        match literal {
+            LiteralValue::String(_) => Some(IntrinsicKind::String),
+            LiteralValue::Number(_) => Some(IntrinsicKind::Number),
+            LiteralValue::BigInt(_) => Some(IntrinsicKind::Bigint),
+            LiteralValue::Boolean(_) => Some(IntrinsicKind::Boolean),
+        }
+    }
+
+    fn apparent_primitive_keyof(&self, kind: IntrinsicKind) -> TypeId {
+        let members = apparent_primitive_members(self.interner, kind);
+        let mut key_types = Vec::with_capacity(members.len());
+        for member in members {
+            key_types.push(self.interner.literal_string(member.name));
+        }
+        if key_types.is_empty() {
+            TypeId::NEVER
+        } else {
+            self.interner.union(key_types)
         }
     }
 }

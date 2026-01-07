@@ -105,7 +105,15 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 ### Phase 13: Apparent Members of Primitives
 - [x] Resolve property access on primitive intrinsics and literal types via apparent members
 - [x] Return callable types for built-in primitive/array methods
+- [x] Apply apparent primitive members during object assignability checks
 - [x] Tests for primitive method property access and literal string properties
+- [x] Tests for primitive-to-object assignability and index signature cases
+- [x] Deduplicate primitive member lists across property access and subtyping
+
+### Phase 14: Mapped Types Over Primitives
+- [x] `keyof` on primitive intrinsics/literals yields apparent member keys
+- [x] Mapped types can expand over primitive apparent keys
+- [x] Tests for primitive `keyof` and mapped types
 
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
