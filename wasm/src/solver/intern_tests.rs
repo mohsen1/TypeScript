@@ -209,3 +209,58 @@ fn test_interner_application_deduplication() {
     assert_eq!(app1, app2);
     assert_ne!(app1, app3);
 }
+
+#[test]
+fn test_tuple_list_interning_deduplication() {
+    use std::sync::Arc;
+
+    let interner = TypeInterner::new();
+    let elements = vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ];
+
+    let tuple_a = interner.tuple(elements.clone());
+    let tuple_b = interner.tuple(elements);
+
+    let Some(TypeKey::Tuple(list_a)) = interner.lookup(tuple_a) else {
+        panic!("Expected tuple type");
+    };
+    let Some(TypeKey::Tuple(list_b)) = interner.lookup(tuple_b) else {
+        panic!("Expected tuple type");
+    };
+
+    assert_eq!(list_a, list_b);
+    let elems_a = interner.tuple_list(list_a);
+    let elems_b = interner.tuple_list(list_b);
+    assert!(Arc::ptr_eq(&elems_a, &elems_b));
+    assert_eq!(elems_a.len(), 2);
+}
+
+#[test]
+fn test_template_literal_list_interning_deduplication() {
+    use std::sync::Arc;
+
+    let interner = TypeInterner::new();
+    let spans = vec![
+        TemplateSpan::Text(interner.intern_string("prefix")),
+        TemplateSpan::Type(TypeId::STRING),
+        TemplateSpan::Text(interner.intern_string("suffix")),
+    ];
+
+    let template_a = interner.template_literal(spans.clone());
+    let template_b = interner.template_literal(spans);
+
+    let Some(TypeKey::TemplateLiteral(list_a)) = interner.lookup(template_a) else {
+        panic!("Expected template literal type");
+    };
+    let Some(TypeKey::TemplateLiteral(list_b)) = interner.lookup(template_b) else {
+        panic!("Expected template literal type");
+    };
+
+    assert_eq!(list_a, list_b);
+    let spans_a = interner.template_list(list_a);
+    let spans_b = interner.template_list(list_b);
+    assert!(Arc::ptr_eq(&spans_a, &spans_b));
+    assert_eq!(spans_a.len(), 3);
+}

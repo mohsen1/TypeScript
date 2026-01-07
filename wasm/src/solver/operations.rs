@@ -22,10 +22,8 @@ use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::{
     apparent_primitive_member_kind,
-    evaluate_conditional,
-    evaluate_index_access,
-    evaluate_mapped,
     ApparentMemberKind,
+    QueryDatabase,
     TypeDatabase,
 };
 use crate::solver::diagnostics::PendingDiagnostic;
@@ -35,6 +33,10 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 pub trait AssignabilityChecker {
     fn is_assignable_to(&mut self, source: TypeId, target: TypeId) -> bool;
+
+    fn is_assignable_to_strict(&mut self, source: TypeId, target: TypeId) -> bool {
+        self.is_assignable_to(source, target)
+    }
 }
 
 // =============================================================================
@@ -79,13 +81,13 @@ struct TupleRestExpansion {
 
 /// Evaluates function calls.
 pub struct CallEvaluator<'a, C: AssignabilityChecker> {
-    interner: &'a dyn TypeDatabase,
+    interner: &'a dyn QueryDatabase,
     checker: &'a mut C,
     defaulted_placeholders: FxHashSet<TypeId>,
 }
 
 impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
-    pub fn new(interner: &'a dyn TypeDatabase, checker: &'a mut C) -> Self {
+    pub fn new(interner: &'a dyn QueryDatabase, checker: &'a mut C) -> Self {
         CallEvaluator {
             interner,
             checker,
@@ -126,8 +128,14 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         };
 
         match key {
-            TypeKey::Function(ref f) => self.resolve_function_call(f, arg_types),
-            TypeKey::Callable(ref c) => self.resolve_callable_call(c, arg_types),
+            TypeKey::Function(f_id) => {
+                let shape = self.interner.function_shape(f_id);
+                self.resolve_function_call(shape.as_ref(), arg_types)
+            }
+            TypeKey::Callable(c_id) => {
+                let shape = self.interner.callable_shape(c_id);
+                self.resolve_callable_call(shape.as_ref(), arg_types)
+            }
             _ => CallResult::NotCallable { type_id: func_type },
         }
     }
@@ -176,7 +184,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
     }
 
     fn resolve_generic_call_inner(&mut self, func: &FunctionShape, arg_types: &[TypeId]) -> CallResult {
-        let mut infer_ctx = InferenceContext::new(self.interner);
+        let mut infer_ctx = InferenceContext::new(self.interner.as_type_database());
         let mut substitution = TypeSubstitution::new();
         let mut var_map: FxHashMap<TypeId, crate::solver::infer::InferenceVar> = FxHashMap::default();
         let mut type_param_vars = Vec::with_capacity(func.type_params.len());
@@ -300,7 +308,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 };
             }
         }
-        if let Some(result) = self.check_argument_types(&instantiated_params, arg_types) {
+        if let Some(result) = self.check_argument_types_with(&instantiated_params, arg_types, true) {
             return result;
         }
 
@@ -309,12 +317,27 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
     }
 
     fn check_argument_types(&mut self, params: &[ParamInfo], arg_types: &[TypeId]) -> Option<CallResult> {
+        self.check_argument_types_with(params, arg_types, false)
+    }
+
+    fn check_argument_types_with(
+        &mut self,
+        params: &[ParamInfo],
+        arg_types: &[TypeId],
+        strict: bool,
+    ) -> Option<CallResult> {
         for (i, arg_type) in arg_types.iter().enumerate() {
             let Some(param_type) = self.param_type_for_arg_index(params, i) else {
                 break;
             };
 
-            if !self.checker.is_assignable_to(*arg_type, param_type) {
+            let assignable = if strict {
+                self.checker.is_assignable_to_strict(*arg_type, param_type)
+            } else {
+                self.checker.is_assignable_to(*arg_type, param_type)
+            };
+
+            if !assignable {
                 return Some(CallResult::ArgumentTypeMismatch {
                     index: i,
                     expected: param_type,
@@ -334,9 +357,10 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 
         match self.interner.lookup(rest_param.type_id) {
             Some(TypeKey::Tuple(elements)) => {
+                let elements = self.interner.tuple_list(elements);
                 let mut min = required;
                 let mut max = required;
-                for elem in elements {
+                for elem in elements.iter() {
                     if elem.rest {
                         let expansion = self.expand_tuple_rest(elem.type_id);
                         for fixed in expansion.fixed {
@@ -372,8 +396,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         match self.interner.lookup(rest_param.type_id) {
             Some(TypeKey::Array(elem)) => Some(elem),
             Some(TypeKey::Tuple(elements)) => {
+                let elements = self.interner.tuple_list(elements);
                 let mut fixed_count = 0usize;
-                for elem in elements {
+                for elem in elements.iter() {
                     if elem.rest {
                         let expansion = self.expand_tuple_rest(elem.type_id);
                         let inner_offset = offset.saturating_sub(fixed_count);
@@ -407,8 +432,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 variadic: Some(elem),
             },
             Some(TypeKey::Tuple(elements)) => {
+                let elements = self.interner.tuple_list(elements);
                 let mut fixed = Vec::new();
-                for elem in elements {
+                for elem in elements.iter() {
                     if elem.rest {
                         let inner = self.expand_tuple_rest(elem.type_id);
                         fixed.extend(inner.fixed);
@@ -445,9 +471,10 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 Some((rest_start, rest_param.type_id))
             }
             Some(TypeKey::Tuple(elements)) => {
+                let elements = self.interner.tuple_list(elements);
                 let mut prefix_len = 0usize;
                 let mut target = None;
-                for elem in elements {
+                for elem in elements.iter() {
                     if elem.rest {
                         if var_map.contains_key(&elem.type_id) {
                             target = Some((rest_start + prefix_len, elem.type_id));
@@ -498,16 +525,27 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 
         match key {
             TypeKey::Array(elem) => self.type_contains_placeholder(elem, var_map, visited),
-            TypeKey::Tuple(elements) => elements
-                .iter()
-                .any(|elem| self.type_contains_placeholder(elem.type_id, var_map, visited)),
-            TypeKey::Union(members) | TypeKey::Intersection(members) => members
-                .iter()
-                .any(|&member| self.type_contains_placeholder(member, var_map, visited)),
-            TypeKey::Object(props) => props
-                .iter()
-                .any(|prop| self.type_contains_placeholder(prop.type_id, var_map, visited)),
-            TypeKey::ObjectWithIndex(shape) => {
+            TypeKey::Tuple(elements) => {
+                let elements = self.interner.tuple_list(elements);
+                elements
+                    .iter()
+                    .any(|elem| self.type_contains_placeholder(elem.type_id, var_map, visited))
+            }
+            TypeKey::Union(members) | TypeKey::Intersection(members) => {
+                let members = self.interner.type_list(members);
+                members
+                    .iter()
+                    .any(|&member| self.type_contains_placeholder(member, var_map, visited))
+            }
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                shape
+                    .properties
+                    .iter()
+                    .any(|prop| self.type_contains_placeholder(prop.type_id, var_map, visited))
+            }
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
                 shape
                     .properties
                     .iter()
@@ -521,11 +559,16 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                             || self.type_contains_placeholder(idx.value_type, var_map, visited)
                     })
             }
-            TypeKey::Application(app) => {
+            TypeKey::Application(app_id) => {
+                let app = self.interner.type_application(app_id);
                 self.type_contains_placeholder(app.base, var_map, visited)
-                    || app.args.iter().any(|&arg| self.type_contains_placeholder(arg, var_map, visited))
+                    || app
+                        .args
+                        .iter()
+                        .any(|&arg| self.type_contains_placeholder(arg, var_map, visited))
             }
-            TypeKey::Function(shape) => {
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(shape_id);
                 shape.type_params.iter().any(|tp| {
                     tp.constraint
                         .is_some_and(|constraint| self.type_contains_placeholder(constraint, var_map, visited))
@@ -540,7 +583,8 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     })
                     || self.type_contains_placeholder(shape.return_type, var_map, visited)
             }
-            TypeKey::Callable(shape) => {
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(shape_id);
                 let in_call = shape.call_signatures.iter().any(|sig| {
                     sig.type_params.iter().any(|tp| {
                         tp.constraint.is_some_and(|constraint| {
@@ -609,10 +653,15 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             TypeKey::KeyOf(operand) | TypeKey::ReadonlyType(operand) => {
                 self.type_contains_placeholder(operand, var_map, visited)
             }
-            TypeKey::TemplateLiteral(spans) => spans.iter().any(|span| match span {
-                TemplateSpan::Text(_) => false,
-                TemplateSpan::Type(inner) => self.type_contains_placeholder(*inner, var_map, visited),
-            }),
+            TypeKey::TemplateLiteral(spans) => {
+                let spans = self.interner.template_list(spans);
+                spans.iter().any(|span| match span {
+                    TemplateSpan::Text(_) => false,
+                    TemplateSpan::Type(inner) => {
+                        self.type_contains_placeholder(*inner, var_map, visited)
+                    }
+                })
+            }
             TypeKey::TypeParameter(_)
             | TypeKey::Infer(_)
             | TypeKey::Intrinsic(_)
@@ -671,6 +720,8 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 self.constrain_types(ctx, var_map, t_inner, s_inner);
             }
             (Some(TypeKey::TemplateLiteral(s_spans)), Some(TypeKey::TemplateLiteral(t_spans))) => {
+                let s_spans = self.interner.template_list(s_spans);
+                let t_spans = self.interner.template_list(t_spans);
                 if s_spans.len() != t_spans.len() {
                     return;
                 }
@@ -690,55 +741,58 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 }
             }
             (Some(TypeKey::IndexAccess(s_obj, s_idx)), _) => {
-                let evaluated = evaluate_index_access(self.interner, s_obj, s_idx);
+                let evaluated = self.interner.evaluate_index_access(s_obj, s_idx);
                 if evaluated != source {
                     self.constrain_types(ctx, var_map, evaluated, target);
                 }
             }
             (_, Some(TypeKey::IndexAccess(t_obj, t_idx))) => {
-                let evaluated = evaluate_index_access(self.interner, t_obj, t_idx);
+                let evaluated = self.interner.evaluate_index_access(t_obj, t_idx);
                 if evaluated != target {
                     self.constrain_types(ctx, var_map, source, evaluated);
                 }
             }
             (Some(TypeKey::Conditional(ref cond)), _) => {
-                let evaluated = evaluate_conditional(self.interner, cond);
+                let evaluated = self.interner.evaluate_conditional(cond);
                 if evaluated != source {
                     self.constrain_types(ctx, var_map, evaluated, target);
                 }
             }
             (_, Some(TypeKey::Conditional(ref cond))) => {
-                let evaluated = evaluate_conditional(self.interner, cond);
+                let evaluated = self.interner.evaluate_conditional(cond);
                 if evaluated != target {
                     self.constrain_types(ctx, var_map, source, evaluated);
                 }
             }
             (Some(TypeKey::Mapped(ref mapped)), _) => {
-                let evaluated = evaluate_mapped(self.interner, mapped);
+                let evaluated = self.interner.evaluate_mapped(mapped);
                 if evaluated != source {
                     self.constrain_types(ctx, var_map, evaluated, target);
                 }
             }
             (_, Some(TypeKey::Mapped(ref mapped))) => {
-                let evaluated = evaluate_mapped(self.interner, mapped);
+                let evaluated = self.interner.evaluate_mapped(mapped);
                 if evaluated != target {
                     self.constrain_types(ctx, var_map, source, evaluated);
                 }
             }
-            (Some(TypeKey::Union(ref s_members)), _) => {
-                for &member in s_members {
+            (Some(TypeKey::Union(s_members)), _) => {
+                let s_members = self.interner.type_list(s_members);
+                for &member in s_members.iter() {
                     self.constrain_types(ctx, var_map, member, target);
                 }
             }
-            (_, Some(TypeKey::Intersection(ref t_members))) => {
-                for &member in t_members {
+            (_, Some(TypeKey::Intersection(t_members))) => {
+                let t_members = self.interner.type_list(t_members);
+                for &member in t_members.iter() {
                     self.constrain_types(ctx, var_map, source, member);
                 }
             }
-            (_, Some(TypeKey::Union(ref t_members))) => {
+            (_, Some(TypeKey::Union(t_members))) => {
+                let t_members = self.interner.type_list(t_members);
                 let mut non_nullable = None;
                 let mut count = 0;
-                for &member in t_members {
+                for &member in t_members.iter() {
                     if !is_nullish(member) {
                         count += 1;
                         if count == 1 {
@@ -755,7 +809,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 
                 let mut placeholder_member = None;
                 let mut placeholder_count = 0;
-                for &member in t_members {
+                for &member in t_members.iter() {
                     let mut visited = FxHashSet::default();
                     if self.type_contains_placeholder(member, var_map, &mut visited) {
                         placeholder_count += 1;
@@ -776,8 +830,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             (Some(TypeKey::Array(s_elem)), Some(TypeKey::Array(t_elem))) => {
                 self.constrain_types(ctx, var_map, s_elem, t_elem);
             }
-            (Some(TypeKey::Tuple(ref s_elems)), Some(TypeKey::Array(t_elem))) => {
-                for s_elem in s_elems {
+            (Some(TypeKey::Tuple(s_elems)), Some(TypeKey::Array(t_elem))) => {
+                let s_elems = self.interner.tuple_list(s_elems);
+                for s_elem in s_elems.iter() {
                     if s_elem.rest {
                         let rest_elem_type = self.rest_element_type(s_elem.type_id);
                         self.constrain_types(ctx, var_map, rest_elem_type, t_elem);
@@ -786,10 +841,14 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     }
                 }
             }
-            (Some(TypeKey::Tuple(ref s_elems)), Some(TypeKey::Tuple(ref t_elems))) => {
-                self.constrain_tuple_types(ctx, var_map, s_elems, t_elems);
+            (Some(TypeKey::Tuple(s_elems)), Some(TypeKey::Tuple(t_elems))) => {
+                let s_elems = self.interner.tuple_list(s_elems);
+                let t_elems = self.interner.tuple_list(t_elems);
+                self.constrain_tuple_types(ctx, var_map, &s_elems, &t_elems);
             }
-            (Some(TypeKey::Function(ref s_fn)), Some(TypeKey::Function(ref t_fn))) => {
+            (Some(TypeKey::Function(s_fn_id)), Some(TypeKey::Function(t_fn_id))) => {
+                let s_fn = self.interner.function_shape(s_fn_id);
+                let t_fn = self.interner.function_shape(t_fn_id);
                 // Contravariant parameters: target_param <: source_param
                 for (s_p, t_p) in s_fn.params.iter().zip(t_fn.params.iter()) {
                     self.constrain_types(ctx, var_map, t_p.type_id, s_p.type_id);
@@ -800,18 +859,22 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 // Covariant return: source_return <: target_return
                 self.constrain_types(ctx, var_map, s_fn.return_type, t_fn.return_type);
             }
-            (Some(TypeKey::Function(ref s_fn)), Some(TypeKey::Callable(ref t_callable))) => {
+            (Some(TypeKey::Function(s_fn_id)), Some(TypeKey::Callable(t_callable_id))) => {
+                let s_fn = self.interner.function_shape(s_fn_id);
+                let t_callable = self.interner.callable_shape(t_callable_id);
                 for sig in &t_callable.call_signatures {
-                    self.constrain_function_to_call_signature(ctx, var_map, s_fn, sig);
+                    self.constrain_function_to_call_signature(ctx, var_map, &s_fn, sig);
                 }
                 if s_fn.is_constructor && t_callable.construct_signatures.len() == 1 {
                     let sig = &t_callable.construct_signatures[0];
                     if sig.type_params.is_empty() {
-                        self.constrain_function_to_call_signature(ctx, var_map, s_fn, sig);
+                        self.constrain_function_to_call_signature(ctx, var_map, &s_fn, sig);
                     }
                 }
             }
-            (Some(TypeKey::Callable(ref s_callable)), Some(TypeKey::Callable(ref t_callable))) => {
+            (Some(TypeKey::Callable(s_callable_id)), Some(TypeKey::Callable(t_callable_id))) => {
+                let s_callable = self.interner.callable_shape(s_callable_id);
+                let t_callable = self.interner.callable_shape(t_callable_id);
                 self.constrain_matching_signatures(
                     ctx,
                     var_map,
@@ -827,11 +890,13 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     true,
                 );
             }
-            (Some(TypeKey::Callable(ref s_callable)), Some(TypeKey::Function(ref t_fn))) => {
+            (Some(TypeKey::Callable(s_callable_id)), Some(TypeKey::Function(t_fn_id))) => {
+                let s_callable = self.interner.callable_shape(s_callable_id);
+                let t_fn = self.interner.function_shape(t_fn_id);
                 if s_callable.call_signatures.len() == 1 {
                     let sig = &s_callable.call_signatures[0];
                     if sig.type_params.is_empty() {
-                        self.constrain_call_signature_to_function(ctx, var_map, sig, t_fn);
+                        self.constrain_call_signature_to_function(ctx, var_map, sig, &t_fn);
                     }
                 } else if let Some(index) = self.select_signature_for_target(
                     &s_callable.call_signatures,
@@ -840,13 +905,17 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     false,
                 ) {
                     let sig = &s_callable.call_signatures[index];
-                    self.constrain_call_signature_to_function(ctx, var_map, sig, t_fn);
+                    self.constrain_call_signature_to_function(ctx, var_map, sig, &t_fn);
                 }
             }
-            (Some(TypeKey::Object(ref s_props)), Some(TypeKey::Object(ref t_props))) => {
-                self.constrain_properties(ctx, var_map, s_props, t_props);
+            (Some(TypeKey::Object(s_shape_id)), Some(TypeKey::Object(t_shape_id))) => {
+                let s_shape = self.interner.object_shape(s_shape_id);
+                let t_shape = self.interner.object_shape(t_shape_id);
+                self.constrain_properties(ctx, var_map, &s_shape.properties, &t_shape.properties);
             }
-            (Some(TypeKey::ObjectWithIndex(ref s_shape)), Some(TypeKey::ObjectWithIndex(ref t_shape))) => {
+            (Some(TypeKey::ObjectWithIndex(s_shape_id)), Some(TypeKey::ObjectWithIndex(t_shape_id))) => {
+                let s_shape = self.interner.object_shape(s_shape_id);
+                let t_shape = self.interner.object_shape(t_shape_id);
                 self.constrain_properties(ctx, var_map, &s_shape.properties, &t_shape.properties);
                 if let (Some(s_idx), Some(t_idx)) = (&s_shape.string_index, &t_shape.string_index) {
                     self.constrain_types(ctx, var_map, s_idx.value_type, t_idx.value_type);
@@ -858,24 +927,40 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     ctx,
                     var_map,
                     &s_shape.properties,
-                    t_shape,
+                    &t_shape,
                 );
                 self.constrain_index_signatures_to_properties(
                     ctx,
                     var_map,
-                    s_shape,
+                    &s_shape,
                     &t_shape.properties,
                 );
             }
-            (Some(TypeKey::Object(ref s_props)), Some(TypeKey::ObjectWithIndex(ref t_shape))) => {
-                self.constrain_properties(ctx, var_map, s_props, &t_shape.properties);
-                self.constrain_properties_against_index_signatures(ctx, var_map, s_props, t_shape);
+            (Some(TypeKey::Object(s_shape_id)), Some(TypeKey::ObjectWithIndex(t_shape_id))) => {
+                let s_shape = self.interner.object_shape(s_shape_id);
+                let t_shape = self.interner.object_shape(t_shape_id);
+                self.constrain_properties(ctx, var_map, &s_shape.properties, &t_shape.properties);
+                self.constrain_properties_against_index_signatures(
+                    ctx,
+                    var_map,
+                    &s_shape.properties,
+                    &t_shape,
+                );
             }
-            (Some(TypeKey::ObjectWithIndex(ref s_shape)), Some(TypeKey::Object(ref t_props))) => {
-                self.constrain_properties(ctx, var_map, &s_shape.properties, t_props);
-                self.constrain_index_signatures_to_properties(ctx, var_map, s_shape, t_props);
+            (Some(TypeKey::ObjectWithIndex(s_shape_id)), Some(TypeKey::Object(t_shape_id))) => {
+                let s_shape = self.interner.object_shape(s_shape_id);
+                let t_shape = self.interner.object_shape(t_shape_id);
+                self.constrain_properties(ctx, var_map, &s_shape.properties, &t_shape.properties);
+                self.constrain_index_signatures_to_properties(
+                    ctx,
+                    var_map,
+                    &s_shape,
+                    &t_shape.properties,
+                );
             }
-            (Some(TypeKey::Application(ref s_app)), Some(TypeKey::Application(ref t_app))) => {
+            (Some(TypeKey::Application(s_app_id)), Some(TypeKey::Application(t_app_id))) => {
+                let s_app = self.interner.type_application(s_app_id);
+                let t_app = self.interner.type_application(t_app_id);
                 if s_app.base == t_app.base && s_app.args.len() == t_app.args.len() {
                     for (s_arg, t_arg) in s_app.args.iter().zip(t_app.args.iter()) {
                         self.constrain_types(ctx, var_map, *s_arg, *t_arg);
@@ -1264,7 +1349,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 }
 
 pub fn infer_call_signature<C: AssignabilityChecker>(
-    interner: &dyn TypeDatabase,
+    interner: &dyn QueryDatabase,
     checker: &mut C,
     sig: &CallSignature,
     arg_types: &[TypeId],
@@ -1274,7 +1359,7 @@ pub fn infer_call_signature<C: AssignabilityChecker>(
 }
 
 pub fn infer_generic_function<C: AssignabilityChecker>(
-    interner: &dyn TypeDatabase,
+    interner: &dyn QueryDatabase,
     checker: &mut C,
     func: &FunctionShape,
     arg_types: &[TypeId],
@@ -1387,10 +1472,10 @@ impl<'a> PropertyAccessEvaluator<'a> {
         };
 
         match key {
-            TypeKey::Object(ref props) => {
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
-                // Search for the property
-                for prop in props {
+                for prop in &shape.properties {
                     if prop.name == prop_atom {
                         return PropertyAccessResult::Success {
                             type_id: self.optional_property_type(prop),
@@ -1404,9 +1489,9 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 }
             }
 
-            TypeKey::ObjectWithIndex(ref shape) => {
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
-                // Check named properties first (explicit properties take precedence)
                 for prop in &shape.properties {
                     if prop.name == prop_atom {
                         return PropertyAccessResult::Success {
@@ -1435,7 +1520,8 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 self.resolve_function_property(obj_type, prop_name, prop_atom)
             }
 
-            TypeKey::Callable(ref shape) => {
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(shape_id);
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
                 for prop in &shape.properties {
                     if prop.name == prop_atom {
@@ -1448,14 +1534,15 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 self.resolve_function_property(obj_type, prop_name, prop_atom)
             }
 
-            TypeKey::Union(ref members) => {
+            TypeKey::Union(members) => {
+                let members = self.interner.type_list(members);
                 // Property access on union: partition into nullable and non-nullable members
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
                 let mut valid_results = Vec::new();
                 let mut nullable_causes = Vec::new();
                 let mut any_from_index = false;  // Track if any member used index signature
 
-                for &member in members {
+                for &member in members.iter() {
                     // Check for null/undefined directly
                     if member == TypeId::NULL || member == TypeId::UNDEFINED || member == TypeId::VOID {
                         let cause = if member == TypeId::VOID {
@@ -1528,10 +1615,11 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 }
             }
 
-            TypeKey::Intersection(ref members) => {
+            TypeKey::Intersection(members) => {
+                let members = self.interner.type_list(members);
                 // Property access on intersection: check each member
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
-                for &member in members {
+                for &member in members.iter() {
                     if let PropertyAccessResult::Success { type_id, from_index_signature } =
                         self.resolve_property_access_inner(member, prop_name, Some(prop_atom))
                     {
@@ -1882,9 +1970,11 @@ impl<'a> BinaryOpEvaluator<'a> {
         }
 
         if let Some(TypeKey::Union(members)) = self.interner.lookup(left) {
+            let members = self.interner.type_list(members);
             return members.iter().any(|member| self.has_overlap(*member, right));
         }
         if let Some(TypeKey::Union(members)) = self.interner.lookup(right) {
+            let members = self.interner.type_list(members);
             return members.iter().any(|member| self.has_overlap(left, *member));
         }
 

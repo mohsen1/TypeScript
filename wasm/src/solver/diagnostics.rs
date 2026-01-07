@@ -348,9 +348,10 @@ impl<'a> TypeFormatter<'a> {
             related: Vec::new(),
         };
 
-        // Render related diagnostics
+        // Render related diagnostics, falling back to the primary span when needed.
         for related in &pending.related {
-            if let Some(span) = &related.span {
+            let span = related.span.as_ref().or(pending.span.as_ref());
+            if let Some(span) = span {
                 let related_msg = self.render_template(
                     get_message_template(related.code),
                     &related.args
@@ -992,7 +993,7 @@ impl SubtypeFailureReason {
                     vec![(*source_type).into(), target.into()],
                 );
                 for member in target_union_members.iter().take(UNION_MEMBER_DIAGNOSTIC_LIMIT) {
-                    diag = diag.with_related(PendingDiagnostic::error(
+                    diag.related.push(PendingDiagnostic::error(
                         codes::TYPE_NOT_ASSIGNABLE,
                         vec![(*source_type).into(), (*member).into()],
                     ));
