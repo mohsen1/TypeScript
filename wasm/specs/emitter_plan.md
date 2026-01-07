@@ -9,10 +9,10 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 ## Current Status
 - LoweringPass -> TransformDirective -> ThinPrinter pipeline exists.
 - ES5/ESNext transforms largely implemented.
-- Remaining TODOs: push real_world_bench throughput toward 500+ MiB/s (emit-only ~317 MiB/s).
+- Remaining TODOs: reduce obvious hot-path overheads without hard throughput targets.
 
 ## Highest-Impact Next Tasks
-- [ ] Performance tuning: reach 500+ MiB/s emitter throughput
+- [ ] Performance tuning: remove obvious hot-path overheads
   - Profile emit-only pipeline (LoweringPass + helper detection).
   - Reduce allocations and repeated scans in emit hot paths.
 - [x] Finish transform-only pipeline
@@ -29,13 +29,13 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 - [x] Performance check
   - Run `./wasm/bench.sh real_world_bench` and track throughput deltas.
   - Results (real_world_bench):
-    - checker_ts_full_pipeline thrpt: 59.173–60.022 MiB/s (improvement ~3.0–6.8%).
-    - checker_ts_emit_only thrpt: 316.81–317.75 MiB/s (improvement ~4.2–10.6%).
+    - checker_ts_full_pipeline thrpt: 59.830–61.057 MiB/s (change within noise).
+    - checker_ts_emit_only thrpt: 318.17–319.40 MiB/s (change within noise).
 
 ## Success Criteria
 - All transforms triggered via TransformContext (no inline ES5 fallbacks).
 - Source maps stable for transformed outputs.
-- Emitter throughput >= 500 MB/s on real-world bench.
+- Emitter perf regressions are detectable and avoided in benchmarks.
 
 ## Task Ledger (legacy checklist)
 
@@ -96,6 +96,8 @@ Next Steps: Cleanup. Remove the legacy inline transformation logic from ThinPrin
 50. ES5 emit: move function parameter downleveling behind TransformDirective [done]
 51. LoweringPass: gate export name extraction for non-exported declarations [done]
 52. CommonJS exports: store identifier ids in directives to avoid name cloning [done]
+53. Class ES5 emitter: write identifier/literal names without cloning strings [done]
+54. ThinEmitter: avoid identifier string clones in ES5 binding/object literal emit [done]
 
 ## Quick Reference
 

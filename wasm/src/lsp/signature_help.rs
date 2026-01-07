@@ -288,11 +288,13 @@ impl<'a> SignatureHelpProvider<'a> {
 
         match key {
             // Single function signature
-            TypeKey::Function(shape) => {
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(shape_id);
                 vec![self.signature_candidate(&shape, checker, false)]
             }
             // Overloaded signatures
-            TypeKey::Callable(shape) => {
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(shape_id);
                 let mut sigs = Vec::new();
                 let include_call = call_kind == CallKind::Call || shape.construct_signatures.is_empty();
                 let include_construct = call_kind == CallKind::New || shape.call_signatures.is_empty();
@@ -330,8 +332,9 @@ impl<'a> SignatureHelpProvider<'a> {
             }
             // Union of functions
             TypeKey::Union(members) => {
+                let members = self.interner.type_list(members);
                 let mut sigs = Vec::new();
-                for member in members {
+                for &member in members.iter() {
                     sigs.extend(self.get_signatures_from_type(member, checker, call_kind));
                 }
                 sigs

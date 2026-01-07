@@ -682,6 +682,7 @@ fn test_index_access_array_string_index() {
 
     match key {
         TypeKey::Union(members) => {
+            let members = interner.type_list(members);
             assert!(members.contains(&TypeId::NUMBER));
             assert!(members.contains(&includes_type));
             assert!(!members.contains(&TypeId::STRING));
@@ -703,6 +704,7 @@ fn test_index_access_array_string_index_with_no_unchecked_indexed_access() {
 
     match key {
         TypeKey::Union(members) => {
+            let members = interner.type_list(members);
             assert!(members.contains(&TypeId::UNDEFINED));
         }
         other => panic!("Expected union, got {:?}", other),
@@ -729,7 +731,8 @@ fn test_index_access_array_string_literal_method() {
 
     let result = evaluate_index_access(&interner, string_array, includes_key);
     match interner.lookup(result) {
-        Some(TypeKey::Function(func)) => {
+        Some(TypeKey::Function(func_id)) => {
+            let func = interner.function_shape(func_id);
             assert_eq!(func.return_type, TypeId::BOOLEAN);
             assert_eq!(func.params.len(), 1);
             assert!(func.params[0].rest);
@@ -795,6 +798,7 @@ fn test_index_access_tuple_string_index() {
 
     match key {
         TypeKey::Union(members) => {
+            let members = interner.type_list(members);
             assert!(members.contains(&TypeId::STRING));
             assert!(members.contains(&TypeId::NUMBER));
             assert!(members.contains(&map_type));
@@ -819,6 +823,7 @@ fn test_index_access_tuple_string_index_with_no_unchecked_indexed_access() {
 
     match key {
         TypeKey::Union(members) => {
+            let members = interner.type_list(members);
             assert!(members.contains(&TypeId::UNDEFINED));
         }
         other => panic!("Expected union, got {:?}", other),
@@ -921,7 +926,8 @@ fn test_index_access_string_literal_member() {
     let to_string_key = interner.literal_string("toString");
     let to_string_type = evaluate_index_access(&interner, TypeId::STRING, to_string_key);
     match interner.lookup(to_string_type) {
-        Some(TypeKey::Function(func)) => {
+        Some(TypeKey::Function(func_id)) => {
+            let func = interner.function_shape(func_id);
             assert_eq!(func.return_type, TypeId::STRING);
             assert_eq!(func.params.len(), 1);
             assert!(func.params[0].rest);
@@ -934,11 +940,11 @@ fn test_index_access_string_literal_member() {
 fn test_index_access_template_literal_members() {
     let interner = TypeInterner::new();
 
-    let template = interner.intern(TypeKey::TemplateLiteral(vec![
+    let template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("prefix")),
         TemplateSpan::Type(TypeId::STRING),
         TemplateSpan::Text(interner.intern_string("suffix")),
-    ]));
+    ]);
 
     let length_key = interner.literal_string("length");
     let length_type = evaluate_index_access(&interner, template, length_key);
@@ -960,6 +966,7 @@ fn test_keyof_readonly_array() {
 
     match key {
         TypeKey::Union(members) => {
+            let members = interner.type_list(members);
             let length = interner.literal_string("length");
             let map = interner.literal_string("map");
             assert!(members.contains(&TypeId::NUMBER));
@@ -985,6 +992,7 @@ fn test_keyof_readonly_tuple() {
 
     match key {
         TypeKey::Union(members) => {
+            let members = interner.type_list(members);
             let key_0 = interner.literal_string("0");
             let key_1 = interner.literal_string("1");
             let length = interner.literal_string("length");
@@ -1334,6 +1342,7 @@ fn test_keyof_array() {
 
     match key {
         TypeKey::Union(members) => {
+            let members = interner.type_list(members);
             let length = interner.literal_string("length");
             let map = interner.literal_string("map");
             assert!(members.contains(&TypeId::NUMBER));
@@ -1360,6 +1369,7 @@ fn test_keyof_tuple() {
 
     match key {
         TypeKey::Union(members) => {
+            let members = interner.type_list(members);
             let key_0 = interner.literal_string("0");
             let key_1 = interner.literal_string("1");
             let length = interner.literal_string("length");
@@ -1431,6 +1441,7 @@ fn test_keyof_string_apparent_members() {
 
     match key {
         TypeKey::Union(members) => {
+            let members = interner.type_list(members);
             let length = interner.literal_string("length");
             let to_string = interner.literal_string("toString");
             assert!(members.contains(&length));
@@ -1445,11 +1456,11 @@ fn test_keyof_string_apparent_members() {
 fn test_keyof_template_literal_matches_string() {
     let interner = TypeInterner::new();
 
-    let template = interner.intern(TypeKey::TemplateLiteral(vec![
+    let template = interner.template_literal(vec![
         TemplateSpan::Text(interner.intern_string("prefix")),
         TemplateSpan::Type(TypeId::STRING),
         TemplateSpan::Text(interner.intern_string("suffix")),
-    ]));
+    ]);
 
     let result = evaluate_keyof(&interner, template);
     let expected = evaluate_keyof(&interner, TypeId::STRING);
@@ -1513,7 +1524,8 @@ fn test_mapped_type_over_string_keys() {
     let key = interner.lookup(result).expect("Expected object type");
 
     match key {
-        TypeKey::ObjectWithIndex(shape) => {
+        TypeKey::ObjectWithIndex(shape_id) => {
+            let shape = interner.object_shape(shape_id);
             let length = interner.intern_string("length");
             let to_string = interner.intern_string("toString");
             let mut saw_length = false;
@@ -1560,7 +1572,8 @@ fn test_mapped_type_string_index_signature() {
     let key = interner.lookup(result).expect("Expected object type");
 
     match key {
-        TypeKey::ObjectWithIndex(shape) => {
+        TypeKey::ObjectWithIndex(shape_id) => {
+            let shape = interner.object_shape(shape_id);
             assert!(shape.properties.is_empty());
             assert!(shape.number_index.is_none());
 
@@ -1594,7 +1607,8 @@ fn test_mapped_type_number_index_signature() {
     let key = interner.lookup(result).expect("Expected object type");
 
     match key {
-        TypeKey::ObjectWithIndex(shape) => {
+        TypeKey::ObjectWithIndex(shape_id) => {
+            let shape = interner.object_shape(shape_id);
             assert!(shape.properties.is_empty());
             assert!(shape.string_index.is_none());
 

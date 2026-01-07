@@ -6,9 +6,12 @@
 use crate::interner::Atom;
 use crate::solver::intern::TypeInterner;
 use crate::solver::types::{
-    CallableShape, FunctionShape, ObjectShape, PropertyInfo, SymbolRef, TupleElement, TypeId,
-    TypeKey,
+    CallableShape, CallableShapeId, ConditionalType, FunctionShape, FunctionShapeId, MappedType,
+    ObjectShape, ObjectShapeId, PropertyInfo, SymbolRef, TemplateLiteralId, TemplateSpan,
+    TupleElement, TupleListId, TypeApplication, TypeApplicationId, TypeId, TypeKey, TypeListId,
 };
+use rustc_hash::FxHashMap;
+use std::sync::{Arc, RwLock};
 
 /// Query interface for the solver.
 ///
@@ -19,6 +22,13 @@ pub trait TypeDatabase {
     fn lookup(&self, id: TypeId) -> Option<TypeKey>;
     fn intern_string(&self, s: &str) -> Atom;
     fn resolve_atom(&self, atom: Atom) -> String;
+    fn type_list(&self, id: TypeListId) -> Arc<[TypeId]>;
+    fn tuple_list(&self, id: TupleListId) -> Arc<[TupleElement]>;
+    fn template_list(&self, id: TemplateLiteralId) -> Arc<[TemplateSpan]>;
+    fn object_shape(&self, id: ObjectShapeId) -> Arc<ObjectShape>;
+    fn function_shape(&self, id: FunctionShapeId) -> Arc<FunctionShape>;
+    fn callable_shape(&self, id: CallableShapeId) -> Arc<CallableShape>;
+    fn type_application(&self, id: TypeApplicationId) -> Arc<TypeApplication>;
 
     fn literal_string(&self, value: &str) -> TypeId;
     fn literal_number(&self, value: f64) -> TypeId;
@@ -34,6 +44,7 @@ pub trait TypeDatabase {
     fn object_with_index(&self, shape: ObjectShape) -> TypeId;
     fn function(&self, shape: FunctionShape) -> TypeId;
     fn callable(&self, shape: CallableShape) -> TypeId;
+    fn template_literal(&self, spans: Vec<TemplateSpan>) -> TypeId;
     fn reference(&self, symbol: SymbolRef) -> TypeId;
     fn application(&self, base: TypeId, args: Vec<TypeId>) -> TypeId;
 }
@@ -53,6 +64,34 @@ impl TypeDatabase for TypeInterner {
 
     fn resolve_atom(&self, atom: Atom) -> String {
         TypeInterner::resolve_atom(self, atom)
+    }
+
+    fn type_list(&self, id: TypeListId) -> Arc<[TypeId]> {
+        TypeInterner::type_list(self, id)
+    }
+
+    fn tuple_list(&self, id: TupleListId) -> Arc<[TupleElement]> {
+        TypeInterner::tuple_list(self, id)
+    }
+
+    fn template_list(&self, id: TemplateLiteralId) -> Arc<[TemplateSpan]> {
+        TypeInterner::template_list(self, id)
+    }
+
+    fn object_shape(&self, id: ObjectShapeId) -> Arc<ObjectShape> {
+        TypeInterner::object_shape(self, id)
+    }
+
+    fn function_shape(&self, id: FunctionShapeId) -> Arc<FunctionShape> {
+        TypeInterner::function_shape(self, id)
+    }
+
+    fn callable_shape(&self, id: CallableShapeId) -> Arc<CallableShape> {
+        TypeInterner::callable_shape(self, id)
+    }
+
+    fn type_application(&self, id: TypeApplicationId) -> Arc<TypeApplication> {
+        TypeInterner::type_application(self, id)
     }
 
     fn literal_string(&self, value: &str) -> TypeId {
@@ -107,12 +146,249 @@ impl TypeDatabase for TypeInterner {
         TypeInterner::callable(self, shape)
     }
 
+    fn template_literal(&self, spans: Vec<TemplateSpan>) -> TypeId {
+        TypeInterner::template_literal(self, spans)
+    }
+
     fn reference(&self, symbol: SymbolRef) -> TypeId {
         TypeInterner::reference(self, symbol)
     }
 
     fn application(&self, base: TypeId, args: Vec<TypeId>) -> TypeId {
         TypeInterner::application(self, base, args)
+    }
+}
+
+/// Query layer for higher-level solver operations.
+///
+/// This is the incremental boundary where caching and (future) salsa hooks live.
+pub trait QueryDatabase: TypeDatabase {
+    /// Expose the underlying TypeDatabase view for legacy entry points.
+    fn as_type_database(&self) -> &dyn TypeDatabase;
+
+    fn evaluate_conditional(&self, cond: &ConditionalType) -> TypeId {
+        crate::solver::evaluate::evaluate_conditional(self.as_type_database(), cond)
+    }
+
+    fn evaluate_index_access(&self, object_type: TypeId, index_type: TypeId) -> TypeId {
+        crate::solver::evaluate::evaluate_index_access(
+            self.as_type_database(),
+            object_type,
+            index_type,
+        )
+    }
+
+    fn evaluate_type(&self, type_id: TypeId) -> TypeId {
+        crate::solver::evaluate::evaluate_type(self.as_type_database(), type_id)
+    }
+
+    fn evaluate_mapped(&self, mapped: &MappedType) -> TypeId {
+        crate::solver::evaluate::evaluate_mapped(self.as_type_database(), mapped)
+    }
+
+    fn evaluate_keyof(&self, operand: TypeId) -> TypeId {
+        crate::solver::evaluate::evaluate_keyof(self.as_type_database(), operand)
+    }
+
+    fn is_subtype_of(&self, source: TypeId, target: TypeId) -> bool {
+        crate::solver::subtype::is_subtype_of(self.as_type_database(), source, target)
+    }
+
+    fn new_inference_context(&self) -> crate::solver::infer::InferenceContext<'_> {
+        crate::solver::infer::InferenceContext::new(self.as_type_database())
+    }
+}
+
+impl QueryDatabase for TypeInterner {
+    fn as_type_database(&self) -> &dyn TypeDatabase {
+        self
+    }
+}
+
+/// Query database wrapper with basic caching.
+pub struct QueryCache<'a> {
+    interner: &'a TypeInterner,
+    eval_cache: RwLock<FxHashMap<TypeId, TypeId>>,
+    subtype_cache: RwLock<FxHashMap<(TypeId, TypeId), bool>>,
+}
+
+impl<'a> QueryCache<'a> {
+    pub fn new(interner: &'a TypeInterner) -> Self {
+        QueryCache {
+            interner,
+            eval_cache: RwLock::new(FxHashMap::default()),
+            subtype_cache: RwLock::new(FxHashMap::default()),
+        }
+    }
+
+    pub fn clear(&self) {
+        self.eval_cache.write().expect("eval cache lock").clear();
+        self.subtype_cache
+            .write()
+            .expect("subtype cache lock")
+            .clear();
+    }
+
+    #[cfg(test)]
+    fn eval_cache_len(&self) -> usize {
+        self.eval_cache.read().expect("eval cache lock").len()
+    }
+
+    #[cfg(test)]
+    fn subtype_cache_len(&self) -> usize {
+        self.subtype_cache
+            .read()
+            .expect("subtype cache lock")
+            .len()
+    }
+}
+
+impl TypeDatabase for QueryCache<'_> {
+    fn intern(&self, key: TypeKey) -> TypeId {
+        self.interner.intern(key)
+    }
+
+    fn lookup(&self, id: TypeId) -> Option<TypeKey> {
+        self.interner.lookup(id)
+    }
+
+    fn intern_string(&self, s: &str) -> Atom {
+        self.interner.intern_string(s)
+    }
+
+    fn resolve_atom(&self, atom: Atom) -> String {
+        self.interner.resolve_atom(atom)
+    }
+
+    fn type_list(&self, id: TypeListId) -> Arc<[TypeId]> {
+        self.interner.type_list(id)
+    }
+
+    fn tuple_list(&self, id: TupleListId) -> Arc<[TupleElement]> {
+        self.interner.tuple_list(id)
+    }
+
+    fn template_list(&self, id: TemplateLiteralId) -> Arc<[TemplateSpan]> {
+        self.interner.template_list(id)
+    }
+
+    fn object_shape(&self, id: ObjectShapeId) -> Arc<ObjectShape> {
+        self.interner.object_shape(id)
+    }
+
+    fn function_shape(&self, id: FunctionShapeId) -> Arc<FunctionShape> {
+        self.interner.function_shape(id)
+    }
+
+    fn callable_shape(&self, id: CallableShapeId) -> Arc<CallableShape> {
+        self.interner.callable_shape(id)
+    }
+
+    fn type_application(&self, id: TypeApplicationId) -> Arc<TypeApplication> {
+        self.interner.type_application(id)
+    }
+
+    fn literal_string(&self, value: &str) -> TypeId {
+        self.interner.literal_string(value)
+    }
+
+    fn literal_number(&self, value: f64) -> TypeId {
+        self.interner.literal_number(value)
+    }
+
+    fn literal_boolean(&self, value: bool) -> TypeId {
+        self.interner.literal_boolean(value)
+    }
+
+    fn literal_bigint(&self, value: &str) -> TypeId {
+        self.interner.literal_bigint(value)
+    }
+
+    fn literal_bigint_with_sign(&self, negative: bool, digits: &str) -> TypeId {
+        self.interner.literal_bigint_with_sign(negative, digits)
+    }
+
+    fn union(&self, members: Vec<TypeId>) -> TypeId {
+        self.interner.union(members)
+    }
+
+    fn intersection(&self, members: Vec<TypeId>) -> TypeId {
+        self.interner.intersection(members)
+    }
+
+    fn array(&self, element: TypeId) -> TypeId {
+        self.interner.array(element)
+    }
+
+    fn tuple(&self, elements: Vec<TupleElement>) -> TypeId {
+        self.interner.tuple(elements)
+    }
+
+    fn object(&self, properties: Vec<PropertyInfo>) -> TypeId {
+        self.interner.object(properties)
+    }
+
+    fn object_with_index(&self, shape: ObjectShape) -> TypeId {
+        self.interner.object_with_index(shape)
+    }
+
+    fn function(&self, shape: FunctionShape) -> TypeId {
+        self.interner.function(shape)
+    }
+
+    fn callable(&self, shape: CallableShape) -> TypeId {
+        self.interner.callable(shape)
+    }
+
+    fn template_literal(&self, spans: Vec<TemplateSpan>) -> TypeId {
+        self.interner.template_literal(spans)
+    }
+
+    fn reference(&self, symbol: SymbolRef) -> TypeId {
+        self.interner.reference(symbol)
+    }
+
+    fn application(&self, base: TypeId, args: Vec<TypeId>) -> TypeId {
+        self.interner.application(base, args)
+    }
+}
+
+impl QueryDatabase for QueryCache<'_> {
+    fn as_type_database(&self) -> &dyn TypeDatabase {
+        self
+    }
+
+    fn evaluate_type(&self, type_id: TypeId) -> TypeId {
+        if let Some(&cached) = self.eval_cache.read().expect("eval cache lock").get(&type_id) {
+            return cached;
+        }
+
+        let result = crate::solver::evaluate::evaluate_type(self.as_type_database(), type_id);
+        self.eval_cache
+            .write()
+            .expect("eval cache lock")
+            .insert(type_id, result);
+        result
+    }
+
+    fn is_subtype_of(&self, source: TypeId, target: TypeId) -> bool {
+        let key = (source, target);
+        if let Some(&cached) = self
+            .subtype_cache
+            .read()
+            .expect("subtype cache lock")
+            .get(&key)
+        {
+            return cached;
+        }
+
+        let result =
+            crate::solver::subtype::is_subtype_of(self.as_type_database(), source, target);
+        self.subtype_cache
+            .write()
+            .expect("subtype cache lock")
+            .insert(key, result);
+        result
     }
 }
 

@@ -68,9 +68,12 @@ impl KeyofKeySet {
         };
 
         match key {
-            TypeKey::Union(members) => members
-                .iter()
-                .all(|&member| self.insert_type(interner, member)),
+            TypeKey::Union(members) => {
+                let members = interner.type_list(members);
+                members
+                    .iter()
+                    .all(|&member| self.insert_type(interner, member))
+            }
             TypeKey::Intrinsic(kind) => match kind {
                 IntrinsicKind::String => {
                     self.has_string = true;
@@ -220,8 +223,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         // Only distribute for naked type parameters (recorded at lowering time).
         if cond.is_distributive {
             if let Some(TypeKey::Union(members)) = self.interner.lookup(check_type) {
+                let members = self.interner.type_list(members);
                 return self.distribute_conditional(
-                    &members,
+                    members.as_ref(),
                     extends_type,
                     cond.true_type,
                     cond.false_type,
@@ -319,15 +323,18 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     self.interner.intern(TypeKey::IndexAccess(object_type, index_type))
                 }
             }
-            TypeKey::Object(props) => {
-                self.evaluate_object_index(&props, index_type)
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                self.evaluate_object_index(&shape.properties, index_type)
             }
-            TypeKey::ObjectWithIndex(shape) => {
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
                 self.evaluate_object_with_index(&shape, index_type)
             }
             TypeKey::Union(members) => {
+                let members = self.interner.type_list(members);
                 let mut results = Vec::new();
-                for &member in &members {
+                for &member in members.iter() {
                     let result = self.evaluate_index_access(member, index_type);
                     if result != TypeId::UNDEFINED || self.no_unchecked_indexed_access {
                         results.push(result);
@@ -342,6 +349,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 self.evaluate_array_index(elem, index_type)
             }
             TypeKey::Tuple(elements) => {
+                let elements = self.interner.tuple_list(elements);
                 self.evaluate_tuple_index(&elements, index_type)
             }
             // For other types, keep as IndexAccess (deferred)
@@ -364,8 +372,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
         // If index is a union of literals, return union of property types
         if let Some(TypeKey::Union(members)) = self.interner.lookup(index_type) {
+            let members = self.interner.type_list(members);
             let mut results = Vec::new();
-            for &member in &members {
+            for &member in members.iter() {
                 let result = self.evaluate_object_index(props, member);
                 if result != TypeId::UNDEFINED || self.no_unchecked_indexed_access {
                     results.push(result);
@@ -390,8 +399,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     fn evaluate_object_with_index(&self, shape: &ObjectShape, index_type: TypeId) -> TypeId {
         // If index is a union, evaluate each member
         if let Some(TypeKey::Union(members)) = self.interner.lookup(index_type) {
+            let members = self.interner.type_list(members);
             let mut results = Vec::new();
-            for &member in &members {
+            for &member in members.iter() {
                 let result = self.evaluate_object_with_index(shape, member);
                 if result != TypeId::UNDEFINED || self.no_unchecked_indexed_access {
                     results.push(result);
@@ -600,8 +610,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
     fn evaluate_array_index(&self, elem: TypeId, index_type: TypeId) -> TypeId {
         if let Some(TypeKey::Union(members)) = self.interner.lookup(index_type) {
+            let members = self.interner.type_list(members);
             let mut results = Vec::new();
-            for &member in &members {
+            for &member in members.iter() {
                 let result = self.evaluate_array_index(elem, member);
                 if result != TypeId::UNDEFINED || self.no_unchecked_indexed_access {
                     results.push(result);
@@ -649,8 +660,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     /// Evaluate index access on a tuple type
     fn evaluate_tuple_index(&self, elements: &[TupleElement], index_type: TypeId) -> TypeId {
         if let Some(TypeKey::Union(members)) = self.interner.lookup(index_type) {
+            let members = self.interner.type_list(members);
             let mut results = Vec::new();
-            for &member in &members {
+            for &member in members.iter() {
                 let result = self.evaluate_tuple_index(elements, member);
                 if result != TypeId::UNDEFINED || self.no_unchecked_indexed_access {
                     results.push(result);
@@ -882,17 +894,20 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     self.interner.intern(TypeKey::KeyOf(operand))
                 }
             }
-            TypeKey::Object(props) => {
-                // keyof { x: T, y: U } = "x" | "y"
-                if props.is_empty() {
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                if shape.properties.is_empty() {
                     return TypeId::NEVER;
                 }
-                let key_types: Vec<TypeId> = props.iter()
+                let key_types: Vec<TypeId> = shape
+                    .properties
+                    .iter()
                     .map(|p| self.interner.intern(TypeKey::Literal(LiteralValue::String(p.name))))
                     .collect();
                 self.interner.union(key_types)
             }
-            TypeKey::ObjectWithIndex(shape) => {
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
                 let mut key_types: Vec<TypeId> = shape
                     .properties
                     .iter()
@@ -916,6 +931,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 self.interner.union(self.array_keyof_keys())
             }
             TypeKey::Tuple(elements) => {
+                let elements = self.interner.tuple_list(elements);
                 let mut key_types: Vec<TypeId> = (0..elements.len())
                     .map(|i| self.interner.literal_string(&i.to_string()))
                     .collect();
@@ -955,6 +971,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             }
             TypeKey::TemplateLiteral(_) => self.apparent_primitive_keyof(IntrinsicKind::String),
             TypeKey::Union(members) => {
+                let members = self.interner.type_list(members);
                 // keyof (A | B) = keyof A & keyof B
                 let key_sets: Vec<TypeId> = members.iter()
                     .map(|&m| self.evaluate_keyof(m))
@@ -967,6 +984,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
             }
             TypeKey::Intersection(members) => {
+                let members = self.interner.type_list(members);
                 // keyof (A & B) = keyof A | keyof B
                 let key_sets: Vec<TypeId> = members.iter()
                     .map(|&m| self.evaluate_keyof(m))
@@ -1015,7 +1033,8 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 Some(keys)
             }
             TypeKey::Union(members) => {
-                for &member in &members {
+                let members = self.interner.type_list(members);
+                for &member in members.iter() {
                     if member == TypeId::STRING {
                         keys.has_string = true;
                         continue;
