@@ -103,6 +103,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Validate tuple-to-array bounds during inference resolution
 - [x] Allow union upper bounds during inference resolution
 - [x] Validate object and function bounds during inference resolution
+- [x] Validate generic application bounds during inference resolution
 
 ## Architecture Notes
 - Use `ena` crate for union-find data structure
