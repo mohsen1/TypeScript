@@ -888,6 +888,9 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         let name_text = self.entity_name_text(type_query.expr_name);
+        let is_identifier = self.ctx.arena.get(type_query.expr_name)
+            .and_then(|node| self.ctx.arena.get_identifier(node))
+            .is_some();
         let base = if let Some(sym_id) = self.resolve_value_symbol_for_lowering(type_query.expr_name) {
             self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(sym_id)))
         } else if self.resolve_type_symbol_for_lowering(type_query.expr_name).is_some() {
@@ -895,6 +898,10 @@ impl<'a> ThinCheckerState<'a> {
             self.error_type_only_value_at(name, type_query.expr_name);
             return TypeId::ERROR;
         } else if let Some(name) = name_text {
+            if is_identifier {
+                self.error_cannot_find_name_at(&name, type_query.expr_name);
+                return TypeId::ERROR;
+            }
             // Not found - fall back to hash (for forward compatibility)
             use std::hash::{Hash, Hasher};
             use std::collections::hash_map::DefaultHasher;
@@ -3334,10 +3341,6 @@ impl<'a> ThinCheckerState<'a> {
             Some(symbol) => symbol,
             None => return false,
         };
-
-        if symbol.flags & symbol_flags::MODULE != 0 {
-            return false;
-        }
 
         let has_value = (symbol.flags & symbol_flags::VALUE) != 0;
         let has_type = (symbol.flags & symbol_flags::TYPE) != 0;
