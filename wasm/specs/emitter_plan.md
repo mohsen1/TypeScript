@@ -27,6 +27,7 @@ Status: Active
 - [x] Emit default re-export specifiers (`export { default ... }`) in declaration emitter.
 - [x] Add parser coverage for default re-export specifiers.
 - [x] Remove inline template helper detection in ThinPrinter (rely on transform helpers).
+- [x] Stop forcing ES5 target in ThinPrinter defaults (respect `PrinterOptions.target`).
 - [x] Shrink `thin_emitter/mod.rs` for maintainability
   - [x] Extract comment utilities + comment/output helpers into modules (keep API stable).
   - [x] Extract module wrapper emission helpers into a submodule (keep API stable).
