@@ -271,6 +271,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Evaluate union object with union key indexed access (cross-product)
 - [x] Tests for union object + union key with noUncheckedIndexedAccess
 
+### Phase 50: Keyof Nullish/Object
+- [x] Treat `keyof object` as `never`
+- [x] Treat `keyof null`/`undefined`/`void`/`never` as `never`
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

@@ -808,12 +808,16 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     // keyof unknown = never
                     TypeId::NEVER
                 }
+                IntrinsicKind::Never
+                | IntrinsicKind::Void
+                | IntrinsicKind::Null
+                | IntrinsicKind::Undefined
+                | IntrinsicKind::Object => TypeId::NEVER,
                 IntrinsicKind::String
                 | IntrinsicKind::Number
                 | IntrinsicKind::Boolean
                 | IntrinsicKind::Bigint
                 | IntrinsicKind::Symbol => self.apparent_primitive_keyof(kind),
-                _ => self.interner.intern(TypeKey::KeyOf(operand)),
             },
             TypeKey::Literal(literal) => {
                 if let Some(kind) = self.apparent_literal_kind(&literal) {

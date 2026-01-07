@@ -1139,6 +1139,34 @@ fn test_keyof_unknown() {
 }
 
 #[test]
+fn test_keyof_object_keyword() {
+    let interner = TypeInterner::new();
+
+    // keyof object = never
+    let result = evaluate_keyof(&interner, TypeId::OBJECT);
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_keyof_never() {
+    let interner = TypeInterner::new();
+
+    // keyof never = never
+    let result = evaluate_keyof(&interner, TypeId::NEVER);
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_keyof_nullish() {
+    let interner = TypeInterner::new();
+
+    // keyof null/undefined/void = never
+    assert_eq!(evaluate_keyof(&interner, TypeId::NULL), TypeId::NEVER);
+    assert_eq!(evaluate_keyof(&interner, TypeId::UNDEFINED), TypeId::NEVER);
+    assert_eq!(evaluate_keyof(&interner, TypeId::VOID), TypeId::NEVER);
+}
+
+#[test]
 fn test_keyof_string_apparent_members() {
     let interner = TypeInterner::new();
 
