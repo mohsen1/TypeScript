@@ -84,6 +84,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Prefer a supertype element when all entries are assignable to it.
 - [x] Add primitive boxing assignability coverage
   - Allow primitive -> wrapper interface, reject wrapper -> primitive.
+- [x] Add unique symbol assignability coverage
+  - Unique symbols are nominal and only subtype themselves plus `symbol`.
 - [x] Add coverage for global Function type assignability
   - Callables assignable to Function; Function not assignable to specific signatures.
 
