@@ -46,6 +46,7 @@ Status: Active
   - [x] Add JSX member element attribute coverage in thin emitter tests.
   - [x] Add JSX namespaced attribute string literal coverage in thin emitter tests.
   - [x] Add JSX member element namespaced attribute coverage in thin emitter tests.
+  - [x] Add JSX member element namespaced attribute expression coverage in thin emitter tests.
   - [x] Add JSX boolean attribute coverage in thin emitter tests.
   - [x] Add JSX member element boolean attribute coverage in thin emitter tests.
   - [x] Add JSX spread + boolean attribute coverage in thin emitter tests.

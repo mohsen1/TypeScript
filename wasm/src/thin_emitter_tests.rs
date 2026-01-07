@@ -1042,6 +1042,28 @@ fn test_thin_emit_jsx_member_element_namespaced_attribute() {
 }
 
 #[test]
+fn test_thin_emit_jsx_member_namespaced_attribute_expression() {
+    let source = "const x = <Foo.Bar xlink:href={url} />;";
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("<Foo.Bar"),
+        "Expected JSX member element in output: {}",
+        output
+    );
+    assert!(
+        output.contains("xlink:href={url}"),
+        "Expected JSX namespaced attribute expression on member element in output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_jsx_boolean_attribute() {
     let source = "const x = <input disabled />;";
     let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
