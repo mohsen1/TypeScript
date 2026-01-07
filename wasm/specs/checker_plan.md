@@ -81,6 +81,8 @@ Status: Active
   - Add coverage for missing nested namespace value members.
 - [x] Enforce type-only namespace members in value position
   - Report TS2693 when accessing interface/type alias exports as values.
+- [x] Enforce type-only namespace aliases in value position
+  - Report TS2693 when `import Alias = NS.Type` is used as a value.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
