@@ -1,6 +1,8 @@
-use super::config::{load_tsconfig, parse_tsconfig};
+use super::config::{load_tsconfig, parse_tsconfig, resolve_compiler_options};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::thin_emitter::{ModuleKind, ScriptTarget};
 
 struct TempDir {
     path: PathBuf,
@@ -97,4 +99,58 @@ fn load_tsconfig_detects_extends_cycle() {
     let err = load_tsconfig(&temp.path.join("a.json")).expect_err("cycle should error");
     let message = err.to_string();
     assert!(message.contains("extends cycle"), "{message}");
+}
+
+#[test]
+fn resolve_compiler_options_defaults() {
+    let resolved = resolve_compiler_options(None).expect("defaults should resolve");
+
+    assert_eq!(resolved.printer.target, ScriptTarget::ESNext);
+    assert_eq!(resolved.printer.module, ModuleKind::None);
+    assert!(resolved.out_dir.is_none());
+    assert!(!resolved.checker.strict);
+    assert!(!resolved.no_emit);
+}
+
+#[test]
+fn resolve_compiler_options_overrides() {
+    let config = parse_tsconfig(
+        r#"{
+          "compilerOptions": {
+            "target": "ES2020",
+            "module": "common-js",
+            "outDir": "dist",
+            "strict": true,
+            "noEmit": true
+          }
+        }"#,
+    )
+    .expect("should parse config");
+
+    let resolved = resolve_compiler_options(config.compiler_options.as_ref())
+        .expect("compiler options should resolve");
+
+    assert_eq!(resolved.printer.target, ScriptTarget::ES2020);
+    assert_eq!(resolved.printer.module, ModuleKind::CommonJS);
+    assert_eq!(resolved.out_dir, Some(PathBuf::from("dist")));
+    assert!(resolved.checker.strict);
+    assert!(resolved.no_emit);
+}
+
+#[test]
+fn resolve_compiler_options_rejects_unknown_values() {
+    let config = parse_tsconfig(
+        r#"{
+          "compilerOptions": {
+            "target": "es2999",
+            "module": "totally-not-a-module"
+          }
+        }"#,
+    )
+    .expect("should parse config");
+
+    let err = resolve_compiler_options(config.compiler_options.as_ref())
+        .expect_err("unknown compilerOptions should error");
+    let message = err.to_string();
+    assert!(message.contains("compilerOptions.target"), "{message}");
 }

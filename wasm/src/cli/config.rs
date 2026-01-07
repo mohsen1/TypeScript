@@ -3,6 +3,8 @@ use serde::Deserialize;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
+use crate::thin_emitter::{ModuleKind, PrinterOptions, ScriptTarget};
+
 #[derive(Debug, Clone, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct TsConfig {
@@ -31,6 +33,61 @@ pub struct CompilerOptions {
     pub strict: Option<bool>,
     #[serde(default)]
     pub no_emit: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CheckerOptions {
+    pub strict: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolvedCompilerOptions {
+    pub printer: PrinterOptions,
+    pub checker: CheckerOptions,
+    pub out_dir: Option<PathBuf>,
+    pub no_emit: bool,
+}
+
+impl Default for ResolvedCompilerOptions {
+    fn default() -> Self {
+        ResolvedCompilerOptions {
+            printer: PrinterOptions::default(),
+            checker: CheckerOptions::default(),
+            out_dir: None,
+            no_emit: false,
+        }
+    }
+}
+
+pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<ResolvedCompilerOptions> {
+    let mut resolved = ResolvedCompilerOptions::default();
+    let Some(options) = options else {
+        return Ok(resolved);
+    };
+
+    if let Some(target) = options.target.as_deref() {
+        resolved.printer.target = parse_script_target(target)?;
+    }
+
+    if let Some(module) = options.module.as_deref() {
+        resolved.printer.module = parse_module_kind(module)?;
+    }
+
+    if let Some(out_dir) = options.out_dir.as_deref() {
+        if !out_dir.is_empty() {
+            resolved.out_dir = Some(PathBuf::from(out_dir));
+        }
+    }
+
+    if let Some(strict) = options.strict {
+        resolved.checker.strict = strict;
+    }
+
+    if let Some(no_emit) = options.no_emit {
+        resolved.no_emit = no_emit;
+    }
+
+    Ok(resolved)
 }
 
 pub fn parse_tsconfig(source: &str) -> Result<TsConfig> {
@@ -108,6 +165,57 @@ fn merge_compiler_options(base: CompilerOptions, child: CompilerOptions) -> Comp
         strict: child.strict.or(base.strict),
         no_emit: child.no_emit.or(base.no_emit),
     }
+}
+
+fn parse_script_target(value: &str) -> Result<ScriptTarget> {
+    let normalized = normalize_option(value);
+    let target = match normalized.as_str() {
+        "es3" => ScriptTarget::ES3,
+        "es5" => ScriptTarget::ES5,
+        "es6" | "es2015" => ScriptTarget::ES2015,
+        "es2016" => ScriptTarget::ES2016,
+        "es2017" => ScriptTarget::ES2017,
+        "es2018" => ScriptTarget::ES2018,
+        "es2019" => ScriptTarget::ES2019,
+        "es2020" => ScriptTarget::ES2020,
+        "es2021" => ScriptTarget::ES2021,
+        "es2022" => ScriptTarget::ES2022,
+        "esnext" => ScriptTarget::ESNext,
+        _ => bail!("unsupported compilerOptions.target '{}'", value),
+    };
+
+    Ok(target)
+}
+
+fn parse_module_kind(value: &str) -> Result<ModuleKind> {
+    let normalized = normalize_option(value);
+    let module = match normalized.as_str() {
+        "none" => ModuleKind::None,
+        "commonjs" => ModuleKind::CommonJS,
+        "amd" => ModuleKind::AMD,
+        "umd" => ModuleKind::UMD,
+        "system" => ModuleKind::System,
+        "es6" | "es2015" => ModuleKind::ES2015,
+        "es2020" => ModuleKind::ES2020,
+        "es2022" => ModuleKind::ES2022,
+        "esnext" => ModuleKind::ESNext,
+        "node16" => ModuleKind::Node16,
+        "nodenext" => ModuleKind::NodeNext,
+        _ => bail!("unsupported compilerOptions.module '{}'", value),
+    };
+
+    Ok(module)
+}
+
+fn normalize_option(value: &str) -> String {
+    let mut normalized = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if ch == '-' || ch == '_' || ch.is_whitespace() {
+            continue;
+        }
+        normalized.push(ch.to_ascii_lowercase());
+    }
+    normalized
 }
 
 fn strip_jsonc(input: &str) -> String {
