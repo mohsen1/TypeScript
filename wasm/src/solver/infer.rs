@@ -803,6 +803,12 @@ impl<'a> InferenceContext<'a> {
             }
         }
 
+        if let (Some(s_string_idx), Some(s_number_idx)) = (&source.string_index, &source.number_index) {
+            if !self.is_subtype(s_number_idx.value_type, s_string_idx.value_type) {
+                return false;
+            }
+        }
+
         self.check_properties_against_index_signatures(&source.properties, target)
     }
 
