@@ -2165,6 +2165,51 @@ fn test_transform_directive_chain_es5_class_commonjs_export() {
 }
 
 #[test]
+fn test_transform_directive_es5_class_emits_members_from_ast() {
+    let source = "class Foo { method() { return 1; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut transforms = TransformContext::new();
+    transforms.insert(
+        class_idx,
+        TransformDirective::ES5Class {
+            class_node: class_idx,
+            class_name: Some("Foo".to_string()),
+            heritage: None,
+            members: Vec::new(),
+        },
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("prototype.method"),
+        "ES5 class emit should include prototype members: {}",
+        output
+    );
+    assert!(
+        !output.contains("class Foo"),
+        "ES5 class transform should downlevel syntax: {}",
+        output
+    );
+}
+
+#[test]
 fn test_transform_directive_composability() {
     // This test verifies that the architecture supports composable transforms
     // For now, we just verify that the TransformContext can be created and passed around
