@@ -346,6 +346,22 @@ fn test_resolve_bounds_object_subtype() {
 }
 
 #[test]
+fn test_resolve_bounds_object_keyword_upper_allows_array() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let lower = interner.array(TypeId::STRING);
+    let upper = TypeId::OBJECT;
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
 fn test_resolve_bounds_function_subtype() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);

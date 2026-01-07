@@ -576,6 +576,11 @@ impl<'a> InferenceContext<'a> {
             return true;
         }
 
+        // object keyword accepts any non-primitive type
+        if target == TypeId::OBJECT {
+            return self.is_object_keyword_type(source);
+        }
+
         let source_key = self.interner.lookup(source);
         let target_key = self.interner.lookup(target);
 
@@ -695,6 +700,44 @@ impl<'a> InferenceContext<'a> {
         }
 
         false
+    }
+
+    fn is_object_keyword_type(&self, source: TypeId) -> bool {
+        match source {
+            TypeId::ANY | TypeId::NEVER | TypeId::ERROR | TypeId::OBJECT => return true,
+            TypeId::UNKNOWN
+            | TypeId::VOID
+            | TypeId::NULL
+            | TypeId::UNDEFINED
+            | TypeId::BOOLEAN
+            | TypeId::NUMBER
+            | TypeId::STRING
+            | TypeId::BIGINT
+            | TypeId::SYMBOL => return false,
+            _ => {}
+        }
+
+        let key = match self.interner.lookup(source) {
+            Some(key) => key,
+            None => return false,
+        };
+
+        match key {
+            TypeKey::Object(_)
+            | TypeKey::ObjectWithIndex(_)
+            | TypeKey::Array(_)
+            | TypeKey::Tuple(_)
+            | TypeKey::Function(_)
+            | TypeKey::Callable(_)
+            | TypeKey::Mapped(_)
+            | TypeKey::Application(_)
+            | TypeKey::ThisType => true,
+            TypeKey::ReadonlyType(inner) => self.is_subtype(inner, TypeId::OBJECT),
+            TypeKey::TypeParameter(info) | TypeKey::Infer(info) => info
+                .constraint
+                .is_some_and(|constraint| self.is_subtype(constraint, TypeId::OBJECT)),
+            _ => false,
+        }
     }
 
     fn optional_property_type(&self, prop: &PropertyInfo) -> TypeId {
