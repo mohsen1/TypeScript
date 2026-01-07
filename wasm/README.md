@@ -10,29 +10,36 @@ engine on top to match TypeScript behavior while preserving correctness where po
 
 > This is a very high level project direction coming from project's manager's boss.
 
-**I want to see you using all tracks of development aggressively. no track should sit idle**
+**Current Phase: Phase 8 - Conformance, Convergence, and Hardening**
 
-The system has a "Ferrari engine" (ThinNode AST + Parallel Binder) but needs a finished transmission (Solver integration).
+**Strategic Shift:** We have crossed the threshold of "building the engine." The components (ThinParser, ThinBinder, Solver, ThinEmitter) exist. We are now shifting to **Integration and Correctness**. We are no longer building features in isolation; we are driving the entire pipeline to pass official TypeScript conformance tests.
 
-### 1. Consolidate the "Split Brain" Type System (High Priority)
-The project currently has friction between the imperative `ThinChecker` (AST walking) and the declarative `solver/` (structural typing).
-*   **Goal:** Move all assignability checks, type relationships, and member lookups into `solver/` behind the `QueryDatabase` trait.
-*   **Action:** `ThinChecker` must become a thin traversal layer that pushes constraints into the solver and pulls diagnostics out, rather than doing logic itself.
+**Top Priority:** The **Solver** is the bottleneck for correctness. The **Emitter** is the bottleneck for utility. All tracks must prioritize tasks that fix type inference gaps or emission semantics over peripheral features (LSP UI, CLI flags).
 
-### 2. Emitter & Compatibility Strategy
-To function as a true drop-in replacement for `tsc`, we **will support ES5 down-leveling** (classes to IIFEs, async to generators).
-*   **Constraint:** **ES3 support is explicitly out of scope.**
-*   **Architecture:** Continue using the **Projection Layer** pattern (`TransformContext`). Do not mutate the AST for transforms; map `NodeIndex` to `TransformDirective` to keep the parallel parser zero-copy and thread-safe.
-*   **Focus:** Ensure the `.d.ts` emitter correctly handles symbol visibility and re-exports; this is the "graduation requirement" for library support.
+### Management Strategy: Autocratic Scheduling
+- **The Manager** is the single source of truth for priority.
+- **Tracks** are generic workers. If the Solver needs 3 workers, the Manager assigns 3 workers to the Solver, regardless of their previous "track name."
+- **Zero-Idle:** If a high-priority task is blocked, swarm it.
 
-### 3. LSP Incrementality
-The current `ThinNodeArena` makes in-place mutation difficult.
-*   **Goal:** Sub-10ms response time on keypress.
-*   **Action:** Refine `IncrementalParseResult` to ensure small edits inside function bodies do not trigger a full file re-bind or global symbol table invalidation.
+### Critical Objectives (Ranked)
 
-### 4. Technical Debt & Cleanup
-*   **Deprecate Legacy AST:** Aggressively remove `parser/ast` (the 208-byte fat nodes). The future is `parser/thin_node` (16-byte packed nodes).
-*   **Memory Hygiene:** Ensure `ThinNodeArena`s are swapped and dropped correctly during long-running LSP sessions to prevent memory leaks.
+1.  **Solver Hardening (The "Brain")**
+    *   **Generic Inference:** `solver/infer.rs` is critical. Focus on inference from usage, context-sensitive typing, and handling circular constraints in `extends` clauses.
+    *   **Conditional Types:** Stress test `solver/evaluate.rs` with distributive conditional types over unions. This is where most "toy" compilers fail.
+    *   **Structural Compatibility:** Verify `subtype.rs` handles variance correctly (covariance for results, contravariance for parameters) in all edge cases.
+
+2.  **Emitter Fidelity (The "Voice")**
+    *   **ES5 Downleveling:** Ensure `transforms/class_es5.rs` and `async_es5.rs` produce semantically identical JavaScript to `tsc`. Edge cases: `super()` calls in derived classes with property initializers, and `this` capture in deeply nested arrow/async functions.
+    *   **Source Maps:** Verify `source_writer.rs` generates valid maps that debuggers can actually attach to.
+
+3.  **End-to-End Validation**
+    *   Stop adding AST nodes. Start compiling real code.
+    *   **Metric:** Successfully compile a non-trivial generic library (e.g., `redux` or `lodash` types) without panicking.
+
+### Anti-Priorities (Do Not Work On)
+*   New LSP features (Semantic Tokens, Code Actions) unless they expose a Solver bug.
+*   CLI argument parsing or fancy terminal output.
+*   Performance micro-optimizations (unless we regress significantly).
 
 
 ## Executive Summary (Manager report)
