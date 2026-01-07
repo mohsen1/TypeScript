@@ -143,34 +143,8 @@ impl<'a> CallEvaluator<'a> {
             return self.resolve_generic_call(func, arg_types);
         }
 
-        // Check argument types
-        let rest_param = func.params.last().filter(|param| param.rest);
-        for (i, arg_type) in arg_types.iter().enumerate() {
-            let param = if i < func.params.len() {
-                &func.params[i]
-            } else if let Some(rest) = rest_param {
-                rest
-            } else {
-                // Rest parameter or excess args already handled by count check
-                break;
-            };
-            let param_type = if param.rest {
-                // For rest parameters, unwrap the array type
-                match self.interner.lookup(param.type_id) {
-                    Some(TypeKey::Array(elem)) => elem,
-                    _ => param.type_id,
-                }
-            } else {
-                param.type_id
-            };
-
-            if !self.subtype.is_assignable_to(*arg_type, param_type) {
-                return CallResult::ArgumentTypeMismatch {
-                    index: i,
-                    expected: param_type,
-                    actual: *arg_type,
-                };
-            }
+        if let Some(result) = self.check_argument_types(&func.params, arg_types) {
+            return result;
         }
 
         CallResult::Success(func.return_type)
@@ -275,8 +249,52 @@ impl<'a> CallEvaluator<'a> {
             }
         }
 
+        let instantiated_params: Vec<ParamInfo> = func.params.iter().map(|p| {
+            ParamInfo {
+                name: p.name.clone(),
+                type_id: instantiate_type(self.interner, p.type_id, &final_subst),
+                optional: p.optional,
+                rest: p.rest,
+            }
+        }).collect();
+        if let Some(result) = self.check_argument_types(&instantiated_params, arg_types) {
+            return result;
+        }
+
         let return_type = instantiate_type(self.interner, func.return_type, &final_subst);
         CallResult::Success(return_type)
+    }
+
+    fn check_argument_types(&mut self, params: &[ParamInfo], arg_types: &[TypeId]) -> Option<CallResult> {
+        let rest_param = params.last().filter(|param| param.rest);
+        for (i, arg_type) in arg_types.iter().enumerate() {
+            let param = if i < params.len() {
+                &params[i]
+            } else if let Some(rest) = rest_param {
+                rest
+            } else {
+                // Rest parameter or excess args already handled by count check
+                break;
+            };
+            let param_type = if param.rest {
+                // For rest parameters, unwrap the array type
+                match self.interner.lookup(param.type_id) {
+                    Some(TypeKey::Array(elem)) => elem,
+                    _ => param.type_id,
+                }
+            } else {
+                param.type_id
+            };
+
+            if !self.subtype.is_assignable_to(*arg_type, param_type) {
+                return Some(CallResult::ArgumentTypeMismatch {
+                    index: i,
+                    expected: param_type,
+                    actual: *arg_type,
+                });
+            }
+        }
+        None
     }
 
     fn type_contains_placeholder(

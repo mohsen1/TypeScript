@@ -437,6 +437,43 @@ fn test_call_generic_function_with_string() {
 }
 
 #[test]
+fn test_call_generic_argument_type_mismatch_with_default() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: Some(TypeId::NUMBER),
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let param_type = interner.union(vec![t_type, TypeId::NUMBER]);
+
+    let func = interner.function(FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: param_type,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    });
+
+    let result = evaluator.resolve_call(func, &[TypeId::STRING]);
+    match result {
+        CallResult::ArgumentTypeMismatch { index, expected, actual } => {
+            assert_eq!(index, 0);
+            assert_eq!(expected, TypeId::NUMBER);
+            assert_eq!(actual, TypeId::STRING);
+        }
+        _ => panic!("Expected ArgumentTypeMismatch, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_call_generic_argument_count_mismatch() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
