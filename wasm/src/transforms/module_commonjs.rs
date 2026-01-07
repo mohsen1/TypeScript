@@ -112,6 +112,9 @@ pub fn collect_export_names(arena: &ThinNodeArena, statements: &[NodeIndex]) -> 
             // These are wrapped in EXPORT_DECLARATION nodes
             k if k == syntax_kind_ext::EXPORT_DECLARATION => {
                 if let Some(export_decl) = arena.get_export_decl(node) {
+                    if export_decl.is_type_only {
+                        continue;
+                    }
                     if export_decl.is_default_export {
                         exports.push("default".to_string());
                         continue;
@@ -123,6 +126,9 @@ pub fn collect_export_names(arena: &ThinNodeArena, statements: &[NodeIndex]) -> 
                             if let Some(named_exports) = arena.get_named_imports(clause_node) {
                                 for &spec_idx in &named_exports.elements.nodes {
                                     if let Some(spec) = arena.get(spec_idx).and_then(|n| arena.get_specifier(n)) {
+                                        if spec.is_type_only {
+                                            continue;
+                                        }
                                         // Use the exported name (name), not the local name (property_name)
                                         if let Some(name) = get_identifier_text(arena, spec.name) {
                                             exports.push(name);
@@ -294,6 +300,10 @@ pub fn get_import_bindings(
         return bindings;
     };
 
+    if clause.is_type_only {
+        return bindings;
+    }
+
     // Default import: import foo from "..."
     if !clause.name.is_none() {
         if let Some(name) = get_identifier_text(arena, clause.name) {
@@ -318,6 +328,9 @@ pub fn get_import_bindings(
                     for &spec_idx in &named_imports.elements.nodes {
                         if let Some(spec_node) = arena.get(spec_idx) {
                             if let Some(spec) = arena.get_specifier(spec_node) {
+                                if spec.is_type_only {
+                                    continue;
+                                }
                                 let local_name = get_identifier_text(arena, spec.name).unwrap_or_default();
                                 let import_name = if !spec.property_name.is_none() {
                                     get_identifier_text(arena, spec.property_name).unwrap_or(local_name.clone())
