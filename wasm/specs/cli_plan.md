@@ -141,6 +141,7 @@ Tests run in this state:
 - `./wasm/test.sh thin_binder_tests::test_thin_binder_resolves_block_local_from_bound_state_binder_ts_432` (pass).
 - `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (rerun after binder.ts:432 fix; tsz still exits with diagnostics, first error `src/compiler/binder.ts:575:33` (TS2693 `Set` only refers to a type, but is being used as a value here), captured via `./wasm/target/release/tsz --project src/compiler/tsconfig.json --noEmit 2>&1 | rg -m1 'TS[0-9]+'`).
 - `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (rerun after binder.ts:432 focus; first TS2304 `src/compiler/binder.ts:756:15` via `./wasm/target/release/tsz --project src/compiler/tsconfig.json --noEmit 2>&1 | rg -m1 'TS2304'`).
+- `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (rerun after binder.ts:432 test; still fails first on `src/compiler/binder.ts:575:33` TS2693 `Set`).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
