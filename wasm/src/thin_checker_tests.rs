@@ -1482,6 +1482,39 @@ map["a"] = 2;
 }
 
 #[test]
+fn test_readonly_index_signature_variable_access_assignment_2540() {
+    // Error 2540: Cannot assign via readonly index signature.
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface ReadonlyMap {
+    readonly [key: string]: number;
+}
+let map: ReadonlyMap = { a: 1 };
+let key: string = "a";
+map[key] = 2;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    let count_2540 = codes.iter().filter(|&&c| c == 2540).count();
+    assert!(count_2540 >= 1,
+        "Expected at least 1 error 2540 for readonly index signature assignment, got {} in: {:?}", count_2540, codes);
+}
+
+#[test]
 fn test_abstractPropertyNegative_errors() {
     // Test the full abstractPropertyNegative test case to verify expected errors
     use crate::thin_parser::ThinParserState;

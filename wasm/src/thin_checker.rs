@@ -5966,36 +5966,11 @@ impl<'a> ThinCheckerState<'a> {
         wants_string: bool,
         wants_number: bool,
     ) -> bool {
-        use crate::solver::TypeKey;
+        use crate::solver::QueryDatabase;
 
-        match self.ctx.types.lookup(type_id) {
-            Some(TypeKey::ReadonlyType(inner)) => {
-                if wants_number {
-                    if let Some(TypeKey::Array(_) | TypeKey::Tuple(_)) = self.ctx.types.lookup(inner) {
-                        return true;
-                    }
-                }
-                self.is_readonly_index_signature(inner, wants_string, wants_number)
-            }
-            Some(TypeKey::ObjectWithIndex(shape_id)) => {
-                let shape = self.ctx.types.object_shape(shape_id);
-                (wants_string && shape.string_index.as_ref().is_some_and(|idx| idx.readonly))
-                    || (wants_number && shape.number_index.as_ref().is_some_and(|idx| idx.readonly))
-            }
-            Some(TypeKey::Union(types)) => {
-                let types = self.ctx.types.type_list(types);
-                types
-                    .iter()
-                    .any(|t| self.is_readonly_index_signature(*t, wants_string, wants_number))
-            }
-            Some(TypeKey::Intersection(types)) => {
-                let types = self.ctx.types.type_list(types);
-                types
-                    .iter()
-                    .any(|t| self.is_readonly_index_signature(*t, wants_string, wants_number))
-            }
-            _ => false,
-        }
+        self.ctx
+            .types
+            .is_readonly_index_signature(type_id, wants_string, wants_number)
     }
 
     fn get_readonly_element_access_name(

@@ -244,6 +244,20 @@ pub trait QueryDatabase: TypeDatabase {
         )
     }
 
+    fn is_readonly_index_signature(
+        &self,
+        object_type: TypeId,
+        wants_string: bool,
+        wants_number: bool,
+    ) -> bool {
+        crate::solver::operations::is_readonly_index_signature(
+            self.as_type_database(),
+            object_type,
+            wants_string,
+            wants_number,
+        )
+    }
+
     fn is_subtype_of(&self, source: TypeId, target: TypeId) -> bool {
         crate::solver::subtype::is_subtype_of(self.as_type_database(), source, target)
     }
