@@ -14,7 +14,7 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
 ## Highest-Impact Next Tasks
 - [ ] Incremental file updates
   - [x] Add `Project::update_file` that applies LSP edits and re-parses.
-  - [ ] Reuse parsed arena + binder where possible.
+  - [x] Reuse parsed arena + binder where possible.
   - [x] Cache `TypeCache` per file for hover/signature help.
   - [x] Extend caches for type-aware completions.
   - [x] Extend caches for diagnostics.
