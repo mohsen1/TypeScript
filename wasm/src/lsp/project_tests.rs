@@ -1058,6 +1058,29 @@ fn test_project_performance_scope_cache_hits_definition() {
 }
 
 #[test]
+fn test_project_performance_scope_cache_hits_hover() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "const value = 1;\nvalue;\n".to_string());
+    let position = Position::new(1, 0);
+
+    assert!(project.get_hover("a.ts", position).is_some());
+    let first = project
+        .performance()
+        .timing(ProjectRequestKind::Hover)
+        .expect("Expected timing data for hover");
+
+    assert!(project.get_hover("a.ts", position).is_some());
+    let second = project
+        .performance()
+        .timing(ProjectRequestKind::Hover)
+        .expect("Expected timing data for hover");
+
+    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
+    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 
