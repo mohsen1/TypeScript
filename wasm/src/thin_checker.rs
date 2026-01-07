@@ -2668,6 +2668,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get property name as string from a property name node (identifier, string literal, etc.)
     fn get_property_name(&self, name_idx: NodeIndex) -> Option<String> {
+        use crate::scanner::SyntaxKind;
+
         let name_node = self.ctx.arena.get(name_idx)?;
 
         // Identifier
@@ -2675,8 +2677,38 @@ impl<'a> ThinCheckerState<'a> {
             return Some(ident.escaped_text.clone());
         }
 
-        // For string/numeric literals, we'd need access to the token text
-        // For now, just handle identifiers which are the common case
+        if matches!(
+            name_node.kind,
+            k if k == SyntaxKind::StringLiteral as u16
+                || k == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+                || k == SyntaxKind::NumericLiteral as u16
+        ) {
+            if let Some(lit) = self.ctx.arena.get_literal(name_node) {
+                if !lit.text.is_empty() {
+                    return Some(lit.text.clone());
+                }
+            }
+        }
+
+        if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+            if let Some(computed) = self.ctx.arena.get_computed_property(name_node) {
+                if let Some(expr_node) = self.ctx.arena.get(computed.expression) {
+                    if matches!(
+                        expr_node.kind,
+                        k if k == SyntaxKind::StringLiteral as u16
+                            || k == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+                            || k == SyntaxKind::NumericLiteral as u16
+                    ) {
+                        if let Some(lit) = self.ctx.arena.get_literal(expr_node) {
+                            if !lit.text.is_empty() {
+                                return Some(lit.text.clone());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         None
     }
 
@@ -5193,15 +5225,10 @@ impl<'a> ThinCheckerState<'a> {
                     // Get member name and type
                     let (member_name, member_type) = if member_node.kind == METHOD_SIGNATURE || member_node.kind == PROPERTY_SIGNATURE {
                         if let Some(sig) = self.ctx.arena.get_signature(member_node) {
-                            if let Some(name_node) = self.ctx.arena.get(sig.name) {
-                                if let Some(id_data) = self.ctx.arena.get_identifier(name_node) {
-                                    let name = id_data.escaped_text.clone();
-                                    // Get the type of this member
-                                    let type_id = self.get_type_of_interface_member(member_idx);
-                                    (name, type_id)
-                                } else {
-                                    continue;
-                                }
+                            if let Some(name) = self.get_property_name(sig.name) {
+                                // Get the type of this member
+                                let type_id = self.get_type_of_interface_member(member_idx);
+                                (name, type_id)
                             } else {
                                 continue;
                             }
@@ -5220,14 +5247,9 @@ impl<'a> ThinCheckerState<'a> {
 
                         let (base_member_name, base_type) = if base_member_node.kind == METHOD_SIGNATURE || base_member_node.kind == PROPERTY_SIGNATURE {
                             if let Some(sig) = self.ctx.arena.get_signature(base_member_node) {
-                                if let Some(name_node) = self.ctx.arena.get(sig.name) {
-                                    if let Some(id_data) = self.ctx.arena.get_identifier(name_node) {
-                                        let name = id_data.escaped_text.clone();
-                                        let type_id = self.get_type_of_interface_member(base_member_idx);
-                                        (name, type_id)
-                                    } else {
-                                        continue;
-                                    }
+                                if let Some(name) = self.get_property_name(sig.name) {
+                                    let type_id = self.get_type_of_interface_member(base_member_idx);
+                                    (name, type_id)
                                 } else {
                                     continue;
                                 }
@@ -5301,9 +5323,7 @@ impl<'a> ThinCheckerState<'a> {
             let Some(sig) = self.ctx.arena.get_signature(member_node) else {
                 return TypeId::ANY;
             };
-            let name = self.ctx.arena.get(sig.name)
-                .and_then(|name_node| self.ctx.arena.get_identifier(name_node))
-                .map(|id_data| id_data.escaped_text.clone());
+            let name = self.get_property_name(sig.name);
             let Some(name) = name else {
                 return TypeId::ANY;
             };

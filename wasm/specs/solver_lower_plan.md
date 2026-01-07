@@ -166,6 +166,8 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: interface extension detects readonly property mismatch (2430)
   - [x] Test: interface extension detects optional property mismatch (2430)
   - [x] Test: interface extension accepts matching generic method signatures
+  - [x] Checker: interface extension matches string literal property names
+  - [x] Test: interface extension detects string literal property mismatch (2430)
 - [x] Parser: fix interface member parsing to track progress by token position (avoid skipping consecutive identifiers)
 - [x] Perf: avoid extra String clone when lowering negative bigint literals
 - [x] Perf: avoid extra allocation when normalizing bigint leading zeros
