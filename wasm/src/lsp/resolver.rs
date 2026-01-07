@@ -184,6 +184,11 @@ impl<'a> ScopeWalker<'a> {
               || k == syntax_kind_ext::FUNCTION_EXPRESSION
               || k == syntax_kind_ext::ARROW_FUNCTION => {
                 if let Some(func) = self.arena.get_function(node) {
+                    if let Some(ref modifiers) = func.modifiers {
+                        for &modifier in &modifiers.nodes {
+                            if let Some(res) = f(self, modifier) { return Some(res); }
+                        }
+                    }
                     if !func.name.is_none() { if let Some(res) = f(self, func.name) { return Some(res); } }
                     if let Some(ref type_params) = func.type_parameters {
                         for &param in &type_params.nodes {
@@ -199,6 +204,11 @@ impl<'a> ScopeWalker<'a> {
             }
             k if k == syntax_kind_ext::METHOD_DECLARATION => {
                 if let Some(method) = self.arena.get_method_decl(node) {
+                    if let Some(ref modifiers) = method.modifiers {
+                        for &modifier in &modifiers.nodes {
+                            if let Some(res) = f(self, modifier) { return Some(res); }
+                        }
+                    }
                     if !method.name.is_none() { if let Some(res) = f(self, method.name) { return Some(res); } }
                     if let Some(ref type_params) = method.type_parameters {
                         for &param in &type_params.nodes {
@@ -214,6 +224,11 @@ impl<'a> ScopeWalker<'a> {
             }
             k if k == syntax_kind_ext::CONSTRUCTOR => {
                 if let Some(ctor) = self.arena.get_constructor(node) {
+                    if let Some(ref modifiers) = ctor.modifiers {
+                        for &modifier in &modifiers.nodes {
+                            if let Some(res) = f(self, modifier) { return Some(res); }
+                        }
+                    }
                     if let Some(ref type_params) = ctor.type_parameters {
                         for &param in &type_params.nodes {
                             if let Some(res) = f(self, param) { return Some(res); }
@@ -228,6 +243,11 @@ impl<'a> ScopeWalker<'a> {
 
             k if k == syntax_kind_ext::CLASS_DECLARATION || k == syntax_kind_ext::CLASS_EXPRESSION => {
                 if let Some(class) = self.arena.get_class(node) {
+                    if let Some(ref modifiers) = class.modifiers {
+                        for &modifier in &modifiers.nodes {
+                            if let Some(res) = f(self, modifier) { return Some(res); }
+                        }
+                    }
                     if !class.name.is_none() { if let Some(res) = f(self, class.name) { return Some(res); } }
                     if let Some(ref type_params) = class.type_parameters {
                         for &param in &type_params.nodes {
@@ -268,6 +288,11 @@ impl<'a> ScopeWalker<'a> {
             }
             k if k == syntax_kind_ext::PARAMETER => {
                 if let Some(param) = self.arena.get_parameter(node) {
+                    if let Some(ref modifiers) = param.modifiers {
+                        for &modifier in &modifiers.nodes {
+                            if let Some(res) = f(self, modifier) { return Some(res); }
+                        }
+                    }
                     if let Some(res) = f(self, param.name) { return Some(res); }
                     if !param.type_annotation.is_none() { if let Some(res) = f(self, param.type_annotation) { return Some(res); } }
                     if !param.initializer.is_none() { if let Some(res) = f(self, param.initializer) { return Some(res); } }
@@ -275,13 +300,28 @@ impl<'a> ScopeWalker<'a> {
             }
             k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
                 if let Some(prop) = self.arena.get_property_decl(node) {
+                    if let Some(ref modifiers) = prop.modifiers {
+                        for &modifier in &modifiers.nodes {
+                            if let Some(res) = f(self, modifier) { return Some(res); }
+                        }
+                    }
                     if let Some(res) = f(self, prop.name) { return Some(res); }
                     if !prop.type_annotation.is_none() { if let Some(res) = f(self, prop.type_annotation) { return Some(res); } }
                     if !prop.initializer.is_none() { if let Some(res) = f(self, prop.initializer) { return Some(res); } }
                 }
             }
+            k if k == syntax_kind_ext::DECORATOR => {
+                if let Some(decorator) = self.arena.get_decorator(node) {
+                    if let Some(res) = f(self, decorator.expression) { return Some(res); }
+                }
+            }
             k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
                 if let Some(accessor) = self.arena.get_accessor(node) {
+                    if let Some(ref modifiers) = accessor.modifiers {
+                        for &modifier in &modifiers.nodes {
+                            if let Some(res) = f(self, modifier) { return Some(res); }
+                        }
+                    }
                     if let Some(res) = f(self, accessor.name) { return Some(res); }
                     if let Some(ref type_params) = accessor.type_parameters {
                         for &param in &type_params.nodes {
