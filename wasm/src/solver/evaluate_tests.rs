@@ -981,6 +981,73 @@ fn test_mapped_type_over_string_keys() {
 }
 
 #[test]
+fn test_mapped_type_string_index_signature() {
+    let interner = TypeInterner::new();
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: TypeId::STRING,
+        template: TypeId::NUMBER,
+        readonly_modifier: Some(MappedModifier::Add),
+        optional_modifier: Some(MappedModifier::Add),
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    let key = interner.lookup(result).expect("Expected object type");
+
+    match key {
+        TypeKey::ObjectWithIndex(shape) => {
+            assert!(shape.properties.is_empty());
+            assert!(shape.number_index.is_none());
+
+            let string_index = shape.string_index.as_ref().expect("expected string index signature");
+            assert_eq!(string_index.key_type, TypeId::STRING);
+            let expected_value = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+            assert_eq!(string_index.value_type, expected_value);
+            assert!(string_index.readonly);
+        }
+        other => panic!("Expected object type, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_mapped_type_number_index_signature() {
+    let interner = TypeInterner::new();
+
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint: TypeId::NUMBER,
+        template: TypeId::STRING,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    let key = interner.lookup(result).expect("Expected object type");
+
+    match key {
+        TypeKey::ObjectWithIndex(shape) => {
+            assert!(shape.properties.is_empty());
+            assert!(shape.string_index.is_none());
+
+            let number_index = shape.number_index.as_ref().expect("expected number index signature");
+            assert_eq!(number_index.key_type, TypeId::NUMBER);
+            assert_eq!(number_index.value_type, TypeId::STRING);
+            assert!(!number_index.readonly);
+        }
+        other => panic!("Expected object type, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_mapped_type_single_key() {
     let interner = TypeInterner::new();
 

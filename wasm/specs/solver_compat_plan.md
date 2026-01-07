@@ -247,6 +247,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Include numeric index keys in `keyof string`
 - [x] Preserve number index signatures when mapping over `keyof string`
 
+### Phase 44: Mapped Index Signatures
+- [x] Emit string/number index signatures when mapping over `string`/`number` constraints
+- [x] Tests for mapped index signatures and modifiers
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
