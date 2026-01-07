@@ -1299,7 +1299,7 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of call expression.
     fn get_type_of_call_expression(&mut self, idx: NodeIndex) -> TypeId {
-        use crate::solver::{CallEvaluator, CallResult, SubtypeChecker};
+        use crate::solver::{CallEvaluator, CallResult, CompatChecker};
 
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
@@ -1353,10 +1353,8 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Use CallEvaluator to resolve the call
-        let mut subtype = SubtypeChecker::new(self.ctx.types);
-        subtype.strict_function_types = false;
-        subtype.allow_void_return = true;
-        let mut evaluator = CallEvaluator::new(self.ctx.types, &mut subtype);
+        let mut checker = CompatChecker::new(self.ctx.types);
+        let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
         let result = evaluator.resolve_call(callee_type, &arg_types);
 
         match result {

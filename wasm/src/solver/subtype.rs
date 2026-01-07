@@ -12,7 +12,7 @@
 use std::collections::HashSet;
 use crate::interner::Atom;
 use crate::solver::types::*;
-use crate::solver::{apparent_primitive_members, ApparentMemberKind, TypeDatabase};
+use crate::solver::{apparent_primitive_members, ApparentMemberKind, AssignabilityChecker, TypeDatabase};
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -2128,6 +2128,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 pub fn is_subtype_of(interner: &dyn TypeDatabase, source: TypeId, target: TypeId) -> bool {
     let mut checker = SubtypeChecker::new(interner);
     checker.is_subtype_of(source, target)
+}
+
+impl<'a, R: TypeResolver> AssignabilityChecker for SubtypeChecker<'a, R> {
+    fn is_assignable_to(&mut self, source: TypeId, target: TypeId) -> bool {
+        SubtypeChecker::is_assignable_to(self, source, target)
+    }
 }
 
 /// Convenience function for one-off subtype checks with a resolver

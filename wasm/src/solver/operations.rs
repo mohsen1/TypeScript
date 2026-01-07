@@ -21,11 +21,14 @@
 use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::{apparent_primitive_member_kind, ApparentMemberKind, TypeDatabase};
-use crate::solver::subtype::SubtypeChecker;
 use crate::solver::diagnostics::PendingDiagnostic;
 use crate::solver::infer::InferenceContext;
 use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
 use rustc_hash::{FxHashMap, FxHashSet};
+
+pub trait AssignabilityChecker {
+    fn is_assignable_to(&mut self, source: TypeId, target: TypeId) -> bool;
+}
 
 // =============================================================================
 // Function Call Resolution
@@ -68,21 +71,20 @@ struct TupleRestExpansion {
 }
 
 /// Evaluates function calls.
-pub struct CallEvaluator<'a> {
+pub struct CallEvaluator<'a, C: AssignabilityChecker> {
     interner: &'a dyn TypeDatabase,
-    subtype: &'a mut SubtypeChecker<'a>,
+    checker: &'a mut C,
 }
 
-impl<'a> CallEvaluator<'a> {
-    pub fn new(interner: &'a dyn TypeDatabase, subtype: &'a mut SubtypeChecker<'a>) -> Self {
-        CallEvaluator { interner, subtype }
+impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
+    pub fn new(interner: &'a dyn TypeDatabase, checker: &'a mut C) -> Self {
+        CallEvaluator { interner, checker }
     }
 
     pub fn infer_call_signature(&mut self, sig: &CallSignature, arg_types: &[TypeId]) -> TypeId {
         let func = FunctionShape {
             params: sig.params.clone(),
             return_type: sig.return_type,
-            type_predicate: sig.type_predicate.clone(),
             type_params: sig.type_params.clone(),
             is_constructor: false,
         };
@@ -200,7 +202,7 @@ impl<'a> CallEvaluator<'a> {
 
             let mut visited = FxHashSet::default();
             if !self.type_contains_placeholder(target_type, &var_map, &mut visited)
-                && !self.subtype.is_assignable_to(arg_type, target_type)
+                && !self.checker.is_assignable_to(arg_type, target_type)
             {
                 return CallResult::ArgumentTypeMismatch {
                     index: i,
@@ -240,7 +242,7 @@ impl<'a> CallEvaluator<'a> {
 
             if let Some(constraint) = tp.constraint {
                 let constraint_ty = instantiate_type(self.interner, constraint, &final_subst);
-                if !self.subtype.is_assignable_to(ty, constraint_ty) {
+                if !self.checker.is_assignable_to(ty, constraint_ty) {
                     return CallResult::Success(TypeId::ANY);
                 }
             }
@@ -285,7 +287,7 @@ impl<'a> CallEvaluator<'a> {
                 break;
             };
 
-            if !self.subtype.is_assignable_to(*arg_type, param_type) {
+            if !self.checker.is_assignable_to(*arg_type, param_type) {
                 return Some(CallResult::ArgumentTypeMismatch {
                     index: i,
                     expected: param_type,
@@ -778,7 +780,6 @@ impl<'a> CallEvaluator<'a> {
             let func = FunctionShape {
                 params: sig.params.clone(),
                 return_type: sig.return_type,
-                type_predicate: sig.type_predicate.clone(),
                 type_params: sig.type_params.clone(),
                 is_constructor: false,
             };
@@ -813,23 +814,23 @@ impl<'a> CallEvaluator<'a> {
     }
 }
 
-pub fn infer_call_signature<'a>(
-    interner: &'a dyn TypeDatabase,
-    subtype: &'a mut SubtypeChecker<'a>,
+pub fn infer_call_signature<C: AssignabilityChecker>(
+    interner: &dyn TypeDatabase,
+    checker: &mut C,
     sig: &CallSignature,
     arg_types: &[TypeId],
 ) -> TypeId {
-    let mut evaluator = CallEvaluator::new(interner, subtype);
+    let mut evaluator = CallEvaluator::new(interner, checker);
     evaluator.infer_call_signature(sig, arg_types)
 }
 
-pub fn infer_generic_function<'a>(
-    interner: &'a dyn TypeDatabase,
-    subtype: &'a mut SubtypeChecker<'a>,
+pub fn infer_generic_function<C: AssignabilityChecker>(
+    interner: &dyn TypeDatabase,
+    checker: &mut C,
     func: &FunctionShape,
     arg_types: &[TypeId],
 ) -> TypeId {
-    let mut evaluator = CallEvaluator::new(interner, subtype);
+    let mut evaluator = CallEvaluator::new(interner, checker);
     evaluator.infer_generic_function(func, arg_types)
 }
 
@@ -1133,7 +1134,6 @@ impl<'a> PropertyAccessEvaluator<'a> {
             params: vec![rest_param],
             return_type,
             type_params: Vec::new(),
-            type_predicate: None,
             is_constructor: false,
         })
     }

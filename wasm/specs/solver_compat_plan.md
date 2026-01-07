@@ -185,6 +185,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Enforce readonly compatibility for index signatures
 - [x] Tests for readonly property and index signature assignability
 
+### Phase 30: Compat Assignability In Calls
+- [x] Allow CallEvaluator to accept compat assignability rules
+- [x] Wire call resolution in ThinChecker through CompatChecker
+- [x] Tests for weak-type rejection during call resolution
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

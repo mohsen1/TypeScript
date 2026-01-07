@@ -3,6 +3,7 @@
 use super::*;
 use crate::solver::intern::TypeInterner;
 use crate::solver::subtype::SubtypeChecker;
+use crate::solver::CompatChecker;
 
 #[test]
 fn test_call_simple_function() {
@@ -93,6 +94,43 @@ fn test_call_argument_type_mismatch() {
         }
         _ => panic!("Expected ArgumentTypeMismatch, got {:?}", result),
     }
+}
+
+#[test]
+fn test_call_weak_type_with_compat_checker() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut checker);
+
+    let weak_target = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("arg")),
+            type_id: weak_target,
+            optional: false,
+            rest: false,
+        }],
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let arg = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let result = evaluator.resolve_call(func, &[arg]);
+    assert!(matches!(result, CallResult::ArgumentTypeMismatch { .. }));
 }
 
 #[test]

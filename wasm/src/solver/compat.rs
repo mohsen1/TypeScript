@@ -3,6 +3,7 @@
 use crate::solver::intern::TypeInterner;
 use crate::solver::subtype::{NoopResolver, SubtypeChecker, SubtypeFailureReason, TypeResolver};
 use crate::solver::types::{PropertyInfo, TypeId, TypeKey};
+use crate::solver::AssignabilityChecker;
 use rustc_hash::FxHashMap;
 
 /// Compatibility checker that applies TypeScript's unsound rules
@@ -265,6 +266,12 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
             },
             _ => true,
         }
+    }
+}
+
+impl<'a, R: TypeResolver> AssignabilityChecker for CompatChecker<'a, R> {
+    fn is_assignable_to(&mut self, source: TypeId, target: TypeId) -> bool {
+        self.is_assignable(source, target)
     }
 }
 
