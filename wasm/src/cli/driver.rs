@@ -19,7 +19,7 @@ use crate::thin_parser::ThinParserState;
 use crate::thin_parser::ParseDiagnostic;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
-use crate::thin_emitter::ThinPrinter;
+use crate::thin_emitter::{ModuleKind, ThinPrinter};
 
 #[derive(Debug, Clone)]
 pub struct CompilationResult {
@@ -321,7 +321,7 @@ fn resolve_module_specifier(
     }
 
     if allow_node_modules {
-        return resolve_node_module_specifier(from_file, &specifier, base_dir);
+        return resolve_node_module_specifier(from_file, &specifier, base_dir, options);
     }
 
     None
@@ -423,22 +423,58 @@ struct PackageJson {
     exports: Option<serde_json::Value>,
 }
 
+fn export_conditions(options: &ResolvedCompilerOptions) -> Vec<&'static str> {
+    let mut conditions = Vec::new();
+    push_condition(&mut conditions, "types");
+
+    match options.printer.module {
+        ModuleKind::CommonJS | ModuleKind::AMD | ModuleKind::UMD | ModuleKind::System => {
+            push_condition(&mut conditions, "require");
+        }
+        ModuleKind::ES2015
+        | ModuleKind::ES2020
+        | ModuleKind::ES2022
+        | ModuleKind::ESNext
+        | ModuleKind::Node16
+        | ModuleKind::NodeNext => {
+            push_condition(&mut conditions, "import");
+        }
+        _ => {}
+    }
+
+    push_condition(&mut conditions, "default");
+    push_condition(&mut conditions, "import");
+    push_condition(&mut conditions, "require");
+
+    conditions
+}
+
+fn push_condition(conditions: &mut Vec<&'static str>, condition: &'static str) {
+    if !conditions.iter().any(|&value| value == condition) {
+        conditions.push(condition);
+    }
+}
+
 fn resolve_node_module_specifier(
     from_file: &Path,
     module_specifier: &str,
     base_dir: &Path,
+    options: &ResolvedCompilerOptions,
 ) -> Option<PathBuf> {
     let (package_name, subpath) = split_package_specifier(module_specifier)?;
+    let conditions = export_conditions(options);
     let mut current = from_file.parent().unwrap_or(base_dir);
 
     loop {
         let package_root = current.join("node_modules").join(&package_name);
         if package_root.is_dir() {
-            let resolved = if let Some(subpath) = subpath.as_deref() {
-                resolve_package_entry(&package_root, subpath)
-            } else {
-                resolve_package_root(&package_root)
-            };
+            let package_json = read_package_json(&package_root.join("package.json"));
+            let resolved = resolve_package_specifier(
+                &package_root,
+                subpath.as_deref(),
+                package_json.as_ref(),
+                &conditions,
+            );
             if resolved.is_some() {
                 return resolved;
             }
@@ -454,6 +490,33 @@ fn resolve_node_module_specifier(
     }
 
     None
+}
+
+fn resolve_package_specifier(
+    package_root: &Path,
+    subpath: Option<&str>,
+    package_json: Option<&PackageJson>,
+    conditions: &[&str],
+) -> Option<PathBuf> {
+    if let Some(package_json) = package_json {
+        if let Some(exports) = package_json.exports.as_ref() {
+            let subpath_key = match subpath {
+                Some(value) => format!("./{}", value),
+                None => ".".to_string(),
+            };
+            if let Some(target) = resolve_exports_subpath(exports, &subpath_key, conditions) {
+                if let Some(resolved) = resolve_package_entry(package_root, &target) {
+                    return Some(resolved);
+                }
+            }
+        }
+    }
+
+    if let Some(subpath) = subpath {
+        return resolve_package_entry(package_root, subpath);
+    }
+
+    resolve_package_root(package_root, package_json)
 }
 
 fn split_package_specifier(specifier: &str) -> Option<(String, Option<String>)> {
@@ -473,12 +536,13 @@ fn split_package_specifier(specifier: &str) -> Option<(String, Option<String>)> 
     Some((first.to_string(), subpath))
 }
 
-fn resolve_package_root(package_root: &Path) -> Option<PathBuf> {
-    let package_json_path = package_root.join("package.json");
-    let package_json = read_package_json(&package_json_path);
+fn resolve_package_root(
+    package_root: &Path,
+    package_json: Option<&PackageJson>,
+) -> Option<PathBuf> {
     let mut candidates = Vec::new();
 
-    if let Some(package_json) = package_json.as_ref() {
+    if let Some(package_json) = package_json {
         candidates = collect_package_entry_candidates(package_json);
     }
 
@@ -536,14 +600,6 @@ fn collect_package_entry_candidates(package_json: &PackageJson) -> Vec<String> {
         }
     }
 
-    if let Some(exports) = package_json.exports.as_ref() {
-        if let Some(entry) = extract_exports_path(exports) {
-            if seen.insert(entry.clone()) {
-                candidates.push(entry);
-            }
-        }
-    }
-
     for value in [
         package_json.module.as_ref(),
         package_json.main.as_ref(),
@@ -558,25 +614,125 @@ fn collect_package_entry_candidates(package_json: &PackageJson) -> Vec<String> {
     candidates
 }
 
-fn extract_exports_path(exports: &serde_json::Value) -> Option<String> {
+fn resolve_exports_subpath(
+    exports: &serde_json::Value,
+    subpath_key: &str,
+    conditions: &[&str],
+) -> Option<String> {
     match exports {
-        serde_json::Value::String(value) => Some(value.clone()),
+        serde_json::Value::String(value) => {
+            if subpath_key == "." {
+                Some(value.clone())
+            } else {
+                None
+            }
+        }
+        serde_json::Value::Array(list) => {
+            for entry in list {
+                if let Some(resolved) = resolve_exports_subpath(entry, subpath_key, conditions) {
+                    return Some(resolved);
+                }
+            }
+            None
+        }
         serde_json::Value::Object(map) => {
-            if let Some(entry) = map.get(".") {
-                if let Some(path) = extract_exports_path(entry) {
-                    return Some(path);
+            let has_subpath_keys = map.keys().any(|key| key.starts_with('.'));
+            if has_subpath_keys {
+                if let Some(value) = map.get(subpath_key) {
+                    if let Some(target) = resolve_exports_target(value, conditions) {
+                        return Some(target);
+                    }
+                }
+
+                let mut best_match: Option<(usize, String, &serde_json::Value)> = None;
+                for (key, value) in map {
+                    let Some(wildcard) = match_exports_subpath(key, subpath_key) else {
+                        continue;
+                    };
+                    let specificity = key.len();
+                    let is_better = match &best_match {
+                        None => true,
+                        Some((best_len, _, _)) => specificity > *best_len,
+                    };
+                    if is_better {
+                        best_match = Some((specificity, wildcard, value));
+                    }
+                }
+
+                if let Some((_, wildcard, value)) = best_match {
+                    if let Some(target) = resolve_exports_target(value, conditions) {
+                        return Some(apply_exports_subpath(&target, &wildcard));
+                    }
+                }
+
+                None
+            } else if subpath_key == "." {
+                resolve_exports_target(exports, conditions)
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
+}
+
+fn resolve_exports_target(
+    target: &serde_json::Value,
+    conditions: &[&str],
+) -> Option<String> {
+    match target {
+        serde_json::Value::String(value) => Some(value.clone()),
+        serde_json::Value::Array(list) => {
+            for entry in list {
+                if let Some(resolved) = resolve_exports_target(entry, conditions) {
+                    return Some(resolved);
                 }
             }
-
-            for key in ["types", "default", "import", "require"] {
-                if let Some(value) = map.get(key).and_then(|value| value.as_str()) {
-                    return Some(value.to_string());
+            None
+        }
+        serde_json::Value::Object(map) => {
+            for condition in conditions {
+                if let Some(value) = map.get(*condition) {
+                    if let Some(resolved) = resolve_exports_target(value, conditions) {
+                        return Some(resolved);
+                    }
                 }
             }
-
             None
         }
         _ => None,
+    }
+}
+
+fn match_exports_subpath(pattern: &str, subpath_key: &str) -> Option<String> {
+    if !pattern.contains('*') {
+        return None;
+    }
+    let pattern = pattern.strip_prefix("./")?;
+    let subpath = subpath_key.strip_prefix("./")?;
+
+    let star = pattern.find('*')?;
+    let (prefix, suffix) = pattern.split_at(star);
+    let suffix = &suffix[1..];
+
+    if !subpath.starts_with(prefix) || !subpath.ends_with(suffix) {
+        return None;
+    }
+
+    let start = prefix.len();
+    let end = subpath.len().saturating_sub(suffix.len());
+    if end < start {
+        return None;
+    }
+
+    Some(subpath[start..end].to_string())
+}
+
+fn apply_exports_subpath(target: &str, wildcard: &str) -> String {
+    if target.contains('*') {
+        target.replace('*', wildcard)
+    } else {
+        target.to_string()
     }
 }
 

@@ -31,7 +31,8 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - [ ] Module resolution parity
   - [x] Resolve relative + baseUrl/paths imports with TS extension inference.
   - [x] Resolve bare specifiers via node_modules package.json entries + index fallback.
-  - [ ] Support Node16/NodeNext exports conditions + subpath exports.
+  - [x] Support exports subpath mapping + basic condition selection (types/import/require/default).
+  - [ ] Expand exports conditions (node/browser) + moduleResolution-specific ordering.
 - [ ] Benchmark harness
   - Script for `tsz` vs `tsc` on large repos with timing + memory stats.
 

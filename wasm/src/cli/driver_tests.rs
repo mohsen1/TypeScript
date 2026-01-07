@@ -286,3 +286,47 @@ fn compile_resolves_node_modules_types() {
         .any(|diag| diag.file.contains("node_modules/pkg/index.d.ts")));
     assert!(!base.join("dist/src/index.js").is_file());
 }
+
+#[test]
+fn compile_resolves_node_modules_exports_subpath() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "noEmitOnError": true
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { widget } from 'pkg/feature/widget'; export { widget };",
+    );
+    write_file(
+        &base.join("node_modules/pkg/package.json"),
+        r#"{
+          "exports": {
+            ".": { "types": "./types/index.d.ts" },
+            "./feature/*": { "types": "./types/feature/*.d.ts" }
+          }
+        }"#,
+    );
+    write_file(
+        &base.join("node_modules/pkg/types/feature/widget.d.ts"),
+        "export const widget = ;",
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("node_modules/pkg/types/feature/widget.d.ts")));
+    assert!(!base.join("dist/src/index.js").is_file());
+}
