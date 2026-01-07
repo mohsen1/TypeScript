@@ -2132,6 +2132,68 @@ const value = obj[key];
 }
 
 #[test]
+fn test_checker_lowers_element_access_literal_key_type() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Foo { a: number; b: string; }
+const obj: Foo = { a: 1, b: "hi" };
+let key: "a";
+const value = obj[key];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_lowers_element_access_numeric_literal_union() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+const tup: [string, number, boolean] = ["a", 1, true];
+let idx: 0 | 2;
+const value = tup[idx];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    let value_key = types.lookup(value_type).expect("value type should exist");
+    match value_key {
+        TypeKey::Union(members) => {
+            assert!(members.contains(&TypeId::STRING));
+            assert!(members.contains(&TypeId::BOOLEAN));
+            assert_eq!(members.len(), 2);
+        }
+        _ => panic!("Expected union type for value, got {:?}", value_key),
+    }
+}
+
+#[test]
 fn test_checker_namespace_merges_with_class_exports() {
     use crate::thin_parser::ThinParserState;
     use crate::solver::TypeKey;

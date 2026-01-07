@@ -1741,10 +1741,16 @@ impl<'a> ThinCheckerState<'a> {
         let index_type = self.get_type_of_node(access.name_or_argument);
         let literal_string = self.get_literal_string_from_node(access.name_or_argument);
         let numeric_string_index = literal_string.and_then(|name| self.get_numeric_index_from_string(name));
+        let literal_index = self.get_literal_index_from_node(access.name_or_argument)
+            .or(numeric_string_index);
 
         if let Some(keys) = self.get_literal_string_keys_from_type(index_type) {
-            if keys.len() > 1 {
-                if let Some(result_type) = self.get_element_access_type_for_literal_keys(object_type, &keys) {
+            if keys.len() > 1 || literal_string.is_none() {
+                if let Some(result_type) = self.get_element_access_type_for_literal_keys(
+                    object_type,
+                    &keys,
+                    access.question_dot_token,
+                ) {
                     return result_type;
                 }
                 self.error_no_index_signature_at(index_type, object_type, access.name_or_argument);
@@ -1775,9 +1781,15 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
+        if literal_index.is_none() {
+            if let Some(keys) = self.get_literal_number_keys_from_type(index_type) {
+                if let Some(result_type) = self.get_element_access_type_for_literal_number_keys(object_type, &keys) {
+                    return result_type;
+                }
+            }
+        }
+
         // Get the index type
-        let literal_index = self.get_literal_index_from_node(access.name_or_argument)
-            .or(numeric_string_index);
         let result_type = self.get_element_access_type(object_type, index_type, literal_index);
 
         if self.should_report_no_index_signature(object_type, index_type, literal_index) {
@@ -1936,6 +1948,16 @@ impl<'a> ThinCheckerState<'a> {
         Some(parsed as usize)
     }
 
+    fn get_numeric_index_from_number(&self, value: f64) -> Option<usize> {
+        if !value.is_finite() || value.fract() != 0.0 || value < 0.0 {
+            return None;
+        }
+        if value > (usize::MAX as f64) {
+            return None;
+        }
+        Some(value as usize)
+    }
+
     fn get_literal_string_keys_from_type(&self, index_type: TypeId) -> Option<Vec<Atom>> {
         use crate::solver::{LiteralValue, TypeKey};
 
@@ -1955,10 +1977,30 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    fn get_literal_number_keys_from_type(&self, index_type: TypeId) -> Option<Vec<f64>> {
+        use crate::solver::{LiteralValue, TypeKey};
+
+        match self.ctx.types.lookup(index_type)? {
+            TypeKey::Literal(LiteralValue::Number(num)) => Some(vec![num.0]),
+            TypeKey::Union(members) => {
+                let mut keys = Vec::with_capacity(members.len());
+                for &member in members.iter() {
+                    match self.ctx.types.lookup(member) {
+                        Some(TypeKey::Literal(LiteralValue::Number(num))) => keys.push(num.0),
+                        _ => return None,
+                    }
+                }
+                Some(keys)
+            }
+            _ => None,
+        }
+    }
+
     fn get_element_access_type_for_literal_keys(
         &mut self,
         object_type: TypeId,
         keys: &[Atom],
+        optional_chain: bool,
     ) -> Option<TypeId> {
         use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
 
@@ -1969,6 +2011,7 @@ impl<'a> ThinCheckerState<'a> {
         let numeric_as_index = self.is_array_like_type(object_type);
         let evaluator = PropertyAccessEvaluator::new(self.ctx.types);
         let mut types = Vec::with_capacity(keys.len());
+        let mut saw_nullable = false;
 
         for &key in keys {
             let name = self.ctx.types.resolve_atom(key);
@@ -1984,9 +2027,43 @@ impl<'a> ThinCheckerState<'a> {
                 PropertyAccessResult::Success { type_id, .. } => types.push(type_id),
                 PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
                     types.push(property_type.unwrap_or(TypeId::ANY));
+                    if optional_chain {
+                        saw_nullable = true;
+                    }
                 }
                 PropertyAccessResult::IsUnknown => types.push(TypeId::ANY),
                 PropertyAccessResult::PropertyNotFound { .. } => return None,
+            }
+        }
+
+        let mut result = if types.len() == 1 {
+            types[0]
+        } else {
+            self.ctx.types.union(types)
+        };
+
+        if optional_chain && saw_nullable {
+            result = self.ctx.types.union(vec![result, TypeId::UNDEFINED]);
+        }
+
+        Some(result)
+    }
+
+    fn get_element_access_type_for_literal_number_keys(
+        &mut self,
+        object_type: TypeId,
+        keys: &[f64],
+    ) -> Option<TypeId> {
+        if keys.is_empty() {
+            return None;
+        }
+
+        let mut types = Vec::with_capacity(keys.len());
+        for &value in keys {
+            if let Some(index) = self.get_numeric_index_from_number(value) {
+                types.push(self.get_element_access_type(object_type, TypeId::NUMBER, Some(index)));
+            } else {
+                return Some(self.get_element_access_type(object_type, TypeId::NUMBER, None));
             }
         }
 
