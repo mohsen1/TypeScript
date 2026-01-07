@@ -960,6 +960,70 @@ c.ro = "error: lhs of assignment can't be readonly";
 }
 
 #[test]
+fn test_readonly_element_access_assignment_2540() {
+    // Error 2540: Cannot assign to 'name' because it is a read-only property.
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Config {
+    readonly name: string;
+}
+let config: Config = { name: "ok" };
+config["name"] = "error";
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    let count_2540 = codes.iter().filter(|&&c| c == 2540).count();
+    assert!(count_2540 >= 1,
+        "Expected at least 1 error 2540 for readonly element access assignment, got {} in: {:?}", count_2540, codes);
+}
+
+#[test]
+fn test_readonly_index_signature_element_access_assignment_2540() {
+    // Error 2540: Cannot assign to 'a' because it is a read-only property.
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface ReadonlyMap {
+    readonly [key: string]: number;
+}
+let map: ReadonlyMap = { a: 1 };
+map["a"] = 2;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    let count_2540 = codes.iter().filter(|&&c| c == 2540).count();
+    assert!(count_2540 >= 1,
+        "Expected at least 1 error 2540 for readonly index signature assignment, got {} in: {:?}", count_2540, codes);
+}
+
+#[test]
 fn test_abstractPropertyNegative_errors() {
     // Test the full abstractPropertyNegative test case to verify expected errors
     use crate::thin_parser::ThinParserState;

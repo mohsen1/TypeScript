@@ -96,7 +96,9 @@ pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bo
                 }
             }
         }
-        k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+        k if k == syntax_kind_ext::VARIABLE_STATEMENT
+            || k == syntax_kind_ext::VARIABLE_DECLARATION_LIST =>
+        {
             if let Some(var_stmt) = arena.get_variable(node) {
                 for &decl_idx in &var_stmt.declarations.nodes {
                     if contains_this_reference(arena, decl_idx) {
