@@ -41,8 +41,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Cached per-shape map in TypeInterner; wired into subtype/infer/property access.
 - [ ] Expand array/tuple method inference beyond `any` placeholders
   - Cover map/filter/concat/at/reduce + iterator helpers to improve precision.
-- [ ] Add microbench for property lookup and union/intersection normalization
-  - Track wins from allocation and lookup changes.
+- [x] Add microbench for property lookup and union/intersection normalization
+  - Added benchmarks in solver_bench for cached property lookup and normalization.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.
