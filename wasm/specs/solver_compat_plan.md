@@ -255,6 +255,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Include array member keys in `keyof` arrays and tuples
 - [x] Tests for `keyof` array/tuple member unions
 
+### Phase 46: Array/Tuple Index Access Members
+- [x] Resolve array/tuple index access for string literal member keys
+- [x] Tests for array/tuple index access on member keys and numeric strings
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

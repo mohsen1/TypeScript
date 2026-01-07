@@ -468,6 +468,50 @@ fn test_index_access_array() {
 }
 
 #[test]
+fn test_index_access_array_string_literal_length() {
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let length_key = interner.literal_string("length");
+
+    let result = evaluate_index_access(&interner, string_array, length_key);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_index_access_array_string_literal_method() {
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let includes_key = interner.literal_string("includes");
+
+    let result = evaluate_index_access(&interner, string_array, includes_key);
+    match interner.lookup(result) {
+        Some(TypeKey::Function(func)) => {
+            assert_eq!(func.return_type, TypeId::BOOLEAN);
+            assert_eq!(func.params.len(), 1);
+            assert!(func.params[0].rest);
+        }
+        other => panic!("Expected function type, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_index_access_array_string_literal_numeric_key_with_no_unchecked_indexed_access() {
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let zero = interner.literal_string("0");
+
+    let mut evaluator = TypeEvaluator::new(&interner);
+    evaluator.set_no_unchecked_indexed_access(true);
+
+    let result = evaluator.evaluate_index_access(string_array, zero);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_index_access_readonly_array() {
     let interner = TypeInterner::new();
 
@@ -488,6 +532,34 @@ fn test_index_access_tuple_literal() {
         TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
     ]);
     let zero = interner.literal_number(0.0);
+
+    let result = evaluate_index_access(&interner, tuple, zero);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_index_access_tuple_string_literal_length() {
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let length_key = interner.literal_string("length");
+
+    let result = evaluate_index_access(&interner, tuple, length_key);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_index_access_tuple_string_literal_numeric_key() {
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let zero = interner.literal_string("0");
 
     let result = evaluate_index_access(&interner, tuple, zero);
     assert_eq!(result, TypeId::STRING);
