@@ -1593,6 +1593,36 @@ fn test_function_rest_tuple_to_rest_array_subtyping() {
 }
 
 #[test]
+fn test_keyof_intersection_contravariant() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+    let keyof_a = interner.intern(TypeKey::KeyOf(obj_a));
+    let keyof_intersection = interner.intern(TypeKey::KeyOf(intersection));
+
+    assert!(checker.is_subtype_of(keyof_a, keyof_intersection));
+    assert!(!checker.is_subtype_of(keyof_intersection, keyof_a));
+}
+
+#[test]
 fn test_keyof_deferred_not_subtype_of_string() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
