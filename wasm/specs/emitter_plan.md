@@ -63,6 +63,7 @@ Pick the most doable and impactful
 38. Imports/exports: handle namespace imports and erase type-only import/export in JS output [done]
 39. CommonJS: emit side-effect imports as require() [done]
 40. Module wrappers: skip type-only import/export dependencies [done]
+41. Module auto-detect: ignore type-only/ambient exports for wrapper/preamble [done]
 
 
 ## Quick Reference
