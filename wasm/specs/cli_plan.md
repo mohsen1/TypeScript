@@ -20,6 +20,7 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Bench harness update: fixed BSD `/usr/bin/time -l` parsing in `wasm/bench_cli.sh` so elapsed time is read from the `real` token.
 - Synthetic benchmark (1000-file project in `/tmp/tsz_bench_large` with minimal `globals.d.ts`): `./wasm/bench_cli.sh --repo /tmp/tsz_bench_large --tsconfig tsconfig.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` → tsz avg 0.170s best 0.170s max_rss 19.6 MiB; tsc avg 0.200s best 0.200s max_rss 141.3 MiB. Next: run on real repo once optional chaining + lib parsing land.
 - Bench-specific config added: `bench/tsconfig.bench.json` with `bench/globals.d.ts` (minimal libs/types). Generated 1000-file synthetic project with `python3 bench/generate_synth_project.py --count 1000` (local `bench/synth/`) and ran `./wasm/bench_cli.sh --repo . --tsconfig bench/tsconfig.bench.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` → tsz avg 0.180s best 0.180s max_rss 19.7 MiB; tsc avg 0.200s best 0.200s max_rss 143.2 MiB.
+- Note: without `bench/globals.d.ts` or a lib, `tsc` fails with missing global type errors (Array/Boolean/etc.), so the bench config keeps libs/types empty and supplies minimal globals.
 
 ## Current Investigation Notes (Incremental export hash)
 Summary of the incremental work (export hash fixed):
