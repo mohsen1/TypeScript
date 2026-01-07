@@ -861,9 +861,14 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
+        let name_text = self.entity_name_text(type_query.expr_name);
         let base = if let Some(sym_id) = self.resolve_value_symbol_for_lowering(type_query.expr_name) {
             self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(sym_id)))
-        } else if let Some(name) = self.entity_name_text(type_query.expr_name) {
+        } else if self.resolve_type_symbol_for_lowering(type_query.expr_name).is_some() {
+            let name = name_text.as_deref().unwrap_or("<unknown>");
+            self.error_type_only_value_at(name, type_query.expr_name);
+            return TypeId::ERROR;
+        } else if let Some(name) = name_text {
             // Not found - fall back to hash (for forward compatibility)
             use std::hash::{Hash, Hasher};
             use std::collections::hash_map::DefaultHasher;
