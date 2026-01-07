@@ -768,6 +768,10 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_commonjs_default_export_expr(node, idx);
             }
 
+            TransformDirective::CommonJSExportDefaultClassES5 { class_node } => {
+                self.emit_commonjs_default_export_class_es5(class_node);
+            }
+
             TransformDirective::ES5ArrowFunction {
                 arrow_node,
                 captures_this,
@@ -911,56 +915,58 @@ impl<'a> ThinPrinter<'a> {
     }
 
     fn emit_commonjs_default_export_expr(&mut self, node: &ThinNode, idx: NodeIndex) {
+        self.emit_commonjs_default_export_assignment(|this| {
+            this.emit_commonjs_default_export_expr_inner(node, idx);
+        });
+    }
+
+    fn emit_commonjs_default_export_expr_inner(&mut self, node: &ThinNode, idx: NodeIndex) {
         match node.kind {
             k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
-                let Some(func) = self.arena.get_function(node) else {
-                    return;
-                };
-
-                self.write("exports.default = ");
-                if self.ctx.target_es5 {
-                    if func.is_async {
-                        self.emit_async_function_es5(func, "", "this");
-                    } else if self.function_parameters_need_es5_transform(&func.parameters.nodes) {
-                        self.emit_function_expression_es5_params(node);
-                    } else {
-                        self.emit_function_expression(node, idx);
-                    }
-                } else {
-                    self.emit_function_expression(node, idx);
-                }
-                self.write_semicolon();
-                self.write_line();
+                self.emit_function_expression(node, idx);
             }
             k if k == syntax_kind_ext::CLASS_DECLARATION => {
-                if self.ctx.target_es5 {
-                    let temp_name = format!("{}_default", self.get_temp_var_name());
-                    let mut es5_emitter = ClassES5Emitter::new(self.arena);
-                    es5_emitter.set_indent_level(self.writer.indent_level());
-                    if let Some(source_text) = self.source_text {
-                        es5_emitter.set_source_text(source_text);
-                    }
-                    let es5_output = es5_emitter.emit_class_with_name(idx, &temp_name);
-                    self.write(&es5_output);
-                    self.write_line();
-                    self.write("exports.default = ");
-                    self.write(&temp_name);
-                    self.write(";");
-                    self.write_line();
-                } else {
-                    self.write("exports.default = ");
-                    self.emit_class_es6(node, idx);
-                    self.write_semicolon();
-                    self.write_line();
-                }
+                self.emit_class_es6(node, idx);
             }
             _ => {
-                self.write("exports.default = ");
                 self.emit_node_default(node, idx);
-                self.write_semicolon();
-                self.write_line();
             }
         }
+    }
+
+    fn emit_commonjs_default_export_assignment<F>(&mut self, mut emit_inner: F)
+    where
+        F: FnMut(&mut Self),
+    {
+        self.write("exports.default = ");
+        emit_inner(self);
+        self.write_semicolon();
+        self.write_line();
+    }
+
+    fn emit_commonjs_default_export_class_es5(&mut self, class_node: NodeIndex) {
+        let Some(node) = self.arena.get(class_node) else {
+            return;
+        };
+
+        if node.kind != syntax_kind_ext::CLASS_DECLARATION {
+            self.emit_node_default(node, class_node);
+            return;
+        }
+
+        let temp_name = format!("{}_default", self.get_temp_var_name());
+        let mut es5_emitter = ClassES5Emitter::new(self.arena);
+        es5_emitter.set_indent_level(self.writer.indent_level());
+        if let Some(source_text) = self.source_text {
+            es5_emitter.set_source_text(source_text);
+        }
+        let es5_output = es5_emitter.emit_class_with_name(class_node, &temp_name);
+        self.write(&es5_output);
+        self.write_line();
+        self.write("exports.default = ");
+        self.write(&temp_name);
+        self.write(";");
+        self.write_line();
     }
 
     fn emit_commonjs_inner(
@@ -1103,7 +1109,16 @@ impl<'a> ThinPrinter<'a> {
                 });
             }
             TransformDirective::CommonJSExportDefaultExpr => {
-                self.emit_commonjs_default_export_expr(node, idx);
+                self.emit_commonjs_default_export_assignment(|this| {
+                    if index == 0 {
+                        this.emit_commonjs_default_export_expr_inner(node, idx);
+                    } else {
+                        this.emit_chained_directive(node, idx, directives, index - 1);
+                    }
+                });
+            }
+            TransformDirective::CommonJSExportDefaultClassES5 { class_node } => {
+                self.emit_commonjs_default_export_class_es5(*class_node);
             }
             TransformDirective::ES5ArrowFunction {
                 arrow_node,
@@ -1890,7 +1905,7 @@ impl<'a> ThinPrinter<'a> {
             // Other tokens and keywords - emit their text
             k if k == SyntaxKind::ThisKeyword as u16 => {
                 // In ES5 mode inside an arrow function body, use _this instead of this
-                if self.ctx.target_es5 && self.ctx.arrow_state.this_capture_depth > 0 {
+                if self.ctx.arrow_state.this_capture_depth > 0 {
                     self.write("_this")
                 } else {
                     self.write("this")
@@ -2196,7 +2211,7 @@ impl<'a> ThinPrinter<'a> {
         self.write(" (");
         let param_transforms = self.emit_function_parameters_es5(&method.parameters.nodes);
         self.write(") ");
-        if self.ctx.target_es5 && param_transforms.has_transforms() {
+        if param_transforms.has_transforms() {
             self.emit_block_with_param_prologue(method.body, &param_transforms);
         } else {
             self.emit(method.body);
@@ -3157,11 +3172,9 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Emit keyword based on node flags - for ES5, always use "var"
+        // Emit keyword based on node flags.
         let flags = node.flags as u32;
-        let keyword = if self.ctx.target_es5 {
-            "var"
-        } else if flags & crate::parser::node_flags::CONST != 0 {
+        let keyword = if flags & crate::parser::node_flags::CONST != 0 {
             "const"
         } else if flags & crate::parser::node_flags::LET != 0 {
             "let"
