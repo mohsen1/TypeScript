@@ -47,7 +47,7 @@ Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (in
 - [x] Narrow logical `&&`/`||` conditions in control flow
   - Apply sequential narrowing for `&&` and union-of-paths narrowing for `||`.
 - [x] Add control-flow tests for logical `&&` and `||` narrowing
-- [ ] Add switch/case narrowing using `SWITCH_CLAUSE` flow nodes
+- [x] Add switch/case narrowing using `SWITCH_CLAUSE` flow nodes
   - Narrow discriminants per case and handle fallthrough/default.
   - Add tests covering switch unions and default behavior.
 - [ ] Implement `instanceof` and `in` operator narrowing

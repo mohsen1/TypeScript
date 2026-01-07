@@ -16,7 +16,7 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
   - [x] Pre-allocate output buffer from source size; write numeric indices without allocations.
   - [x] Write numeric values in ES5 transforms without allocating strings.
   - [ ] Profile emit-only pipeline (LoweringPass + helper detection).
-  - [ ] Reduce allocations and repeated scans in emit hot paths.
+  - [x] Reduce allocations and repeated scans in emit hot paths (share directive payloads; drop unused module wrapper body clone).
 - [x] Finish transform-only pipeline
   - [x] Remove or gate `ctx.target_es5` inline paths in `thin_emitter/mod.rs`.
   - [x] Ensure LoweringPass emits directives for all ES5 transforms (class, arrow, async, template, params, object literal).

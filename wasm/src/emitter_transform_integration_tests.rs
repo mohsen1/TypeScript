@@ -11,6 +11,7 @@ use crate::scanner::SyntaxKind;
 use crate::thin_emitter::ThinPrinter;
 use crate::thin_parser::ThinParserState;
 use crate::transform_context::{TransformContext, TransformDirective};
+use std::sync::Arc;
 
 #[test]
 fn test_two_phase_emission_es5_class() {
@@ -2139,7 +2140,7 @@ fn test_transform_directive_chain_es5_class_commonjs_export() {
                 heritage: None,
             },
             TransformDirective::CommonJSExport {
-                names: vec![name_id],
+                names: Arc::from(vec![name_id]),
                 is_default: false,
                 inner: Box::new(TransformDirective::Identity),
             },

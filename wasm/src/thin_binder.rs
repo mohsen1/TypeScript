@@ -42,6 +42,8 @@ pub struct ThinBinderState {
     /// Node-to-flow mapping: tracks which flow node was active at each AST node
     /// Used by the checker for control flow analysis (type narrowing)
     pub node_flow: FxHashMap<u32, FlowNodeId>,
+    /// Map case/default clause nodes to their containing switch statement.
+    switch_clause_to_switch: FxHashMap<u32, NodeIndex>,
     /// Hoisted var declarations
     hoisted_vars: Vec<(String, NodeIndex)>,
     /// Hoisted function declarations
@@ -73,6 +75,7 @@ impl ThinBinderState {
             current_scope_idx: 0,
             node_symbols: FxHashMap::default(),
             node_flow: FxHashMap::default(),
+            switch_clause_to_switch: FxHashMap::default(),
             hoisted_vars: Vec::new(),
             hoisted_functions: Vec::new(),
             scopes: Vec::new(),
@@ -93,6 +96,7 @@ impl ThinBinderState {
         self.current_scope_idx = 0;
         self.node_symbols.clear();
         self.node_flow.clear();
+        self.switch_clause_to_switch.clear();
         self.hoisted_vars.clear();
         self.hoisted_functions.clear();
         self.scopes.clear();
@@ -124,6 +128,7 @@ impl ThinBinderState {
             current_scope_idx: 0,
             node_symbols,
             node_flow: FxHashMap::default(),
+            switch_clause_to_switch: FxHashMap::default(),
             hoisted_vars: Vec::new(),
             hoisted_functions: Vec::new(),
             scopes: Vec::new(),
@@ -1443,24 +1448,77 @@ impl ThinBinderState {
         }
     }
 
-    fn bind_switch_statement(&mut self, arena: &ThinNodeArena, node: &ThinNode, _idx: NodeIndex) {
+    fn bind_switch_statement(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
         if let Some(switch_data) = arena.get_switch(node) {
             self.bind_expression(arena, switch_data.expression);
+
+            let pre_switch_flow = self.current_flow;
+            let end_label = self.create_branch_label();
+            let mut fallthrough_flow = FlowNodeId::NONE;
+
             // Case block contains case clauses
             if let Some(case_block_node) = arena.get(switch_data.case_block) {
                 if let Some(case_block) = arena.get_block(case_block_node) {
                     for &clause_idx in &case_block.statements.nodes {
                         if let Some(clause_node) = arena.get(clause_idx) {
                             if let Some(clause) = arena.get_case_clause(clause_node) {
-                                self.bind_expression(arena, clause.expression);
+                                self.switch_clause_to_switch.insert(clause_idx.0, idx);
+
+                                self.current_flow = pre_switch_flow;
+                                if !clause.expression.is_none() {
+                                    self.bind_expression(arena, clause.expression);
+                                }
+
+                                let clause_flow = self.create_switch_clause_flow(
+                                    pre_switch_flow,
+                                    fallthrough_flow,
+                                    clause_idx,
+                                );
+                                self.current_flow = clause_flow;
+
                                 for &stmt_idx in &clause.statements.nodes {
                                     self.bind_node(arena, stmt_idx);
+                                }
+
+                                self.add_antecedent(end_label, self.current_flow);
+
+                                if self.clause_allows_fallthrough(arena, clause) {
+                                    fallthrough_flow = self.current_flow;
+                                } else {
+                                    fallthrough_flow = FlowNodeId::NONE;
                                 }
                             }
                         }
                     }
                 }
             }
+
+            self.current_flow = end_label;
+        }
+    }
+
+    fn clause_allows_fallthrough(
+        &self,
+        arena: &ThinNodeArena,
+        clause: &crate::parser::thin_node::CaseClauseData,
+    ) -> bool {
+        let Some(&last_stmt_idx) = clause.statements.nodes.last() else {
+            return true;
+        };
+
+        let Some(stmt_node) = arena.get(last_stmt_idx) else {
+            return true;
+        };
+
+        match stmt_node.kind {
+            k if k == syntax_kind_ext::BREAK_STATEMENT
+                || k == syntax_kind_ext::RETURN_STATEMENT
+                || k == syntax_kind_ext::THROW_STATEMENT
+                || k == syntax_kind_ext::CONTINUE_STATEMENT =>
+            {
+                false
+            }
+            _ => true,
         }
     }
 
@@ -1717,6 +1775,11 @@ impl ThinBinderState {
         self.node_flow.get(&node.0).copied()
     }
 
+    /// Get the containing switch statement for a case/default clause.
+    pub fn get_switch_for_clause(&self, clause: NodeIndex) -> Option<NodeIndex> {
+        self.switch_clause_to_switch.get(&clause.0).copied()
+    }
+
     /// Record the current flow node for an AST node.
     /// Called during binding to track flow position for identifiers and other expressions.
     fn record_flow(&mut self, node: NodeIndex) {
@@ -1741,6 +1804,22 @@ impl ThinBinderState {
             node.antecedent.push(antecedent);
             node.node = condition;
         }
+        id
+    }
+
+    /// Create a flow node for a switch clause with optional fallthrough.
+    fn create_switch_clause_flow(
+        &mut self,
+        pre_switch: FlowNodeId,
+        fallthrough: FlowNodeId,
+        clause: NodeIndex,
+    ) -> FlowNodeId {
+        let id = self.flow_nodes.alloc(flow_flags::SWITCH_CLAUSE);
+        if let Some(node) = self.flow_nodes.get_mut(id) {
+            node.node = clause;
+        }
+        self.add_antecedent(id, pre_switch);
+        self.add_antecedent(id, fallthrough);
         id
     }
 

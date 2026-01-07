@@ -20,7 +20,7 @@
 
 use crate::binder::{FlowNode, FlowNodeId, flow_flags};
 use crate::interner::Atom;
-use crate::parser::thin_node::ThinNodeArena;
+use crate::parser::thin_node::{BinaryExprData, ThinNodeArena};
 use crate::parser::{NodeIndex, syntax_kind_ext};
 use crate::scanner::SyntaxKind;
 use crate::solver::{LiteralValue, TypeId, TypeInterner, TypeKey, NarrowingContext};
@@ -93,6 +93,10 @@ impl<'a> FlowAnalyzer<'a> {
 
         if flow.has_any_flags(flow_flags::CONDITION) {
             return self.handle_condition(reference, type_id, flow, visited);
+        }
+
+        if flow.has_any_flags(flow_flags::SWITCH_CLAUSE) {
+            return self.handle_switch_clause(reference, type_id, flow, visited);
         }
 
         if flow.has_any_flags(flow_flags::START) {
@@ -172,6 +176,129 @@ impl<'a> FlowAnalyzer<'a> {
 
         // Apply narrowing based on the condition
         self.narrow_type_by_condition(pre_type, flow.node, reference, is_true_branch)
+    }
+
+    /// Handle switch clause flow nodes, including fallthrough and default narrowing.
+    fn handle_switch_clause(
+        &self,
+        reference: NodeIndex,
+        type_id: TypeId,
+        flow: &FlowNode,
+        visited: &mut Vec<FlowNodeId>,
+    ) -> TypeId {
+        let clause_idx = flow.node;
+        let Some(switch_idx) = self.binder.get_switch_for_clause(clause_idx) else {
+            return type_id;
+        };
+        let Some(switch_node) = self.arena.get(switch_idx) else {
+            return type_id;
+        };
+        let Some(switch_data) = self.arena.get_switch(switch_node) else {
+            return type_id;
+        };
+        let Some(clause_node) = self.arena.get(clause_idx) else {
+            return type_id;
+        };
+        let Some(clause) = self.arena.get_case_clause(clause_node) else {
+            return type_id;
+        };
+
+        let pre_switch_type = if let Some(&ant) = flow.antecedent.first() {
+            self.check_flow(reference, type_id, ant, visited)
+        } else {
+            type_id
+        };
+
+        let narrowing = NarrowingContext::new(self.interner);
+        let mut clause_type = if clause.expression.is_none() {
+            self.narrow_by_default_switch_clause(
+                pre_switch_type,
+                switch_data.expression,
+                switch_data.case_block,
+                reference,
+                &narrowing,
+            )
+        } else {
+            self.narrow_by_switch_clause(
+                pre_switch_type,
+                switch_data.expression,
+                clause.expression,
+                reference,
+                &narrowing,
+            )
+        };
+
+        if flow.antecedent.len() > 1 {
+            let mut fallthrough_types = Vec::new();
+            for &ant in flow.antecedent.iter().skip(1) {
+                fallthrough_types.push(self.check_flow(reference, type_id, ant, &mut visited.clone()));
+            }
+
+            let fallthrough_type = if fallthrough_types.len() == 1 {
+                fallthrough_types[0]
+            } else {
+                self.interner.union(fallthrough_types)
+            };
+
+            clause_type = self.union_types(clause_type, fallthrough_type);
+        }
+
+        clause_type
+    }
+
+    fn narrow_by_switch_clause(
+        &self,
+        type_id: TypeId,
+        switch_expr: NodeIndex,
+        case_expr: NodeIndex,
+        target: NodeIndex,
+        narrowing: &NarrowingContext,
+    ) -> TypeId {
+        let binary = BinaryExprData {
+            left: switch_expr,
+            operator_token: SyntaxKind::EqualsEqualsEqualsToken as u16,
+            right: case_expr,
+        };
+
+        self.narrow_by_binary_expr(type_id, &binary, target, true, narrowing)
+    }
+
+    fn narrow_by_default_switch_clause(
+        &self,
+        type_id: TypeId,
+        switch_expr: NodeIndex,
+        case_block: NodeIndex,
+        target: NodeIndex,
+        narrowing: &NarrowingContext,
+    ) -> TypeId {
+        let Some(case_block_node) = self.arena.get(case_block) else {
+            return type_id;
+        };
+        let Some(case_block) = self.arena.get_block(case_block_node) else {
+            return type_id;
+        };
+
+        let mut narrowed = type_id;
+        for &clause_idx in &case_block.statements.nodes {
+            let Some(clause_node) = self.arena.get(clause_idx) else {
+                continue;
+            };
+            let Some(clause) = self.arena.get_case_clause(clause_node) else {
+                continue;
+            };
+            if clause.expression.is_none() {
+                continue;
+            }
+
+            let binary = BinaryExprData {
+                left: switch_expr,
+                operator_token: SyntaxKind::EqualsEqualsEqualsToken as u16,
+                right: clause.expression,
+            };
+            narrowed = self.narrow_by_binary_expr(narrowed, &binary, target, false, narrowing);
+        }
+
+        narrowed
     }
 
     /// Apply type narrowing based on a condition expression.

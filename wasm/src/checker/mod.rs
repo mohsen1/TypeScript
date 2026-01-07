@@ -19,6 +19,9 @@ pub mod statements;
 pub mod declarations;
 pub mod control_flow;
 
+#[cfg(test)]
+mod control_flow_tests;
+
 // Re-export key types
 pub use types::{
     type_flags, object_flags, signature_flags, diagnostic_codes,
