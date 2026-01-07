@@ -665,6 +665,55 @@ fn test_thin_emit_import() {
 }
 
 #[test]
+fn test_thin_emit_namespace_import_es6() {
+    let source = r#"import * as ns from "module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es6(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("import * as ns from \"module\";"),
+        "Output should contain namespace import: {}",
+        output
+    );
+}
+
+#[test]
+fn test_thin_emit_import_type_only_erased() {
+    let source = r#"import type { Foo } from "module"; const x = 1;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es6(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(!output.contains("import"), "Type-only imports should be erased: {}", output);
+    assert!(output.contains("x = 1"), "Output should retain value statement: {}", output);
+}
+
+#[test]
+fn test_thin_emit_import_type_specifier_filtered() {
+    let source = r#"import { type Foo, bar } from "module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es6(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("import { bar } from \"module\";"),
+        "Output should keep value imports only: {}",
+        output
+    );
+    assert!(!output.contains("Foo"), "Type-only specifier should be omitted: {}", output);
+}
+
+#[test]
 fn test_thin_emit_export() {
     let source = "export function greet() { return 'hello'; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -699,6 +748,38 @@ fn test_thin_emit_export_default() {
         "Output should contain 'function': {}",
         output
     );
+}
+
+#[test]
+fn test_thin_emit_export_type_only_erased() {
+    let source = r#"export type { Foo } from "module"; const x = 1;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es6(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(!output.contains("export"), "Type-only exports should be erased: {}", output);
+    assert!(output.contains("x = 1"), "Output should retain value statement: {}", output);
+}
+
+#[test]
+fn test_thin_emit_export_type_specifier_filtered() {
+    let source = r#"export { type Foo, bar } from "module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es6(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("export { bar } from \"module\";"),
+        "Output should keep value exports only: {}",
+        output
+    );
+    assert!(!output.contains("Foo"), "Type-only specifier should be omitted: {}", output);
 }
 
 #[test]
@@ -925,6 +1006,28 @@ fn test_commonjs_import_named() {
     assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
     assert!(output.contains("var foo = module_1.foo;"), "Expected foo binding in output: {}", output);
     assert!(output.contains("var bar = module_1.bar;"), "Expected bar binding in output: {}", output);
+}
+
+#[test]
+fn test_commonjs_import_namespace() {
+    let source = r#"import * as ns from "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
+    assert!(
+        output.contains("var ns = __importStar(module_1);"),
+        "Expected namespace binding in output: {}",
+        output
+    );
 }
 
 #[test]

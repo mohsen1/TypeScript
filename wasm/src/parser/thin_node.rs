@@ -2541,11 +2541,11 @@ impl ThinNodeArena {
     }
 
     /// Get named imports/exports data.
-    /// Works for both NAMED_IMPORTS and NAMED_EXPORTS (they share the same data structure).
+    /// Works for NAMED_IMPORTS, NAMESPACE_IMPORT, and NAMED_EXPORTS (they share the same data structure).
     #[inline]
     pub fn get_named_imports(&self, node: &ThinNode) -> Option<&NamedImportsData> {
-        use super::syntax_kind_ext::{NAMED_IMPORTS, NAMED_EXPORTS};
-        if node.has_data() && (node.kind == NAMED_IMPORTS || node.kind == NAMED_EXPORTS) {
+        use super::syntax_kind_ext::{NAMED_EXPORTS, NAMED_IMPORTS, NAMESPACE_IMPORT};
+        if node.has_data() && (node.kind == NAMED_IMPORTS || node.kind == NAMED_EXPORTS || node.kind == NAMESPACE_IMPORT) {
             self.named_imports.get(node.data_index as usize)
         } else {
             None

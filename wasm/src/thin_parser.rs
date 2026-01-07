@@ -3201,14 +3201,21 @@ impl ThinParserState {
 
     /// Parse namespace import: * as name
     fn parse_namespace_import(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::AsteriskToken);
         self.parse_expected(SyntaxKind::AsKeyword);
         let name = self.parse_identifier();
+        let end_pos = self.token_end();
 
-        // Store the namespace import with the name
-        // For namespace import, we return the name identifier directly
-        // The caller knows we're in a namespace import context
-        name
+        self.arena.add_named_imports(
+            syntax_kind_ext::NAMESPACE_IMPORT,
+            start_pos,
+            end_pos,
+            NamedImportsData {
+                name,
+                elements: self.make_node_list(Vec::new()),
+            },
+        )
     }
 
     /// Parse named imports: { x, y as z }

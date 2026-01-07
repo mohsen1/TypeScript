@@ -1550,7 +1550,7 @@ impl<'a> ThinPrinter<'a> {
             k if k == syntax_kind_ext::IMPORT_CLAUSE => {
                 self.emit_import_clause(node);
             }
-            k if k == syntax_kind_ext::NAMED_IMPORTS => {
+            k if k == syntax_kind_ext::NAMED_IMPORTS || k == syntax_kind_ext::NAMESPACE_IMPORT => {
                 self.emit_named_imports(node);
             }
             k if k == syntax_kind_ext::IMPORT_SPECIFIER => {
@@ -4205,13 +4205,74 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        self.write("import ");
-
-        if !import.import_clause.is_none() {
-            self.emit(import.import_clause);
-            self.write(" from ");
+        if import.import_clause.is_none() {
+            self.write("import ");
+            self.emit(import.module_specifier);
+            self.write_semicolon();
+            return;
         }
 
+        let Some(clause_node) = self.arena.get(import.import_clause) else {
+            return;
+        };
+        let Some(clause) = self.arena.get_import_clause(clause_node) else {
+            return;
+        };
+
+        if clause.is_type_only {
+            return;
+        }
+
+        let mut has_default = false;
+        let mut namespace_name = None;
+        let mut value_specs = Vec::new();
+        let mut raw_named_bindings = None;
+
+        if !clause.name.is_none() {
+            has_default = true;
+        }
+
+        if !clause.named_bindings.is_none() {
+            if let Some(bindings_node) = self.arena.get(clause.named_bindings) {
+                if let Some(named_imports) = self.arena.get_named_imports(bindings_node) {
+                    if !named_imports.name.is_none() && named_imports.elements.nodes.is_empty() {
+                        namespace_name = Some(named_imports.name);
+                    } else {
+                        value_specs = self.collect_value_specifiers(&named_imports.elements);
+                    }
+                } else {
+                    raw_named_bindings = Some(clause.named_bindings);
+                }
+            }
+        }
+
+        let has_named = namespace_name.is_some() || !value_specs.is_empty() || raw_named_bindings.is_some();
+        if !has_default && !has_named {
+            return;
+        }
+
+        self.write("import ");
+        if has_default {
+            self.emit(clause.name);
+        }
+
+        if has_named {
+            if has_default {
+                self.write(", ");
+            }
+            if let Some(name) = namespace_name {
+                self.write("* as ");
+                self.emit(name);
+            } else if !value_specs.is_empty() {
+                self.write("{ ");
+                self.emit_comma_separated(&value_specs);
+                self.write(" }");
+            } else if let Some(raw_node) = raw_named_bindings {
+                self.emit(raw_node);
+            }
+        }
+
+        self.write(" from ");
         self.emit(import.module_specifier);
         self.write_semicolon();
     }
@@ -4223,9 +4284,41 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Skip type-only imports in CommonJS
         if import.import_clause.is_none() {
             return; // Side-effect import: import "module"; -> skip or emit require
+        }
+
+        let Some(clause_node) = self.arena.get(import.import_clause) else {
+            return;
+        };
+        let Some(clause) = self.arena.get_import_clause(clause_node) else {
+            return;
+        };
+
+        if clause.is_type_only {
+            return;
+        }
+
+        let mut has_value_binding = !clause.name.is_none();
+        if !clause.named_bindings.is_none() {
+            if let Some(bindings_node) = self.arena.get(clause.named_bindings) {
+                if let Some(named_imports) = self.arena.get_named_imports(bindings_node) {
+                    if !named_imports.name.is_none() && named_imports.elements.nodes.is_empty() {
+                        has_value_binding = true;
+                    } else {
+                        let value_specs = self.collect_value_specifiers(&named_imports.elements);
+                        if !value_specs.is_empty() {
+                            has_value_binding = true;
+                        }
+                    }
+                } else {
+                    has_value_binding = true;
+                }
+            }
+        }
+
+        if !has_value_binding {
+            return;
         }
 
         // Get module specifier and generate var name
@@ -4285,6 +4378,12 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
+        if !imports.name.is_none() && imports.elements.nodes.is_empty() {
+            self.write("* as ");
+            self.emit(imports.name);
+            return;
+        }
+
         self.write("{ ");
         self.emit_comma_separated(&imports.elements.nodes);
         self.write(" }");
@@ -4315,20 +4414,55 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        self.write("export ");
+        if export.is_type_only {
+            return;
+        }
 
         if export.is_default_export {
-            self.write("default ");
+            self.write("export default ");
             self.emit(export.export_clause);
             self.write_semicolon();
             return;
         }
 
-        if !export.export_clause.is_none() {
-            self.emit(export.export_clause);
-        } else {
-            self.write("*");
+        if export.export_clause.is_none() {
+            self.write("export *");
+            if !export.module_specifier.is_none() {
+                self.write(" from ");
+                self.emit(export.module_specifier);
+            }
+            self.write_semicolon();
+            return;
         }
+
+        let Some(clause_node) = self.arena.get(export.export_clause) else {
+            return;
+        };
+
+        if clause_node.kind == syntax_kind_ext::NAMED_EXPORTS {
+            if let Some(named_exports) = self.arena.get_named_imports(clause_node) {
+                let value_specs = self.collect_value_specifiers(&named_exports.elements);
+                if value_specs.is_empty() {
+                    return;
+                }
+                self.write("export { ");
+                self.emit_comma_separated(&value_specs);
+                self.write(" }");
+                if !export.module_specifier.is_none() {
+                    self.write(" from ");
+                    self.emit(export.module_specifier);
+                }
+                self.write_semicolon();
+                return;
+            }
+        }
+
+        if self.export_clause_is_type_only(clause_node) {
+            return;
+        }
+
+        self.write("export ");
+        self.emit(export.export_clause);
 
         if !export.module_specifier.is_none() {
             self.write(" from ");
@@ -4345,6 +4479,10 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
+        if export.is_type_only {
+            return;
+        }
+
         // Re-export from another module: export { x } from "module";
         if !export.module_specifier.is_none() {
             let module_spec = if let Some(spec_node) = self.arena.get(export.module_specifier) {
@@ -4359,15 +4497,15 @@ impl<'a> ThinPrinter<'a> {
 
             let module_var = format!("{}_1", module_commonjs::sanitize_module_name(&module_spec));
 
-            // First emit the require
-            self.write("var ");
-            self.write(&module_var);
-            self.write(" = require(\"");
-            self.write(&module_spec);
-            self.write("\");");
-            self.write_line();
-
             if export.export_clause.is_none() {
+                // First emit the require
+                self.write("var ");
+                self.write(&module_var);
+                self.write(" = require(\"");
+                self.write(&module_spec);
+                self.write("\");");
+                self.write_line();
+
                 self.write("__exportStar(");
                 self.write(&module_var);
                 self.write(", exports);");
@@ -4378,9 +4516,25 @@ impl<'a> ThinPrinter<'a> {
             // Then emit Object.defineProperty for each export
             if let Some(clause_node) = self.arena.get(export.export_clause) {
                 if let Some(named_exports) = self.arena.get_named_imports(clause_node) {
+                    let value_specs = self.collect_value_specifiers(&named_exports.elements);
+                    if value_specs.is_empty() {
+                        return;
+                    }
+
+                    // First emit the require
+                    self.write("var ");
+                    self.write(&module_var);
+                    self.write(" = require(\"");
+                    self.write(&module_spec);
+                    self.write("\");");
+                    self.write_line();
+
                     for &spec_idx in &named_exports.elements.nodes {
                         if let Some(spec_node) = self.arena.get(spec_idx) {
                             if let Some(spec) = self.arena.get_specifier(spec_node) {
+                                if spec.is_type_only {
+                                    continue;
+                                }
                                 // Get export name and import name
                                 let export_name = self.get_identifier_text_idx(spec.name);
                                 let import_name = if !spec.property_name.is_none() {
@@ -4427,6 +4581,10 @@ impl<'a> ThinPrinter<'a> {
 
         // Check if export_clause contains a declaration (export const x, export function f, etc.)
         if let Some(clause_node) = self.arena.get(export.export_clause) {
+            if self.export_clause_is_type_only(clause_node) {
+                return;
+            }
+
             let clause_kind = clause_node.kind;
             let is_decl = clause_kind == syntax_kind_ext::VARIABLE_STATEMENT
                 || clause_kind == syntax_kind_ext::FUNCTION_DECLARATION
@@ -4594,7 +4752,12 @@ impl<'a> ThinPrinter<'a> {
                 k if k == syntax_kind_ext::NAMED_EXPORTS => {
                     // Emit exports.x = x; for each name
                     if let Some(named_exports) = self.arena.get_named_imports(clause_node) {
-                        for &spec_idx in &named_exports.elements.nodes {
+                        let value_specs = self.collect_value_specifiers(&named_exports.elements);
+                        if value_specs.is_empty() {
+                            return;
+                        }
+
+                        for &spec_idx in &value_specs {
                             if let Some(spec_node) = self.arena.get(spec_idx) {
                                 if let Some(spec) = self.arena.get_specifier(spec_node) {
                                     let export_name = self.get_identifier_text_idx(spec.name);
@@ -4740,6 +4903,60 @@ impl<'a> ThinPrinter<'a> {
             self.write(" as ");
         }
         self.emit(spec.name);
+    }
+
+    fn collect_value_specifiers(&self, elements: &NodeList) -> Vec<NodeIndex> {
+        let mut specs = Vec::new();
+        for &spec_idx in &elements.nodes {
+            if let Some(spec_node) = self.arena.get(spec_idx) {
+                if let Some(spec) = self.arena.get_specifier(spec_node) {
+                    if spec.is_type_only {
+                        continue;
+                    }
+                }
+            }
+            specs.push(spec_idx);
+        }
+        specs
+    }
+
+    fn export_clause_is_type_only(&self, clause_node: &ThinNode) -> bool {
+        match clause_node.kind {
+            k if k == syntax_kind_ext::INTERFACE_DECLARATION => true,
+            k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => true,
+            k if k == syntax_kind_ext::ENUM_DECLARATION => {
+                let Some(enum_decl) = self.arena.get_enum(clause_node) else {
+                    return false;
+                };
+                self.has_declare_modifier(&enum_decl.modifiers)
+                    || self.has_modifier(&enum_decl.modifiers, SyntaxKind::ConstKeyword as u16)
+            }
+            k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                let Some(class_decl) = self.arena.get_class(clause_node) else {
+                    return false;
+                };
+                self.has_declare_modifier(&class_decl.modifiers)
+            }
+            k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                let Some(func_decl) = self.arena.get_function(clause_node) else {
+                    return false;
+                };
+                self.has_declare_modifier(&func_decl.modifiers)
+            }
+            k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+                let Some(var_decl) = self.arena.get_variable(clause_node) else {
+                    return false;
+                };
+                self.has_declare_modifier(&var_decl.modifiers)
+            }
+            k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                let Some(module_decl) = self.arena.get_module(clause_node) else {
+                    return false;
+                };
+                self.has_declare_modifier(&module_decl.modifiers)
+            }
+            _ => false,
+        }
     }
 
     // =========================================================================
@@ -5938,11 +6155,19 @@ impl<'a> ThinPrinter<'a> {
                         // Check for: import * as ns from "mod"
                         if let Some(clause_node) = self.arena.get(import.import_clause) {
                             if let Some(clause) = self.arena.get_import_clause(clause_node) {
+                                if clause.is_type_only {
+                                    continue;
+                                }
                                 if let Some(bindings_node) = self.arena.get(clause.named_bindings) {
                                     // NAMESPACE_IMPORT = 275
                                     if bindings_node.kind == syntax_kind_ext::NAMESPACE_IMPORT {
                                         helpers.import_star = true;
                                         helpers.create_binding = true; // __importStar depends on __createBinding
+                                    } else if let Some(named_imports) = self.arena.get_named_imports(bindings_node) {
+                                        if !named_imports.name.is_none() && named_imports.elements.nodes.is_empty() {
+                                            helpers.import_star = true;
+                                            helpers.create_binding = true;
+                                        }
                                     }
                                 }
                             }
@@ -5951,6 +6176,9 @@ impl<'a> ThinPrinter<'a> {
                 }
                 k if k == syntax_kind_ext::EXPORT_DECLARATION => {
                     if let Some(export) = self.arena.get_export_decl(node) {
+                        if export.is_type_only {
+                            continue;
+                        }
                         // Check for: export * from "mod" (module_specifier present, no export_clause)
                         if !export.module_specifier.is_none() && export.export_clause.is_none() {
                             helpers.export_star = true;
