@@ -1887,6 +1887,34 @@ fn test_keyof_template_literal_matches_string() {
     assert_eq!(result, expected);
 }
 
+#[test]
+fn test_intersection_reduction_disjoint_discriminant_evaluates_never() {
+    let interner = TypeInterner::new();
+
+    let kind = interner.intern_string("kind");
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: kind,
+        type_id: interner.literal_string("a"),
+        write_type: interner.literal_string("a"),
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: kind,
+        type_id: interner.literal_string("b"),
+        write_type: interner.literal_string("b"),
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+    let result = evaluate_type(&interner, intersection);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
 // =============================================================================
 // Mapped Type Tests
 // =============================================================================
