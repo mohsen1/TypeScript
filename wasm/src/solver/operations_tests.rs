@@ -1567,6 +1567,54 @@ fn test_infer_generic_readonly_property_mismatch_with_index_signature() {
 }
 
 #[test]
+fn test_infer_generic_readonly_index_signature_mismatch() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("bag")),
+            type_id: interner.object_with_index(ObjectShape {
+                properties: Vec::new(),
+                string_index: Some(IndexSignature {
+                    key_type: TypeId::STRING,
+                    value_type: t_type,
+                    readonly: false,
+                }),
+                number_index: None,
+            }),
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let arg = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: true,
+        }),
+        number_index: None,
+    });
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[arg]);
+    assert_eq!(result, TypeId::ANY);
+}
+
+#[test]
 fn test_infer_generic_tuple_element() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
