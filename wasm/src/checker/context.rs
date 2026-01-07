@@ -104,9 +104,6 @@ pub struct CheckerContext<'a> {
     /// Current depth of call expression resolution.
     pub call_depth: RefCell<u32>,
 
-    /// Stack of local scopes for function parameters and block-scoped variables.
-    pub local_scope_stack: Vec<FxHashMap<String, TypeId>>,
-
     /// Stack of expected return types for functions.
     pub return_type_stack: Vec<TypeId>,
 
@@ -140,7 +137,6 @@ impl<'a> CheckerContext<'a> {
             contextual_type: None,
             instantiation_depth: RefCell::new(0),
             call_depth: RefCell::new(0),
-            local_scope_stack: Vec::new(),
             return_type_stack: Vec::new(),
             enclosing_class: None,
         }
@@ -173,7 +169,6 @@ impl<'a> CheckerContext<'a> {
             contextual_type: None,
             instantiation_depth: RefCell::new(0),
             call_depth: RefCell::new(0),
-            local_scope_stack: Vec::new(),
             return_type_stack: Vec::new(),
             enclosing_class: None,
         }
@@ -205,41 +200,6 @@ impl<'a> CheckerContext<'a> {
     pub fn get_node_span(&self, idx: NodeIndex) -> Option<(u32, u32)> {
         let node = self.arena.get(idx)?;
         Some((node.pos, node.end))
-    }
-
-    // --- Scope Management ---
-
-    /// Push a new local scope.
-    pub fn push_local_scope(&mut self) {
-        self.local_scope_stack.push(FxHashMap::default());
-    }
-
-    /// Pop the current local scope.
-    pub fn pop_local_scope(&mut self) {
-        self.local_scope_stack.pop();
-    }
-
-    /// Add a local variable to the current scope.
-    pub fn add_local(&mut self, name: String, type_id: TypeId) {
-        if let Some(scope) = self.local_scope_stack.last_mut() {
-            scope.insert(name, type_id);
-        }
-    }
-
-    /// Look up a local variable in the scope stack.
-    pub fn lookup_local(&self, name: &str) -> Option<TypeId> {
-        for scope in self.local_scope_stack.iter().rev() {
-            if let Some(&type_id) = scope.get(name) {
-                return Some(type_id);
-            }
-        }
-        None
-    }
-
-    /// Look up a local variable in the current (innermost) scope only.
-    /// This is used for redeclaration checking (TS2403).
-    pub fn lookup_local_in_current_scope(&self, name: &str) -> Option<TypeId> {
-        self.local_scope_stack.last()?.get(name).copied()
     }
 
     /// Push an expected return type onto the stack.
