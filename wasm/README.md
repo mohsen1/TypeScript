@@ -39,10 +39,10 @@ The current `ThinNodeArena` makes in-place mutation difficult.
 Last updated: 2026-01-07
 
 - Overall: Migration remains active; Rust/WASM compiler is under construction and not production-ready.
-- Tracks: CLI preserved binder scopes for stateless checking and the bench now stops at `binder.ts:432` (`statements` missing); emitter `.d.ts` output now covers type-only re-exports, export assignment, and export default; checker narrows computed element access for literal, numeric, and const-literal keys; LSP preserves cross-file symbols and scope cache after function-body edits; solver expanded TS_UNSOUNDNESS coverage (key remapping, `keyof` variance, tuple-wrapped conditional nondistribution).
+- Tracks: CLI added focused binder regression tests for the binder.ts:331 parameter binding gap and re-ran benches (still stops at `binder.ts:432` with `statements` missing); emitter `.d.ts` now covers default re-export specifiers with parser coverage; checker routes tuple literal element access through the solver so optional elements include `undefined`; LSP stabilized nested function-body edit cache timing to preserve prefix symbols and scope reuse; solver expanded TS_UNSOUNDNESS coverage for homomorphic mapped types over primitives and noUnchecked object index signatures.
 - Baselines (`tests/cases`, first 100): compiler errors 60/77 (77.9%) pass, JS 40/76 (52.6%) pass; conformance errors 18/90 (20.0%) pass, JS 1/88 (1.1%) pass (no new run).
 - Risk: CLI bench blocked by TS2304 in `binder.ts:432`; ES module imports still resolve to `any`; source maps remain minimal; parser/arena child enumeration TODOs remain; conformance baseline pass rates are low.
-- Next focus: finish binder scope wiring to clear the bench gap and rerun real repo benchmarks, push assignability/member lookup into solver to end split-brain typing, ship `.d.ts` visibility + re-export handling with ES5 downlevel and fuller source maps, tighten LSP incremental parse to avoid full rebinds, and retire legacy AST with arena memory-hygiene checks.
+- Next focus: fix the binder.ts:432 scope wiring and rerun real repo benchmarks, keep pushing assignability/member lookup into solver to end split-brain typing, remove remaining inline emitter transforms in favor of directives, tighten LSP incremental edits that touch suffix scopes, and retire legacy AST with arena memory-hygiene checks.
 
 ## Status
 This project is not ready for general use yet. The interface and distribution are in progress.
