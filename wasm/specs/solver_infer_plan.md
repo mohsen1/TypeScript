@@ -128,6 +128,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Add NaN numeric literal inference coverage for number index signatures
 - [x] Add -Infinity numeric literal inference coverage for number index signatures
 - [x] Add negative zero numeric literal inference coverage for number index signatures
+- [x] Add exponent-form numeric literal inference coverage for number index signatures
 - [x] Enforce index signature consistency during bounds validation
 
 ## Architecture Notes
