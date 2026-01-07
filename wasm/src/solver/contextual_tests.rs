@@ -51,6 +51,27 @@ fn test_contextual_function_parameter() {
 }
 
 #[test]
+fn test_contextual_function_this_parameter() {
+    let interner = TypeInterner::new();
+
+    // type Handler = (this: string, x: number) => void
+    let handler = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::NUMBER, optional: false, rest: false },
+        ],
+        this_type: Some(TypeId::STRING),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let ctx = ContextualTypeContext::with_expected(&interner, handler);
+    assert_eq!(ctx.get_this_type(), Some(TypeId::STRING));
+    assert_eq!(ctx.get_parameter_type(0), Some(TypeId::NUMBER));
+}
+
+#[test]
 fn test_contextual_function_return() {
     let interner = TypeInterner::new();
 

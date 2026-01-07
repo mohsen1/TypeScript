@@ -96,6 +96,27 @@ fn test_format_function_type() {
 }
 
 #[test]
+fn test_format_function_type_with_this() {
+    let interner = TypeInterner::new();
+    let mut formatter = TypeFormatter::new(&interner);
+
+    let func = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::NUMBER, optional: false, rest: false },
+        ],
+        this_type: Some(TypeId::STRING),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let formatted = formatter.format(func);
+    assert!(formatted.contains("this: string"));
+    assert!(formatted.contains("x: number"));
+}
+
+#[test]
 fn test_type_not_assignable_diagnostic() {
     let interner = TypeInterner::new();
     let mut builder = DiagnosticBuilder::new(&interner);

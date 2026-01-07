@@ -315,21 +315,15 @@ impl<'a> SignatureHelpProvider<'a> {
 
     /// Format a FunctionShape into SignatureInformation
     fn format_signature(&self, shape: &FunctionShape, checker: &ThinCheckerState, is_constructor: bool) -> SignatureInformation {
-        let mut label_parts = Vec::new();
         let mut parameters = Vec::new();
 
-        // 1. Prefix
-        if is_constructor {
-            label_parts.push("new (".to_string());
-        } else {
-            label_parts.push("(".to_string());
+        // 1. Parameters
+        let mut param_labels = Vec::new();
+        if let Some(this_type) = shape.this_type {
+            param_labels.push(format!("this: {}", checker.format_type(this_type)));
         }
 
-        // 2. Parameters
-        for (i, param) in shape.params.iter().enumerate() {
-            if i > 0 {
-                label_parts.push(", ".to_string());
-            }
+        for param in &shape.params {
 
             let name = param.name
                 .map(|atom| checker.ctx.types.resolve_atom(atom))
@@ -344,15 +338,16 @@ impl<'a> SignatureHelpProvider<'a> {
                 documentation: None, // TODO: Extract JSDoc for params
             });
 
-            label_parts.push(param_label);
+            param_labels.push(param_label);
         }
 
         // 3. Return Type
         let return_type_str = checker.format_type(shape.return_type);
-        label_parts.push(format!("): {}", return_type_str));
+        let prefix = if is_constructor { "new (" } else { "(" };
+        let label = format!("{}{}): {}", prefix, param_labels.join(", "), return_type_str);
 
         SignatureInformation {
-            label: label_parts.join(""),
+            label,
             documentation: None, // TODO: Extract JSDoc for function
             parameters,
         }

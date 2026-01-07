@@ -1707,11 +1707,19 @@ impl<'a> ThinCheckerState<'a> {
                         None
                     };
 
+                    let is_this_param = name == Some(this_atom);
+
                     // Use type annotation if present, otherwise infer from context
                     let type_id = if !param.type_annotation.is_none() {
                         // Check parameter type for parameter properties in function types
                         self.check_type_for_parameter_properties(param.type_annotation);
                         self.get_type_from_type_node(param.type_annotation)
+                    } else if is_this_param {
+                        if let Some(ref helper) = ctx_helper {
+                            helper.get_this_type().unwrap_or(TypeId::ANY)
+                        } else {
+                            TypeId::ANY
+                        }
                     } else {
                         // Infer from contextual type
                         if let Some(ref helper) = ctx_helper {
@@ -1721,14 +1729,12 @@ impl<'a> ThinCheckerState<'a> {
                         }
                     };
 
-                    if let Some(name_atom) = name {
-                        if name_atom == this_atom {
-                            if this_type.is_none() {
-                                this_type = Some(type_id);
-                            }
-                            param_types.push(None);
-                            continue;
+                    if is_this_param {
+                        if this_type.is_none() {
+                            this_type = Some(type_id);
                         }
+                        param_types.push(None);
+                        continue;
                     }
 
                     // Check if optional or has initializer

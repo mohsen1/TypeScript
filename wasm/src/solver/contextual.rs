@@ -94,6 +94,34 @@ impl<'a> ContextualTypeContext<'a> {
         }
     }
 
+    /// Get the contextual type for a `this` parameter, if present on the expected type.
+    pub fn get_this_type(&self) -> Option<TypeId> {
+        let expected = self.expected?;
+        let key = self.interner.lookup(expected)?;
+
+        match key {
+            TypeKey::Function(shape) => shape.this_type,
+            TypeKey::Callable(shape) => shape.call_signatures.first().and_then(|sig| sig.this_type),
+            TypeKey::Union(members) => {
+                let this_types: Vec<TypeId> = members.iter()
+                    .filter_map(|&m| {
+                        let ctx = ContextualTypeContext::with_expected(self.interner, m);
+                        ctx.get_this_type()
+                    })
+                    .collect();
+
+                if this_types.is_empty() {
+                    None
+                } else if this_types.len() == 1 {
+                    Some(this_types[0])
+                } else {
+                    Some(self.interner.union(this_types))
+                }
+            }
+            _ => None,
+        }
+    }
+
     /// Get the contextual return type for a function.
     pub fn get_return_type(&self) -> Option<TypeId> {
         let expected = self.expected?;

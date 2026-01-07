@@ -1213,6 +1213,35 @@ fn test_strict_function_variance() {
     // Now unsafe assignment should pass (legacy behavior)
     assert!(checker.is_subtype_of(string_arg_fn, union_arg_fn));
 }
+
+#[test]
+fn test_this_parameter_variance() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let union_this = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let union_this_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(union_this),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let string_this_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(TypeId::STRING),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    // this parameter is contravariant like regular parameters
+    assert!(checker.is_subtype_of(union_this_fn, string_this_fn));
+    assert!(!checker.is_subtype_of(string_this_fn, union_this_fn));
+}
 #[test]
 fn test_function_fixed_to_rest_subtyping() {
     use std::sync::Arc;
