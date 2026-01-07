@@ -124,6 +124,14 @@ impl<'a> FlowAnalyzer<'a> {
             return self.handle_switch_clause(reference, type_id, flow, visited);
         }
 
+        if flow.has_any_flags(flow_flags::ASSIGNMENT) {
+            return self.handle_assignment(reference, type_id, flow, visited);
+        }
+
+        if flow.has_any_flags(flow_flags::ARRAY_MUTATION) {
+            return self.handle_array_mutation(reference, type_id, flow, visited);
+        }
+
         if flow.has_any_flags(flow_flags::START) {
             // Reached start of flow - return initial type
             return type_id;
@@ -269,6 +277,72 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         clause_type
+    }
+
+    fn handle_assignment(
+        &self,
+        reference: NodeIndex,
+        type_id: TypeId,
+        flow: &FlowNode,
+        visited: &mut Vec<FlowNodeId>,
+    ) -> TypeId {
+        let Some(node) = self.arena.get(flow.node) else {
+            return type_id;
+        };
+
+        let affects_reference = if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            self.arena
+                .get_binary_expr(node)
+                .map(|bin| self.is_assignment_operator(bin.operator_token)
+                    && self.assignment_affects_reference(bin.left, reference))
+                .unwrap_or(false)
+        } else if node.kind == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
+            || node.kind == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION
+        {
+            self.arena
+                .get_unary_expr(node)
+                .map(|unary| (unary.operator == SyntaxKind::PlusPlusToken as u16
+                    || unary.operator == SyntaxKind::MinusMinusToken as u16)
+                    && self.assignment_affects_reference(unary.operand, reference))
+                .unwrap_or(false)
+        } else {
+            false
+        };
+
+        if affects_reference {
+            return type_id;
+        }
+
+        if let Some(&ant) = flow.antecedent.first() {
+            self.check_flow(reference, type_id, ant, visited)
+        } else {
+            type_id
+        }
+    }
+
+    fn handle_array_mutation(
+        &self,
+        reference: NodeIndex,
+        type_id: TypeId,
+        flow: &FlowNode,
+        visited: &mut Vec<FlowNodeId>,
+    ) -> TypeId {
+        let Some(node) = self.arena.get(flow.node) else {
+            return type_id;
+        };
+        let Some(call) = self.arena.get_call_expr(node) else {
+            return type_id;
+        };
+
+        if self.array_mutation_affects_reference(call, reference) {
+            return type_id;
+        }
+
+        if let Some(&ant) = flow.antecedent.first() {
+            self.check_flow(reference, type_id, ant, visited)
+        } else {
+            type_id
+        }
     }
 
     fn narrow_by_switch_clause(
@@ -502,6 +576,81 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         None
+    }
+
+    fn is_assignment_operator(&self, operator: u16) -> bool {
+        matches!(
+            operator,
+            k if k == SyntaxKind::EqualsToken as u16
+                || k == SyntaxKind::PlusEqualsToken as u16
+                || k == SyntaxKind::MinusEqualsToken as u16
+                || k == SyntaxKind::AsteriskEqualsToken as u16
+                || k == SyntaxKind::AsteriskAsteriskEqualsToken as u16
+                || k == SyntaxKind::SlashEqualsToken as u16
+                || k == SyntaxKind::PercentEqualsToken as u16
+                || k == SyntaxKind::LessThanLessThanEqualsToken as u16
+                || k == SyntaxKind::GreaterThanGreaterThanEqualsToken as u16
+                || k == SyntaxKind::GreaterThanGreaterThanGreaterThanEqualsToken as u16
+                || k == SyntaxKind::AmpersandEqualsToken as u16
+                || k == SyntaxKind::BarEqualsToken as u16
+                || k == SyntaxKind::BarBarEqualsToken as u16
+                || k == SyntaxKind::AmpersandAmpersandEqualsToken as u16
+                || k == SyntaxKind::QuestionQuestionEqualsToken as u16
+                || k == SyntaxKind::CaretEqualsToken as u16
+        )
+    }
+
+    fn assignment_affects_reference(&self, left: NodeIndex, target: NodeIndex) -> bool {
+        let left = self.skip_parenthesized(left);
+        if self.is_matching_reference(left, target) {
+            return true;
+        }
+
+        let Some(node) = self.arena.get(left) else {
+            return false;
+        };
+
+        if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+            || node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION
+        {
+            let Some(access) = self.arena.get_access_expr(node) else {
+                return false;
+            };
+            if access.question_dot_token {
+                return false;
+            }
+            return self.assignment_affects_reference(access.expression, target);
+        }
+
+        if node.kind == syntax_kind_ext::NON_NULL_EXPRESSION {
+            if let Some(unary) = self.arena.get_unary_expr_ex(node) {
+                return self.assignment_affects_reference(unary.expression, target);
+            }
+        }
+
+        if node.kind == syntax_kind_ext::TYPE_ASSERTION
+            || node.kind == syntax_kind_ext::AS_EXPRESSION
+            || node.kind == syntax_kind_ext::SATISFIES_EXPRESSION
+        {
+            if let Some(assertion) = self.arena.get_type_assertion(node) {
+                return self.assignment_affects_reference(assertion.expression, target);
+            }
+        }
+
+        false
+    }
+
+    fn array_mutation_affects_reference(&self, call: &CallExprData, target: NodeIndex) -> bool {
+        let Some(callee_node) = self.arena.get(call.expression) else {
+            return false;
+        };
+        let Some(access) = self.arena.get_access_expr(callee_node) else {
+            return false;
+        };
+        if access.question_dot_token {
+            return false;
+        }
+        self.assignment_affects_reference(access.expression, target)
     }
 
     fn narrow_by_call_predicate(
