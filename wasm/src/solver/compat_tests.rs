@@ -810,6 +810,68 @@ fn test_apparent_string_members_assignable() {
 }
 
 #[test]
+fn test_apparent_string_members_include_substr_and_locale_compare() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let locale_compare = interner.intern_string("localeCompare");
+    let substr = interner.intern_string("substr");
+    let locale_compare_type = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("that")),
+            type_id: TypeId::ANY,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let substr_type = interner.function(FunctionShape {
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("start")),
+                type_id: TypeId::ANY,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("length")),
+                type_id: TypeId::ANY,
+                optional: true,
+                rest: false,
+            },
+        ],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let target = interner.object(vec![
+        PropertyInfo {
+            name: locale_compare,
+            type_id: locale_compare_type,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+        PropertyInfo {
+            name: substr,
+            type_id: substr_type,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    assert!(checker.is_assignable(TypeId::STRING, target));
+}
+
+#[test]
 fn test_apparent_string_members_reject_mismatch() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);

@@ -19,6 +19,7 @@ const STRING_METHODS_RETURN_STRING: &[&str] = &[
     "padStart",
     "repeat",
     "slice",
+    "substr",
     "substring",
     "toLocaleLowerCase",
     "toLocaleUpperCase",
@@ -37,6 +38,7 @@ const STRING_METHODS_RETURN_NUMBER: &[&str] = &[
     "codePointAt",
     "indexOf",
     "lastIndexOf",
+    "localeCompare",
     "search",
 ];
 const STRING_METHODS_RETURN_BOOLEAN: &[&str] = &["endsWith", "includes", "startsWith"];
