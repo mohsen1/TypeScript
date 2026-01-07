@@ -1226,6 +1226,9 @@ impl<'a> LoweringPass<'a> {
                 || node.kind == syntax_kind_ext::IMPORT_EQUALS_DECLARATION
             {
                 if let Some(import_decl) = self.arena.get_import_decl(node) {
+                    if !self.import_has_runtime_dependency(import_decl) {
+                        continue;
+                    }
                     if let Some(text) = self.get_module_specifier_text(import_decl.module_specifier) {
                         if !deps.contains(&text) {
                             deps.push(text);
@@ -1237,6 +1240,9 @@ impl<'a> LoweringPass<'a> {
 
             if node.kind == syntax_kind_ext::EXPORT_DECLARATION {
                 if let Some(export_decl) = self.arena.get_export_decl(node) {
+                    if !self.export_has_runtime_dependency(export_decl) {
+                        continue;
+                    }
                     if let Some(text) = self.get_module_specifier_text(export_decl.module_specifier) {
                         if !deps.contains(&text) {
                             deps.push(text);
@@ -1247,6 +1253,114 @@ impl<'a> LoweringPass<'a> {
         }
 
         deps
+    }
+
+    fn import_has_runtime_dependency(
+        &self,
+        import_decl: &crate::parser::thin_node::ImportDeclData,
+    ) -> bool {
+        if import_decl.import_clause.is_none() {
+            return true;
+        }
+
+        let Some(clause_node) = self.arena.get(import_decl.import_clause) else {
+            return true;
+        };
+
+        if clause_node.kind != syntax_kind_ext::IMPORT_CLAUSE {
+            return true;
+        }
+
+        let Some(clause) = self.arena.get_import_clause(clause_node) else {
+            return true;
+        };
+
+        if clause.is_type_only {
+            return false;
+        }
+
+        if !clause.name.is_none() {
+            return true;
+        }
+
+        if clause.named_bindings.is_none() {
+            return false;
+        }
+
+        let Some(bindings_node) = self.arena.get(clause.named_bindings) else {
+            return false;
+        };
+
+        let Some(named) = self.arena.get_named_imports(bindings_node) else {
+            return true;
+        };
+
+        if !named.name.is_none() {
+            return true;
+        }
+
+        if named.elements.nodes.is_empty() {
+            return true;
+        }
+
+        for &spec_idx in &named.elements.nodes {
+            let Some(spec_node) = self.arena.get(spec_idx) else {
+                continue;
+            };
+            if let Some(spec) = self.arena.get_specifier(spec_node) {
+                if !spec.is_type_only {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    fn export_has_runtime_dependency(
+        &self,
+        export_decl: &crate::parser::thin_node::ExportDeclData,
+    ) -> bool {
+        if export_decl.is_type_only {
+            return false;
+        }
+
+        if export_decl.module_specifier.is_none() {
+            return false;
+        }
+
+        if export_decl.export_clause.is_none() {
+            return true;
+        }
+
+        let Some(clause_node) = self.arena.get(export_decl.export_clause) else {
+            return true;
+        };
+
+        let Some(named) = self.arena.get_named_imports(clause_node) else {
+            return true;
+        };
+
+        if !named.name.is_none() {
+            return true;
+        }
+
+        if named.elements.nodes.is_empty() {
+            return true;
+        }
+
+        for &spec_idx in &named.elements.nodes {
+            let Some(spec_node) = self.arena.get(spec_idx) else {
+                continue;
+            };
+            if let Some(spec) = self.arena.get_specifier(spec_node) {
+                if !spec.is_type_only {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     fn get_module_specifier_text(&self, specifier: NodeIndex) -> Option<String> {

@@ -62,6 +62,7 @@ Pick the most doable and impactful
 37. Enum modifiers: attach const/declare in parser; erase const/declare enum emit + CommonJS exports [done]
 38. Imports/exports: handle namespace imports and erase type-only import/export in JS output [done]
 39. CommonJS: emit side-effect imports as require() [done]
+40. Module wrappers: skip type-only import/export dependencies [done]
 
 
 ## Quick Reference
