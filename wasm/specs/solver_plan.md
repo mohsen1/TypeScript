@@ -80,6 +80,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Getter types are covariant; setter types are contravariant in property assignability.
 - [x] Add constructor void exception coverage for construct signatures
   - Construct signatures returning values are assignable to `new () => void`.
+- [x] Add best common type inference for array literals
+  - Prefer a supertype element when all entries are assignable to it.
 - [x] Add coverage for global Function type assignability
   - Callables assignable to Function; Function not assignable to specific signatures.
 

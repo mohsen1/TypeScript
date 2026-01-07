@@ -849,6 +849,28 @@ fn test_thin_emit_jsx_namespaced_member_expression() {
 }
 
 #[test]
+fn test_thin_emit_jsx_namespaced_attribute() {
+    let source = "const x = <svg xlink:href=\"path\" />;";
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("<svg"),
+        "Expected JSX element in output: {}",
+        output
+    );
+    assert!(
+        output.contains("xlink:href=\"path\""),
+        "Expected JSX namespaced attribute in output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_enum_declaration() {
     let source = "enum Color { Red, Green, Blue }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

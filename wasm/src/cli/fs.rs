@@ -15,6 +15,7 @@ pub struct FileDiscoveryOptions {
     pub include: Option<Vec<String>>,
     pub exclude: Option<Vec<String>>,
     pub out_dir: Option<PathBuf>,
+    pub follow_links: bool,
 }
 
 impl FileDiscoveryOptions {
@@ -36,6 +37,7 @@ impl FileDiscoveryOptions {
             include: config.include.clone(),
             exclude: config.exclude.clone(),
             out_dir: out_dir.map(Path::to_path_buf),
+            follow_links: false,
         }
     }
 }
@@ -63,7 +65,7 @@ pub fn discover_ts_files(options: &FileDiscoveryOptions) -> Result<Vec<PathBuf>>
         };
 
         let walker = WalkDir::new(&options.base_dir)
-            .follow_links(false)
+            .follow_links(options.follow_links)
             .into_iter()
             .filter_entry(|entry| allow_entry(entry, &options.base_dir, exclude_set.as_ref()));
 
