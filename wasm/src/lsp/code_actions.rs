@@ -1375,8 +1375,24 @@ impl<'a> CodeActionProvider<'a> {
             }
             let had_trailing_ws = insert_offset != close_offset;
             let trailing_space = if had_trailing_ws { "" } else { " " };
-            let prefix = if elements.is_empty() { " " } else { ", " };
-            let new_text = format!("{}{}: undefined{}", prefix, property_name, trailing_space);
+            let last_char = if insert_offset > object_node.pos {
+                self.source.as_bytes().get((insert_offset - 1) as usize).copied()
+            } else {
+                None
+            };
+            let had_trailing_comma = matches!(last_char, Some(b','));
+            let prefix = if elements.is_empty() {
+                " "
+            } else if had_trailing_comma {
+                " "
+            } else {
+                ", "
+            };
+            let mut new_text = format!("{}{}: undefined", prefix, property_name);
+            if had_trailing_comma {
+                new_text.push(',');
+            }
+            new_text.push_str(trailing_space);
             let insert_pos = self.line_map.offset_to_position(insert_offset, self.source);
             edits.push(TextEdit {
                 range: Range::new(insert_pos, insert_pos),
