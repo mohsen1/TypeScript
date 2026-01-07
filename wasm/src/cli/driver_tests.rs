@@ -531,12 +531,15 @@ fn compile_with_cache_invalidates_paths() {
     let result = compile_with_cache(&args, base, &mut cache).expect("compile should succeed");
     assert!(!result.diagnostics.is_empty());
     assert_eq!(cache.len(), 1);
+    assert_eq!(cache.bind_len(), 1);
 
     let canonical = std::fs::canonicalize(&index_path).unwrap_or(index_path.clone());
     cache.invalidate_paths(vec![canonical]);
     assert_eq!(cache.len(), 0);
+    assert_eq!(cache.bind_len(), 0);
 
     let result = compile_with_cache(&args, base, &mut cache).expect("compile should succeed");
     assert!(!result.diagnostics.is_empty());
     assert_eq!(cache.len(), 1);
+    assert_eq!(cache.bind_len(), 1);
 }
