@@ -51,7 +51,13 @@ pub fn compile(args: &CliArgs, cwd: &Path) -> Result<CompilationResult> {
         .collect();
 
     let program = parallel::compile_files(compile_inputs);
-    let diagnostics = collect_diagnostics(&program);
+    let mut diagnostics = collect_diagnostics(&program);
+    diagnostics.sort_by(|left, right| {
+        left.file
+            .cmp(&right.file)
+            .then(left.start.cmp(&right.start))
+            .then(left.code.cmp(&right.code))
+    });
 
     let emitted_files = if resolved.no_emit {
         Vec::new()
