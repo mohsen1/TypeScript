@@ -47,6 +47,8 @@ Status: Active
   - [x] Add JSX namespaced attribute string literal coverage in thin emitter tests.
   - [x] Add JSX member element namespaced attribute coverage in thin emitter tests.
   - [x] Add JSX boolean attribute coverage in thin emitter tests.
+  - [x] Add JSX member element boolean attribute coverage in thin emitter tests.
+  - [x] Add JSX spread + boolean attribute coverage in thin emitter tests.
   - [x] Extract template literal emission helpers into a module.
 - [ ] Performance tuning (deferred until correctness parity)
   - [x] Pre-allocate output buffer from source size; write numeric indices without allocations.

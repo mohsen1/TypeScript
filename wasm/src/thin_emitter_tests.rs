@@ -1069,6 +1069,60 @@ fn test_thin_emit_jsx_boolean_attribute() {
 }
 
 #[test]
+fn test_thin_emit_jsx_member_boolean_attribute() {
+    let source = "const x = <Foo.Bar disabled />;";
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("<Foo.Bar"),
+        "Expected JSX member element in output: {}",
+        output
+    );
+    assert!(
+        output.contains("disabled"),
+        "Expected JSX boolean attribute on member element in output: {}",
+        output
+    );
+    assert!(
+        !output.contains("disabled="),
+        "Expected JSX boolean attribute without initializer: {}",
+        output
+    );
+}
+
+#[test]
+fn test_thin_emit_jsx_spread_and_boolean_attribute() {
+    let source = "const x = <input {...props} disabled />;";
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("{...props}"),
+        "Expected JSX spread attribute in output: {}",
+        output
+    );
+    assert!(
+        output.contains("disabled"),
+        "Expected JSX boolean attribute in output: {}",
+        output
+    );
+    assert!(
+        !output.contains("disabled="),
+        "Expected JSX boolean attribute without initializer: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_enum_declaration() {
     let source = "enum Color { Red, Green, Blue }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
