@@ -316,6 +316,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Include callable types in typeof "function" narrowing
 - [x] Tests for object/function typeof narrowing cases
 
+### Phase 61: Typeof Narrowing Any/Unknown
+- [x] Preserve any and narrow unknown for typeof checks
+- [x] Tests for typeof narrowing with any/unknown
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

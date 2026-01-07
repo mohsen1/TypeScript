@@ -251,6 +251,31 @@ fn test_narrow_by_typeof_template_literal() {
 }
 
 #[test]
+fn test_narrow_by_typeof_any() {
+    let interner = TypeInterner::new();
+
+    let narrowed = narrow_by_typeof(&interner, TypeId::ANY, "string");
+    assert_eq!(narrowed, TypeId::ANY);
+}
+
+#[test]
+fn test_narrow_by_typeof_unknown_string() {
+    let interner = TypeInterner::new();
+
+    let narrowed = narrow_by_typeof(&interner, TypeId::UNKNOWN, "string");
+    assert_eq!(narrowed, TypeId::STRING);
+}
+
+#[test]
+fn test_narrow_by_typeof_unknown_object() {
+    let interner = TypeInterner::new();
+
+    let narrowed = narrow_by_typeof(&interner, TypeId::UNKNOWN, "object");
+    let expected = interner.union(vec![TypeId::OBJECT, TypeId::NULL]);
+    assert_eq!(narrowed, expected);
+}
+
+#[test]
 fn test_narrow_by_typeof_object_with_object_literal() {
     let interner = TypeInterner::new();
 

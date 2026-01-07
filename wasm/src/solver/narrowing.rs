@@ -208,6 +208,23 @@ impl<'a> NarrowingContext<'a> {
         source_type: TypeId,
         typeof_result: &str,
     ) -> TypeId {
+        if source_type == TypeId::ANY {
+            return TypeId::ANY;
+        }
+
+        if source_type == TypeId::UNKNOWN {
+            return match typeof_result {
+                "string" => TypeId::STRING,
+                "number" => TypeId::NUMBER,
+                "boolean" => TypeId::BOOLEAN,
+                "bigint" => TypeId::BIGINT,
+                "symbol" => TypeId::SYMBOL,
+                "undefined" => TypeId::UNDEFINED,
+                "object" => self.interner.union(vec![TypeId::OBJECT, TypeId::NULL]),
+                _ => source_type,
+            };
+        }
+
         let target_type = match typeof_result {
             "string" => TypeId::STRING,
             "number" => TypeId::NUMBER,
