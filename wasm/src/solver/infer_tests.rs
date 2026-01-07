@@ -290,6 +290,22 @@ fn test_resolve_bounds_tuple_lower_array_upper() {
 }
 
 #[test]
+fn test_resolve_bounds_union_upper_allows_literal_lower() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let hello = interner.literal_string("hello");
+    let upper = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    ctx.add_lower_bound(var, hello);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, hello);
+}
+
+#[test]
 fn test_resolve_bounds_conflict() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
