@@ -94,6 +94,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - `keyof (A & B)` unions keys and stays assignable from `keyof A`.
 - [x] Add error poisoning coverage
   - `error` is compatible with all types and poisons unions/conditionals.
+- [x] Add correlated union index access coverage
+  - Index access over union objects/keys uses cross-product (no correlation).
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.

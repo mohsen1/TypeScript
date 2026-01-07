@@ -1911,6 +1911,17 @@ fn test_thin_parser_optional_chain_call_with_type_arguments() {
 }
 
 #[test]
+fn test_thin_parser_relational_with_parenthesized_rhs() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "if (context.flags & NodeBuilderFlags.WriteTypeParametersInQualifiedName && index < (chain.length - 1)) { }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+}
+
+#[test]
 fn test_thin_parser_spread_in_call_arguments() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
