@@ -145,6 +145,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Treat `void` as undefined for property access nullish checks
 - [x] Tests for property access on `void`
 
+### Phase 21: Index Signature Consistency
+- [x] Validate explicit properties against target index signatures even with source index signatures
+- [x] Tests for object-with-index property vs index signature compatibility
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
