@@ -876,8 +876,7 @@ impl<'a> LoweringPass<'a> {
         };
 
         if self.ctx.target_es5 {
-            let captures_this = !arrow.body.is_none()
-                && contains_this_reference(self.arena, arrow.body);
+            let captures_this = contains_this_reference(self.arena, idx);
 
             self.transforms.insert(
                 idx,

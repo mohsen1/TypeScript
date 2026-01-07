@@ -32,7 +32,6 @@ use crate::transform_context::TransformContext;
 use crate::transforms::class_es5::ClassES5Emitter;
 use crate::transforms::enum_es5::EnumES5Emitter;
 use crate::transforms::namespace_es5::NamespaceES5Emitter;
-use crate::transforms::arrow_es5::contains_this_reference;
 
 // =============================================================================
 // Comment Utilities
@@ -763,10 +762,13 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_commonjs_default_export_expr(node, idx);
             }
 
-            TransformDirective::ES5ArrowFunction { arrow_node, .. } => {
+            TransformDirective::ES5ArrowFunction {
+                arrow_node,
+                captures_this,
+            } => {
                 if let Some(arrow_node) = self.arena.get(arrow_node) {
                     if let Some(func) = self.arena.get_function(arrow_node) {
-                        self.emit_arrow_function_es5(arrow_node, func);
+                        self.emit_arrow_function_es5(arrow_node, func, captures_this);
                         return;
                     }
                 }
@@ -783,7 +785,7 @@ impl<'a> ThinPrinter<'a> {
                             String::new()
                         };
 
-                        self.emit_async_function_es5(func, &func_name);
+                        self.emit_async_function_es5(func, &func_name, "this");
                         return;
                     }
                 }
@@ -878,7 +880,7 @@ impl<'a> ThinPrinter<'a> {
 
                 self.write("exports.default = ");
                 if self.ctx.target_es5 && func.is_async {
-                    self.emit_async_function_es5(func, "");
+                    self.emit_async_function_es5(func, "", "this");
                 } else {
                     self.emit_function_expression(node, idx);
                 }
@@ -949,17 +951,20 @@ impl<'a> ThinPrinter<'a> {
                     if let Some(func) = self.arena.get_function(func_node) {
                         if !func.name.is_none() {
                             let func_name = self.get_identifier_text_idx(func.name);
-                            self.emit_async_function_es5(func, &func_name);
+                            self.emit_async_function_es5(func, &func_name, "this");
                         } else {
-                            self.emit_async_function_es5(func, export_name.unwrap_or(""));
+                            self.emit_async_function_es5(func, export_name.unwrap_or(""), "this");
                         }
                     }
                 }
             }
-            TransformDirective::ES5ArrowFunction { arrow_node, .. } => {
+            TransformDirective::ES5ArrowFunction {
+                arrow_node,
+                captures_this,
+            } => {
                 if let Some(arrow_node) = self.arena.get(*arrow_node) {
                     if let Some(func) = self.arena.get_function(arrow_node) {
-                        self.emit_arrow_function_es5(arrow_node, func);
+                        self.emit_arrow_function_es5(arrow_node, func, *captures_this);
                     }
                 }
             }
@@ -1042,10 +1047,13 @@ impl<'a> ThinPrinter<'a> {
             TransformDirective::CommonJSExportDefaultExpr => {
                 self.emit_commonjs_default_export_expr(node, idx);
             }
-            TransformDirective::ES5ArrowFunction { arrow_node, .. } => {
+            TransformDirective::ES5ArrowFunction {
+                arrow_node,
+                captures_this,
+            } => {
                 if let Some(arrow_node) = self.arena.get(*arrow_node) {
                     if let Some(func) = self.arena.get_function(arrow_node) {
-                        self.emit_arrow_function_es5(arrow_node, func);
+                        self.emit_arrow_function_es5(arrow_node, func, *captures_this);
                         return;
                     }
                 }
@@ -1061,7 +1069,7 @@ impl<'a> ThinPrinter<'a> {
                             String::new()
                         };
 
-                        self.emit_async_function_es5(func, &func_name);
+                        self.emit_async_function_es5(func, &func_name, "this");
                         return;
                     }
                 }
@@ -2268,58 +2276,57 @@ impl<'a> ThinPrinter<'a> {
 
     /// Emit ES5-compatible function expression for arrow function
     /// Arrow: (x) => x + 1  →  function (x) { return x + 1; }
-    fn emit_arrow_function_es5(&mut self, _node: &ThinNode, func: &crate::parser::thin_node::FunctionData) {
-        // Check if arrow body uses `this` - if so, we need _this capture
-        let body_uses_this = !func.body.is_none()
-            && contains_this_reference(self.arena, func.body);
+    fn emit_arrow_function_es5(
+        &mut self,
+        _node: &ThinNode,
+        func: &crate::parser::thin_node::FunctionData,
+        captures_this: bool,
+    ) {
+        let needs_this_capture = captures_this;
 
-        // Track that we're inside an arrow function body with `this`
-        if body_uses_this {
+        if needs_this_capture {
+            self.write("(function (_this) { return ");
             self.ctx.arrow_state.this_capture_depth += 1;
         }
 
         if func.is_async {
-            self.write("async ");
-        }
+            let this_expr = if needs_this_capture { "_this" } else { "this" };
+            self.emit_async_function_es5(func, "", this_expr);
+        } else {
+            self.write("function (");
+            let param_transforms = self.emit_function_parameters_es5(&func.parameters.nodes);
+            self.write(") ");
 
-        self.write("function (");
-        let param_transforms = self.emit_function_parameters_es5(&func.parameters.nodes);
-        self.write(") ");
+            // If body is not a block (concise arrow), wrap with return
+            let body_node = self.arena.get(func.body);
+            let is_block = body_node.map(|n| n.kind == syntax_kind_ext::BLOCK).unwrap_or(false);
+            let needs_param_prologue = param_transforms.has_transforms();
 
-        // If body is not a block (concise arrow), wrap with return
-        let body_node = self.arena.get(func.body);
-        let is_block = body_node.map(|n| n.kind == syntax_kind_ext::BLOCK).unwrap_or(false);
-        let needs_param_prologue = param_transforms.has_transforms();
-
-        if is_block {
-            // Check if it's a simple single-return block
-            if let Some(block_node) = self.arena.get(func.body) {
-                if let Some(block) = self.arena.get_block(block_node) {
-                    if !needs_param_prologue
-                        && block.statements.nodes.len() == 1
-                        && self.is_simple_return_statement(block.statements.nodes[0]) {
-                        self.emit_single_line_block(func.body);
+            if is_block {
+                // Check if it's a simple single-return block
+                if let Some(block_node) = self.arena.get(func.body) {
+                    if let Some(block) = self.arena.get_block(block_node) {
+                        if !needs_param_prologue
+                            && block.statements.nodes.len() == 1
+                            && self.is_simple_return_statement(block.statements.nodes[0])
+                        {
+                            self.emit_single_line_block(func.body);
+                        } else if needs_param_prologue {
+                            self.emit_block_with_param_prologue(func.body, &param_transforms);
+                        } else {
+                            self.emit(func.body);
+                        }
                     } else if needs_param_prologue {
                         self.emit_block_with_param_prologue(func.body, &param_transforms);
                     } else {
                         self.emit(func.body);
                     }
-                } else {
-                    if needs_param_prologue {
-                        self.emit_block_with_param_prologue(func.body, &param_transforms);
-                    } else {
-                        self.emit(func.body);
-                    }
-                }
-            } else {
-                if needs_param_prologue {
+                } else if needs_param_prologue {
                     self.emit_block_with_param_prologue(func.body, &param_transforms);
                 } else {
                     self.emit(func.body);
                 }
-            }
-        } else {
-            if needs_param_prologue {
+            } else if needs_param_prologue {
                 self.write("{");
                 self.write_line();
                 self.increase_indent();
@@ -2338,9 +2345,11 @@ impl<'a> ThinPrinter<'a> {
             }
         }
 
-        // Restore this capture depth
-        if body_uses_this {
+        if needs_this_capture {
             self.ctx.arrow_state.this_capture_depth -= 1;
+            self.write("; })(");
+            self.write("this");
+            self.write("))");
         }
     }
 
@@ -2527,6 +2536,7 @@ impl<'a> ThinPrinter<'a> {
         &mut self,
         func: &crate::parser::thin_node::FunctionData,
         func_name: &str,
+        this_expr: &str,
     ) {
         // function name(params) {
         self.write("function");
@@ -2557,7 +2567,9 @@ impl<'a> ThinPrinter<'a> {
         };
 
         // Write with surrounding __awaiter wrapper
-        self.write("return __awaiter(this, void 0, void 0, function () {");
+        self.write("return __awaiter(");
+        self.write(this_expr);
+        self.write(", void 0, void 0, function () {");
         self.write_line();
         self.increase_indent();
         self.write(&generator_body);
