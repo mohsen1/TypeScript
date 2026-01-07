@@ -677,6 +677,14 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     self.constrain_function_to_call_signature(ctx, var_map, s_fn, sig);
                 }
             }
+            (Some(TypeKey::Callable(ref s_callable)), Some(TypeKey::Function(ref t_fn))) => {
+                if s_callable.call_signatures.len() == 1 {
+                    let sig = &s_callable.call_signatures[0];
+                    if sig.type_params.is_empty() {
+                        self.constrain_call_signature_to_function(ctx, var_map, sig, t_fn);
+                    }
+                }
+            }
             (Some(TypeKey::Object(ref s_props)), Some(TypeKey::Object(ref t_props))) => {
                 self.constrain_properties(ctx, var_map, s_props, t_props);
             }
@@ -756,6 +764,19 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         var_map: &FxHashMap<TypeId, crate::solver::infer::InferenceVar>,
         source: &FunctionShape,
         target: &CallSignature,
+    ) {
+        for (s_p, t_p) in source.params.iter().zip(target.params.iter()) {
+            self.constrain_types(ctx, var_map, t_p.type_id, s_p.type_id);
+        }
+        self.constrain_types(ctx, var_map, source.return_type, target.return_type);
+    }
+
+    fn constrain_call_signature_to_function(
+        &self,
+        ctx: &mut InferenceContext,
+        var_map: &FxHashMap<TypeId, crate::solver::infer::InferenceVar>,
+        source: &CallSignature,
+        target: &FunctionShape,
     ) {
         for (s_p, t_p) in source.params.iter().zip(target.params.iter()) {
             self.constrain_types(ctx, var_map, t_p.type_id, s_p.type_id);
