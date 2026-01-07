@@ -17,6 +17,7 @@ use crate::interner::{Atom, ShardedInterner};
 const SHARD_BITS: u32 = 6;
 const SHARD_COUNT: usize = 1 << SHARD_BITS; // 64 shards
 const SHARD_MASK: u32 = (SHARD_COUNT as u32) - 1;
+const PROPERTY_MAP_THRESHOLD: usize = 24;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum PrimitiveClass {
@@ -164,6 +165,7 @@ pub struct TypeInterner {
     tuple_lists: RwLock<SliceInterner<TupleElement>>,
     template_lists: RwLock<SliceInterner<TemplateSpan>>,
     object_shapes: RwLock<ValueInterner<ObjectShape>>,
+    object_property_maps: RwLock<Vec<Option<Arc<FxHashMap<Atom, usize>>>>>,
     function_shapes: RwLock<ValueInterner<FunctionShape>>,
     callable_shapes: RwLock<ValueInterner<CallableShape>>,
     conditional_types: RwLock<ValueInterner<ConditionalType>>,
@@ -185,6 +187,7 @@ impl TypeInterner {
             tuple_lists: RwLock::new(SliceInterner::new()),
             template_lists: RwLock::new(SliceInterner::new()),
             object_shapes: RwLock::new(ValueInterner::new()),
+            object_property_maps: RwLock::new(Vec::new()),
             function_shapes: RwLock::new(ValueInterner::new()),
             callable_shapes: RwLock::new(ValueInterner::new()),
             conditional_types: RwLock::new(ValueInterner::new()),
@@ -235,6 +238,55 @@ impl TypeInterner {
                 string_index: None,
                 number_index: None,
             }))
+    }
+
+    pub fn object_property_index(&self, shape_id: ObjectShapeId, name: Atom) -> PropertyLookup {
+        let shape = self.object_shape(shape_id);
+        if shape.properties.len() < PROPERTY_MAP_THRESHOLD {
+            return PropertyLookup::Uncached;
+        }
+
+        let Some(map) = self.object_property_map(shape_id, &shape) else {
+            return PropertyLookup::Uncached;
+        };
+
+        match map.get(&name) {
+            Some(&idx) => PropertyLookup::Found(idx),
+            None => PropertyLookup::NotFound,
+        }
+    }
+
+    fn object_property_map(
+        &self,
+        shape_id: ObjectShapeId,
+        shape: &ObjectShape,
+    ) -> Option<Arc<FxHashMap<Atom, usize>>> {
+        if shape.properties.len() < PROPERTY_MAP_THRESHOLD {
+            return None;
+        }
+
+        {
+            let maps = self.object_property_maps.read().unwrap();
+            if let Some(Some(map)) = maps.get(shape_id.0 as usize) {
+                return Some(map.clone());
+            }
+        }
+
+        let mut map = FxHashMap::default();
+        for (idx, prop) in shape.properties.iter().enumerate() {
+            map.insert(prop.name, idx);
+        }
+        let map = Arc::new(map);
+
+        let mut maps = self.object_property_maps.write().unwrap();
+        if maps.len() <= shape_id.0 as usize {
+            maps.resize_with(shape_id.0 as usize + 1, || None);
+        }
+        if let Some(Some(existing)) = maps.get(shape_id.0 as usize) {
+            return Some(existing.clone());
+        }
+        maps[shape_id.0 as usize] = Some(map.clone());
+        Some(map)
     }
 
     pub fn function_shape(&self, id: FunctionShapeId) -> Arc<FunctionShape> {

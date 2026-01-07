@@ -1481,13 +1481,13 @@ impl<'a> PropertyAccessEvaluator<'a> {
             TypeKey::Object(shape_id) => {
                 let shape = self.interner.object_shape(shape_id);
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
-                for prop in &shape.properties {
-                    if prop.name == prop_atom {
-                        return PropertyAccessResult::Success {
-                            type_id: self.optional_property_type(prop),
-                            from_index_signature: false,
-                        };
-                    }
+                if let Some(prop) =
+                    self.lookup_object_property(shape_id, &shape.properties, prop_atom)
+                {
+                    return PropertyAccessResult::Success {
+                        type_id: self.optional_property_type(prop),
+                        from_index_signature: false,
+                    };
                 }
                 PropertyAccessResult::PropertyNotFound {
                     type_id: obj_type,
@@ -1498,13 +1498,13 @@ impl<'a> PropertyAccessEvaluator<'a> {
             TypeKey::ObjectWithIndex(shape_id) => {
                 let shape = self.interner.object_shape(shape_id);
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
-                for prop in &shape.properties {
-                    if prop.name == prop_atom {
-                        return PropertyAccessResult::Success {
-                            type_id: self.optional_property_type(prop),
-                            from_index_signature: false,
-                        };
-                    }
+                if let Some(prop) =
+                    self.lookup_object_property(shape_id, &shape.properties, prop_atom)
+                {
+                    return PropertyAccessResult::Success {
+                        type_id: self.optional_property_type(prop),
+                        from_index_signature: false,
+                    };
                 }
 
                 // Check string index signature (THIS is the case for error 4111)
@@ -1697,6 +1697,19 @@ impl<'a> PropertyAccessEvaluator<'a> {
         }
     }
 
+    fn lookup_object_property<'props>(
+        &self,
+        shape_id: ObjectShapeId,
+        props: &'props [PropertyInfo],
+        prop_atom: Atom,
+    ) -> Option<&'props PropertyInfo> {
+        match self.interner.object_property_index(shape_id, prop_atom) {
+            PropertyLookup::Found(idx) => props.get(idx),
+            PropertyLookup::NotFound => None,
+            PropertyLookup::Uncached => props.iter().find(|p| p.name == prop_atom),
+        }
+    }
+
     fn any_args_function(&self, return_type: TypeId) -> TypeId {
         let rest_array = self.interner.array(TypeId::ANY);
         let rest_param = ParamInfo {
@@ -1791,59 +1804,414 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
     /// Resolve properties on array type.
     fn resolve_array_property(&self, array_type: TypeId, prop_name: &str, prop_atom: Atom) -> PropertyAccessResult {
+        let element_type = self.array_element_type(array_type);
+        let array_of_element = self.interner.array(element_type);
+        let element_or_undefined = self.element_type_with_undefined(element_type);
+
         match prop_name {
             // Array properties
             "length" => PropertyAccessResult::Success { type_id: TypeId::NUMBER, from_index_signature: false },
 
             // Array methods that return arrays
-            "concat" | "filter" | "flat" | "flatMap" | "map" | "reverse" |
-            "slice" | "sort" | "splice" | "toReversed" | "toSorted" |
-            "toSpliced" | "with" => {
-                // These return array-related types; for now, return ANY as placeholder
-                // Full type inference would require understanding the callback return type
-                self.method_result(TypeId::ANY)
+            "concat" => {
+                let union_item = self.interner.union(vec![element_type, array_of_element]);
+                let rest_items = self.interner.array(union_item);
+                self.function_result(
+                    Vec::new(),
+                    vec![self.param(rest_items, false, true)],
+                    array_of_element,
+                )
+            }
+            "filter" => {
+                let callback = self.array_callback_type(element_type, array_of_element, TypeId::BOOLEAN);
+                self.function_result(
+                    Vec::new(),
+                    vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)],
+                    array_of_element,
+                )
+            }
+            "flat" => {
+                let flat_element = self.flatten_once_type(element_type);
+                let flat_array = self.interner.array(flat_element);
+                self.function_result(
+                    Vec::new(),
+                    vec![self.param(TypeId::NUMBER, true, false)],
+                    flat_array,
+                )
+            }
+            "flatMap" => {
+                let u_param = self.type_param("U");
+                let u_type = self.type_param_type(&u_param);
+                let array_u = self.interner.array(u_type);
+                let callback_return = self.interner.union(vec![u_type, array_u]);
+                let callback = self.array_callback_type(element_type, array_of_element, callback_return);
+                self.function_result(
+                    vec![u_param],
+                    vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)],
+                    array_u,
+                )
+            }
+            "map" => {
+                let u_param = self.type_param("U");
+                let u_type = self.type_param_type(&u_param);
+                let callback = self.array_callback_type(element_type, array_of_element, u_type);
+                let array_u = self.interner.array(u_type);
+                self.function_result(
+                    vec![u_param],
+                    vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)],
+                    array_u,
+                )
+            }
+            "reverse" | "toReversed" => {
+                self.function_result(Vec::new(), Vec::new(), array_of_element)
+            }
+            "slice" => {
+                self.function_result(
+                    Vec::new(),
+                    vec![self.param(TypeId::NUMBER, true, false), self.param(TypeId::NUMBER, true, false)],
+                    array_of_element,
+                )
+            }
+            "sort" | "toSorted" => {
+                let compare = self.array_compare_callback_type(element_type);
+                self.function_result(
+                    Vec::new(),
+                    vec![self.param(compare, true, false)],
+                    array_of_element,
+                )
+            }
+            "splice" | "toSpliced" => {
+                self.function_result(
+                    Vec::new(),
+                    vec![
+                        self.param(TypeId::NUMBER, false, false),
+                        self.param(TypeId::NUMBER, true, false),
+                        self.param(self.interner.array(element_type), false, true),
+                    ],
+                    array_of_element,
+                )
+            }
+            "with" => {
+                self.function_result(
+                    Vec::new(),
+                    vec![
+                        self.param(TypeId::NUMBER, false, false),
+                        self.param(element_type, false, false),
+                    ],
+                    array_of_element,
+                )
             }
 
             // Array methods that return specific types
-            "at" | "find" | "findLast" | "pop" | "shift" => {
-                // Returns element type or undefined; use ANY as placeholder
-                self.method_result(TypeId::ANY)
+            "at" => {
+                self.function_result(
+                    Vec::new(),
+                    vec![self.param(TypeId::NUMBER, false, false)],
+                    element_or_undefined,
+                )
+            }
+            "find" | "findLast" => {
+                let callback = self.array_callback_type(element_type, array_of_element, TypeId::BOOLEAN);
+                self.function_result(
+                    Vec::new(),
+                    vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)],
+                    element_or_undefined,
+                )
+            }
+            "pop" | "shift" => {
+                self.function_result(Vec::new(), Vec::new(), element_or_undefined)
             }
 
             "every" | "includes" | "some" => {
-                // Returns boolean
-                self.method_result(TypeId::BOOLEAN)
+                let params = match prop_name {
+                    "includes" => vec![
+                        self.param(element_type, false, false),
+                        self.param(TypeId::NUMBER, true, false),
+                    ],
+                    _ => {
+                        let callback = self.array_callback_type(
+                            element_type,
+                            array_of_element,
+                            TypeId::BOOLEAN,
+                        );
+                        vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)]
+                    }
+                };
+                self.function_result(Vec::new(), params, TypeId::BOOLEAN)
             }
 
             "findIndex" | "findLastIndex" | "indexOf" | "lastIndexOf" | "push" | "unshift" => {
-                // Returns number
-                self.method_result(TypeId::NUMBER)
+                let params = match prop_name {
+                    "push" | "unshift" => vec![self.param(self.interner.array(element_type), false, true)],
+                    "indexOf" | "lastIndexOf" => vec![
+                        self.param(element_type, false, false),
+                        self.param(TypeId::NUMBER, true, false),
+                    ],
+                    _ => {
+                        let callback = self.array_callback_type(
+                            element_type,
+                            array_of_element,
+                            TypeId::BOOLEAN,
+                        );
+                        vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)]
+                    }
+                };
+                self.function_result(Vec::new(), params, TypeId::NUMBER)
             }
 
             "forEach" | "copyWithin" | "fill" => {
-                // forEach returns undefined, copyWithin/fill return this
-                self.method_result(TypeId::UNDEFINED)
+                let (params, return_type) = match prop_name {
+                    "forEach" => {
+                        let callback = self.array_callback_type(
+                            element_type,
+                            array_of_element,
+                            TypeId::UNDEFINED,
+                        );
+                        (vec![self.param(callback, false, false), self.param(TypeId::ANY, true, false)], TypeId::UNDEFINED)
+                    }
+                    "copyWithin" => (
+                        vec![
+                            self.param(TypeId::NUMBER, false, false),
+                            self.param(TypeId::NUMBER, true, false),
+                            self.param(TypeId::NUMBER, true, false),
+                        ],
+                        array_of_element,
+                    ),
+                    _ => (
+                        vec![
+                            self.param(element_type, false, false),
+                            self.param(TypeId::NUMBER, true, false),
+                            self.param(TypeId::NUMBER, true, false),
+                        ],
+                        array_of_element,
+                    ),
+                };
+                self.function_result(Vec::new(), params, return_type)
             }
 
             "join" | "toLocaleString" | "toString" => {
-                // Returns string
-                self.method_result(TypeId::STRING)
+                let params = if prop_name == "join" {
+                    vec![self.param(TypeId::STRING, true, false)]
+                } else {
+                    Vec::new()
+                };
+                self.function_result(Vec::new(), params, TypeId::STRING)
             }
 
             "entries" | "keys" | "values" => {
-                // Returns iterator; use ANY as placeholder
-                self.method_result(TypeId::ANY)
+                let return_type = match prop_name {
+                    "entries" => {
+                        let tuple = self.interner.tuple(vec![
+                            TupleElement {
+                                type_id: TypeId::NUMBER,
+                                name: None,
+                                optional: false,
+                                rest: false,
+                            },
+                            TupleElement {
+                                type_id: element_type,
+                                name: None,
+                                optional: false,
+                                rest: false,
+                            },
+                        ]);
+                        self.interner.array(tuple)
+                    }
+                    "keys" => self.interner.array(TypeId::NUMBER),
+                    _ => array_of_element,
+                };
+                self.function_result(Vec::new(), Vec::new(), return_type)
             }
 
             "reduce" | "reduceRight" => {
-                // Returns the accumulator type; use ANY as placeholder
-                self.method_result(TypeId::ANY)
+                self.callable_result(self.array_reduce_callable(element_type, array_of_element))
             }
 
             _ => PropertyAccessResult::PropertyNotFound {
                 type_id: array_type,
                 property_name: prop_atom,
             },
+        }
+    }
+
+    fn array_element_type(&self, array_type: TypeId) -> TypeId {
+        match self.interner.lookup(array_type) {
+            Some(TypeKey::Array(elem)) => elem,
+            Some(TypeKey::Tuple(elements)) => {
+                let elements = self.interner.tuple_list(elements);
+                self.tuple_element_union(&elements)
+            }
+            _ => TypeId::ANY,
+        }
+    }
+
+    fn tuple_element_union(&self, elements: &[TupleElement]) -> TypeId {
+        let mut members = Vec::new();
+        for elem in elements {
+            let mut ty = if elem.rest {
+                self.array_element_type(elem.type_id)
+            } else {
+                elem.type_id
+            };
+            if elem.optional {
+                ty = self.element_type_with_undefined(ty);
+            }
+            members.push(ty);
+        }
+        self.interner.union(members)
+    }
+
+    fn element_type_with_undefined(&self, element_type: TypeId) -> TypeId {
+        self.interner.union(vec![element_type, TypeId::UNDEFINED])
+    }
+
+    fn flatten_once_type(&self, element_type: TypeId) -> TypeId {
+        match self.interner.lookup(element_type) {
+            Some(TypeKey::Array(elem)) => elem,
+            Some(TypeKey::Tuple(elements)) => {
+                let elements = self.interner.tuple_list(elements);
+                self.tuple_element_union(&elements)
+            }
+            Some(TypeKey::Union(members)) => {
+                let members = self.interner.type_list(members);
+                let mut flat = Vec::with_capacity(members.len());
+                for &member in members.iter() {
+                    flat.push(self.flatten_once_type(member));
+                }
+                self.interner.union(flat)
+            }
+            _ => element_type,
+        }
+    }
+
+    fn array_callback_type(
+        &self,
+        element_type: TypeId,
+        array_type: TypeId,
+        return_type: TypeId,
+    ) -> TypeId {
+        self.function_type(
+            Vec::new(),
+            vec![
+                self.param(element_type, false, false),
+                self.param(TypeId::NUMBER, false, false),
+                self.param(array_type, false, false),
+            ],
+            return_type,
+        )
+    }
+
+    fn array_compare_callback_type(&self, element_type: TypeId) -> TypeId {
+        self.function_type(
+            Vec::new(),
+            vec![
+                self.param(element_type, false, false),
+                self.param(element_type, false, false),
+            ],
+            TypeId::NUMBER,
+        )
+    }
+
+    fn array_reduce_callable(&self, element_type: TypeId, array_type: TypeId) -> CallableShape {
+        let callback_no_init = self.array_reduce_callback_type(element_type, element_type, array_type);
+        let no_init = CallSignature {
+            type_params: Vec::new(),
+            params: vec![self.param(callback_no_init, false, false)],
+            this_type: None,
+            return_type: element_type,
+            type_predicate: None,
+        };
+
+        let u_param = self.type_param("U");
+        let u_type = self.type_param_type(&u_param);
+        let callback_with_init = self.array_reduce_callback_type(u_type, element_type, array_type);
+        let with_init = CallSignature {
+            type_params: vec![u_param],
+            params: vec![self.param(callback_with_init, false, false), self.param(u_type, false, false)],
+            this_type: None,
+            return_type: u_type,
+            type_predicate: None,
+        };
+
+        CallableShape {
+            call_signatures: vec![no_init, with_init],
+            construct_signatures: Vec::new(),
+            properties: Vec::new(),
+        }
+    }
+
+    fn array_reduce_callback_type(
+        &self,
+        accumulator_type: TypeId,
+        element_type: TypeId,
+        array_type: TypeId,
+    ) -> TypeId {
+        self.function_type(
+            Vec::new(),
+            vec![
+                self.param(accumulator_type, false, false),
+                self.param(element_type, false, false),
+                self.param(TypeId::NUMBER, false, false),
+                self.param(array_type, false, false),
+            ],
+            accumulator_type,
+        )
+    }
+
+    fn type_param(&self, name: &str) -> TypeParamInfo {
+        TypeParamInfo {
+            name: self.interner.intern_string(name),
+            constraint: None,
+            default: None,
+        }
+    }
+
+    fn type_param_type(&self, param: &TypeParamInfo) -> TypeId {
+        self.interner
+            .intern(TypeKey::TypeParameter(param.clone()))
+    }
+
+    fn param(&self, type_id: TypeId, optional: bool, rest: bool) -> ParamInfo {
+        ParamInfo {
+            name: None,
+            type_id,
+            optional,
+            rest,
+        }
+    }
+
+    fn function_type(
+        &self,
+        type_params: Vec<TypeParamInfo>,
+        params: Vec<ParamInfo>,
+        return_type: TypeId,
+    ) -> TypeId {
+        self.interner.function(FunctionShape {
+            type_params,
+            params,
+            this_type: None,
+            return_type,
+            type_predicate: None,
+            is_constructor: false,
+        })
+    }
+
+    fn function_result(
+        &self,
+        type_params: Vec<TypeParamInfo>,
+        params: Vec<ParamInfo>,
+        return_type: TypeId,
+    ) -> PropertyAccessResult {
+        PropertyAccessResult::Success {
+            type_id: self.function_type(type_params, params, return_type),
+            from_index_signature: false,
+        }
+    }
+
+    fn callable_result(&self, callable: CallableShape) -> PropertyAccessResult {
+        PropertyAccessResult::Success {
+            type_id: self.interner.callable(callable),
+            from_index_signature: false,
         }
     }
 

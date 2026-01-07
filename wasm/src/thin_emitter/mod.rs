@@ -31,239 +31,13 @@ use crate::transform_context::{IdentifierId, TransformContext, TransformDirectiv
 use crate::transforms::class_es5::ClassES5Emitter;
 use crate::transforms::enum_es5::EnumES5Emitter;
 use crate::transforms::namespace_es5::NamespaceES5Emitter;
+use std::sync::Arc;
 
-// =============================================================================
-// Comment Utilities
-// =============================================================================
+mod comments;
+mod comment_helpers;
+mod helpers;
 
-/// Represents a comment range in the source text.
-#[derive(Debug, Clone, Copy)]
-pub struct CommentRange {
-    pub pos: u32,
-    pub end: u32,
-    pub kind: CommentKind,
-    pub has_trailing_newline: bool,
-}
-
-/// Kind of comment.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CommentKind {
-    SingleLine,  // // comment
-    MultiLine,   // /* comment */
-}
-
-/// Check if a character is a line break.
-fn is_line_break(ch: char) -> bool {
-    ch == '\n' || ch == '\r' || ch == '\u{2028}' || ch == '\u{2029}'
-}
-
-/// Check if a character is whitespace (but not a line break).
-fn is_whitespace_single_line(ch: char) -> bool {
-    ch == ' ' || ch == '\t' || ch == '\u{000B}' || ch == '\u{000C}'
-}
-
-/// UTF-8 safe helper to get the character at a byte position.
-/// Returns None if pos is out of bounds or not on a char boundary.
-fn char_at(text: &str, pos: usize) -> Option<char> {
-    if pos >= text.len() {
-        return None;
-    }
-    text[pos..].chars().next()
-}
-
-/// Get trailing comments starting at a position in the source text.
-/// Trailing comments are comments that appear on the same line after a token,
-/// before a newline.
-pub fn get_trailing_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
-    let mut comments = Vec::new();
-    let len = text.len();
-    let mut i = pos;
-
-    // Scan for trailing comments (on the same line, before newline)
-    while i < len {
-        let ch = char_at(text, i).unwrap_or('\0');
-        let char_len = ch.len_utf8();
-
-        // Skip whitespace (but not newlines)
-        if is_whitespace_single_line(ch) {
-            i += char_len;
-            continue;
-        }
-
-        // Stop at newline - trailing comments end here
-        if is_line_break(ch) {
-            break;
-        }
-
-        // Check for comment start (/ is ASCII, safe to check byte directly)
-        if ch == '/' && i + 1 < len {
-            let next_byte = text.as_bytes()[i + 1];
-
-            if next_byte == b'/' {
-                // Single-line comment: // ...
-                let start = i;
-                i += 2;
-                while i < len {
-                    let c = char_at(text, i).unwrap_or('\0');
-                    if is_line_break(c) {
-                        break;
-                    }
-                    i += c.len_utf8();
-                }
-                comments.push(CommentRange {
-                    pos: start as u32,
-                    end: i as u32,
-                    kind: CommentKind::SingleLine,
-                    has_trailing_newline: i < len && is_line_break(char_at(text, i).unwrap_or('\0')),
-                });
-                continue;
-            } else if next_byte == b'*' {
-                // Multi-line comment: /* ... */
-                let start = i;
-                i += 2;
-                let mut has_newline = false;
-                while i + 1 < len {
-                    let c = char_at(text, i).unwrap_or('\0');
-                    if c == '*' && text.as_bytes()[i + 1] == b'/' {
-                        i += 2;
-                        break;
-                    }
-                    if is_line_break(c) {
-                        has_newline = true;
-                    }
-                    i += c.len_utf8();
-                }
-                // For trailing comments, we stop after the first multi-line comment
-                // if it spans multiple lines
-                comments.push(CommentRange {
-                    pos: start as u32,
-                    end: i as u32,
-                    kind: CommentKind::MultiLine,
-                    has_trailing_newline: has_newline,
-                });
-                if has_newline {
-                    break;
-                }
-                continue;
-            }
-        }
-
-        // Non-whitespace, non-comment character - stop scanning
-        break;
-    }
-
-    comments
-}
-
-/// Get leading comments before a position in the source text.
-/// Leading comments are comments that appear before a token,
-/// potentially on preceding lines.
-pub fn get_leading_comment_ranges(text: &str, pos: usize) -> Vec<CommentRange> {
-    let mut comments = Vec::new();
-    let len = text.len();
-    let mut i = pos;
-
-    // Skip shebang at the start of file
-    if i == 0 && len >= 2 && text.as_bytes()[0] == b'#' && text.as_bytes()[1] == b'!' {
-        while i < len {
-            let c = char_at(text, i).unwrap_or('\0');
-            if is_line_break(c) {
-                break;
-            }
-            i += c.len_utf8();
-        }
-    }
-
-    // Scan for leading comments
-    let mut pending: Option<CommentRange> = None;
-
-    while i < len {
-        let ch = char_at(text, i).unwrap_or('\0');
-        let char_len = ch.len_utf8();
-
-        // Skip whitespace
-        if is_whitespace_single_line(ch) {
-            i += char_len;
-            continue;
-        }
-
-        // Handle newlines - they mark comment boundaries
-        if is_line_break(ch) {
-            i += char_len;
-            // Skip \r\n as a single newline
-            if ch == '\r' && i < len && text.as_bytes()[i] == b'\n' {
-                i += 1;
-            }
-            if let Some(mut p) = pending.take() {
-                p.has_trailing_newline = true;
-                comments.push(p);
-            }
-            continue;
-        }
-
-        // Check for comment start (/ is ASCII, safe to check byte directly)
-        if ch == '/' && i + 1 < len {
-            let next_byte = text.as_bytes()[i + 1];
-
-            if next_byte == b'/' {
-                // Emit any pending comment first
-                if let Some(p) = pending.take() {
-                    comments.push(p);
-                }
-                // Single-line comment
-                let start = i;
-                i += 2;
-                while i < len {
-                    let c = char_at(text, i).unwrap_or('\0');
-                    if is_line_break(c) {
-                        break;
-                    }
-                    i += c.len_utf8();
-                }
-                pending = Some(CommentRange {
-                    pos: start as u32,
-                    end: i as u32,
-                    kind: CommentKind::SingleLine,
-                    has_trailing_newline: false,
-                });
-                continue;
-            } else if next_byte == b'*' {
-                // Emit any pending comment first
-                if let Some(p) = pending.take() {
-                    comments.push(p);
-                }
-                // Multi-line comment
-                let start = i;
-                i += 2;
-                while i + 1 < len {
-                    if text.as_bytes()[i] == b'*' && text.as_bytes()[i + 1] == b'/' {
-                        i += 2;
-                        break;
-                    }
-                    let c = char_at(text, i).unwrap_or('\0');
-                    i += c.len_utf8();
-                }
-                pending = Some(CommentRange {
-                    pos: start as u32,
-                    end: i as u32,
-                    kind: CommentKind::MultiLine,
-                    has_trailing_newline: false,
-                });
-                continue;
-            }
-        }
-
-        // Non-whitespace, non-comment - we're done
-        break;
-    }
-
-    // Emit final pending comment
-    if let Some(p) = pending {
-        comments.push(p);
-    }
-
-    comments
-}
+pub use comments::{CommentKind, CommentRange, get_leading_comment_ranges, get_trailing_comment_ranges};
 
 // =============================================================================
 // Emitter Options
@@ -381,7 +155,7 @@ enum EmitDirective {
     ES5Namespace { namespace_node: NodeIndex },
     ES5Enum { enum_node: NodeIndex },
     CommonJSExport {
-        names: Vec<IdentifierId>,
+        names: Arc<[IdentifierId]>,
         is_default: bool,
         inner: Box<EmitDirective>,
     },
@@ -399,7 +173,7 @@ enum EmitDirective {
     ES5TemplateLiteral,
     ModuleWrapper {
         format: crate::transform_context::ModuleFormat,
-        dependencies: Vec<String>,
+        dependencies: Arc<[String]>,
     },
     Chain(Vec<EmitDirective>),
 }
@@ -564,186 +338,6 @@ impl<'a> ThinPrinter<'a> {
     }
 
     // =========================================================================
-    // Comment Emission Helpers
-    // =========================================================================
-
-    /// Emit trailing comments after a node's end position.
-    /// Note: In TypeScript's AST, node.end often includes trailing trivia (including comments).
-    /// We clamp the position to valid bounds and scan from there.
-    fn emit_trailing_comments(&mut self, end_pos: u32) {
-        if self.ctx.options.remove_comments {
-            return;
-        }
-
-        let Some(text) = self.source_text else {
-            return;
-        };
-
-        // Clamp position to valid range
-        let pos = std::cmp::min(end_pos as usize, text.len());
-        let comments = get_trailing_comment_ranges(text, pos);
-        for comment in comments {
-            // Add space before trailing comment
-            self.write_space();
-            // Emit the comment text
-            let comment_text = &text[comment.pos as usize..comment.end as usize];
-            self.write(comment_text);
-        }
-    }
-
-    /// Emit leading comments before a node's start position.
-    fn emit_leading_comments(&mut self, pos: u32) {
-        if self.ctx.options.remove_comments {
-            return;
-        }
-
-        let Some(text) = self.source_text else {
-            return;
-        };
-
-        let comments = get_leading_comment_ranges(text, pos as usize);
-        for comment in comments {
-            let comment_text = &text[comment.pos as usize..comment.end as usize];
-            self.write(comment_text);
-            if comment.has_trailing_newline {
-                self.write_line();
-            } else if comment.kind == CommentKind::MultiLine {
-                self.write_space();
-            }
-        }
-    }
-
-    /// Emit comments in the gap between last_processed_pos and the given position.
-    /// This handles comments that appear between AST nodes.
-    fn emit_comments_in_gap(&mut self, up_to_pos: u32) {
-        if self.ctx.options.remove_comments {
-            return;
-        }
-
-        let Some(text) = self.source_text else {
-            return;
-        };
-
-        // Scan for comments between last_processed_pos and up_to_pos
-        let start = self.last_processed_pos as usize;
-        let end = std::cmp::min(up_to_pos as usize, text.len());
-
-        if start >= end {
-            return;
-        }
-
-        // Scan the gap for comments
-        let gap_text = &text[start..end];
-        let bytes = gap_text.as_bytes();
-        let len = bytes.len();
-        let mut pos = 0;
-
-        while pos < len {
-            let ch = bytes[pos];
-
-            // Skip whitespace
-            if ch == b' ' || ch == b'\t' || ch == b'\r' || ch == b'\n' {
-                pos += 1;
-                continue;
-            }
-
-            // Check for comment start
-            if ch == b'/' && pos + 1 < len {
-                let next = bytes[pos + 1];
-
-                if next == b'/' {
-                    // Single-line comment
-                    let comment_start = start + pos;
-                    let mut comment_end = pos + 2;
-                    while comment_end < len && bytes[comment_end] != b'\n' && bytes[comment_end] != b'\r' {
-                        comment_end += 1;
-                    }
-                    let comment_text = &text[comment_start..start + comment_end];
-                    self.write(comment_text);
-                    self.write_line();
-
-                    // Skip past the comment and newline
-                    pos = comment_end;
-                    if pos < len && bytes[pos] == b'\r' {
-                        pos += 1;
-                    }
-                    if pos < len && bytes[pos] == b'\n' {
-                        pos += 1;
-                    }
-                    continue;
-                } else if next == b'*' {
-                    // Multi-line comment
-                    let comment_start = start + pos;
-                    let mut comment_end = pos + 2;
-                    while comment_end + 1 < len {
-                        if bytes[comment_end] == b'*' && bytes[comment_end + 1] == b'/' {
-                            comment_end += 2;
-                            break;
-                        }
-                        comment_end += 1;
-                    }
-                    let comment_text = &text[comment_start..start + comment_end];
-                    self.write(comment_text);
-                    self.write_line();
-
-                    pos = comment_end;
-                    continue;
-                }
-            }
-
-            // Hit non-whitespace, non-comment content - stop scanning
-            break;
-        }
-    }
-
-    // =========================================================================
-    // Output Helpers (delegate to SourceWriter)
-    // pub(super) for access from submodules (expressions, statements, declarations)
-    // =========================================================================
-
-    /// Write text to output.
-    pub(super) fn write(&mut self, text: &str) {
-        self.writer.write(text);
-    }
-
-    /// Write a single character.
-    pub(super) fn write_char(&mut self, ch: char) {
-        self.writer.write_char(ch);
-    }
-
-    /// Write a newline.
-    pub(super) fn write_line(&mut self) {
-        self.writer.write_line();
-    }
-
-    /// Write a space.
-    pub(super) fn write_space(&mut self) {
-        self.writer.write_space();
-    }
-
-    /// Write an unsigned integer.
-    pub(super) fn write_usize(&mut self, value: usize) {
-        self.writer.write_usize(value);
-    }
-
-    /// Write a semicolon (respecting options).
-    pub(super) fn write_semicolon(&mut self) {
-        if !self.ctx.options.omit_trailing_semicolon {
-            self.write(";");
-        }
-    }
-
-    /// Increase indentation.
-    pub(super) fn increase_indent(&mut self) {
-        self.writer.increase_indent();
-    }
-
-    /// Decrease indentation.
-    pub(super) fn decrease_indent(&mut self) {
-        self.writer.decrease_indent();
-    }
-
-    // =========================================================================
     // Transform Application (Phase 2 Architecture)
     // =========================================================================
 
@@ -813,7 +407,6 @@ impl<'a> ThinPrinter<'a> {
             TransformDirective::ModuleWrapper {
                 format,
                 dependencies,
-                ..
             } => EmitDirective::ModuleWrapper {
                 format: *format,
                 dependencies: dependencies.clone(),
@@ -887,7 +480,7 @@ impl<'a> ThinPrinter<'a> {
                 inner,
             } => {
                 let export_name = names.first().copied();
-                self.emit_commonjs_export(names.as_slice(), is_default, |this| {
+                self.emit_commonjs_export(names.as_ref(), is_default, |this| {
                     this.emit_commonjs_inner(node, idx, inner.as_ref(), export_name);
                 });
             }
@@ -993,7 +586,7 @@ impl<'a> ThinPrinter<'a> {
                 dependencies,
             } => {
                 if let Some(source) = self.arena.get_source_file(node) {
-                    self.emit_module_wrapper(&format, dependencies.as_slice(), node, source);
+                    self.emit_module_wrapper(&format, dependencies.as_ref(), node, source);
                     return;
                 }
 
@@ -1242,7 +835,7 @@ impl<'a> ThinPrinter<'a> {
                 inner,
             } => {
                 let export_name = names.first().copied();
-                self.emit_commonjs_export(names.as_slice(), *is_default, |this| {
+                self.emit_commonjs_export(names.as_ref(), *is_default, |this| {
                     if index == 0 {
                         this.emit_commonjs_inner(node, idx, inner.as_ref(), export_name);
                     } else {
@@ -1350,7 +943,7 @@ impl<'a> ThinPrinter<'a> {
                 dependencies,
             } => {
                 if let Some(source) = self.arena.get_source_file(node) {
-                    self.emit_module_wrapper(format, dependencies.as_slice(), node, source);
+                    self.emit_module_wrapper(format, dependencies.as_ref(), node, source);
                     return;
                 }
 

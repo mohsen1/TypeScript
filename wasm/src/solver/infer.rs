@@ -690,15 +690,18 @@ impl<'a> InferenceContext<'a> {
         {
             let s_shape = self.interner.object_shape(*s_props);
             let t_shape = self.interner.object_shape(*t_props);
-            return self.object_subtype_of(&s_shape.properties, &t_shape.properties);
+            return self.object_subtype_of(&s_shape.properties, Some(*s_props), &t_shape.properties);
         }
 
-        if let (Some(TypeKey::ObjectWithIndex(s_shape)), Some(TypeKey::ObjectWithIndex(t_shape))) =
+        if let (
+            Some(TypeKey::ObjectWithIndex(s_shape_id)),
+            Some(TypeKey::ObjectWithIndex(t_shape_id)),
+        ) =
             (source_key.as_ref(), target_key.as_ref())
         {
-            let s_shape = self.interner.object_shape(*s_shape);
-            let t_shape = self.interner.object_shape(*t_shape);
-            return self.object_with_index_subtype_of(&s_shape, &t_shape);
+            let s_shape = self.interner.object_shape(*s_shape_id);
+            let t_shape = self.interner.object_shape(*t_shape_id);
+            return self.object_with_index_subtype_of(&s_shape, Some(*s_shape_id), &t_shape);
         }
 
         if let (Some(TypeKey::Object(s_props)), Some(TypeKey::ObjectWithIndex(t_shape))) =
@@ -706,15 +709,15 @@ impl<'a> InferenceContext<'a> {
         {
             let s_shape = self.interner.object_shape(*s_props);
             let t_shape = self.interner.object_shape(*t_shape);
-            return self.object_props_subtype_index(&s_shape.properties, &t_shape);
+            return self.object_props_subtype_index(&s_shape.properties, Some(*s_props), &t_shape);
         }
 
-        if let (Some(TypeKey::ObjectWithIndex(s_shape)), Some(TypeKey::Object(t_props))) =
+        if let (Some(TypeKey::ObjectWithIndex(s_shape_id)), Some(TypeKey::Object(t_props))) =
             (source_key.as_ref(), target_key.as_ref())
         {
-            let s_shape = self.interner.object_shape(*s_shape);
+            let s_shape = self.interner.object_shape(*s_shape_id);
             let t_shape = self.interner.object_shape(*t_props);
-            return self.object_subtype_of(&s_shape.properties, &t_shape.properties);
+            return self.object_subtype_of(&s_shape.properties, Some(*s_shape_id), &t_shape.properties);
         }
 
         if let (Some(TypeKey::Function(s_fn)), Some(TypeKey::Function(t_fn))) =
@@ -887,9 +890,30 @@ impl<'a> InferenceContext<'a> {
         self.is_subtype(source, target)
     }
 
-    fn object_subtype_of(&self, source: &[PropertyInfo], target: &[PropertyInfo]) -> bool {
+    fn lookup_property<'props>(
+        &self,
+        props: &'props [PropertyInfo],
+        shape_id: Option<ObjectShapeId>,
+        name: Atom,
+    ) -> Option<&'props PropertyInfo> {
+        if let Some(shape_id) = shape_id {
+            match self.interner.object_property_index(shape_id, name) {
+                PropertyLookup::Found(idx) => return props.get(idx),
+                PropertyLookup::NotFound => return None,
+                PropertyLookup::Uncached => {}
+            }
+        }
+        props.iter().find(|p| p.name == name)
+    }
+
+    fn object_subtype_of(
+        &self,
+        source: &[PropertyInfo],
+        source_shape_id: Option<ObjectShapeId>,
+        target: &[PropertyInfo],
+    ) -> bool {
         for t_prop in target {
-            let s_prop = source.iter().find(|p| p.name == t_prop.name);
+            let s_prop = self.lookup_property(source, source_shape_id, t_prop.name);
             match s_prop {
                 Some(sp) => {
                     if sp.optional && !t_prop.optional {
@@ -918,15 +942,29 @@ impl<'a> InferenceContext<'a> {
         true
     }
 
-    fn object_props_subtype_index(&self, source: &[PropertyInfo], target: &ObjectShape) -> bool {
-        if !self.object_subtype_of(source, &target.properties) {
+    fn object_props_subtype_index(
+        &self,
+        source: &[PropertyInfo],
+        source_shape_id: Option<ObjectShapeId>,
+        target: &ObjectShape,
+    ) -> bool {
+        if !self
+            .object_subtype_of(source, source_shape_id, &target.properties)
+        {
             return false;
         }
         self.check_properties_against_index_signatures(source, target)
     }
 
-    fn object_with_index_subtype_of(&self, source: &ObjectShape, target: &ObjectShape) -> bool {
-        if !self.object_subtype_of(&source.properties, &target.properties) {
+    fn object_with_index_subtype_of(
+        &self,
+        source: &ObjectShape,
+        source_shape_id: Option<ObjectShapeId>,
+        target: &ObjectShape,
+    ) -> bool {
+        if !self
+            .object_subtype_of(&source.properties, source_shape_id, &target.properties)
+        {
             return false;
         }
 
@@ -1224,7 +1262,7 @@ impl<'a> InferenceContext<'a> {
             }
         }
 
-        self.object_subtype_of(&source.properties, &target.properties)
+        self.object_subtype_of(&source.properties, None, &target.properties)
     }
 
     fn function_subtype_callable(&self, source: &FunctionShape, target: &CallableShape) -> bool {

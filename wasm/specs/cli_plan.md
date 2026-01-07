@@ -9,7 +9,7 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 ## Current Status
 - Args/tsconfig parsing, globbing, compile + emit work.
 - Watch mode implemented with notify + debounce.
-- Incremental compile in place (cache reuse + export-hash dependent invalidation); still missing symbol-level invalidation.
+- Incremental compile in place (cache reuse + export-hash dependent invalidation + symbol-level dependent invalidation).
 - Module resolution supports node/bundler + exports/conditions basics; parity still incomplete.
 
 ## Current Investigation Notes (Incremental export hash)
@@ -24,9 +24,13 @@ Summary of the incremental work (export hash fixed):
   3) `invalidate_paths` for changed files only;
   4) compile once with `compile_inner`;
   5) compare old vs new export hashes; if unchanged, return result;
-  6) if changed, `invalidate_paths_with_dependents` and compile again.
+  6) if changed, `invalidate_paths_with_dependents_symbols` and compile again.
   - Entry point: `compile_with_cache_and_changes` in `wasm/src/cli/driver.rs`.
   - Watch mode (`wasm/src/cli/watch.rs`) now uses `compile_with_cache_and_changes` for non-config changes.
+- Added symbol-level invalidation for dependents on export changes:
+  - Cache import binding symbol IDs per dependent (`CompilationCache::import_symbol_ids`).
+  - Track symbol dependency graph in `TypeCache` and invalidate only affected symbols + node cache.
+  - Changed files still fully invalidate parse/bind/type caches.
 - Export hash computation (`compute_export_hash` in `wasm/src/cli/driver.rs`) includes:
   - Exported symbols from `program.file_locals` (symbol name + formatted type via `TypeFormatter::with_symbols`).
   - Export declarations/signatures: `export * from`, `export {..} from`, `export * as ns`, `export =`, and default export expression signature.
@@ -46,6 +50,7 @@ Remaining limitation:
 Tests run in this state:
 - `./wasm/test.sh cli::driver_tests::compile_with_cache_rechecks_dependents_on_export_change` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_with_cache_skips_dependents_when_exports_unchanged` (pass).
+- `./wasm/test.sh cli::driver_tests::invalidate_paths_with_dependents_symbols_keeps_unrelated_cache` (pass).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
@@ -56,7 +61,7 @@ Tests run in this state:
   - [x] Emit outputs only for dirty files in cached builds.
   - [x] Reuse cached dependencies to skip reading unchanged files in watch builds.
   - [x] Skip dependent invalidation when exported API is unchanged.
-  - [ ] Invalidate affected symbols only.
+  - [x] Invalidate affected symbols only.
 - [ ] Expand tsconfig support
   - [x] baseUrl
   - [x] paths

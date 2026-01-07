@@ -8,9 +8,9 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
 
 ## Current Status
 - Lowering, inference, compat, and diagnostics are implemented and tested.
-- TypeDatabase trait exists, TypeInterner is sharded.
-- Remaining work is performance and incremental architecture.
-- Generic call inference validates argument types with strict function variance while avoiding weak-type rejections.
+- TypeKey is POD with side-table IDs (lists/shapes/conditional/mapped/template); QueryDatabase/QueryCache entry points exist.
+- Sharded string interner is Arc-backed; solver hot paths use `resolve_atom_ref` to avoid per-lookup allocations.
+- Remaining work is performance tuning (allocation churn, lookup hot paths) and richer built-in type behavior.
 
 ## Highest-Impact Next Tasks
 - [x] Make TypeKey POD with side-table slices
@@ -35,6 +35,14 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Add tests for strict/unsound toggles.
 - [x] Benchmarks
   - Add microbench for subtype/evaluate/infer to `./wasm/bench.sh`.
+- [ ] Introduce SmallVec (or stack-first buffers) for short union/intersection/member lists
+  - Reduce Vec churn in interner normalization and hot-path unions.
+- [x] Add fast-path property lookup for large object shapes
+  - Cached per-shape map in TypeInterner; wired into subtype/infer/property access.
+- [x] Expand array/tuple method inference beyond `any` placeholders
+  - Added method signatures for map/filter/concat/at/reduce and iterator helpers.
+- [x] Add microbench for property lookup and union/intersection normalization
+  - Added benchmarks in solver_bench for cached property lookup and normalization.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.
