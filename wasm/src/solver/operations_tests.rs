@@ -2104,6 +2104,82 @@ fn test_infer_generic_index_signatures_from_mixed_properties() {
 }
 
 #[test]
+fn test_infer_generic_index_signatures_from_optional_mixed_properties() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let u_param = TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let u_type = interner.intern(TypeKey::TypeParameter(u_param.clone()));
+
+    let indexed_tu = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: u_type,
+            readonly: false,
+        }),
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: t_type,
+            readonly: false,
+        }),
+    });
+
+    let func = FunctionShape {
+        type_params: vec![t_param, u_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("bag")),
+            type_id: indexed_tu,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: interner.tuple(vec![
+            TupleElement { type_id: t_type, name: None, optional: false, rest: false },
+            TupleElement { type_id: u_type, name: None, optional: false, rest: false },
+        ]),
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let object_literal = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("0"),
+            type_id: TypeId::STRING,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("foo"),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[object_literal]);
+    let expected_t = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    let expected_u = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::UNDEFINED]);
+    let expected = interner.tuple(vec![
+        TupleElement { type_id: expected_t, name: None, optional: false, rest: false },
+        TupleElement { type_id: expected_u, name: None, optional: false, rest: false },
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_infer_generic_property_from_source_index_signature() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
