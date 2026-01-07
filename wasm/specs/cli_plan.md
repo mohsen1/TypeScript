@@ -15,6 +15,7 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - [ ] Incremental compilation caches
   - [x] Cache parsed arenas + binder results per file.
   - [x] Reuse `TypeCache` in `ThinCheckerState::with_cache`.
+  - [x] Invalidate dependent files via module graph.
   - [ ] Invalidate affected symbols only.
 - [ ] Expand tsconfig support
   - [x] baseUrl
