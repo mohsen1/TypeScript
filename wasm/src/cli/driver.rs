@@ -1055,6 +1055,9 @@ fn resolve_module_specifier(
         return None;
     }
     let specifier = specifier.replace('\\', "/");
+    if specifier.starts_with('#') {
+        return resolve_package_imports_specifier(from_file, &specifier, base_dir, options);
+    }
     let mut candidates = Vec::new();
 
     let resolution = options.effective_module_resolution();
@@ -1259,6 +1262,8 @@ struct PackageJson {
     package_type: Option<String>,
     #[serde(default)]
     exports: Option<serde_json::Value>,
+    #[serde(default)]
+    imports: Option<serde_json::Value>,
     #[serde(default, rename = "typesVersions")]
     types_versions: Option<serde_json::Value>,
 }
@@ -1367,6 +1372,46 @@ fn resolve_node_module_specifier(
             );
             if resolved.is_some() {
                 return resolved;
+            }
+        }
+
+        if current == base_dir {
+            break;
+        }
+        let Some(parent) = current.parent() else {
+            break;
+        };
+        current = parent;
+    }
+
+    None
+}
+
+fn resolve_package_imports_specifier(
+    from_file: &Path,
+    module_specifier: &str,
+    base_dir: &Path,
+    options: &ResolvedCompilerOptions,
+) -> Option<PathBuf> {
+    let conditions = export_conditions(options);
+    let mut current = from_file.parent().unwrap_or(base_dir);
+
+    loop {
+        let package_json_path = current.join("package.json");
+        if package_json_path.is_file() {
+            if let Some(package_json) = read_package_json(&package_json_path) {
+                if let Some(imports) = package_json.imports.as_ref() {
+                    if let Some(target) =
+                        resolve_imports_subpath(imports, module_specifier, &conditions)
+                    {
+                        let package_type = package_type_from_json(Some(&package_json));
+                        if let Some(resolved) =
+                            resolve_package_entry(current, &target, options, package_type)
+                        {
+                            return Some(resolved);
+                        }
+                    }
+                }
             }
         }
 
@@ -1913,12 +1958,78 @@ fn resolve_exports_target(
     }
 }
 
+fn resolve_imports_subpath(
+    imports: &serde_json::Value,
+    subpath_key: &str,
+    conditions: &[&str],
+) -> Option<String> {
+    let serde_json::Value::Object(map) = imports else {
+        return None;
+    };
+
+    let has_subpath_keys = map.keys().any(|key| key.starts_with('#'));
+    if !has_subpath_keys {
+        return None;
+    }
+
+    if let Some(value) = map.get(subpath_key) {
+        return resolve_exports_target(value, conditions);
+    }
+
+    let mut best_match: Option<(usize, String, &serde_json::Value)> = None;
+    for (key, value) in map {
+        let Some(wildcard) = match_imports_subpath(key, subpath_key) else {
+            continue;
+        };
+        let specificity = key.len();
+        let is_better = match &best_match {
+            None => true,
+            Some((best_len, _, _)) => specificity > *best_len,
+        };
+        if is_better {
+            best_match = Some((specificity, wildcard, value));
+        }
+    }
+
+    if let Some((_, wildcard, value)) = best_match {
+        if let Some(target) = resolve_exports_target(value, conditions) {
+            return Some(apply_exports_subpath(&target, &wildcard));
+        }
+    }
+
+    None
+}
+
 fn match_exports_subpath(pattern: &str, subpath_key: &str) -> Option<String> {
     if !pattern.contains('*') {
         return None;
     }
     let pattern = pattern.strip_prefix("./")?;
     let subpath = subpath_key.strip_prefix("./")?;
+
+    let star = pattern.find('*')?;
+    let (prefix, suffix) = pattern.split_at(star);
+    let suffix = &suffix[1..];
+
+    if !subpath.starts_with(prefix) || !subpath.ends_with(suffix) {
+        return None;
+    }
+
+    let start = prefix.len();
+    let end = subpath.len().saturating_sub(suffix.len());
+    if end < start {
+        return None;
+    }
+
+    Some(subpath[start..end].to_string())
+}
+
+fn match_imports_subpath(pattern: &str, subpath_key: &str) -> Option<String> {
+    if !pattern.contains('*') {
+        return None;
+    }
+    let pattern = pattern.strip_prefix('#')?;
+    let subpath = subpath_key.strip_prefix('#')?;
 
     let star = pattern.find('*')?;
     let (prefix, suffix) = pattern.split_at(star);

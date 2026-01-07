@@ -10,8 +10,8 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Args/tsconfig parsing, globbing, compile + emit work.
 - Watch mode implemented with notify + debounce.
 - Incremental compile in place (cache reuse + export-hash dependent invalidation + symbol-level dependent invalidation).
-- Module resolution supports node/bundler + exports/conditions basics + typesVersions mappings (default TS version 6.0.0, override via flag/env/tsconfig; precedence CLI > env > config > default; env var `TSZ_TYPES_VERSIONS_COMPILER_VERSION`).
-- Active: typesVersions compiler version precedence (CLI > env > config > default).
+- Module resolution supports node/bundler + exports/conditions basics + typesVersions + package.json `imports` mappings (default TS version 6.0.0, override via flag/env/tsconfig; precedence CLI > env > config > default; env var `TSZ_TYPES_VERSIONS_COMPILER_VERSION`).
+- Active: tsconfig `types`/`typeRoots` package inclusion.
 - Benchmark harness script added for tsz vs tsc comparisons.
 
 ## Current Investigation Notes (Incremental export hash)
@@ -71,6 +71,8 @@ Tests run in this state:
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_cli_overrides_env_and_tsconfig` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_invalid_tsconfig_falls_back` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_empty_env_uses_tsconfig` (pass).
+- `./wasm/test.sh cli::driver_tests::compile_resolves_package_imports_wildcard` (pass).
+- `./wasm/test.sh cli::driver_tests::compile_resolves_package_imports_prefers_types_condition` (pass).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
@@ -91,6 +93,8 @@ Tests run in this state:
   - [x] declarationMap (basic .d.ts.map output + sourceMappingURL comments)
   - [x] noEmitOnError
   - [x] lib (resolve `compilerOptions.lib` to src/lib and follow references)
+  - [ ] types (include @types packages specified in compilerOptions.types)
+  - [ ] typeRoots (include type packages from compilerOptions.typeRoots)
 - [x] Respect `--project` and tsconfig inheritance in CLI.
   - `--project` accepts file or directory
   - `extends` chain already supported
@@ -104,7 +108,7 @@ Tests run in this state:
 - [x] typesVersions range selection/fallback + fixed version doc.
 - [x] typesVersions compiler version override (flag/env) + fallback tests.
 - [x] typesVersions compiler version override via tsconfig + docs.
-- [ ] Module resolution parity: support package.json `imports` (# specifiers) with conditions.
+- [x] Module resolution parity: support package.json `imports` (# specifiers) with conditions.
 - [x] Benchmark harness
   - Script: `wasm/bench_cli.sh` (tsz vs tsc timing + memory stats).
 
