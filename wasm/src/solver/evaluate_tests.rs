@@ -157,10 +157,23 @@ fn test_conditional_instantiated_param_tuple_wrapper_no_distribution() {
     let lit_true = interner.literal_boolean(true);
     let lit_false = interner.literal_boolean(false);
 
+    let tuple_check = interner.tuple(vec![TupleElement {
+        type_id: t_param,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let tuple_extends = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+
     // [T] extends [string] ? true : false, with T = string | number (no distribution).
     let cond = ConditionalType {
-        check_type: t_param,
-        extends_type: TypeId::STRING,
+        check_type: tuple_check,
+        extends_type: tuple_extends,
         true_type: lit_true,
         false_type: lit_false,
         is_distributive: false,
