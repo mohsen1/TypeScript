@@ -26,7 +26,8 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Statement parsing now treats `namespace`/`module` as expressions when not followed by a declaration name (e.g., `namespace = x`).
 - Statement parsing now treats `type` as an identifier in expression statements (e.g., `type.prop = value`).
 - Bench helper: suppress speculative type-argument diagnostics so `index < (chain.length - 1)` parses as relational (checker.ts:8505:110).
-- Bench helper: arrow lookahead parses return types to avoid false `=>` expectation in conditional branches (checker.ts:15885).
+- Bench helper: arrow lookahead parses return types after `)` to avoid false `=>` expectation in conditional branches (checker.ts:15885).
+- Focused parser coverage for checker.ts:15885 (`everyType` arrow with optional chaining + ternary/comma).
 - Latest bench gap from rerun: `src/compiler/binder.ts:331:9` (TS2304: cannot find name `node`).
 - Latest attempt: `npm install --no-save --no-package-lock typescript @types/node`, `cargo build --release --bin tsz`, `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` → tsz failed before timing; tsc not run.
 - Bench harness update: fixed BSD `/usr/bin/time -l` parsing in `wasm/bench_cli.sh` so elapsed time is read from the `real` token.
@@ -120,7 +121,9 @@ Tests run in this state:
 - `./wasm/test.sh thin_parser_tests::test_thin_parser_type_identifier_assignment_statement` (pass).
 - `./wasm/test.sh thin_parser_tests::test_thin_parser_relational_with_parenthesized_rhs` (pass).
 - `./wasm/test.sh thin_parser_tests::test_thin_parser_every_type_arrow_conditional_comma` (pass).
-- `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (failed: tsz diagnostics; captured first TS error at `src/compiler/binder.ts:331:9` (TS2304 `Cannot find name 'node'`)).
+- `./wasm/test.sh thin_parser_tests::test_thin_parser_every_type_arrow_conditional_comma_expression` (pass).
+- `./wasm/test.sh thin_parser_tests::test_thin_parser_arrow_optional_chain_with_ternary_comma` (pass).
+- `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (failed: tsz diagnostics; rerun after 15885 test still reports `src/compiler/binder.ts:331:9` (TS2304 `Cannot find name 'node'`)).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
