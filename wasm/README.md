@@ -38,7 +38,7 @@ The current `ThinNodeArena` makes in-place mutation difficult.
 Last updated: 2026-01-07
 
 - Overall: Migration is active; Rust/WASM compiler is under construction and not production-ready.
-- Tracks: CLI added typesVersions support plus a tsz vs tsc benchmark harness and is picking the next module-resolution parity gap; emitter reactivated to deliver real source maps (starting with no-transform paths); checker is extending flow clearing to destructuring/compound assignments; LSP is improving recovery for incomplete member access/call chains; solver is adding never[] optional-tuple assignability with tests.
+- Tracks: CLI is adding typesVersions range selection/fallback behavior with tests; emitter is implementing real source maps (no-transform paths first); checker is clearing narrowings for destructuring/compound assignments; LSP is hardening recovery for incomplete member access/call chains; solver is adding undefined for optional tuple index access.
 - Baselines (`tests/cases`, first 100): compiler errors 60/77 (77.9%) pass, JS 40/76 (52.6%) pass; conformance errors 18/90 (20.0%) pass, JS 1/88 (1.1%) pass.
 - Risk: ES module imports still resolve to `any` (cross-file types unreliable); source maps remain stubbed to a single 0,0 mapping; parser/arena child enumeration TODOs remain; baseline pass rates are still low on conformance; assignment/flow clearing uses conservative heuristics.
 - Next focus: close module-resolution parity gaps, ship real source maps, improve baseline pass rates, type ES imports, validate predicate/assignment flow with broader tests, and keep correctness ahead of perf tweaks.
