@@ -45,6 +45,16 @@ fn test_type_only_export() {
 }
 
 #[test]
+fn test_export_assignment() {
+    let output = emit_declaration("export = Foo;");
+    assert!(
+        output.contains("export = Foo;"),
+        "Should emit export assignment: {}",
+        output
+    );
+}
+
+#[test]
 fn test_type_only_named_export_reexport() {
     let source = "export type { Foo } from './foo'; export { type Bar as Baz } from './bar';";
     let output = emit_declaration(source);
