@@ -31,7 +31,10 @@ Loop:
   3. Implement in wasm/src/*.rs (make sure you add test too)
   4. Test: ./wasm/test.sh
   5. If pass → update *_plan.md, commit
-  6. **CRITICAL: Sync with origin after EVERY task**
+  6. **CRITICAL: Continuously sync with origin/rust**
+     - Before starting any task
+     - After finishing any task
+     - Whenever idle (do not wait for conflicts to pile up)
      - Run: `git add . && git commit -m "[wasm] your changes"`
      - Run: `git push origin rust` (ALL tracks push to shared rust branch)
      - Run: `git fetch origin && git merge origin/rust`
