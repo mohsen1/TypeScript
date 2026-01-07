@@ -2123,6 +2123,12 @@ fn test_transform_directive_chain_es5_class_commonjs_export() {
         .nodes
         .first()
         .expect("expected class declaration");
+    let class_node = arena.get(class_idx).expect("expected class node");
+    let class_data = arena.get_class(class_node).expect("expected class data");
+    let name_idx = class_data.name;
+    assert!(!name_idx.is_none(), "expected class name");
+    let name_node = arena.get(name_idx).expect("expected class name node");
+    let name_id = name_node.data_index;
 
     let mut transforms = TransformContext::new();
     transforms.insert(
@@ -2133,7 +2139,7 @@ fn test_transform_directive_chain_es5_class_commonjs_export() {
                 heritage: None,
             },
             TransformDirective::CommonJSExport {
-                names: vec!["Foo".to_string()],
+                names: vec![name_id],
                 is_default: false,
                 inner: Box::new(TransformDirective::Identity),
             },
