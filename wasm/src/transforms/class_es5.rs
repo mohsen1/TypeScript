@@ -2738,16 +2738,26 @@ impl<'a> ClassES5Emitter<'a> {
                     self.write("]");
                 }
             }
+            k if k == syntax_kind_ext::SPREAD_ELEMENT => {
+                if let Some(spread) = self.arena.unary_exprs_ex.get(expr_node.data_index as usize) {
+                    self.write("...");
+                    self.emit_expression(spread.expression);
+                }
+            }
             k if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION => {
                 if let Some(obj) = self.arena.get_literal_expr(expr_node) {
-                    self.write("{ ");
-                    let mut first = true;
-                    for &prop_idx in &obj.elements.nodes {
-                        if !first { self.write(", "); }
-                        first = false;
-                        self.emit_object_property(prop_idx);
+                    if self.has_computed_property_in_object(&obj.elements.nodes) {
+                        self.emit_object_literal_es5(&obj.elements.nodes);
+                    } else {
+                        self.write("{ ");
+                        let mut first = true;
+                        for &prop_idx in &obj.elements.nodes {
+                            if !first { self.write(", "); }
+                            first = false;
+                            self.emit_object_property(prop_idx);
+                        }
+                        self.write(" }");
                     }
-                    self.write(" }");
                 }
             }
             k if k == syntax_kind_ext::ARROW_FUNCTION => {
@@ -2869,6 +2879,230 @@ impl<'a> ClassES5Emitter<'a> {
                 self.emit_expression(shorthand.name);
             } else if let Some(ident) = self.arena.get_identifier(prop_node) {
                 self.write(&ident.escaped_text);
+            }
+        }
+    }
+
+    fn has_computed_property_in_object(&self, elements: &[NodeIndex]) -> bool {
+        for &idx in elements {
+            if self.is_computed_property_member(idx) {
+                return true;
+            }
+            if let Some(node) = self.arena.get(idx) {
+                if node.kind == syntax_kind_ext::SPREAD_ASSIGNMENT
+                    || node.kind == syntax_kind_ext::SPREAD_ELEMENT
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    fn is_computed_property_member(&self, idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(idx) else { return false };
+
+        let name_idx = match node.kind {
+            k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
+                self.arena.get_property_assignment(node).map(|p| p.name)
+            }
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                self.arena.get_method_decl(node).map(|m| m.name)
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                self.arena.get_accessor(node).map(|a| a.name)
+            }
+            _ => None,
+        };
+
+        if let Some(name_idx) = name_idx {
+            if let Some(name_node) = self.arena.get(name_idx) {
+                return name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME;
+            }
+        }
+
+        false
+    }
+
+    fn emit_object_literal_es5(&mut self, elements: &[NodeIndex]) {
+        let temp_var = self.get_temp_var_name();
+
+        let first_computed_idx = elements.iter()
+            .position(|&idx| self.is_computed_property_member(idx) || {
+                self.arena.get(idx).map(|n| {
+                    n.kind == syntax_kind_ext::SPREAD_ASSIGNMENT
+                        || n.kind == syntax_kind_ext::SPREAD_ELEMENT
+                }).unwrap_or(false)
+            })
+            .unwrap_or(elements.len());
+
+        self.write("(");
+        self.write(&temp_var);
+        self.write(" = ");
+
+        if first_computed_idx > 0 {
+            self.write("{ ");
+            let mut first = true;
+            for i in 0..first_computed_idx {
+                if !first { self.write(", "); }
+                first = false;
+                self.emit_object_property(elements[i]);
+            }
+            self.write(" }");
+        } else {
+            self.write("{}");
+        }
+
+        for i in first_computed_idx..elements.len() {
+            self.write(", ");
+            self.emit_property_assignment_es5(elements[i], &temp_var);
+        }
+
+        self.write(", ");
+        self.write(&temp_var);
+        self.write(")");
+    }
+
+    fn emit_property_assignment_es5(&mut self, prop_idx: NodeIndex, temp_var: &str) {
+        let Some(node) = self.arena.get(prop_idx) else { return };
+
+        match node.kind {
+            k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
+                if let Some(prop) = self.arena.get_property_assignment(node) {
+                    self.emit_binding_element_access(prop.name, temp_var);
+                    self.write(" = ");
+                    self.emit_expression(prop.initializer);
+                }
+            }
+            k if k == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT => {
+                if let Some(shorthand) = self.arena.get_shorthand_property(node) {
+                    let name = self.get_identifier_text(shorthand.name);
+                    self.write(temp_var);
+                    self.write(".");
+                    self.write(&name);
+                    self.write(" = ");
+                    self.write(&name);
+                }
+            }
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                if let Some(method) = self.arena.get_method_decl(node) {
+                    self.emit_binding_element_access(method.name, temp_var);
+                    self.write(" = function");
+                    if method.asterisk_token {
+                        self.write("*");
+                    }
+                    self.write(" (");
+                    let param_transforms = self.emit_parameters(&method.parameters);
+                    self.write(") ");
+
+                    if let Some(body_node) = self.arena.get(method.body) {
+                        if body_node.kind == syntax_kind_ext::BLOCK {
+                            if param_transforms.is_empty() {
+                                self.emit_statement(method.body);
+                            } else {
+                                self.write("{");
+                                self.write_line();
+                                self.increase_indent();
+                                self.emit_param_destructuring_prologue(&param_transforms);
+                                self.emit_block_contents(method.body);
+                                self.decrease_indent();
+                                self.write_indent();
+                                self.write("}");
+                            }
+                        } else {
+                            self.emit_expression(method.body);
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR => {
+                if let Some(accessor) = self.arena.get_accessor(node) {
+                    self.write("Object.defineProperty(");
+                    self.write(temp_var);
+                    self.write(", ");
+                    self.emit_property_key_string(accessor.name);
+                    self.write(", { get: function () ");
+                    self.emit_statement(accessor.body);
+                    self.write(", enumerable: true, configurable: true })");
+                }
+            }
+            k if k == syntax_kind_ext::SET_ACCESSOR => {
+                if let Some(accessor) = self.arena.get_accessor(node) {
+                    self.write("Object.defineProperty(");
+                    self.write(temp_var);
+                    self.write(", ");
+                    self.emit_property_key_string(accessor.name);
+                    self.write(", { set: function (");
+                    let param_transforms = self.emit_parameters(&accessor.parameters);
+                    self.write(") ");
+
+                    if let Some(body_node) = self.arena.get(accessor.body) {
+                        if body_node.kind == syntax_kind_ext::BLOCK {
+                            if param_transforms.is_empty() {
+                                self.emit_statement(accessor.body);
+                            } else {
+                                self.write("{");
+                                self.write_line();
+                                self.increase_indent();
+                                self.emit_param_destructuring_prologue(&param_transforms);
+                                self.emit_block_contents(accessor.body);
+                                self.decrease_indent();
+                                self.write_indent();
+                                self.write("}");
+                            }
+                        } else {
+                            self.emit_expression(accessor.body);
+                        }
+                    }
+                    self.write(", enumerable: true, configurable: true })");
+                }
+            }
+            k if k == syntax_kind_ext::SPREAD_ASSIGNMENT => {
+                if let Some(spread) = self.arena.get_spread(node) {
+                    self.write("Object.assign(");
+                    self.write(temp_var);
+                    self.write(", ");
+                    self.emit_expression(spread.expression);
+                    self.write(")");
+                }
+            }
+            k if k == syntax_kind_ext::SPREAD_ELEMENT => {
+                if let Some(spread) = self.arena.unary_exprs_ex.get(node.data_index as usize) {
+                    self.write("Object.assign(");
+                    self.write(temp_var);
+                    self.write(", ");
+                    self.emit_expression(spread.expression);
+                    self.write(")");
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn emit_property_key_string(&mut self, name_idx: NodeIndex) {
+        let Some(name_node) = self.arena.get(name_idx) else { return };
+
+        if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+            if let Some(computed) = self.arena.get_computed_property(name_node) {
+                self.emit_expression(computed.expression);
+            }
+            return;
+        }
+
+        if name_node.kind == SyntaxKind::Identifier as u16 {
+            let name = self.get_identifier_text(name_idx);
+            self.write("\"");
+            self.write(&name);
+            self.write("\"");
+        } else if name_node.kind == SyntaxKind::StringLiteral as u16 {
+            if let Some(lit) = self.arena.get_literal(name_node) {
+                self.write("\"");
+                self.write(&lit.text);
+                self.write("\"");
+            }
+        } else if name_node.kind == SyntaxKind::NumericLiteral as u16 {
+            if let Some(lit) = self.arena.get_literal(name_node) {
+                self.write(&lit.text);
             }
         }
     }
@@ -3237,6 +3471,56 @@ mod tests {
                     // Check for __classPrivateFieldSet in constructor (for initializer)
                     assert!(output.contains("__classPrivateFieldSet(this, _Counter_count, 0, \"f\")"),
                             "Expected __classPrivateFieldSet for initializer: {}", output);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_class_method_object_literal_computed_es5() {
+        let source = r#"class Foo {
+            method() {
+                return { [k]: 1 };
+            }
+        }"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        if let Some(root_node) = parser.arena.get(root) {
+            if let Some(source_file) = parser.arena.get_source_file(root_node) {
+                if let Some(&class_idx) = source_file.statements.nodes.first() {
+                    let mut emitter = ClassES5Emitter::new(&parser.arena);
+                    let output = emitter.emit_class(class_idx);
+
+                    assert!(output.contains("[k] = 1"),
+                            "Expected computed property assignment in ES5 output: {}", output);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_class_method_object_literal_spread_es5() {
+        let source = r#"class Foo {
+            method() {
+                return { ...a, b: 1 };
+            }
+        }"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        if let Some(root_node) = parser.arena.get(root) {
+            if let Some(source_file) = parser.arena.get_source_file(root_node) {
+                if let Some(&class_idx) = source_file.statements.nodes.first() {
+                    let mut emitter = ClassES5Emitter::new(&parser.arena);
+                    let output = emitter.emit_class(class_idx);
+
+                    assert!(output.contains("Object.assign("),
+                            "Expected Object.assign in ES5 output for object spread: {}", output);
+                    assert!(!output.contains("...a"),
+                            "ES5 output should not contain object spread syntax: {}", output);
                 }
             }
         }

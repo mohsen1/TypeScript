@@ -50,6 +50,7 @@ Pick the most doable and impactful
 25. ES5 emit: downlevel default parameters in functions/methods [done]
 26. ES5 emit: handle destructuring defaults/nested patterns in ES5 bindings [done]
 27. ES5 emit: downlevel object spread in object literals [done]
+28. Class ES5 emit: downlevel object literal computed/spread properties [done]
 
 
 ## Quick Reference
