@@ -391,11 +391,16 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 // Tuple is subtype of array if all elements are subtypes
                 for elem in elems {
                     if elem.rest {
-                        // For rest elements (...T[]), elem.type_id is an Array type
-                        // We need to unwrap T[] -> T and check T <: U
-                        let rest_elem_type = self.get_array_element_type(elem.type_id);
-                        if !self.check_subtype(rest_elem_type, *t_elem).is_true() {
-                            return SubtypeResult::False;
+                        let expansion = self.expand_tuple_rest(elem.type_id);
+                        for fixed in expansion.fixed {
+                            if !self.check_subtype(fixed.type_id, *t_elem).is_true() {
+                                return SubtypeResult::False;
+                            }
+                        }
+                        if let Some(variadic) = expansion.variadic {
+                            if !self.check_subtype(variadic, *t_elem).is_true() {
+                                return SubtypeResult::False;
+                            }
                         }
                     } else {
                         // Regular element: T <: U
@@ -937,12 +942,52 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             }
         }
 
+        if !self
+            .check_properties_against_index_signatures(&source.properties, target)
+            .is_true()
+        {
+            return SubtypeResult::False;
+        }
+
         // If source has string index, all number-indexed properties must be compatible
         // (since number converts to string for property access)
         if let (Some(s_string_idx), Some(s_number_idx)) = (&source.string_index, &source.number_index) {
             if !self.check_subtype(s_number_idx.value_type, s_string_idx.value_type).is_true() {
                 // This is a constraint violation in the source itself
                 return SubtypeResult::False;
+            }
+        }
+
+        SubtypeResult::True
+    }
+
+    fn check_properties_against_index_signatures(
+        &mut self,
+        source: &[PropertyInfo],
+        target: &ObjectShape,
+    ) -> SubtypeResult {
+        let string_index = target.string_index.as_ref();
+        let number_index = target.number_index.as_ref();
+
+        if string_index.is_none() && number_index.is_none() {
+            return SubtypeResult::True;
+        }
+
+        for prop in source {
+            let prop_type = self.optional_property_type(prop);
+
+            if let Some(number_idx) = number_index {
+                let prop_name_str = self.interner.resolve_atom(prop.name);
+                let is_numeric = prop_name_str.parse::<f64>().is_ok();
+                if is_numeric && !self.check_subtype(prop_type, number_idx.value_type).is_true() {
+                    return SubtypeResult::False;
+                }
+            }
+
+            if let Some(string_idx) = string_index {
+                if !self.check_subtype(prop_type, string_idx.value_type).is_true() {
+                    return SubtypeResult::False;
+                }
             }
         }
 
@@ -956,31 +1001,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::False;
         }
 
-        // Check properties against index signatures
-        for prop in source {
-            let prop_type = self.optional_property_type(prop);
-            // Check if property name is numeric
-            let prop_name_str = self.interner.resolve_atom(prop.name);
-            let is_numeric = prop_name_str.parse::<f64>().is_ok();
-
-            if is_numeric {
-                // Numeric properties must satisfy number index signature if present
-                if let Some(ref number_idx) = target.number_index {
-                    if !self.check_subtype(prop_type, number_idx.value_type).is_true() {
-                        return SubtypeResult::False;
-                    }
-                }
-            }
-
-            // All properties (numeric or not) must also satisfy string index signature if present
-            if let Some(ref string_idx) = target.string_index {
-                if !self.check_subtype(prop_type, string_idx.value_type).is_true() {
-                    return SubtypeResult::False;
-                }
-            }
-        }
-
-        SubtypeResult::True
+        self.check_properties_against_index_signatures(source, target)
     }
 
     /// Check if parameter types are compatible based on variance settings.

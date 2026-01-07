@@ -1,5 +1,9 @@
 use super::*;
 
+fn has_flag(flags: u32, flag: TokenFlags) -> bool {
+    (flags & flag as u32) != 0
+}
+
 #[test]
 fn test_scan_empty() {
     let mut scanner = ScannerState::new(String::new(), true);
@@ -110,6 +114,58 @@ fn test_scan_bigint() {
     let mut scanner = ScannerState::new("123n".to_string(), true);
     assert_eq!(scanner.scan(), SyntaxKind::BigIntLiteral);
     assert_eq!(scanner.get_token_value(), "123n");
+}
+
+#[test]
+fn test_scan_numeric_separators_valid() {
+    let cases = [
+        "1_000",
+        "0xFF_FF",
+        "0b1010_0101",
+        "0o12_34",
+        "1_2.3_4",
+        "1e2_3",
+        "1_000n",
+        "0xFF_FFn",
+    ];
+
+    for source in cases {
+        let mut scanner = ScannerState::new(source.to_string(), true);
+        let token = scanner.scan();
+        assert!(matches!(
+            token,
+            SyntaxKind::NumericLiteral | SyntaxKind::BigIntLiteral
+        ));
+        let flags = scanner.get_token_flags();
+        assert!(has_flag(flags, TokenFlags::ContainsSeparator));
+        assert!(!has_flag(flags, TokenFlags::ContainsInvalidSeparator));
+    }
+}
+
+#[test]
+fn test_scan_numeric_separators_invalid() {
+    let cases = [
+        "1__0",
+        "1_",
+        "0x_FF",
+        "1_.0",
+        "1._0",
+        "1e_2",
+        "1e+_2",
+        "0b_1",
+    ];
+
+    for source in cases {
+        let mut scanner = ScannerState::new(source.to_string(), true);
+        let token = scanner.scan();
+        assert!(matches!(
+            token,
+            SyntaxKind::NumericLiteral | SyntaxKind::BigIntLiteral
+        ));
+        let flags = scanner.get_token_flags();
+        assert!(has_flag(flags, TokenFlags::ContainsSeparator));
+        assert!(has_flag(flags, TokenFlags::ContainsInvalidSeparator));
+    }
 }
 
 #[test]

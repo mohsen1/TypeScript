@@ -46,6 +46,9 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Extract variable: avoid cross-scope extractions
    - [x] Extract variable: parenthesize comma expressions
    - [x] Extract variable: block TDZ declarations after insertion
+   - [x] Extract variable: handle JSX tag TDZ references
+   - [x] Extract variable: handle JSX attribute TDZ references
+   - [x] Extract variable: handle JSX children TDZ references
 
 2. **Extend AST Coverage** (if needed)
    - [x] Traverse template expressions in LSP resolver for references/completions

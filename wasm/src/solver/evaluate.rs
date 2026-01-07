@@ -182,6 +182,19 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             TypeKey::ObjectWithIndex(shape) => {
                 self.evaluate_object_with_index(&shape, index_type)
             }
+            TypeKey::Union(members) => {
+                let mut results = Vec::new();
+                for &member in &members {
+                    let result = self.evaluate_index_access(member, index_type);
+                    if result != TypeId::UNDEFINED || self.no_unchecked_indexed_access {
+                        results.push(result);
+                    }
+                }
+                if results.is_empty() {
+                    return TypeId::UNDEFINED;
+                }
+                self.interner.union(results)
+            }
             TypeKey::Array(elem) => {
                 // Array[number] -> element type
                 if self.is_number_like(index_type) {

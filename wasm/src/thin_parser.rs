@@ -15,7 +15,7 @@
 //! - 4 nodes fit per 64-byte cache line (vs 0.31 for fat nodes)
 
 use crate::scanner::SyntaxKind;
-use crate::scanner_impl::ScannerState;
+use crate::scanner_impl::{ScannerState, TokenFlags};
 use crate::parser::{
     NodeIndex, NodeList,
     thin_node::{
@@ -228,16 +228,20 @@ impl ThinParserState {
         }
     }
 
+    fn parse_error_at(&mut self, start: u32, length: u32, message: &str, code: u32) {
+        self.parse_diagnostics.push(ParseDiagnostic {
+            start,
+            length,
+            message: message.to_string(),
+            code,
+        });
+    }
+
     /// Report parse error at current token with specific error code
     pub fn parse_error_at_current_token(&mut self, message: &str, code: u32) {
         let start = self.scanner.get_token_start() as u32;
         let end = self.scanner.get_token_end() as u32;
-        self.parse_diagnostics.push(ParseDiagnostic {
-            start,
-            length: end - start,
-            message: message.to_string(),
-            code,
-        });
+        self.parse_error_at(start, end - start, message, code);
     }
 
     // =========================================================================
@@ -5294,20 +5298,19 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         // Capture end position BEFORE consuming the token
         let end_pos = self.token_end();
-        // Use zero-copy accessor for parsing
-        let text_ref = self.scanner.get_token_value_ref();
-        let value = if text_ref.as_bytes().contains(&b'_') {
-            let mut sanitized = String::with_capacity(text_ref.len());
-            for &byte in text_ref.as_bytes() {
+        let text = self.scanner.get_token_value_ref().to_string();
+        self.report_invalid_numeric_separator();
+        let value = if text.as_bytes().contains(&b'_') {
+            let mut sanitized = String::with_capacity(text.len());
+            for &byte in text.as_bytes() {
                 if byte != b'_' {
                     sanitized.push(byte as char);
                 }
             }
             sanitized.parse::<f64>().ok()
         } else {
-            text_ref.parse::<f64>().ok()
+            text.parse::<f64>().ok()
         };
-        let text = text_ref.to_string();
         self.next_token();
 
         self.arena.add_literal(
@@ -5324,6 +5327,7 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         let end_pos = self.token_end();
         let text = self.scanner.get_token_value_ref().to_string();
+        self.report_invalid_numeric_separator();
         self.next_token();
 
         self.arena.add_literal(
@@ -5332,6 +5336,31 @@ impl ThinParserState {
             end_pos,
             LiteralData { text, raw_text: None, value: None },
         )
+    }
+
+    fn report_invalid_numeric_separator(&mut self) {
+        if (self.scanner.get_token_flags() & TokenFlags::ContainsInvalidSeparator as u32) == 0 {
+            return;
+        }
+
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+        let (message, code) = if self.scanner.invalid_separator_is_consecutive() {
+            (
+                diagnostic_messages::MULTIPLE_CONSECUTIVE_NUMERIC_SEPARATORS_NOT_PERMITTED,
+                diagnostic_codes::MULTIPLE_CONSECUTIVE_NUMERIC_SEPARATORS_NOT_PERMITTED,
+            )
+        } else {
+            (
+                diagnostic_messages::NUMERIC_SEPARATORS_NOT_ALLOWED_HERE,
+                diagnostic_codes::NUMERIC_SEPARATORS_NOT_ALLOWED_HERE,
+            )
+        };
+
+        if let Some(pos) = self.scanner.get_invalid_separator_pos() {
+            self.parse_error_at(pos as u32, 1, message, code);
+        } else {
+            self.parse_error_at_current_token(message, code);
+        }
     }
 
     /// Parse boolean literal

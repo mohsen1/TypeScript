@@ -12,6 +12,7 @@ use crate::scanner::SyntaxKind;
 use crate::parser::syntax_kind_ext;
 use crate::solver::types::*;
 use crate::solver::TypeDatabase;
+use crate::solver::subtype::{SubtypeChecker, TypeResolver};
 use crate::interner::Atom;
 use std::cell::RefCell;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -49,6 +50,14 @@ enum PropertyMerge {
 struct MethodOverloads {
     signatures: Vec<CallSignature>,
     optional: bool,
+}
+
+struct IndexSignatureResolver;
+
+impl TypeResolver for IndexSignatureResolver {
+    fn resolve_ref(&self, _symbol: SymbolRef, _interner: &dyn TypeDatabase) -> Option<TypeId> {
+        Some(TypeId::ANY)
+    }
 }
 
 impl InterfaceParts {
@@ -734,6 +743,13 @@ impl<'a> TypeLowering<'a> {
             }
 
             if string_index.is_some() || number_index.is_some() {
+                if !self.index_signature_properties_compatible(
+                    &properties,
+                    string_index.as_ref(),
+                    number_index.as_ref(),
+                ) {
+                    return TypeId::ERROR;
+                }
                 return self.interner.object_with_index(ObjectShape {
                     properties,
                     string_index,
@@ -854,6 +870,13 @@ impl<'a> TypeLowering<'a> {
         }
 
         if parts.string_index.is_some() || parts.number_index.is_some() {
+            if !self.index_signature_properties_compatible(
+                &properties,
+                parts.string_index.as_ref(),
+                parts.number_index.as_ref(),
+            ) {
+                return TypeId::ERROR;
+            }
             return self.interner.object_with_index(ObjectShape {
                 properties,
                 string_index: parts.string_index,
@@ -933,6 +956,215 @@ impl<'a> TypeLowering<'a> {
             value_type,
             readonly,
         })
+    }
+
+    fn index_signature_properties_compatible(
+        &self,
+        properties: &[PropertyInfo],
+        string_index: Option<&IndexSignature>,
+        number_index: Option<&IndexSignature>,
+    ) -> bool {
+        if string_index.is_none() && number_index.is_none() {
+            return true;
+        }
+
+        let skip_string = string_index
+            .map(|idx| self.contains_meta_type(idx.value_type))
+            .unwrap_or(false);
+        let skip_number = number_index
+            .map(|idx| self.contains_meta_type(idx.value_type))
+            .unwrap_or(false);
+
+        let resolver = IndexSignatureResolver;
+        let mut checker = SubtypeChecker::with_resolver(self.interner, &resolver);
+
+        for prop in properties {
+            let prop_type = if prop.optional {
+                self.interner.union(vec![prop.type_id, TypeId::UNDEFINED])
+            } else {
+                prop.type_id
+            };
+
+            if self.contains_meta_type(prop_type) {
+                continue;
+            }
+
+            if let Some(number_idx) = number_index {
+                if !skip_number {
+                    let prop_name = self.interner.resolve_atom(prop.name);
+                    let is_numeric = prop_name.parse::<f64>().is_ok();
+                    if is_numeric && !checker.is_subtype_of(prop_type, number_idx.value_type) {
+                        return false;
+                    }
+                }
+            }
+
+            if let Some(string_idx) = string_index {
+                if !skip_string && !checker.is_subtype_of(prop_type, string_idx.value_type) {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
+    fn contains_meta_type(&self, type_id: TypeId) -> bool {
+        let mut visited = FxHashSet::default();
+        self.contains_meta_type_inner(type_id, &mut visited)
+    }
+
+    fn contains_meta_type_inner(&self, type_id: TypeId, visited: &mut FxHashSet<TypeId>) -> bool {
+        if !visited.insert(type_id) {
+            return false;
+        }
+
+        let key = match self.interner.lookup(type_id) {
+            Some(key) => key,
+            None => return false,
+        };
+
+        match key {
+            TypeKey::TypeParameter(_)
+            | TypeKey::Infer(_)
+            | TypeKey::ThisType
+            | TypeKey::TypeQuery(_)
+            | TypeKey::Conditional(_)
+            | TypeKey::Mapped(_)
+            | TypeKey::IndexAccess(_, _)
+            | TypeKey::KeyOf(_) => true,
+            TypeKey::Union(members) | TypeKey::Intersection(members) => members
+                .iter()
+                .any(|member| self.contains_meta_type_inner(*member, visited)),
+            TypeKey::Array(elem) => self.contains_meta_type_inner(elem, visited),
+            TypeKey::Tuple(elements) => elements
+                .iter()
+                .any(|elem| self.contains_meta_type_inner(elem.type_id, visited)),
+            TypeKey::Object(props) => props
+                .iter()
+                .any(|prop| self.contains_meta_type_inner(prop.type_id, visited)),
+            TypeKey::ObjectWithIndex(shape) => {
+                if shape
+                    .properties
+                    .iter()
+                    .any(|prop| self.contains_meta_type_inner(prop.type_id, visited))
+                {
+                    return true;
+                }
+                if let Some(index) = &shape.string_index {
+                    if self.contains_meta_type_inner(index.value_type, visited)
+                        || self.contains_meta_type_inner(index.key_type, visited)
+                    {
+                        return true;
+                    }
+                }
+                if let Some(index) = &shape.number_index {
+                    if self.contains_meta_type_inner(index.value_type, visited)
+                        || self.contains_meta_type_inner(index.key_type, visited)
+                    {
+                        return true;
+                    }
+                }
+                false
+            }
+            TypeKey::Function(shape) => {
+                if shape
+                    .params
+                    .iter()
+                    .any(|param| self.contains_meta_type_inner(param.type_id, visited))
+                {
+                    return true;
+                }
+                if self.contains_meta_type_inner(shape.return_type, visited) {
+                    return true;
+                }
+                for param in &shape.type_params {
+                    if let Some(constraint) = param.constraint {
+                        if self.contains_meta_type_inner(constraint, visited) {
+                            return true;
+                        }
+                    }
+                    if let Some(default) = param.default {
+                        if self.contains_meta_type_inner(default, visited) {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            TypeKey::Callable(shape) => {
+                for sig in &shape.call_signatures {
+                    if sig
+                        .params
+                        .iter()
+                        .any(|param| self.contains_meta_type_inner(param.type_id, visited))
+                    {
+                        return true;
+                    }
+                    if self.contains_meta_type_inner(sig.return_type, visited) {
+                        return true;
+                    }
+                    for param in &sig.type_params {
+                        if let Some(constraint) = param.constraint {
+                            if self.contains_meta_type_inner(constraint, visited) {
+                                return true;
+                            }
+                        }
+                        if let Some(default) = param.default {
+                            if self.contains_meta_type_inner(default, visited) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                for sig in &shape.construct_signatures {
+                    if sig
+                        .params
+                        .iter()
+                        .any(|param| self.contains_meta_type_inner(param.type_id, visited))
+                    {
+                        return true;
+                    }
+                    if self.contains_meta_type_inner(sig.return_type, visited) {
+                        return true;
+                    }
+                    for param in &sig.type_params {
+                        if let Some(constraint) = param.constraint {
+                            if self.contains_meta_type_inner(constraint, visited) {
+                                return true;
+                            }
+                        }
+                        if let Some(default) = param.default {
+                            if self.contains_meta_type_inner(default, visited) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                shape
+                    .properties
+                    .iter()
+                    .any(|prop| self.contains_meta_type_inner(prop.type_id, visited))
+            }
+            TypeKey::Application(app) => {
+                if self.contains_meta_type_inner(app.base, visited) {
+                    return true;
+                }
+                app.args
+                    .iter()
+                    .any(|arg| self.contains_meta_type_inner(*arg, visited))
+            }
+            TypeKey::ReadonlyType(inner) => self.contains_meta_type_inner(inner, visited),
+            TypeKey::TemplateLiteral(spans) => spans.iter().any(|span| match span {
+                TemplateSpan::Text(_) => false,
+                TemplateSpan::Type(inner) => self.contains_meta_type_inner(*inner, visited),
+            }),
+            TypeKey::Ref(_)
+            | TypeKey::Intrinsic(_)
+            | TypeKey::Literal(_)
+            | TypeKey::UniqueSymbol(_)
+            | TypeKey::Error => false,
+        }
     }
 
     /// Lower a type element (property signature, method signature, etc.)
