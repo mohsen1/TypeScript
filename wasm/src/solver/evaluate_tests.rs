@@ -526,6 +526,31 @@ fn test_index_access_string_literal_numeric_key() {
 }
 
 #[test]
+fn test_index_access_string_number_with_no_unchecked_indexed_access() {
+    let interner = TypeInterner::new();
+
+    let mut evaluator = TypeEvaluator::new(&interner);
+    evaluator.set_no_unchecked_indexed_access(true);
+
+    let result = evaluator.evaluate_index_access(TypeId::STRING, TypeId::NUMBER);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_index_access_string_literal_numeric_key_with_no_unchecked_indexed_access() {
+    let interner = TypeInterner::new();
+
+    let mut evaluator = TypeEvaluator::new(&interner);
+    evaluator.set_no_unchecked_indexed_access(true);
+
+    let zero = interner.literal_string("0");
+    let result = evaluator.evaluate_index_access(TypeId::STRING, zero);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_index_access_string_literal_member() {
     let interner = TypeInterner::new();
 

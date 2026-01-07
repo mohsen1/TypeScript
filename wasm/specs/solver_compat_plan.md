@@ -234,6 +234,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Treat numeric string literals as number index keys
 - [x] Tests for string primitive index access cases
 
+### Phase 41: Unchecked Primitive Index Access
+- [x] Include `undefined` for primitive index access when noUncheckedIndexedAccess is enabled
+- [x] Tests for unchecked primitive index access
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
