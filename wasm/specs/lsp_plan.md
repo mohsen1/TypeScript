@@ -67,6 +67,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Bind export assignment expressions for local resolution
    - [x] Bind labeled/with statements for local resolution
    - [x] Hoist `var` declarations in LSP resolver scopes
+   - [x] Traverse decorator expressions in binder/resolver
    - [x] Bind class static blocks for local resolution
    - [x] Add import/export handling for cross-file navigation
 
