@@ -1367,6 +1367,32 @@ fn test_keyof_type_param_constraint() {
 }
 
 #[test]
+fn test_base_constraint_assignability_evaluate_keyof() {
+    let interner = TypeInterner::new();
+
+    let constraint = interner.object(vec![
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
+ write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
+ write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+    ]);
+
+    let type_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(constraint),
+        default: None,
+    }));
+
+    let key_of = interner.intern(TypeKey::KeyOf(type_param));
+    let result = evaluate_type(&interner, key_of);
+    let expected = interner.union(vec![
+        interner.literal_string("x"),
+        interner.literal_string("y"),
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_keyof_type_param_no_constraint_deferred() {
     let interner = TypeInterner::new();
 
