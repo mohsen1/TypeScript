@@ -46,6 +46,10 @@ pub struct CompilerOptions {
     #[serde(default)]
     pub declaration_dir: Option<String>,
     #[serde(default)]
+    pub source_map: Option<bool>,
+    #[serde(default)]
+    pub declaration_map: Option<bool>,
+    #[serde(default)]
     pub strict: Option<bool>,
     #[serde(default)]
     pub no_emit: Option<bool>,
@@ -71,6 +75,8 @@ pub struct ResolvedCompilerOptions {
     pub out_dir: Option<PathBuf>,
     pub declaration_dir: Option<PathBuf>,
     pub emit_declarations: bool,
+    pub source_map: bool,
+    pub declaration_map: bool,
     pub no_emit: bool,
     pub no_emit_on_error: bool,
 }
@@ -153,6 +159,8 @@ impl Default for ResolvedCompilerOptions {
             out_dir: None,
             declaration_dir: None,
             emit_declarations: false,
+            source_map: false,
+            declaration_map: false,
             no_emit: false,
             no_emit_on_error: false,
         }
@@ -229,6 +237,14 @@ pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<Res
 
     if let Some(declaration) = options.declaration {
         resolved.emit_declarations = declaration;
+    }
+
+    if let Some(source_map) = options.source_map {
+        resolved.source_map = source_map;
+    }
+
+    if let Some(declaration_map) = options.declaration_map {
+        resolved.declaration_map = declaration_map;
     }
 
     if let Some(strict) = options.strict {
@@ -326,6 +342,8 @@ fn merge_compiler_options(base: CompilerOptions, child: CompilerOptions) -> Comp
         out_dir: child.out_dir.or(base.out_dir),
         declaration: child.declaration.or(base.declaration),
         declaration_dir: child.declaration_dir.or(base.declaration_dir),
+        source_map: child.source_map.or(base.source_map),
+        declaration_map: child.declaration_map.or(base.declaration_map),
         strict: child.strict.or(base.strict),
         no_emit: child.no_emit.or(base.no_emit),
         no_emit_on_error: child.no_emit_on_error.or(base.no_emit_on_error),
