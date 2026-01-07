@@ -832,6 +832,24 @@ impl<'a> ThinPrinter<'a> {
                 self.emit_node_default(node, idx);
             }
 
+            TransformDirective::ES5FunctionParameters { function_node } => {
+                if let Some(func_node) = self.arena.get(function_node) {
+                    match func_node.kind {
+                        k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                            self.emit_function_declaration_es5_params(func_node);
+                            return;
+                        }
+                        k if k == syntax_kind_ext::FUNCTION_EXPRESSION => {
+                            self.emit_function_expression_es5_params(func_node);
+                            return;
+                        }
+                        _ => {}
+                    }
+                }
+
+                self.emit_node_default(node, idx);
+            }
+
             TransformDirective::ES5TemplateLiteral { .. } => {
                 if !self.emit_template_literal_es5(node, idx) {
                     self.emit_node_default(node, idx);
@@ -900,8 +918,14 @@ impl<'a> ThinPrinter<'a> {
                 };
 
                 self.write("exports.default = ");
-                if self.ctx.target_es5 && func.is_async {
-                    self.emit_async_function_es5(func, "", "this");
+                if self.ctx.target_es5 {
+                    if func.is_async {
+                        self.emit_async_function_es5(func, "", "this");
+                    } else if self.function_parameters_need_es5_transform(&func.parameters.nodes) {
+                        self.emit_function_expression_es5_params(node);
+                    } else {
+                        self.emit_function_expression(node, idx);
+                    }
                 } else {
                     self.emit_function_expression(node, idx);
                 }
@@ -986,6 +1010,19 @@ impl<'a> ThinPrinter<'a> {
                 if let Some(arrow_node) = self.arena.get(*arrow_node) {
                     if let Some(func) = self.arena.get_function(arrow_node) {
                         self.emit_arrow_function_es5(arrow_node, func, *captures_this);
+                    }
+                }
+            }
+            TransformDirective::ES5FunctionParameters { function_node } => {
+                if let Some(func_node) = self.arena.get(*function_node) {
+                    match func_node.kind {
+                        k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                            self.emit_function_declaration_es5_params(func_node);
+                        }
+                        k if k == syntax_kind_ext::FUNCTION_EXPRESSION => {
+                            self.emit_function_expression_es5_params(func_node);
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -1123,6 +1160,23 @@ impl<'a> ThinPrinter<'a> {
                 if let Some(list_node) = self.arena.get(*decl_list) {
                     self.emit_variable_declaration_list_es5(list_node);
                     return;
+                }
+
+                self.emit_chained_previous(node, idx, directives, index);
+            }
+            TransformDirective::ES5FunctionParameters { function_node } => {
+                if let Some(func_node) = self.arena.get(*function_node) {
+                    match func_node.kind {
+                        k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                            self.emit_function_declaration_es5_params(func_node);
+                            return;
+                        }
+                        k if k == syntax_kind_ext::FUNCTION_EXPRESSION => {
+                            self.emit_function_expression_es5_params(func_node);
+                            return;
+                        }
+                        _ => {}
+                    }
                 }
 
                 self.emit_chained_previous(node, idx, directives, index);
@@ -2537,12 +2591,7 @@ impl<'a> ThinPrinter<'a> {
 
         // Parameters (without types for JavaScript)
         self.write("(");
-        let param_transforms = if self.ctx.target_es5 {
-            self.emit_function_parameters_es5(&func.parameters.nodes)
-        } else {
-            self.emit_function_parameters_js(&func.parameters.nodes);
-            ParamTransformPlan::default()
-        };
+        self.emit_function_parameters_js(&func.parameters.nodes);
         self.write(") ");
 
         // Emit body - check if it's a simple single-statement body
@@ -2559,9 +2608,7 @@ impl<'a> ThinPrinter<'a> {
             false
         };
         
-        if self.ctx.target_es5 && param_transforms.has_transforms() {
-            self.emit_block_with_param_prologue(func.body, &param_transforms);
-        } else if is_simple_body {
+        if is_simple_body {
             self.emit_single_line_block(func.body);
         } else {
             self.emit(func.body);
@@ -2652,18 +2699,99 @@ impl<'a> ThinPrinter<'a> {
 
         // Parameters - only emit names, not types for JavaScript
         self.write("(");
-        let param_transforms = if self.ctx.target_es5 {
-            self.emit_function_parameters_es5(&func.parameters.nodes)
-        } else {
-            self.emit_function_parameters_js(&func.parameters.nodes);
-            ParamTransformPlan::default()
-        };
+        self.emit_function_parameters_js(&func.parameters.nodes);
         self.write(")");
 
         // No return type for JavaScript
 
         self.write_space();
-        if self.ctx.target_es5 && param_transforms.has_transforms() {
+        self.emit(func.body);
+    }
+
+    fn emit_function_expression_es5_params(&mut self, node: &ThinNode) {
+        let Some(func) = self.arena.get_function(node) else {
+            return;
+        };
+
+        self.write("function");
+
+        if func.asterisk_token {
+            self.write("*");
+        }
+
+        // Name (if any) - add space before open paren whether or not there's a name
+        if !func.name.is_none() {
+            self.write_space();
+            self.emit(func.name);
+        }
+
+        // Space before ( for TypeScript compatibility: function (x) vs function(x)
+        self.write(" ");
+
+        // Parameters (without types for JavaScript)
+        self.write("(");
+        let param_transforms = self.emit_function_parameters_es5(&func.parameters.nodes);
+        self.write(") ");
+
+        // Emit body - check if it's a simple single-statement body
+        let body_node = self.arena.get(func.body);
+        let is_simple_body = if let Some(body) = body_node {
+            if let Some(block) = self.arena.get_block(body) {
+                // Single return statement = simple body
+                block.statements.nodes.len() == 1
+                    && self.is_simple_return_statement(block.statements.nodes[0])
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if param_transforms.has_transforms() {
+            self.emit_block_with_param_prologue(func.body, &param_transforms);
+        } else if is_simple_body {
+            self.emit_single_line_block(func.body);
+        } else {
+            self.emit(func.body);
+        }
+    }
+
+    fn emit_function_declaration_es5_params(&mut self, node: &ThinNode) {
+        let Some(func) = self.arena.get_function(node) else {
+            return;
+        };
+
+        // Skip ambient declarations (declare function)
+        if self.has_declare_modifier(&func.modifiers) {
+            return;
+        }
+
+        // For JavaScript emit: skip declaration-only functions (no body)
+        if func.body.is_none() {
+            return;
+        }
+
+        self.write("function");
+
+        if func.asterisk_token {
+            self.write("*");
+        }
+
+        // Name
+        if !func.name.is_none() {
+            self.write_space();
+            self.emit(func.name);
+        }
+
+        // Parameters - only emit names, not types for JavaScript
+        self.write("(");
+        let param_transforms = self.emit_function_parameters_es5(&func.parameters.nodes);
+        self.write(")");
+
+        // No return type for JavaScript
+
+        self.write_space();
+        if param_transforms.has_transforms() {
             self.emit_block_with_param_prologue(func.body, &param_transforms);
         } else {
             self.emit(func.body);
@@ -2733,6 +2861,21 @@ impl<'a> ThinPrinter<'a> {
         self.write_line();
         self.decrease_indent();
         self.write("}");
+    }
+
+    fn function_parameters_need_es5_transform(&self, params: &[NodeIndex]) -> bool {
+        params.iter().any(|&param_idx| {
+            let Some(param_node) = self.arena.get(param_idx) else {
+                return false;
+            };
+            let Some(param) = self.arena.get_parameter(param_node) else {
+                return false;
+            };
+
+            param.dot_dot_dot_token
+                || !param.initializer.is_none()
+                || self.is_binding_pattern(param.name)
+        })
     }
 
     fn emit_function_parameters_es5(&mut self, params: &[NodeIndex]) -> ParamTransformPlan {

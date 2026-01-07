@@ -2117,6 +2117,35 @@ const value = obj.value;
 }
 
 #[test]
+fn test_interface_extends_type_alias_applies_type_arguments() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Box<T> = { value: T };
+interface Derived extends Box<string> {
+    count: number;
+}
+const obj: Derived = { value: "x", count: 1 };
+const value = obj.value;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::STRING);
+}
+
+#[test]
 fn test_interface_extends_readonly_property_mismatch_2430() {
     use crate::thin_parser::ThinParserState;
 

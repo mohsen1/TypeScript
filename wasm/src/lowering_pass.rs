@@ -760,6 +760,8 @@ impl<'a> LoweringPass<'a> {
         // Check if this is an async function targeting ES5
         let base_directive = if self.ctx.target_es5 && self.has_async_modifier(idx) {
             TransformDirective::ES5AsyncFunction { function_node: idx }
+        } else if self.ctx.target_es5 && self.function_parameters_need_es5_transform(&func.parameters) {
+            TransformDirective::ES5FunctionParameters { function_node: idx }
         } else {
             TransformDirective::Identity
         };
@@ -985,11 +987,18 @@ impl<'a> LoweringPass<'a> {
             return;
         };
 
-        if self.ctx.target_es5 && func.is_async {
-            self.transforms.insert(
-                idx,
-                TransformDirective::ES5AsyncFunction { function_node: idx },
-            );
+        if self.ctx.target_es5 {
+            if func.is_async {
+                self.transforms.insert(
+                    idx,
+                    TransformDirective::ES5AsyncFunction { function_node: idx },
+                );
+            } else if self.function_parameters_need_es5_transform(&func.parameters) {
+                self.transforms.insert(
+                    idx,
+                    TransformDirective::ES5FunctionParameters { function_node: idx },
+                );
+            }
         }
 
         for &param_idx in &func.parameters.nodes {
@@ -1137,6 +1146,21 @@ impl<'a> LoweringPass<'a> {
             };
 
             !decl.initializer.is_none() && self.is_binding_pattern_idx(decl.name)
+        })
+    }
+
+    fn function_parameters_need_es5_transform(&self, params: &NodeList) -> bool {
+        params.nodes.iter().any(|&param_idx| {
+            let Some(param_node) = self.arena.get(param_idx) else {
+                return false;
+            };
+            let Some(param) = self.arena.get_parameter(param_node) else {
+                return false;
+            };
+
+            param.dot_dot_dot_token
+                || !param.initializer.is_none()
+                || self.is_binding_pattern_idx(param.name)
         })
     }
 

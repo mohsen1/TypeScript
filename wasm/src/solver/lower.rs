@@ -5,7 +5,7 @@
 //!
 //! Lowering is lazy - types are only computed when queried.
 
-use crate::parser::thin_node::{ThinNodeArena, SignatureData, IndexSignatureData};
+use crate::parser::thin_node::{ThinNodeArena, SignatureData, IndexSignatureData, TypeAliasData};
 use crate::parser::base::NodeIndex;
 use crate::parser::NodeList;
 use crate::scanner::SyntaxKind;
@@ -843,6 +843,20 @@ impl<'a> TypeLowering<'a> {
         }
 
         self.finish_interface_parts(parts)
+    }
+
+    pub fn lower_type_alias_declaration(&self, alias: &TypeAliasData) -> TypeId {
+        if let Some(params) = alias.type_parameters.as_ref() {
+            if !params.nodes.is_empty() {
+                self.push_type_param_scope();
+                let _ = self.collect_type_parameters(params);
+                let result = self.lower_type(alias.type_node);
+                self.pop_type_param_scope();
+                return result;
+            }
+        }
+
+        self.lower_type(alias.type_node)
     }
 
     fn collect_interface_members(&self, members: &NodeList, parts: &mut InterfaceParts) {
