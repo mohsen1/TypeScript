@@ -72,13 +72,16 @@ fn test_object_subtyping() {
 
     // { x: number }
     let obj_x = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
+ write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
 
     // { x: number, y: string }
     let obj_xy = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
+ write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
+ write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ]);
 
     // Object with more properties is subtype
@@ -95,10 +98,12 @@ fn test_readonly_property_subtyping() {
 
     let name = interner.intern_string("x");
     let readonly_obj = interner.object(vec![
-        PropertyInfo { name, type_id: TypeId::NUMBER, optional: false, readonly: true, is_method: false },
+        PropertyInfo { name, type_id: TypeId::NUMBER,
+ write_type: TypeId::NUMBER, optional: false, readonly: true, is_method: false },
     ]);
     let mutable_obj = interner.object(vec![
-        PropertyInfo { name, type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name, type_id: TypeId::NUMBER,
+ write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
 
     assert!(!checker.is_subtype_of(readonly_obj, mutable_obj));
@@ -232,13 +237,16 @@ fn test_ref_to_object_resolution() {
 
     // Create an object type: { x: number }
     let obj_x = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
+ write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
 
     // Create a Ref that resolves to { x: number, y: string }
     let obj_xy = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
+ write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
+ write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ]);
 
     let ref_type = interner.reference(SymbolRef(100));
@@ -783,6 +791,7 @@ fn test_number_index_signature_numeric_property() {
         PropertyInfo {
             name: interner.intern_string("0"),
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -817,6 +826,7 @@ fn test_number_index_signature_type_mismatch() {
         PropertyInfo {
             name: interner.intern_string("0"),
             type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
             optional: false,
             readonly: false,
             is_method: false,
@@ -851,6 +861,7 @@ fn test_number_index_signature_multiple_numeric_props() {
         PropertyInfo {
             name: interner.intern_string("0"),
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -858,6 +869,7 @@ fn test_number_index_signature_multiple_numeric_props() {
         PropertyInfo {
             name: interner.intern_string("1"),
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -865,6 +877,7 @@ fn test_number_index_signature_multiple_numeric_props() {
         PropertyInfo {
             name: interner.intern_string("2"),
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -899,6 +912,7 @@ fn test_number_and_string_index_signatures() {
         PropertyInfo {
             name: interner.intern_string("0"),
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -906,6 +920,7 @@ fn test_number_and_string_index_signatures() {
         PropertyInfo {
             name: interner.intern_string("foo"),
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -979,6 +994,7 @@ fn test_readonly_property_with_mutable_index_signature() {
     let source = interner.object(vec![PropertyInfo {
         name: interner.intern_string("x"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: true,
         is_method: false,
@@ -1018,6 +1034,7 @@ fn test_object_with_index_properties_match_target_index() {
             PropertyInfo {
                 name: interner.intern_string("0"),
                 type_id: TypeId::STRING,
+                write_type: TypeId::STRING,
                 optional: false,
                 readonly: false,
                 is_method: false,
@@ -1025,6 +1042,7 @@ fn test_object_with_index_properties_match_target_index() {
             PropertyInfo {
                 name: interner.intern_string("name"),
                 type_id: TypeId::STRING,
+                write_type: TypeId::STRING,
                 optional: false,
                 readonly: false,
                 is_method: false,
@@ -1068,6 +1086,7 @@ fn test_object_with_index_property_mismatch_string_index() {
         properties: vec![PropertyInfo {
             name: interner.intern_string("name"),
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -1102,6 +1121,7 @@ fn test_object_with_index_property_mismatch_number_index() {
         properties: vec![PropertyInfo {
             name: interner.intern_string("0"),
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -1145,6 +1165,7 @@ fn test_object_with_index_satisfies_named_property_string_index() {
     let target = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -1171,6 +1192,7 @@ fn test_object_with_index_named_property_mismatch_string_index() {
     let target = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -1197,6 +1219,7 @@ fn test_object_with_index_satisfies_numeric_property_number_index() {
     let target = interner.object(vec![PropertyInfo {
         name: interner.intern_string("0"),
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -1223,6 +1246,7 @@ fn test_object_with_index_noncanonical_numeric_property_fails() {
     let target = interner.object(vec![PropertyInfo {
         name: interner.intern_string("01"),
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -1249,6 +1273,7 @@ fn test_object_with_index_readonly_index_to_mutable_property_fails() {
     let target = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,

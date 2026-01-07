@@ -683,9 +683,41 @@ impl ThinBinderState {
                 if let Some(loop_data) = arena.get_loop(node) {
                     self.enter_scope(ContainerKind::Block, idx);
                     self.bind_node(arena, loop_data.initializer);
-                    self.bind_expression(arena, loop_data.condition);
-                    self.bind_node(arena, loop_data.statement);
-                    self.bind_expression(arena, loop_data.incrementor);
+
+                    let loop_label = self.create_loop_label();
+                    if !self.current_flow.is_none() {
+                        self.add_antecedent(loop_label, self.current_flow);
+                    }
+                    self.current_flow = loop_label;
+
+                    if !loop_data.condition.is_none() {
+                        self.bind_expression(arena, loop_data.condition);
+                        let pre_condition_flow = self.current_flow;
+                        let true_flow = self.create_flow_condition(
+                            flow_flags::TRUE_CONDITION,
+                            pre_condition_flow,
+                            loop_data.condition,
+                        );
+                        self.current_flow = true_flow;
+                        self.bind_node(arena, loop_data.statement);
+                        self.bind_expression(arena, loop_data.incrementor);
+                        self.add_antecedent(loop_label, self.current_flow);
+
+                        let false_flow = self.create_flow_condition(
+                            flow_flags::FALSE_CONDITION,
+                            pre_condition_flow,
+                            loop_data.condition,
+                        );
+                        self.current_flow = false_flow;
+                    } else {
+                        self.bind_node(arena, loop_data.statement);
+                        self.bind_expression(arena, loop_data.incrementor);
+                        self.add_antecedent(loop_label, self.current_flow);
+                        let merge_label = self.create_branch_label();
+                        self.add_antecedent(merge_label, loop_label);
+                        self.add_antecedent(merge_label, self.current_flow);
+                        self.current_flow = merge_label;
+                    }
                     self.exit_scope();
                 }
             }
@@ -696,8 +728,19 @@ impl ThinBinderState {
                 if let Some(for_data) = arena.get_for_in_of(node) {
                     self.enter_scope(ContainerKind::Block, idx);
                     self.bind_node(arena, for_data.initializer);
+                    let loop_label = self.create_loop_label();
+                    if !self.current_flow.is_none() {
+                        self.add_antecedent(loop_label, self.current_flow);
+                    }
+                    self.current_flow = loop_label;
+
                     self.bind_expression(arena, for_data.expression);
                     self.bind_node(arena, for_data.statement);
+                    self.add_antecedent(loop_label, self.current_flow);
+                    let merge_label = self.create_branch_label();
+                    self.add_antecedent(merge_label, loop_label);
+                    self.add_antecedent(merge_label, self.current_flow);
+                    self.current_flow = merge_label;
                     self.exit_scope();
                 }
             }

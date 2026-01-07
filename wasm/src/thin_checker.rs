@@ -1278,10 +1278,12 @@ impl<'a> ThinCheckerState<'a> {
                                 type_predicate,
                                 is_constructor: false,
                             };
+                            let method_type = self.ctx.types.function(shape);
                             self.pop_type_parameters(type_param_updates);
                             properties.push(PropertyInfo {
                                 name: name_atom,
-                                type_id: self.ctx.types.function(shape),
+                                type_id: method_type,
+                                write_type: method_type,
                                 optional: sig.question_token,
                                 readonly: self.has_readonly_modifier(&sig.modifiers),
                                 is_method: true,
@@ -1295,6 +1297,7 @@ impl<'a> ThinCheckerState<'a> {
                             properties.push(PropertyInfo {
                                 name: name_atom,
                                 type_id,
+                                write_type: type_id,
                                 optional: sig.question_token,
                                 readonly: self.has_readonly_modifier(&sig.modifiers),
                                 is_method: false,
@@ -1547,6 +1550,7 @@ impl<'a> ThinCheckerState<'a> {
                             properties.push(PropertyInfo {
                                 name: self.ctx.types.intern_string(&id_data.escaped_text),
                                 type_id,
+                                write_type: type_id,
                                 optional: sig.question_token,
                                 readonly: self.has_readonly_modifier(&sig.modifiers),
                                 is_method: member_node.kind == METHOD_SIGNATURE,
@@ -2207,6 +2211,7 @@ impl<'a> ThinCheckerState<'a> {
                     properties.insert(name_atom, PropertyInfo {
                         name: name_atom,
                         type_id,
+                        write_type: type_id,
                         optional: prop.question_token,
                         readonly: self.has_readonly_modifier(&prop.modifiers),
                         is_method: false,
@@ -2310,6 +2315,7 @@ impl<'a> ThinCheckerState<'a> {
                         properties.insert(name_atom, PropertyInfo {
                             name: name_atom,
                             type_id,
+                            write_type: type_id,
                             optional: param.question_token,
                             readonly: self.has_readonly_modifier(&param.modifiers),
                             is_method: false,
@@ -2324,11 +2330,13 @@ impl<'a> ThinCheckerState<'a> {
             if methods.contains_key(&name) {
                 continue;
             }
-            let type_id = accessor.getter.or(accessor.setter).unwrap_or(TypeId::ANY);
+            let read_type = accessor.getter.or(accessor.setter).unwrap_or(TypeId::ANY);
+            let write_type = accessor.setter.or(accessor.getter).unwrap_or(read_type);
             let readonly = accessor.getter.is_some() && accessor.setter.is_none();
             properties.insert(name, PropertyInfo {
                 name,
-                type_id,
+                type_id: read_type,
+                write_type,
                 optional: false,
                 readonly,
                 is_method: false,
@@ -2352,6 +2360,7 @@ impl<'a> ThinCheckerState<'a> {
             properties.insert(name, PropertyInfo {
                 name,
                 type_id,
+                write_type: type_id,
                 optional,
                 readonly: false,
                 is_method: true,
@@ -4354,6 +4363,7 @@ impl<'a> ThinCheckerState<'a> {
                     properties.push(PropertyInfo {
                         name: self.ctx.types.intern_string(&name),
                         type_id: value_type,
+                        write_type: value_type,
                         optional: false,
                         readonly: false,
                         is_method: false,
@@ -4367,6 +4377,7 @@ impl<'a> ThinCheckerState<'a> {
                     properties.push(PropertyInfo {
                         name: self.ctx.types.intern_string(&ident.escaped_text),
                         type_id: value_type,
+                        write_type: value_type,
                         optional: false,
                         readonly: false,
                         is_method: false,
@@ -4390,6 +4401,7 @@ impl<'a> ThinCheckerState<'a> {
                     properties.push(PropertyInfo {
                         name: self.ctx.types.intern_string(&name),
                         type_id: method_type,
+                        write_type: method_type,
                         optional: false,
                         readonly: false,
                         is_method: false,
@@ -4420,6 +4432,7 @@ impl<'a> ThinCheckerState<'a> {
                     properties.push(PropertyInfo {
                         name: self.ctx.types.intern_string(&name),
                         type_id: accessor_type,
+                        write_type: accessor_type,
                         optional: false,
                         readonly: false,
                         is_method: false,
@@ -7230,10 +7243,12 @@ impl<'a> ThinCheckerState<'a> {
                     is_constructor: false,
                 };
                 self.pop_type_parameters(type_param_updates);
+                let method_type = self.ctx.types.function(shape);
 
                 let prop = PropertyInfo {
                     name: name_atom,
-                    type_id: self.ctx.types.function(shape),
+                    type_id: method_type,
+                    write_type: method_type,
                     optional: sig.question_token,
                     readonly: self.has_readonly_modifier(&sig.modifiers),
                     is_method: true,
@@ -7249,6 +7264,7 @@ impl<'a> ThinCheckerState<'a> {
             let prop = PropertyInfo {
                 name: name_atom,
                 type_id,
+                write_type: type_id,
                 optional: sig.question_token,
                 readonly: self.has_readonly_modifier(&sig.modifiers),
                 is_method: false,

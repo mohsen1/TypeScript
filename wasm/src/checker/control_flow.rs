@@ -1762,10 +1762,12 @@ if (action.type === "add") {}
         let type_remove = types.literal_string("remove");
 
         let add_member = types.object(vec![
-            PropertyInfo { name: type_key, type_id: type_add, optional: false, readonly: false, is_method: false },
+            PropertyInfo { name: type_key, type_id: type_add,
+ write_type: type_add, optional: false, readonly: false, is_method: false },
         ]);
         let remove_member = types.object(vec![
-            PropertyInfo { name: type_key, type_id: type_remove, optional: false, readonly: false, is_method: false },
+            PropertyInfo { name: type_key, type_id: type_remove,
+ write_type: type_remove, optional: false, readonly: false, is_method: false },
         ]);
 
         let union = types.union(vec![add_member, remove_member]);

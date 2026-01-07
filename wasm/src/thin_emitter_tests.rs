@@ -768,6 +768,38 @@ fn test_thin_emit_union_type() {
 }
 
 #[test]
+fn test_thin_emit_jsx_element() {
+    let source = "const x = <div className=\"foo\">{bar}</div>;";
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("<div"),
+        "Expected JSX element in output: {}",
+        output
+    );
+    assert!(
+        output.contains("className=\"foo\""),
+        "Expected JSX attribute in output: {}",
+        output
+    );
+    assert!(
+        output.contains("{bar}"),
+        "Expected JSX expression in output: {}",
+        output
+    );
+    assert!(
+        output.contains("</div>"),
+        "Expected JSX closing tag in output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_enum_declaration() {
     let source = "enum Color { Red, Green, Blue }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
