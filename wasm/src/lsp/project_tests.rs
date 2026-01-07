@@ -1112,6 +1112,32 @@ fn test_project_performance_scope_cache_hits_completions() {
 }
 
 #[test]
+fn test_project_performance_scope_cache_hits_signature_help() {
+    let mut project = Project::new();
+
+    project.set_file(
+        "a.ts".to_string(),
+        "function foo(a: number, b: string) {}\nfoo(1, \"x\");\n".to_string(),
+    );
+    let position = Position::new(1, 4);
+
+    assert!(project.get_signature_help("a.ts", position).is_some());
+    let first = project
+        .performance()
+        .timing(ProjectRequestKind::SignatureHelp)
+        .expect("Expected timing data for signature help");
+
+    assert!(project.get_signature_help("a.ts", position).is_some());
+    let second = project
+        .performance()
+        .timing(ProjectRequestKind::SignatureHelp)
+        .expect("Expected timing data for signature help");
+
+    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
+    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 
