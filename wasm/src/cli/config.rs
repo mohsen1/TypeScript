@@ -30,6 +30,10 @@ pub struct CompilerOptions {
     #[serde(default)]
     pub out_dir: Option<String>,
     #[serde(default)]
+    pub declaration: Option<bool>,
+    #[serde(default)]
+    pub declaration_dir: Option<String>,
+    #[serde(default)]
     pub strict: Option<bool>,
     #[serde(default)]
     pub no_emit: Option<bool>,
@@ -45,6 +49,8 @@ pub struct ResolvedCompilerOptions {
     pub printer: PrinterOptions,
     pub checker: CheckerOptions,
     pub out_dir: Option<PathBuf>,
+    pub declaration_dir: Option<PathBuf>,
+    pub emit_declarations: bool,
     pub no_emit: bool,
 }
 
@@ -54,6 +60,8 @@ impl Default for ResolvedCompilerOptions {
             printer: PrinterOptions::default(),
             checker: CheckerOptions::default(),
             out_dir: None,
+            declaration_dir: None,
+            emit_declarations: false,
             no_emit: false,
         }
     }
@@ -77,6 +85,16 @@ pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<Res
         if !out_dir.is_empty() {
             resolved.out_dir = Some(PathBuf::from(out_dir));
         }
+    }
+
+    if let Some(declaration_dir) = options.declaration_dir.as_deref() {
+        if !declaration_dir.is_empty() {
+            resolved.declaration_dir = Some(PathBuf::from(declaration_dir));
+        }
+    }
+
+    if let Some(declaration) = options.declaration {
+        resolved.emit_declarations = declaration;
     }
 
     if let Some(strict) = options.strict {
@@ -162,6 +180,8 @@ fn merge_compiler_options(base: CompilerOptions, child: CompilerOptions) -> Comp
         target: child.target.or(base.target),
         module: child.module.or(base.module),
         out_dir: child.out_dir.or(base.out_dir),
+        declaration: child.declaration.or(base.declaration),
+        declaration_dir: child.declaration_dir.or(base.declaration_dir),
         strict: child.strict.or(base.strict),
         no_emit: child.no_emit.or(base.no_emit),
     }
