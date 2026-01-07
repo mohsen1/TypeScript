@@ -728,7 +728,7 @@ impl ThinParser {
         let provider = RenameProvider::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
         let pos = Position::new(line, character);
 
-        match provider.provide_rename_edits(root, pos, new_name) {
+        match provider.provide_rename_edits_with_scope_cache(root, pos, new_name, &mut self.scope_cache) {
             Ok(edit) => Ok(serde_wasm_bindgen::to_value(&edit)?),
             Err(e) => Err(JsValue::from_str(&e)),
         }

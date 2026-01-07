@@ -2,6 +2,7 @@ use anyhow::{bail, Context, Result};
 use rayon::prelude::*;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use crate::binder::SymbolTable;
@@ -14,7 +15,7 @@ use crate::cli::config::{
 };
 use crate::cli::fs::{discover_ts_files, is_ts_file, FileDiscoveryOptions};
 use crate::declaration_emitter::DeclarationEmitter;
-use crate::parallel::{self, BoundFile, MergedProgram};
+use crate::parallel::{self, BindResult, BoundFile, MergedProgram};
 use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
 use crate::parser::NodeIndex;
 use crate::thin_parser::ThinParserState;
@@ -22,6 +23,7 @@ use crate::thin_parser::ParseDiagnostic;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
 use crate::thin_emitter::{ModuleKind, ThinPrinter};
+use rustc_hash::FxHasher;
 
 #[derive(Debug, Clone)]
 pub struct CompilationResult {
@@ -32,6 +34,12 @@ pub struct CompilationResult {
 #[derive(Default)]
 pub(crate) struct CompilationCache {
     type_caches: HashMap<PathBuf, TypeCache>,
+    bind_cache: HashMap<PathBuf, BindCacheEntry>,
+}
+
+struct BindCacheEntry {
+    hash: u64,
+    bind_result: BindResult,
 }
 
 impl CompilationCache {
@@ -41,16 +49,23 @@ impl CompilationCache {
     {
         for path in paths {
             self.type_caches.remove(&path);
+            self.bind_cache.remove(&path);
         }
     }
 
     pub(crate) fn clear(&mut self) {
         self.type_caches.clear();
+        self.bind_cache.clear();
     }
 
     #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
         self.type_caches.len()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn bind_len(&self) -> usize {
+        self.bind_cache.len()
     }
 }
 
@@ -69,7 +84,7 @@ pub(crate) fn compile_with_cache(
 fn compile_inner(
     args: &CliArgs,
     cwd: &Path,
-    cache: Option<&mut CompilationCache>,
+    mut cache: Option<&mut CompilationCache>,
 ) -> Result<CompilationResult> {
     let cwd = canonicalize_or_owned(cwd);
     let tsconfig_path = resolve_tsconfig_path(&cwd, args.project.as_deref())?;
@@ -105,12 +120,15 @@ fn compile_inner(
     }
 
     let sources = read_source_files(&file_paths, &base_dir, &resolved)?;
-    let compile_inputs: Vec<(String, String)> = sources
-        .into_iter()
-        .map(|source| (source.path.to_string_lossy().into_owned(), source.text))
-        .collect();
-
-    let program = parallel::compile_files(compile_inputs);
+    let program = if let Some(cache) = cache.as_deref_mut() {
+        build_program_with_cache(sources, cache)
+    } else {
+        let compile_inputs: Vec<(String, String)> = sources
+            .into_iter()
+            .map(|source| (source.path.to_string_lossy().into_owned(), source.text))
+            .collect();
+        parallel::compile_files(compile_inputs)
+    };
     let mut diagnostics = collect_diagnostics(&program, cache);
     diagnostics.sort_by(|left, right| {
         left.file
@@ -142,6 +160,96 @@ fn compile_inner(
         diagnostics,
         emitted_files,
     })
+}
+
+struct SourceMeta {
+    path: PathBuf,
+    file_name: String,
+    hash: u64,
+    cached_ok: bool,
+}
+
+fn build_program_with_cache(
+    sources: Vec<SourceFile>,
+    cache: &mut CompilationCache,
+) -> MergedProgram {
+    let mut meta = Vec::with_capacity(sources.len());
+    let mut to_parse = Vec::new();
+
+    for source in sources {
+        let hash = hash_text(&source.text);
+        let file_name = source.path.to_string_lossy().into_owned();
+        let cached_ok = cache
+            .bind_cache
+            .get(&source.path)
+            .map(|entry| entry.hash == hash)
+            .unwrap_or(false);
+
+        if !cached_ok {
+            to_parse.push((file_name.clone(), source.text));
+        }
+
+        meta.push(SourceMeta {
+            path: source.path,
+            file_name,
+            hash,
+            cached_ok,
+        });
+    }
+
+    let parsed_results = if to_parse.is_empty() {
+        Vec::new()
+    } else {
+        parallel::parse_and_bind_parallel(to_parse)
+    };
+
+    let mut parsed_map: HashMap<String, BindResult> = parsed_results
+        .into_iter()
+        .map(|result| (result.file_name.clone(), result))
+        .collect();
+
+    for entry in &meta {
+        if entry.cached_ok {
+            continue;
+        }
+
+        let result = parsed_map
+            .remove(&entry.file_name)
+            .unwrap_or_else(|| {
+                panic!("missing parse result for {}", entry.file_name);
+            });
+        cache.bind_cache.insert(
+            entry.path.clone(),
+            BindCacheEntry {
+                hash: entry.hash,
+                bind_result: result,
+            },
+        );
+    }
+
+    let mut current_paths = HashSet::with_capacity(meta.len());
+    for entry in &meta {
+        current_paths.insert(entry.path.clone());
+    }
+    cache
+        .bind_cache
+        .retain(|path, _| current_paths.contains(path));
+
+    let mut ordered = Vec::with_capacity(meta.len());
+    for entry in &meta {
+        let Some(cached) = cache.bind_cache.get(&entry.path) else {
+            continue;
+        };
+        ordered.push(&cached.bind_result);
+    }
+
+    parallel::merge_bind_results_ref(&ordered)
+}
+
+fn hash_text(text: &str) -> u64 {
+    let mut hasher = FxHasher::default();
+    text.hash(&mut hasher);
+    hasher.finish()
 }
 
 #[derive(Debug, Clone)]
