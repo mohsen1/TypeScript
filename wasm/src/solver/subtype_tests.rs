@@ -508,6 +508,66 @@ fn test_tuple_to_array_with_rest() {
 }
 
 #[test]
+fn test_tuple_to_array_with_rest_tuple() {
+    // [string, ...[string, string]] IS assignable to string[]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let rest_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+    ]);
+
+    assert!(checker.is_subtype_of(source, string_array));
+}
+
+#[test]
+fn test_tuple_to_array_with_rest_tuple_mismatch() {
+    // [string, ...[string, number]] is NOT assignable to string[]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let rest_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+    ]);
+
+    assert!(!checker.is_subtype_of(source, string_array));
+}
+
+#[test]
+fn test_tuple_to_array_with_rest_tuple_variadic() {
+    // [string, ...[string, ...string[]]] IS assignable to string[]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let rest_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+    ]);
+
+    assert!(checker.is_subtype_of(source, string_array));
+}
+
+#[test]
 fn test_tuple_to_array_all_matching_with_rest() {
     // [string, ...string[]] IS assignable to string[]
     let interner = TypeInterner::new();
