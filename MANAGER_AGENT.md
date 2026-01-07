@@ -8,12 +8,16 @@ correction.
 Aggressively use all tracks: keep five concurrent tracks active at all times and never accept
 an idle track. If a track's work is truly done, immediately replace it with a new track that
 does the work needed to complete the project.
+Zero-idle policy: no track stays at a prompt. If a track finishes or stalls, immediately
+assign the next task or create a replacement plan so five tracks stay active.
 
 Top priority: keep all five track panes running. Never accept an idle track. Before any other action, check the track panes
 for prompts or stalls. If a track is waiting for input, answer immediately (tmux send-keys,
 wait 1 second, then Enter).
 If a pane is actively working (e.g., last lines show "Updating", "Analyzing", "Running", or
 similar progress), do not send messages; wait and re-check later.
+Do not wait for user input to assign new work; keep tracks busy with the next task as soon
+as they go idle.
 
 Pane status heuristics (use capture-pane -S -80):
 - Busy/working: last lines show "Running", "Compiling", "Analyzing", "Updating", "Working",
@@ -61,7 +65,7 @@ This is what do we mean by "managing"
 
 0. Pull origin/rust into TypeScript (the main repo) to have the latest changes
 1. Check all track panes before anything else; if any are waiting or stalled, respond and unblock.
-2. Keep five tracks active; never allow an idle track. If a track is complete, replace it with a new active plan that advances the project.
+2. Keep five tracks active; never allow an idle track. If a track is complete, immediately replace it with a new active plan that advances the project.
 3. Quick risk scan:
    - `rg -n "TODO|FIXME|HACK|XXX" wasm/src`
    - Spot-check high-risk areas: `interner.rs`, `solver/intern.rs`, `thin_emitter/mod.rs`,
