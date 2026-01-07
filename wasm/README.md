@@ -39,10 +39,10 @@ The current `ThinNodeArena` makes in-place mutation difficult.
 Last updated: 2026-01-07
 
 - Overall: Migration is active; Rust/WASM compiler is under construction and not production-ready.
-- Tracks: CLI now supports package.json `imports` (# specifiers) and typesVersions compiler version overrides (flag/env/tsconfig); emitter emits minimal real source maps for no-transform JS plus declaration map coverage; checker now reports TS2693 for type-only values including `typeof` queries; LSP added more incremental prefix-stability tests while continuing incremental rebind work; solver added tuple/array assignability rules and overlap coverage for generic constraints.
-- Baselines (`tests/cases`, first 100): compiler errors 60/77 (77.9%) pass, JS 40/76 (52.6%) pass; conformance errors 18/90 (20.0%) pass, JS 1/88 (1.1%) pass.
-- Risk: ES module imports still resolve to `any` (cross-file types unreliable); source maps are still minimal and not yet full-fidelity across transforms/declarations; parser/arena child enumeration TODOs remain; baseline pass rates are still low on conformance; assignment/flow clearing uses conservative heuristics.
-- Next focus: finish CLI tsconfig `types`/`typeRoots` inclusion and remaining module-resolution gaps, ship full transform/declaration source maps, implement incremental rebind improvements in LSP, expand checker correctness (e.g., TS2749), type ES imports, improve baseline pass rates, and keep correctness ahead of perf tweaks.
+- Tracks: CLI parser gained coverage for spread call args, keyword identifiers, and as/satisfies precedence but bench still hits a TS1005 parse gap at `checker.ts:8505`; emitter added JSX namespaced attribute parity tests (including member elements); checker now supports namespace element access flow narrowing + type-only diagnostics; LSP added scope cache reuse tests across edits and files; solver added TS_UNSOUNDNESS coverage for mapped type key remap and `keyof` intersections.
+- Baselines (`tests/cases`, first 100): compiler errors 60/77 (77.9%) pass, JS 40/76 (52.6%) pass; conformance errors 18/90 (20.0%) pass, JS 1/88 (1.1%) pass (no new run).
+- Risk: CLI bench blocked by the remaining parser gap at `checker.ts:8505`; ES module imports still resolve to `any`; source maps remain minimal; parser/arena child enumeration TODOs remain; conformance baseline pass rates are low.
+- Next focus: close remaining parser gaps to run full CLI benches, push assignability/member lookup into solver to end split-brain typing, ship `.d.ts` visibility + re-export handling with ES5 downlevel and full source maps, tighten LSP incremental parse to avoid full rebinds, and retire legacy AST with arena memory-hygiene checks.
 
 ## Status
 This project is not ready for general use yet. The interface and distribution are in progress.
