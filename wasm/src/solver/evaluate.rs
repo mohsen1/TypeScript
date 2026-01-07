@@ -169,6 +169,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             TypeKey::Object(props) => {
                 self.evaluate_object_index(&props, index_type)
             }
+            TypeKey::ObjectWithIndex(shape) => {
+                self.evaluate_object_with_index(&shape, index_type)
+            }
             TypeKey::Array(elem) => {
                 // Array[number] -> element type
                 if self.is_number_like(index_type) {
@@ -224,6 +227,76 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
 
         TypeId::UNDEFINED
+    }
+
+    /// Evaluate property access on an object type with index signatures.
+    fn evaluate_object_with_index(&self, shape: &ObjectShape, index_type: TypeId) -> TypeId {
+        // If index is a union, evaluate each member
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(index_type) {
+            let mut results = Vec::new();
+            for &member in &members {
+                let result = self.evaluate_object_with_index(shape, member);
+                if result != TypeId::UNDEFINED {
+                    results.push(result);
+                }
+            }
+            if results.is_empty() {
+                return TypeId::UNDEFINED;
+            }
+            return self.interner.union(results);
+        }
+
+        // If index is a literal string, look up the property first, then fallback to string index.
+        if let Some(TypeKey::Literal(LiteralValue::String(name))) = self.interner.lookup(index_type) {
+            for prop in &shape.properties {
+                if prop.name == name {
+                    return prop.type_id;
+                }
+            }
+            if let Some(string_index) = shape.string_index.as_ref() {
+                return string_index.value_type;
+            }
+            return TypeId::UNDEFINED;
+        }
+
+        // If index is a literal number, prefer number index, then string index.
+        if let Some(TypeKey::Literal(LiteralValue::Number(_))) = self.interner.lookup(index_type) {
+            if let Some(number_index) = shape.number_index.as_ref() {
+                return number_index.value_type;
+            }
+            if let Some(string_index) = shape.string_index.as_ref() {
+                return string_index.value_type;
+            }
+            return TypeId::UNDEFINED;
+        }
+
+        if index_type == TypeId::STRING {
+            if let Some(string_index) = shape.string_index.as_ref() {
+                return string_index.value_type;
+            }
+            return self.union_property_types(&shape.properties);
+        }
+
+        if index_type == TypeId::NUMBER {
+            if let Some(number_index) = shape.number_index.as_ref() {
+                return number_index.value_type;
+            }
+            if let Some(string_index) = shape.string_index.as_ref() {
+                return string_index.value_type;
+            }
+            return self.union_property_types(&shape.properties);
+        }
+
+        TypeId::UNDEFINED
+    }
+
+    fn union_property_types(&self, props: &[PropertyInfo]) -> TypeId {
+        let all_types: Vec<TypeId> = props.iter().map(|p| p.type_id).collect();
+        if all_types.is_empty() {
+            TypeId::UNDEFINED
+        } else {
+            self.interner.union(all_types)
+        }
     }
 
     /// Evaluate index access on a tuple type
