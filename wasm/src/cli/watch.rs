@@ -155,7 +155,7 @@ impl WatchState {
         if clear_cache {
             self.type_cache.clear();
         } else {
-            self.type_cache.invalidate_paths(normalized);
+            self.type_cache.invalidate_paths_with_dependents(normalized);
         }
     }
 
