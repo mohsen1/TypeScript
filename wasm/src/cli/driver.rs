@@ -2600,14 +2600,34 @@ fn emit_outputs(
 
         if let Some(js_path) = js_output_path(base_dir, root_dir, out_dir, options.jsx, &input_path) {
             let mut printer = ThinPrinter::with_options(&file.arena, options.printer.clone());
+            let map_info = if options.source_map {
+                map_output_info(&js_path)
+            } else {
+                None
+            };
+
+            if let Some((_, _, output_name)) = map_info.as_ref() {
+                if let Some(source_text) = file
+                    .arena
+                    .get(file.source_file)
+                    .and_then(|node| file.arena.get_source_file(node))
+                    .map(|source| source.text.as_str())
+                {
+                    printer.set_source_map_text(source_text);
+                }
+                printer.enable_source_map(output_name, &file.file_name);
+            }
+
             printer.emit(file.source_file);
+            let map_json = map_info
+                .as_ref()
+                .and_then(|_| printer.generate_source_map_json());
             let mut contents = printer.take_output();
             let mut map_output = None;
 
-            if options.source_map {
-                if let Some((map_path, map_name, output_name)) = map_output_info(&js_path) {
+            if let Some((map_path, map_name, _)) = map_info {
+                if let Some(map_json) = map_json {
                     append_source_mapping_url(&mut contents, &map_name, new_line);
-                    let map_json = generate_basic_source_map(&output_name, &file.file_name);
                     map_output = Some(OutputFile {
                         path: map_path,
                         contents: map_json,
