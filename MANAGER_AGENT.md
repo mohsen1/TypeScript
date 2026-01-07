@@ -51,7 +51,11 @@ Useful commands:
 - Project name: Codename Zang (Zang = Persian for rust).
 - CLI binary: `tsz`.
 
-## Operating loop
+## Management loop
+
+This is what do we mean by "managing"
+
+0. Pull origin/rust into TypeScript (the main repo) to have the latest changes
 1. Check all track panes before anything else; if any are waiting or stalled, respond and unblock.
 2. Keep five tracks active; nudge or restart stuck tracks as needed.
 3. Quick risk scan:
