@@ -1,6 +1,6 @@
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Deserialize;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
 use crate::thin_emitter::{ModuleKind, PrinterOptions, ScriptTarget};
@@ -30,6 +30,8 @@ pub struct CompilerOptions {
     #[serde(default)]
     pub jsx: Option<String>,
     #[serde(default)]
+    pub lib: Option<Vec<String>>,
+    #[serde(default)]
     pub root_dir: Option<String>,
     #[serde(default)]
     pub out_dir: Option<String>,
@@ -55,6 +57,7 @@ pub struct ResolvedCompilerOptions {
     pub printer: PrinterOptions,
     pub checker: CheckerOptions,
     pub jsx: Option<JsxEmit>,
+    pub lib_files: Vec<PathBuf>,
     pub root_dir: Option<PathBuf>,
     pub out_dir: Option<PathBuf>,
     pub declaration_dir: Option<PathBuf>,
@@ -75,6 +78,7 @@ impl Default for ResolvedCompilerOptions {
             printer: PrinterOptions::default(),
             checker: CheckerOptions::default(),
             jsx: None,
+            lib_files: Vec::new(),
             root_dir: None,
             out_dir: None,
             declaration_dir: None,
@@ -101,6 +105,10 @@ pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<Res
 
     if let Some(jsx) = options.jsx.as_deref() {
         resolved.jsx = Some(parse_jsx_emit(jsx)?);
+    }
+
+    if let Some(lib_list) = options.lib.as_ref() {
+        resolved.lib_files = resolve_lib_files(lib_list)?;
     }
 
     if let Some(root_dir) = options.root_dir.as_deref() {
@@ -212,6 +220,7 @@ fn merge_compiler_options(base: CompilerOptions, child: CompilerOptions) -> Comp
         target: child.target.or(base.target),
         module: child.module.or(base.module),
         jsx: child.jsx.or(base.jsx),
+        lib: child.lib.or(base.lib),
         root_dir: child.root_dir.or(base.root_dir),
         out_dir: child.out_dir.or(base.out_dir),
         declaration: child.declaration.or(base.declaration),
@@ -271,6 +280,123 @@ fn parse_jsx_emit(value: &str) -> Result<JsxEmit> {
     };
 
     Ok(jsx)
+}
+
+fn resolve_lib_files(lib_list: &[String]) -> Result<Vec<PathBuf>> {
+    if lib_list.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let lib_dir = default_lib_dir()?;
+    let lib_map = build_lib_map(&lib_dir)?;
+    let mut resolved = Vec::new();
+    let mut pending: VecDeque<String> = lib_list
+        .iter()
+        .map(|value| normalize_lib_name(value))
+        .collect();
+    let mut visited = HashSet::new();
+
+    while let Some(lib_name) = pending.pop_front() {
+        if lib_name.is_empty() || !visited.insert(lib_name.clone()) {
+            continue;
+        }
+
+        let path = lib_map
+            .get(&lib_name)
+            .ok_or_else(|| anyhow!("unsupported compilerOptions.lib '{}'", lib_name))?
+            .clone();
+        resolved.push(path.clone());
+
+        let contents = std::fs::read_to_string(&path)
+            .with_context(|| format!("failed to read lib file {}", path.display()))?;
+        for reference in extract_lib_references(&contents) {
+            pending.push_back(reference);
+        }
+    }
+
+    Ok(resolved)
+}
+
+fn default_lib_dir() -> Result<PathBuf> {
+    let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let candidate = manifest_dir.join("..").join("src").join("lib");
+    if candidate.is_dir() {
+        Ok(canonicalize_or_owned(&candidate))
+    } else {
+        bail!("lib directory not found at {}", candidate.display());
+    }
+}
+
+fn build_lib_map(lib_dir: &Path) -> Result<HashMap<String, PathBuf>> {
+    let mut map = HashMap::new();
+    for entry in std::fs::read_dir(lib_dir)
+        .with_context(|| format!("failed to read lib directory {}", lib_dir.display()))?
+    {
+        let entry = entry?;
+        let path = entry.path();
+        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if !file_name.ends_with(".d.ts") {
+            continue;
+        }
+
+        let stem = file_name.trim_end_matches(".d.ts");
+        let stem = stem.strip_suffix(".generated").unwrap_or(stem);
+        let key = normalize_lib_name(stem);
+        map.insert(key, canonicalize_or_owned(&path));
+    }
+
+    Ok(map)
+}
+
+fn extract_lib_references(source: &str) -> Vec<String> {
+    let mut refs = Vec::new();
+    for line in source.lines() {
+        let line = line.trim_start();
+        if !line.starts_with("///") {
+            if line.is_empty() {
+                continue;
+            }
+            break;
+        }
+        if let Some(value) = parse_reference_lib_value(line) {
+            refs.push(normalize_lib_name(value));
+        }
+    }
+    refs
+}
+
+fn parse_reference_lib_value(line: &str) -> Option<&str> {
+    let mut offset = 0;
+    let bytes = line.as_bytes();
+    while let Some(idx) = line[offset..].find("lib=") {
+        let start = offset + idx;
+        if start > 0 {
+            let prev = bytes[start - 1];
+            if !prev.is_ascii_whitespace() && prev != b'<' {
+                offset = start + 4;
+                continue;
+            }
+        }
+        let quote = *bytes.get(start + 4)?;
+        if quote != b'"' && quote != b'\'' {
+            offset = start + 4;
+            continue;
+        }
+        let rest = &line[start + 5..];
+        let end = rest.find(quote as char)?;
+        return Some(&rest[..end]);
+    }
+    None
+}
+
+fn normalize_lib_name(value: &str) -> String {
+    value.trim().to_ascii_lowercase()
+}
+
+fn canonicalize_or_owned(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
 fn normalize_option(value: &str) -> String {

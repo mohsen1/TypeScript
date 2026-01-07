@@ -41,7 +41,13 @@ pub fn compile(args: &CliArgs, cwd: &Path) -> Result<CompilationResult> {
         config.as_ref(),
         out_dir.as_deref(),
     )?;
-    let file_paths = discover_ts_files(&discovery)?;
+    let mut file_paths = discover_ts_files(&discovery)?;
+    if !resolved.lib_files.is_empty() {
+        let mut merged = std::collections::BTreeSet::new();
+        merged.extend(file_paths.into_iter());
+        merged.extend(resolved.lib_files.iter().cloned());
+        file_paths = merged.into_iter().collect();
+    }
     if file_paths.is_empty() {
         bail!("no input files found");
     }

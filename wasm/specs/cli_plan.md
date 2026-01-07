@@ -24,7 +24,7 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
   - [ ] sourceMap
   - [ ] declarationMap
   - [x] noEmitOnError
-  - [ ] lib
+  - [x] lib (resolve `compilerOptions.lib` to src/lib and follow references)
 - [x] Respect `--project` and tsconfig inheritance in CLI.
   - `--project` accepts file or directory
   - `extends` chain already supported

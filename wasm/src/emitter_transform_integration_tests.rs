@@ -1381,6 +1381,40 @@ fn test_two_phase_emission_amd_module_wrapper() {
 }
 
 #[test]
+fn test_two_phase_emission_amd_wrapper_reexport_star() {
+    let source = "export * from \"./dep\";";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::AMD;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("define([\"require\", \"exports\", \"./dep\"]"),
+        "AMD output should include re-export dependency: {}",
+        output
+    );
+    assert!(
+        output.contains("require(\"./dep\")"),
+        "AMD output should require re-export dependency: {}",
+        output
+    );
+    assert!(
+        output.contains("__exportStar("),
+        "AMD output should include __exportStar call: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_umd_module_wrapper() {
     let source = "export const x = 1;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -1413,6 +1447,40 @@ fn test_two_phase_emission_umd_module_wrapper() {
 }
 
 #[test]
+fn test_two_phase_emission_umd_wrapper_reexport_star() {
+    let source = "export * from \"./dep\";";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::UMD;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("(function (factory) {"),
+        "UMD output should include wrapper header: {}",
+        output
+    );
+    assert!(
+        output.contains("require(\"./dep\")"),
+        "UMD output should require re-export dependency: {}",
+        output
+    );
+    assert!(
+        output.contains("__exportStar("),
+        "UMD output should include __exportStar call: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_system_module_wrapper() {
     let source = "import { foo } from \"./bar\"; export const x = foo;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -1441,6 +1509,40 @@ fn test_two_phase_emission_system_module_wrapper() {
     assert!(
         output.contains("execute: function ()"),
         "System output should include execute block"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_system_wrapper_reexport_named() {
+    let source = "export { foo } from \"./dep\";";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::System;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("System.register([\"./dep\"]"),
+        "System output should include dependency list: {}",
+        output
+    );
+    assert!(
+        output.contains("require(\"./dep\")"),
+        "System output should require re-export dependency: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.defineProperty(exports, \"foo\""),
+        "System output should define exported binding: {}",
+        output
     );
 }
 
