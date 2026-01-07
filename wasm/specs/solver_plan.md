@@ -92,6 +92,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Remapped keys returning `never` are filtered from mapped outputs.
 - [x] Add keyof contravariance coverage for intersections
   - `keyof (A & B)` unions keys and stays assignable from `keyof A`.
+- [x] Add error poisoning coverage
+  - `error` is compatible with all types and poisons unions/conditionals.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.

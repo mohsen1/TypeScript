@@ -127,6 +127,10 @@ Status: Active
   - Resolve `Ns["value"]` to exported value members (including alias access).
   - Apply flow narrowing for string-literal element access and report TS2693 for type-only members.
   - Risk: computed element access (non-literal) still falls back to index signature rules.
+- [x] Clear flow narrowing when property/element access bases are reassigned
+  - Treat property/element access chains with stable names as narrowable references.
+  - Clear narrowings when the base object is reassigned.
+  - Risk: complex computed access remains conservative.
 
 ## Baseline / Validation
 - `./wasm/test.sh`

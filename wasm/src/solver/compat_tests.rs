@@ -150,6 +150,15 @@ fn test_unknown_assignability() {
 }
 
 #[test]
+fn test_error_poisoning_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    assert!(checker.is_assignable(TypeId::ERROR, TypeId::STRING));
+    assert!(checker.is_assignable(TypeId::STRING, TypeId::ERROR));
+}
+
+#[test]
 fn test_function_bivariance_default() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
