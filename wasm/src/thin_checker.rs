@@ -2998,6 +2998,29 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    fn resolve_namespace_value_member(&mut self, object_type: TypeId, property_name: &str) -> Option<TypeId> {
+        use crate::solver::{SymbolRef, TypeKey};
+
+        let Some(TypeKey::Ref(SymbolRef(sym_id))) = self.ctx.types.lookup(object_type) else {
+            return None;
+        };
+
+        let symbol = self.ctx.binder.get_symbol(SymbolId(sym_id))?;
+        if symbol.flags & symbol_flags::MODULE == 0 {
+            return None;
+        }
+
+        let exports = symbol.exports.as_ref()?;
+        let member_id = exports.get(property_name)?;
+        if let Some(member_symbol) = self.ctx.binder.get_symbol(member_id) {
+            if member_symbol.flags & symbol_flags::VALUE == 0 && member_symbol.flags & symbol_flags::ALIAS == 0 {
+                return None;
+            }
+        }
+
+        Some(self.get_type_of_symbol(member_id))
+    }
+
     /// Get type of property access expression.
     fn get_type_of_property_access(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
@@ -3044,6 +3067,10 @@ impl<'a> ThinCheckerState<'a> {
         // If it's an identifier, look up the property
         if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
             let property_name = &ident.escaped_text;
+
+            if let Some(member_type) = self.resolve_namespace_value_member(object_type, property_name) {
+                return member_type;
+            }
 
             // Use PropertyAccessEvaluator to resolve the property access
             let evaluator = PropertyAccessEvaluator::new(self.ctx.types);

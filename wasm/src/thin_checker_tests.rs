@@ -3849,6 +3849,43 @@ let missing: Alias.Missing;
 }
 
 #[test]
+fn test_namespace_value_member_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Outer {
+    export const top = 1;
+    export namespace Inner {
+        export const value = 2;
+    }
+}
+import Alias = Outer.Inner;
+const direct = Outer.Inner.value;
+const topValue = Outer.top;
+const viaAlias = Alias.value;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let direct_sym = binder.file_locals.get("direct").expect("direct should exist");
+    let top_sym = binder.file_locals.get("topValue").expect("topValue should exist");
+    let alias_sym = binder.file_locals.get("viaAlias").expect("viaAlias should exist");
+
+    assert_eq!(checker.get_type_of_symbol(direct_sym), TypeId::NUMBER);
+    assert_eq!(checker.get_type_of_symbol(top_sym), TypeId::NUMBER);
+    assert_eq!(checker.get_type_of_symbol(alias_sym), TypeId::NUMBER);
+}
+
+#[test]
 fn test_deep_binary_expression_type_check() {
     use crate::thin_parser::ThinParserState;
 
