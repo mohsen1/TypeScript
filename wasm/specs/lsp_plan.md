@@ -68,7 +68,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
 #### Testing
 
 Latest run:
-- `./wasm/test.sh` ❌ (`src/emitter_transform_integration_tests.rs` `test_two_phase_emission_commonjs_auto_detect_exports`; pre-existing on rust)
+- `./wasm/test.sh` ❌ (`src/emitter_parity_tests.rs` `test_parity_commonjs_export`; pre-existing on rust)
 
 ## Quick Reference
 

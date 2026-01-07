@@ -968,17 +968,14 @@ impl ThinBinderState {
         if let Some(node) = arena.get(idx) {
             if let Some(param) = arena.get_parameter(node) {
                 if let Some(name) = self.get_identifier_name(arena, param.name) {
-                    let sym_id = self.symbols.alloc(symbol_flags::FUNCTION_SCOPED_VARIABLE, name.to_string());
-                    self.current_scope.set(name.to_string(), sym_id);
-                    self.node_symbols.insert(idx.0, sym_id);
+                    let sym_id = self.declare_symbol(name, symbol_flags::FUNCTION_SCOPED_VARIABLE, idx, false);
+                    self.node_symbols.insert(param.name.0, sym_id);
                 } else {
                     let mut names = Vec::new();
                     self.collect_binding_identifiers(arena, param.name, &mut names);
                     for ident_idx in names {
                         if let Some(name) = self.get_identifier_name(arena, ident_idx) {
-                            let sym_id = self.symbols.alloc(symbol_flags::FUNCTION_SCOPED_VARIABLE, name.to_string());
-                            self.current_scope.set(name.to_string(), sym_id);
-                            self.node_symbols.insert(ident_idx.0, sym_id);
+                            self.declare_symbol(name, symbol_flags::FUNCTION_SCOPED_VARIABLE, ident_idx, false);
                         }
                     }
                 }
