@@ -7,10 +7,11 @@ High-performance semantic solver and inference engine aligned with WASM architec
 Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/specs/SOLVER.md`.
 
 ## Current Status
+- Status: Complete.
 - Lowering, inference, compat, and diagnostics are implemented and tested.
 - TypeKey is POD with side-table IDs (lists/shapes/conditional/mapped/template); QueryDatabase/QueryCache entry points exist.
 - Sharded string interner is Arc-backed; solver hot paths use `resolve_atom_ref` to avoid per-lookup allocations.
-- Remaining work is performance tuning (allocation churn, lookup hot paths) and richer built-in type behavior.
+- Future work: performance tuning (allocation churn, lookup hot paths) and richer built-in type behavior as needed.
 
 ## Highest-Impact Next Tasks
 - [x] Make TypeKey POD with side-table slices
@@ -45,6 +46,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Added benchmarks in solver_bench for cached property lookup and normalization.
 - [x] Reduce Vec churn in hot union/intersection paths
   - Added union2/union3/intersection2 helpers and switched common two-member unions to stack-first buffers.
+- [x] Add coverage for union/intersection normalization with unknown
+  - Assert unknown dominates unions and is identity for intersections.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.
