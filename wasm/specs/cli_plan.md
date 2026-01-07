@@ -131,7 +131,7 @@ Tests run in this state:
 - `./wasm/test.sh thin_checker_tests::test_thin_checker_resolves_function_parameter_from_bound_state` (pass).
 - `./wasm/test.sh thin_binder_tests::test_thin_binder_resolves_parameter_from_bound_state` (pass).
 - `./wasm/test.sh thin_binder_tests::test_thin_binder_resolves_parameter_from_bound_state_module_instance_state` (pass).
-- `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (failed: tsz diagnostics; first error remains `src/compiler/binder.ts:432:37` (TS2304 `Cannot find name 'statements'`), captured via `./wasm/target/release/tsz --project src/compiler/tsconfig.json --noEmit 2>&1 | rg -m1 'TS[0-9]+'`).
+- `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (rerun after binder.ts:331 regression; first error remains `src/compiler/binder.ts:432:37` (TS2304 `Cannot find name 'statements'`), captured via `./wasm/target/release/tsz --project src/compiler/tsconfig.json --noEmit 2>&1 | rg -m1 'TS[0-9]+'`).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
