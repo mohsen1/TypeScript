@@ -923,17 +923,22 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
+        // LEGACY FALLBACK: Try old methods for backward compatibility during transition
+        let name = &ident.escaped_text;
+
         // NEW STATELESS APPROACH: Query binder's persistent scope system
         // This enables lazy checking without traversal-order dependency
         if let Some(sym_id) = self.ctx.binder.resolve_identifier(self.ctx.arena, idx) {
             // Get the declared type of the symbol
             let declared_type = self.get_type_of_symbol(sym_id);
-            // Apply control flow analysis to narrow the type
-            return self.apply_flow_narrowing(idx, declared_type);
+            if declared_type != TypeId::ANY {
+                return self.apply_flow_narrowing(idx, declared_type);
+            }
+            if let Some(local_type) = self.lookup_local(name) {
+                return self.apply_flow_narrowing(idx, local_type);
+            }
+            return declared_type;
         }
-
-        // LEGACY FALLBACK: Try old methods for backward compatibility during transition
-        let name = &ident.escaped_text;
 
         // Check local scopes first to get the declared type
         if let Some(declared_type) = self.lookup_local(name) {
@@ -2886,7 +2891,12 @@ impl<'a> ThinCheckerState<'a> {
 
         // Determine final type (declared or inferred from initializer)
         let final_type = if !var_decl.initializer.is_none() {
+            let prev_context = self.ctx.contextual_type;
+            if declared_type != TypeId::ANY {
+                self.ctx.contextual_type = Some(declared_type);
+            }
             let init_type = self.get_type_of_node(var_decl.initializer);
+            self.ctx.contextual_type = prev_context;
 
             // If there's a type annotation, check that initializer is assignable
             if !var_decl.type_annotation.is_none() && declared_type != TypeId::ANY {
