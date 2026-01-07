@@ -27,6 +27,10 @@ Status: Active
 - [x] Emit default re-export specifiers (`export { default ... }`) in declaration emitter.
 - [x] Add parser coverage for default re-export specifiers.
 - [x] Remove inline template helper detection in ThinPrinter (rely on transform helpers).
+- [ ] Remove ThinPrinter auto-lower fallback in favor of explicit TransformDirective usage.
+  - WIP: removed `auto_lower` field + LoweringPass auto-run in `emit()`.
+  - WIP: added `make_printer_with_transforms`/`make_es5_printer` helpers in `thin_emitter_tests.rs` and replaced `new_es5` calls.
+  - TODO: audit remaining callers that implicitly relied on auto-lower (esp. ES5/default paths) and run `./wasm/test.sh thin_emitter` after final adjustments.
 - [x] Stop forcing ES5 target in ThinPrinter defaults (respect `PrinterOptions.target`).
 - [x] Shrink `thin_emitter/mod.rs` for maintainability
   - [x] Extract comment utilities + comment/output helpers into modules (keep API stable).

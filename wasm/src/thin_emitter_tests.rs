@@ -1,12 +1,37 @@
 //! Tests for ThinEmitter
 
+use crate::emit_context::EmitContext;
+use crate::lowering_pass::LoweringPass;
+use crate::thin_emitter::{ModuleKind, PrinterOptions, ScriptTarget, ThinPrinter};
 use crate::thin_parser::ThinParserState;
-use crate::thin_emitter::{PrinterOptions, ThinPrinter};
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
 use crate::solver::TypeInterner;
+use crate::parser::NodeIndex;
 use crate::parser::syntax_kind_ext;
 use serde_json::Value;
+
+fn make_printer_with_transforms<'a>(
+    parser: &'a ThinParserState,
+    root: NodeIndex,
+    options: PrinterOptions,
+    auto_detect_module: bool,
+) -> ThinPrinter<'a> {
+    let mut ctx = EmitContext::with_options(options.clone());
+    ctx.auto_detect_module = auto_detect_module;
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_auto_detect_module(ctx.auto_detect_module);
+    printer
+}
+
+fn make_es5_printer<'a>(parser: &'a ThinParserState, root: NodeIndex) -> ThinPrinter<'a> {
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    make_printer_with_transforms(parser, root, options, false)
+}
 
 #[test]
 fn test_thin_printer_creation() {
@@ -45,7 +70,7 @@ fn test_thin_emitter_source_map_transform_class() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.set_source_map_text(parser.get_source_text());
     printer.enable_source_map("test.js", "test.ts");
     printer.emit(root);
@@ -96,7 +121,7 @@ fn test_thin_emit_variable_declaration() {
     // Initialize scanner by parsing source file (which calls next_token)
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -247,7 +272,7 @@ fn test_thin_emit_for_of_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -315,7 +340,7 @@ fn test_thin_emit_class_method_destructured_param_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -337,7 +362,7 @@ fn test_thin_emit_function_destructured_param_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -359,7 +384,7 @@ fn test_thin_emit_function_default_param_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -381,7 +406,7 @@ fn test_thin_emit_function_destructured_default_param_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -411,7 +436,7 @@ fn test_thin_emit_function_destructured_binding_default_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -433,7 +458,7 @@ fn test_thin_emit_function_rest_param_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -460,7 +485,7 @@ fn test_thin_emit_class_method_default_param_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -482,7 +507,7 @@ fn test_thin_emit_class_method_nested_destructured_param_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -504,7 +529,7 @@ fn test_thin_emit_class_method_rest_param_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -531,7 +556,7 @@ fn test_thin_emit_object_rest_destructuring_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -553,7 +578,7 @@ fn test_thin_emit_array_rest_destructuring_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -575,7 +600,7 @@ fn test_thin_emit_object_literal_computed_shorthand_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -597,7 +622,7 @@ fn test_thin_emit_object_destructuring_default_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -619,7 +644,7 @@ fn test_thin_emit_array_destructuring_default_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -641,7 +666,7 @@ fn test_thin_emit_object_nested_destructuring_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -663,7 +688,7 @@ fn test_thin_emit_object_spread_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -685,7 +710,7 @@ fn test_thin_emit_array_nested_destructuring_es5() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -707,7 +732,7 @@ fn test_thin_emit_arrow_function() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -1246,7 +1271,7 @@ fn test_thin_emit_enum_declaration() {
     let root = parser.parse_source_file();
 
     // ES5 target transforms enum to IIFE
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -1328,7 +1353,7 @@ fn test_thin_pipeline_integration() {
     let _ = &checker.ctx.types; // Access types arena to verify it exists
 
     // Step 4: Emit (ES5)
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(source_file);
 
     let output = printer.get_output();
@@ -1575,7 +1600,7 @@ fn test_thin_emit_static_property() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -1605,7 +1630,7 @@ fn test_thin_emit_static_readonly() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -1620,7 +1645,7 @@ fn test_thin_emit_protected_constructor() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();
@@ -1635,7 +1660,7 @@ fn test_thin_emit_static_get_accessor() {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
 
-    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    let mut printer = make_es5_printer(&parser, root);
     printer.emit(root);
 
     let output = printer.get_output();

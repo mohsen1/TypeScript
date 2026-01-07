@@ -31,7 +31,6 @@ use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::source_writer::{SourcePosition, SourceWriter, source_position_from_offset};
-use crate::lowering_pass::LoweringPass;
 use crate::transform_context::{IdentifierId, TransformContext, TransformDirective};
 use crate::transforms::class_es5::ClassES5Emitter;
 use crate::transforms::enum_es5::EnumES5Emitter;
@@ -218,8 +217,6 @@ pub struct ThinPrinter<'a> {
     /// Transform directives from lowering pass (optional, defaults to empty)
     pub(super) transforms: TransformContext,
 
-    /// Auto-run LoweringPass for source files when transforms are missing.
-    pub(super) auto_lower: bool,
 
     /// Source text for detecting single-line constructs
     pub(super) source_text: Option<&'a str>,
@@ -264,7 +261,6 @@ impl<'a> ThinPrinter<'a> {
             writer,
             ctx,
             transforms: TransformContext::new(), // Empty by default, can be set later
-            auto_lower: true,
             source_text: None,
             source_map_text: None,
             last_processed_pos: 0,
@@ -277,7 +273,6 @@ impl<'a> ThinPrinter<'a> {
     pub fn with_transforms(arena: &'a ThinNodeArena, transforms: TransformContext) -> Self {
         let mut printer = Self::new(arena);
         printer.transforms = transforms;
-        printer.auto_lower = printer.transforms.is_empty();
         printer
     }
 
@@ -289,7 +284,6 @@ impl<'a> ThinPrinter<'a> {
     ) -> Self {
         let mut printer = Self::with_options(arena, options);
         printer.transforms = transforms;
-        printer.auto_lower = printer.transforms.is_empty();
         printer
     }
 
@@ -953,17 +947,6 @@ impl<'a> ThinPrinter<'a> {
     pub fn emit(&mut self, idx: NodeIndex) {
         if idx.is_none() {
             return;
-        }
-
-        if self.auto_lower && self.transforms.is_empty() {
-            let should_lower = self
-                .arena
-                .get(idx)
-                .is_some_and(|node| node.kind == syntax_kind_ext::SOURCE_FILE);
-            if should_lower {
-                let lowering = LoweringPass::new(self.arena, &self.ctx);
-                self.transforms = lowering.run(idx);
-            }
         }
 
         let Some(node) = self.arena.get(idx) else {
