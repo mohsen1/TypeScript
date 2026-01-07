@@ -3,6 +3,7 @@
 //! Separated from thin_parser.rs as per project conventions.
 
 use crate::checker::types::diagnostics::diagnostic_codes;
+use crate::parser::syntax_kind_ext;
 use crate::thin_parser::ThinParserState;
 use std::mem::size_of;
 
@@ -143,6 +144,50 @@ fn test_thin_parser_array_literal() {
 
     assert!(!root.is_none());
     assert!(parser.get_diagnostics().is_empty());
+}
+
+#[test]
+fn test_thin_parser_array_binding_pattern_span() {
+    let source = "const [foo] = bar;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let binding = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN)
+        .expect("array binding pattern not found");
+    let expected_end = source.find(']').expect("] not found") as u32 + 1;
+    assert!(
+        binding.end == expected_end,
+        "span: '{}' ({}..{})",
+        &source[binding.pos as usize..binding.end as usize],
+        binding.pos,
+        binding.end
+    );
+}
+
+#[test]
+fn test_thin_parser_object_binding_pattern_span() {
+    let source = "const { foo } = bar;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let binding = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN)
+        .expect("object binding pattern not found");
+    let expected_end = source.find('}').expect("} not found") as u32 + 1;
+    assert!(
+        binding.end == expected_end,
+        "span: '{}' ({}..{})",
+        &source[binding.pos as usize..binding.end as usize],
+        binding.pos,
+        binding.end
+    );
 }
 
 #[test]

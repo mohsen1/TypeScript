@@ -5230,8 +5230,8 @@ impl ThinParserState {
             }
         }
 
-        self.parse_expected(SyntaxKind::CloseBraceToken);
         let end_pos = self.token_end();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
 
         self.arena.add_binding_pattern(
             syntax_kind_ext::OBJECT_BINDING_PATTERN,

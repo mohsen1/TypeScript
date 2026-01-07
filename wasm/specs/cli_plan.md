@@ -32,28 +32,28 @@ Implement a high-performance, `tsc`-compatible command-line interface. This driv
 - [x] **JSONC Parsing**
   - [x] Implement `tsconfig.json` parser that handles comments (JSONC).
   - [x] Support `extends` inheritance (recursive loading).
-- [ ] **Option Mapping**
+- [x] **Option Mapping**
   - [x] Map `tsconfig` "compilerOptions" to internal `PrinterOptions` (Emitter) and `CheckerOptions`.
-  - Handle `include`, `exclude`, and `files` globs.
+  - [x] Handle `include`, `exclude`, and `files` globs.
 
 ### Phase 3: The Driver (Orchestration)
 - [x] **File Discovery**
   - [x] Implement efficient globbing to find all `.ts` files based on config.
-- [ ] **Pipeline Connection**
-  - Wire up `parallel::compile_files` (Parser/Binder) to the discovered files.
-  - Wire up `thin_checker::check_source_file` for type checking.
-  - Wire up `thin_emitter::emit` for output generation.
-- [ ] **Output Writer**
-  - Implement parallel file writing for emitted `.js` and `.d.ts` files to `outDir`.
-  - Ensure directory structures are created.
+- [x] **Pipeline Connection**
+  - [x] Wire up `parallel::compile_files` (Parser/Binder) to the discovered files.
+  - [x] Wire up `thin_checker::check_source_file` for type checking.
+  - [x] Wire up `thin_emitter::emit` for output generation.
+- [x] **Output Writer**
+  - [x] Implement parallel file writing for emitted `.js` and `.d.ts` files to `outDir`.
+  - [x] Ensure directory structures are created.
 
 ### Phase 4: Diagnostics & Reporting
-- [ ] **Diagnostic Formatter**
-  - Implement a reporter that looks like `tsc` (file.ts:line:col - error TS1234: Message).
-  - Add color support (`colored` crate).
-  - Integrate `solver::diagnostics` output into the CLI reporter.
-- [ ] **Exit Codes**
-  - Return proper exit codes (0 for success, 1 for errors) based on diagnostic severity.
+- [x] **Diagnostic Formatter**
+  - [x] Implement a reporter that looks like `tsc` (file.ts:line:col - error TS1234: Message).
+  - [x] Add color support (`colored` crate).
+  - [x] Integrate `solver::diagnostics` output into the CLI reporter.
+- [x] **Exit Codes**
+  - [x] Return proper exit codes (0 for success, 1 for errors) based on diagnostic severity.
 
 ### Phase 5: Watch Mode (The Speed Demon)
 - [ ] **File Watching**

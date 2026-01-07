@@ -120,6 +120,8 @@ fn resolve_compiler_options_overrides() {
             "target": "ES2020",
             "module": "common-js",
             "outDir": "dist",
+            "declaration": true,
+            "declarationDir": "types",
             "strict": true,
             "noEmit": true
           }
@@ -133,6 +135,8 @@ fn resolve_compiler_options_overrides() {
     assert_eq!(resolved.printer.target, ScriptTarget::ES2020);
     assert_eq!(resolved.printer.module, ModuleKind::CommonJS);
     assert_eq!(resolved.out_dir, Some(PathBuf::from("dist")));
+    assert_eq!(resolved.declaration_dir, Some(PathBuf::from("types")));
+    assert!(resolved.emit_declarations);
     assert!(resolved.checker.strict);
     assert!(resolved.no_emit);
 }

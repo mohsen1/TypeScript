@@ -603,10 +603,7 @@ impl ThinBinderState {
 
             // Binary expressions - traverse into operands
             k if k == syntax_kind_ext::BINARY_EXPRESSION => {
-                if let Some(bin) = arena.get_binary_expr(node) {
-                    self.bind_node(arena, bin.left);
-                    self.bind_node(arena, bin.right);
-                }
+                self.bind_binary_expression_iterative(arena, idx);
             }
 
             // Conditional expressions - traverse into branches
@@ -1727,6 +1724,56 @@ impl ThinBinderState {
     // Expression binding for flow analysis
     // =========================================================================
 
+    // Avoid deep recursion on large left-associative binary expression chains.
+    fn bind_binary_expression_iterative(&mut self, arena: &ThinNodeArena, root: NodeIndex) {
+        let mut stack = vec![root];
+        while let Some(idx) = stack.pop() {
+            let node = match arena.get(idx) {
+                Some(n) => n,
+                None => continue,
+            };
+
+            if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+                if let Some(bin) = arena.get_binary_expr(node) {
+                    if !bin.right.is_none() {
+                        stack.push(bin.right);
+                    }
+                    if !bin.left.is_none() {
+                        stack.push(bin.left);
+                    }
+                }
+                continue;
+            }
+
+            self.bind_node(arena, idx);
+        }
+    }
+
+    fn bind_binary_expression_flow_iterative(&mut self, arena: &ThinNodeArena, root: NodeIndex) {
+        let mut stack = vec![root];
+        while let Some(idx) = stack.pop() {
+            let node = match arena.get(idx) {
+                Some(n) => n,
+                None => continue,
+            };
+
+            if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+                self.record_flow(idx);
+                if let Some(bin) = arena.get_binary_expr(node) {
+                    if !bin.right.is_none() {
+                        stack.push(bin.right);
+                    }
+                    if !bin.left.is_none() {
+                        stack.push(bin.left);
+                    }
+                }
+                continue;
+            }
+
+            self.bind_expression(arena, idx);
+        }
+    }
+
     /// Bind an expression and record flow positions for identifiers.
     /// This is used for condition expressions in if/while/for statements.
     fn bind_expression(&mut self, arena: &ThinNodeArena, idx: NodeIndex) {
@@ -1739,6 +1786,11 @@ impl ThinBinderState {
             None => return,
         };
 
+        if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            self.bind_binary_expression_flow_iterative(arena, idx);
+            return;
+        }
+
         // Record flow position for this node
         self.record_flow(idx);
 
@@ -1746,15 +1798,6 @@ impl ThinBinderState {
             // Identifiers - record flow position for type narrowing
             k if k == SyntaxKind::Identifier as u16 => {
                 // Already recorded above
-                return;
-            }
-
-            // Binary expressions - recurse into operands
-            k if k == syntax_kind_ext::BINARY_EXPRESSION => {
-                if let Some(bin) = arena.get_binary_expr(node) {
-                    self.bind_expression(arena, bin.left);
-                    self.bind_expression(arena, bin.right);
-                }
                 return;
             }
 

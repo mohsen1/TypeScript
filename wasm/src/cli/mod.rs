@@ -2,7 +2,9 @@
 
 pub mod args;
 pub mod config;
+pub mod driver;
 pub mod fs;
+pub mod reporter;
 
 #[cfg(test)]
 mod args_tests;
@@ -10,3 +12,7 @@ mod args_tests;
 mod config_tests;
 #[cfg(test)]
 mod fs_tests;
+#[cfg(test)]
+mod driver_tests;
+#[cfg(test)]
+mod reporter_tests;
