@@ -1069,6 +1069,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 LiteralValue::BigInt(_) => Some(IntrinsicKind::Bigint),
                 LiteralValue::Boolean(_) => Some(IntrinsicKind::Boolean),
             },
+            TypeKey::TemplateLiteral(_) => Some(IntrinsicKind::String),
             _ => None,
         }
     }

@@ -787,6 +787,24 @@ fn test_index_access_string_literal_member() {
 }
 
 #[test]
+fn test_index_access_template_literal_members() {
+    let interner = TypeInterner::new();
+
+    let template = interner.intern(TypeKey::TemplateLiteral(vec![
+        TemplateSpan::Text(interner.intern_string("prefix")),
+        TemplateSpan::Type(TypeId::STRING),
+        TemplateSpan::Text(interner.intern_string("suffix")),
+    ]));
+
+    let length_key = interner.literal_string("length");
+    let length_type = evaluate_index_access(&interner, template, length_key);
+    assert_eq!(length_type, TypeId::NUMBER);
+
+    let number_index = evaluate_index_access(&interner, template, TypeId::NUMBER);
+    assert_eq!(number_index, TypeId::STRING);
+}
+
+#[test]
 fn test_keyof_readonly_array() {
     let interner = TypeInterner::new();
 
