@@ -2194,6 +2194,41 @@ const value = tup[idx];
 }
 
 #[test]
+fn test_checker_lowers_element_access_mixed_literal_key_union() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+const arr: string[] = ["a"];
+let key: "length" | 0;
+const value = arr[key];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    let value_key = types.lookup(value_type).expect("value type should exist");
+    match value_key {
+        TypeKey::Union(members) => {
+            assert!(members.contains(&TypeId::STRING));
+            assert!(members.contains(&TypeId::NUMBER));
+            assert_eq!(members.len(), 2);
+        }
+        _ => panic!("Expected union type for value, got {:?}", value_key),
+    }
+}
+
+#[test]
 fn test_checker_element_access_reports_nullable_object() {
     use crate::thin_parser::ThinParserState;
 

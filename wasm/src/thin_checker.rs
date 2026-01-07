@@ -1760,13 +1760,38 @@ impl<'a> ThinCheckerState<'a> {
         let mut report_no_index = false;
         let mut use_index_signature_check = true;
 
-        if let Some(keys) = self.get_literal_string_keys_from_type(index_type) {
-            if keys.len() > 1 || literal_string_is_none {
-                use_index_signature_check = false;
-                result_type = self.get_element_access_type_for_literal_keys(object_type_for_access, &keys);
-                if result_type.is_none() {
-                    report_no_index = true;
-                    result_type = Some(TypeId::ANY);
+        if literal_index.is_none() {
+            if let Some((string_keys, number_keys)) = self.get_literal_key_union_from_type(index_type) {
+                let total_keys = string_keys.len() + number_keys.len();
+                if total_keys > 1 || literal_string_is_none {
+                    if !string_keys.is_empty() && number_keys.is_empty() {
+                        use_index_signature_check = false;
+                    }
+
+                    let mut types = Vec::new();
+                    if !string_keys.is_empty() {
+                        match self.get_element_access_type_for_literal_keys(object_type_for_access, &string_keys) {
+                            Some(result) => types.push(result),
+                            None => report_no_index = true,
+                        }
+                    }
+
+                    if !number_keys.is_empty() {
+                        match self.get_element_access_type_for_literal_number_keys(object_type_for_access, &number_keys) {
+                            Some(result) => types.push(result),
+                            None => report_no_index = true,
+                        }
+                    }
+
+                    if report_no_index {
+                        result_type = Some(TypeId::ANY);
+                    } else if !types.is_empty() {
+                        result_type = Some(if types.len() == 1 {
+                            types[0]
+                        } else {
+                            self.ctx.types.union(types)
+                        });
+                    }
                 }
             }
         }
@@ -1789,12 +1814,6 @@ impl<'a> ThinCheckerState<'a> {
                         }
                     });
                 }
-            }
-        }
-
-        if result_type.is_none() && literal_index.is_none() {
-            if let Some(keys) = self.get_literal_number_keys_from_type(index_type) {
-                result_type = self.get_element_access_type_for_literal_number_keys(object_type_for_access, &keys);
             }
         }
 
@@ -2046,39 +2065,23 @@ impl<'a> ThinCheckerState<'a> {
         Some(value as usize)
     }
 
-    fn get_literal_string_keys_from_type(&self, index_type: TypeId) -> Option<Vec<Atom>> {
+    fn get_literal_key_union_from_type(&self, index_type: TypeId) -> Option<(Vec<Atom>, Vec<f64>)> {
         use crate::solver::{LiteralValue, TypeKey};
 
         match self.ctx.types.lookup(index_type)? {
-            TypeKey::Literal(LiteralValue::String(atom)) => Some(vec![atom]),
+            TypeKey::Literal(LiteralValue::String(atom)) => Some((vec![atom], Vec::new())),
+            TypeKey::Literal(LiteralValue::Number(num)) => Some((Vec::new(), vec![num.0])),
             TypeKey::Union(members) => {
-                let mut keys = Vec::with_capacity(members.len());
+                let mut string_keys = Vec::with_capacity(members.len());
+                let mut number_keys = Vec::new();
                 for &member in members.iter() {
                     match self.ctx.types.lookup(member) {
-                        Some(TypeKey::Literal(LiteralValue::String(atom))) => keys.push(atom),
+                        Some(TypeKey::Literal(LiteralValue::String(atom))) => string_keys.push(atom),
+                        Some(TypeKey::Literal(LiteralValue::Number(num))) => number_keys.push(num.0),
                         _ => return None,
                     }
                 }
-                Some(keys)
-            }
-            _ => None,
-        }
-    }
-
-    fn get_literal_number_keys_from_type(&self, index_type: TypeId) -> Option<Vec<f64>> {
-        use crate::solver::{LiteralValue, TypeKey};
-
-        match self.ctx.types.lookup(index_type)? {
-            TypeKey::Literal(LiteralValue::Number(num)) => Some(vec![num.0]),
-            TypeKey::Union(members) => {
-                let mut keys = Vec::with_capacity(members.len());
-                for &member in members.iter() {
-                    match self.ctx.types.lookup(member) {
-                        Some(TypeKey::Literal(LiteralValue::Number(num))) => keys.push(num.0),
-                        _ => return None,
-                    }
-                }
-                Some(keys)
+                Some((string_keys, number_keys))
             }
             _ => None,
         }
@@ -2179,11 +2182,12 @@ impl<'a> ThinCheckerState<'a> {
             return false;
         }
 
+        let literal_keys = self.get_literal_key_union_from_type(index_type);
         let wants_number = index_type == TypeId::NUMBER
             || literal_index.is_some()
-            || self.get_literal_number_keys_from_type(index_type).is_some();
+            || literal_keys.as_ref().is_some_and(|(_, number_keys)| !number_keys.is_empty());
         let wants_string = index_type == TypeId::STRING
-            || self.get_literal_string_keys_from_type(index_type).is_some();
+            || literal_keys.as_ref().is_some_and(|(string_keys, _)| !string_keys.is_empty());
         if !wants_number && !wants_string {
             return false;
         }

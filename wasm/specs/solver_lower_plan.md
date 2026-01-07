@@ -154,6 +154,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: checker element access unions numeric literal tuple indices
   - [x] Test: checker element access reports nullish object (2532)
   - [x] Test: checker element access optional chain unions undefined
+  - [x] Test: checker element access unions mixed string/number literal keys
 - [x] Parser: fix interface member parsing to track progress by token position (avoid skipping consecutive identifiers)
 - [x] Perf: avoid extra String clone when lowering negative bigint literals
 - [x] Perf: avoid extra allocation when normalizing bigint leading zeros
