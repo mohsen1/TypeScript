@@ -743,8 +743,8 @@ impl<'a> LoweringPass<'a> {
             self.has_default_modifier(&class.modifiers)
         };
 
-        // Get class name for export
-        let class_name = if !class.name.is_none() {
+        // Get class name only if we might need it for exports.
+        let class_name = if is_exported && !class.name.is_none() {
             Some(self.get_identifier_text(class.name))
         } else {
             None
