@@ -93,6 +93,32 @@ fn test_project_cross_file_references_tsx_import() {
 }
 
 #[test]
+fn test_project_rename_cross_file() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "export const value = 1;\n".to_string());
+    project.set_file(
+        "b.ts".to_string(),
+        "import { value } from \"./a\";\nvalue;\n".to_string(),
+    );
+
+    let edits = project
+        .get_rename_edits("b.ts", Position::new(1, 0), "renamed".to_string())
+        .expect("Expected rename edits");
+
+    let a_file = project.file("a.ts").unwrap();
+    let b_file = project.file("b.ts").unwrap();
+    let a_edits = edits.changes.get("a.ts").expect("Expected edits for a.ts");
+    let b_edits = edits.changes.get("b.ts").expect("Expected edits for b.ts");
+
+    let updated_a = apply_text_edits(a_file.source_text(), a_file.line_map(), a_edits);
+    let updated_b = apply_text_edits(b_file.source_text(), b_file.line_map(), b_edits);
+
+    assert_eq!(updated_a, "export const renamed = 1;\n");
+    assert_eq!(updated_b, "import { renamed } from \"./a\";\nrenamed;\n");
+}
+
+#[test]
 fn test_project_update_file_applies_edits() {
     let mut project = Project::new();
     project.set_file("a.ts".to_string(), "const value = 1;\n".to_string());

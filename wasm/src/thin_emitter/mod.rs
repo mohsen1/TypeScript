@@ -27,8 +27,7 @@ use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::source_writer::SourceWriter;
 use crate::lowering_pass::LoweringPass;
-use crate::transform_context::TransformDirective;
-use crate::transform_context::TransformContext;
+use crate::transform_context::{IdentifierId, TransformContext, TransformDirective};
 use crate::transforms::class_es5::ClassES5Emitter;
 use crate::transforms::enum_es5::EnumES5Emitter;
 use crate::transforms::namespace_es5::NamespaceES5Emitter;
@@ -382,7 +381,7 @@ enum EmitDirective {
     ES5Namespace { namespace_node: NodeIndex },
     ES5Enum { enum_node: NodeIndex },
     CommonJSExport {
-        names: Vec<String>,
+        names: Vec<IdentifierId>,
         is_default: bool,
         inner: Box<EmitDirective>,
     },
@@ -880,7 +879,7 @@ impl<'a> ThinPrinter<'a> {
                 is_default,
                 inner,
             } => {
-                let export_name = names.first().map(|name| name.as_str());
+                let export_name = names.first().copied();
                 self.emit_commonjs_export(names.as_slice(), is_default, |this| {
                     this.emit_commonjs_inner(node, idx, inner.as_ref(), export_name);
                 });
@@ -1000,7 +999,12 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
-    fn emit_commonjs_export<F>(&mut self, names: &[String], is_default: bool, mut emit_inner: F)
+    fn emit_commonjs_export<F>(
+        &mut self,
+        names: &[IdentifierId],
+        is_default: bool,
+        mut emit_inner: F,
+    )
     where
         F: FnMut(&mut Self),
     {
@@ -1019,7 +1023,7 @@ impl<'a> ThinPrinter<'a> {
         self.write_line();
         if is_default {
             self.write("exports.default = ");
-            self.write(&names[0]);
+            self.write_identifier_by_id(names[0]);
             self.write(";");
         } else {
             for (i, name) in names.iter().enumerate() {
@@ -1027,9 +1031,9 @@ impl<'a> ThinPrinter<'a> {
                     self.write_line();
                 }
                 self.write("exports.");
-                self.write(name);
+                self.write_identifier_by_id(*name);
                 self.write(" = ");
-                self.write(name);
+                self.write_identifier_by_id(*name);
                 self.write(";");
             }
         }
@@ -1095,7 +1099,7 @@ impl<'a> ThinPrinter<'a> {
         node: &ThinNode,
         idx: NodeIndex,
         inner: &EmitDirective,
-        export_name: Option<&str>,
+        export_name: Option<IdentifierId>,
     ) {
         match inner {
             EmitDirective::ES5Class { class_node } => {
@@ -1127,8 +1131,14 @@ impl<'a> ThinPrinter<'a> {
                         if !func.name.is_none() {
                             let func_name = self.get_identifier_text_idx(func.name);
                             self.emit_async_function_es5(func, &func_name, "this");
+                        } else if let Some(export_name) = export_name {
+                            if let Some(ident) = self.arena.identifiers.get(export_name as usize) {
+                                self.emit_async_function_es5(func, &ident.escaped_text, "this");
+                            } else {
+                                self.emit_async_function_es5(func, "", "this");
+                            }
                         } else {
-                            self.emit_async_function_es5(func, export_name.unwrap_or(""), "this");
+                            self.emit_async_function_es5(func, "", "this");
                         }
                     }
                 }
@@ -1224,7 +1234,7 @@ impl<'a> ThinPrinter<'a> {
                 is_default,
                 inner,
             } => {
-                let export_name = names.first().map(|name| name.as_str());
+                let export_name = names.first().copied();
                 self.emit_commonjs_export(names.as_slice(), *is_default, |this| {
                     if index == 0 {
                         this.emit_commonjs_inner(node, idx, inner.as_ref(), export_name);
@@ -2073,6 +2083,12 @@ impl<'a> ThinPrinter<'a> {
 
     fn emit_identifier(&mut self, node: &ThinNode) {
         if let Some(ident) = self.arena.get_identifier(node) {
+            self.write(&ident.escaped_text);
+        }
+    }
+
+    fn write_identifier_by_id(&mut self, id: IdentifierId) {
+        if let Some(ident) = self.arena.identifiers.get(id as usize) {
             self.write(&ident.escaped_text);
         }
     }
