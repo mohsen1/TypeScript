@@ -2283,6 +2283,11 @@ impl<'a> ThinPrinter<'a> {
         captures_this: bool,
     ) {
         let needs_this_capture = captures_this;
+        let parent_this_expr = if self.ctx.arrow_state.this_capture_depth > 0 {
+            "_this"
+        } else {
+            "this"
+        };
 
         if needs_this_capture {
             self.write("(function (_this) { return ");
@@ -2290,7 +2295,11 @@ impl<'a> ThinPrinter<'a> {
         }
 
         if func.is_async {
-            let this_expr = if needs_this_capture { "_this" } else { "this" };
+            let this_expr = if needs_this_capture {
+                "_this"
+            } else {
+                parent_this_expr
+            };
             self.emit_async_function_es5(func, "", this_expr);
         } else {
             self.write("function (");
@@ -2348,7 +2357,7 @@ impl<'a> ThinPrinter<'a> {
         if needs_this_capture {
             self.ctx.arrow_state.this_capture_depth -= 1;
             self.write("; })(");
-            self.write("this");
+            self.write(parent_this_expr);
             self.write("))");
         }
     }
