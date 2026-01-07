@@ -59,6 +59,54 @@ fn test_lower_literal_number_type() {
 }
 
 #[test]
+fn test_lower_literal_hex_number_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0xFF;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 255.0);
+        }
+        _ => panic!("Expected hex literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_binary_number_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0b1010;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 10.0);
+        }
+        _ => panic!("Expected binary literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_octal_number_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0o77;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 63.0);
+        }
+        _ => panic!("Expected octal literal type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_literal_bigint_type() {
     let (arena, type_idx) = parse_type_alias_type_node("type T = 123n;");
     let interner = TypeInterner::new();
@@ -87,6 +135,22 @@ fn test_lower_literal_negative_number_type() {
             assert_eq!(num.0, -42.0);
         }
         _ => panic!("Expected negative number literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_negative_hex_number_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = -0x2A;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, -42.0);
+        }
+        _ => panic!("Expected negative hex literal type, got {:?}", key),
     }
 }
 

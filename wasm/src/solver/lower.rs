@@ -1100,6 +1100,47 @@ impl<'a> TypeLowering<'a> {
         }
     }
 
+    fn parse_numeric_literal_value(&self, value: Option<f64>, text: &str) -> Option<f64> {
+        if let Some(value) = value {
+            return Some(value);
+        }
+
+        if let Some(rest) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
+            return Self::parse_radix_digits(rest, 16);
+        }
+        if let Some(rest) = text.strip_prefix("0b").or_else(|| text.strip_prefix("0B")) {
+            return Self::parse_radix_digits(rest, 2);
+        }
+        if let Some(rest) = text.strip_prefix("0o").or_else(|| text.strip_prefix("0O")) {
+            return Self::parse_radix_digits(rest, 8);
+        }
+
+        text.parse::<f64>().ok()
+    }
+
+    fn parse_radix_digits(text: &str, base: u32) -> Option<f64> {
+        if text.is_empty() {
+            return None;
+        }
+
+        let mut value = 0f64;
+        let base_value = base as f64;
+        for &byte in text.as_bytes() {
+            let digit = match byte {
+                b'0'..=b'9' => (byte - b'0') as u32,
+                b'a'..=b'f' => (byte - b'a' + 10) as u32,
+                b'A'..=b'F' => (byte - b'A' + 10) as u32,
+                _ => return None,
+            };
+            if digit >= base {
+                return None;
+            }
+            value = value * base_value + digit as f64;
+        }
+
+        Some(value)
+    }
+
     /// Lower a literal type ("foo", 42, etc.)
     fn lower_literal_type(&self, node_idx: NodeIndex) -> TypeId {
         let node = match self.arena.get(node_idx) {
@@ -1120,8 +1161,8 @@ impl<'a> TypeLowering<'a> {
                     }
                     k if k == SyntaxKind::NumericLiteral as u16 => {
                         if let Some(lit_data) = self.arena.get_literal(literal_node) {
-                            if let Ok(n) = lit_data.text.parse::<f64>() {
-                                self.interner.literal_number(n)
+                            if let Some(value) = self.parse_numeric_literal_value(lit_data.value, &lit_data.text) {
+                                self.interner.literal_number(value)
                             } else {
                                 TypeId::NUMBER
                             }
@@ -1152,8 +1193,8 @@ impl<'a> TypeLowering<'a> {
                             match operand_node.kind {
                                 k if k == SyntaxKind::NumericLiteral as u16 => {
                                     if let Some(lit_data) = self.arena.get_literal(operand_node) {
-                                        if let Ok(n) = lit_data.text.parse::<f64>() {
-                                            let value = if op == SyntaxKind::MinusToken as u16 { -n } else { n };
+                                        if let Some(value) = self.parse_numeric_literal_value(lit_data.value, &lit_data.text) {
+                                            let value = if op == SyntaxKind::MinusToken as u16 { -value } else { value };
                                             self.interner.literal_number(value)
                                         } else {
                                             TypeId::NUMBER
