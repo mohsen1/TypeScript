@@ -30,7 +30,7 @@ use rayon::prelude::*;
 use std::sync::Arc;
 use crate::thin_parser::{ParseDiagnostic, ThinParserState};
 use crate::thin_binder::ThinBinderState;
-use crate::binder::{SymbolArena, SymbolTable, SymbolId};
+use crate::binder::{Scope, ScopeId, SymbolArena, SymbolId, SymbolTable};
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
 use rustc_hash::FxHashMap;
@@ -124,6 +124,10 @@ pub struct BindResult {
     pub file_locals: SymbolTable,
     /// Node-to-symbol mapping
     pub node_symbols: FxHashMap<u32, SymbolId>,
+    /// Persistent scopes for stateless checking
+    pub scopes: Vec<Scope>,
+    /// Map from AST node to scope ID
+    pub node_scope_ids: FxHashMap<u32, ScopeId>,
     /// Parse diagnostics
     pub parse_diagnostics: Vec<ParseDiagnostic>,
 }
@@ -159,6 +163,8 @@ pub fn parse_and_bind_parallel(files: Vec<(String, String)>) -> Vec<BindResult> 
                 symbols: binder.symbols,
                 file_locals: binder.file_locals,
                 node_symbols: binder.node_symbols,
+                scopes: binder.scopes,
+                node_scope_ids: binder.node_scope_ids,
                 parse_diagnostics,
             }
         })
@@ -182,6 +188,8 @@ pub fn parse_and_bind_single(file_name: String, source_text: String) -> BindResu
         symbols: binder.symbols,
         file_locals: binder.file_locals,
         node_symbols: binder.node_symbols,
+        scopes: binder.scopes,
+        node_scope_ids: binder.node_scope_ids,
         parse_diagnostics,
     }
 }
@@ -232,6 +240,10 @@ pub struct BoundFile {
     pub arena: Arc<ThinNodeArena>,
     /// Node-to-symbol mapping (symbol IDs are global after merge)
     pub node_symbols: FxHashMap<u32, SymbolId>,
+    /// Persistent scopes (symbol IDs are global after merge)
+    pub scopes: Vec<Scope>,
+    /// Map from AST node to scope ID
+    pub node_scope_ids: FxHashMap<u32, ScopeId>,
     /// Parse diagnostics
     pub parse_diagnostics: Vec<ParseDiagnostic>,
 }
@@ -308,6 +320,22 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
             }
         }
 
+        let mut remapped_scopes = Vec::with_capacity(result.scopes.len());
+        for scope in &result.scopes {
+            let mut table = SymbolTable::new();
+            for (name, old_sym_id) in scope.table.iter() {
+                if let Some(&new_sym_id) = id_remap.get(old_sym_id) {
+                    table.set(name.clone(), new_sym_id);
+                }
+            }
+            remapped_scopes.push(Scope {
+                parent: scope.parent,
+                table,
+                kind: scope.kind,
+                container_node: scope.container_node,
+            });
+        }
+
         file_locals_list.push(remapped_file_locals);
 
         files.push(BoundFile {
@@ -315,6 +343,8 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
             source_file: result.source_file,
             arena: Arc::clone(&result.arena),
             node_symbols: remapped_node_symbols,
+            scopes: remapped_scopes,
+            node_scope_ids: result.node_scope_ids.clone(),
             parse_diagnostics: result.parse_diagnostics.clone(),
         });
     }
@@ -577,10 +607,12 @@ fn create_binder_from_bound_file(file: &BoundFile, program: &MergedProgram, file
         }
     }
 
-    ThinBinderState::from_bound_state(
+    ThinBinderState::from_bound_state_with_scopes(
         program.symbols.clone(),
         file_locals,
         file.node_symbols.clone(),
+        file.scopes.clone(),
+        file.node_scope_ids.clone(),
     )
 }
 

@@ -28,7 +28,9 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Bench helper: suppress speculative type-argument diagnostics so `index < (chain.length - 1)` parses as relational (checker.ts:8505:110).
 - Bench helper: arrow lookahead parses return types after `)` to avoid false `=>` expectation in conditional branches (checker.ts:15885).
 - Focused parser coverage for checker.ts:15885 (`everyType` arrow with optional chaining + ternary/comma) via `test_thin_parser_checker_every_type_arrow_optional_chain` and `test_thin_parser_checker_every_type_arrow_optional_chain_line`.
-- Latest bench gap from rerun: `src/compiler/binder.ts:331:9` (TS2304: cannot find name `node`).
+- Bound file merge now preserves persistent scopes for stateless checking; CLI binder reconstruction uses them to resolve locals.
+- Focused checker regression: `test_thin_checker_resolves_function_parameter_from_bound_state`.
+- Latest bench gap from rerun: `src/compiler/binder.ts:432:37` (TS2304: cannot find name `statements`).
 - Latest attempt: `npm install --no-save --no-package-lock typescript @types/node`, `cargo build --release --bin tsz`, `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` → tsz failed before timing; tsc not run.
 - Bench harness update: fixed BSD `/usr/bin/time -l` parsing in `wasm/bench_cli.sh` so elapsed time is read from the `real` token.
 - Synthetic benchmark (1000-file project in `/tmp/tsz_bench_large` with minimal `globals.d.ts`): `./wasm/bench_cli.sh --repo /tmp/tsz_bench_large --tsconfig tsconfig.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` → tsz avg 0.170s best 0.170s max_rss 19.6 MiB; tsc avg 0.200s best 0.200s max_rss 141.3 MiB. Next: run on real repo once optional chaining + lib parsing land.
@@ -125,7 +127,8 @@ Tests run in this state:
 - `./wasm/test.sh thin_parser_tests::test_thin_parser_arrow_optional_chain_with_ternary_comma` (pass).
 - `./wasm/test.sh thin_parser_tests::test_thin_parser_checker_every_type_arrow_optional_chain` (pass).
 - `./wasm/test.sh thin_parser_tests::test_thin_parser_checker_every_type_arrow_optional_chain_line` (pass).
-- `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (failed: tsz diagnostics; rerun after 15885 test still reports `src/compiler/binder.ts:331:9` (TS2304 `Cannot find name 'node'`)).
+- `./wasm/test.sh thin_checker_tests::test_thin_checker_resolves_function_parameter_from_bound_state` (pass).
+- `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (failed: tsz diagnostics; first error now `src/compiler/binder.ts:432:37` (TS2304 `Cannot find name 'statements'`), captured via `./wasm/target/release/tsz --project src/compiler/tsconfig.json --noEmit 2>&1 | rg -m1 'TS[0-9]+'`).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches

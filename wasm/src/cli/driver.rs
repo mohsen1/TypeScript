@@ -2832,10 +2832,12 @@ fn create_binder_from_bound_file(
         }
     }
 
-    ThinBinderState::from_bound_state(
+    ThinBinderState::from_bound_state_with_scopes(
         program.symbols.clone(),
         file_locals,
         file.node_symbols.clone(),
+        file.scopes.clone(),
+        file.node_scope_ids.clone(),
     )
 }
 

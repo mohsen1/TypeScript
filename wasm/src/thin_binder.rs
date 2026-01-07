@@ -142,6 +142,39 @@ impl ThinBinderState {
         }
     }
 
+    /// Create a ThinBinderState from existing bound state, preserving scopes.
+    pub fn from_bound_state_with_scopes(
+        symbols: SymbolArena,
+        file_locals: SymbolTable,
+        node_symbols: FxHashMap<u32, SymbolId>,
+        scopes: Vec<Scope>,
+        node_scope_ids: FxHashMap<u32, ScopeId>,
+    ) -> Self {
+        let mut flow_nodes = FlowNodeArena::new();
+        let unreachable_flow = flow_nodes.alloc(flow_flags::UNREACHABLE);
+
+        ThinBinderState {
+            symbols,
+            current_scope: SymbolTable::new(),
+            scope_stack: Vec::new(),
+            file_locals,
+            flow_nodes,
+            current_flow: FlowNodeId::NONE,
+            unreachable_flow,
+            scope_chain: Vec::new(),
+            current_scope_idx: 0,
+            node_symbols,
+            node_flow: FxHashMap::default(),
+            top_level_flow: FxHashMap::default(),
+            switch_clause_to_switch: FxHashMap::default(),
+            hoisted_vars: Vec::new(),
+            hoisted_functions: Vec::new(),
+            scopes,
+            node_scope_ids,
+            current_scope_id: ScopeId::NONE,
+        }
+    }
+
     /// Resolve an identifier to a symbol by walking up the persistent scope tree.
     /// This method enables stateless checking - the checker can query scope information
     /// without maintaining a traversal-order-dependent stack.

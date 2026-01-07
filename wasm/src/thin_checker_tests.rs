@@ -139,6 +139,54 @@ takesFoo(obj);
 }
 
 #[test]
+fn test_thin_checker_resolves_function_parameter_from_bound_state() {
+    use crate::binder::SymbolTable;
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::parallel;
+
+    let source = r#"
+export function f(node: { body: number }) {
+    if (node.body) {
+        return node.body;
+    }
+    return node.body;
+}
+"#;
+
+    let program = parallel::compile_files(vec![("test.ts".to_string(), source.to_string())]);
+    let file = &program.files[0];
+
+    let mut file_locals = SymbolTable::new();
+    for (name, &sym_id) in program.file_locals[0].iter() {
+        file_locals.set(name.clone(), sym_id);
+    }
+    for (name, &sym_id) in program.globals.iter() {
+        if !file_locals.has(name) {
+            file_locals.set(name.clone(), sym_id);
+        }
+    }
+
+    let binder = ThinBinderState::from_bound_state_with_scopes(
+        program.symbols.clone(),
+        file_locals,
+        file.node_symbols.clone(),
+        file.scopes.clone(),
+        file.node_scope_ids.clone(),
+    );
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(&file.arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(file.source_file);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::CANNOT_FIND_NAME),
+        "Unexpected 'Cannot find name' diagnostics: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+#[test]
 fn test_excess_property_in_return_statement() {
     use crate::thin_parser::ThinParserState;
 
