@@ -145,6 +145,10 @@ Status: Active
   - Use literal key types (e.g. `key: "prop"`) to narrow `obj[key]`.
   - Clear narrowing when computed element assignments use literal keys.
   - Risk: `typeof` operands are now type-checked to populate node types, which can surface missing-name diagnostics.
+- [x] Narrow computed element access with numeric literal keys
+  - Use numeric literal keys (e.g. `idx: 0`) to narrow `arr[idx]`.
+  - Clear narrowing when computed numeric element assignments occur.
+  - Risk: numeric keys are stringified for flow matching and may differ from JS `ToString` for exotic literals.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
