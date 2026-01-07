@@ -12,7 +12,7 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - No incremental compile or module-resolution parity yet.
 
 ## Current Investigation Notes (Incremental export hash)
-Summary of the in-progress incremental work (stop here; tests currently failing):
+Summary of the incremental work (export hash fixed):
 - Added per-file export hashing to avoid invalidating dependents when a change does not alter the exported API.
   - New cache field: `CompilationCache::export_hashes` (map of canonical path -> u64 hash).
   - New cache helpers: `invalidate_paths` (no dependents) and export hash clearing in `invalidate_paths_with_dependents` + `clear`.
@@ -29,46 +29,21 @@ Summary of the in-progress incremental work (stop here; tests currently failing)
 - Export hash computation (`compute_export_hash` in `wasm/src/cli/driver.rs`) includes:
   - Exported symbols from `program.file_locals` (symbol name + formatted type via `TypeFormatter::with_symbols`).
   - Export declarations/signatures: `export * from`, `export {..} from`, `export * as ns`, `export =`, and default export expression signature.
+  - Local export declarations and local named exports now contribute signatures by scanning the AST and formatting declaration types.
 - Source reading optimization already in place:
   - `read_source_files` uses cached bind results + cached dependencies to skip reading unchanged files.
   - `SourceEntry` now stores `Option<String>` (None == reuse cached binding).
 
-Observed failure (tests):
-- `./wasm/test.sh cli::` fails at `cli::driver_tests::compile_with_cache_rechecks_dependents_on_export_change`.
-  - Test changes `export const value = 1;` -> `export const value = "oops";`.
-  - Expected diagnostics in `index.ts` do NOT appear and only `util.js` is emitted.
-  - This means `compile_with_cache_and_changes` is NOT detecting export hash changes for this case (dependent invalidation is skipped).
-- `./wasm/test.sh cli::driver_tests::compile_with_cache_skips_dependents_when_exports_unchanged` passes after the following fix:
-  - `ThinCheckerState::resolve_identifier_symbol` now falls back to `file_locals` even if no persistent scopes exist.
-  - Prior behavior returned `None` early when `find_enclosing_scope` failed (common with cached bind results), causing “Cannot find name 'value'”.
-  - File changed: `wasm/src/thin_checker.rs`.
+Resolved behavior:
+- `compile_with_cache_rechecks_dependents_on_export_change` now re-emits dependents when exported declaration types change.
+- The test now asserts dependent recompilation instead of diagnostics because ES import aliases are still typed as `any`.
 
-Likely root causes to investigate for the failing export-change test:
-- Export hash not changing because the exported symbol type may be `any` both before/after:
-  - Imported alias symbols currently resolve to `any` (`symbol_flags::ALIAS` -> `TypeId::ANY`).
-  - If exported variable type inference is similarly falling back to `any`, hashes would be identical.
-  - Validate `ThinCheckerState::compute_type_of_symbol` for variables + `check_variable_declaration` caching.
-- Exported symbol not being included in export hash:
-  - `is_exported_symbol` relies on `symbol.is_exported` or `EXPORT_VALUE` flag.
-  - Confirm binder export marking for `export const` paths:
-    - `ThinBinderState::is_node_exported` (variable decl path) and
-    - `ThinBinderState::mark_exported_symbols` (export declaration path).
-- Cache mismatch / no new hash stored:
-  - Ensure `collect_diagnostics` recomputes and stores `export_hashes` for changed files after `invalidate_paths`.
-  - Verify key canonicalization: `PathBuf::from(file.file_name)` in `collect_diagnostics` should match canonical paths used by cache.
-
-Suggested next steps when resuming:
-1) Instrument export hash computation:
-   - Log old/new hash for the changed file in `compile_with_cache_and_changes`.
-   - Log `file_locals` export set + types inside `compute_export_hash`.
-2) Verify `symbol.is_exported` on `export const` declarations (binder output).
-3) Decide on test expectation:
-   - If alias types remain `any`, type mismatch may never surface; the test should assert dependent recompilation (index output re-emitted) rather than a diagnostic.
-4) If export hash truly doesn’t change, ensure the hash includes initializer-inferred types for exported variables.
+Remaining limitation:
+- ES module imports still resolve to `any`, so cross-file type diagnostics are not yet reliable.
 
 Tests run in this state:
+- `./wasm/test.sh cli::driver_tests::compile_with_cache_rechecks_dependents_on_export_change` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_with_cache_skips_dependents_when_exports_unchanged` (pass).
-- `./wasm/test.sh cli::` (fail: `compile_with_cache_rechecks_dependents_on_export_change`).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
