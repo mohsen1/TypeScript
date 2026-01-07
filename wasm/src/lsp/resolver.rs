@@ -911,10 +911,11 @@ impl<'a> ScopeWalker<'a> {
             // Found the target! Try to resolve it
             if let Some(node) = self.arena.get(current) {
                 if node.kind == SyntaxKind::Identifier as u16 {
-                    // Get the identifier text and resolve it
                     if let Some(text) = self.arena.get_identifier_text(current) {
                         return self.resolve_name(text);
                     }
+                } else if node.kind == SyntaxKind::PrivateIdentifier as u16 {
+                    return self.binder.resolve_identifier(self.arena, current);
                 }
             }
             return None;
@@ -1322,7 +1323,9 @@ impl<'a> ScopeWalker<'a> {
         }
 
         // 2. Check if this is an identifier with matching text
-        if node.kind == SyntaxKind::Identifier as u16 {
+        if node.kind == SyntaxKind::Identifier as u16
+            || node.kind == SyntaxKind::PrivateIdentifier as u16
+        {
             if let Some(text) = self.arena.get_identifier_text(current) {
                 if text == target_name {
                     // Check if this is a declaration
@@ -1333,7 +1336,12 @@ impl<'a> ScopeWalker<'a> {
                         }
                     } else {
                         // It's a usage - resolve using CURRENT scope stack (O(1))
-                        if let Some(resolved_sym) = self.resolve_name(text) {
+                        let resolved_sym = if node.kind == SyntaxKind::PrivateIdentifier as u16 {
+                            self.binder.resolve_identifier(self.arena, current)
+                        } else {
+                            self.resolve_name(text)
+                        };
+                        if let Some(resolved_sym) = resolved_sym {
                             if resolved_sym == target_symbol {
                                 refs.push(current);
                             }

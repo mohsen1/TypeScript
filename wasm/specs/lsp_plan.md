@@ -51,6 +51,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Extract variable: handle JSX tag TDZ references
    - [x] Extract variable: handle JSX attribute TDZ references
    - [x] Extract variable: handle JSX children TDZ references
+   - [x] Rename: normalize private identifiers (`#name`)
 
 2. **Extend AST Coverage** (if needed)
    - [x] Traverse template expressions in LSP resolver for references/completions
