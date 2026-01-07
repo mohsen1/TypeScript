@@ -1934,6 +1934,18 @@ fn test_thin_parser_every_type_arrow_conditional_comma() {
 }
 
 #[test]
+fn test_thin_parser_every_type_arrow_conditional_comma_expression() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "const ok = everyType(type, t => !!t.symbol?.parent && (!memberName ? (memberName = t.symbol.escapedName, true) : memberName === t.symbol.escapedName));".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty());
+}
+
+#[test]
 fn test_thin_parser_spread_in_call_arguments() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
