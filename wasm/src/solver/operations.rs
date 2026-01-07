@@ -87,6 +87,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             this_type: sig.this_type,
             return_type: sig.return_type,
             type_params: sig.type_params.clone(),
+            type_predicate: sig.type_predicate.clone(),
             is_constructor: false,
         };
         match self.resolve_function_call(&func, arg_types) {
@@ -785,6 +786,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 this_type: sig.this_type,
                 return_type: sig.return_type,
                 type_params: sig.type_params.clone(),
+                type_predicate: sig.type_predicate.clone(),
                 is_constructor: false,
             };
 
