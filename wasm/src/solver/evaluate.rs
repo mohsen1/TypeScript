@@ -218,7 +218,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         if check_type == TypeId::ANY {
             let true_eval = self.evaluate(cond.true_type);
             let false_eval = self.evaluate(cond.false_type);
-            return self.interner.union(vec![true_eval, false_eval]);
+            return self.interner.union2(true_eval, false_eval);
         }
 
         // Step 1: Check for distributivity
@@ -481,7 +481,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
     fn optional_property_type(&self, prop: &PropertyInfo) -> TypeId {
         if prop.optional {
-            self.interner.union(vec![prop.type_id, TypeId::UNDEFINED])
+            self.interner.union2(prop.type_id, TypeId::UNDEFINED)
         } else {
             prop.type_id
         }
@@ -656,7 +656,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         if !self.no_unchecked_indexed_access || type_id == TypeId::UNDEFINED {
             return type_id;
         }
-        self.interner.union(vec![type_id, TypeId::UNDEFINED])
+        self.interner.union2(type_id, TypeId::UNDEFINED)
     }
 
     /// Evaluate index access on a tuple type
@@ -821,7 +821,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             subst.insert(mapped.type_param.name, key_type);
             let mut value_type = instantiate_type(self.interner, mapped.template, &subst);
             if optional {
-                value_type = self.interner.union(vec![value_type, TypeId::UNDEFINED]);
+                value_type = self.interner.union2(value_type, TypeId::UNDEFINED);
             }
             Some(IndexSignature {
                 key_type,
@@ -838,7 +838,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             subst.insert(mapped.type_param.name, key_type);
             let mut value_type = instantiate_type(self.interner, mapped.template, &subst);
             if optional {
-                value_type = self.interner.union(vec![value_type, TypeId::UNDEFINED]);
+                value_type = self.interner.union2(value_type, TypeId::UNDEFINED);
             }
             Some(IndexSignature {
                 key_type,
@@ -947,7 +947,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             TypeKey::Intrinsic(kind) => match kind {
                 IntrinsicKind::Any => {
                     // keyof any = string | number | symbol
-                    self.interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::SYMBOL])
+                    self.interner.union3(TypeId::STRING, TypeId::NUMBER, TypeId::SYMBOL)
                 }
                 IntrinsicKind::Unknown => {
                     // keyof unknown = never

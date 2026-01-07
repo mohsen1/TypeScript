@@ -838,7 +838,7 @@ impl<'a> InferenceContext<'a> {
 
     fn optional_property_type(&self, prop: &PropertyInfo) -> TypeId {
         if prop.optional {
-            self.interner.union(vec![prop.type_id, TypeId::UNDEFINED])
+            self.interner.union2(prop.type_id, TypeId::UNDEFINED)
         } else {
             prop.type_id
         }

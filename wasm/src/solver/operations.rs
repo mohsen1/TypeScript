@@ -1245,7 +1245,7 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 
     fn optional_property_type(&self, prop: &PropertyInfo) -> TypeId {
         if prop.optional {
-            self.interner.union(vec![prop.type_id, TypeId::UNDEFINED])
+            self.interner.union2(prop.type_id, TypeId::UNDEFINED)
         } else {
             prop.type_id
         }
@@ -1739,12 +1739,12 @@ impl<'a> PropertyAccessEvaluator<'a> {
         if !self.no_unchecked_indexed_access || type_id == TypeId::UNDEFINED {
             return type_id;
         }
-        self.interner.union(vec![type_id, TypeId::UNDEFINED])
+        self.interner.union2(type_id, TypeId::UNDEFINED)
     }
 
     fn optional_property_type(&self, prop: &PropertyInfo) -> TypeId {
         if prop.optional {
-            self.interner.union(vec![prop.type_id, TypeId::UNDEFINED])
+            self.interner.union2(prop.type_id, TypeId::UNDEFINED)
         } else {
             prop.type_id
         }
@@ -1814,7 +1814,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
             // Array methods that return arrays
             "concat" => {
-                let union_item = self.interner.union(vec![element_type, array_of_element]);
+                let union_item = self.interner.union2(element_type, array_of_element);
                 let rest_items = self.interner.array(union_item);
                 self.function_result(
                     Vec::new(),
@@ -1843,7 +1843,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 let u_param = self.type_param("U");
                 let u_type = self.type_param_type(&u_param);
                 let array_u = self.interner.array(u_type);
-                let callback_return = self.interner.union(vec![u_type, array_u]);
+                let callback_return = self.interner.union2(u_type, array_u);
                 let callback = self.array_callback_type(element_type, array_of_element, callback_return);
                 self.function_result(
                     vec![u_param],
@@ -2062,7 +2062,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
     }
 
     fn element_type_with_undefined(&self, element_type: TypeId) -> TypeId {
-        self.interner.union(vec![element_type, TypeId::UNDEFINED])
+        self.interner.union2(element_type, TypeId::UNDEFINED)
     }
 
     fn flatten_once_type(&self, element_type: TypeId) -> TypeId {
@@ -2323,7 +2323,7 @@ impl<'a> BinaryOpEvaluator<'a> {
 
     fn evaluate_logical(&self, left: TypeId, right: TypeId) -> BinaryOpResult {
         // For && and ||, TypeScript returns a union of the two types
-        BinaryOpResult::Success(self.interner.union(vec![left, right]))
+        BinaryOpResult::Success(self.interner.union2(left, right))
     }
 
     fn has_overlap(&self, left: TypeId, right: TypeId) -> bool {
@@ -2362,7 +2362,7 @@ impl<'a> BinaryOpEvaluator<'a> {
             return false;
         }
 
-        if self.interner.intersection(vec![left, right]) == TypeId::NEVER {
+        if self.interner.intersection2(left, right) == TypeId::NEVER {
             return false;
         }
 

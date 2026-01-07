@@ -224,7 +224,7 @@ impl<'a> NarrowingContext<'a> {
                 "bigint" => TypeId::BIGINT,
                 "symbol" => TypeId::SYMBOL,
                 "undefined" => TypeId::UNDEFINED,
-                "object" => self.interner.union(vec![TypeId::OBJECT, TypeId::NULL]),
+                "object" => self.interner.union2(TypeId::OBJECT, TypeId::NULL),
                 "function" => self.function_type(),
                 _ => source_type,
             };
@@ -495,7 +495,7 @@ impl<'a> NarrowingContext<'a> {
             return None;
         }
 
-        Some(self.interner.intersection(vec![source, narrowed_constraint]))
+        Some(self.interner.intersection2(source, narrowed_constraint))
     }
 
     fn narrow_type_param_to_function(&self, source: TypeId) -> Option<TypeId> {
@@ -507,7 +507,7 @@ impl<'a> NarrowingContext<'a> {
         let constraint = info.constraint.unwrap_or(TypeId::UNKNOWN);
         if constraint == source || constraint == TypeId::UNKNOWN {
             let function_type = self.function_type();
-            return Some(self.interner.intersection(vec![source, function_type]));
+            return Some(self.interner.intersection2(source, function_type));
         }
 
         let narrowed_constraint = self.narrow_to_function(constraint);
@@ -515,7 +515,7 @@ impl<'a> NarrowingContext<'a> {
             return None;
         }
 
-        Some(self.interner.intersection(vec![source, narrowed_constraint]))
+        Some(self.interner.intersection2(source, narrowed_constraint))
     }
 
     fn narrow_type_param_excluding(&self, source: TypeId, excluded: TypeId) -> Option<TypeId> {
@@ -537,7 +537,7 @@ impl<'a> NarrowingContext<'a> {
             return Some(TypeId::NEVER);
         }
 
-        Some(self.interner.intersection(vec![source, narrowed_constraint]))
+        Some(self.interner.intersection2(source, narrowed_constraint))
     }
 
     fn narrow_type_param_excluding_function(&self, source: TypeId) -> Option<TypeId> {
@@ -559,7 +559,7 @@ impl<'a> NarrowingContext<'a> {
             return Some(TypeId::NEVER);
         }
 
-        Some(self.interner.intersection(vec![source, narrowed_constraint]))
+        Some(self.interner.intersection2(source, narrowed_constraint))
     }
 
     fn function_type(&self) -> TypeId {
