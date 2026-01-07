@@ -57,6 +57,7 @@ Pick the most doable and impactful
 32. Export declarations: CommonJS transforms for vars and transform-aware emission [done]
 33. Export declarations: handle default anonymous function/class + ES6 default emit [done]
 34. CommonJS preamble: include default/named export declarations in exports init [done]
+35. CommonJS export declarations: enum transform + exports assignment [done]
 
 
 ## Quick Reference
