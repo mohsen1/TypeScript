@@ -908,10 +908,15 @@ impl<'a> PropertyAccessEvaluator<'a> {
             return PropertyAccessResult::IsUnknown;
         }
 
-        if obj_type == TypeId::NULL || obj_type == TypeId::UNDEFINED {
+        if obj_type == TypeId::NULL || obj_type == TypeId::UNDEFINED || obj_type == TypeId::VOID {
+            let cause = if obj_type == TypeId::VOID {
+                TypeId::UNDEFINED
+            } else {
+                obj_type
+            };
             return PropertyAccessResult::PossiblyNullOrUndefined {
                 property_type: None,
-                cause: obj_type,
+                cause,
             };
         }
 
@@ -986,8 +991,13 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
                 for &member in members {
                     // Check for null/undefined directly
-                    if member == TypeId::NULL || member == TypeId::UNDEFINED {
-                        nullable_causes.push(member);
+                    if member == TypeId::NULL || member == TypeId::UNDEFINED || member == TypeId::VOID {
+                        let cause = if member == TypeId::VOID {
+                            TypeId::UNDEFINED
+                        } else {
+                            member
+                        };
+                        nullable_causes.push(cause);
                         continue;
                     }
 

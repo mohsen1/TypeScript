@@ -141,6 +141,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Preserve named properties alongside numeric index keys
 - [x] Tests for `keyof` with index signatures
 
+### Phase 20: Void Property Access
+- [x] Treat `void` as undefined for property access nullish checks
+- [x] Tests for property access on `void`
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

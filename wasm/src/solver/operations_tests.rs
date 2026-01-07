@@ -351,6 +351,21 @@ fn test_property_access_object() {
 }
 
 #[test]
+fn test_property_access_void() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let result = evaluator.resolve_property_access(TypeId::VOID, "x");
+    match result {
+        PropertyAccessResult::PossiblyNullOrUndefined { property_type, cause } => {
+            assert!(property_type.is_none());
+            assert_eq!(cause, TypeId::UNDEFINED);
+        }
+        _ => panic!("Expected PossiblyNullOrUndefined, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_property_access_index_signature_no_unchecked() {
     let interner = TypeInterner::new();
     let mut evaluator = PropertyAccessEvaluator::new(&interner);
