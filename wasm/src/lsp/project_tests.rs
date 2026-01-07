@@ -193,6 +193,24 @@ fn test_project_completions_auto_import_named() {
 }
 
 #[test]
+fn test_project_diagnostics_cached() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "const value: string = 1;\n".to_string());
+
+    let diagnostics = project
+        .get_diagnostics("a.ts")
+        .expect("Expected diagnostics");
+    assert!(!diagnostics.is_empty(), "Should report diagnostics");
+    assert_eq!(diagnostics[0].severity, Some(DiagnosticSeverity::Error));
+
+    let diagnostics_again = project
+        .get_diagnostics("a.ts")
+        .expect("Expected diagnostics on cached run");
+    assert_eq!(diagnostics_again.len(), diagnostics.len());
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 

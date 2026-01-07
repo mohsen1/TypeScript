@@ -15,7 +15,7 @@ use crate::lsp::code_actions::{
     ImportCandidateKind,
 };
 use crate::lsp::completions::{CompletionItem, CompletionItemKind, Completions};
-use crate::lsp::diagnostics::LspDiagnostic;
+use crate::lsp::diagnostics::{convert_diagnostic, LspDiagnostic};
 use crate::lsp::hover::{HoverInfo, HoverProvider};
 use crate::lsp::signature_help::{SignatureHelp, SignatureHelpProvider};
 use crate::lsp::utils::find_node_at_offset;
@@ -24,6 +24,7 @@ use crate::parser::{NodeIndex, syntax_kind_ext, thin_node::ThinNodeArena};
 use crate::scanner::SyntaxKind;
 use crate::solver::TypeInterner;
 use crate::thin_binder::ThinBinderState;
+use crate::thin_checker::ThinCheckerState;
 use crate::thin_parser::ThinParserState;
 use crate::lsp::definition::GoToDefinition;
 use crate::lsp::references::FindReferences;
@@ -153,6 +154,40 @@ impl ProjectFile {
         );
 
         provider.get_completions_with_cache(self.root, position, &mut self.type_cache)
+    }
+
+    pub fn get_diagnostics(&mut self) -> Vec<LspDiagnostic> {
+        let file_name = self.file_name.clone();
+        let source_text = self.parser.get_source_text();
+
+        let mut checker = if let Some(cache) = self.type_cache.take() {
+            ThinCheckerState::with_cache(
+                self.parser.get_arena(),
+                &self.binder,
+                &self.type_interner,
+                file_name,
+                cache,
+            )
+        } else {
+            ThinCheckerState::new(
+                self.parser.get_arena(),
+                &self.binder,
+                &self.type_interner,
+                file_name,
+            )
+        };
+
+        checker.check_source_file(self.root);
+
+        let diagnostics = checker
+            .ctx
+            .diagnostics
+            .iter()
+            .map(|diag| convert_diagnostic(diag, &self.line_map, source_text))
+            .collect();
+
+        self.type_cache = Some(checker.extract_cache());
+        diagnostics
     }
 
     fn node_location(&self, node_idx: NodeIndex) -> Option<Location> {
@@ -674,6 +709,12 @@ impl Project {
             completions.sort_by(|a, b| a.label.cmp(&b.label));
             Some(completions)
         }
+    }
+
+    /// Diagnostics within a single file.
+    pub fn get_diagnostics(&mut self, file_name: &str) -> Option<Vec<LspDiagnostic>> {
+        let file = self.files.get_mut(file_name)?;
+        Some(file.get_diagnostics())
     }
 
     /// Code actions for a file (project-aware).
