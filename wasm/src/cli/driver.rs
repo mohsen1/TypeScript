@@ -717,6 +717,7 @@ fn build_discovery_options(
     config: Option<&TsConfig>,
     out_dir: Option<&Path>,
 ) -> Result<FileDiscoveryOptions> {
+    let follow_links = env_flag("TSZ_FOLLOW_SYMLINKS");
     if !args.files.is_empty() {
         return Ok(FileDiscoveryOptions {
             base_dir: base_dir.to_path_buf(),
@@ -724,6 +725,7 @@ fn build_discovery_options(
             include: None,
             exclude: None,
             out_dir: out_dir.map(Path::to_path_buf),
+            follow_links,
         });
     }
 
@@ -734,7 +736,9 @@ fn build_discovery_options(
         bail!("no tsconfig.json path available");
     };
 
-    Ok(FileDiscoveryOptions::from_tsconfig(tsconfig_path, config, out_dir))
+    let mut options = FileDiscoveryOptions::from_tsconfig(tsconfig_path, config, out_dir);
+    options.follow_links = follow_links;
+    Ok(options)
 }
 
 fn collect_type_root_files(base_dir: &Path, options: &ResolvedCompilerOptions) -> Vec<PathBuf> {
@@ -3137,6 +3141,14 @@ fn normalize_type_roots(base_dir: &Path, roots: Option<Vec<PathBuf>>) -> Option<
 
 fn canonicalize_or_owned(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+fn env_flag(name: &str) -> bool {
+    let Ok(value) = std::env::var(name) else {
+        return false;
+    };
+    let normalized = value.trim().to_ascii_lowercase();
+    matches!(normalized.as_str(), "1" | "true" | "yes" | "on")
 }
 
 pub(crate) fn apply_cli_overrides(options: &mut ResolvedCompilerOptions, args: &CliArgs) {
