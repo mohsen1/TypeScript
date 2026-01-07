@@ -1623,7 +1623,6 @@ impl<'a> CodeActionProvider<'a> {
         // 5. Generate a unique variable name scoped to the insertion point.
         let var_name = self.unique_extracted_name(stmt_idx);
 
-        // TODO: Preserve operator precedence (wrap in parentheses when needed).
         // 6. Extract the selected text (snap to node boundaries)
         let (node_start, node_end) = self.expression_text_span(expr_idx, expr_node);
         let selected_text = self.source.get(node_start as usize..node_end as usize)?;
@@ -1663,7 +1662,7 @@ impl<'a> CodeActionProvider<'a> {
         } else {
             var_name.clone()
         };
-        if expr_node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+        if self.should_preserve_parenthesized_replacement(expr_node) {
             replacement_text = format!("({})", replacement_text);
         }
         edits.push(TextEdit {
@@ -1772,6 +1771,36 @@ impl<'a> CodeActionProvider<'a> {
             if let Some(paren) = self.arena.get_parenthesized(expr_node) {
                 if let Some(inner) = self.arena.get(paren.expression) {
                     return self.needs_parentheses_for_extraction(inner);
+                }
+            }
+            return false;
+        }
+
+        if expr_node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            if let Some(binary) = self.arena.get_binary_expr(expr_node) {
+                return binary.operator_token == SyntaxKind::CommaToken as u16;
+            }
+        }
+
+        false
+    }
+
+    fn should_preserve_parenthesized_replacement(&self, expr_node: &ThinNode) -> bool {
+        if expr_node.kind != syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+            return false;
+        }
+
+        let Some(paren) = self.arena.get_parenthesized(expr_node) else { return true; };
+        let Some(inner) = self.arena.get(paren.expression) else { return true; };
+
+        !self.is_comma_expression(inner)
+    }
+
+    fn is_comma_expression(&self, expr_node: &ThinNode) -> bool {
+        if expr_node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+            if let Some(paren) = self.arena.get_parenthesized(expr_node) {
+                if let Some(inner) = self.arena.get(paren.expression) {
+                    return self.is_comma_expression(inner);
                 }
             }
             return false;
