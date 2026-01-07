@@ -4280,6 +4280,13 @@ impl<'a> ThinPrinter<'a> {
 
         self.write("export ");
 
+        if export.is_default_export {
+            self.write("default ");
+            self.emit(export.export_clause);
+            self.write_semicolon();
+            return;
+        }
+
         if !export.export_clause.is_none() {
             self.emit(export.export_clause);
         } else {
@@ -4362,6 +4369,25 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
+        let mut is_anonymous_default = false;
+        if export.is_default_export {
+            if let Some(clause_node) = self.arena.get(export.export_clause) {
+                match clause_node.kind {
+                    k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                        if let Some(func) = self.arena.get_function(clause_node) {
+                            is_anonymous_default = func.name.is_none();
+                        }
+                    }
+                    k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                        if let Some(class) = self.arena.get_class(clause_node) {
+                            is_anonymous_default = class.name.is_none();
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
         // Check if export_clause contains a declaration (export const x, export function f, etc.)
         if let Some(clause_node) = self.arena.get(export.export_clause) {
             let clause_kind = clause_node.kind;
@@ -4369,7 +4395,7 @@ impl<'a> ThinPrinter<'a> {
                 || clause_kind == syntax_kind_ext::FUNCTION_DECLARATION
                 || clause_kind == syntax_kind_ext::CLASS_DECLARATION;
 
-            if is_decl && self.transforms.has_transform(export.export_clause) {
+            if is_decl && !is_anonymous_default && self.transforms.has_transform(export.export_clause) {
                 self.emit(export.export_clause);
                 return;
             }
@@ -4398,6 +4424,20 @@ impl<'a> ThinPrinter<'a> {
                 }
                 // export function f() {} or export default function f() {}
                 k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                    if is_anonymous_default {
+                        if let Some(func) = self.arena.get_function(clause_node) {
+                            self.write("exports.default = ");
+                            if self.ctx.target_es5 && func.is_async {
+                                self.emit_async_function_es5(func, "", false, false);
+                            } else {
+                                self.emit_function_expression(clause_node, export.export_clause);
+                            }
+                            self.write_semicolon();
+                            self.write_line();
+                        }
+                        return;
+                    }
+
                     // Emit the function declaration
                     self.emit_function_declaration(clause_node, export.export_clause);
                     self.write_line();
@@ -4422,6 +4462,33 @@ impl<'a> ThinPrinter<'a> {
                 }
                 // export class C {} or export default class C {}
                 k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                    if is_anonymous_default {
+                        if self.ctx.target_es5 {
+                            let temp_name = format!("{}_default", self.get_temp_var_name());
+                            let mut es5_emitter = ClassES5Emitter::new(self.arena);
+                            es5_emitter.set_indent_level(self.writer.indent_level());
+                            if let Some(source_text) = self.source_text {
+                                es5_emitter.set_source_text(source_text);
+                            }
+                            let es5_output = es5_emitter.emit_class_with_name(
+                                export.export_clause,
+                                &temp_name,
+                            );
+                            self.write(&es5_output);
+                            self.write_line();
+                            self.write("exports.default = ");
+                            self.write(&temp_name);
+                            self.write(";");
+                            self.write_line();
+                        } else {
+                            self.write("exports.default = ");
+                            self.emit_class_es6(clause_node, export.export_clause);
+                            self.write_semicolon();
+                            self.write_line();
+                        }
+                        return;
+                    }
+
                     // Emit the class declaration
                     self.emit_class_declaration(clause_node, export.export_clause);
                     self.write_line();

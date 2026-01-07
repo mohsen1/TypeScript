@@ -654,6 +654,28 @@ fn test_thin_emit_export() {
 }
 
 #[test]
+fn test_thin_emit_export_default() {
+    let source = "export default function () { return 1; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("export default"),
+        "Output should contain 'export default': {}",
+        output
+    );
+    assert!(
+        output.contains("function"),
+        "Output should contain 'function': {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_get_accessor() {
     let source = "class Foo { get value() { return this._value; } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
