@@ -112,6 +112,14 @@ impl<'a> ClassES5Emitter<'a> {
     }
 
     pub fn emit_class(&mut self, class_idx: NodeIndex) -> String {
+        self.emit_class_internal(class_idx, None)
+    }
+
+    pub fn emit_class_with_name(&mut self, class_idx: NodeIndex, name: &str) -> String {
+        self.emit_class_internal(class_idx, Some(name))
+    }
+
+    fn emit_class_internal(&mut self, class_idx: NodeIndex, override_name: Option<&str>) -> String {
         self.output.clear();
 
         let Some(class_node) = self.arena.get(class_idx) else {
@@ -123,7 +131,11 @@ impl<'a> ClassES5Emitter<'a> {
         };
 
         // Get class name
-        let class_name = self.get_identifier_text(class_data.name);
+        let class_name = if let Some(name) = override_name {
+            name.to_string()
+        } else {
+            self.get_identifier_text(class_data.name)
+        };
         self.class_name = class_name.clone();
 
         // Collect private fields from the class

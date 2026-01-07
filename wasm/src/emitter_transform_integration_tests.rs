@@ -590,6 +590,88 @@ fn test_two_phase_emission_commonjs_async_function_export() {
 }
 
 #[test]
+fn test_two_phase_emission_commonjs_default_anonymous_async_function_export() {
+    let source = "export default async function () { await bar(); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ES5 async transforms"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_module_kind(crate::thin_emitter::ModuleKind::CommonJS);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should contain __awaiter: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.default = function"),
+        "CommonJS output should export default function: {}",
+        output
+    );
+    assert!(
+        !output.contains("export default"),
+        "CommonJS output should not contain ES module syntax: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_commonjs_default_anonymous_class_export() {
+    let source = "export default class { method() { return 1; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ES5 class transforms"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_module_kind(crate::thin_emitter::ModuleKind::CommonJS);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var _a_default = /** @class */"),
+        "CommonJS output should downlevel default class: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.default = _a_default;"),
+        "CommonJS output should export default class temp: {}",
+        output
+    );
+    assert!(
+        !output.contains("export default"),
+        "CommonJS output should not contain ES module syntax: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_commonjs_auto_detect_exports() {
     let source = "export const x = 1;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

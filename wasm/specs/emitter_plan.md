@@ -55,6 +55,7 @@ Pick the most doable and impactful
 30. LoweringPass: compose ES5/CommonJS transforms with Chain [done]
 31. LoweringPass: handle export-declared functions and async detection [done]
 32. Export declarations: CommonJS transforms for vars and transform-aware emission [done]
+33. Export declarations: handle default anonymous function/class + ES6 default emit [done]
 
 
 ## Quick Reference
