@@ -131,6 +131,9 @@ Status: Active
   - Treat property/element access chains with stable names as narrowable references.
   - Clear narrowings when the base object is reassigned.
   - Risk: complex computed access remains conservative.
+- [x] Clear flow narrowing when property/element access targets are reassigned
+  - Clear narrowings after `obj.prop = ...` and `obj["prop"] = ...`.
+  - Risk: computed access with non-literal keys remains conservative.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
