@@ -328,10 +328,13 @@ impl<'a> NarrowingContext<'a> {
 
     /// Check if a type is a function type.
     fn is_function_type(&self, type_id: TypeId) -> bool {
-        matches!(
-            self.interner.lookup(type_id),
-            Some(TypeKey::Function(_) | TypeKey::Callable(_))
-        )
+        match self.interner.lookup(type_id) {
+            Some(TypeKey::Function(_) | TypeKey::Callable(_)) => true,
+            Some(TypeKey::Intersection(members)) => members
+                .iter()
+                .any(|member| self.is_function_type(*member)),
+            _ => false,
+        }
     }
 
     fn is_object_typeof(&self, type_id: TypeId) -> bool {
@@ -342,6 +345,9 @@ impl<'a> NarrowingContext<'a> {
             | Some(TypeKey::Tuple(_))
             | Some(TypeKey::Mapped(_)) => true,
             Some(TypeKey::ReadonlyType(inner)) => self.is_object_typeof(inner),
+            Some(TypeKey::Intersection(members)) => members
+                .iter()
+                .all(|member| self.is_object_typeof(*member)),
             Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info
                 .constraint
                 .map(|constraint| self.is_object_typeof(constraint))
@@ -377,18 +383,28 @@ impl<'a> NarrowingContext<'a> {
             }
         }
 
-        if target == TypeId::STRING {
-            if matches!(self.interner.lookup(source), Some(TypeKey::TemplateLiteral(_))) {
-                return true;
-            }
-        }
-
-        // null/undefined to object (for typeof "object" narrowing)
+        // object/null for typeof "object"
         if target == TypeId::OBJECT {
             if source == TypeId::NULL {
                 return true;
             }
             if self.is_object_typeof(source) {
+                return true;
+            }
+            return false;
+        }
+
+        if let Some(TypeKey::Intersection(members)) = self.interner.lookup(source) {
+            if members
+                .iter()
+                .any(|member| self.is_assignable_to(*member, target))
+            {
+                return true;
+            }
+        }
+
+        if target == TypeId::STRING {
+            if matches!(self.interner.lookup(source), Some(TypeKey::TemplateLiteral(_))) {
                 return true;
             }
         }
