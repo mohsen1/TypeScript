@@ -78,6 +78,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Source properties must satisfy target index signatures even with source index signatures.
 - [x] Support split accessor property variance
   - Getter types are covariant; setter types are contravariant in property assignability.
+- [x] Add constructor void exception coverage for construct signatures
+  - Construct signatures returning values are assignable to `new () => void`.
 - [x] Add coverage for global Function type assignability
   - Callables assignable to Function; Function not assignable to specific signatures.
 

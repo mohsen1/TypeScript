@@ -34,6 +34,8 @@ Status: Active
   - [x] Extract function emission helpers into a module.
   - [x] Extract type emission helpers into a module.
   - [x] Extract JSX emission helpers into a module.
+  - [x] Extract shared identifier/modifier helpers into the helpers module.
+  - [x] Add JSX fragment/spread emission coverage in thin emitter tests.
 - [ ] Performance tuning (deferred until correctness parity)
   - [x] Pre-allocate output buffer from source size; write numeric indices without allocations.
   - [x] Write numeric values in ES5 transforms without allocating strings.

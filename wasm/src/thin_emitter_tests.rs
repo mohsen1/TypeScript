@@ -800,6 +800,33 @@ fn test_thin_emit_jsx_element() {
 }
 
 #[test]
+fn test_thin_emit_jsx_fragment_spread() {
+    let source = "const x = <><Component {...props} /></>;";
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("<>"),
+        "Expected JSX fragment open in output: {}",
+        output
+    );
+    assert!(
+        output.contains("</>"),
+        "Expected JSX fragment close in output: {}",
+        output
+    );
+    assert!(
+        output.contains("{...props}"),
+        "Expected JSX spread attribute in output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_enum_declaration() {
     let source = "enum Color { Red, Green, Blue }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
