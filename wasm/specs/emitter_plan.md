@@ -69,6 +69,7 @@ Next Steps: Cleanup. Remove the legacy inline transformation logic from ThinPrin
 42. Import equals: emit JS and ignore internal aliases in module auto-detect [done]
 43. CommonJS preamble: include export import equals in exports init [done]
 44. ES5 emit: downlevel template literals + tagged templates with __makeTemplateObject helper [done]
+45. ES5 emit: include __awaiter/__generator helpers when async downleveling [done]
 
 
 ## Quick Reference

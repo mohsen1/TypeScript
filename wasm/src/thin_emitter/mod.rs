@@ -6131,6 +6131,10 @@ impl<'a> ThinPrinter<'a> {
         if self.ctx.target_es5 && self.needs_rest_helper() {
             helpers.rest = true;
         }
+        if self.ctx.target_es5 && self.needs_async_helpers() {
+            helpers.awaiter = true;
+            helpers.generator = true;
+        }
         if self.ctx.target_es5 && self.needs_make_template_object_helper() {
             helpers.make_template_object = true;
         }
@@ -6643,6 +6647,22 @@ impl<'a> ThinPrinter<'a> {
                 let Some(elem) = self.arena.get_binding_element(elem_node) else { continue };
                 if elem.dot_dot_dot_token {
                     return true;
+                }
+            }
+
+            false
+        })
+    }
+
+    fn needs_async_helpers(&self) -> bool {
+        self.arena.nodes.iter().any(|node| {
+            if let Some(func) = self.arena.get_function(node) {
+                return func.is_async;
+            }
+
+            if node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                if let Some(method) = self.arena.get_method_decl(node) {
+                    return self.has_modifier(&method.modifiers, SyntaxKind::AsyncKeyword as u16);
                 }
             }
 
