@@ -5291,15 +5291,26 @@ impl<'a> ThinCheckerState<'a> {
     /// Get the type of an interface member (method signature or property signature).
     fn get_type_of_interface_member(&mut self, member_idx: NodeIndex) -> TypeId {
         use crate::parser::syntax_kind_ext::{METHOD_SIGNATURE, PROPERTY_SIGNATURE};
-        use crate::solver::FunctionShape;
+        use crate::solver::{FunctionShape, PropertyInfo};
 
         let Some(member_node) = self.ctx.arena.get(member_idx) else {
             return TypeId::ANY;
         };
 
-        if member_node.kind == METHOD_SIGNATURE {
-            // For method signatures, build a function type
-            if let Some(sig) = self.ctx.arena.get_signature(member_node) {
+        if member_node.kind == METHOD_SIGNATURE || member_node.kind == PROPERTY_SIGNATURE {
+            let Some(sig) = self.ctx.arena.get_signature(member_node) else {
+                return TypeId::ANY;
+            };
+            let name = self.ctx.arena.get(sig.name)
+                .and_then(|name_node| self.ctx.arena.get_identifier(name_node))
+                .map(|id_data| id_data.escaped_text.clone());
+            let Some(name) = name else {
+                return TypeId::ANY;
+            };
+            let name_atom = self.ctx.types.intern_string(&name);
+
+            if member_node.kind == METHOD_SIGNATURE {
+                let (type_params, type_param_updates) = self.push_type_parameters(&sig.type_parameters);
                 let (params, this_type) = self.extract_params_from_signature(sig);
                 let return_type = if !sig.type_annotation.is_none() {
                     self.get_type_from_type_node(sig.type_annotation)
@@ -5308,23 +5319,38 @@ impl<'a> ThinCheckerState<'a> {
                 };
 
                 let shape = FunctionShape {
-                    type_params: Vec::new(),
+                    type_params,
                     params,
                     this_type,
                     return_type,
                     type_predicate: None,
                     is_constructor: false,
                 };
+                self.pop_type_parameters(type_param_updates);
 
-                return self.ctx.types.function(shape);
+                let prop = PropertyInfo {
+                    name: name_atom,
+                    type_id: self.ctx.types.function(shape),
+                    optional: sig.question_token,
+                    readonly: false,
+                    is_method: true,
+                };
+                return self.ctx.types.object(vec![prop]);
             }
-        } else if member_node.kind == PROPERTY_SIGNATURE {
-            // For property signatures, get the type annotation
-            if let Some(sig) = self.ctx.arena.get_signature(member_node) {
-                if !sig.type_annotation.is_none() {
-                    return self.get_type_from_type_node(sig.type_annotation);
-                }
-            }
+
+            let type_id = if !sig.type_annotation.is_none() {
+                self.get_type_from_type_node(sig.type_annotation)
+            } else {
+                TypeId::ANY
+            };
+            let prop = PropertyInfo {
+                name: name_atom,
+                type_id,
+                optional: sig.question_token,
+                readonly: self.has_readonly_modifier(&sig.modifiers),
+                is_method: false,
+            };
+            return self.ctx.types.object(vec![prop]);
         }
 
         TypeId::ANY

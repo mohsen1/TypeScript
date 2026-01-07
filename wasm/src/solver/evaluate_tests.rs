@@ -1279,6 +1279,21 @@ fn test_keyof_string_apparent_members() {
     }
 }
 
+#[test]
+fn test_keyof_template_literal_matches_string() {
+    let interner = TypeInterner::new();
+
+    let template = interner.intern(TypeKey::TemplateLiteral(vec![
+        TemplateSpan::Text(interner.intern_string("prefix")),
+        TemplateSpan::Type(TypeId::STRING),
+        TemplateSpan::Text(interner.intern_string("suffix")),
+    ]));
+
+    let result = evaluate_keyof(&interner, template);
+    let expected = evaluate_keyof(&interner, TypeId::STRING);
+    assert_eq!(result, expected);
+}
+
 // =============================================================================
 // Mapped Type Tests
 // =============================================================================

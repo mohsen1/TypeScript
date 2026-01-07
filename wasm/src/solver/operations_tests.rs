@@ -597,6 +597,24 @@ fn test_property_access_primitive_constructor_value() {
 }
 
 #[test]
+fn test_property_access_template_literal() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let template = interner.intern(TypeKey::TemplateLiteral(vec![
+        TemplateSpan::Text(interner.intern_string("prefix")),
+        TemplateSpan::Type(TypeId::STRING),
+        TemplateSpan::Text(interner.intern_string("suffix")),
+    ]));
+
+    let result = evaluator.resolve_property_access(template, "length");
+    match result {
+        PropertyAccessResult::Success { type_id: t, .. } => assert_eq!(t, TypeId::NUMBER),
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_property_access_literal_string_length() {
     let interner = TypeInterner::new();
     let evaluator = PropertyAccessEvaluator::new(&interner);
@@ -1484,6 +1502,93 @@ fn test_infer_generic_construct_signature_param() {
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[ctor_arg]);
     assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_infer_generic_keyof_param_from_keyof_arg() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let keyof_param = interner.intern(TypeKey::KeyOf(t_type));
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("key")),
+            type_id: keyof_param,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let arg_keyof = interner.intern(TypeKey::KeyOf(obj));
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[arg_keyof]);
+    assert_eq!(result, obj);
+}
+
+#[test]
+fn test_infer_generic_index_access_param_from_index_access_arg() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let k_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+    let index_access_param = interner.intern(TypeKey::IndexAccess(t_type, k_type));
+
+    let func = FunctionShape {
+        type_params: vec![t_param, k_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: index_access_param,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: index_access_param,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let key_literal = interner.literal_string("value");
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let index_access_arg = interner.intern(TypeKey::IndexAccess(obj, key_literal));
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[index_access_arg]);
+    assert_eq!(result, index_access_arg);
 }
 
 #[test]

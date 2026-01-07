@@ -640,6 +640,13 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             (_, Some(TypeKey::ReadonlyType(t_inner))) => {
                 self.constrain_types(ctx, var_map, source, t_inner);
             }
+            (Some(TypeKey::IndexAccess(s_obj, s_idx)), Some(TypeKey::IndexAccess(t_obj, t_idx))) => {
+                self.constrain_types(ctx, var_map, s_obj, t_obj);
+                self.constrain_types(ctx, var_map, s_idx, t_idx);
+            }
+            (Some(TypeKey::KeyOf(s_inner)), Some(TypeKey::KeyOf(t_inner))) => {
+                self.constrain_types(ctx, var_map, t_inner, s_inner);
+            }
             (Some(TypeKey::Union(ref s_members)), _) => {
                 for &member in s_members {
                     self.constrain_types(ctx, var_map, member, target);
@@ -1424,6 +1431,11 @@ impl<'a> PropertyAccessEvaluator<'a> {
                     LiteralValue::Boolean(_) => self.resolve_boolean_property(prop_name, prop_atom),
                     LiteralValue::BigInt(_) => self.resolve_bigint_property(prop_name, prop_atom),
                 }
+            }
+
+            TypeKey::TemplateLiteral(_) => {
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                self.resolve_string_property(prop_name, prop_atom)
             }
 
             // Built-in properties

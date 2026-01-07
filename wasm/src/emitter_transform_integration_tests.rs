@@ -1095,6 +1095,42 @@ fn test_two_phase_emission_commonjs_export_assignment_suppresses_named_exports()
 }
 
 #[test]
+fn test_two_phase_emission_commonjs_export_default_arrow() {
+    let source = "export default () => this.x;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_module_kind(crate::thin_emitter::ModuleKind::CommonJS);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("exports.default ="),
+        "CommonJS default export should emit exports.default: {}",
+        output
+    );
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow export should capture this via IIFE: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 arrow export should not contain '=>': {}",
+        output
+    );
+}
+
+#[test]
 fn test_transform_directive_chain_es5_class_commonjs_export() {
     let source = "class Foo {}";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

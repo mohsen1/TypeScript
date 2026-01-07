@@ -915,6 +915,13 @@ fn test_object_interface_accepts_primitives() {
     assert!(checker.is_assignable(TypeId::NUMBER, object_interface));
     assert!(checker.is_assignable(TypeId::BOOLEAN, object_interface));
     assert!(checker.is_assignable(TypeId::SYMBOL, object_interface));
+
+    let template = interner.intern(TypeKey::TemplateLiteral(vec![
+        TemplateSpan::Text(interner.intern_string("prefix")),
+        TemplateSpan::Type(TypeId::STRING),
+        TemplateSpan::Text(interner.intern_string("suffix")),
+    ]));
+    assert!(checker.is_assignable(template, object_interface));
 }
 
 #[test]

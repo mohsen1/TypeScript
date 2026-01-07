@@ -147,6 +147,11 @@ impl<'a> LoweringPass<'a> {
                     self.visit(expr_stmt.expression);
                 }
             }
+            k if k == syntax_kind_ext::EXPORT_ASSIGNMENT => {
+                if let Some(export_assign) = self.arena.get_export_assignment(node) {
+                    self.visit(export_assign.expression);
+                }
+            }
             k if k == syntax_kind_ext::CALL_EXPRESSION => {
                 if let Some(call) = self.arena.get_call_expr(node) {
                     self.visit(call.expression);

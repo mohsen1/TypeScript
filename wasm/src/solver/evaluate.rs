@@ -946,6 +946,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     self.interner.intern(TypeKey::KeyOf(operand))
                 }
             }
+            TypeKey::TemplateLiteral(_) => self.apparent_primitive_keyof(IntrinsicKind::String),
             TypeKey::Union(members) => {
                 // keyof (A | B) = keyof A & keyof B
                 let key_sets: Vec<TypeId> = members.iter()
