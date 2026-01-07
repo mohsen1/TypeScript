@@ -3575,7 +3575,7 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             // Use solver QueryDatabase to resolve the property access
-            let result = self.ctx.types.resolve_property_access(object_type, property_name);
+            let result = self.ctx.types.property_access_type(object_type, property_name);
 
             match result {
                 PropertyAccessResult::Success { type_id: prop_type, from_index_signature } => {
@@ -3730,7 +3730,7 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(property_name) = self.get_literal_string_from_node(access.name_or_argument) {
                 if numeric_string_index.is_none() {
                     use_index_signature_check = false;
-                    let result = self.ctx.types.resolve_property_access(object_type_for_access, property_name);
+                    let result = self.ctx.types.property_access_type(object_type_for_access, property_name);
                     result_type = Some(match result {
                         PropertyAccessResult::Success { type_id, .. } => type_id,
                         PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
@@ -4046,7 +4046,7 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
 
-            match self.ctx.types.resolve_property_access(object_type, &name) {
+            match self.ctx.types.property_access_type(object_type, &name) {
                 PropertyAccessResult::Success { type_id, .. } => types.push(type_id),
                 PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
                     types.push(property_type.unwrap_or(TypeId::ANY));

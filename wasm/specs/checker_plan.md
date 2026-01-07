@@ -168,6 +168,9 @@ Status: Active
 - [x] Route contextual property type lookup through solver QueryDatabase
   - Add QueryDatabase helper for contextual property type resolution.
   - Add focused test for contextual callback param typing.
+- [x] Route property access type lookup through solver QueryDatabase
+  - Add QueryDatabase helper for property access type resolution.
+  - Add focused test for union property access typing.
 - [x] Route tuple/array literal element access through solver index-access evaluation
   - Use QueryDatabase `evaluate_index_access` for tuple/array literal indices to honor optional/rest elements.
   - Add focused test ensuring optional tuple element access includes `undefined`.
