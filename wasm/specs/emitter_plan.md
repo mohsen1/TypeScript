@@ -9,12 +9,15 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 ## Current Status
 - LoweringPass -> TransformDirective -> ThinPrinter pipeline exists.
 - ES5/ESNext transforms largely implemented.
-- Remaining TODOs: verify LoweringPass emits directives for all ES5 transforms; run perf bench.
+- Remaining TODOs: investigate real_world_bench regression (emit-only + full pipeline).
 
 ## Highest-Impact Next Tasks
-- [ ] Finish transform-only pipeline
+- [ ] Investigate real_world_bench regression
+  - Find regression source for emit-only throughput drop.
+  - Restore throughput towards 500+ MiB/s target.
+- [x] Finish transform-only pipeline
   - [x] Remove or gate `ctx.target_es5` inline paths in `thin_emitter/mod.rs`.
-  - Ensure LoweringPass emits directives for all ES5 transforms (class, arrow, async, template, params, object literal).
+  - [x] Ensure LoweringPass emits directives for all ES5 transforms (class, arrow, async, template, params, object literal).
 - [x] Plumb class heritage in LoweringPass
   - Fill `TransformDirective::ES5Class.heritage` or drop unused field.
   - Add regression tests for `extends` + private fields + helper injection.
@@ -23,8 +26,11 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
   - Add `.d.ts` tests for generic interface signatures.
 - [x] Validate module wrapper + export transforms
   - Add parity tests for AMD/UMD/System wrappers and re-exports.
-- [ ] Performance check
+- [x] Performance check
   - Run `./wasm/bench.sh real_world_bench` and track throughput deltas.
+  - Results (real_world_bench):
+    - checker_ts_full_pipeline thrpt: 54.596–56.077 MiB/s (regressed ~13.7–17.6%).
+    - checker_ts_emit_only thrpt: 243.73–259.33 MiB/s (regressed ~53.3–56.0%).
 
 ## Success Criteria
 - All transforms triggered via TransformContext (no inline ES5 fallbacks).

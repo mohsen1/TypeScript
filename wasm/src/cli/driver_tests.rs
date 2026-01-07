@@ -186,3 +186,62 @@ fn compile_with_jsx_preserve_emits_jsx_extension() {
     assert!(result.diagnostics.is_empty());
     assert!(base.join("dist/src/view.jsx").is_file());
 }
+
+#[test]
+fn compile_resolves_relative_imports_from_files_list() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { value } from './util'; export { value };",
+    );
+    write_file(&base.join("src/util.ts"), "export const value = 1;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+    assert!(base.join("dist/src/index.js").is_file());
+    assert!(base.join("dist/src/util.js").is_file());
+}
+
+#[test]
+fn compile_resolves_paths_mappings() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "baseUrl": ".",
+            "paths": {
+              "@lib/*": ["src/lib/*"]
+            }
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { value } from '@lib/value'; export { value };",
+    );
+    write_file(&base.join("src/lib/value.ts"), "export const value = 1;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+    assert!(base.join("dist/src/lib/value.js").is_file());
+}

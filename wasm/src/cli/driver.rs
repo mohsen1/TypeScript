@@ -1,14 +1,20 @@
 use anyhow::{bail, Context, Result};
 use rayon::prelude::*;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
 use crate::binder::SymbolTable;
 use crate::checker::types::diagnostics::{Diagnostic, DiagnosticCategory};
 use crate::cli::args::CliArgs;
-use crate::cli::config::{load_tsconfig, resolve_compiler_options, JsxEmit, ResolvedCompilerOptions, TsConfig};
-use crate::cli::fs::{discover_ts_files, FileDiscoveryOptions};
+use crate::cli::config::{
+    load_tsconfig, resolve_compiler_options, JsxEmit, PathMapping, ResolvedCompilerOptions, TsConfig,
+};
+use crate::cli::fs::{discover_ts_files, is_ts_file, FileDiscoveryOptions};
 use crate::declaration_emitter::DeclarationEmitter;
 use crate::parallel::{self, BoundFile, MergedProgram};
+use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
+use crate::parser::NodeIndex;
+use crate::thin_parser::ThinParserState;
 use crate::thin_parser::ParseDiagnostic;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
@@ -33,6 +39,8 @@ pub fn compile(args: &CliArgs, cwd: &Path) -> Result<CompilationResult> {
     let root_dir = normalize_root_dir(&base_dir, resolved.root_dir.clone());
     let out_dir = normalize_output_dir(&base_dir, resolved.out_dir.clone());
     let declaration_dir = normalize_output_dir(&base_dir, resolved.declaration_dir.clone());
+    let base_url = normalize_base_url(&base_dir, resolved.base_url.clone());
+    resolved.base_url = base_url;
 
     let discovery = build_discovery_options(
         args,
@@ -52,7 +60,7 @@ pub fn compile(args: &CliArgs, cwd: &Path) -> Result<CompilationResult> {
         bail!("no input files found");
     }
 
-    let sources = read_source_files(&file_paths)?;
+    let sources = read_source_files(&file_paths, &base_dir, &resolved)?;
     let compile_inputs: Vec<(String, String)> = sources
         .into_iter()
         .map(|source| (source.path.to_string_lossy().into_owned(), source.text))
@@ -181,19 +189,214 @@ fn build_discovery_options(
     Ok(FileDiscoveryOptions::from_tsconfig(tsconfig_path, config, out_dir))
 }
 
-fn read_source_files(paths: &[PathBuf]) -> Result<Vec<SourceFile>> {
-    let mut sources = Vec::with_capacity(paths.len());
+fn read_source_files(
+    paths: &[PathBuf],
+    base_dir: &Path,
+    options: &ResolvedCompilerOptions,
+) -> Result<Vec<SourceFile>> {
+    let mut sources = HashMap::new();
+    let mut seen = HashSet::new();
+    let mut pending = VecDeque::new();
+
     for path in paths {
         let canonical = canonicalize_or_owned(path);
-        let text = std::fs::read_to_string(&canonical)
-            .with_context(|| format!("failed to read {}", canonical.display()))?;
-        sources.push(SourceFile {
-            path: canonical,
-            text,
-        });
+        if seen.insert(canonical.clone()) {
+            pending.push_back(canonical);
+        }
     }
-    Ok(sources)
+
+    while let Some(path) = pending.pop_front() {
+        let text = std::fs::read_to_string(&path)
+            .with_context(|| format!("failed to read {}", path.display()))?;
+        let specifiers = collect_module_specifiers_from_text(&path, &text);
+        sources.insert(path.clone(), text);
+
+        for specifier in specifiers {
+            if let Some(resolved) = resolve_module_specifier(&path, &specifier, options, base_dir) {
+                let canonical = canonicalize_or_owned(&resolved);
+                if seen.insert(canonical.clone()) {
+                    pending.push_back(canonical);
+                }
+            }
+        }
+    }
+
+    let mut list: Vec<SourceFile> = sources
+        .into_iter()
+        .map(|(path, text)| SourceFile { path, text })
+        .collect();
+    list.sort_by(|left, right| left.path.to_string_lossy().cmp(&right.path.to_string_lossy()));
+    Ok(list)
 }
+
+fn collect_module_specifiers_from_text(path: &Path, text: &str) -> Vec<String> {
+    let file_name = path.to_string_lossy().into_owned();
+    let mut parser = ThinParserState::new(file_name, text.to_string());
+    let source_file = parser.parse_source_file();
+    let (arena, _diagnostics) = parser.into_parts();
+    collect_module_specifiers(&arena, source_file)
+}
+
+fn collect_module_specifiers(arena: &ThinNodeArena, source_file: NodeIndex) -> Vec<String> {
+    let mut specifiers = Vec::new();
+
+    let Some(node) = arena.get(source_file) else {
+        return specifiers;
+    };
+    let Some(source) = arena.get_source_file(node) else {
+        return specifiers;
+    };
+
+    for &stmt_idx in &source.statements.nodes {
+        if stmt_idx.is_none() {
+            continue;
+        }
+        let Some(stmt) = arena.get(stmt_idx) else {
+            continue;
+        };
+        if let Some(import_decl) = arena.get_import_decl(stmt) {
+            if let Some(text) = arena.get_literal_text(import_decl.module_specifier) {
+                specifiers.push(text.to_string());
+            }
+        }
+        if let Some(export_decl) = arena.get_export_decl(stmt) {
+            if let Some(text) = arena.get_literal_text(export_decl.module_specifier) {
+                specifiers.push(text.to_string());
+            }
+        }
+    }
+
+    specifiers
+}
+
+fn resolve_module_specifier(
+    from_file: &Path,
+    module_specifier: &str,
+    options: &ResolvedCompilerOptions,
+    base_dir: &Path,
+) -> Option<PathBuf> {
+    let specifier = module_specifier.trim();
+    if specifier.is_empty() {
+        return None;
+    }
+    let specifier = specifier.replace('\\', "/");
+    let mut candidates = Vec::new();
+
+    if Path::new(&specifier).is_absolute() {
+        candidates.extend(expand_module_path_candidates(&PathBuf::from(specifier)));
+    } else if specifier.starts_with('.') {
+        let from_dir = from_file.parent().unwrap_or(base_dir);
+        let joined = from_dir.join(&specifier);
+        candidates.extend(expand_module_path_candidates(&joined));
+    } else if let Some(base_url) = options.base_url.as_ref() {
+        if let Some(paths) = options.paths.as_ref() {
+            if let Some((mapping, wildcard)) = select_path_mapping(paths, &specifier) {
+                for target in &mapping.targets {
+                    let substituted = substitute_path_target(target, &wildcard);
+                    let path = if Path::new(&substituted).is_absolute() {
+                        PathBuf::from(substituted)
+                    } else {
+                        base_url.join(substituted)
+                    };
+                    candidates.extend(expand_module_path_candidates(&path));
+                }
+            }
+        }
+
+        if candidates.is_empty() {
+            candidates.extend(expand_module_path_candidates(&base_url.join(&specifier)));
+        }
+    }
+
+    for candidate in candidates {
+        if candidate.is_file() && is_ts_file(&candidate) {
+            return Some(canonicalize_or_owned(&candidate));
+        }
+    }
+    None
+}
+
+fn select_path_mapping<'a>(
+    mappings: &'a [PathMapping],
+    specifier: &str,
+) -> Option<(&'a PathMapping, String)> {
+    let mut best: Option<(&PathMapping, String)> = None;
+    let mut best_score = 0usize;
+    let mut best_pattern_len = 0usize;
+
+    for mapping in mappings {
+        let Some(wildcard) = mapping.match_specifier(specifier) else {
+            continue;
+        };
+        let score = mapping.specificity();
+        let pattern_len = mapping.pattern.len();
+
+        let is_better = match &best {
+            None => true,
+            Some((current, _)) => {
+                score > best_score
+                    || (score == best_score && pattern_len > best_pattern_len)
+                    || (score == best_score
+                        && pattern_len == best_pattern_len
+                        && mapping.pattern < current.pattern)
+            }
+        };
+
+        if is_better {
+            best_score = score;
+            best_pattern_len = pattern_len;
+            best = Some((mapping, wildcard));
+        }
+    }
+
+    best
+}
+
+fn substitute_path_target(target: &str, wildcard: &str) -> String {
+    if target.contains('*') {
+        target.replace('*', wildcard)
+    } else {
+        target.to_string()
+    }
+}
+
+fn expand_module_path_candidates(path: &Path) -> Vec<PathBuf> {
+    let base = normalize_path(path);
+    if base.extension().is_some() {
+        return vec![base];
+    }
+
+    let mut candidates = Vec::new();
+    for ext in TS_EXTENSION_CANDIDATES {
+        candidates.push(base.with_extension(ext));
+    }
+    for ext in TS_EXTENSION_CANDIDATES {
+        candidates.push(base.join("index").with_extension(ext));
+    }
+    candidates
+}
+
+fn normalize_path(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+
+    for component in path.components() {
+        match component {
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                normalized.pop();
+            }
+            std::path::Component::RootDir
+            | std::path::Component::Normal(_)
+            | std::path::Component::Prefix(_) => {
+                normalized.push(component.as_os_str());
+            }
+        }
+    }
+
+    normalized
+}
+
+const TS_EXTENSION_CANDIDATES: [&str; 7] = ["ts", "tsx", "d.ts", "mts", "cts", "d.mts", "d.cts"];
 
 fn collect_diagnostics(program: &MergedProgram) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
@@ -405,6 +608,17 @@ fn js_extension_for(path: &Path, jsx: Option<JsxEmit>) -> Option<&'static str> {
         },
         _ => None,
     }
+}
+
+pub(crate) fn normalize_base_url(base_dir: &Path, dir: Option<PathBuf>) -> Option<PathBuf> {
+    dir.map(|dir| {
+        let resolved = if dir.is_absolute() {
+            dir
+        } else {
+            base_dir.join(dir)
+        };
+        canonicalize_or_owned(&resolved)
+    })
 }
 
 pub(crate) fn normalize_output_dir(base_dir: &Path, dir: Option<PathBuf>) -> Option<PathBuf> {
