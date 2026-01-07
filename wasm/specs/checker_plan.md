@@ -139,6 +139,8 @@ Status: Active
   - Clear narrowings when assignments use the opposite access form.
 - [x] Keep computed element access conservative in flow narrowing
   - Do not narrow `obj[key]` when the key is not a literal string.
+- [x] Narrow element access with literal string keys
+  - Apply flow narrowing for `obj["prop"]` in type guard branches.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
