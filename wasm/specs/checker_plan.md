@@ -156,6 +156,9 @@ Status: Active
 - [x] Narrow discriminant comparisons for computed element access
   - Use literal key types (e.g. `key: "kind"`) to match discriminant property names.
   - Add focused test for computed element discriminant narrowing.
+- [x] Route readonly property checks through solver QueryDatabase
+  - Add solver helper for readonly property detection and call via QueryDatabase.
+  - Add focused test for readonly array element assignment.
 - [x] Route tuple literal element access through solver index-access evaluation
   - Use QueryDatabase `evaluate_index_access` for tuple literal indices to honor optional/rest elements.
   - Add focused test ensuring optional tuple element access includes `undefined`.
