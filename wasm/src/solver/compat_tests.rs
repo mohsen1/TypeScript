@@ -1,7 +1,7 @@
 use super::*;
+use crate::solver::{instantiate_type, TypeEnvironment, TypeSubstitution};
 use crate::solver::subtype::SubtypeFailureReason;
 use crate::solver::types::*;
-use crate::solver::TypeEnvironment;
 
 fn make_animal_dog(interner: &TypeInterner) -> (TypeId, TypeId) {
     let name = interner.intern_string("name");
@@ -1941,6 +1941,49 @@ fn test_mapped_type_key_remap_filters_keys() {
     assert!(checker.is_assignable(mapped, expected));
     assert!(checker.is_assignable(expected, mapped));
     assert!(!checker.is_assignable(mapped, requires_a));
+}
+
+#[test]
+fn test_conditional_tuple_wrapper_no_distribution_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let tuple_check = interner.tuple(vec![TupleElement {
+        type_id: t_param,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let tuple_extends = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+
+    let conditional = interner.conditional(ConditionalType {
+        check_type: tuple_check,
+        extends_type: tuple_extends,
+        true_type: TypeId::NUMBER,
+        false_type: TypeId::BOOLEAN,
+        is_distributive: false,
+    });
+
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, string_or_number);
+
+    let instantiated = instantiate_type(&interner, conditional, &subst);
+
+    assert!(checker.is_assignable(instantiated, TypeId::BOOLEAN));
+    assert!(!checker.is_assignable(instantiated, TypeId::NUMBER));
 }
 
 #[test]

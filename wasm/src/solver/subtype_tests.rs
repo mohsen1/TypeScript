@@ -1,4 +1,5 @@
 use super::*;
+use crate::solver::{instantiate_type, TypeSubstitution};
 
 #[test]
 fn test_intrinsic_subtyping() {
@@ -1506,6 +1507,49 @@ fn test_deferred_conditional_structural_subtyping() {
 
     assert!(checker.is_subtype_of(source, target));
     assert!(!checker.is_subtype_of(source, mismatch));
+}
+
+#[test]
+fn test_conditional_tuple_wrapper_no_distribution_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let tuple_check = interner.tuple(vec![TupleElement {
+        type_id: t_param,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+    let tuple_extends = interner.tuple(vec![TupleElement {
+        type_id: TypeId::STRING,
+        name: None,
+        optional: false,
+        rest: false,
+    }]);
+
+    let conditional = interner.conditional(ConditionalType {
+        check_type: tuple_check,
+        extends_type: tuple_extends,
+        true_type: TypeId::NUMBER,
+        false_type: TypeId::BOOLEAN,
+        is_distributive: false,
+    });
+
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, string_or_number);
+
+    let instantiated = instantiate_type(&interner, conditional, &subst);
+
+    assert!(checker.is_subtype_of(instantiated, TypeId::BOOLEAN));
+    assert!(!checker.is_subtype_of(instantiated, TypeId::NUMBER));
 }
 
 #[test]

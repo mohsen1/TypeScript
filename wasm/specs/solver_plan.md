@@ -106,6 +106,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Array index access includes `undefined` only when `noUncheckedIndexedAccess` is enabled.
 - [x] Disable conditional distributivity for tuple-wrapped type params
   - `[T] extends [U]` remains non-distributive after instantiation.
+- [x] Add tuple-wrapped conditional nondistribution coverage in subtype/compat
+  - Assignability honors the non-distributive branch when wrapped in tuples.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.

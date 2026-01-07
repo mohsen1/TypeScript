@@ -145,10 +145,14 @@ Status: Active
   - Use literal key types (e.g. `key: "prop"`) to narrow `obj[key]`.
   - Clear narrowing when computed element assignments use literal keys.
   - Risk: `typeof` operands are now type-checked to populate node types, which can surface missing-name diagnostics.
+  - Re-validated literal key flow tests after merge; stable-name matching holds.
 - [x] Narrow computed element access with numeric literal keys
   - Use numeric literal keys (e.g. `idx: 0`) to narrow `arr[idx]`.
   - Clear narrowing when computed numeric element assignments occur.
   - Risk: numeric keys are stringified for flow matching and may differ from JS `ToString` for exotic literals.
+- [x] Infer const literal key types for computed element access
+  - Treat `const key = "prop"` / `const idx = 0` as literal key types in flow narrowing.
+  - Risk: literal inference only covers simple literal initializers (no const context propagation).
 
 ## Baseline / Validation
 - `./wasm/test.sh`
