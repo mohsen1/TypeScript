@@ -35,6 +35,7 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - For-in/of nodes now set parent pointers so bound-state scope lookup can walk to block locals; added `test_thin_binder_resolves_block_local_from_bound_state_binder_ts_432` (resolves binder.ts:432:37 `statements` lookup).
 - TS2304 binder gap tracked: `src/compiler/binder.ts:432:37` (`statements`) now covered by the bound-state binder regression test.
 - Latest bench gap from rerun after binder.ts:432 fix: `src/compiler/binder.ts:575:33` (TS2693: `Set` only refers to a type, but is being used as a value here).
+- Next TS2304 gap after rerun: `src/compiler/binder.ts:756:15` (TS2304: cannot find name `getDeclarationName`).
 - Latest attempt: `npm install --no-save --no-package-lock typescript @types/node`, `cargo build --release --bin tsz`, `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` → tsz failed before timing; tsc not run.
 - Bench harness update: fixed BSD `/usr/bin/time -l` parsing in `wasm/bench_cli.sh` so elapsed time is read from the `real` token.
 - Synthetic benchmark (1000-file project in `/tmp/tsz_bench_large` with minimal `globals.d.ts`): `./wasm/bench_cli.sh --repo /tmp/tsz_bench_large --tsconfig tsconfig.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` → tsz avg 0.170s best 0.170s max_rss 19.6 MiB; tsc avg 0.200s best 0.200s max_rss 141.3 MiB. Next: run on real repo once optional chaining + lib parsing land.
@@ -139,6 +140,7 @@ Tests run in this state:
 - `./wasm/test.sh thin_binder_tests::test_thin_binder_resolves_parameter_from_bound_state_binder_ts_331_without_scopes` (pass).
 - `./wasm/test.sh thin_binder_tests::test_thin_binder_resolves_block_local_from_bound_state_binder_ts_432` (pass).
 - `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (rerun after binder.ts:432 fix; tsz still exits with diagnostics, first error `src/compiler/binder.ts:575:33` (TS2693 `Set` only refers to a type, but is being used as a value here), captured via `./wasm/target/release/tsz --project src/compiler/tsconfig.json --noEmit 2>&1 | rg -m1 'TS[0-9]+'`).
+- `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (rerun after binder.ts:432 focus; first TS2304 `src/compiler/binder.ts:756:15` via `./wasm/target/release/tsz --project src/compiler/tsconfig.json --noEmit 2>&1 | rg -m1 'TS2304'`).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
