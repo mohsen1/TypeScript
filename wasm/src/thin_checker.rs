@@ -3779,7 +3779,7 @@ impl<'a> ThinCheckerState<'a> {
         index_type: TypeId,
         literal_index: Option<usize>,
     ) -> TypeId {
-        use crate::solver::{LiteralValue, TypeKey};
+        use crate::solver::{LiteralValue, QueryDatabase, TypeKey};
 
         let object_key = match self.ctx.types.lookup(object_type) {
             Some(TypeKey::ReadonlyType(inner)) => self.ctx.types.lookup(inner),
@@ -3790,25 +3790,20 @@ impl<'a> ThinCheckerState<'a> {
             Some(TypeKey::Array(element)) => element,
             Some(TypeKey::Tuple(elements)) => {
                 let elements = self.ctx.types.tuple_list(elements);
-                let literal_index = literal_index.or_else(|| {
-                    match self.ctx.types.lookup(index_type) {
-                        Some(TypeKey::Literal(LiteralValue::Number(num))) => {
-                            let value = num.0;
-                            if value.is_finite() && value.fract() == 0.0 && value >= 0.0 {
-                                Some(value as usize)
-                            } else {
-                                None
+                let literal_index_type = literal_index
+                    .map(|index| self.ctx.types.literal_number(index as f64))
+                    .or_else(|| {
+                        match self.ctx.types.lookup(index_type) {
+                            Some(TypeKey::Literal(LiteralValue::Number(num))) => {
+                                Some(self.ctx.types.literal_number(num.0))
                             }
+                            _ => None,
                         }
-                        _ => None,
-                    }
-                });
+                    });
 
-                if let Some(index) = literal_index {
-                    if let Some(element) = elements.get(index) {
-                        return element.type_id;
-                    }
-                    return TypeId::ANY;
+                if let Some(literal_index_type) = literal_index_type {
+                    let result = self.ctx.types.evaluate_index_access(object_type, literal_index_type);
+                    return if result == TypeId::UNDEFINED { TypeId::ANY } else { result };
                 }
 
                 let mut element_types: Vec<TypeId> = elements.iter().map(|element| element.type_id).collect();
