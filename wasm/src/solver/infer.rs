@@ -11,7 +11,7 @@
 //! - Efficient unification with path compression
 
 use ena::unify::{InPlaceUnificationTable, UnifyKey, UnifyValue, NoError};
-use std::collections::HashSet;
+use rustc_hash::FxHashSet;
 use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::TypeDatabase;
@@ -269,7 +269,7 @@ impl<'a> InferenceContext<'a> {
             return false;
         }
 
-        let mut visited = HashSet::new();
+        let mut visited = FxHashSet::default();
         for &(atom, param_var) in &self.type_params {
             if self.table.find(param_var) == root {
                 if self.type_contains_param(ty, atom, &mut visited) {
@@ -280,7 +280,7 @@ impl<'a> InferenceContext<'a> {
         false
     }
 
-    fn type_contains_param(&self, ty: TypeId, target: Atom, visited: &mut HashSet<TypeId>) -> bool {
+    fn type_contains_param(&self, ty: TypeId, target: Atom, visited: &mut FxHashSet<TypeId>) -> bool {
         if !visited.insert(ty) {
             return false;
         }
@@ -526,12 +526,13 @@ impl<'a> InferenceContext<'a> {
         }
 
         // Filter out duplicates and special types
+        let mut seen = FxHashSet::default();
         let mut unique: Vec<TypeId> = Vec::new();
         for &ty in types {
             if ty == TypeId::NEVER {
                 continue; // never doesn't contribute to union
             }
-            if !unique.contains(&ty) {
+            if seen.insert(ty) {
                 unique.push(ty);
             }
         }

@@ -89,6 +89,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Treat rest parameters as optional for min argument count
 - [x] Validate generic call argument count and non-generic params
 - [x] Validate generic calls after inference for defaulted params
+- [x] Use FxHashSet in inference visited/dedup
 
 ## Architecture Notes
 - Use `ena` crate for union-find data structure
