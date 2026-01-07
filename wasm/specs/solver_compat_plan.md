@@ -291,6 +291,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Include Object prototype members in primitive apparent members
 - [x] Tests for primitive assignability to Object-like interface
 
+### Phase 55: Array to Variadic Tuple Assignability
+- [x] Allow arrays to assign to variadic tuples with no required fixed elements
+- [x] Tests for array-to-variadic tuple assignability and rejection cases
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

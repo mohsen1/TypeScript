@@ -445,6 +445,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 SubtypeResult::True
             }
 
+            // Array to tuple (variadic tuples with no required fixed elements only)
+            (TypeKey::Array(s_elem), TypeKey::Tuple(t_elems)) => {
+                self.check_array_to_tuple_subtype(*s_elem, t_elems)
+            }
+
             // Object to object
             (TypeKey::Object(s_props), TypeKey::Object(t_props)) => {
                 self.check_object_subtype(s_props, t_props)
@@ -947,6 +952,42 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
 
         SubtypeResult::True
+    }
+
+    fn check_array_to_tuple_subtype(&mut self, source_elem: TypeId, target: &[TupleElement]) -> SubtypeResult {
+        for (index, t_elem) in target.iter().enumerate() {
+            if t_elem.rest {
+                let expansion = self.expand_tuple_rest(t_elem.type_id);
+                for fixed in expansion.fixed {
+                    if !fixed.optional {
+                        return SubtypeResult::False;
+                    }
+                    if !self.check_subtype(source_elem, fixed.type_id).is_true() {
+                        return SubtypeResult::False;
+                    }
+                }
+                if let Some(variadic) = expansion.variadic {
+                    if !self.check_subtype(source_elem, variadic).is_true() {
+                        return SubtypeResult::False;
+                    }
+                } else {
+                    return SubtypeResult::False;
+                }
+                if index + 1 < target.len() {
+                    return SubtypeResult::False;
+                }
+                return SubtypeResult::True;
+            }
+
+            if !t_elem.optional {
+                return SubtypeResult::False;
+            }
+            if !self.check_subtype(source_elem, t_elem.type_id).is_true() {
+                return SubtypeResult::False;
+            }
+        }
+
+        SubtypeResult::False
     }
 
     /// Check object subtyping (structural)
