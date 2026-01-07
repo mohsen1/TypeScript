@@ -21,12 +21,14 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - String literals: `"hello"` -> `TypeKey::Literal(atom)`
   - Number literals: `42` -> special handling (store as Atom? or separate pool?)
   - Boolean literals: `true`, `false`
+  - Hex/binary/octal numeric literals map to numeric literal types
 - [x] Tests for basic lowering
   - Test: `number` annotation -> Intrinsic(Number)
   - Test: `"hello"` -> Literal with correct Atom
   - Test: Verify deduplication (same type -> same TypeId)
   - [x] Add BigInt literal type test once `123n` parses in type position
   - [x] Test: Negative numeric and bigint literal types
+  - [x] Test: Hex/binary/octal numeric literal types
 
 ### Phase 2: Complex Type Structures
 - [x] Implement object type lowering
