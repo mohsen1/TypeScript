@@ -386,6 +386,138 @@ fn test_resolve_bounds_function_subtype() {
 }
 
 #[test]
+fn test_resolve_bounds_callable_subtype() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let source_param = ParamInfo {
+        name: Some(interner.intern_string("x")),
+        type_id: interner.union(vec![TypeId::STRING, TypeId::NUMBER]),
+        optional: false,
+        rest: false,
+    };
+    let target_param = ParamInfo {
+        name: Some(interner.intern_string("y")),
+        type_id: TypeId::STRING,
+        optional: false,
+        rest: false,
+    };
+
+    let lower = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: Vec::new(),
+            params: vec![source_param],
+            return_type: TypeId::NUMBER,
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+    let upper = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: Vec::new(),
+            params: vec![target_param],
+            return_type: TypeId::NUMBER,
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
+fn test_resolve_bounds_function_to_callable() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let source_param = ParamInfo {
+        name: Some(interner.intern_string("x")),
+        type_id: interner.union(vec![TypeId::STRING, TypeId::NUMBER]),
+        optional: false,
+        rest: false,
+    };
+    let target_param = ParamInfo {
+        name: Some(interner.intern_string("y")),
+        type_id: TypeId::STRING,
+        optional: false,
+        rest: false,
+    };
+
+    let lower = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![source_param],
+        return_type: TypeId::NUMBER,
+        is_constructor: false,
+    });
+    let upper = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: Vec::new(),
+            params: vec![target_param],
+            return_type: TypeId::NUMBER,
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
+fn test_resolve_bounds_callable_to_function() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let source_param = ParamInfo {
+        name: Some(interner.intern_string("x")),
+        type_id: interner.union(vec![TypeId::STRING, TypeId::NUMBER]),
+        optional: false,
+        rest: false,
+    };
+    let target_param = ParamInfo {
+        name: Some(interner.intern_string("y")),
+        type_id: TypeId::STRING,
+        optional: false,
+        rest: false,
+    };
+
+    let lower = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: Vec::new(),
+            params: vec![source_param],
+            return_type: TypeId::NUMBER,
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+    let upper = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![target_param],
+        return_type: TypeId::NUMBER,
+        is_constructor: false,
+    });
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
 fn test_resolve_bounds_application_subtype() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
