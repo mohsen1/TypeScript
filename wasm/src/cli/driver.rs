@@ -1260,6 +1260,8 @@ struct PackageJson {
     package_type: Option<String>,
     #[serde(default)]
     exports: Option<serde_json::Value>,
+    #[serde(default, rename = "typesVersions")]
+    types_versions: Option<serde_json::Value>,
 }
 
 fn export_conditions(options: &ResolvedCompilerOptions) -> Vec<&'static str> {
@@ -1370,6 +1372,19 @@ fn resolve_package_specifier(
                 {
                     return Some(resolved);
                 }
+            }
+        }
+
+        if let Some(types_versions) = package_json.types_versions.as_ref() {
+            let types_subpath = subpath.unwrap_or("index");
+            if let Some(resolved) = resolve_types_versions(
+                package_root,
+                types_subpath,
+                types_versions,
+                options,
+                package_type,
+            ) {
+                return Some(resolved);
             }
         }
     }
@@ -1496,6 +1511,122 @@ fn collect_package_entry_candidates(package_json: &PackageJson) -> Vec<String> {
     }
 
     candidates
+}
+
+fn resolve_types_versions(
+    package_root: &Path,
+    subpath: &str,
+    types_versions: &serde_json::Value,
+    options: &ResolvedCompilerOptions,
+    package_type: Option<PackageType>,
+) -> Option<PathBuf> {
+    let paths = select_types_versions_paths(types_versions)?;
+    let mut best_pattern: Option<&String> = None;
+    let mut best_value: Option<&serde_json::Value> = None;
+    let mut best_wildcard = String::new();
+    let mut best_specificity = 0usize;
+    let mut best_len = 0usize;
+
+    for (pattern, value) in paths {
+        let Some(wildcard) = match_types_versions_pattern(pattern, subpath) else {
+            continue;
+        };
+        let specificity = types_versions_specificity(pattern);
+        let pattern_len = pattern.len();
+        let is_better = match best_pattern {
+            None => true,
+            Some(current) => {
+                specificity > best_specificity
+                    || (specificity == best_specificity && pattern_len > best_len)
+                    || (specificity == best_specificity
+                        && pattern_len == best_len
+                        && pattern < current)
+            }
+        };
+
+        if is_better {
+            best_specificity = specificity;
+            best_len = pattern_len;
+            best_pattern = Some(pattern);
+            best_value = Some(value);
+            best_wildcard = wildcard;
+        }
+    }
+
+    let Some(value) = best_value else {
+        return None;
+    };
+
+    let mut targets = Vec::new();
+    match value {
+        serde_json::Value::String(value) => targets.push(value.as_str()),
+        serde_json::Value::Array(list) => {
+            for entry in list {
+                if let Some(value) = entry.as_str() {
+                    targets.push(value);
+                }
+            }
+        }
+        _ => {}
+    }
+
+    for target in targets {
+        let substituted = substitute_path_target(target, &best_wildcard);
+        if let Some(resolved) =
+            resolve_package_entry(package_root, &substituted, options, package_type)
+        {
+            return Some(resolved);
+        }
+    }
+
+    None
+}
+
+fn select_types_versions_paths(
+    types_versions: &serde_json::Value,
+) -> Option<&serde_json::Map<String, serde_json::Value>> {
+    let map = types_versions.as_object()?;
+    for key in ["*", ">=0", ">=0.0", ">=0.0.0"] {
+        if let Some(value) = map.get(key) {
+            return value.as_object();
+        }
+    }
+    let (_, value) = map.iter().next()?;
+    value.as_object()
+}
+
+fn match_types_versions_pattern(pattern: &str, subpath: &str) -> Option<String> {
+    if !pattern.contains('*') {
+        return if pattern == subpath {
+            Some(String::new())
+        } else {
+            None
+        };
+    }
+
+    let star = pattern.find('*')?;
+    let (prefix, suffix) = pattern.split_at(star);
+    let suffix = &suffix[1..];
+
+    if !subpath.starts_with(prefix) || !subpath.ends_with(suffix) {
+        return None;
+    }
+
+    let start = prefix.len();
+    let end = subpath.len().saturating_sub(suffix.len());
+    if end < start {
+        return None;
+    }
+
+    Some(subpath[start..end].to_string())
+}
+
+fn types_versions_specificity(pattern: &str) -> usize {
+    if let Some(star) = pattern.find('*') {
+        star + (pattern.len() - star - 1)
+    } else {
+        pattern.len()
+    }
 }
 
 fn resolve_exports_subpath(
