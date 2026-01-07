@@ -60,6 +60,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Avoid treating class members as lexical locals in LSP resolution
    - [x] Resolve class names within class scopes
    - [x] Bind class expressions in initializers for local resolution
+   - [x] Find references for class names in class scopes/expressions
    - [x] Add import/export handling for cross-file navigation
 
 3. **Multi-File Support**
@@ -73,7 +74,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
 #### Testing
 
 Latest run:
-- `./wasm/test.sh` ❌ (build errors: duplicate `type_predicate` in `src/solver/operations.rs`; pre-existing on rust)
+- `./wasm/test.sh` ❌ (build errors: missing `this_type` in `src/solver/infer_tests.rs`; pre-existing on rust)
 
 ## Quick Reference
 
