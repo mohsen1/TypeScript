@@ -478,6 +478,16 @@ impl<'a> LoweringPass<'a> {
                 );
                 return;
             }
+
+            if export_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                self.lower_function_declaration(
+                    export_node,
+                    export_decl.export_clause,
+                    true,
+                    export_decl.is_default_export,
+                );
+                return;
+            }
         }
 
         self.visit(export_decl.export_clause);
@@ -542,10 +552,15 @@ impl<'a> LoweringPass<'a> {
 
         // Wrap with CommonJS export if needed
         let final_directive = if is_exported && class_name.is_some() {
-            TransformDirective::CommonJSExport {
+            let export_directive = TransformDirective::CommonJSExport {
                 names: vec![class_name.unwrap()],
                 is_default,
-                inner: Box::new(base_directive),
+                inner: Box::new(TransformDirective::Identity),
+            };
+
+            match base_directive {
+                TransformDirective::Identity => export_directive,
+                other => TransformDirective::Chain(vec![other, export_directive]),
             }
         } else {
             base_directive
@@ -562,8 +577,13 @@ impl<'a> LoweringPass<'a> {
         }
     }
 
-    /// Visit a function declaration
-    fn visit_function_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
+    fn lower_function_declaration(
+        &mut self,
+        node: &ThinNode,
+        idx: NodeIndex,
+        force_export: bool,
+        force_default: bool,
+    ) {
         let Some(func) = self.arena.get_function(node) else {
             return;
         };
@@ -574,10 +594,18 @@ impl<'a> LoweringPass<'a> {
             }
         }
 
-        let is_exported =
-            self.is_commonjs() && self.has_export_modifier(&func.modifiers)
-                && !self.has_export_assignment;
-        let is_default = self.has_default_modifier(&func.modifiers);
+        let mut is_exported = self.is_commonjs()
+            && !self.has_export_assignment
+            && (force_export || self.has_export_modifier(&func.modifiers));
+        if force_export && self.is_commonjs() && !self.has_export_assignment {
+            is_exported = true;
+        }
+
+        let is_default = if force_export {
+            force_default
+        } else {
+            self.has_default_modifier(&func.modifiers)
+        };
 
         let func_name = if !func.name.is_none() {
             Some(self.get_identifier_text(func.name))
@@ -593,10 +621,15 @@ impl<'a> LoweringPass<'a> {
         };
 
         let final_directive = if is_exported && func_name.is_some() {
-            TransformDirective::CommonJSExport {
+            let export_directive = TransformDirective::CommonJSExport {
                 names: vec![func_name.unwrap()],
                 is_default,
-                inner: Box::new(base_directive),
+                inner: Box::new(TransformDirective::Identity),
+            };
+
+            match base_directive {
+                TransformDirective::Identity => export_directive,
+                other => TransformDirective::Chain(vec![other, export_directive]),
             }
         } else {
             base_directive
@@ -610,10 +643,14 @@ impl<'a> LoweringPass<'a> {
             self.visit(param_idx);
         }
 
-        // Visit children
         if !func.body.is_none() {
             self.visit(func.body);
         }
+    }
+
+    /// Visit a function declaration
+    fn visit_function_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
+        self.lower_function_declaration(node, idx, false, false);
     }
 
     /// Visit an arrow function
@@ -771,6 +808,10 @@ impl<'a> LoweringPass<'a> {
         let Some(func) = self.arena.get_function(func_node) else {
             return false;
         };
+
+        if func.is_async {
+            return true;
+        }
 
         let Some(mods) = &func.modifiers else {
             return false;

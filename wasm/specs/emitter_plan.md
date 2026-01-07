@@ -52,6 +52,8 @@ Pick the most doable and impactful
 27. ES5 emit: downlevel object spread in object literals [done]
 28. Class ES5 emit: downlevel object literal computed/spread properties [done]
 29. ThinEmitter: apply TransformDirective::Chain composition [done]
+30. LoweringPass: compose ES5/CommonJS transforms with Chain [done]
+31. LoweringPass: handle export-declared functions and async detection [done]
 
 
 ## Quick Reference

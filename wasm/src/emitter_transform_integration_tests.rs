@@ -549,6 +549,47 @@ fn test_two_phase_emission_commonjs_multi_export_vars() {
 }
 
 #[test]
+fn test_two_phase_emission_commonjs_async_function_export() {
+    let source = "export async function foo() { await bar(); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate async/CommonJS transforms"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should contain __awaiter: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.foo = foo;"),
+        "CommonJS output should export foo: {}",
+        output
+    );
+    assert_eq!(
+        output.matches("exports.foo = foo;").count(),
+        1,
+        "Expected a single CommonJS export assignment: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_commonjs_auto_detect_exports() {
     let source = "export const x = 1;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
