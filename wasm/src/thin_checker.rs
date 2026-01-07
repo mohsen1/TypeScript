@@ -1738,62 +1738,86 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         }
 
+        let (object_type_for_access, nullish_cause) = self.split_nullish_type(object_type);
+        let Some(object_type_for_access) = object_type_for_access else {
+            if access.question_dot_token {
+                return TypeId::UNDEFINED;
+            }
+            if let Some(cause) = nullish_cause {
+                self.report_possibly_nullish_object(access.expression, cause);
+            }
+            return TypeId::ERROR;
+        };
+
         let index_type = self.get_type_of_node(access.name_or_argument);
-        let literal_string = self.get_literal_string_from_node(access.name_or_argument);
-        let numeric_string_index = literal_string.and_then(|name| self.get_numeric_index_from_string(name));
+        let literal_string_is_none = self.get_literal_string_from_node(access.name_or_argument).is_none();
+        let numeric_string_index = self.get_literal_string_from_node(access.name_or_argument)
+            .and_then(|name| self.get_numeric_index_from_string(name));
         let literal_index = self.get_literal_index_from_node(access.name_or_argument)
             .or(numeric_string_index);
 
+        let mut result_type = None;
+        let mut report_no_index = false;
+        let mut use_index_signature_check = true;
+
         if let Some(keys) = self.get_literal_string_keys_from_type(index_type) {
-            if keys.len() > 1 || literal_string.is_none() {
-                if let Some(result_type) = self.get_element_access_type_for_literal_keys(
-                    object_type,
-                    &keys,
-                    access.question_dot_token,
-                ) {
-                    return result_type;
+            if keys.len() > 1 || literal_string_is_none {
+                use_index_signature_check = false;
+                result_type = self.get_element_access_type_for_literal_keys(object_type_for_access, &keys);
+                if result_type.is_none() {
+                    report_no_index = true;
+                    result_type = Some(TypeId::ANY);
                 }
-                self.error_no_index_signature_at(index_type, object_type, access.name_or_argument);
-                return TypeId::ANY;
             }
         }
 
-        if let Some(property_name) = literal_string {
-            if numeric_string_index.is_none() {
-                let evaluator = PropertyAccessEvaluator::new(self.ctx.types);
-                let result = evaluator.resolve_property_access(object_type, property_name);
-                return match result {
-                    PropertyAccessResult::Success { type_id, .. } => type_id,
-                    PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
-                        if access.question_dot_token {
-                            let base_type = property_type.unwrap_or(TypeId::ANY);
-                            self.ctx.types.union(vec![base_type, TypeId::UNDEFINED])
-                        } else {
+        if result_type.is_none() {
+            if let Some(property_name) = self.get_literal_string_from_node(access.name_or_argument) {
+                if numeric_string_index.is_none() {
+                    use_index_signature_check = false;
+                    let evaluator = PropertyAccessEvaluator::new(self.ctx.types);
+                    let result = evaluator.resolve_property_access(object_type_for_access, property_name);
+                    result_type = Some(match result {
+                        PropertyAccessResult::Success { type_id, .. } => type_id,
+                        PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
                             property_type.unwrap_or(TypeId::ANY)
                         }
-                    }
-                    PropertyAccessResult::IsUnknown => TypeId::ANY,
-                    PropertyAccessResult::PropertyNotFound { .. } => {
-                        self.error_no_index_signature_at(index_type, object_type, access.name_or_argument);
-                        TypeId::ANY
-                    }
-                };
-            }
-        }
-
-        if literal_index.is_none() {
-            if let Some(keys) = self.get_literal_number_keys_from_type(index_type) {
-                if let Some(result_type) = self.get_element_access_type_for_literal_number_keys(object_type, &keys) {
-                    return result_type;
+                        PropertyAccessResult::IsUnknown => TypeId::ANY,
+                        PropertyAccessResult::PropertyNotFound { .. } => {
+                            report_no_index = true;
+                            TypeId::ANY
+                        }
+                    });
                 }
             }
         }
 
-        // Get the index type
-        let result_type = self.get_element_access_type(object_type, index_type, literal_index);
+        if result_type.is_none() && literal_index.is_none() {
+            if let Some(keys) = self.get_literal_number_keys_from_type(index_type) {
+                result_type = self.get_element_access_type_for_literal_number_keys(object_type_for_access, &keys);
+            }
+        }
 
-        if self.should_report_no_index_signature(object_type, index_type, literal_index) {
+        let mut result_type = result_type.unwrap_or_else(|| {
+            self.get_element_access_type(object_type_for_access, index_type, literal_index)
+        });
+
+        if use_index_signature_check
+            && self.should_report_no_index_signature(object_type_for_access, index_type, literal_index)
+        {
+            report_no_index = true;
+        }
+
+        if report_no_index {
             self.error_no_index_signature_at(index_type, object_type, access.name_or_argument);
+        }
+
+        if let Some(cause) = nullish_cause {
+            if access.question_dot_token {
+                result_type = self.ctx.types.union(vec![result_type, TypeId::UNDEFINED]);
+            } else if !report_no_index {
+                self.report_possibly_nullish_object(access.expression, cause);
+            }
         }
 
         result_type
@@ -1887,6 +1911,70 @@ impl<'a> ThinCheckerState<'a> {
             }
             _ => TypeId::ANY,
         }
+    }
+
+    fn split_nullish_type(&mut self, type_id: TypeId) -> (Option<TypeId>, Option<TypeId>) {
+        use crate::solver::{IntrinsicKind, TypeKey};
+
+        let Some(key) = self.ctx.types.lookup(type_id) else {
+            return (Some(type_id), None);
+        };
+
+        match key {
+            TypeKey::Intrinsic(IntrinsicKind::Null) => (None, Some(TypeId::NULL)),
+            TypeKey::Intrinsic(IntrinsicKind::Undefined | IntrinsicKind::Void) => {
+                (None, Some(TypeId::UNDEFINED))
+            }
+            TypeKey::Union(members) => {
+                let mut non_null = Vec::with_capacity(members.len());
+                let mut nullish = Vec::new();
+
+                for &member in members.iter() {
+                    match self.ctx.types.lookup(member) {
+                        Some(TypeKey::Intrinsic(IntrinsicKind::Null)) => nullish.push(TypeId::NULL),
+                        Some(TypeKey::Intrinsic(IntrinsicKind::Undefined | IntrinsicKind::Void)) => {
+                            nullish.push(TypeId::UNDEFINED);
+                        }
+                        _ => non_null.push(member),
+                    }
+                }
+
+                if nullish.is_empty() {
+                    return (Some(type_id), None);
+                }
+
+                let non_null_type = if non_null.is_empty() {
+                    None
+                } else if non_null.len() == 1 {
+                    Some(non_null[0])
+                } else {
+                    Some(self.ctx.types.union(non_null))
+                };
+
+                let cause = if nullish.len() == 1 {
+                    Some(nullish[0])
+                } else {
+                    Some(self.ctx.types.union(nullish))
+                };
+
+                (non_null_type, cause)
+            }
+            _ => (Some(type_id), None),
+        }
+    }
+
+    fn report_possibly_nullish_object(&mut self, idx: NodeIndex, cause: TypeId) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        let (code, message) = if cause == TypeId::NULL {
+            (diagnostic_codes::OBJECT_IS_POSSIBLY_NULL, "Object is possibly 'null'.")
+        } else if cause == TypeId::UNDEFINED {
+            (diagnostic_codes::OBJECT_IS_POSSIBLY_UNDEFINED, "Object is possibly 'undefined'.")
+        } else {
+            (diagnostic_codes::OBJECT_IS_POSSIBLY_NULL_OR_UNDEFINED, "Object is possibly 'null' or 'undefined'.")
+        };
+
+        self.error_at_node(idx, message, code);
     }
 
     fn get_literal_index_from_node(&self, idx: NodeIndex) -> Option<usize> {
@@ -2000,7 +2088,6 @@ impl<'a> ThinCheckerState<'a> {
         &mut self,
         object_type: TypeId,
         keys: &[Atom],
-        optional_chain: bool,
     ) -> Option<TypeId> {
         use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
 
@@ -2011,7 +2098,6 @@ impl<'a> ThinCheckerState<'a> {
         let numeric_as_index = self.is_array_like_type(object_type);
         let evaluator = PropertyAccessEvaluator::new(self.ctx.types);
         let mut types = Vec::with_capacity(keys.len());
-        let mut saw_nullable = false;
 
         for &key in keys {
             let name = self.ctx.types.resolve_atom(key);
@@ -2027,26 +2113,17 @@ impl<'a> ThinCheckerState<'a> {
                 PropertyAccessResult::Success { type_id, .. } => types.push(type_id),
                 PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
                     types.push(property_type.unwrap_or(TypeId::ANY));
-                    if optional_chain {
-                        saw_nullable = true;
-                    }
                 }
                 PropertyAccessResult::IsUnknown => types.push(TypeId::ANY),
                 PropertyAccessResult::PropertyNotFound { .. } => return None,
             }
         }
 
-        let mut result = if types.len() == 1 {
-            types[0]
+        if types.len() == 1 {
+            Some(types[0])
         } else {
-            self.ctx.types.union(types)
-        };
-
-        if optional_chain && saw_nullable {
-            result = self.ctx.types.union(vec![result, TypeId::UNDEFINED]);
+            Some(self.ctx.types.union(types))
         }
-
-        Some(result)
     }
 
     fn get_element_access_type_for_literal_number_keys(
@@ -2102,8 +2179,11 @@ impl<'a> ThinCheckerState<'a> {
             return false;
         }
 
-        let wants_number = index_type == TypeId::NUMBER || literal_index.is_some();
-        let wants_string = index_type == TypeId::STRING;
+        let wants_number = index_type == TypeId::NUMBER
+            || literal_index.is_some()
+            || self.get_literal_number_keys_from_type(index_type).is_some();
+        let wants_string = index_type == TypeId::STRING
+            || self.get_literal_string_keys_from_type(index_type).is_some();
         if !wants_number && !wants_string {
             return false;
         }

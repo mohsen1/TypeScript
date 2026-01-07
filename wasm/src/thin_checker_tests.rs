@@ -2194,6 +2194,68 @@ const value = tup[idx];
 }
 
 #[test]
+fn test_checker_element_access_reports_nullable_object() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Foo = { a: number };
+let obj: Foo | undefined;
+const value = obj["a"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2532), "Expected error 2532 for possibly undefined object, got: {:?}", codes);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_element_access_optional_chain_nullable_object() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+type Foo = { a: number };
+let obj: Foo | undefined;
+const value = obj?.["a"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    let value_key = types.lookup(value_type).expect("value type should exist");
+    match value_key {
+        TypeKey::Union(members) => {
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&TypeId::UNDEFINED));
+        }
+        _ => panic!("Expected union type for value, got {:?}", value_key),
+    }
+}
+
+#[test]
 fn test_checker_namespace_merges_with_class_exports() {
     use crate::thin_parser::ThinParserState;
     use crate::solver::TypeKey;
