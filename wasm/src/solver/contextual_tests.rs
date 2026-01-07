@@ -267,8 +267,10 @@ fn test_contextual_property() {
 
     // { x: number, y: string }
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER,
+ write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING,
+ write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ]);
 
     let ctx = ContextualTypeContext::with_expected(&interner, obj);
@@ -288,10 +290,12 @@ fn test_contextual_nested_property() {
 
     // { nested: { value: number } }
     let inner = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("value"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("value"), type_id: TypeId::NUMBER,
+ write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
     let outer = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("nested"), type_id: inner, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("nested"), type_id: inner,
+ write_type: inner, optional: false, readonly: false, is_method: false },
     ]);
 
     let ctx = ContextualTypeContext::with_expected(&interner, outer);

@@ -10,7 +10,7 @@ use crate::thin_binder::ThinBinderState;
 use crate::lsp::position::{Position, Range, LineMap};
 use crate::lsp::utils::find_node_at_offset;
 use crate::lsp::references::FindReferences;
-use crate::lsp::resolver::ScopeCache;
+use crate::lsp::resolver::{ScopeCache, ScopeCacheStats};
 use crate::scanner::{self, SyntaxKind};
 
 /// A single text edit.
@@ -120,7 +120,7 @@ impl<'a> RenameProvider<'a> {
         position: Position,
         new_name: String,
     ) -> Result<WorkspaceEdit, String> {
-        self.provide_rename_edits_internal(root, position, new_name, None)
+        self.provide_rename_edits_internal(root, position, new_name, None, None)
     }
 
     pub fn provide_rename_edits_with_scope_cache(
@@ -129,8 +129,9 @@ impl<'a> RenameProvider<'a> {
         position: Position,
         new_name: String,
         scope_cache: &mut ScopeCache,
+        scope_stats: Option<&mut ScopeCacheStats>,
     ) -> Result<WorkspaceEdit, String> {
-        self.provide_rename_edits_internal(root, position, new_name, Some(scope_cache))
+        self.provide_rename_edits_internal(root, position, new_name, Some(scope_cache), scope_stats)
     }
 
     fn provide_rename_edits_internal(
@@ -139,6 +140,7 @@ impl<'a> RenameProvider<'a> {
         position: Position,
         new_name: String,
         scope_cache: Option<&mut ScopeCache>,
+        mut scope_stats: Option<&mut ScopeCacheStats>,
     ) -> Result<WorkspaceEdit, String> {
         let node_idx = self
             .rename_target_node(position)
@@ -159,7 +161,12 @@ impl<'a> RenameProvider<'a> {
         // We use find_references which includes the definition
         let locations = if let Some(scope_cache) = scope_cache {
             finder
-                .find_references_with_scope_cache(root, position, scope_cache, None)
+                .find_references_with_scope_cache(
+                    root,
+                    position,
+                    scope_cache,
+                    scope_stats.as_deref_mut(),
+                )
         } else {
             finder.find_references(root, position)
         }
@@ -354,6 +361,7 @@ mod rename_tests {
             pos,
             "next".to_string(),
             &mut scope_cache,
+            None,
         );
         assert!(result.is_ok(), "Rename should succeed with scope cache");
         assert!(!scope_cache.is_empty(), "Expected scope cache to populate for rename");

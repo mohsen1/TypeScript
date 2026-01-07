@@ -130,6 +130,7 @@ fn test_interner_intersection_disjoint_object_literals() {
     let obj_a = interner.object(vec![PropertyInfo {
         name: kind,
         type_id: interner.literal_string("a"),
+        write_type: interner.literal_string("a"),
         optional: false,
         readonly: false,
         is_method: false,
@@ -137,6 +138,7 @@ fn test_interner_intersection_disjoint_object_literals() {
     let obj_b = interner.object(vec![PropertyInfo {
         name: kind,
         type_id: interner.literal_string("b"),
+        write_type: interner.literal_string("b"),
         optional: false,
         readonly: false,
         is_method: false,
@@ -158,6 +160,7 @@ fn test_interner_intersection_disjoint_object_literal_union() {
     let obj_union = interner.object(vec![PropertyInfo {
         name: kind,
         type_id: union,
+        write_type: union,
         optional: false,
         readonly: false,
         is_method: false,
@@ -165,6 +168,7 @@ fn test_interner_intersection_disjoint_object_literal_union() {
     let obj_c = interner.object(vec![PropertyInfo {
         name: kind,
         type_id: interner.literal_string("c"),
+        write_type: interner.literal_string("c"),
         optional: false,
         readonly: false,
         is_method: false,
@@ -182,6 +186,7 @@ fn test_interner_intersection_optional_object_literals_not_reduced() {
     let obj_a = interner.object(vec![PropertyInfo {
         name: kind,
         type_id: interner.literal_string("a"),
+        write_type: interner.literal_string("a"),
         optional: true,
         readonly: false,
         is_method: false,
@@ -189,6 +194,7 @@ fn test_interner_intersection_optional_object_literals_not_reduced() {
     let obj_b = interner.object(vec![PropertyInfo {
         name: kind,
         type_id: interner.literal_string("b"),
+        write_type: interner.literal_string("b"),
         optional: true,
         readonly: false,
         is_method: false,
@@ -205,12 +211,16 @@ fn test_interner_object_sorting() {
 
     // Properties in different order should produce same TypeId
     let props1 = vec![
-        PropertyInfo { name: interner.intern_string("a"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("b"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("a"), type_id: TypeId::STRING,
+ write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("b"), type_id: TypeId::NUMBER,
+ write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ];
     let props2 = vec![
-        PropertyInfo { name: interner.intern_string("b"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("a"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("b"), type_id: TypeId::NUMBER,
+ write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("a"), type_id: TypeId::STRING,
+ write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ];
 
     let id1 = interner.object(props1);
@@ -229,6 +239,7 @@ fn test_interner_object_property_lookup_cache() {
         props.push(PropertyInfo {
             name: interner.intern_string(&name),
             type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
             optional: false,
             readonly: false,
             is_method: false,
@@ -260,6 +271,7 @@ fn test_interner_object_property_lookup_cache() {
     let small = interner.object(vec![PropertyInfo {
         name: interner.intern_string("only"),
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,

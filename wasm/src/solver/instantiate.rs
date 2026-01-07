@@ -249,6 +249,7 @@ impl<'a> TypeInstantiator<'a> {
                     .map(|p| PropertyInfo {
                         name: p.name,
                         type_id: self.instantiate(p.type_id),
+                        write_type: self.instantiate(p.write_type),
                         optional: p.optional,
                         readonly: p.readonly,
                         is_method: p.is_method,
@@ -264,6 +265,7 @@ impl<'a> TypeInstantiator<'a> {
                     .map(|p| PropertyInfo {
                         name: p.name,
                         type_id: self.instantiate(p.type_id),
+                        write_type: self.instantiate(p.write_type),
                         optional: p.optional,
                         readonly: p.readonly,
                         is_method: p.is_method,
@@ -340,6 +342,7 @@ impl<'a> TypeInstantiator<'a> {
                     .map(|p| PropertyInfo {
                         name: p.name,
                         type_id: self.instantiate(p.type_id),
+                        write_type: self.instantiate(p.write_type),
                         optional: p.optional,
                         readonly: p.readonly,
                         is_method: p.is_method,

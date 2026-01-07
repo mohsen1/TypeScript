@@ -844,6 +844,14 @@ impl<'a> InferenceContext<'a> {
         }
     }
 
+    fn optional_property_write_type(&self, prop: &PropertyInfo) -> TypeId {
+        if prop.optional {
+            self.interner.union2(prop.write_type, TypeId::UNDEFINED)
+        } else {
+            prop.write_type
+        }
+    }
+
     fn is_subtype_with_method_variance(
         &self,
         source: TypeId,
@@ -930,6 +938,19 @@ impl<'a> InferenceContext<'a> {
                         t_prop.is_method,
                     ) {
                         return false;
+                    }
+                    if !t_prop.readonly
+                        && (sp.write_type != sp.type_id || t_prop.write_type != t_prop.type_id)
+                    {
+                        let source_write = self.optional_property_write_type(sp);
+                        let target_write = self.optional_property_write_type(t_prop);
+                        if !self.is_subtype_with_method_variance(
+                            target_write,
+                            source_write,
+                            t_prop.is_method,
+                        ) {
+                            return false;
+                        }
                     }
                 }
                 None => {

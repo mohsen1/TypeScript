@@ -14,10 +14,12 @@ fn test_find_discriminants_basic() {
     let type_remove = interner.literal_string("remove");
 
     let member1 = interner.object(vec![
-        PropertyInfo { name: type_name, type_id: type_add, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: type_name, type_id: type_add,
+ write_type: type_add, optional: false, readonly: false, is_method: false },
     ]);
     let member2 = interner.object(vec![
-        PropertyInfo { name: type_name, type_id: type_remove, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: type_name, type_id: type_remove,
+ write_type: type_remove, optional: false, readonly: false, is_method: false },
     ]);
 
     let union = interner.union(vec![member1, member2]);
@@ -42,12 +44,16 @@ fn test_find_discriminants_multiple_props() {
     let type_2 = interner.literal_number(2.0);
 
     let member1 = interner.object(vec![
-        PropertyInfo { name: kind_name, type_id: kind_a, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: type_name, type_id: type_1, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: kind_name, type_id: kind_a,
+ write_type: kind_a, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: type_name, type_id: type_1,
+ write_type: type_1, optional: false, readonly: false, is_method: false },
     ]);
     let member2 = interner.object(vec![
-        PropertyInfo { name: kind_name, type_id: kind_b, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: type_name, type_id: type_2, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: kind_name, type_id: kind_b,
+ write_type: kind_b, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: type_name, type_id: type_2,
+ write_type: type_2, optional: false, readonly: false, is_method: false },
     ]);
 
     let union = interner.union(vec![member1, member2]);
@@ -66,10 +72,12 @@ fn test_find_discriminants_non_literal() {
     // type T = { type: string } | { type: string }
     // Not a discriminated union - type is not literal
     let member1 = interner.object(vec![
-        PropertyInfo { name: type_name, type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: type_name, type_id: TypeId::STRING,
+ write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ]);
     let member2 = interner.object(vec![
-        PropertyInfo { name: type_name, type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: type_name, type_id: TypeId::STRING,
+ write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ]);
 
     let union = interner.union(vec![member1, member2]);
@@ -92,10 +100,12 @@ fn test_find_discriminants_missing_property() {
     let kind_b = interner.literal_string("b");
 
     let member1 = interner.object(vec![
-        PropertyInfo { name: type_name, type_id: type_a, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: type_name, type_id: type_a,
+ write_type: type_a, optional: false, readonly: false, is_method: false },
     ]);
     let member2 = interner.object(vec![
-        PropertyInfo { name: kind_name, type_id: kind_b, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: kind_name, type_id: kind_b,
+ write_type: kind_b, optional: false, readonly: false, is_method: false },
     ]);
 
     let union = interner.union(vec![member1, member2]);
@@ -119,12 +129,16 @@ fn test_narrow_by_discriminant() {
     let type_remove = interner.literal_string("remove");
 
     let member_add = interner.object(vec![
-        PropertyInfo { name: type_name, type_id: type_add, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("value"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: type_name, type_id: type_add,
+ write_type: type_add, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("value"), type_id: TypeId::NUMBER,
+ write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
     let member_remove = interner.object(vec![
-        PropertyInfo { name: type_name, type_id: type_remove, optional: false, readonly: false, is_method: false },
-        PropertyInfo { name: interner.intern_string("id"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: type_name, type_id: type_remove,
+ write_type: type_remove, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("id"), type_id: TypeId::STRING,
+ write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ]);
 
     let union = interner.union(vec![member_add, member_remove]);
@@ -147,7 +161,8 @@ fn test_narrow_by_discriminant_no_match() {
     let type_unknown = interner.literal_string("unknown");
 
     let member = interner.object(vec![
-        PropertyInfo { name: type_name, type_id: type_add, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: type_name, type_id: type_add,
+ write_type: type_add, optional: false, readonly: false, is_method: false },
     ]);
 
     let union = interner.union(vec![member]);
@@ -168,13 +183,16 @@ fn test_narrow_excluding_discriminant() {
     let type_c = interner.literal_string("c");
 
     let member_a = interner.object(vec![
-        PropertyInfo { name: type_name, type_id: type_a, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: type_name, type_id: type_a,
+ write_type: type_a, optional: false, readonly: false, is_method: false },
     ]);
     let member_b = interner.object(vec![
-        PropertyInfo { name: type_name, type_id: type_b, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: type_name, type_id: type_b,
+ write_type: type_b, optional: false, readonly: false, is_method: false },
     ]);
     let member_c = interner.object(vec![
-        PropertyInfo { name: type_name, type_id: type_c, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: type_name, type_id: type_c,
+ write_type: type_c, optional: false, readonly: false, is_method: false },
     ]);
 
     let union = interner.union(vec![member_a, member_b, member_c]);
@@ -324,6 +342,7 @@ fn test_narrow_by_typeof_negation_function() {
     let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -342,6 +361,7 @@ fn test_narrow_by_typeof_negation_function_branded_intersection() {
     let brand = interner.object(vec![PropertyInfo {
         name: interner.intern_string("__brand"),
         type_id: interner.literal_string("Tagged"),
+        write_type: interner.literal_string("Tagged"),
         optional: false,
         readonly: false,
         is_method: false,
@@ -534,6 +554,7 @@ fn test_narrow_by_typeof_branded_string_intersection() {
     let brand = interner.object(vec![PropertyInfo {
         name: interner.intern_string("__brand"),
         type_id: interner.literal_string("UserId"),
+        write_type: interner.literal_string("UserId"),
         optional: false,
         readonly: false,
         is_method: false,
@@ -552,6 +573,7 @@ fn test_narrow_by_typeof_branded_function_intersection() {
     let brand = interner.object(vec![PropertyInfo {
         name: interner.intern_string("__brand"),
         type_id: interner.literal_string("Tagged"),
+        write_type: interner.literal_string("Tagged"),
         optional: false,
         readonly: false,
         is_method: false,
@@ -583,6 +605,7 @@ fn test_narrow_by_typeof_object_excludes_branded_function_intersection() {
     let brand = interner.object(vec![PropertyInfo {
         name: interner.intern_string("__brand"),
         type_id: interner.literal_string("Tagged"),
+        write_type: interner.literal_string("Tagged"),
         optional: false,
         readonly: false,
         is_method: false,
@@ -604,6 +627,7 @@ fn test_narrow_by_typeof_object_excludes_branded_function_intersection() {
     let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -621,6 +645,7 @@ fn test_narrow_by_typeof_object_with_object_literal() {
     let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -638,6 +663,7 @@ fn test_narrow_by_typeof_object_excludes_function() {
     let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,

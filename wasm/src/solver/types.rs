@@ -242,7 +242,10 @@ impl std::hash::Hash for OrderedFloat {
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct PropertyInfo {
     pub name: Atom,
+    /// Read type (getter/lookup).
     pub type_id: TypeId,
+    /// Write type (setter/assignment).
+    pub write_type: TypeId,
     pub optional: bool,
     pub readonly: bool,
     pub is_method: bool,

@@ -837,6 +837,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 ApparentMemberKind::Value(type_id) => properties.push(PropertyInfo {
                     name,
                     type_id,
+                    write_type: type_id,
                     optional: false,
                     readonly: false,
                     is_method: false,
@@ -844,6 +845,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 ApparentMemberKind::Method(return_type) => properties.push(PropertyInfo {
                     name,
                     type_id: self.apparent_method_type(return_type),
+                    write_type: self.apparent_method_type(return_type),
                     optional: false,
                     readonly: false,
                     is_method: true,
@@ -1066,6 +1068,18 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     {
                         return SubtypeResult::False;
                     }
+                    if !t_prop.readonly
+                        && (sp.write_type != sp.type_id || t_prop.write_type != t_prop.type_id)
+                    {
+                        let source_write = self.optional_property_write_type(sp);
+                        let target_write = self.optional_property_write_type(t_prop);
+                        if !self
+                            .check_subtype_with_method_variance(target_write, source_write, t_prop.is_method)
+                            .is_true()
+                        {
+                            return SubtypeResult::False;
+                        }
+                    }
                 }
                 None => {
                     // Property missing
@@ -1183,6 +1197,18 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     .is_true()
                 {
                     return SubtypeResult::False;
+                }
+                if !t_prop.readonly
+                    && (sp.write_type != sp.type_id || t_prop.write_type != t_prop.type_id)
+                {
+                    let source_write = self.optional_property_write_type(sp);
+                    let target_write = self.optional_property_write_type(t_prop);
+                    if !self
+                        .check_subtype_with_method_variance(target_write, source_write, t_prop.is_method)
+                        .is_true()
+                    {
+                        return SubtypeResult::False;
+                    }
                 }
             } else if !self
                 .check_missing_property_against_index_signatures(source, t_prop)
@@ -1384,6 +1410,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             self.interner.union2(prop.type_id, TypeId::UNDEFINED)
         } else {
             prop.type_id
+        }
+    }
+
+    fn optional_property_write_type(&self, prop: &PropertyInfo) -> TypeId {
+        if prop.optional && !self.exact_optional_property_types {
+            self.interner.union2(prop.write_type, TypeId::UNDEFINED)
+        } else {
+            prop.write_type
         }
     }
 
@@ -2077,6 +2111,25 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                             nested_reason: nested.map(Box::new),
                         });
                     }
+                    if !t_prop.readonly
+                        && (sp.write_type != sp.type_id || t_prop.write_type != t_prop.type_id)
+                    {
+                        let source_write = self.optional_property_write_type(sp);
+                        let target_write = self.optional_property_write_type(t_prop);
+                        if !self
+                            .check_subtype_with_method_variance(target_write, source_write, t_prop.is_method)
+                            .is_true()
+                        {
+                            let nested = self
+                                .explain_failure_with_method_variance(target_write, source_write, t_prop.is_method);
+                            return Some(SubtypeFailureReason::PropertyTypeMismatch {
+                                property_name: t_prop.name,
+                                source_property_type: source_write,
+                                target_property_type: target_write,
+                                nested_reason: nested.map(Box::new),
+                            });
+                        }
+                    }
                 }
                 None => {
                     // Required property is missing
@@ -2212,6 +2265,25 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         target_property_type: target_type,
                         nested_reason: nested.map(Box::new),
                     });
+                }
+                if !t_prop.readonly
+                    && (sp.write_type != sp.type_id || t_prop.write_type != t_prop.type_id)
+                {
+                    let source_write = self.optional_property_write_type(sp);
+                    let target_write = self.optional_property_write_type(t_prop);
+                    if !self
+                        .check_subtype_with_method_variance(target_write, source_write, t_prop.is_method)
+                        .is_true()
+                    {
+                        let nested = self
+                            .explain_failure_with_method_variance(target_write, source_write, t_prop.is_method);
+                        return Some(SubtypeFailureReason::PropertyTypeMismatch {
+                            property_name: t_prop.name,
+                            source_property_type: source_write,
+                            target_property_type: target_write,
+                            nested_reason: nested.map(Box::new),
+                        });
+                    }
                 }
                 continue;
             }

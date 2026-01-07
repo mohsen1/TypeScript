@@ -9,6 +9,7 @@ fn make_animal_dog(interner: &TypeInterner) -> (TypeId, TypeId) {
     let animal = interner.object(vec![PropertyInfo {
         name,
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -18,6 +19,7 @@ fn make_animal_dog(interner: &TypeInterner) -> (TypeId, TypeId) {
         PropertyInfo {
             name,
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -25,6 +27,7 @@ fn make_animal_dog(interner: &TypeInterner) -> (TypeId, TypeId) {
         PropertyInfo {
             name: breed,
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -60,6 +63,7 @@ fn make_object_interface(interner: &TypeInterner) -> TypeId {
     let constructor = PropertyInfo {
         name: interner.intern_string("constructor"),
         type_id: TypeId::ANY,
+        write_type: TypeId::ANY,
         optional: false,
         readonly: false,
         is_method: false,
@@ -67,6 +71,7 @@ fn make_object_interface(interner: &TypeInterner) -> TypeId {
     let to_string = PropertyInfo {
         name: interner.intern_string("toString"),
         type_id: interner.function(method(TypeId::STRING)),
+        write_type: interner.function(method(TypeId::STRING)),
         optional: false,
         readonly: false,
         is_method: true,
@@ -74,6 +79,7 @@ fn make_object_interface(interner: &TypeInterner) -> TypeId {
     let to_locale = PropertyInfo {
         name: interner.intern_string("toLocaleString"),
         type_id: interner.function(method(TypeId::STRING)),
+        write_type: interner.function(method(TypeId::STRING)),
         optional: false,
         readonly: false,
         is_method: true,
@@ -81,6 +87,7 @@ fn make_object_interface(interner: &TypeInterner) -> TypeId {
     let value_of = PropertyInfo {
         name: interner.intern_string("valueOf"),
         type_id: interner.function(method(TypeId::ANY)),
+        write_type: interner.function(method(TypeId::ANY)),
         optional: false,
         readonly: false,
         is_method: true,
@@ -88,6 +95,7 @@ fn make_object_interface(interner: &TypeInterner) -> TypeId {
     let has_own = PropertyInfo {
         name: interner.intern_string("hasOwnProperty"),
         type_id: interner.function(method_with_any(TypeId::BOOLEAN)),
+        write_type: interner.function(method_with_any(TypeId::BOOLEAN)),
         optional: false,
         readonly: false,
         is_method: true,
@@ -95,6 +103,7 @@ fn make_object_interface(interner: &TypeInterner) -> TypeId {
     let is_proto = PropertyInfo {
         name: interner.intern_string("isPrototypeOf"),
         type_id: interner.function(method_with_any(TypeId::BOOLEAN)),
+        write_type: interner.function(method_with_any(TypeId::BOOLEAN)),
         optional: false,
         readonly: false,
         is_method: true,
@@ -102,6 +111,7 @@ fn make_object_interface(interner: &TypeInterner) -> TypeId {
     let prop_enum = PropertyInfo {
         name: interner.intern_string("propertyIsEnumerable"),
         type_id: interner.function(method_with_any(TypeId::BOOLEAN)),
+        write_type: interner.function(method_with_any(TypeId::BOOLEAN)),
         optional: false,
         readonly: false,
         is_method: true,
@@ -255,6 +265,7 @@ fn test_method_bivariance_even_strict() {
     let source = interner.object(vec![PropertyInfo {
         name,
         type_id: source_fn,
+        write_type: source_fn,
         optional: false,
         readonly: false,
         is_method: true,
@@ -263,6 +274,7 @@ fn test_method_bivariance_even_strict() {
     let target = interner.object(vec![PropertyInfo {
         name,
         type_id: target_fn,
+        write_type: target_fn,
         optional: false,
         readonly: false,
         is_method: true,
@@ -311,6 +323,7 @@ fn test_function_property_stays_strict() {
     let source = interner.object(vec![PropertyInfo {
         name,
         type_id: source_fn,
+        write_type: source_fn,
         optional: false,
         readonly: false,
         is_method: false,
@@ -319,6 +332,7 @@ fn test_function_property_stays_strict() {
     let target = interner.object(vec![PropertyInfo {
         name,
         type_id: target_fn,
+        write_type: target_fn,
         optional: false,
         readonly: false,
         is_method: false,
@@ -391,6 +405,7 @@ fn test_constructor_void_return_assignability() {
     let instance = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -487,6 +502,7 @@ fn test_weak_type_rejects_no_common_properties() {
     let weak_target = interner.object(vec![PropertyInfo {
         name: a,
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: true,
         readonly: false,
         is_method: false,
@@ -495,6 +511,7 @@ fn test_weak_type_rejects_no_common_properties() {
     let source = interner.object(vec![PropertyInfo {
         name: b,
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -517,6 +534,7 @@ fn test_weak_type_allows_overlap() {
     let weak_target = interner.object(vec![PropertyInfo {
         name: a,
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: true,
         readonly: false,
         is_method: false,
@@ -525,6 +543,7 @@ fn test_weak_type_allows_overlap() {
     let source = interner.object(vec![PropertyInfo {
         name: a,
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -544,6 +563,7 @@ fn test_weak_type_skips_empty_target() {
     let source = interner.object(vec![PropertyInfo {
         name: a,
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -868,6 +888,7 @@ fn test_object_keyword_accepts_non_primitives() {
     let obj = interner.object(vec![PropertyInfo {
         name,
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -922,6 +943,60 @@ fn test_object_interface_accepts_primitives() {
         TemplateSpan::Text(interner.intern_string("suffix")),
     ]);
     assert!(checker.is_assignable(template, object_interface));
+}
+
+#[test]
+fn test_split_accessor_allows_wider_setter_in_source() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let name = interner.intern_string("x");
+    let source = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        write_type: interner.union2(TypeId::STRING, TypeId::NUMBER),
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let target = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_assignable(source, target));
+}
+
+#[test]
+fn test_split_accessor_rejects_wider_setter_in_target() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let name = interner.intern_string("x");
+    let source = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let target = interner.object(vec![PropertyInfo {
+        name,
+        type_id: TypeId::STRING,
+        write_type: interner.union2(TypeId::STRING, TypeId::NUMBER),
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(!checker.is_assignable(source, target));
 }
 
 #[test]
@@ -984,6 +1059,7 @@ fn test_function_type_rejects_non_callables() {
     let obj = interner.object(vec![PropertyInfo {
         name,
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -1104,6 +1180,7 @@ fn test_apparent_string_members_assignable() {
         PropertyInfo {
             name: length,
             type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
             optional: false,
             readonly: false,
             is_method: false,
@@ -1111,6 +1188,7 @@ fn test_apparent_string_members_assignable() {
         PropertyInfo {
             name: to_upper,
             type_id: to_upper_type,
+            write_type: to_upper_type,
             optional: false,
             readonly: false,
             is_method: true,
@@ -1169,6 +1247,7 @@ fn test_apparent_string_members_include_substr_and_locale_compare() {
         PropertyInfo {
             name: locale_compare,
             type_id: locale_compare_type,
+            write_type: locale_compare_type,
             optional: false,
             readonly: false,
             is_method: true,
@@ -1176,6 +1255,7 @@ fn test_apparent_string_members_include_substr_and_locale_compare() {
         PropertyInfo {
             name: substr,
             type_id: substr_type,
+            write_type: substr_type,
             optional: false,
             readonly: false,
             is_method: true,
@@ -1223,6 +1303,7 @@ fn test_apparent_string_members_include_legacy_and_unicode() {
         PropertyInfo {
             name: normalize,
             type_id: normalize_type,
+            write_type: normalize_type,
             optional: false,
             readonly: false,
             is_method: true,
@@ -1230,6 +1311,7 @@ fn test_apparent_string_members_include_legacy_and_unicode() {
         PropertyInfo {
             name: is_well_formed,
             type_id: is_well_formed_type,
+            write_type: is_well_formed_type,
             optional: false,
             readonly: false,
             is_method: true,
@@ -1237,6 +1319,7 @@ fn test_apparent_string_members_include_legacy_and_unicode() {
         PropertyInfo {
             name: fontcolor,
             type_id: fontcolor_type,
+            write_type: fontcolor_type,
             optional: false,
             readonly: false,
             is_method: true,
@@ -1255,6 +1338,7 @@ fn test_apparent_string_members_reject_mismatch() {
     let target = interner.object(vec![PropertyInfo {
         name: length,
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -1281,6 +1365,7 @@ fn test_apparent_number_method_assignable() {
     let target = interner.object(vec![PropertyInfo {
         name: to_fixed,
         type_id: to_fixed_type,
+        write_type: to_fixed_type,
         optional: false,
         readonly: false,
         is_method: true,
@@ -1307,6 +1392,7 @@ fn test_apparent_boolean_members_assignable() {
     let target = interner.object(vec![PropertyInfo {
         name: to_string,
         type_id: to_string_type,
+        write_type: to_string_type,
         optional: false,
         readonly: false,
         is_method: true,
@@ -1333,6 +1419,7 @@ fn test_apparent_bigint_members_assignable() {
     let target = interner.object(vec![PropertyInfo {
         name: value_of,
         type_id: value_of_type,
+        write_type: value_of_type,
         optional: false,
         readonly: false,
         is_method: true,
@@ -1362,6 +1449,7 @@ fn test_apparent_symbol_members_assignable() {
         PropertyInfo {
             name: description,
             type_id: description_type,
+            write_type: description_type,
             optional: false,
             readonly: false,
             is_method: false,
@@ -1369,6 +1457,7 @@ fn test_apparent_symbol_members_assignable() {
         PropertyInfo {
             name: to_string,
             type_id: to_string_type,
+            write_type: to_string_type,
             optional: false,
             readonly: false,
             is_method: true,
@@ -1423,6 +1512,7 @@ fn test_optional_property_allows_undefined() {
     let source = interner.object(vec![PropertyInfo {
         name,
         type_id: TypeId::UNDEFINED,
+        write_type: TypeId::UNDEFINED,
         optional: true,
         readonly: false,
         is_method: false,
@@ -1430,6 +1520,7 @@ fn test_optional_property_allows_undefined() {
     let target = interner.object(vec![PropertyInfo {
         name,
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: true,
         readonly: false,
         is_method: false,
@@ -1447,6 +1538,7 @@ fn test_optional_property_rejects_required_target() {
     let source = interner.object(vec![PropertyInfo {
         name,
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: true,
         readonly: false,
         is_method: false,
@@ -1454,6 +1546,7 @@ fn test_optional_property_rejects_required_target() {
     let target = interner.object(vec![PropertyInfo {
         name,
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -1471,6 +1564,7 @@ fn test_optional_property_rejects_string_index_signature() {
     let source = interner.object(vec![PropertyInfo {
         name,
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: true,
         readonly: false,
         is_method: false,
@@ -1499,6 +1593,7 @@ fn test_exact_optional_property_rejects_undefined() {
     let source = interner.object(vec![PropertyInfo {
         name,
         type_id: TypeId::UNDEFINED,
+        write_type: TypeId::UNDEFINED,
         optional: true,
         readonly: false,
         is_method: false,
@@ -1506,6 +1601,7 @@ fn test_exact_optional_property_rejects_undefined() {
     let target = interner.object(vec![PropertyInfo {
         name,
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: true,
         readonly: false,
         is_method: false,
@@ -1524,6 +1620,7 @@ fn test_exact_optional_property_allows_string_index_signature() {
     let source = interner.object(vec![PropertyInfo {
         name,
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: true,
         readonly: false,
         is_method: false,

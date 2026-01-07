@@ -994,6 +994,12 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             match source.name.cmp(&target.name) {
                 std::cmp::Ordering::Equal => {
                     self.constrain_types(ctx, var_map, source.type_id, target.type_id);
+                    if !target.readonly
+                        && (source.write_type != source.type_id
+                            || target.write_type != target.type_id)
+                    {
+                        self.constrain_types(ctx, var_map, target.write_type, source.write_type);
+                    }
                     source_idx += 1;
                     target_idx += 1;
                 }

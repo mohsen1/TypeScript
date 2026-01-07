@@ -122,6 +122,7 @@ fn test_instantiate_object() {
         PropertyInfo {
             name: interner.intern_string("value"),
             type_id: type_param_t,
+            write_type: type_param_t,
             optional: false,
             readonly: false,
             is_method: false,
@@ -138,6 +139,7 @@ fn test_instantiate_object() {
         PropertyInfo {
             name: interner.intern_string("value"),
             type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
             optional: false,
             readonly: false,
             is_method: false,
