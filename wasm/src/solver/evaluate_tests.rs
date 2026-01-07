@@ -1456,6 +1456,40 @@ fn test_keyof_tuple() {
 }
 
 #[test]
+fn test_keyof_tuple_with_rest_tuple() {
+    let interner = TypeInterner::new();
+
+    // keyof [string, ...[number, boolean]] includes expanded indices
+    let rest_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+    ]);
+
+    let result = evaluate_keyof(&interner, tuple);
+    let key = interner.lookup(result).expect("expected union for keyof tuple with rest");
+
+    match key {
+        TypeKey::Union(members) => {
+            let members = interner.type_list(members);
+            let key_0 = interner.literal_string("0");
+            let key_1 = interner.literal_string("1");
+            let key_2 = interner.literal_string("2");
+            let length = interner.literal_string("length");
+            assert!(members.contains(&key_0));
+            assert!(members.contains(&key_1));
+            assert!(members.contains(&key_2));
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&length));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_keyof_any() {
     let interner = TypeInterner::new();
 
