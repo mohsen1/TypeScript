@@ -728,6 +728,62 @@ fn test_two_phase_emission_es5_arrow_this_in_angle_type_assertion() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_arrow_this_in_tagged_template_span() {
+    let source = "const foo = () => tag`${this.x}`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow should capture this in tagged template span: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 arrow should rewrite this in tagged template span: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_this_in_tagged_template_tag() {
+    let source = "const foo = () => this.tag`hi`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow should capture this in tagged template tag: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.tag"),
+        "ES5 arrow should rewrite this in tagged template tag: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_arrow_this_in_non_null() {
     let source = "const foo = () => this!.x;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

@@ -1759,6 +1759,9 @@ impl<'a> ThinPrinter<'a> {
             }
 
             // Template literals
+            k if k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION => {
+                self.emit_tagged_template_expression(node);
+            }
             k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
                 self.emit_template_expression(node);
             }
@@ -5398,6 +5401,15 @@ impl<'a> ThinPrinter<'a> {
     // =========================================================================
     // Template Literals
     // =========================================================================
+
+    fn emit_tagged_template_expression(&mut self, node: &ThinNode) {
+        let Some(tagged) = self.arena.get_tagged_template(node) else {
+            return;
+        };
+
+        self.emit_expression(tagged.tag);
+        self.emit(tagged.template);
+    }
 
     fn emit_template_expression(&mut self, node: &ThinNode) {
         let Some(tpl) = self.arena.get_template_expr(node) else {

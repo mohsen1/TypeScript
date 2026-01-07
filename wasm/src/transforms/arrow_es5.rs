@@ -166,6 +166,15 @@ pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bo
                 }
             }
         }
+        k if k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION => {
+            if let Some(tagged) = arena.get_tagged_template(node) {
+                if contains_this_reference(arena, tagged.tag)
+                    || contains_this_reference(arena, tagged.template)
+                {
+                    return true;
+                }
+            }
+        }
         k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
             if let Some(template) = arena.get_template_expr(node) {
                 for &span_idx in &template.template_spans.nodes {
