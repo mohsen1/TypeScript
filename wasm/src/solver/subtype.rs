@@ -293,11 +293,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             match &target_key {
                 TypeKey::Object(t_shape_id) => {
                     let t_shape = self.interner.object_shape(*t_shape_id);
-                    return self.check_object_subtype(&shape.properties, &t_shape.properties);
+                    return self.check_object_subtype(&shape.properties, None, &t_shape.properties);
                 }
                 TypeKey::ObjectWithIndex(t_shape_id) => {
                     let t_shape = self.interner.object_shape(*t_shape_id);
-                    return self.check_object_with_index_subtype(&shape, &t_shape);
+                    return self.check_object_with_index_subtype(&shape, None, &t_shape);
                 }
                 _ => {}
             }
@@ -466,21 +466,21 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             (TypeKey::Object(s_shape_id), TypeKey::Object(t_shape_id)) => {
                 let s_shape = self.interner.object_shape(*s_shape_id);
                 let t_shape = self.interner.object_shape(*t_shape_id);
-                self.check_object_subtype(&s_shape.properties, &t_shape.properties)
+                self.check_object_subtype(&s_shape.properties, Some(*s_shape_id), &t_shape.properties)
             }
 
             // Object with index to object with index
             (TypeKey::ObjectWithIndex(s_shape_id), TypeKey::ObjectWithIndex(t_shape_id)) => {
                 let s_shape = self.interner.object_shape(*s_shape_id);
                 let t_shape = self.interner.object_shape(*t_shape_id);
-                self.check_object_with_index_subtype(&s_shape, &t_shape)
+                self.check_object_with_index_subtype(&s_shape, Some(*s_shape_id), &t_shape)
             }
 
             // Object with index to simple object (index signatures can satisfy missing properties)
             (TypeKey::ObjectWithIndex(s_shape_id), TypeKey::Object(t_shape_id)) => {
                 let s_shape = self.interner.object_shape(*s_shape_id);
                 let t_shape = self.interner.object_shape(*t_shape_id);
-                self.check_object_with_index_to_object(&s_shape, &t_shape.properties)
+                self.check_object_with_index_to_object(&s_shape, *s_shape_id, &t_shape.properties)
             }
 
             // Simple object to object with index
@@ -488,7 +488,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 // All source properties must satisfy target's index signature
                 let s_shape = self.interner.object_shape(*s_shape_id);
                 let t_shape = self.interner.object_shape(*t_shape_id);
-                self.check_object_to_indexed(&s_shape.properties, &t_shape)
+                self.check_object_to_indexed(&s_shape.properties, Some(*s_shape_id), &t_shape)
             }
 
             // Function to function
@@ -1022,11 +1022,32 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         SubtypeResult::False
     }
 
+    fn lookup_property<'props>(
+        &self,
+        props: &'props [PropertyInfo],
+        shape_id: Option<ObjectShapeId>,
+        name: Atom,
+    ) -> Option<&'props PropertyInfo> {
+        if let Some(shape_id) = shape_id {
+            match self.interner.object_property_index(shape_id, name) {
+                PropertyLookup::Found(idx) => return props.get(idx),
+                PropertyLookup::NotFound => return None,
+                PropertyLookup::Uncached => {}
+            }
+        }
+        props.iter().find(|p| p.name == name)
+    }
+
     /// Check object subtyping (structural)
-    fn check_object_subtype(&mut self, source: &[PropertyInfo], target: &[PropertyInfo]) -> SubtypeResult {
+    fn check_object_subtype(
+        &mut self,
+        source: &[PropertyInfo],
+        source_shape_id: Option<ObjectShapeId>,
+        target: &[PropertyInfo],
+    ) -> SubtypeResult {
         // For each property in target, source must have a compatible property
         for t_prop in target {
-            let s_prop = source.iter().find(|p| p.name == t_prop.name);
+            let s_prop = self.lookup_property(source, source_shape_id, t_prop.name);
 
             match s_prop {
                 Some(sp) => {
@@ -1062,9 +1083,17 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     /// Check object with index signature subtyping
-    fn check_object_with_index_subtype(&mut self, source: &ObjectShape, target: &ObjectShape) -> SubtypeResult {
+    fn check_object_with_index_subtype(
+        &mut self,
+        source: &ObjectShape,
+        source_shape_id: Option<ObjectShapeId>,
+        target: &ObjectShape,
+    ) -> SubtypeResult {
         // First check named properties
-        if !self.check_object_subtype(&source.properties, &target.properties).is_true() {
+        if !self
+            .check_object_subtype(&source.properties, source_shape_id, &target.properties)
+            .is_true()
+        {
             return SubtypeResult::False;
         }
 
@@ -1137,10 +1166,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     fn check_object_with_index_to_object(
         &mut self,
         source: &ObjectShape,
+        source_shape_id: ObjectShapeId,
         target: &[PropertyInfo],
     ) -> SubtypeResult {
         for t_prop in target {
-            if let Some(sp) = source.properties.iter().find(|p| p.name == t_prop.name) {
+            if let Some(sp) = self.lookup_property(&source.properties, Some(source_shape_id), t_prop.name) {
                 // Check optional compatibility
                 if sp.optional && !t_prop.optional {
                     return SubtypeResult::False;
@@ -1258,9 +1288,17 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     /// Check simple object to object with index signature
-    fn check_object_to_indexed(&mut self, source: &[PropertyInfo], target: &ObjectShape) -> SubtypeResult {
+    fn check_object_to_indexed(
+        &mut self,
+        source: &[PropertyInfo],
+        source_shape_id: Option<ObjectShapeId>,
+        target: &ObjectShape,
+    ) -> SubtypeResult {
         // First check named properties match
-        if !self.check_object_subtype(source, &target.properties).is_true() {
+        if !self
+            .check_object_subtype(source, source_shape_id, &target.properties)
+            .is_true()
+        {
             return SubtypeResult::False;
         }
 
@@ -1516,7 +1554,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
 
         // Check properties (if any)
-        if !self.check_object_subtype(&source.properties, &target.properties).is_true() {
+        if !self
+            .check_object_subtype(&source.properties, None, &target.properties)
+            .is_true()
+        {
             return SubtypeResult::False;
         }
 
@@ -1863,12 +1904,19 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         source,
                         target,
                         &shape.properties,
+                        None,
                         &t_shape.properties,
                     );
                 }
                 TypeKey::ObjectWithIndex(t_shape_id) => {
                     let t_shape = self.interner.object_shape(*t_shape_id);
-                    return self.explain_indexed_object_failure(source, target, &shape, &t_shape);
+                    return self.explain_indexed_object_failure(
+                        source,
+                        target,
+                        &shape,
+                        None,
+                        &t_shape,
+                    );
                 }
                 _ => {}
             }
@@ -1879,14 +1927,26 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             (TypeKey::Object(s_shape_id), TypeKey::Object(t_shape_id)) => {
                 let s_shape = self.interner.object_shape(*s_shape_id);
                 let t_shape = self.interner.object_shape(*t_shape_id);
-                self.explain_object_failure(source, target, &s_shape.properties, &t_shape.properties)
+                self.explain_object_failure(
+                    source,
+                    target,
+                    &s_shape.properties,
+                    Some(*s_shape_id),
+                    &t_shape.properties,
+                )
             }
 
             // Object with index to object with index
             (TypeKey::ObjectWithIndex(s_shape_id), TypeKey::ObjectWithIndex(t_shape_id)) => {
                 let s_shape = self.interner.object_shape(*s_shape_id);
                 let t_shape = self.interner.object_shape(*t_shape_id);
-                self.explain_indexed_object_failure(source, target, &s_shape, &t_shape)
+                self.explain_indexed_object_failure(
+                    source,
+                    target,
+                    &s_shape,
+                    Some(*s_shape_id),
+                    &t_shape,
+                )
             }
 
             // Object with index to object
@@ -1897,6 +1957,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     source,
                     target,
                     &s_shape,
+                    *s_shape_id,
                     &t_shape.properties,
                 )
             }
@@ -1906,7 +1967,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 let s_shape = self.interner.object_shape(*s_shape_id);
                 let t_shape = self.interner.object_shape(*t_shape_id);
                 if let Some(reason) =
-                    self.explain_object_failure(source, target, &s_shape.properties, &t_shape.properties)
+                    self.explain_object_failure(
+                        source,
+                        target,
+                        &s_shape.properties,
+                        Some(*s_shape_id),
+                        &t_shape.properties,
+                    )
                 {
                     return Some(reason);
                 }
@@ -1975,10 +2042,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         source: TypeId,
         target: TypeId,
         source_props: &[PropertyInfo],
+        source_shape_id: Option<ObjectShapeId>,
         target_props: &[PropertyInfo],
     ) -> Option<SubtypeFailureReason> {
         for t_prop in target_props {
-            let s_prop = source_props.iter().find(|p| p.name == t_prop.name);
+            let s_prop = self.lookup_property(source_props, source_shape_id, t_prop.name);
 
             match s_prop {
                 Some(sp) => {
@@ -2035,6 +2103,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         source: TypeId,
         target: TypeId,
         source_shape: &ObjectShape,
+        source_shape_id: Option<ObjectShapeId>,
         target_shape: &ObjectShape,
     ) -> Option<SubtypeFailureReason> {
         // First check properties
@@ -2042,6 +2111,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             source,
             target,
             &source_shape.properties,
+            source_shape_id,
             &target_shape.properties,
         ) {
             return Some(reason);
@@ -2113,10 +2183,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         source: TypeId,
         target: TypeId,
         source_shape: &ObjectShape,
+        source_shape_id: ObjectShapeId,
         target_props: &[PropertyInfo],
     ) -> Option<SubtypeFailureReason> {
         for t_prop in target_props {
-            if let Some(sp) = source_shape.properties.iter().find(|p| p.name == t_prop.name) {
+            if let Some(sp) =
+                self.lookup_property(&source_shape.properties, Some(source_shape_id), t_prop.name)
+            {
                 if sp.optional && !t_prop.optional {
                     return Some(SubtypeFailureReason::OptionalPropertyRequired {
                         property_name: t_prop.name,

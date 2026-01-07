@@ -46,6 +46,7 @@ use crate::transform_context::{IdentifierId, ModuleFormat, TransformContext, Tra
 use crate::thin_emitter::ModuleKind;
 use crate::transforms::arrow_es5::contains_this_reference;
 use crate::transforms::private_fields_es5::is_private_identifier;
+use std::sync::Arc;
 
 /// Lowering pass - Phase 1 of emission
 ///
@@ -773,7 +774,7 @@ impl<'a> LoweringPass<'a> {
         let final_directive = if is_exported {
             if let Some(export_name) = class_name {
                 let export_directive = TransformDirective::CommonJSExport {
-                    names: vec![export_name],
+                    names: Arc::from(vec![export_name]),
                     is_default,
                     inner: Box::new(TransformDirective::Identity),
                 };
@@ -849,7 +850,7 @@ impl<'a> LoweringPass<'a> {
         let final_directive = if is_exported {
             if let Some(export_name) = func_name {
                 let export_directive = TransformDirective::CommonJSExport {
-                    names: vec![export_name],
+                    names: Arc::from(vec![export_name]),
                     is_default,
                     inner: Box::new(TransformDirective::Identity),
                 };
@@ -917,7 +918,7 @@ impl<'a> LoweringPass<'a> {
         let final_directive = if is_exported {
             if let Some(export_name) = enum_name {
                 let export_directive = TransformDirective::CommonJSExport {
-                    names: vec![export_name],
+                    names: Arc::from(vec![export_name]),
                     is_default: false,
                     inner: Box::new(TransformDirective::Identity),
                 };
@@ -986,7 +987,7 @@ impl<'a> LoweringPass<'a> {
         let final_directive = if is_exported {
             if let Some(export_name) = module_name {
                 let export_directive = TransformDirective::CommonJSExport {
-                    names: vec![export_name],
+                    names: Arc::from(vec![export_name]),
                     is_default: false,
                     inner: Box::new(TransformDirective::Identity),
                 };
@@ -1068,7 +1069,7 @@ impl<'a> LoweringPass<'a> {
                 self.transforms.insert(
                     idx,
                     TransformDirective::CommonJSExport {
-                        names: export_names,
+                        names: Arc::from(export_names),
                         is_default: false,
                         inner: Box::new(TransformDirective::Identity),
                     },
@@ -1521,13 +1522,12 @@ impl<'a> LoweringPass<'a> {
             return;
         }
 
-        let dependencies = self.collect_module_dependencies(&source.statements.nodes);
+        let dependencies = Arc::from(self.collect_module_dependencies(&source.statements.nodes));
         self.transforms.insert(
             source_file,
             TransformDirective::ModuleWrapper {
                 format,
                 dependencies,
-                body: source.statements.nodes.clone(),
             },
         );
     }

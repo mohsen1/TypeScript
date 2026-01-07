@@ -23,6 +23,11 @@ Useful commands:
 - `TypeScript/wasm/specs/TS_UNSOUNDNESS_CATALOG.md`
 - `TypeScript/wasm/README.md`
 
+## Project direction (from humans)
+- The "Project Direction" section in `TypeScript/wasm/README.md` is authoritative and set by a human.
+- Always read it and adjust management priorities accordingly.
+- You may fix spelling/typos there now, but treat it as human-owned going forward.
+
 ## Tracks and plans
 - emitter-track -> `TypeScript/wasm/specs/emitter_plan.md`
 - cli-track -> `TypeScript/wasm/specs/cli_plan.md`
@@ -85,6 +90,9 @@ Manager actions:
   - `tmux send-keys -t <session> "your message"`
   - wait 1 second
   - `tmux send-keys -t <session> C-m`
+- Read a track pane to decide next action:
+  - `tmux capture-pane -p -t zang-hub:hub.<pane> -S -200`
+  - Use the output to decide whether to nudge, pause, or redirect a track.
 
 If sessions need to be recreated:
 - `tmux new-session -d -s <track> -c <path>`

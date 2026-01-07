@@ -198,6 +198,61 @@ fn test_interner_object_sorting() {
 }
 
 #[test]
+fn test_interner_object_property_lookup_cache() {
+    let interner = TypeInterner::new();
+
+    let mut props = Vec::with_capacity(PROPERTY_MAP_THRESHOLD + 2);
+    for i in 0..(PROPERTY_MAP_THRESHOLD + 2) {
+        let name = format!("prop{}", i);
+        props.push(PropertyInfo {
+            name: interner.intern_string(&name),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        });
+    }
+
+    let obj = interner.object(props);
+    let shape_id = match interner.lookup(obj) {
+        Some(TypeKey::Object(shape_id)) => shape_id,
+        other => panic!("expected object type, got {:?}", other),
+    };
+
+    let target_name = format!("prop{}", PROPERTY_MAP_THRESHOLD / 2);
+    let target_atom = interner.intern_string(&target_name);
+    match interner.object_property_index(shape_id, target_atom) {
+        PropertyLookup::Found(idx) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties[idx].name, target_atom);
+        }
+        other => panic!("expected cached lookup, got {:?}", other),
+    }
+
+    let missing = interner.intern_string("missing");
+    assert_eq!(
+        interner.object_property_index(shape_id, missing),
+        PropertyLookup::NotFound
+    );
+
+    let small = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("only"),
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let small_shape_id = match interner.lookup(small) {
+        Some(TypeKey::Object(shape_id)) => shape_id,
+        other => panic!("expected object type, got {:?}", other),
+    };
+    assert_eq!(
+        interner.object_property_index(small_shape_id, interner.intern_string("only")),
+        PropertyLookup::Uncached
+    );
+}
+
+#[test]
 fn test_interner_application_deduplication() {
     let interner = TypeInterner::new();
 

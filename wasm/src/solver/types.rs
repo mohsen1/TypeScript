@@ -248,6 +248,13 @@ pub struct PropertyInfo {
     pub is_method: bool,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum PropertyLookup {
+    Found(usize),
+    NotFound,
+    Uncached,
+}
+
 /// Index signature information for object types
 /// Represents `{ [key: string]: ValueType }` or `{ [key: number]: ValueType }`
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

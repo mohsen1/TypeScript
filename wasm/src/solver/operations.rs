@@ -1481,13 +1481,13 @@ impl<'a> PropertyAccessEvaluator<'a> {
             TypeKey::Object(shape_id) => {
                 let shape = self.interner.object_shape(shape_id);
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
-                for prop in &shape.properties {
-                    if prop.name == prop_atom {
-                        return PropertyAccessResult::Success {
-                            type_id: self.optional_property_type(prop),
-                            from_index_signature: false,
-                        };
-                    }
+                if let Some(prop) =
+                    self.lookup_object_property(shape_id, &shape.properties, prop_atom)
+                {
+                    return PropertyAccessResult::Success {
+                        type_id: self.optional_property_type(prop),
+                        from_index_signature: false,
+                    };
                 }
                 PropertyAccessResult::PropertyNotFound {
                     type_id: obj_type,
@@ -1498,13 +1498,13 @@ impl<'a> PropertyAccessEvaluator<'a> {
             TypeKey::ObjectWithIndex(shape_id) => {
                 let shape = self.interner.object_shape(shape_id);
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
-                for prop in &shape.properties {
-                    if prop.name == prop_atom {
-                        return PropertyAccessResult::Success {
-                            type_id: self.optional_property_type(prop),
-                            from_index_signature: false,
-                        };
-                    }
+                if let Some(prop) =
+                    self.lookup_object_property(shape_id, &shape.properties, prop_atom)
+                {
+                    return PropertyAccessResult::Success {
+                        type_id: self.optional_property_type(prop),
+                        from_index_signature: false,
+                    };
                 }
 
                 // Check string index signature (THIS is the case for error 4111)
@@ -1694,6 +1694,19 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 type_id: obj_type,
                 property_name: prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name)),
             },
+        }
+    }
+
+    fn lookup_object_property<'props>(
+        &self,
+        shape_id: ObjectShapeId,
+        props: &'props [PropertyInfo],
+        prop_atom: Atom,
+    ) -> Option<&'props PropertyInfo> {
+        match self.interner.object_property_index(shape_id, prop_atom) {
+            PropertyLookup::Found(idx) => props.get(idx),
+            PropertyLookup::NotFound => None,
+            PropertyLookup::Uncached => props.iter().find(|p| p.name == prop_atom),
         }
     }
 

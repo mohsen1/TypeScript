@@ -7,9 +7,9 @@ use crate::interner::Atom;
 use crate::solver::intern::TypeInterner;
 use crate::solver::types::{
     CallableShape, CallableShapeId, ConditionalType, ConditionalTypeId, FunctionShape,
-    FunctionShapeId, MappedType, MappedTypeId, ObjectShape, ObjectShapeId, PropertyInfo, SymbolRef,
-    TemplateLiteralId, TemplateSpan, TupleElement, TupleListId, TypeApplication,
-    TypeApplicationId, TypeId, TypeKey, TypeListId,
+    FunctionShapeId, MappedType, MappedTypeId, ObjectShape, ObjectShapeId, PropertyInfo,
+    PropertyLookup, SymbolRef, TemplateLiteralId, TemplateSpan, TupleElement, TupleListId,
+    TypeApplication, TypeApplicationId, TypeId, TypeKey, TypeListId,
 };
 use rustc_hash::FxHashMap;
 use std::sync::{Arc, RwLock};
@@ -28,6 +28,7 @@ pub trait TypeDatabase {
     fn tuple_list(&self, id: TupleListId) -> Arc<[TupleElement]>;
     fn template_list(&self, id: TemplateLiteralId) -> Arc<[TemplateSpan]>;
     fn object_shape(&self, id: ObjectShapeId) -> Arc<ObjectShape>;
+    fn object_property_index(&self, shape_id: ObjectShapeId, name: Atom) -> PropertyLookup;
     fn function_shape(&self, id: FunctionShapeId) -> Arc<FunctionShape>;
     fn callable_shape(&self, id: CallableShapeId) -> Arc<CallableShape>;
     fn conditional_type(&self, id: ConditionalTypeId) -> Arc<ConditionalType>;
@@ -90,6 +91,10 @@ impl TypeDatabase for TypeInterner {
 
     fn object_shape(&self, id: ObjectShapeId) -> Arc<ObjectShape> {
         TypeInterner::object_shape(self, id)
+    }
+
+    fn object_property_index(&self, shape_id: ObjectShapeId, name: Atom) -> PropertyLookup {
+        TypeInterner::object_property_index(self, shape_id, name)
     }
 
     fn function_shape(&self, id: FunctionShapeId) -> Arc<FunctionShape> {
@@ -304,6 +309,10 @@ impl TypeDatabase for QueryCache<'_> {
 
     fn object_shape(&self, id: ObjectShapeId) -> Arc<ObjectShape> {
         self.interner.object_shape(id)
+    }
+
+    fn object_property_index(&self, shape_id: ObjectShapeId, name: Atom) -> PropertyLookup {
+        self.interner.object_property_index(shape_id, name)
     }
 
     fn function_shape(&self, id: FunctionShapeId) -> Arc<FunctionShape> {

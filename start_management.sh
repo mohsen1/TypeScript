@@ -18,6 +18,7 @@ TRACK_IDLE_SECONDS="${TRACK_IDLE_SECONDS:-60}"
 TRACK_POKE="${TRACK_POKE:-continue with your plan.}"
 TRACK_START_PROMPT="${TRACK_START_PROMPT:-$TRACK_POKE}"
 TRACK_START_PAUSE="${TRACK_START_PAUSE:-15}"
+SEND_ENTER_PAUSE="${SEND_ENTER_PAUSE:-1}"
 TRACK_LIMIT="${TRACK_LIMIT:-5}"
 AUTO_ATTACH="${AUTO_ATTACH:-1}"
 
@@ -217,6 +218,7 @@ if ! tmux has-session -t "$SESSION_MAIN" 2>/dev/null; then
     tmux select-pane -t "$right_pane_id" -T "$name" 2>/dev/null || true
     tmux send-keys -t "$right_pane_id" "$TRACK_START_PROMPT"
     sleep "$TRACK_START_PAUSE"
+    sleep "$SEND_ENTER_PAUSE"
     tmux send-keys -t "$right_pane_id" C-m
 
     dir="${TRACK_DIRS[1]}"
@@ -226,6 +228,7 @@ if ! tmux has-session -t "$SESSION_MAIN" 2>/dev/null; then
     tmux select-pane -t "$left_bottom_id" -T "$name" 2>/dev/null || true
     tmux send-keys -t "$left_bottom_id" "$TRACK_START_PROMPT"
     sleep "$TRACK_START_PAUSE"
+    sleep "$SEND_ENTER_PAUSE"
     tmux send-keys -t "$left_bottom_id" C-m
 
     dir="${TRACK_DIRS[2]}"
@@ -235,6 +238,7 @@ if ! tmux has-session -t "$SESSION_MAIN" 2>/dev/null; then
     tmux select-pane -t "$left_third_id" -T "$name" 2>/dev/null || true
     tmux send-keys -t "$left_third_id" "$TRACK_START_PROMPT"
     sleep "$TRACK_START_PAUSE"
+    sleep "$SEND_ENTER_PAUSE"
     tmux send-keys -t "$left_third_id" C-m
 
     dir="${TRACK_DIRS[3]}"
@@ -244,6 +248,7 @@ if ! tmux has-session -t "$SESSION_MAIN" 2>/dev/null; then
     tmux select-pane -t "$right_bottom_id" -T "$name" 2>/dev/null || true
     tmux send-keys -t "$right_bottom_id" "$TRACK_START_PROMPT"
     sleep "$TRACK_START_PAUSE"
+    sleep "$SEND_ENTER_PAUSE"
     tmux send-keys -t "$right_bottom_id" C-m
 
     dir="${TRACK_DIRS[4]}"
@@ -253,6 +258,7 @@ if ! tmux has-session -t "$SESSION_MAIN" 2>/dev/null; then
     tmux select-pane -t "$right_third_id" -T "$name" 2>/dev/null || true
     tmux send-keys -t "$right_third_id" "$TRACK_START_PROMPT"
     sleep "$TRACK_START_PAUSE"
+    sleep "$SEND_ENTER_PAUSE"
     tmux send-keys -t "$right_third_id" C-m
   else
     for idx in "${!TRACK_DIRS[@]}"; do
@@ -271,6 +277,7 @@ if ! tmux has-session -t "$SESSION_MAIN" 2>/dev/null; then
       tmux select-pane -t "$pane_id" -T "$name" 2>/dev/null || true
       tmux send-keys -t "$pane_id" "$TRACK_START_PROMPT"
       sleep "$TRACK_START_PAUSE"
+      sleep "$SEND_ENTER_PAUSE"
       tmux send-keys -t "$pane_id" C-m
     done
   fi
@@ -296,6 +303,7 @@ TRACK_LIMIT=__TRACK_LIMIT__
 TRACK_CMD=__TRACK_CMD__
 TRACK_START_PROMPT=__TRACK_START_PROMPT__
 TRACK_START_PAUSE=__TRACK_START_PAUSE__
+SEND_ENTER_PAUSE=__SEND_ENTER_PAUSE__
 MANAGER_IDLE_SECONDS=__MANAGER_IDLE_SECONDS__
 MANAGER_POKE=__MANAGER_POKE__
 TRACK_IDLE_SECONDS=__TRACK_IDLE_SECONDS__
@@ -436,6 +444,7 @@ while tmux has-session -t "$MAIN_SESSION" 2>/dev/null; do
     tmux select-pane -t "$pane_id" -T "$track" 2>/dev/null || true
     tmux send-keys -t "$pane_id" "$TRACK_START_PROMPT"
     sleep "$TRACK_START_PAUSE"
+    sleep "$SEND_ENTER_PAUSE"
     tmux send-keys -t "$pane_id" C-m
     running["$track"]="$pane_id"
     track_panes=$((track_panes + 1))
@@ -465,7 +474,9 @@ while tmux has-session -t "$MAIN_SESSION" 2>/dev/null; do
     content=$(tmux capture-pane -p -t "$pane" -S -200)
     if [ -z "${update_handled[$pane]-}" ]; then
       if printf "%s" "$content" | grep -q "Update available"; then
-        tmux send-keys -t "$pane" "1" C-m
+        tmux send-keys -t "$pane" "1"
+        sleep "$SEND_ENTER_PAUSE"
+        tmux send-keys -t "$pane" C-m
         update_handled[$pane]=1
       fi
     fi
@@ -479,12 +490,16 @@ while tmux has-session -t "$MAIN_SESSION" 2>/dev/null; do
     idle=$((now - last_seen))
     if [ "$pane" = "$manager_pane" ]; then
       if [ "$MANAGER_IDLE_SECONDS" -gt 0 ] && [ $idle -ge "$MANAGER_IDLE_SECONDS" ]; then
-        tmux send-keys -t "$pane" "$MANAGER_POKE" C-m
+        tmux send-keys -t "$pane" "$MANAGER_POKE"
+        sleep "$SEND_ENTER_PAUSE"
+        tmux send-keys -t "$pane" C-m
         last_change[$pane]="$now"
       fi
     else
       if [ "$TRACK_IDLE_SECONDS" -gt 0 ] && [ $idle -ge "$TRACK_IDLE_SECONDS" ]; then
-        tmux send-keys -t "$pane" "$TRACK_POKE" C-m
+        tmux send-keys -t "$pane" "$TRACK_POKE"
+        sleep "$SEND_ENTER_PAUSE"
+        tmux send-keys -t "$pane" C-m
         last_change[$pane]="$now"
       fi
     fi
@@ -501,6 +516,7 @@ MONITOR_CMD="${MONITOR_CMD/__TRACK_LIMIT__/$TRACK_LIMIT}"
 MONITOR_CMD="${MONITOR_CMD/__TRACK_CMD__/$(escape_for_bash "$track_cmd")}"
 MONITOR_CMD="${MONITOR_CMD/__TRACK_START_PROMPT__/$(escape_for_bash "$TRACK_START_PROMPT")}"
 MONITOR_CMD="${MONITOR_CMD/__TRACK_START_PAUSE__/$TRACK_START_PAUSE}"
+MONITOR_CMD="${MONITOR_CMD/__SEND_ENTER_PAUSE__/$SEND_ENTER_PAUSE}"
 MONITOR_CMD="${MONITOR_CMD/__MANAGER_IDLE_SECONDS__/$MANAGER_IDLE_SECONDS}"
 MONITOR_CMD="${MONITOR_CMD/__MANAGER_POKE__/$(escape_for_bash "$MANAGER_POKE")}"
 MONITOR_CMD="${MONITOR_CMD/__TRACK_IDLE_SECONDS__/$TRACK_IDLE_SECONDS}"

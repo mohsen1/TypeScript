@@ -27,6 +27,7 @@
 use crate::parser::NodeIndex;
 use crate::transforms::helpers::HelpersNeeded;
 use rustc_hash::FxHashMap;
+use std::sync::Arc;
 
 pub type IdentifierId = u32;
 
@@ -91,7 +92,7 @@ pub enum TransformDirective {
     /// ```
     CommonJSExport {
         /// Identifier ids to export
-        names: Vec<IdentifierId>,
+        names: Arc<[IdentifierId]>,
         /// Whether this is a default export
         is_default: bool,
         /// The inner directive to apply first
@@ -197,9 +198,7 @@ pub enum TransformDirective {
         /// Module format (AMD, System, UMD)
         format: ModuleFormat,
         /// Dependencies
-        dependencies: Vec<String>,
-        /// Module body nodes
-        body: Vec<NodeIndex>,
+        dependencies: Arc<[String]>,
     },
 
     /// Chain multiple transforms (composition)
@@ -364,7 +363,7 @@ mod tests {
 
         // Chain ES5 class transform with CommonJS export
         let directive = TransformDirective::CommonJSExport {
-            names: vec![name_id],
+            names: Arc::from(vec![name_id]),
             is_default: false,
             inner: Box::new(TransformDirective::ES5Class {
                 class_node,
@@ -377,8 +376,26 @@ mod tests {
         let retrieved = ctx.get(class_node).unwrap();
         match retrieved {
             TransformDirective::CommonJSExport { names, inner, .. } => {
-                assert_eq!(names, &[name_id]);
+                assert_eq!(names.as_ref(), &[name_id]);
                 assert!(matches!(**inner, TransformDirective::ES5Class { .. }));
+            }
+            _ => panic!("Expected CommonJSExport directive"),
+        }
+    }
+
+    #[test]
+    fn test_commonjs_export_names_shared() {
+        let names: Arc<[IdentifierId]> = Arc::from(vec![1, 2]);
+        let directive = TransformDirective::CommonJSExport {
+            names: names.clone(),
+            is_default: false,
+            inner: Box::new(TransformDirective::Identity),
+        };
+
+        let cloned = directive.clone();
+        match cloned {
+            TransformDirective::CommonJSExport { names: cloned_names, .. } => {
+                assert!(Arc::ptr_eq(&names, &cloned_names));
             }
             _ => panic!("Expected CommonJSExport directive"),
         }

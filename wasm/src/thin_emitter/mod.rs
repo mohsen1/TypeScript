@@ -31,6 +31,7 @@ use crate::transform_context::{IdentifierId, TransformContext, TransformDirectiv
 use crate::transforms::class_es5::ClassES5Emitter;
 use crate::transforms::enum_es5::EnumES5Emitter;
 use crate::transforms::namespace_es5::NamespaceES5Emitter;
+use std::sync::Arc;
 
 // =============================================================================
 // Comment Utilities
@@ -381,7 +382,7 @@ enum EmitDirective {
     ES5Namespace { namespace_node: NodeIndex },
     ES5Enum { enum_node: NodeIndex },
     CommonJSExport {
-        names: Vec<IdentifierId>,
+        names: Arc<[IdentifierId]>,
         is_default: bool,
         inner: Box<EmitDirective>,
     },
@@ -399,7 +400,7 @@ enum EmitDirective {
     ES5TemplateLiteral,
     ModuleWrapper {
         format: crate::transform_context::ModuleFormat,
-        dependencies: Vec<String>,
+        dependencies: Arc<[String]>,
     },
     Chain(Vec<EmitDirective>),
 }
@@ -813,7 +814,6 @@ impl<'a> ThinPrinter<'a> {
             TransformDirective::ModuleWrapper {
                 format,
                 dependencies,
-                ..
             } => EmitDirective::ModuleWrapper {
                 format: *format,
                 dependencies: dependencies.clone(),
@@ -887,7 +887,7 @@ impl<'a> ThinPrinter<'a> {
                 inner,
             } => {
                 let export_name = names.first().copied();
-                self.emit_commonjs_export(names.as_slice(), is_default, |this| {
+                self.emit_commonjs_export(names.as_ref(), is_default, |this| {
                     this.emit_commonjs_inner(node, idx, inner.as_ref(), export_name);
                 });
             }
@@ -993,7 +993,7 @@ impl<'a> ThinPrinter<'a> {
                 dependencies,
             } => {
                 if let Some(source) = self.arena.get_source_file(node) {
-                    self.emit_module_wrapper(&format, dependencies.as_slice(), node, source);
+                    self.emit_module_wrapper(&format, dependencies.as_ref(), node, source);
                     return;
                 }
 
@@ -1242,7 +1242,7 @@ impl<'a> ThinPrinter<'a> {
                 inner,
             } => {
                 let export_name = names.first().copied();
-                self.emit_commonjs_export(names.as_slice(), *is_default, |this| {
+                self.emit_commonjs_export(names.as_ref(), *is_default, |this| {
                     if index == 0 {
                         this.emit_commonjs_inner(node, idx, inner.as_ref(), export_name);
                     } else {
@@ -1350,7 +1350,7 @@ impl<'a> ThinPrinter<'a> {
                 dependencies,
             } => {
                 if let Some(source) = self.arena.get_source_file(node) {
-                    self.emit_module_wrapper(format, dependencies.as_slice(), node, source);
+                    self.emit_module_wrapper(format, dependencies.as_ref(), node, source);
                     return;
                 }
 
