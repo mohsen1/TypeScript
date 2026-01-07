@@ -387,6 +387,43 @@ fn test_index_access_object_with_string_index_signature() {
 }
 
 #[test]
+fn test_index_access_object_with_string_index_signature_optional_property() {
+    let interner = TypeInterner::new();
+
+    let key_x = interner.intern_string("x");
+    let key_y = interner.literal_string("y");
+
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name: key_x,
+            type_id: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::BOOLEAN,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let key_x_literal = interner.literal_string("x");
+    let result = evaluate_index_access(&interner, obj, key_x_literal);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+
+    let result = evaluate_index_access(&interner, obj, key_y);
+    assert_eq!(result, TypeId::BOOLEAN);
+
+    let key_union = interner.union(vec![key_x_literal, key_y]);
+    let result = evaluate_index_access(&interner, obj, key_union);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED, TypeId::BOOLEAN]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_index_access_object_with_number_index_signature() {
     let interner = TypeInterner::new();
 
@@ -469,6 +506,20 @@ fn test_index_access_type_param_no_constraint_deferred() {
         }
         other => panic!("Expected deferred IndexAccess, got {:?}", other),
     }
+}
+
+#[test]
+fn test_index_access_optional_property() {
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: true, readonly: false, is_method: false },
+    ]);
+
+    let key_x = interner.literal_string("x");
+    let result = evaluate_index_access(&interner, obj, key_x);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
 }
 
 #[test]

@@ -784,6 +784,106 @@ fn test_two_phase_emission_es5_arrow_this_in_tagged_template_tag() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_tagged_template_downlevel() {
+    let source = "const msg = tag`hi ${name}!`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let source_text = parser.get_source_text().to_string();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.set_source_text(&source_text);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__makeTemplateObject"),
+        "ES5 tagged template should use __makeTemplateObject helper: {}",
+        output
+    );
+    assert!(
+        output.contains("tag(__templateObject_"),
+        "ES5 tagged template should call tag with template object cache: {}",
+        output
+    );
+    assert!(
+        !output.contains('`'),
+        "ES5 tagged template should not emit backticks: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_template_expression_downlevel() {
+    let source = "const msg = `hi ${name}`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let source_text = parser.get_source_text().to_string();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.set_source_text(&source_text);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("\"hi \""),
+        "ES5 template expression should emit string literal head: {}",
+        output
+    );
+    assert!(
+        output.contains("+ (name)"),
+        "ES5 template expression should concatenate expression: {}",
+        output
+    );
+    assert!(
+        !output.contains('`'),
+        "ES5 template expression should not emit backticks: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_no_substitution_template_downlevel() {
+    let source = "const msg = `hello`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let source_text = parser.get_source_text().to_string();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.set_source_text(&source_text);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("\"hello\""),
+        "ES5 no-substitution template should emit string literal: {}",
+        output
+    );
+    assert!(
+        !output.contains('`'),
+        "ES5 no-substitution template should not emit backticks: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_arrow_this_in_non_null() {
     let source = "const foo = () => this!.x;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

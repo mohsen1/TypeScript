@@ -1,77 +1,83 @@
-# Solver Track A: Core Logic (Generics & Inference)
+# CLI Track: The Native Interface
 
+<<<<<<< HEAD
 ## Mission
-Implement the mathematical engine for type inference and generic instantiation. Focus on algorithms, not business rules.
+Implement a high-performance, `tsc`-compatible command-line interface. This drives the core Rust compiler logic (Parser -> Binder -> Solver -> Emitter) in a native environment, handling file I/O, configuration parsing, and error reporting.
 
 ## Scope
-**Files:** `src/solver/infer.rs`, `src/solver/instantiate.rs`, `src/solver/operations.rs`
+**Files:** 
+- `wasm/src/bin/stc.rs` (Entry point)
+- `wasm/src/cli/` (New module)
+  - `args.rs` (Clap definitions)
+  - `config.rs` (tsconfig.json parsing)
+  - `driver.rs` (Pipeline orchestration)
+  - `fs.rs` (File system abstractions)
+  - `reporter.rs` (Diagnostic formatting)
 
-**Independence:** HIGH - Mostly interacts with TypeId and TypeInterner, minimal dependencies on other solver logic.
+**Independence:** **High**. Consumes the `wasm` library (Parser/Solver/Emitter) but does not modify core logic.
 
 ## Current Status
-🟢 **Complete** - Integration tests cover union/optional inference plus application/object/tuple/index constraints.
+**Starting** - Core compiler features (Parallel Parsing, Binding, Emitter) are ready to be wired up to a CLI driver.
 
 ## Tasks
 
-### Phase 1: Inference Variables Foundation
-- [x] Implement `InferenceContext` using `ena` unification table
-  - [x] Create `InferenceVar` type (wraps ena's InferenceVariable)
-  - [x] Implement `new_inference_var()` -> InferenceVar
-  - [x] Implement `unify(var1, var2)` using ena's union-find
-  - [x] Store inference type param names as Atom (no Arc<str> allocations)
-- [x] Add tests for basic unification
-  - [x] Test: `unify(T, number)` then resolve T -> number
-  - [x] Test: `unify(T, U)` then `unify(U, string)` -> both resolve to string
-  - [x] Test: Circular unification detection (occurs-check)
+### Phase 1: Foundation & Arguments
+- [ ] **Scaffold Binary**
+  - Add `[[bin]]` entry in `Cargo.toml` for `stc` (Speedy TypeScript Compiler).
+  - Add dependencies: `clap` (derive), `anyhow`, `serde`, `serde_json` (with preserve_order).
+- [ ] **Implement Argument Parsing**
+  - Replicate common `tsc` flags: `--target`, `--module`, `--outDir`, `--strict`, `--noEmit`.
+  - Implement `--help` and `--version`.
 
-### Phase 2: Generic Instantiation
-- [x] Implement `instantiate_generic(type: TypeId, args: &[TypeId]) -> TypeId`
-  - [x] Handle `Array<T>` + `[number]` -> `Array<number>`
-  - [x] Handle `Promise<T>` instantiation (generic `Application` args)
-  - [x] Cache instantiations to avoid duplicates
-- [x] Add substitution logic
-  - [x] Walk type structure replacing type parameters with concrete types
-  - [x] Handle nested generics: `Map<K, Array<V>>` (generic `Application` args)
-  - [x] Use Atom keys in TypeSubstitution to avoid Arc<str> allocations
-- [x] Tests for instantiation
-  - [x] Test: `Array<T>` with T=number -> `Array<number>`
-  - [x] Test: `Map<K,V>` with K=string, V=number
-  - [x] Test: Nested generics
+### Phase 2: Project Configuration (tsconfig)
+- [ ] **JSONC Parsing**
+  - Implement `tsconfig.json` parser that handles comments (JSONC).
+  - Support `extends` inheritance (recursive loading).
+- [ ] **Option Mapping**
+  - Map `tsconfig` "compilerOptions" to internal `PrinterOptions` (Emitter) and `CheckerOptions`.
+  - Handle `include`, `exclude`, and `files` globs.
 
-### Phase 3: Constraint Solving
-- [x] Implement constraint system
-  - [x] Lower/upper bounds tracked per inference var
-  - [x] Constraints merged on var unification
-  - [x] Store constraints in Vec by var id to avoid HashMap overhead
-- [x] Implement `resolve_constraints() -> Result<(), Error>`
-  - [x] Check for conflicts (upper bound not assignable to lower bound)
-  - [x] Finalize inference variables to concrete types
-- [x] Tests for constraints
-  - [x] Test: `T extends string` -> T can be string literal
-  - [x] Test: Conflicting bounds error
-  - [x] Test: Multiple bounds intersection
+### Phase 3: The Driver (Orchestration)
+- [ ] **File Discovery**
+  - Implement efficient globbing to find all `.ts` files based on config.
+- [ ] **Pipeline Connection**
+  - Wire up `parallel::compile_files` (Parser/Binder) to the discovered files.
+  - Wire up `thin_checker::check_source_file` for type checking.
+  - Wire up `thin_emitter::emit` for output generation.
+- [ ] **Output Writer**
+  - Implement parallel file writing for emitted `.js` and `.d.ts` files to `outDir`.
+  - Ensure directory structures are created.
 
-### Phase 4: Integration
-- [x] Expose public API for other solver modules
-  - [x] `infer_call_signature(fn_type, args) -> TypeId`
-  - [x] `infer_generic_function(fn, args) -> TypeId`
-- [x] Add comprehensive test suite
-  - [x] Test function call inference: `identity<T>(x: T) => x` with number
-  - [x] Test array methods: `[1,2,3].map(x => x.toString())`
-  - [x] Test generic class instantiation
-  - [x] Test application parameter inference: `Promise<T>` with `Promise<number>`
-  - [x] Test object property inference: `{ value: T }` with `{ value: string }`
-  - [x] Test tuple element inference: `[T, T]` with `[number, number]`
-  - [x] Test index signature inference: `{ [key: string]: T }` with `{ [key: string]: number }`
-  - [x] Test union source inference: `{ value: T }` with `{ value: number } | { value: string }`
-  - [x] Test optional union inference: `T | undefined` with `number`
-  - [x] Test rest parameter inference: `(...args: T[])` with `number, string`
-  - [x] Test default type params: `<T = string>(x?: T)` with no args
-  - [x] Test default from prior param: `<T, U = T>(x: T)` with `number`
-  - [x] Test constraint fallback: `<T extends number>(x?: T)` with no args
-  - [x] Test constraint violation: `<T extends string>(x: T)` with `number`
-  - [x] Test constraint from prior param: `<T, U extends T>(x: T, y: U)` with `string`
+### Phase 4: Diagnostics & Reporting
+- [ ] **Diagnostic Formatter**
+  - Implement a reporter that looks like `tsc` (file.ts:line:col - error TS1234: Message).
+  - Add color support (`colored` crate).
+  - Integrate `solver::diagnostics` output into the CLI reporter.
+- [ ] **Exit Codes**
+  - Return proper exit codes (0 for success, 1 for errors) based on diagnostic severity.
 
+### Phase 5: Watch Mode (The Speed Demon)
+- [ ] **File Watching**
+  - Integrate `notify` crate for filesystem events.
+  - Implement debounce logic.
+- [ ] **Incremental Re-compilation**
+  - Invalidate specific entries in `ThinParserState` / `Binder` when files change.
+  - Re-trigger check/emit only for affected files (and dependents).
+
+### Phase 6: Documentation & Polish
+- [ ] **Documentation Website**
+  - Set up Docusaurus structure.
+  - Auto-generate CLI flag documentation from Clap structs.
+  - Write "Migration from tsc" guide.
+- [ ] **Benchmarks vs tsc**
+  - Create a script to run `stc` vs `tsc` on large open source repos (e.g., Three.js, React).
+
+## Success Criteria
+- [ ] **Compatibility:** Can compile a standard `tsconfig.json` project correctly.
+- [ ] **Performance:** Significantly faster than `tsc` (Goal: 10x startup/emit speed).
+- [ ] **UX:** Error messages are clear, colorful, and point to the correct source location.
+- [ ] **Extensibility:** Infrastructure allows adding custom Rust transforms/lints later.
+=======
 ### Phase 5: Structural Constraints
 - [x] Constrain Application args when bases match
 - [x] Constrain object properties and index signatures
@@ -133,6 +139,8 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Add exponent-form numeric literal inference coverage for number index signatures
 - [x] Add optional object property inference coverage
 - [x] Add optional property inference coverage for explicit undefined values
+- [x] Include optional properties in index/property access evaluation
+- [x] Add optional property access coverage for indexed objects
 - [x] Add optional property inference coverage for index signature inference
 - [x] Add optional property inference coverage for number index signature inference
 - [x] Add optional property inference coverage for mixed index signatures
@@ -175,3 +183,4 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - Can infer type arguments for generic functions
 - Can resolve conditional types (future, but foundation ready)
 - Zero TypeScript-specific business logic in this module
+>>>>>>> solver-infer-track

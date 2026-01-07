@@ -1125,6 +1125,296 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    fn call_signature_from_method(
+        &mut self,
+        method: &crate::parser::thin_node::MethodDeclData,
+    ) -> crate::solver::CallSignature {
+        let (type_params, type_param_updates) = self.push_type_parameters(&method.type_parameters);
+        let (params, this_type) = self.extract_params_from_parameter_list(&method.parameters);
+        let return_type = if !method.type_annotation.is_none() {
+            self.get_type_from_type_node(method.type_annotation)
+        } else {
+            TypeId::ANY
+        };
+
+        self.pop_type_parameters(type_param_updates);
+
+        crate::solver::CallSignature {
+            type_params,
+            params,
+            this_type,
+            return_type,
+            type_predicate: None,
+        }
+    }
+
+    fn call_signature_from_constructor(
+        &mut self,
+        ctor: &crate::parser::thin_node::ConstructorData,
+        instance_type: TypeId,
+    ) -> crate::solver::CallSignature {
+        let (type_params, type_param_updates) = self.push_type_parameters(&ctor.type_parameters);
+        let (params, this_type) = self.extract_params_from_parameter_list(&ctor.parameters);
+
+        self.pop_type_parameters(type_param_updates);
+
+        crate::solver::CallSignature {
+            type_params,
+            params,
+            this_type,
+            return_type: instance_type,
+            type_predicate: None,
+        }
+    }
+
+    fn get_class_instance_type(&mut self, class: &crate::parser::thin_node::ClassData) -> TypeId {
+        use crate::solver::{CallSignature, CallableShape, PropertyInfo};
+        use rustc_hash::FxHashMap;
+
+        struct MethodAggregate {
+            signatures: Vec<CallSignature>,
+            optional: bool,
+        }
+
+        struct AccessorAggregate {
+            getter: Option<TypeId>,
+            setter: Option<TypeId>,
+        }
+
+        let mut properties: FxHashMap<Atom, PropertyInfo> = FxHashMap::default();
+        let mut methods: FxHashMap<Atom, MethodAggregate> = FxHashMap::default();
+        let mut accessors: FxHashMap<Atom, AccessorAggregate> = FxHashMap::default();
+
+        for &member_idx in &class.members.nodes {
+            let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+
+            match member_node.kind {
+                k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                    let Some(prop) = self.ctx.arena.get_property_decl(member_node) else {
+                        continue;
+                    };
+                    if self.has_static_modifier(&prop.modifiers) {
+                        continue;
+                    }
+                    let Some(name) = self.get_property_name(prop.name) else {
+                        continue;
+                    };
+                    let name_atom = self.ctx.types.intern_string(&name);
+                    let type_id = if !prop.type_annotation.is_none() {
+                        self.get_type_from_type_node(prop.type_annotation)
+                    } else if !prop.initializer.is_none() {
+                        self.get_type_of_node(prop.initializer)
+                    } else {
+                        TypeId::ANY
+                    };
+
+                    properties.insert(name_atom, PropertyInfo {
+                        name: name_atom,
+                        type_id,
+                        optional: prop.question_token,
+                        readonly: self.has_readonly_modifier(&prop.modifiers),
+                        is_method: false,
+                    });
+                }
+                k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                    let Some(method) = self.ctx.arena.get_method_decl(member_node) else {
+                        continue;
+                    };
+                    if self.has_static_modifier(&method.modifiers) {
+                        continue;
+                    }
+                    let Some(name) = self.get_property_name(method.name) else {
+                        continue;
+                    };
+                    let name_atom = self.ctx.types.intern_string(&name);
+                    let signature = self.call_signature_from_method(method);
+                    let entry = methods.entry(name_atom).or_insert(MethodAggregate {
+                        signatures: Vec::new(),
+                        optional: false,
+                    });
+                    entry.signatures.push(signature);
+                    entry.optional |= method.question_token;
+                }
+                k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                    let Some(accessor) = self.ctx.arena.get_accessor(member_node) else {
+                        continue;
+                    };
+                    if self.has_static_modifier(&accessor.modifiers) {
+                        continue;
+                    }
+                    let Some(name) = self.get_property_name(accessor.name) else {
+                        continue;
+                    };
+                    let name_atom = self.ctx.types.intern_string(&name);
+                    let entry = accessors.entry(name_atom).or_insert(AccessorAggregate {
+                        getter: None,
+                        setter: None,
+                    });
+
+                    if k == syntax_kind_ext::GET_ACCESSOR {
+                        let getter_type = if !accessor.type_annotation.is_none() {
+                            self.get_type_from_type_node(accessor.type_annotation)
+                        } else {
+                            self.infer_getter_return_type(accessor.body)
+                        };
+                        entry.getter = Some(getter_type);
+                    } else {
+                        let setter_type = accessor.parameters.nodes.first()
+                            .and_then(|&param_idx| self.ctx.arena.get(param_idx))
+                            .and_then(|param_node| self.ctx.arena.get_parameter(param_node))
+                            .and_then(|param| {
+                                if !param.type_annotation.is_none() {
+                                    Some(self.get_type_from_type_node(param.type_annotation))
+                                } else {
+                                    None
+                                }
+                            })
+                            .unwrap_or(TypeId::ANY);
+                        entry.setter = Some(setter_type);
+                    }
+                }
+                k if k == syntax_kind_ext::CONSTRUCTOR => {
+                    let Some(ctor) = self.ctx.arena.get_constructor(member_node) else {
+                        continue;
+                    };
+                    if ctor.body.is_none() {
+                        continue;
+                    }
+                    for &param_idx in &ctor.parameters.nodes {
+                        let Some(param_node) = self.ctx.arena.get(param_idx) else {
+                            continue;
+                        };
+                        let Some(param) = self.ctx.arena.get_parameter(param_node) else {
+                            continue;
+                        };
+                        if !self.has_parameter_property_modifier(&param.modifiers) {
+                            continue;
+                        }
+                        let Some(name) = self.get_property_name(param.name) else {
+                            continue;
+                        };
+                        let name_atom = self.ctx.types.intern_string(&name);
+                        if properties.contains_key(&name_atom) {
+                            continue;
+                        }
+                        let type_id = if !param.type_annotation.is_none() {
+                            self.get_type_from_type_node(param.type_annotation)
+                        } else if !param.initializer.is_none() {
+                            self.get_type_of_node(param.initializer)
+                        } else {
+                            TypeId::ANY
+                        };
+                        properties.insert(name_atom, PropertyInfo {
+                            name: name_atom,
+                            type_id,
+                            optional: param.question_token,
+                            readonly: self.has_readonly_modifier(&param.modifiers),
+                            is_method: false,
+                        });
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        for (name, accessor) in accessors {
+            if methods.contains_key(&name) {
+                continue;
+            }
+            let type_id = accessor.getter.or(accessor.setter).unwrap_or(TypeId::ANY);
+            let readonly = accessor.getter.is_some() && accessor.setter.is_none();
+            properties.insert(name, PropertyInfo {
+                name,
+                type_id,
+                optional: false,
+                readonly,
+                is_method: false,
+            });
+        }
+
+        for (name, method) in methods {
+            let type_id = self.ctx.types.callable(CallableShape {
+                call_signatures: method.signatures,
+                construct_signatures: Vec::new(),
+                properties: Vec::new(),
+            });
+            properties.insert(name, PropertyInfo {
+                name,
+                type_id,
+                optional: method.optional,
+                readonly: false,
+                is_method: true,
+            });
+        }
+
+        let props: Vec<PropertyInfo> = properties.into_values().collect();
+        self.ctx.types.object(props)
+    }
+
+    fn get_class_constructor_type(&mut self, class: &crate::parser::thin_node::ClassData) -> TypeId {
+        use crate::solver::{CallSignature, CallableShape};
+
+        let (_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
+        let instance_type = self.get_class_instance_type(class);
+
+        let mut has_overloads = false;
+        for &member_idx in &class.members.nodes {
+            let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+            if member_node.kind == syntax_kind_ext::CONSTRUCTOR {
+                if let Some(ctor) = self.ctx.arena.get_constructor(member_node) {
+                    if ctor.body.is_none() {
+                        has_overloads = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        let mut construct_signatures = Vec::new();
+        for &member_idx in &class.members.nodes {
+            let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+            if member_node.kind != syntax_kind_ext::CONSTRUCTOR {
+                continue;
+            }
+            let Some(ctor) = self.ctx.arena.get_constructor(member_node) else {
+                continue;
+            };
+
+            if has_overloads {
+                if ctor.body.is_none() {
+                    construct_signatures.push(self.call_signature_from_constructor(ctor, instance_type));
+                }
+            } else {
+                construct_signatures.push(self.call_signature_from_constructor(ctor, instance_type));
+                break;
+            }
+        }
+
+        if construct_signatures.is_empty() {
+            construct_signatures.push(CallSignature {
+                type_params: Vec::new(),
+                params: Vec::new(),
+                this_type: None,
+                return_type: instance_type,
+                type_predicate: None,
+            });
+        }
+
+        self.pop_type_parameters(type_param_updates);
+
+        self.ctx.types.callable(CallableShape {
+            call_signatures: Vec::new(),
+            construct_signatures,
+            properties: Vec::new(),
+        })
+    }
+
     // =========================================================================
     // Type Resolution - Specific Node Types
     // =========================================================================
@@ -1404,7 +1694,18 @@ impl<'a> ThinCheckerState<'a> {
 
         // Class - return class constructor type
         if flags & symbol_flags::CLASS != 0 {
-            // TODO: Build class constructor type
+            let decl_idx = if !value_decl.is_none() {
+                value_decl
+            } else {
+                symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE)
+            };
+            if !decl_idx.is_none() {
+                if let Some(node) = self.ctx.arena.get(decl_idx) {
+                    if let Some(class) = self.ctx.arena.get_class(node) {
+                        return self.get_class_constructor_type(class);
+                    }
+                }
+            }
             return TypeId::ANY;
         }
 
@@ -1688,6 +1989,7 @@ impl<'a> ThinCheckerState<'a> {
     /// Get type of new expression.
     fn get_type_of_new_expression(&mut self, idx: NodeIndex) -> TypeId {
         use crate::checker::types::diagnostics::diagnostic_codes;
+        use crate::solver::{CallEvaluator, CallResult, CompatChecker, TypeKey, CallableShape};
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
         };
@@ -1742,9 +2044,83 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ERROR;
         }
 
-        // For now, return any for new expressions
-        // TODO: Extract instance type from constructor
-        TypeId::ANY
+        if constructor_type == TypeId::ANY || constructor_type == TypeId::ERROR {
+            return TypeId::ANY;
+        }
+
+        let construct_type = match self.ctx.types.lookup(constructor_type) {
+            Some(TypeKey::Callable(shape)) => {
+                if shape.construct_signatures.is_empty() {
+                    None
+                } else {
+                    Some(self.ctx.types.callable(CallableShape {
+                        call_signatures: shape.construct_signatures.clone(),
+                        construct_signatures: Vec::new(),
+                        properties: Vec::new(),
+                    }))
+                }
+            }
+            Some(TypeKey::Function(_)) => Some(constructor_type),
+            _ => None,
+        };
+
+        let Some(construct_type) = construct_type else {
+            return TypeId::ANY;
+        };
+
+        let args = new_expr.arguments.as_ref().map(|a| &a.nodes).map(|n| n.as_slice()).unwrap_or(&[]);
+        let mut arg_types = Vec::with_capacity(args.len());
+        let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, construct_type);
+        let arg_count = args.len();
+
+        for (i, &arg_idx) in args.iter().enumerate() {
+            let expected_type = ctx_helper.get_parameter_type_for_call(i, arg_count);
+
+            let prev_context = self.ctx.contextual_type;
+            self.ctx.contextual_type = expected_type;
+
+            let arg_type = self.get_type_of_node(arg_idx);
+            arg_types.push(arg_type);
+
+            if let Some(expected) = expected_type {
+                if expected != TypeId::ANY && expected != TypeId::UNKNOWN {
+                    if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
+                        if arg_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                            self.check_object_literal_excess_properties(arg_type, expected, arg_idx);
+                        }
+                    }
+                }
+            }
+
+            self.ctx.contextual_type = prev_context;
+        }
+
+        let mut checker = CompatChecker::new(self.ctx.types);
+        let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
+        let result = evaluator.resolve_call(construct_type, &arg_types);
+
+        match result {
+            CallResult::Success(return_type) => return_type,
+            CallResult::NotCallable { .. } => {
+                self.error_not_callable_at(constructor_type, new_expr.expression);
+                TypeId::ERROR
+            }
+            CallResult::ArgumentCountMismatch { expected_min, expected_max, actual } => {
+                let expected = expected_max.unwrap_or(expected_min);
+                self.error_argument_count_mismatch_at(expected, actual, idx);
+                TypeId::ERROR
+            }
+            CallResult::ArgumentTypeMismatch { index, expected, actual } => {
+                if index < args.len() {
+                    self.error_argument_not_assignable_at(actual, expected, args[index]);
+                }
+                TypeId::ERROR
+            }
+            CallResult::NoOverloadMatch { failures, .. } => {
+                self.error_no_overload_matches_at(idx, &failures);
+                TypeId::ERROR
+            }
+        }
     }
 
     /// Check if a type contains any abstract class constructors.
@@ -4121,6 +4497,25 @@ impl<'a> ThinCheckerState<'a> {
             for &mod_idx in &mods.nodes {
                 if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
                     if mod_node.kind == SyntaxKind::ReadonlyKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Check if modifiers include a parameter property keyword.
+    fn has_parameter_property_modifier(&self, modifiers: &Option<crate::parser::NodeList>) -> bool {
+        use crate::scanner::SyntaxKind;
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.ctx.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::PublicKeyword as u16
+                        || mod_node.kind == SyntaxKind::PrivateKeyword as u16
+                        || mod_node.kind == SyntaxKind::ProtectedKeyword as u16
+                        || mod_node.kind == SyntaxKind::ReadonlyKeyword as u16
+                    {
                         return true;
                     }
                 }

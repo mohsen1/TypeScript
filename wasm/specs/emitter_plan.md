@@ -21,6 +21,8 @@ Note:
 
 Pick the most doable and impactful
 
+Next Steps: Cleanup. Remove the legacy inline transformation logic from ThinPrinter to rely strictly on TransformDirective.
+
 1. Integrate LoweringPass into public API (lib.rs exports) [done]
 2. Implement remaining directive handlers (arrow, async, modules) [partial: arrow this-capture (incl. nested) + async arrow downlevel handled; AMD/UMD/System wrappers auto-lower in legacy ThinPrinter]
 3. Deprecate old API, make transforms required [partial: emit/emitModern now use two-phase pipeline; ThinPrinter auto-runs LoweringPass for source files]
@@ -30,7 +32,7 @@ Pick the most doable and impactful
 5. Implement System/AMD/UMD module formats (if needed) [done]
 6. Public API integration (export LoweringPass) [done - covered by #1]
 7. Deprecate inline transform logic (breaking change) [partial: removed inline ES5 class/enum/namespace/arrow/for-of/async/object literal computed/spread paths; default anonymous export now handled via transform directive]
-8. More unit test if there are gaps [added parity tests; auto-detect/export-assignment coverage; export default arrow; arrow this in object literals/await/type assertions/satisfies/tagged templates]
+8. More unit test if there are gaps [added parity tests; auto-detect/export-assignment coverage; export default arrow; arrow this in object literals/await/type assertions/satisfies/tagged templates; ES5 template literal/tagged template downlevel]
 9. Emit ES6 class heritage clauses (extends) [done]
 10. Class ES5 transform: emit try/throw statements and parenthesized expressions [done]
 11. CommonJS export star (export * from) support [done]
@@ -66,6 +68,7 @@ Pick the most doable and impactful
 41. Module auto-detect: ignore type-only/ambient exports for wrapper/preamble [done]
 42. Import equals: emit JS and ignore internal aliases in module auto-detect [done]
 43. CommonJS preamble: include export import equals in exports init [done]
+44. ES5 emit: downlevel template literals + tagged templates with __makeTemplateObject helper [done]
 
 
 ## Quick Reference

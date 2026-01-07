@@ -12,6 +12,8 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 🟢 **Ready to Start** - TypeKey refactor is complete, APIs are stable.
 
 ## Tasks
+*   **Next Steps:** Focus on **Validation**. With so many rules implemented, the risk of regression or interaction bugs is high. Run `tests/cases/compiler` against the new solver logic.
+
 
 ### Phase 1: The Compatibility Layer (compat.rs)
 - [x] Create `CompatChecker` struct
@@ -331,6 +333,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 ### Phase 64: Typeof Narrowing Negation
 - [x] Exclude function-like types for typeof !== "function"
 - [x] Tests for typeof negation of function types
+
+### Phase 65: Type Parameter Negation Narrowing
+- [x] Narrow type parameters by excluding targets using constraints
+- [x] Tests for type parameter negative narrowing
 
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness

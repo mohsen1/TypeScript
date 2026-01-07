@@ -359,6 +359,148 @@ f(true);
 }
 
 #[test]
+fn test_new_expression_infers_class_instance_type() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+class Foo {
+    name: string;
+    count = 1;
+    readonly tag: string = "x";
+    greet(msg: string): number { return 1; }
+}
+const f = new Foo();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let f_sym = binder.file_locals.get("f").expect("f should exist");
+    let f_type = checker.get_type_of_symbol(f_sym);
+    let f_key = types.lookup(f_type).expect("f type should exist");
+    match f_key {
+        TypeKey::Object(props) => {
+            let name_atom = types.intern_string("name");
+            let count_atom = types.intern_string("count");
+            let tag_atom = types.intern_string("tag");
+            let greet_atom = types.intern_string("greet");
+
+            assert!(
+                props.iter().any(|p| p.name == name_atom && p.type_id == TypeId::STRING),
+                "Expected name: string in class instance properties, got: {:?}",
+                props
+            );
+            assert!(
+                props.iter().any(|p| p.name == count_atom && p.type_id == TypeId::NUMBER),
+                "Expected count: number in class instance properties, got: {:?}",
+                props
+            );
+            let tag_prop = props.iter().find(|p| p.name == tag_atom)
+                .expect("tag property should exist");
+            assert!(tag_prop.readonly, "Expected tag to be readonly");
+            assert!(
+                props.iter().any(|p| p.name == greet_atom && p.is_method),
+                "Expected greet method in class instance properties, got: {:?}",
+                props
+            );
+        }
+        _ => panic!("Expected f to be Object type, got {:?}", f_key),
+    }
+}
+
+#[test]
+fn test_new_expression_infers_parameter_properties() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+class Foo {
+    constructor(public id: number, readonly tag: string, count: number) {}
+}
+const f = new Foo(1, "x", 2);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let f_sym = binder.file_locals.get("f").expect("f should exist");
+    let f_type = checker.get_type_of_symbol(f_sym);
+    let f_key = types.lookup(f_type).expect("f type should exist");
+    match f_key {
+        TypeKey::Object(props) => {
+            let id_atom = types.intern_string("id");
+            let tag_atom = types.intern_string("tag");
+            let count_atom = types.intern_string("count");
+
+            assert!(
+                props.iter().any(|p| p.name == id_atom && p.type_id == TypeId::NUMBER),
+                "Expected id: number in class instance properties, got: {:?}",
+                props
+            );
+            let tag_prop = props.iter().find(|p| p.name == tag_atom)
+                .expect("tag property should exist");
+            assert_eq!(tag_prop.type_id, TypeId::STRING);
+            assert!(tag_prop.readonly, "Expected tag to be readonly");
+            assert!(
+                !props.iter().any(|p| p.name == count_atom),
+                "Expected count to be absent from class instance properties, got: {:?}",
+                props
+            );
+        }
+        _ => panic!("Expected f to be Object type, got {:?}", f_key),
+    }
+}
+
+#[test]
+fn test_new_expression_reports_overload_mismatch() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Foo {
+    constructor(x: string);
+    constructor(x: number, y: number);
+    constructor(x: any, y?: any) {}
+}
+new Foo(true);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::NO_OVERLOAD_MATCHES_CALL),
+        "Expected error 2769 for constructor overload mismatch, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_parameter_property_in_function_2369() {
     use crate::thin_parser::ThinParserState;
     // Parameter properties (public/private/protected/readonly on params)

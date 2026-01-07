@@ -451,6 +451,32 @@ fn test_property_access_object() {
 }
 
 #[test]
+fn test_property_access_optional_property() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let result = evaluator.resolve_property_access(obj, "x");
+    match result {
+        PropertyAccessResult::Success { type_id, from_index_signature } => {
+            let expected = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+            assert_eq!(type_id, expected);
+            assert!(!from_index_signature);
+        }
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_property_access_readonly_array() {
     let interner = TypeInterner::new();
     let evaluator = PropertyAccessEvaluator::new(&interner);
@@ -529,6 +555,38 @@ fn test_property_access_index_signature_no_unchecked() {
             let expected = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
             assert_eq!(type_id, expected);
             assert!(from_index_signature);
+        }
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_property_access_object_with_index_optional_property() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            optional: true,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::BOOLEAN,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let result = evaluator.resolve_property_access(obj, "x");
+    match result {
+        PropertyAccessResult::Success { type_id, from_index_signature } => {
+            let expected = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+            assert_eq!(type_id, expected);
+            assert!(!from_index_signature);
         }
         _ => panic!("Expected success, got {:?}", result),
     }
