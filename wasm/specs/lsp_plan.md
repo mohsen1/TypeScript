@@ -58,6 +58,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Extract variable: fix parenthesized expression end spans
    - [x] Extract variable: fix call/element access end spans
    - [x] Extract variable: fix array/object literal end spans
+   - [x] Extract variable: fix binding pattern end spans
    - [x] Rename: normalize private identifiers (`#name`)
 
 2. **Extend AST Coverage** (if needed)
