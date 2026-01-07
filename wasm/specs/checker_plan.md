@@ -95,9 +95,19 @@ Status: Active
 - [x] Report TS2693 for type-only symbols in `typeof` type queries
   - Error when `typeof` references interface/type alias exports.
   - Add focused tests for type-query usage.
+- [x] Report TS2304 for unknown names in `typeof` type queries
+  - Error on missing identifier targets in `typeof`.
+  - Add focused tests for unknown `typeof` names.
 - [x] Report TS2749 for value-only symbols in type positions
-  - Error on local value names and namespace value members used as types.
-  - Add coverage for namespace alias chains.
+  - Error on local value names, functions, and namespace symbols used as types.
+  - Add coverage for namespace alias chains and namespace-as-type usage.
+- [x] Add loop flow labels for while/do statements
+  - Enable narrowing within `while` bodies and keep `do` bodies conservative.
+  - Add focused flow tests for loop narrowing.
+- [x] Add loop flow labels for for/for-in/for-of statements
+  - Narrow within `for` condition bodies and keep iterator loops conservative.
+  - Add focused flow tests for `for` condition narrowing.
+  - Risk: loop exit narrowing remains conservative (no fixed point for assignments).
 
 ## Baseline / Validation
 - `./wasm/test.sh`

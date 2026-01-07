@@ -38,6 +38,7 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
   - [x] Assert prefix symbol stability after multi-statement append.
   - [x] Assert multi-prefix symbol stability when editing later statements.
   - [x] Assert multi-prefix symbol stability after append edits.
+  - [x] Prune stale flow/scope maps for nodes at/after `reparse_start`.
 - [x] JSDoc extraction for signature help/hover
   - [x] Parse JSDoc blocks and attach to `SignatureInformation` and `Hover`.
 - [x] Extract variable precedence fix
@@ -47,8 +48,12 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
   - [x] Add member completions using `ThinCheckerState` + `format_type`.
   - [x] Include auto-import suggestions from project export index.
 - [x] Performance instrumentation
-  - Measure per-request timing and memoize scope walkers.
+  - [x] Measure per-request timing and memoize scope walkers.
   - [x] Reuse scope cache for rename operations.
+  - [x] Cover scope cache hit timing for completions.
+  - [x] Cover scope cache hit timing for signature help.
+  - [x] Cover scope cache hit timing for references.
+  - [x] Cover scope cache hit timing for rename.
 - [x] Cross-file rename
   - [x] Project-level rename builds workspace edits from multi-file references.
   - [x] Preserve local alias names when renaming exported symbols.

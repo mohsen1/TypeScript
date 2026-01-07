@@ -12,8 +12,13 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Incremental compile in place (cache reuse + export-hash dependent invalidation + symbol-level dependent invalidation).
 - Module resolution supports node/bundler + exports/conditions basics + typesVersions + package.json `imports` mappings (default TS version 6.0.0, override via flag/env/tsconfig; precedence CLI > env > config > default; env var `TSZ_TYPES_VERSIONS_COMPILER_VERSION`).
 - tsconfig `types`/`typeRoots` packages included in the root file set.
+- package.json `imports` condition selection coverage (require vs import).
 - Active: benchmarks vs tsc on large repos.
 - Benchmark harness script added for tsz vs tsc comparisons.
+- Bench attempt on `src/compiler/tsconfig.json` failed in `tsz` (unsupported syntax like optional chaining + lib parsing errors). Next: add optional chaining parsing or pick a compatible large repo / bench-specific tsconfig that avoids libs.
+- Latest attempt: `npm install --no-save --no-package-lock typescript @types/node`, `cargo build --release --bin tsz`, `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` → tsz failed before timing; tsc not run.
+- Bench harness update: fixed BSD `/usr/bin/time -l` parsing in `wasm/bench_cli.sh` so elapsed time is read from the `real` token.
+- Synthetic benchmark (1000-file project in `/tmp/tsz_bench_large` with minimal `globals.d.ts`): `./wasm/bench_cli.sh --repo /tmp/tsz_bench_large --tsconfig tsconfig.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` → tsz avg 0.170s best 0.170s max_rss 19.6 MiB; tsc avg 0.200s best 0.200s max_rss 141.3 MiB. Next: run on real repo once optional chaining + lib parsing land.
 
 ## Current Investigation Notes (Incremental export hash)
 Summary of the incremental work (export hash fixed):
@@ -74,8 +79,13 @@ Tests run in this state:
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_empty_env_uses_tsconfig` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_package_imports_wildcard` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_package_imports_prefers_types_condition` (pass).
+- `./wasm/test.sh cli::driver_tests::compile_resolves_package_imports_prefers_require_condition_for_commonjs` (pass).
+- `./wasm/test.sh cli::driver_tests::compile_resolves_package_imports_prefers_import_condition_for_esm` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_tsconfig_types_includes_selected_packages` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_tsconfig_type_roots_includes_packages` (pass).
+- `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` (failed: tsz diagnostics on optional chaining + lib .d.ts parsing).
+- `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` (failed again: tsz exits with diagnostics; no timings).
+- `./wasm/bench_cli.sh --repo /tmp/tsz_bench_large --tsconfig tsconfig.json --runs 3 --warmup 1 --tsz <repo>/wasm/target/release/tsz --tsc <repo>/node_modules/.bin/tsc` (tsz avg 0.170s best 0.170s max_rss 19.6 MiB; tsc avg 0.200s best 0.200s max_rss 141.3 MiB).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
@@ -108,6 +118,7 @@ Tests run in this state:
   - [x] Expand exports conditions (node/browser) + moduleResolution-specific ordering.
   - [x] Honor package.json `type` + Node16/NodeNext extension rules.
   - [x] Apply `typesVersions` mappings for package subpaths.
+  - [x] `imports` condition selection coverage (require vs import).
 - [x] typesVersions range selection/fallback + fixed version doc.
 - [x] typesVersions compiler version override (flag/env) + fallback tests.
 - [x] typesVersions compiler version override via tsconfig + docs.

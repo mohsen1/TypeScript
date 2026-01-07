@@ -122,6 +122,28 @@ fn test_thin_emit_function_declaration() {
 }
 
 #[test]
+fn test_thin_emit_function_expression() {
+    let source = "const fnExpr = function() { return 1; };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function ("),
+        "Expected function expression in output: {}",
+        output
+    );
+    assert!(
+        output.contains("{ return 1; }"),
+        "Expected single-line return block in output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_string_literal_single_quote() {
     let source = "const s = \"hi\";";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -707,6 +729,42 @@ fn test_thin_emit_type_alias_declaration() {
 
     let output = printer.get_output();
     assert!(!output.contains("type"), "JavaScript output should NOT contain 'type': {}", output);
+}
+
+#[test]
+fn test_thin_emit_union_type() {
+    let source = "type Value = string | number;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = &parser.arena;
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    let mut type_node = None;
+    for &stmt_idx in &source_file.statements.nodes {
+        let Some(stmt_node) = arena.get(stmt_idx) else {
+            continue;
+        };
+        if stmt_node.kind == syntax_kind_ext::TYPE_ALIAS_DECLARATION {
+            let alias = arena.get_type_alias(stmt_node).expect("expected type alias data");
+            type_node = Some(alias.type_node);
+            break;
+        }
+    }
+
+    let type_node = type_node.expect("expected type alias type node");
+    let mut printer = ThinPrinter::new(arena);
+    printer.emit(type_node);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("string | number"),
+        "Expected union type in output: {}",
+        output
+    );
 }
 
 #[test]
