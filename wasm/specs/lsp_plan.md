@@ -63,6 +63,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Find references for class names in class scopes/expressions
    - [x] Bind nested function/class expressions inside complex initializers
    - [x] Bind nested function/class expressions inside if conditions
+   - [x] Bind loop/switch condition expressions for local resolution
    - [x] Bind class static blocks for local resolution
    - [x] Add import/export handling for cross-file navigation
 
