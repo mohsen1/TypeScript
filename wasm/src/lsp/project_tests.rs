@@ -1315,6 +1315,27 @@ fn test_project_scope_cache_reuse_hover_to_references() {
 }
 
 #[test]
+fn test_project_scope_cache_reuse_hover_to_rename() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "const value = 1;\nvalue;\n".to_string());
+    let position = Position::new(1, 0);
+
+    assert!(project.get_hover("a.ts", position).is_some());
+    let _ = project
+        .get_rename_edits("a.ts", position, "next".to_string())
+        .expect("Expected rename edits");
+
+    let timing = project
+        .performance()
+        .timing(ProjectRequestKind::Rename)
+        .expect("Expected timing data for rename");
+
+    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover");
+    assert_eq!(timing.scope_misses, 0, "Expected rename to reuse cached scope");
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 
