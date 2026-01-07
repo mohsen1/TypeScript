@@ -114,6 +114,8 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Honor readonly properties and index signatures during bounds validation
 - [x] Allow bivariant method parameter checks for bounds validation
 - [x] Add readonly and method variance bounds coverage
+- [x] Use assignability checks for bounds validation in inference resolution
+- [x] Add assignability-based bounds coverage for bivariant function params
 - [x] Enforce index signature consistency during bounds validation
 
 ## Architecture Notes

@@ -1,4 +1,5 @@
 use super::*;
+use crate::solver::{AssignabilityChecker, CompatChecker};
 
 #[test]
 fn test_inference_basic() {
@@ -535,6 +536,69 @@ fn test_resolve_bounds_function_property_contravariant_params() {
             ..
         }) if actual_lower == lower && actual_upper == upper
     ));
+}
+
+#[test]
+fn test_resolve_bounds_with_assignability_bivariant_function_property() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+    let mut checker = CompatChecker::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name_f = interner.intern_string("f");
+
+    let narrow_param = ParamInfo {
+        name: Some(interner.intern_string("x")),
+        type_id: TypeId::STRING,
+        optional: false,
+        rest: false,
+    };
+    let wide_param = ParamInfo {
+        name: Some(interner.intern_string("x")),
+        type_id: interner.union(vec![TypeId::STRING, TypeId::NUMBER]),
+        optional: false,
+        rest: false,
+    };
+
+    let lower_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![narrow_param],
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let upper_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![wide_param],
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let lower = interner.object(vec![PropertyInfo {
+        name: name_f,
+        type_id: lower_fn,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let upper = interner.object(vec![PropertyInfo {
+        name: name_f,
+        type_id: upper_fn,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx
+        .resolve_with_constraints_by(var, |source, target| {
+            checker.is_assignable_to(source, target)
+        })
+        .unwrap();
+    assert_eq!(result, lower);
 }
 
 #[test]
