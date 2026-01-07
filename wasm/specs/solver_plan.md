@@ -94,6 +94,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Remapped keys returning `never` are filtered from mapped outputs.
 - [x] Add mapped type key remapping coverage in evaluate/subtype
   - Evaluate drops filtered keys; subtype treats mapped results structurally.
+- [x] Add mapped type over primitive assignability coverage
+  - Mapped types over `keyof number` expose apparent primitive members in subtype/compat.
 - [x] Add keyof contravariance coverage for intersections
   - `keyof (A & B)` unions keys and stays assignable from `keyof A`.
 - [x] Add keyof contravariance coverage for unions with index signatures
