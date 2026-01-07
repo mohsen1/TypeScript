@@ -508,6 +508,54 @@ const f = new Foo(1, "x", 2);
 }
 
 #[test]
+fn test_new_expression_infers_base_class_properties() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+class Base<T> {
+    value: T;
+}
+class Derived extends Base<string> {
+    count = 1;
+}
+const d = new Derived();
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let d_sym = binder.file_locals.get("d").expect("d should exist");
+    let d_type = checker.get_type_of_symbol(d_sym);
+    let d_key = types.lookup(d_type).expect("d type should exist");
+    match d_key {
+        TypeKey::Object(props) => {
+            let value_atom = types.intern_string("value");
+            let count_atom = types.intern_string("count");
+            let value_prop = props
+                .iter()
+                .find(|p| p.name == value_atom)
+                .expect("value property should exist");
+            assert_eq!(value_prop.type_id, TypeId::STRING);
+            assert!(
+                props.iter().any(|p| p.name == count_atom && p.type_id == TypeId::NUMBER),
+                "Expected count: number in class instance properties, got: {:?}",
+                props
+            );
+        }
+        _ => panic!("Expected d to be Object type, got {:?}", d_key),
+    }
+}
+
+#[test]
 fn test_new_expression_reports_overload_mismatch() {
     use crate::checker::types::diagnostics::diagnostic_codes;
     use crate::thin_parser::ThinParserState;
