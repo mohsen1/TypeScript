@@ -101,6 +101,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: typeof value references in interfaces (qualified and unqualified)
   - [x] Test: typeof lowering uses value resolver (type vs value space)
 - [x] Parser: fix interface member parsing to track progress by token position (avoid skipping consecutive identifiers)
+- [x] Perf: avoid extra String clone when lowering negative bigint literals
 
 ## Architecture Notes
 - All strings MUST go through interner.intern_string() -> Atom
