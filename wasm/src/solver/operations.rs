@@ -696,6 +696,16 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             (Some(TypeKey::Array(s_elem)), Some(TypeKey::Array(t_elem))) => {
                 self.constrain_types(ctx, var_map, s_elem, t_elem);
             }
+            (Some(TypeKey::Tuple(ref s_elems)), Some(TypeKey::Array(t_elem))) => {
+                for s_elem in s_elems {
+                    if s_elem.rest {
+                        let rest_elem_type = self.rest_element_type(s_elem.type_id);
+                        self.constrain_types(ctx, var_map, rest_elem_type, t_elem);
+                    } else {
+                        self.constrain_types(ctx, var_map, s_elem.type_id, t_elem);
+                    }
+                }
+            }
             (Some(TypeKey::Tuple(ref s_elems)), Some(TypeKey::Tuple(ref t_elems))) => {
                 self.constrain_tuple_types(ctx, var_map, s_elems, t_elems);
             }
