@@ -339,6 +339,66 @@ fn test_narrow_by_typeof_negation_function_branded_intersection() {
 }
 
 #[test]
+fn test_narrow_by_typeof_negation_function_type_param_with_union_constraint() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let constraint = interner.union(vec![func, TypeId::STRING]);
+    let param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(constraint),
+        default: None,
+    }));
+    let union = interner.union(vec![param, TypeId::BOOLEAN]);
+
+    let narrowed = ctx.narrow_excluding_function(union);
+    let expected_param = interner.intersection(vec![param, TypeId::STRING]);
+    let expected = interner.union(vec![expected_param, TypeId::BOOLEAN]);
+    assert_eq!(narrowed, expected);
+}
+
+#[test]
+fn test_narrow_by_typeof_negation_function_type_param_to_never() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(func),
+        default: None,
+    }));
+
+    let narrowed = ctx.narrow_excluding_function(param);
+    assert_eq!(narrowed, TypeId::NEVER);
+}
+
+#[test]
 fn test_narrow_by_typeof_type_param_with_union_constraint() {
     let interner = TypeInterner::new();
     let constraint = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
@@ -352,6 +412,62 @@ fn test_narrow_by_typeof_type_param_with_union_constraint() {
     let narrowed = narrow_by_typeof(&interner, union, "string");
     let expected = interner.intersection(vec![param, TypeId::STRING]);
     assert_eq!(narrowed, expected);
+}
+
+#[test]
+fn test_narrow_by_typeof_function_type_param_with_union_constraint() {
+    let interner = TypeInterner::new();
+
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let constraint = interner.union(vec![func, TypeId::STRING]);
+    let param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(constraint),
+        default: None,
+    }));
+    let union = interner.union(vec![param, TypeId::BOOLEAN]);
+
+    let narrowed = narrow_by_typeof(&interner, union, "function");
+    let expected = interner.intersection(vec![param, func]);
+    assert_eq!(narrowed, expected);
+}
+
+#[test]
+fn test_narrow_by_typeof_function_type_param_with_non_function_constraint() {
+    let interner = TypeInterner::new();
+    let param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::NUMBER),
+        default: None,
+    }));
+
+    let narrowed = narrow_by_typeof(&interner, param, "function");
+    assert_eq!(narrowed, TypeId::NEVER);
+}
+
+#[test]
+fn test_narrow_by_typeof_function_unconstrained_type_param() {
+    let interner = TypeInterner::new();
+    let param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    }));
+
+    let narrowed = narrow_by_typeof(&interner, param, "function");
+    assert_eq!(narrowed, param);
 }
 
 #[test]

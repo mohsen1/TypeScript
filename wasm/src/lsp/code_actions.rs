@@ -1703,6 +1703,9 @@ impl<'a> CodeActionProvider<'a> {
 
     fn format_extracted_initializer(&self, expr_node: &ThinNode, selected_text: &str) -> String {
         if self.needs_parentheses_for_extraction(expr_node) {
+            if expr_node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+                return selected_text.to_string();
+            }
             return format!("({})", selected_text);
         }
         selected_text.to_string()
@@ -1762,6 +1765,15 @@ impl<'a> CodeActionProvider<'a> {
     }
 
     fn needs_parentheses_for_extraction(&self, expr_node: &ThinNode) -> bool {
+        if expr_node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+            if let Some(paren) = self.arena.get_parenthesized(expr_node) {
+                if let Some(inner) = self.arena.get(paren.expression) {
+                    return self.needs_parentheses_for_extraction(inner);
+                }
+            }
+            return false;
+        }
+
         if expr_node.kind == syntax_kind_ext::BINARY_EXPRESSION {
             if let Some(binary) = self.arena.get_binary_expr(expr_node) {
                 return binary.operator_token == SyntaxKind::CommaToken as u16;
