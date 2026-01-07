@@ -649,6 +649,32 @@ fn test_strict_null_checks_toggle() {
 }
 
 #[test]
+fn test_no_unchecked_indexed_access_toggle() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let indexed = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let index_access = interner.intern(TypeKey::IndexAccess(indexed, TypeId::STRING));
+    let number_or_undefined = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+
+    assert!(checker.is_assignable(index_access, TypeId::NUMBER));
+
+    checker.set_no_unchecked_indexed_access(true);
+
+    assert!(!checker.is_assignable(index_access, TypeId::NUMBER));
+    assert!(checker.is_assignable(index_access, number_or_undefined));
+}
+
+#[test]
 fn test_object_keyword_accepts_non_primitives() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);

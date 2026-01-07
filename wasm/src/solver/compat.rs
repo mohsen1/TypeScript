@@ -12,6 +12,7 @@ pub struct CompatChecker<'a, R: TypeResolver = NoopResolver> {
     subtype: SubtypeChecker<'a, R>,
     strict_function_types: bool,
     strict_null_checks: bool,
+    no_unchecked_indexed_access: bool,
     exact_optional_property_types: bool,
     cache: FxHashMap<(TypeId, TypeId), bool>,
 }
@@ -24,6 +25,7 @@ impl<'a> CompatChecker<'a, NoopResolver> {
             subtype: SubtypeChecker::new(interner),
             strict_function_types: false,
             strict_null_checks: true,
+            no_unchecked_indexed_access: false,
             exact_optional_property_types: false,
             cache: FxHashMap::default(),
         }
@@ -38,6 +40,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
             subtype: SubtypeChecker::with_resolver(interner, resolver),
             strict_function_types: false,
             strict_null_checks: true,
+            no_unchecked_indexed_access: false,
             exact_optional_property_types: false,
             cache: FxHashMap::default(),
         }
@@ -56,6 +59,14 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
     pub fn set_strict_null_checks(&mut self, strict: bool) {
         if self.strict_null_checks != strict {
             self.strict_null_checks = strict;
+            self.cache.clear();
+        }
+    }
+
+    /// Configure unchecked indexed access (include `undefined` in `T[K]`).
+    pub fn set_no_unchecked_indexed_access(&mut self, enabled: bool) {
+        if self.no_unchecked_indexed_access != enabled {
+            self.no_unchecked_indexed_access = enabled;
             self.cache.clear();
         }
     }
@@ -103,6 +114,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
             self.subtype.allow_bivariant_rest = true;
             self.subtype.exact_optional_property_types = self.exact_optional_property_types;
             self.subtype.strict_null_checks = self.strict_null_checks;
+            self.subtype.no_unchecked_indexed_access = self.no_unchecked_indexed_access;
             self.subtype.is_subtype_of(source, target)
         };
 
@@ -138,6 +150,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         self.subtype.allow_bivariant_rest = true;
         self.subtype.exact_optional_property_types = self.exact_optional_property_types;
         self.subtype.strict_null_checks = self.strict_null_checks;
+        self.subtype.no_unchecked_indexed_access = self.no_unchecked_indexed_access;
         self.subtype.explain_failure(source, target)
     }
 

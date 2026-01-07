@@ -429,6 +429,76 @@ fn test_lower_readonly_type_operator() {
 }
 
 #[test]
+fn test_lower_conditional_type_with_infer() {
+    let (arena, type_idx) =
+        parse_type_alias_type_node("type T = string extends infer R ? string : never;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Conditional(cond) => {
+            assert_eq!(cond.check_type, TypeId::STRING);
+            assert_eq!(cond.true_type, TypeId::STRING);
+            assert_eq!(cond.false_type, TypeId::NEVER);
+            match interner.lookup(cond.extends_type) {
+                Some(TypeKey::Infer(info)) => {
+                    assert_eq!(interner.resolve_atom(info.name), "R");
+                    assert!(info.constraint.is_none());
+                }
+                other => panic!("Expected infer type in extends, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Conditional type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_infer_type_with_constraint() {
+    let (arena, type_idx) = parse_type_alias_type_node(
+        "type T = string extends infer R extends string ? string : never;",
+    );
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Conditional(cond) => match interner.lookup(cond.extends_type) {
+            Some(TypeKey::Infer(info)) => {
+                assert_eq!(interner.resolve_atom(info.name), "R");
+                assert_eq!(info.constraint, Some(TypeId::STRING));
+            }
+            other => panic!("Expected infer type in extends, got {:?}", other),
+        },
+        _ => panic!("Expected Conditional type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_conditional_infer_binding() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = string extends infer R ? R : never;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Conditional(cond) => {
+            assert_eq!(cond.true_type, cond.extends_type);
+            match interner.lookup(cond.true_type) {
+                Some(TypeKey::Infer(info)) => {
+                    assert_eq!(interner.resolve_atom(info.name), "R");
+                }
+                other => panic!("Expected infer type in true branch, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Conditional type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_deduplicates_identical_types() {
     let (arena_one, type_one) = parse_type_alias_type_node("type A = \"same\";");
     let (arena_two, type_two) = parse_type_alias_type_node("type B = \"same\";");
