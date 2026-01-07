@@ -7300,6 +7300,7 @@ impl ThinParserState {
         let snapshot = self.scanner.save_state();
         let saved_token = self.current_token;
         let saved_arena_len = self.arena.nodes.len();
+        let saved_diagnostics_len = self.parse_diagnostics.len();
 
         // Consume <
         self.next_token();
@@ -7355,6 +7356,8 @@ impl ThinParserState {
         self.current_token = saved_token;
         // Truncate arena to remove any nodes we added
         self.arena.nodes.truncate(saved_arena_len);
+        // Drop any speculative diagnostics from the failed parse
+        self.parse_diagnostics.truncate(saved_diagnostics_len);
         None
     }
 
