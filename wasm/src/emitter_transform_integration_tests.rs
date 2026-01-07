@@ -616,6 +616,34 @@ fn test_two_phase_emission_es5_async_arrow_function() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_async_arrow_this_capture_await() {
+    let source = "const foo = async () => await this.bar;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 async arrow should capture this via IIFE: {}",
+        output
+    );
+    assert!(
+        output.contains("__awaiter(_this"),
+        "ES5 async arrow should pass _this to __awaiter: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_async_function() {
     let source = "async function foo() { return 1; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

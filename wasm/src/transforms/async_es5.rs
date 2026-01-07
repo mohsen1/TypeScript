@@ -667,8 +667,10 @@ impl<'a> AsyncES5Emitter<'a> {
             k if k == syntax_kind_ext::AWAIT_EXPRESSION => {
                 // For expressions like return await x, we emit just the operand
                 // (the await is handled by the state machine)
-                if let Some(unary) = self.arena.get_unary_expr(node) {
-                    self.emit_expression(unary.operand);
+                if let Some(unary) = self.arena.get_unary_expr_ex(node) {
+                    if !unary.expression.is_none() {
+                        self.emit_expression(unary.expression);
+                    }
                 }
             }
             _ => {

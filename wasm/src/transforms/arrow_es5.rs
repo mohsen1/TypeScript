@@ -213,6 +213,17 @@ pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bo
                 }
             }
         }
+        k if k == syntax_kind_ext::AWAIT_EXPRESSION
+            || k == syntax_kind_ext::YIELD_EXPRESSION =>
+        {
+            if let Some(unary) = arena.get_unary_expr_ex(node) {
+                if !unary.expression.is_none()
+                    && contains_this_reference(arena, unary.expression)
+                {
+                    return true;
+                }
+            }
+        }
         k if k == syntax_kind_ext::VARIABLE_STATEMENT
             || k == syntax_kind_ext::VARIABLE_DECLARATION_LIST =>
         {
