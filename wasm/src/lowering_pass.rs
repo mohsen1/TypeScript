@@ -45,6 +45,7 @@ use crate::scanner::SyntaxKind;
 use crate::transform_context::{ModuleFormat, TransformContext, TransformDirective};
 use crate::thin_emitter::ModuleKind;
 use crate::transforms::arrow_es5::contains_this_reference;
+use crate::transforms::private_fields_es5::is_private_identifier;
 
 /// Lowering pass - Phase 1 of emission
 ///
@@ -74,6 +75,7 @@ impl<'a> LoweringPass<'a> {
         self.init_module_state(source_file);
         self.visit(source_file);
         self.maybe_wrap_module(source_file);
+        self.transforms.mark_helpers_populated();
         self.transforms
     }
 
@@ -203,6 +205,18 @@ impl<'a> LoweringPass<'a> {
             }
             k if k == syntax_kind_ext::METHOD_DECLARATION => {
                 if let Some(method) = self.arena.get_method_decl(node) {
+                    if self.ctx.target_es5 {
+                        if let Some(mods) = &method.modifiers {
+                            if mods.nodes.iter().any(|&mod_idx| {
+                                self.arena
+                                    .get(mod_idx)
+                                    .map(|n| n.kind == SyntaxKind::AsyncKeyword as u16)
+                                    .unwrap_or(false)
+                            }) {
+                                self.mark_async_helpers();
+                            }
+                        }
+                    }
                     if let Some(mods) = &method.modifiers {
                         for &mod_idx in &mods.nodes {
                             self.visit(mod_idx);
@@ -262,6 +276,14 @@ impl<'a> LoweringPass<'a> {
             }
             k if k == syntax_kind_ext::CLASS_EXPRESSION => {
                 if let Some(class_data) = self.arena.get_class(node) {
+                    if self.ctx.target_es5 {
+                        self.transforms.insert(
+                            idx,
+                            TransformDirective::ES5ClassExpression { class_node: idx },
+                        );
+                        let heritage = self.get_extends_heritage(&class_data.heritage_clauses);
+                        self.mark_class_helpers(idx, heritage);
+                    }
                     if let Some(mods) = &class_data.modifiers {
                         for &mod_idx in &mods.nodes {
                             self.visit(mod_idx);
@@ -289,6 +311,20 @@ impl<'a> LoweringPass<'a> {
                 || k == syntax_kind_ext::ARRAY_BINDING_PATTERN =>
             {
                 if let Some(pattern) = self.arena.get_binding_pattern(node) {
+                    if self.ctx.target_es5
+                        && node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                        && pattern.elements.nodes.iter().any(|&elem_idx| {
+                            let Some(elem_node) = self.arena.get(elem_idx) else {
+                                return false;
+                            };
+                            self.arena
+                                .get_binding_element(elem_node)
+                                .map(|elem| elem.dot_dot_dot_token)
+                                .unwrap_or(false)
+                        })
+                    {
+                        self.transforms.helpers_mut().rest = true;
+                    }
                     for &elem in &pattern.elements.nodes {
                         self.visit(elem);
                     }
@@ -333,6 +369,7 @@ impl<'a> LoweringPass<'a> {
                             template_node: idx,
                         },
                     );
+                    self.transforms.helpers_mut().make_template_object = true;
                 }
                 if let Some(tagged) = self.arena.get_tagged_template(node) {
                     self.visit(tagged.tag);
@@ -508,6 +545,7 @@ impl<'a> LoweringPass<'a> {
                 idx,
                 TransformDirective::ES5ForOf { for_of_node: idx },
             );
+            self.transforms.helpers_mut().values = true;
         }
 
         self.visit(for_in_of.initializer);
@@ -575,6 +613,9 @@ impl<'a> LoweringPass<'a> {
                         let class_name = self.get_identifier_text(class.name);
                         if !Self::is_valid_identifier_name(&class_name) {
                             let directive = if self.ctx.target_es5 {
+                                let heritage =
+                                    self.get_extends_heritage(&class.heritage_clauses);
+                                self.mark_class_helpers(export_decl.export_clause, heritage);
                                 TransformDirective::CommonJSExportDefaultClassES5 {
                                     class_node: export_decl.export_clause,
                                 }
@@ -641,13 +682,14 @@ impl<'a> LoweringPass<'a> {
     }
 
     fn commonjs_default_export_function_directive(
-        &self,
+        &mut self,
         function_node: NodeIndex,
         func: &crate::parser::thin_node::FunctionData,
     ) -> TransformDirective {
         let mut directives = Vec::new();
         if self.ctx.target_es5 {
             if func.is_async {
+                self.mark_async_helpers();
                 directives.push(TransformDirective::ES5AsyncFunction { function_node });
             } else if self.function_parameters_need_es5_transform(&func.parameters) {
                 directives.push(TransformDirective::ES5FunctionParameters { function_node });
@@ -708,13 +750,18 @@ impl<'a> LoweringPass<'a> {
             None
         };
 
+        let heritage = self.get_extends_heritage(&class.heritage_clauses);
+        if self.ctx.target_es5 {
+            self.mark_class_helpers(idx, heritage);
+        }
+
         // Determine the base transform
         let base_directive = if self.ctx.target_es5 {
             // ES5 class transform
             TransformDirective::ES5Class {
                 class_node: idx,
                 class_name: class_name.clone(),
-                heritage: None, // TODO: Handle heritage clauses
+                heritage,
                 members: class.members.nodes.clone(),
             }
         } else {
@@ -787,6 +834,7 @@ impl<'a> LoweringPass<'a> {
 
         // Check if this is an async function targeting ES5
         let base_directive = if self.ctx.target_es5 && self.has_async_modifier(idx) {
+            self.mark_async_helpers();
             TransformDirective::ES5AsyncFunction { function_node: idx }
         } else if self.ctx.target_es5 && self.function_parameters_need_es5_transform(&func.parameters) {
             TransformDirective::ES5FunctionParameters { function_node: idx }
@@ -960,6 +1008,10 @@ impl<'a> LoweringPass<'a> {
                     captures_this,
                 },
             );
+
+            if arrow.is_async {
+                self.mark_async_helpers();
+            }
         }
 
         for &param_idx in &arrow.parameters.nodes {
@@ -1017,6 +1069,7 @@ impl<'a> LoweringPass<'a> {
 
         if self.ctx.target_es5 {
             if func.is_async {
+                self.mark_async_helpers();
                 self.transforms.insert(
                     idx,
                     TransformDirective::ES5AsyncFunction { function_node: idx },
@@ -1120,6 +1173,20 @@ impl<'a> LoweringPass<'a> {
         })
     }
 
+    fn get_extends_heritage(&self, heritage_clauses: &Option<NodeList>) -> Option<NodeIndex> {
+        let clauses = heritage_clauses.as_ref()?;
+
+        for &clause_idx in &clauses.nodes {
+            let clause_node = self.arena.get(clause_idx)?;
+            let heritage = self.arena.get_heritage(clause_node)?;
+            if heritage.token == SyntaxKind::ExtendsKeyword as u16 {
+                return Some(clause_idx);
+            }
+        }
+
+        None
+    }
+
     /// Check if a function has the 'async' modifier
     fn has_async_modifier(&self, func_idx: NodeIndex) -> bool {
         let Some(func_node) = self.arena.get(func_idx) else {
@@ -1144,6 +1211,67 @@ impl<'a> LoweringPass<'a> {
                 .map(|n| n.kind == SyntaxKind::AsyncKeyword as u16)
                 .unwrap_or(false)
         })
+    }
+
+    fn mark_async_helpers(&mut self) {
+        let helpers = self.transforms.helpers_mut();
+        helpers.awaiter = true;
+        helpers.generator = true;
+    }
+
+    fn mark_class_helpers(&mut self, class_node: NodeIndex, heritage: Option<NodeIndex>) {
+        if heritage.is_some() {
+            self.transforms.helpers_mut().extends = true;
+        }
+
+        let Some(class_node) = self.arena.get(class_node) else {
+            return;
+        };
+        let Some(class_data) = self.arena.get_class(class_node) else {
+            return;
+        };
+
+        if self.class_has_private_members(class_data) {
+            let helpers = self.transforms.helpers_mut();
+            helpers.class_private_field_get = true;
+            helpers.class_private_field_set = true;
+        }
+    }
+
+    fn class_has_private_members(
+        &self,
+        class_data: &crate::parser::thin_node::ClassData,
+    ) -> bool {
+        for &member_idx in &class_data.members.nodes {
+            let Some(member_node) = self.arena.get(member_idx) else { continue };
+
+            match member_node.kind {
+                k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                    if let Some(prop) = self.arena.get_property_decl(member_node) {
+                        if is_private_identifier(self.arena, prop.name) {
+                            return true;
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                    if let Some(method) = self.arena.get_method_decl(member_node) {
+                        if is_private_identifier(self.arena, method.name) {
+                            return true;
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                    if let Some(accessor) = self.arena.get_accessor(member_node) {
+                        if is_private_identifier(self.arena, accessor.name) {
+                            return true;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        false
     }
 
     fn needs_es5_object_literal_transform(&self, elements: &[NodeIndex]) -> bool {

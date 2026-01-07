@@ -2,7 +2,7 @@ use wasm_bindgen::prelude::*;
 
 // String interning for identifier deduplication (Performance optimization)
 pub mod interner;
-pub use interner::{Atom, Interner};
+pub use interner::{Atom, Interner, ShardedInterner};
 #[cfg(test)]
 mod interner_tests;
 
@@ -570,11 +570,19 @@ impl ThinParser {
         let binder = self.binder.as_ref().unwrap();
         let line_map = self.line_map.as_ref().unwrap();
         let source_text = self.parser.get_source_text();
+        let file_name = self.parser.get_file_name().to_string();
 
-        let provider = Completions::new(self.parser.get_arena(), binder, line_map, source_text);
+        let provider = Completions::new_with_types(
+            self.parser.get_arena(),
+            binder,
+            line_map,
+            &self.type_interner,
+            source_text,
+            file_name,
+        );
         let pos = Position::new(line, character);
 
-        let result = provider.get_completions(root, pos);
+        let result = provider.get_completions_with_cache(root, pos, &mut self.type_cache);
         Ok(serde_wasm_bindgen::to_value(&result)?)
     }
 

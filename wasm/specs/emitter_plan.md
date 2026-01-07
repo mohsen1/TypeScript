@@ -9,22 +9,28 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 ## Current Status
 - LoweringPass -> TransformDirective -> ThinPrinter pipeline exists.
 - ES5/ESNext transforms largely implemented.
-- Remaining TODOs: call/construct signature type parameters, class heritage plumbing, lingering inline ES5 paths.
+- Remaining TODOs: push real_world_bench throughput toward 500+ MiB/s (emit-only ~285 MiB/s).
 
 ## Highest-Impact Next Tasks
-- [ ] Finish transform-only pipeline
-  - Remove or gate `ctx.target_es5` inline paths in `thin_emitter/mod.rs`.
-  - Ensure LoweringPass emits directives for all ES5 transforms (class, arrow, async, template, params, object literal).
-- [ ] Plumb class heritage in LoweringPass
+- [ ] Performance tuning: reach 500+ MiB/s emitter throughput
+  - Profile emit-only pipeline (LoweringPass + helper detection).
+  - Reduce allocations and repeated scans in emit hot paths.
+- [x] Finish transform-only pipeline
+  - [x] Remove or gate `ctx.target_es5` inline paths in `thin_emitter/mod.rs`.
+  - [x] Ensure LoweringPass emits directives for all ES5 transforms (class, arrow, async, template, params, object literal).
+- [x] Plumb class heritage in LoweringPass
   - Fill `TransformDirective::ES5Class.heritage` or drop unused field.
   - Add regression tests for `extends` + private fields + helper injection.
-- [ ] Emit type parameters for call/construct signatures
+- [x] Emit type parameters for call/construct signatures
   - Implement in `emit_call_signature` and `emit_construct_signature`.
   - Add `.d.ts` tests for generic interface signatures.
-- [ ] Validate module wrapper + export transforms
-  - Add parity tests for CommonJS/AMD/UMD wrappers and re-exports.
-- [ ] Performance check
+- [x] Validate module wrapper + export transforms
+  - Add parity tests for AMD/UMD/System wrappers and re-exports.
+- [x] Performance check
   - Run `./wasm/bench.sh real_world_bench` and track throughput deltas.
+  - Results (real_world_bench):
+    - checker_ts_full_pipeline thrpt: 56.380–57.578 MiB/s (no significant change).
+    - checker_ts_emit_only thrpt: 282.25–287.65 MiB/s (no significant change).
 
 ## Success Criteria
 - All transforms triggered via TransformContext (no inline ES5 fallbacks).

@@ -25,6 +25,14 @@ fn apply_text_edits(source: &str, line_map: &LineMap, edits: &[TextEdit]) -> Str
     result
 }
 
+fn range_for_substring(source: &str, line_map: &LineMap, needle: &str) -> Range {
+    let start = source.find(needle).expect("substring not found") as u32;
+    let end = start + needle.len() as u32;
+    let start_pos = line_map.offset_to_position(start, source);
+    let end_pos = line_map.offset_to_position(end, source);
+    Range::new(start_pos, end_pos)
+}
+
 #[test]
 fn test_project_cross_file_references_named_import() {
     let mut project = Project::new();
@@ -82,6 +90,124 @@ fn test_project_cross_file_references_tsx_import() {
     let refs = refs.unwrap();
     assert!(refs.iter().any(|loc| loc.file_path == "a.tsx"), "Should include references from a.tsx");
     assert!(refs.iter().any(|loc| loc.file_path == "b.ts"), "Should include references from b.ts");
+}
+
+#[test]
+fn test_project_update_file_applies_edits() {
+    let mut project = Project::new();
+    project.set_file("a.ts".to_string(), "const value = 1;\n".to_string());
+
+    let file = project.file("a.ts").unwrap();
+    let range = range_for_substring(file.source_text(), file.line_map(), "1");
+    let edit = TextEdit::new(range, "2".to_string());
+
+    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+
+    let updated = project.file("a.ts").unwrap().source_text();
+    assert_eq!(updated, "const value = 2;\n");
+}
+
+#[test]
+fn test_project_update_file_refreshes_cross_file_references() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "export const foo = 1;\n".to_string());
+    project.set_file("b.ts".to_string(), "import { foo } from \"./a\";\nfoo;\n".to_string());
+
+    let before_refs = project
+        .find_references("b.ts", Position::new(1, 0))
+        .expect("Expected references for foo");
+    assert!(before_refs.iter().any(|loc| loc.file_path == "a.ts"));
+
+    let rename_edit = {
+        let file = project.file("a.ts").unwrap();
+        let range = range_for_substring(file.source_text(), file.line_map(), "foo");
+        TextEdit::new(range, "bar".to_string())
+    };
+    project
+        .update_file("a.ts", &[rename_edit])
+        .expect("Expected update to succeed");
+
+    let after_refs = project
+        .find_references("b.ts", Position::new(1, 0))
+        .expect("Expected references for foo");
+    assert!(after_refs.iter().all(|loc| loc.file_path != "a.ts"));
+}
+
+#[test]
+fn test_project_hover_includes_jsdoc() {
+    let mut project = Project::new();
+    let source = "/** The answer */\nconst x = 42;\nx;";
+    project.set_file("a.ts".to_string(), source.to_string());
+
+    let info = project
+        .get_hover("a.ts", Position::new(2, 0))
+        .expect("Expected hover info");
+
+    assert!(info.contents.iter().any(|content| content.contains("The answer")));
+}
+
+#[test]
+fn test_project_signature_help_includes_jsdoc() {
+    let mut project = Project::new();
+    let source = "/** Adds two numbers. */\nfunction add(a: number, b: number): number { return a + b; }\nadd(1, 2);";
+    project.set_file("a.ts".to_string(), source.to_string());
+
+    let pos = {
+        let file = project.file("a.ts").unwrap();
+        range_for_substring(file.source_text(), file.line_map(), "1").start
+    };
+
+    let help = project
+        .get_signature_help("a.ts", pos)
+        .expect("Expected signature help");
+
+    let doc = help.signatures[help.active_signature as usize]
+        .documentation
+        .clone()
+        .unwrap_or_default();
+    assert_eq!(doc, "Adds two numbers.");
+}
+
+#[test]
+fn test_project_completions_auto_import_named() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "export const foo = 1;\n".to_string());
+    project.set_file("b.ts".to_string(), "foo;\n".to_string());
+
+    let items = project
+        .get_completions("b.ts", Position::new(0, 1))
+        .expect("Expected completions");
+
+    let has_auto_import = items.iter().any(|item| {
+        if item.label != "foo" {
+            return false;
+        }
+        let detail = item.detail.as_deref().unwrap_or("");
+        let doc = item.documentation.as_deref().unwrap_or("");
+        detail.contains("auto-import") && detail.contains("./a") && doc.contains("import { foo } from \"./a\";")
+    });
+
+    assert!(has_auto_import, "Should include auto-import completion for foo");
+}
+
+#[test]
+fn test_project_diagnostics_cached() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "const value: string = 1;\n".to_string());
+
+    let diagnostics = project
+        .get_diagnostics("a.ts")
+        .expect("Expected diagnostics");
+    assert!(!diagnostics.is_empty(), "Should report diagnostics");
+    assert_eq!(diagnostics[0].severity, Some(DiagnosticSeverity::Error));
+
+    let diagnostics_again = project
+        .get_diagnostics("a.ts")
+        .expect("Expected diagnostics on cached run");
+    assert_eq!(diagnostics_again.len(), diagnostics.len());
 }
 
 #[test]

@@ -38,6 +38,7 @@ fn default_args() -> CliArgs {
         target: None,
         module: None,
         out_dir: None,
+        project: None,
         strict: false,
         no_emit: false,
         watch: false,
@@ -84,4 +85,299 @@ fn compile_with_explicit_files_without_tsconfig() {
 
     assert!(result.diagnostics.is_empty());
     assert!(base.join("main.js").is_file());
+}
+
+#[test]
+fn compile_with_root_dir_flattens_output_paths() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "rootDir": "src",
+            "declaration": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/index.ts"), "export const value = 1;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+    assert!(base.join("dist/index.js").is_file());
+    assert!(base.join("dist/index.d.ts").is_file());
+}
+
+#[test]
+fn compile_respects_no_emit_on_error() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "noEmitOnError": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/index.ts"), "let x = ;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(!base.join("dist/src/index.js").is_file());
+}
+
+#[test]
+fn compile_with_project_dir_uses_tsconfig() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    let config_dir = base.join("configs");
+    write_file(
+        &config_dir.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(&config_dir.join("src/index.ts"), "export const value = 1;");
+
+    let mut args = default_args();
+    args.project = Some(PathBuf::from("configs"));
+
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+    assert!(config_dir.join("dist/src/index.js").is_file());
+}
+
+#[test]
+fn compile_with_jsx_preserve_emits_jsx_extension() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "jsx": "preserve"
+          },
+          "include": ["src/**/*.tsx"]
+        }"#,
+    );
+    write_file(&base.join("src/view.tsx"), "export const View = () => <div />;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+    assert!(base.join("dist/src/view.jsx").is_file());
+}
+
+#[test]
+fn compile_resolves_relative_imports_from_files_list() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { value } from './util'; export { value };",
+    );
+    write_file(&base.join("src/util.ts"), "export const value = 1;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+    assert!(base.join("dist/src/index.js").is_file());
+    assert!(base.join("dist/src/util.js").is_file());
+}
+
+#[test]
+fn compile_resolves_paths_mappings() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "baseUrl": ".",
+            "paths": {
+              "@lib/*": ["src/lib/*"]
+            }
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { value } from '@lib/value'; export { value };",
+    );
+    write_file(&base.join("src/lib/value.ts"), "export const value = 1;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+    assert!(base.join("dist/src/lib/value.js").is_file());
+}
+
+#[test]
+fn compile_resolves_node_modules_types() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "noEmitOnError": true
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { value } from 'pkg'; export { value };",
+    );
+    write_file(
+        &base.join("node_modules/pkg/package.json"),
+        r#"{
+          "types": "index.d.ts"
+        }"#,
+    );
+    write_file(
+        &base.join("node_modules/pkg/index.d.ts"),
+        "export const value = ;",
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("node_modules/pkg/index.d.ts")));
+    assert!(!base.join("dist/src/index.js").is_file());
+}
+
+#[test]
+fn compile_resolves_node_modules_exports_subpath() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "noEmitOnError": true
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { widget } from 'pkg/feature/widget'; export { widget };",
+    );
+    write_file(
+        &base.join("node_modules/pkg/package.json"),
+        r#"{
+          "exports": {
+            ".": { "types": "./types/index.d.ts" },
+            "./feature/*": { "types": "./types/feature/*.d.ts" }
+          }
+        }"#,
+    );
+    write_file(
+        &base.join("node_modules/pkg/types/feature/widget.d.ts"),
+        "export const widget = ;",
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("node_modules/pkg/types/feature/widget.d.ts")));
+    assert!(!base.join("dist/src/index.js").is_file());
+}
+
+#[test]
+fn compile_prefers_browser_exports_for_bundler() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "moduleResolution": "bundler",
+            "noEmitOnError": true
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { widget } from 'pkg'; export { widget };",
+    );
+    write_file(
+        &base.join("node_modules/pkg/package.json"),
+        r#"{
+          "exports": {
+            ".": {
+              "browser": "./browser.d.ts",
+              "node": "./node.d.ts"
+            }
+          }
+        }"#,
+    );
+    write_file(
+        &base.join("node_modules/pkg/browser.d.ts"),
+        "export const widget = ;",
+    );
+    write_file(
+        &base.join("node_modules/pkg/node.d.ts"),
+        "export const widget = 1;",
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("node_modules/pkg/browser.d.ts")));
+    assert!(!base.join("dist/src/index.js").is_file());
 }

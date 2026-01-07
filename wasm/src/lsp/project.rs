@@ -9,19 +9,26 @@ use std::path::{Component, Path, PathBuf};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::binder::SymbolId;
+use crate::checker::TypeCache;
 use crate::lsp::code_actions::{
     CodeAction, CodeActionContext, CodeActionKind, CodeActionProvider, ImportCandidate,
     ImportCandidateKind,
 };
-use crate::lsp::diagnostics::LspDiagnostic;
+use crate::lsp::completions::{CompletionItem, CompletionItemKind, Completions};
+use crate::lsp::diagnostics::{convert_diagnostic, LspDiagnostic};
+use crate::lsp::hover::{HoverInfo, HoverProvider};
+use crate::lsp::signature_help::{SignatureHelp, SignatureHelpProvider};
 use crate::lsp::utils::find_node_at_offset;
 use crate::parser::thin_node::NodeAccess;
 use crate::parser::{NodeIndex, syntax_kind_ext, thin_node::ThinNodeArena};
 use crate::scanner::SyntaxKind;
+use crate::solver::TypeInterner;
 use crate::thin_binder::ThinBinderState;
+use crate::thin_checker::ThinCheckerState;
 use crate::thin_parser::ThinParserState;
 use crate::lsp::definition::GoToDefinition;
 use crate::lsp::references::FindReferences;
+use crate::lsp::rename::TextEdit;
 use crate::lsp::position::{LineMap, Position, Location, Range};
 
 enum ImportKind {
@@ -53,6 +60,8 @@ pub struct ProjectFile {
     parser: ThinParserState,
     binder: ThinBinderState,
     line_map: LineMap,
+    type_interner: TypeInterner,
+    type_cache: Option<TypeCache>,
 }
 
 impl ProjectFile {
@@ -73,6 +82,8 @@ impl ProjectFile {
             parser,
             binder,
             line_map,
+            type_interner: TypeInterner::new(),
+            type_cache: None,
         }
     }
 
@@ -104,6 +115,91 @@ impl ProjectFile {
     /// Original source text for this file.
     pub fn source_text(&self) -> &str {
         self.parser.get_source_text()
+    }
+
+    pub fn update_source(&mut self, source_text: String) {
+        self.parser.reset(self.file_name.clone(), source_text);
+        self.root = self.parser.parse_source_file();
+
+        let arena = self.parser.get_arena();
+        self.binder.reset();
+        self.binder.bind_source_file(arena, self.root);
+
+        self.line_map = LineMap::build(self.parser.get_source_text());
+        self.type_cache = None;
+    }
+
+    pub fn get_hover(&mut self, position: Position) -> Option<HoverInfo> {
+        let provider = HoverProvider::new(
+            self.parser.get_arena(),
+            &self.binder,
+            &self.line_map,
+            &self.type_interner,
+            self.parser.get_source_text(),
+            self.file_name.clone(),
+        );
+
+        provider.get_hover(self.root, position, &mut self.type_cache)
+    }
+
+    pub fn get_signature_help(&mut self, position: Position) -> Option<SignatureHelp> {
+        let provider = SignatureHelpProvider::new(
+            self.parser.get_arena(),
+            &self.binder,
+            &self.line_map,
+            &self.type_interner,
+            self.parser.get_source_text(),
+            self.file_name.clone(),
+        );
+
+        provider.get_signature_help(self.root, position, &mut self.type_cache)
+    }
+
+    pub fn get_completions(&mut self, position: Position) -> Option<Vec<CompletionItem>> {
+        let provider = Completions::new_with_types(
+            self.parser.get_arena(),
+            &self.binder,
+            &self.line_map,
+            &self.type_interner,
+            self.parser.get_source_text(),
+            self.file_name.clone(),
+        );
+
+        provider.get_completions_with_cache(self.root, position, &mut self.type_cache)
+    }
+
+    pub fn get_diagnostics(&mut self) -> Vec<LspDiagnostic> {
+        let file_name = self.file_name.clone();
+        let source_text = self.parser.get_source_text();
+
+        let mut checker = if let Some(cache) = self.type_cache.take() {
+            ThinCheckerState::with_cache(
+                self.parser.get_arena(),
+                &self.binder,
+                &self.type_interner,
+                file_name,
+                cache,
+            )
+        } else {
+            ThinCheckerState::new(
+                self.parser.get_arena(),
+                &self.binder,
+                &self.type_interner,
+                file_name,
+            )
+        };
+
+        checker.check_source_file(self.root);
+
+        let diagnostics = checker
+            .ctx
+            .diagnostics
+            .iter()
+            .map(|diag| convert_diagnostic(diag, &self.line_map, source_text))
+            .collect();
+
+        self.type_cache = Some(checker.extract_cache());
+        diagnostics
     }
 
     fn node_location(&self, node_idx: NodeIndex) -> Option<Location> {
@@ -475,6 +571,27 @@ impl ProjectFile {
     }
 }
 
+fn apply_text_edits(source: &str, line_map: &LineMap, edits: &[TextEdit]) -> Option<String> {
+    let mut edits_with_offsets = Vec::with_capacity(edits.len());
+    for edit in edits {
+        let start = line_map.position_to_offset(edit.range.start, source)? as usize;
+        let end = line_map.position_to_offset(edit.range.end, source)? as usize;
+        if start > end || end > source.len() {
+            return None;
+        }
+        edits_with_offsets.push((start, end, edit));
+    }
+
+    edits_with_offsets.sort_by(|a, b| b.0.cmp(&a.0).then(b.1.cmp(&a.1)));
+
+    let mut result = source.to_string();
+    for (start, end, edit) in edits_with_offsets {
+        result.replace_range(start..end, &edit.new_text);
+    }
+
+    Some(result)
+}
+
 /// Multi-file container for LSP operations.
 pub struct Project {
     files: FxHashMap<String, ProjectFile>,
@@ -497,6 +614,29 @@ impl Project {
     pub fn set_file(&mut self, file_name: String, source_text: String) {
         let file = ProjectFile::new(file_name.clone(), source_text);
         self.files.insert(file_name, file);
+    }
+
+    /// Update an existing file by applying incremental text edits.
+    pub fn update_file(&mut self, file_name: &str, edits: &[TextEdit]) -> Option<()> {
+        if edits.is_empty() {
+            return Some(());
+        }
+
+        let (updated_source, unchanged) = {
+            let file = self.files.get(file_name)?;
+            let source = file.source_text();
+            let updated = apply_text_edits(source, file.line_map(), edits)?;
+            let unchanged = updated == source;
+            (updated, unchanged)
+        };
+
+        if unchanged {
+            return Some(());
+        }
+
+        let file = self.files.get_mut(file_name)?;
+        file.update_source(updated_source);
+        Some(())
     }
 
     /// Remove a file from the project.
@@ -523,6 +663,70 @@ impl Project {
             file.source_text(),
         );
         goto_def.get_definition(file.root(), position)
+    }
+
+    /// Hover within a single file.
+    pub fn get_hover(&mut self, file_name: &str, position: Position) -> Option<HoverInfo> {
+        let file = self.files.get_mut(file_name)?;
+        file.get_hover(position)
+    }
+
+    /// Signature help within a single file.
+    pub fn get_signature_help(&mut self, file_name: &str, position: Position) -> Option<SignatureHelp> {
+        let file = self.files.get_mut(file_name)?;
+        file.get_signature_help(position)
+    }
+
+    /// Completions within a single file.
+    pub fn get_completions(&mut self, file_name: &str, position: Position) -> Option<Vec<CompletionItem>> {
+        let mut completions = {
+            let file = self.files.get_mut(file_name)?;
+            file.get_completions(position).unwrap_or_default()
+        };
+
+        let mut existing = FxHashSet::default();
+        for item in &completions {
+            existing.insert(item.label.clone());
+        }
+
+        let (missing_name, skip_auto_import) = {
+            let file = self.files.get(file_name)?;
+            if let Some((node_idx, name)) = self.identifier_at_position(file, position) {
+                let skip = self.is_member_access_node(file.arena(), node_idx);
+                (Some(name), skip)
+            } else {
+                (None, false)
+            }
+        };
+
+        if let Some(missing_name) = missing_name {
+            if !skip_auto_import && !existing.contains(&missing_name) {
+                let file = self.files.get(file_name)?;
+                let mut candidates = Vec::new();
+                let mut seen = FxHashSet::default();
+                self.collect_import_candidates_for_name(file, &missing_name, &mut candidates, &mut seen);
+
+                for candidate in candidates {
+                    if existing.contains(&candidate.local_name) {
+                        continue;
+                    }
+                    completions.push(self.completion_from_import_candidate(&candidate));
+                }
+            }
+        }
+
+        if completions.is_empty() {
+            None
+        } else {
+            completions.sort_by(|a, b| a.label.cmp(&b.label));
+            Some(completions)
+        }
+    }
+
+    /// Diagnostics within a single file.
+    pub fn get_diagnostics(&mut self, file_name: &str) -> Option<Vec<LspDiagnostic>> {
+        let file = self.files.get_mut(file_name)?;
+        Some(file.get_diagnostics())
     }
 
     /// Code actions for a file (project-aware).
@@ -1102,6 +1306,60 @@ impl Project {
         }
     }
 
+    fn completion_from_import_candidate(&self, candidate: &ImportCandidate) -> CompletionItem {
+        let detail = self.auto_import_detail(candidate);
+        let documentation = self.auto_import_documentation(candidate);
+
+        let mut item = CompletionItem::new(candidate.local_name.clone(), CompletionItemKind::Variable);
+        item = item.with_detail(detail);
+        if let Some(doc) = documentation {
+            item = item.with_documentation(doc);
+        }
+        item
+    }
+
+    fn auto_import_detail(&self, candidate: &ImportCandidate) -> String {
+        let prefix = if candidate.is_type_only {
+            "auto-import type"
+        } else {
+            "auto-import"
+        };
+
+        match candidate.kind {
+            ImportCandidateKind::Named { .. } => {
+                format!("{} from {}", prefix, candidate.module_specifier)
+            }
+            ImportCandidateKind::Default => {
+                format!("{} default from {}", prefix, candidate.module_specifier)
+            }
+            ImportCandidateKind::Namespace => {
+                format!("{} namespace from {}", prefix, candidate.module_specifier)
+            }
+        }
+    }
+
+    fn auto_import_documentation(&self, candidate: &ImportCandidate) -> Option<String> {
+        let import_kw = if candidate.is_type_only {
+            "import type"
+        } else {
+            "import"
+        };
+
+        let snippet = match &candidate.kind {
+            ImportCandidateKind::Named { export_name } => {
+                format!("{} {{ {} }} from \"{}\";", import_kw, export_name, candidate.module_specifier)
+            }
+            ImportCandidateKind::Default => {
+                format!("{} {} from \"{}\";", import_kw, candidate.local_name, candidate.module_specifier)
+            }
+            ImportCandidateKind::Namespace => {
+                format!("{} * as {} from \"{}\";", import_kw, candidate.local_name, candidate.module_specifier)
+            }
+        };
+
+        Some(snippet)
+    }
+
     fn matching_exports_in_file(
         &self,
         file_name: &str,
@@ -1281,6 +1539,43 @@ impl Project {
         file.arena()
             .get_identifier_text(node_idx)
             .map(|text| text.to_string())
+    }
+
+    fn identifier_at_position(&self, file: &ProjectFile, position: Position) -> Option<(NodeIndex, String)> {
+        let offset = file.line_map().position_to_offset(position, file.source_text())?;
+        let mut node_idx = find_node_at_offset(file.arena(), offset);
+        if node_idx.is_none() && offset > 0 {
+            node_idx = find_node_at_offset(file.arena(), offset - 1);
+        }
+        if node_idx.is_none() {
+            return None;
+        }
+
+        let node = file.arena().get(node_idx)?;
+        if node.kind != SyntaxKind::Identifier as u16 {
+            return None;
+        }
+
+        let text = file.arena().get_identifier_text(node_idx)?.to_string();
+        Some((node_idx, text))
+    }
+
+    fn is_member_access_node(&self, arena: &ThinNodeArena, node_idx: NodeIndex) -> bool {
+        let mut current = node_idx;
+        while !current.is_none() {
+            let Some(node) = arena.get(current) else { break; };
+            if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+                || node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION
+                || node.kind == syntax_kind_ext::QUALIFIED_NAME
+            {
+                return true;
+            }
+
+            let Some(ext) = arena.get_extended(current) else { break; };
+            current = ext.parent;
+        }
+
+        false
     }
 
     fn import_target_at_position(&self, file: &ProjectFile, position: Position) -> Option<ImportTarget> {

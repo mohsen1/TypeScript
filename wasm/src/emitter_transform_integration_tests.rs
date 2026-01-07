@@ -6,7 +6,7 @@
 
 use crate::emit_context::EmitContext;
 use crate::lowering_pass::LoweringPass;
-use crate::parser::NodeIndex;
+use crate::parser::{NodeIndex, syntax_kind_ext};
 use crate::scanner::SyntaxKind;
 use crate::thin_emitter::ThinPrinter;
 use crate::thin_parser::ThinParserState;
@@ -52,6 +52,202 @@ fn test_two_phase_emission_es5_class() {
     assert!(
         output.contains("return Point"),
         "ES5 output should return constructor"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_expression() {
+    let source = "const C = class { method() { return 1; } };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut class_expr_idx = None;
+    for (idx, node) in arena.nodes.iter().enumerate() {
+        if node.kind == syntax_kind_ext::CLASS_EXPRESSION {
+            class_expr_idx = Some(NodeIndex(idx as u32));
+            break;
+        }
+    }
+
+    let class_expr_idx = class_expr_idx.expect("expected class expression");
+    let directive = transforms
+        .get(class_expr_idx)
+        .expect("expected transform directive for class expression");
+    assert!(
+        matches!(directive, TransformDirective::ES5ClassExpression { .. }),
+        "LoweringPass should generate ES5ClassExpression transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var C ="),
+        "ES5 class expression should downlevel to var assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("(function () {"),
+        "ES5 class expression should emit IIFE: {}",
+        output
+    );
+    assert!(
+        !output.contains("class {"),
+        "ES5 class expression should not emit ES6 class syntax: {}",
+        output
+    );
+}
+
+#[test]
+fn test_lowering_pass_sets_es5_helpers() {
+    let source = r#"
+async function foo() { await bar(); }
+const { x, ...rest } = obj;
+for (const v of arr) { v; }
+const t = tag`hi ${name}`;
+class Base {}
+class Derived extends Base { #count = 0; }
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+    let helpers = transforms.helpers();
+
+    assert!(
+        helpers.awaiter && helpers.generator,
+        "Expected async helpers to be set"
+    );
+    assert!(helpers.values, "Expected __values helper to be set");
+    assert!(helpers.rest, "Expected __rest helper to be set");
+    assert!(
+        helpers.make_template_object,
+        "Expected __makeTemplateObject helper to be set"
+    );
+    assert!(helpers.extends, "Expected __extends helper to be set");
+    assert!(
+        helpers.class_private_field_get && helpers.class_private_field_set,
+        "Expected class private field helpers to be set"
+    );
+}
+
+#[test]
+fn test_lowering_pass_es5_class_heritage_clause() {
+    let source = "class Base {} class Derived extends Base {}";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    let mut derived_idx = None;
+    for &stmt_idx in &source_file.statements.nodes {
+        let Some(stmt_node) = arena.get(stmt_idx) else { continue };
+        if stmt_node.kind != syntax_kind_ext::CLASS_DECLARATION {
+            continue;
+        }
+        let Some(class_data) = arena.get_class(stmt_node) else { continue };
+        if let Some(clauses) = &class_data.heritage_clauses {
+            if !clauses.nodes.is_empty() {
+                derived_idx = Some(stmt_idx);
+                break;
+            }
+        }
+    }
+
+    let derived_idx = derived_idx.expect("expected derived class declaration");
+    let directive = transforms
+        .get(derived_idx)
+        .expect("expected transform directive for derived class");
+
+    match directive {
+        TransformDirective::ES5Class { heritage, .. } => {
+            let heritage_idx = heritage.expect("expected extends heritage clause");
+            let heritage_node = arena.get(heritage_idx).expect("expected heritage node");
+            let heritage_data = arena
+                .get_heritage(heritage_node)
+                .expect("expected heritage data");
+            assert_eq!(
+                heritage_data.token,
+                SyntaxKind::ExtendsKeyword as u16,
+                "Expected extends heritage clause"
+            );
+        }
+        _ => panic!("Expected ES5Class directive"),
+    }
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_extends_private_fields_helpers() {
+    let source = r#"
+class Base {}
+class Derived extends Base {
+    #count = 0;
+    getCount() { return this.#count; }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var __extends"),
+        "ES5 output should include __extends helper: {}",
+        output
+    );
+    assert!(
+        output.contains("var __classPrivateFieldGet"),
+        "ES5 output should include __classPrivateFieldGet helper: {}",
+        output
+    );
+    assert!(
+        output.contains("var __classPrivateFieldSet"),
+        "ES5 output should include __classPrivateFieldSet helper: {}",
+        output
+    );
+    assert!(
+        output.contains("__extends(Derived, _super)"),
+        "ES5 output should call __extends for Derived: {}",
+        output
+    );
+    assert!(
+        output.contains("__classPrivateFieldSet(")
+            && output.contains("_Derived_count")
+            && output.contains("0, \"f\""),
+        "ES5 output should emit private field initializer: {}",
+        output
     );
 }
 
@@ -1275,6 +1471,40 @@ fn test_two_phase_emission_amd_module_wrapper() {
 }
 
 #[test]
+fn test_two_phase_emission_amd_wrapper_reexport_star() {
+    let source = "export * from \"./dep\";";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::AMD;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("define([\"require\", \"exports\", \"./dep\"]"),
+        "AMD output should include re-export dependency: {}",
+        output
+    );
+    assert!(
+        output.contains("require(\"./dep\")"),
+        "AMD output should require re-export dependency: {}",
+        output
+    );
+    assert!(
+        output.contains("__exportStar("),
+        "AMD output should include __exportStar call: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_umd_module_wrapper() {
     let source = "export const x = 1;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -1307,6 +1537,40 @@ fn test_two_phase_emission_umd_module_wrapper() {
 }
 
 #[test]
+fn test_two_phase_emission_umd_wrapper_reexport_star() {
+    let source = "export * from \"./dep\";";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::UMD;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("(function (factory) {"),
+        "UMD output should include wrapper header: {}",
+        output
+    );
+    assert!(
+        output.contains("require(\"./dep\")"),
+        "UMD output should require re-export dependency: {}",
+        output
+    );
+    assert!(
+        output.contains("__exportStar("),
+        "UMD output should include __exportStar call: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_system_module_wrapper() {
     let source = "import { foo } from \"./bar\"; export const x = foo;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -1335,6 +1599,40 @@ fn test_two_phase_emission_system_module_wrapper() {
     assert!(
         output.contains("execute: function ()"),
         "System output should include execute block"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_system_wrapper_reexport_named() {
+    let source = "export { foo } from \"./dep\";";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::System;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("System.register([\"./dep\"]"),
+        "System output should include dependency list: {}",
+        output
+    );
+    assert!(
+        output.contains("require(\"./dep\")"),
+        "System output should require re-export dependency: {}",
+        output
+    );
+    assert!(
+        output.contains("Object.defineProperty(exports, \"foo\""),
+        "System output should define exported binding: {}",
+        output
     );
 }
 

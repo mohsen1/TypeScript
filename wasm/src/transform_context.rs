@@ -25,6 +25,7 @@
 //! - ✅ Clear separation of concerns
 
 use crate::parser::NodeIndex;
+use crate::transforms::helpers::HelpersNeeded;
 use rustc_hash::FxHashMap;
 
 /// Transform directives tell the printer how to emit a node differently
@@ -57,6 +58,13 @@ pub enum TransformDirective {
         heritage: Option<NodeIndex>,
         /// Members to transform
         members: Vec<NodeIndex>,
+    },
+
+    /// ES5 Class Expression: Transform class expression to IIFE expression.
+    /// Uses a synthetic name for anonymous classes to preserve semantics.
+    ES5ClassExpression {
+        /// Original class expression node index
+        class_node: NodeIndex,
     },
 
     /// ES5 Namespace: Transform namespace to IIFE pattern
@@ -217,6 +225,9 @@ pub struct TransformContext {
     /// Map of NodeIndex -> TransformDirective
     /// Only contains entries for nodes that need transformation
     directives: FxHashMap<NodeIndex, TransformDirective>,
+    /// Helper usage derived during lowering (optional).
+    helpers: HelpersNeeded,
+    helpers_populated: bool,
 }
 
 impl TransformContext {
@@ -224,6 +235,8 @@ impl TransformContext {
     pub fn new() -> Self {
         TransformContext {
             directives: FxHashMap::default(),
+            helpers: HelpersNeeded::default(),
+            helpers_populated: false,
         }
     }
 
@@ -237,6 +250,32 @@ impl TransformContext {
         self.directives.get(&node)
     }
 
+    /// Access helper usage recorded during lowering.
+    pub fn helpers(&self) -> &HelpersNeeded {
+        &self.helpers
+    }
+
+    /// Mutate helper usage, marking it as populated.
+    pub fn helpers_mut(&mut self) -> &mut HelpersNeeded {
+        self.helpers_populated = true;
+        &mut self.helpers
+    }
+
+    /// Check if helper usage has been populated by a lowering pass.
+    pub fn helpers_populated(&self) -> bool {
+        self.helpers_populated
+    }
+
+    /// Mark helper usage as populated without changing flags.
+    pub fn mark_helpers_populated(&mut self) {
+        self.helpers_populated = true;
+    }
+
+    /// Iterate over all registered directives.
+    pub fn iter(&self) -> impl Iterator<Item = (&NodeIndex, &TransformDirective)> {
+        self.directives.iter()
+    }
+
     /// Check if a node has a transform directive
     pub fn has_transform(&self, node: NodeIndex) -> bool {
         self.directives.contains_key(&node)
@@ -245,6 +284,8 @@ impl TransformContext {
     /// Clear all directives (for reuse)
     pub fn clear(&mut self) {
         self.directives.clear();
+        self.helpers = HelpersNeeded::default();
+        self.helpers_populated = false;
     }
 
     /// Get the number of registered transforms
