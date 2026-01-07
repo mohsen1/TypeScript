@@ -825,7 +825,7 @@ impl<'a> LoweringPass<'a> {
             self.has_default_modifier(&func.modifiers)
         };
 
-        let func_name = if !func.name.is_none() {
+        let func_name = if is_exported && !func.name.is_none() {
             Some(self.get_identifier_text(func.name))
         } else {
             None
@@ -841,16 +841,20 @@ impl<'a> LoweringPass<'a> {
             TransformDirective::Identity
         };
 
-        let final_directive = if is_exported && func_name.is_some() {
-            let export_directive = TransformDirective::CommonJSExport {
-                names: vec![func_name.unwrap()],
-                is_default,
-                inner: Box::new(TransformDirective::Identity),
-            };
+        let final_directive = if is_exported {
+            if let Some(export_name) = func_name {
+                let export_directive = TransformDirective::CommonJSExport {
+                    names: vec![export_name],
+                    is_default,
+                    inner: Box::new(TransformDirective::Identity),
+                };
 
-            match base_directive {
-                TransformDirective::Identity => export_directive,
-                other => TransformDirective::Chain(vec![other, export_directive]),
+                match base_directive {
+                    TransformDirective::Identity => export_directive,
+                    other => TransformDirective::Chain(vec![other, export_directive]),
+                }
+            } else {
+                base_directive
             }
         } else {
             base_directive
@@ -893,7 +897,7 @@ impl<'a> LoweringPass<'a> {
             is_exported = true;
         }
 
-        let enum_name = if !enum_decl.name.is_none() {
+        let enum_name = if is_exported && !enum_decl.name.is_none() {
             Some(self.get_identifier_text(enum_decl.name))
         } else {
             None
@@ -905,16 +909,20 @@ impl<'a> LoweringPass<'a> {
             TransformDirective::Identity
         };
 
-        let final_directive = if is_exported && enum_name.is_some() {
-            let export_directive = TransformDirective::CommonJSExport {
-                names: vec![enum_name.unwrap()],
-                is_default: false,
-                inner: Box::new(TransformDirective::Identity),
-            };
+        let final_directive = if is_exported {
+            if let Some(export_name) = enum_name {
+                let export_directive = TransformDirective::CommonJSExport {
+                    names: vec![export_name],
+                    is_default: false,
+                    inner: Box::new(TransformDirective::Identity),
+                };
 
-            match base_directive {
-                TransformDirective::Identity => export_directive,
-                other => TransformDirective::Chain(vec![other, export_directive]),
+                match base_directive {
+                    TransformDirective::Identity => export_directive,
+                    other => TransformDirective::Chain(vec![other, export_directive]),
+                }
+            } else {
+                base_directive
             }
         } else {
             base_directive
@@ -958,7 +966,11 @@ impl<'a> LoweringPass<'a> {
             is_exported = true;
         }
 
-        let module_name = self.get_module_root_name(module_decl.name);
+        let module_name = if is_exported {
+            self.get_module_root_name(module_decl.name)
+        } else {
+            None
+        };
 
         let base_directive = if self.ctx.target_es5 {
             TransformDirective::ES5Namespace { namespace_node: idx }
@@ -966,16 +978,20 @@ impl<'a> LoweringPass<'a> {
             TransformDirective::Identity
         };
 
-        let final_directive = if is_exported && module_name.is_some() {
-            let export_directive = TransformDirective::CommonJSExport {
-                names: vec![module_name.unwrap()],
-                is_default: false,
-                inner: Box::new(TransformDirective::Identity),
-            };
+        let final_directive = if is_exported {
+            if let Some(export_name) = module_name {
+                let export_directive = TransformDirective::CommonJSExport {
+                    names: vec![export_name],
+                    is_default: false,
+                    inner: Box::new(TransformDirective::Identity),
+                };
 
-            match base_directive {
-                TransformDirective::Identity => export_directive,
-                other => TransformDirective::Chain(vec![other, export_directive]),
+                match base_directive {
+                    TransformDirective::Identity => export_directive,
+                    other => TransformDirective::Chain(vec![other, export_directive]),
+                }
+            } else {
+                base_directive
             }
         } else {
             base_directive
@@ -1920,6 +1936,21 @@ mod tests {
         assert!(
             !transforms.is_empty(),
             "Expected CommonJS export transform for variables"
+        );
+    }
+
+    #[test]
+    fn test_lowering_pass_commonjs_non_export_function_no_transforms() {
+        let (arena, root) = parse("function foo() {}");
+        let mut ctx = EmitContext::default();
+        ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+        let lowering = LoweringPass::new(&arena, &ctx);
+        let transforms = lowering.run(root);
+
+        assert!(
+            transforms.is_empty(),
+            "Non-exported functions should not add CommonJS transforms"
         );
     }
 
