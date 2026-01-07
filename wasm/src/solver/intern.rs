@@ -11,6 +11,7 @@
 use std::hash::{Hash, Hasher};
 use std::sync::{Arc, RwLock};
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
+use smallvec::SmallVec;
 use crate::solver::types::*;
 use crate::interner::{Atom, ShardedInterner};
 
@@ -18,6 +19,9 @@ const SHARD_BITS: u32 = 6;
 const SHARD_COUNT: usize = 1 << SHARD_BITS; // 64 shards
 const SHARD_MASK: u32 = (SHARD_COUNT as u32) - 1;
 const PROPERTY_MAP_THRESHOLD: usize = 24;
+const TYPE_LIST_INLINE: usize = 8;
+
+type TypeListBuffer = SmallVec<[TypeId; TYPE_LIST_INLINE]>;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum PrimitiveClass {
@@ -552,7 +556,7 @@ impl TypeInterner {
     /// Intern a union type, normalizing and deduplicating members
     pub fn union(&self, mut members: Vec<TypeId>) -> TypeId {
         // Flatten nested unions
-        let mut flat: Vec<TypeId> = Vec::new();
+        let mut flat: TypeListBuffer = SmallVec::new();
         for member in members.drain(..) {
             if let Some(TypeKey::Union(inner)) = self.lookup(member) {
                 let members = self.type_list(inner);
@@ -585,7 +589,7 @@ impl TypeInterner {
             return TypeId::UNKNOWN;
         }
         // Remove `never` from unions
-        flat.retain(|&id| id != TypeId::NEVER);
+        flat.retain(|id| *id != TypeId::NEVER);
         if flat.is_empty() {
             return TypeId::NEVER;
         }
@@ -593,14 +597,14 @@ impl TypeInterner {
             return flat[0];
         }
 
-        let list_id = self.intern_type_list(flat);
+        let list_id = self.intern_type_list(flat.into_vec());
         self.intern(TypeKey::Union(list_id))
     }
 
     /// Intern an intersection type, normalizing and deduplicating members
     pub fn intersection(&self, mut members: Vec<TypeId>) -> TypeId {
         // Flatten nested intersections
-        let mut flat: Vec<TypeId> = Vec::new();
+        let mut flat: TypeListBuffer = SmallVec::new();
         for member in members.drain(..) {
             if let Some(TypeKey::Intersection(inner)) = self.lookup(member) {
                 let members = self.type_list(inner);
@@ -633,7 +637,7 @@ impl TypeInterner {
             return TypeId::ANY;
         }
         // Remove `unknown` from intersections (identity element)
-        flat.retain(|&id| id != TypeId::UNKNOWN);
+        flat.retain(|id| *id != TypeId::UNKNOWN);
         if self.intersection_has_disjoint_primitives(&flat) {
             return TypeId::NEVER;
         }
@@ -647,7 +651,7 @@ impl TypeInterner {
             return flat[0];
         }
 
-        let list_id = self.intern_type_list(flat);
+        let list_id = self.intern_type_list(flat.into_vec());
         self.intern(TypeKey::Intersection(list_id))
     }
 
