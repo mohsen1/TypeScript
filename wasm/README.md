@@ -11,9 +11,11 @@ engine on top to match TypeScript behavior while preserving correctness where po
 > This is a very high level project direction coming from project's manager's boss.
 
 - Don't get too bugged down with performance. lets ship something first that works. 
-- I saw emitter/mod.rs is a giant file. smaller files are better
+- lib.d.ts and similar -- lets handle this.
 - I want to see `test/cases` baseline pass rates in manager report
-
+- While you have the mechanisms, tsc has thousands of specific error messages. Your diagnostic engine is generic; matching the user experience of tsc errors requires massive effort.
+- tsconfig.json has hundreds of flags. You handle the big ones (target, module, strict), but full compatibility is a long tail.
+- Your immediate implementation risk: The complexity of solver/subtype.rs and solver/infer.rs suggests you are deep in the weeds of TypeScript's unsound type system. This is where "compatibility bugs" live—cases where your logic makes sense, but TS does something weird for legacy reasons, breaking compatibility with existing codebases. **you need to manage this well**
 
 ## Executive Summary (Manager report)
 Last updated: 2026-01-07
