@@ -1,6 +1,7 @@
 use super::*;
 use crate::solver::subtype::SubtypeFailureReason;
 use crate::solver::types::*;
+use crate::solver::TypeEnvironment;
 
 fn make_animal_dog(interner: &TypeInterner) -> (TypeId, TypeId) {
     let name = interner.intern_string("name");
@@ -1414,6 +1415,38 @@ fn test_apparent_number_method_assignable() {
     }]);
 
     assert!(checker.is_assignable(TypeId::NUMBER, target));
+}
+
+#[test]
+fn test_number_interface_boxing_assignability() {
+    let interner = TypeInterner::new();
+    let symbol = SymbolRef(1);
+    let number_interface = interner.reference(symbol);
+
+    let to_fixed = interner.intern_string("toFixed");
+    let to_fixed_type = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let number_object = interner.object(vec![PropertyInfo {
+        name: to_fixed,
+        type_id: to_fixed_type,
+        write_type: to_fixed_type,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let mut env = TypeEnvironment::new();
+    env.insert(symbol, number_object);
+
+    let mut checker = CompatChecker::with_resolver(&interner, &env);
+    assert!(checker.is_assignable(TypeId::NUMBER, number_interface));
+    assert!(!checker.is_assignable(number_interface, TypeId::NUMBER));
 }
 
 #[test]
