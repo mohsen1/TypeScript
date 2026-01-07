@@ -51,12 +51,14 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
 - [x] Implement union and intersection types
   - `string | number` -> TypeKey::Union(Slice<TypeId>)
   - `A & B` -> TypeKey::Intersection(Slice<TypeId>)
+- [x] Bind infer parameters when lowering conditional types
 - [x] Tests for complex types
   - [x] Test: Object type with multiple properties
   - [x] Test: Nested objects
   - [x] Test: Union/intersection normalization
   - [x] Test: Tuple optional/rest/named elements
   - [x] Test: Conditional type with infer (including constraint)
+  - [x] Test: Conditional infer binding in true branch
 
 ### Phase 3: Function Signatures
 - [x] Implement function type lowering

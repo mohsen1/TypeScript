@@ -14,7 +14,7 @@ use crate::solver::types::*;
 use crate::solver::TypeDatabase;
 use crate::interner::Atom;
 use std::cell::RefCell;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -983,15 +983,175 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_conditional_type(node) {
+            let check_type = self.lower_type(data.check_type);
+            let extends_type = self.lower_type(data.extends_type);
+
+            self.push_type_param_scope();
+            let mut visited = FxHashSet::default();
+            self.collect_infer_bindings(extends_type, &mut visited);
+            let true_type = self.lower_type(data.true_type);
+            let false_type = self.lower_type(data.false_type);
+            self.pop_type_param_scope();
+
             let cond = ConditionalType {
-                check_type: self.lower_type(data.check_type),
-                extends_type: self.lower_type(data.extends_type),
-                true_type: self.lower_type(data.true_type),
-                false_type: self.lower_type(data.false_type),
+                check_type,
+                extends_type,
+                true_type,
+                false_type,
             };
             self.interner.intern(TypeKey::Conditional(Box::new(cond)))
         } else {
             TypeId::ERROR
+        }
+    }
+
+    fn collect_infer_bindings(&self, type_id: TypeId, visited: &mut FxHashSet<TypeId>) {
+        if !visited.insert(type_id) {
+            return;
+        }
+
+        let key = match self.interner.lookup(type_id) {
+            Some(key) => key,
+            None => return,
+        };
+
+        match key {
+            TypeKey::Infer(info) => {
+                self.add_type_param_binding(info.name, type_id);
+                if let Some(constraint) = info.constraint {
+                    self.collect_infer_bindings(constraint, visited);
+                }
+                if let Some(default) = info.default {
+                    self.collect_infer_bindings(default, visited);
+                }
+            }
+            TypeKey::Array(elem) => self.collect_infer_bindings(elem, visited),
+            TypeKey::Tuple(elements) => {
+                for element in elements {
+                    self.collect_infer_bindings(element.type_id, visited);
+                }
+            }
+            TypeKey::Union(members) | TypeKey::Intersection(members) => {
+                for member in members {
+                    self.collect_infer_bindings(member, visited);
+                }
+            }
+            TypeKey::Object(props) => {
+                for prop in props {
+                    self.collect_infer_bindings(prop.type_id, visited);
+                }
+            }
+            TypeKey::ObjectWithIndex(shape) => {
+                for prop in &shape.properties {
+                    self.collect_infer_bindings(prop.type_id, visited);
+                }
+                if let Some(index) = &shape.string_index {
+                    self.collect_infer_bindings(index.key_type, visited);
+                    self.collect_infer_bindings(index.value_type, visited);
+                }
+                if let Some(index) = &shape.number_index {
+                    self.collect_infer_bindings(index.key_type, visited);
+                    self.collect_infer_bindings(index.value_type, visited);
+                }
+            }
+            TypeKey::Function(shape) => {
+                for param in &shape.params {
+                    self.collect_infer_bindings(param.type_id, visited);
+                }
+                self.collect_infer_bindings(shape.return_type, visited);
+                for param in &shape.type_params {
+                    if let Some(constraint) = param.constraint {
+                        self.collect_infer_bindings(constraint, visited);
+                    }
+                    if let Some(default) = param.default {
+                        self.collect_infer_bindings(default, visited);
+                    }
+                }
+            }
+            TypeKey::Callable(shape) => {
+                for sig in &shape.call_signatures {
+                    for param in &sig.params {
+                        self.collect_infer_bindings(param.type_id, visited);
+                    }
+                    self.collect_infer_bindings(sig.return_type, visited);
+                    for param in &sig.type_params {
+                        if let Some(constraint) = param.constraint {
+                            self.collect_infer_bindings(constraint, visited);
+                        }
+                        if let Some(default) = param.default {
+                            self.collect_infer_bindings(default, visited);
+                        }
+                    }
+                }
+                for sig in &shape.construct_signatures {
+                    for param in &sig.params {
+                        self.collect_infer_bindings(param.type_id, visited);
+                    }
+                    self.collect_infer_bindings(sig.return_type, visited);
+                    for param in &sig.type_params {
+                        if let Some(constraint) = param.constraint {
+                            self.collect_infer_bindings(constraint, visited);
+                        }
+                        if let Some(default) = param.default {
+                            self.collect_infer_bindings(default, visited);
+                        }
+                    }
+                }
+                for prop in &shape.properties {
+                    self.collect_infer_bindings(prop.type_id, visited);
+                }
+            }
+            TypeKey::TypeParameter(info) => {
+                if let Some(constraint) = info.constraint {
+                    self.collect_infer_bindings(constraint, visited);
+                }
+                if let Some(default) = info.default {
+                    self.collect_infer_bindings(default, visited);
+                }
+            }
+            TypeKey::Application(app) => {
+                self.collect_infer_bindings(app.base, visited);
+                for &arg in &app.args {
+                    self.collect_infer_bindings(arg, visited);
+                }
+            }
+            TypeKey::Conditional(cond) => {
+                self.collect_infer_bindings(cond.check_type, visited);
+                self.collect_infer_bindings(cond.extends_type, visited);
+                self.collect_infer_bindings(cond.true_type, visited);
+                self.collect_infer_bindings(cond.false_type, visited);
+            }
+            TypeKey::Mapped(mapped) => {
+                if let Some(constraint) = mapped.type_param.constraint {
+                    self.collect_infer_bindings(constraint, visited);
+                }
+                if let Some(default) = mapped.type_param.default {
+                    self.collect_infer_bindings(default, visited);
+                }
+                self.collect_infer_bindings(mapped.constraint, visited);
+                self.collect_infer_bindings(mapped.template, visited);
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                self.collect_infer_bindings(obj, visited);
+                self.collect_infer_bindings(idx, visited);
+            }
+            TypeKey::KeyOf(inner) | TypeKey::ReadonlyType(inner) => {
+                self.collect_infer_bindings(inner, visited);
+            }
+            TypeKey::TemplateLiteral(spans) => {
+                for span in spans {
+                    if let TemplateSpan::Type(inner) = span {
+                        self.collect_infer_bindings(inner, visited);
+                    }
+                }
+            }
+            TypeKey::Intrinsic(_)
+            | TypeKey::Literal(_)
+            | TypeKey::Ref(_)
+            | TypeKey::TypeQuery(_)
+            | TypeKey::UniqueSymbol(_)
+            | TypeKey::ThisType
+            | TypeKey::Error => {}
         }
     }
 
