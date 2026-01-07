@@ -40,6 +40,7 @@ fn default_args() -> CliArgs {
         out_dir: None,
         strict: false,
         no_emit: false,
+        watch: false,
         files: Vec::new(),
     }
 }

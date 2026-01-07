@@ -27,6 +27,10 @@ pub struct CliArgs {
     #[arg(long = "noEmit", alias = "no-emit")]
     pub no_emit: bool,
 
+    /// Watch input files and recompile on changes.
+    #[arg(short, long)]
+    pub watch: bool,
+
     /// Input files to compile.
     #[arg(value_name = "FILE")]
     pub files: Vec<PathBuf>,

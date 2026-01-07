@@ -3,11 +3,16 @@ use std::io::IsTerminal;
 use clap::Parser;
 
 use wasm::cli::args::CliArgs;
-use wasm::cli::{driver, reporter::Reporter};
+use wasm::cli::{driver, reporter::Reporter, watch};
 
 fn main() -> Result<()> {
     let args = CliArgs::parse();
     let cwd = std::env::current_dir().context("failed to resolve current directory")?;
+
+    if args.watch {
+        return watch::run(&args, &cwd);
+    }
+
     let result = driver::compile(&args, &cwd)?;
 
     if !result.diagnostics.is_empty() {

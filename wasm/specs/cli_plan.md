@@ -57,7 +57,7 @@ Implement a high-performance, `tsc`-compatible command-line interface. This driv
   - [x] Return proper exit codes (0 for success, 1 for errors) based on diagnostic severity.
 
 ### Phase 5: Watch Mode (The Speed Demon)
-- [ ] **File Watching**
+- [x] **File Watching**
   - Integrate `notify` crate for filesystem events.
   - Implement debounce logic.
 - [ ] **Incremental Re-compilation**
