@@ -688,6 +688,12 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 for sig in &t_callable.call_signatures {
                     self.constrain_function_to_call_signature(ctx, var_map, s_fn, sig);
                 }
+                if s_fn.is_constructor && t_callable.construct_signatures.len() == 1 {
+                    let sig = &t_callable.construct_signatures[0];
+                    if sig.type_params.is_empty() {
+                        self.constrain_function_to_call_signature(ctx, var_map, s_fn, sig);
+                    }
+                }
             }
             (Some(TypeKey::Callable(ref s_callable)), Some(TypeKey::Callable(ref t_callable))) => {
                 if s_callable.call_signatures.len() == 1
@@ -695,6 +701,20 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 {
                     let source_sig = &s_callable.call_signatures[0];
                     let target_sig = &t_callable.call_signatures[0];
+                    if source_sig.type_params.is_empty() && target_sig.type_params.is_empty() {
+                        self.constrain_call_signature_to_call_signature(
+                            ctx,
+                            var_map,
+                            source_sig,
+                            target_sig,
+                        );
+                    }
+                }
+                if s_callable.construct_signatures.len() == 1
+                    && t_callable.construct_signatures.len() == 1
+                {
+                    let source_sig = &s_callable.construct_signatures[0];
+                    let target_sig = &t_callable.construct_signatures[0];
                     if source_sig.type_params.is_empty() && target_sig.type_params.is_empty() {
                         self.constrain_call_signature_to_call_signature(
                             ctx,

@@ -151,6 +151,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Infer type params from callable arguments with single signatures
 - [x] Infer type params from callable parameters with callable arguments
 - [x] Infer type params from function/callable this-type positions
+- [x] Infer type params from constructor call signatures
 - [x] Enforce index signature consistency during bounds validation
 
 ## Architecture Notes
