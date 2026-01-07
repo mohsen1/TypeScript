@@ -3354,11 +3354,11 @@ impl ThinParserState {
             }
         }
 
-        let first_name = self.parse_identifier();
+        let first_name = self.parse_identifier_name();
 
         // Check for "as" alias
         let (property_name, name) = if self.parse_optional(SyntaxKind::AsKeyword) {
-            let alias = self.parse_identifier();
+            let alias = self.parse_identifier_name();
             (first_name, alias)
         } else {
             (NodeIndex::NONE, first_name)
@@ -3624,11 +3624,11 @@ impl ThinParserState {
             }
         }
 
-        let first_name = self.parse_identifier();
+        let first_name = self.parse_identifier_name();
 
         // Check for "as" alias
         let (property_name, name) = if self.parse_optional(SyntaxKind::AsKeyword) {
-            let alias = self.parse_identifier();
+            let alias = self.parse_identifier_name();
             (first_name, alias)
         } else {
             (NodeIndex::NONE, first_name)
