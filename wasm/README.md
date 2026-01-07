@@ -10,13 +10,29 @@ engine on top to match TypeScript behavior while preserving correctness where po
 
 > This is a very high level project direction coming from project's manager's boss.
 
-- Don't get too bogged down with performance. let's ship something first that works.
-- lib.d.ts and similar -- let's handle this. Don't forget you are in TypeScript repo so you can use its files
-- I saw emitter/mod.rs is a giant file. Smaller files are better.
-- I want to see `test/cases` baseline pass rates in manager report.
-- While you have the mechanisms, tsc has thousands of specific error messages. Your diagnostic engine is generic; matching the user experience of tsc errors requires massive effort.
-- tsconfig.json has hundreds of flags. You handle the big ones (target, module, strict), but full compatibility is a long tail.
-- Your immediate implementation risk: The complexity of solver/subtype.rs and solver/infer.rs suggests you are deep in the weeds of TypeScript's unsound type system. This is where "compatibility bugs" live—cases where your logic makes sense, but TS does something weird for legacy reasons, breaking compatibility with existing codebases. **you need to manage this well**
+
+The system has a "Ferrari engine" (ThinNode AST + Parallel Binder) but needs a finished transmission (Solver integration).
+
+### 1. Consolidate the "Split Brain" Type System (High Priority)
+The project currently has friction between the imperative `ThinChecker` (AST walking) and the declarative `solver/` (structural typing).
+*   **Goal:** Move all assignability checks, type relationships, and member lookups into `solver/` behind the `QueryDatabase` trait.
+*   **Action:** `ThinChecker` must become a thin traversal layer that pushes constraints into the solver and pulls diagnostics out, rather than doing logic itself.
+
+### 2. Emitter & Compatibility Strategy
+To function as a true drop-in replacement for `tsc`, we **will support ES5 down-leveling** (classes to IIFEs, async to generators).
+*   **Constraint:** **ES3 support is explicitly out of scope.**
+*   **Architecture:** Continue using the **Projection Layer** pattern (`TransformContext`). Do not mutate the AST for transforms; map `NodeIndex` to `TransformDirective` to keep the parallel parser zero-copy and thread-safe.
+*   **Focus:** Ensure the `.d.ts` emitter correctly handles symbol visibility and re-exports; this is the "graduation requirement" for library support.
+
+### 3. LSP Incrementality
+The current `ThinNodeArena` makes in-place mutation difficult.
+*   **Goal:** Sub-10ms response time on keypress.
+*   **Action:** Refine `IncrementalParseResult` to ensure small edits inside function bodies do not trigger a full file re-bind or global symbol table invalidation.
+
+### 4. Technical Debt & Cleanup
+*   **Deprecate Legacy AST:** Aggressively remove `parser/ast` (the 208-byte fat nodes). The future is `parser/thin_node` (16-byte packed nodes).
+*   **Memory Hygiene:** Ensure `ThinNodeArena`s are swapped and dropped correctly during long-running LSP sessions to prevent memory leaks.
+
 
 ## Executive Summary (Manager report)
 Last updated: 2026-01-07
