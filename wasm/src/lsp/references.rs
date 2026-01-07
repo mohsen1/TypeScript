@@ -100,16 +100,7 @@ impl<'a> FindReferences<'a> {
         // 6. Convert to Locations
         let locations: Vec<Location> = all_nodes
             .iter()
-            .filter_map(|&idx| {
-                let node = self.arena.get(idx)?;
-                let start_pos = self.line_map.offset_to_position(node.pos, self.source_text);
-                let end_pos = self.line_map.offset_to_position(node.end, self.source_text);
-
-                Some(Location {
-                    file_path: self.file_name.clone(),
-                    range: Range::new(start_pos, end_pos),
-                })
-            })
+            .filter_map(|&idx| self.location_for_node(idx))
             .collect();
 
         if locations.is_empty() {
@@ -166,16 +157,7 @@ impl<'a> FindReferences<'a> {
         // Convert to Locations
         let locations: Vec<Location> = all_nodes
             .iter()
-            .filter_map(|&idx| {
-                let node = self.arena.get(idx)?;
-                let start_pos = self.line_map.offset_to_position(node.pos, self.source_text);
-                let end_pos = self.line_map.offset_to_position(node.end, self.source_text);
-
-                Some(Location {
-                    file_path: self.file_name.clone(),
-                    range: Range::new(start_pos, end_pos),
-                })
-            })
+            .filter_map(|&idx| self.location_for_node(idx))
             .collect();
 
         if locations.is_empty() {
@@ -222,22 +204,117 @@ impl<'a> FindReferences<'a> {
         // Convert to Locations
         let locations: Vec<Location> = ref_nodes
             .iter()
-            .filter_map(|&idx| {
-                let node = self.arena.get(idx)?;
-                let start_pos = self.line_map.offset_to_position(node.pos, self.source_text);
-                let end_pos = self.line_map.offset_to_position(node.end, self.source_text);
-
-                Some(Location {
-                    file_path: self.file_name.clone(),
-                    range: Range::new(start_pos, end_pos),
-                })
-            })
+            .filter_map(|&idx| self.location_for_node(idx))
             .collect();
 
         if locations.is_empty() {
             None
         } else {
             Some(locations)
+        }
+    }
+
+    fn location_for_node(&self, idx: NodeIndex) -> Option<Location> {
+        let target_idx = self.name_node_for(idx).unwrap_or(idx);
+        let node = self.arena.get(target_idx)?;
+        let start_pos = self.line_map.offset_to_position(node.pos, self.source_text);
+        let end_pos = self.line_map.offset_to_position(node.end, self.source_text);
+
+        Some(Location {
+            file_path: self.file_name.clone(),
+            range: Range::new(start_pos, end_pos),
+        })
+    }
+
+    fn name_node_for(&self, idx: NodeIndex) -> Option<NodeIndex> {
+        let node = self.arena.get(idx)?;
+        match node.kind {
+            k if k == syntax_kind_ext::VARIABLE_DECLARATION => {
+                let decl = self.arena.get_variable_declaration(node)?;
+                if decl.name.is_none() { None } else { Some(decl.name) }
+            }
+            k if k == syntax_kind_ext::PARAMETER => {
+                let param = self.arena.get_parameter(node)?;
+                if param.name.is_none() { None } else { Some(param.name) }
+            }
+            k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                let func = self.arena.get_function(node)?;
+                if func.name.is_none() { None } else { Some(func.name) }
+            }
+            k if k == syntax_kind_ext::CLASS_DECLARATION
+                || k == syntax_kind_ext::CLASS_EXPRESSION => {
+                let class = self.arena.get_class(node)?;
+                if class.name.is_none() { None } else { Some(class.name) }
+            }
+            k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
+                let iface = self.arena.get_interface(node)?;
+                if iface.name.is_none() { None } else { Some(iface.name) }
+            }
+            k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                let alias = self.arena.get_type_alias(node)?;
+                if alias.name.is_none() { None } else { Some(alias.name) }
+            }
+            k if k == syntax_kind_ext::ENUM_DECLARATION => {
+                let enm = self.arena.get_enum(node)?;
+                if enm.name.is_none() { None } else { Some(enm.name) }
+            }
+            k if k == syntax_kind_ext::ENUM_MEMBER => {
+                let member = self.arena.get_enum_member(node)?;
+                if member.name.is_none() { None } else { Some(member.name) }
+            }
+            k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                let module = self.arena.get_module(node)?;
+                if module.name.is_none() { None } else { Some(module.name) }
+            }
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                let method = self.arena.get_method_decl(node)?;
+                if method.name.is_none() { None } else { Some(method.name) }
+            }
+            k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                let prop = self.arena.get_property_decl(node)?;
+                if prop.name.is_none() { None } else { Some(prop.name) }
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                let accessor = self.arena.get_accessor(node)?;
+                if accessor.name.is_none() { None } else { Some(accessor.name) }
+            }
+            k if k == syntax_kind_ext::IMPORT_SPECIFIER => {
+                let spec = self.arena.get_specifier(node)?;
+                if !spec.name.is_none() {
+                    Some(spec.name)
+                } else if !spec.property_name.is_none() {
+                    Some(spec.property_name)
+                } else {
+                    None
+                }
+            }
+            k if k == syntax_kind_ext::EXPORT_SPECIFIER => {
+                let spec = self.arena.get_specifier(node)?;
+                if !spec.property_name.is_none() {
+                    Some(spec.property_name)
+                } else if !spec.name.is_none() {
+                    Some(spec.name)
+                } else {
+                    None
+                }
+            }
+            k if k == syntax_kind_ext::IMPORT_EQUALS_DECLARATION => {
+                let import = self.arena.get_import_decl(node)?;
+                if import.import_clause.is_none() {
+                    return None;
+                }
+                let clause_node = self.arena.get(import.import_clause)?;
+                if clause_node.kind == SyntaxKind::Identifier as u16 {
+                    Some(import.import_clause)
+                } else {
+                    None
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_PARAMETER => {
+                let param = self.arena.get_type_parameter(node)?;
+                if param.name.is_none() { None } else { Some(param.name) }
+            }
+            _ => None,
         }
     }
 

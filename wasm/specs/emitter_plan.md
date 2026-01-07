@@ -29,8 +29,8 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 - [x] Performance check
   - Run `./wasm/bench.sh real_world_bench` and track throughput deltas.
   - Results (real_world_bench):
-    - checker_ts_full_pipeline thrpt: 57.766–58.824 MiB/s (regression ~2.6–5.0%).
-    - checker_ts_emit_only thrpt: 317.28–318.59 MiB/s (improvement ~1.4–4.1%).
+    - checker_ts_full_pipeline thrpt: 60.112–60.890 MiB/s (change within noise).
+    - checker_ts_emit_only thrpt: 316.01–318.13 MiB/s (no significant change).
 
 ## Success Criteria
 - All transforms triggered via TransformContext (no inline ES5 fallbacks).
@@ -95,6 +95,8 @@ Next Steps: Cleanup. Remove the legacy inline transformation logic from ThinPrin
 49. ES5 emit: move variable destructuring downleveling behind TransformDirective [done]
 50. ES5 emit: move function parameter downleveling behind TransformDirective [done]
 51. LoweringPass: gate export name extraction for non-exported declarations [done]
+52. CommonJS exports: store identifier ids in directives to avoid name cloning [done]
+53. Class ES5 emitter: write identifier/literal names without cloning strings [done]
 
 ## Quick Reference
 

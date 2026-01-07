@@ -370,8 +370,9 @@ impl<'a> FlowAnalyzer<'a> {
                 }
             }
             TypeKey::Union(members) => {
+                let members = self.interner.type_list(members);
                 let mut falsy_members = Vec::new();
-                for member in members {
+                for &member in members.iter() {
                     if let Some(falsy) = self.falsy_component(member) {
                         falsy_members.push(falsy);
                     }
@@ -498,6 +499,7 @@ if (x) {}
         let key = types.lookup(narrowed).expect("narrowed type");
         match key {
             TypeKey::Union(members) => {
+                let members = types.type_list(members);
                 assert!(members.contains(&falsy_string));
                 assert!(members.contains(&falsy_number));
                 assert!(members.contains(&falsy_boolean));

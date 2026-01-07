@@ -22,7 +22,7 @@ use crate::lsp::signature_help::{SignatureHelp, SignatureHelpProvider};
 use crate::lsp::utils::find_node_at_offset;
 use crate::lsp::resolver::{ScopeCache, ScopeCacheStats};
 use crate::parser::thin_node::NodeAccess;
-use crate::parser::{NodeIndex, syntax_kind_ext, thin_node::ThinNodeArena};
+use crate::parser::{NodeIndex, NodeList, syntax_kind_ext, thin_node::ThinNodeArena};
 use crate::scanner::SyntaxKind;
 use crate::solver::TypeInterner;
 use crate::thin_binder::ThinBinderState;
@@ -30,7 +30,7 @@ use crate::thin_checker::ThinCheckerState;
 use crate::thin_parser::ThinParserState;
 use crate::lsp::definition::GoToDefinition;
 use crate::lsp::references::FindReferences;
-use crate::lsp::rename::TextEdit;
+use crate::lsp::rename::{RenameProvider, TextEdit, WorkspaceEdit};
 use crate::lsp::position::{LineMap, Position, Location, Range};
 
 enum ImportKind {
@@ -54,6 +54,14 @@ struct ExportMatch {
     kind: ImportCandidateKind,
     is_type_only: bool,
 }
+
+struct IncrementalUpdatePlan {
+    reparse_start: u32,
+    prefix_nodes: Vec<NodeIndex>,
+}
+
+const INCREMENTAL_NODE_MULTIPLIER: usize = 4;
+const INCREMENTAL_MIN_NODE_BUDGET: usize = 4096;
 
 /// Parsed file state used by LSP features.
 pub struct ProjectFile {
@@ -132,6 +140,154 @@ impl ProjectFile {
         self.line_map = LineMap::build(self.parser.get_source_text());
         self.type_cache = None;
         self.scope_cache.clear();
+    }
+
+    pub fn update_source_with_edits(&mut self, source_text: String, edits: &[TextEdit]) {
+        if edits.is_empty() {
+            self.update_source(source_text);
+            return;
+        }
+
+        if let Some(plan) = self.incremental_update_plan(edits, source_text.len()) {
+            if self.apply_incremental_update(source_text, plan) {
+                return;
+            }
+            let refreshed = self.parser.get_source_text().to_string();
+            self.update_source(refreshed);
+            return;
+        }
+
+        self.update_source(source_text);
+    }
+
+    fn incremental_update_plan(
+        &self,
+        edits: &[TextEdit],
+        new_text_len: usize,
+    ) -> Option<IncrementalUpdatePlan> {
+        let (change_start, _) = self.change_range_from_edits(edits)?;
+        if change_start == 0 {
+            return None;
+        }
+
+        let arena = self.parser.get_arena();
+        let root_node = arena.get(self.root)?;
+        let source_file = arena.get_source_file(root_node)?;
+        let mut reparse_start = change_start;
+
+        for &stmt_idx in &source_file.statements.nodes {
+            let stmt = arena.get(stmt_idx)?;
+            if change_start < stmt.end {
+                if change_start >= stmt.pos {
+                    reparse_start = stmt.pos;
+                }
+                break;
+            }
+        }
+
+        if reparse_start == 0 {
+            return None;
+        }
+
+        let estimated_nodes = (new_text_len / 20).max(1);
+        let max_nodes = estimated_nodes
+            .saturating_mul(INCREMENTAL_NODE_MULTIPLIER)
+            .max(INCREMENTAL_MIN_NODE_BUDGET);
+        if arena.len() > max_nodes {
+            return None;
+        }
+
+        let mut prefix_nodes = Vec::new();
+        for &stmt_idx in &source_file.statements.nodes {
+            let stmt = arena.get(stmt_idx)?;
+            if stmt.pos < reparse_start {
+                prefix_nodes.push(stmt_idx);
+            } else {
+                break;
+            }
+        }
+
+        Some(IncrementalUpdatePlan {
+            reparse_start,
+            prefix_nodes,
+        })
+    }
+
+    fn change_range_from_edits(&self, edits: &[TextEdit]) -> Option<(u32, u32)> {
+        let source_text = self.parser.get_source_text();
+        let mut min_start: Option<u32> = None;
+        let mut max_end: Option<u32> = None;
+
+        for edit in edits {
+            let start = self
+                .line_map
+                .position_to_offset(edit.range.start, source_text)?;
+            let end = self
+                .line_map
+                .position_to_offset(edit.range.end, source_text)?;
+            min_start = Some(min_start.map_or(start, |current| current.min(start)));
+            max_end = Some(max_end.map_or(end, |current| current.max(end)));
+        }
+
+        Some((min_start?, max_end?))
+    }
+
+    fn apply_incremental_update(&mut self, source_text: String, plan: IncrementalUpdatePlan) -> bool {
+        let parse_result = self.parser.parse_source_file_statements_from_offset(
+            self.file_name.clone(),
+            source_text,
+            plan.reparse_start,
+        );
+
+        let new_text = self.parser.get_source_text().to_string();
+        let line_map = LineMap::build(&new_text);
+        let comments = crate::comments::get_comment_ranges(&new_text);
+
+        let mut combined_nodes = Vec::with_capacity(
+            plan.prefix_nodes.len() + parse_result.statements.nodes.len(),
+        );
+        combined_nodes.extend(plan.prefix_nodes.iter().copied());
+        combined_nodes.extend(parse_result.statements.nodes.iter().copied());
+
+        let new_statements = NodeList {
+            nodes: combined_nodes,
+            pos: 0,
+            end: 0,
+            has_trailing_comma: false,
+        };
+
+        let root = self.root;
+        {
+            let arena = &mut self.parser.arena;
+            for &node in &parse_result.statements.nodes {
+                if let Some(ext) = arena.get_extended_mut(node) {
+                    ext.parent = root;
+                }
+            }
+            if let Some(ext) = arena.get_extended_mut(parse_result.end_of_file_token) {
+                ext.parent = root;
+            }
+            if let Some(root_node) = arena.get_mut(root) {
+                root_node.end = parse_result.end_pos;
+            }
+            let Some(root_node) = arena.get(root) else { return false; };
+            let data_index = root_node.data_index as usize;
+            let Some(source_file) = arena.source_files.get_mut(data_index) else { return false; };
+
+            source_file.statements = new_statements;
+            source_file.end_of_file_token = parse_result.end_of_file_token;
+            source_file.text = new_text;
+            source_file.comments = comments;
+        }
+
+        self.line_map = line_map;
+        self.binder.reset();
+        let arena = self.parser.get_arena();
+        self.binder.bind_source_file(arena, self.root);
+        self.type_cache = None;
+        self.scope_cache.clear();
+
+        true
     }
 
     pub fn get_hover(&mut self, position: Position) -> Option<HoverInfo> {
@@ -726,7 +882,7 @@ impl Project {
         }
 
         let file = self.files.get_mut(file_name)?;
-        file.update_source(updated_source);
+        file.update_source_with_edits(updated_source, edits);
         Some(())
     }
 
@@ -1472,6 +1628,42 @@ impl Project {
             .record(ProjectRequestKind::References, start.elapsed(), scope_stats);
 
         result
+    }
+
+    /// Rename a symbol across files in the project.
+    pub fn get_rename_edits(
+        &mut self,
+        file_name: &str,
+        position: Position,
+        new_name: String,
+    ) -> Result<WorkspaceEdit, String> {
+        let normalized_name = {
+            let file = self
+                .files
+                .get(file_name)
+                .ok_or_else(|| "You cannot rename this element.".to_string())?;
+            let provider = RenameProvider::new(
+                file.parser.get_arena(),
+                &file.binder,
+                &file.line_map,
+                file.file_name.clone(),
+                file.parser.get_source_text(),
+            );
+            provider.normalize_rename_at_position(position, &new_name)?
+        };
+
+        let locations = self
+            .find_references(file_name, position)
+            .ok_or_else(|| "Could not find symbol to rename".to_string())?;
+        let mut workspace_edit = WorkspaceEdit::new();
+        for location in locations {
+            workspace_edit.add_edit(
+                location.file_path,
+                TextEdit::new(location.range, normalized_name.clone()),
+            );
+        }
+
+        Ok(workspace_edit)
     }
 
     fn definition_from_import(&self, file: &ProjectFile, position: Position) -> Option<Vec<Location>> {

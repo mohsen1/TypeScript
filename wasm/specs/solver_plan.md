@@ -10,6 +10,7 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
 - Lowering, inference, compat, and diagnostics are implemented and tested.
 - TypeDatabase trait exists, TypeInterner is sharded.
 - Remaining work is performance and incremental architecture.
+- Generic call inference validates argument types with strict function variance while avoiding weak-type rejections.
 
 ## Highest-Impact Next Tasks
 - [x] Make TypeKey POD with side-table slices
@@ -27,7 +28,7 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
 - [x] Assignability cleanup
   - Route all assignability through CompatChecker; remove TODO in `SubtypeChecker::is_assignable_to`.
   - Add tests for strict/unsound toggles.
-- [ ] Benchmarks
+- [x] Benchmarks
   - Add microbench for subtype/evaluate/infer to `./wasm/bench.sh`.
 
 ## Success Criteria

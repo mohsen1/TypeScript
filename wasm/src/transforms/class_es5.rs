@@ -384,10 +384,12 @@ impl<'a> ClassES5Emitter<'a> {
                 for &prop_idx in &instance_props {
                     let Some(prop_node) = self.arena.get(prop_idx) else { continue };
                     let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
-                    let name = self.get_identifier_text(prop_data.name);
+                    if !self.has_identifier_text(prop_data.name) {
+                        continue;
+                    }
                     self.write_indent();
                     self.write("_this.");
-                    self.write(&name);
+                    self.write_identifier_text(prop_data.name);
                     self.write(" = ");
                     self.emit_expression(prop_data.initializer);
                     self.write(";");
@@ -405,10 +407,12 @@ impl<'a> ClassES5Emitter<'a> {
                 for &prop_idx in &instance_props {
                     let Some(prop_node) = self.arena.get(prop_idx) else { continue };
                     let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
-                    let name = self.get_identifier_text(prop_data.name);
+                    if !self.has_identifier_text(prop_data.name) {
+                        continue;
+                    }
                     self.write_indent();
                     self.write("this.");
-                    self.write(&name);
+                    self.write_identifier_text(prop_data.name);
                     self.write(" = ");
                     self.emit_expression(prop_data.initializer);
                     self.write(";");
@@ -452,11 +456,13 @@ impl<'a> ClassES5Emitter<'a> {
             let Some(prop_node) = self.arena.get(prop_idx) else { continue };
             let Some(prop_data) = self.arena.get_property_decl(prop_node) else { continue };
 
-            let prop_name = self.get_identifier_text(prop_data.name);
+            if !self.has_identifier_text(prop_data.name) {
+                continue;
+            }
 
             self.write_indent();
             self.write("this.");
-            self.write(&prop_name);
+            self.write_identifier_text(prop_data.name);
             self.write(" = ");
             self.emit_expression(prop_data.initializer);
             self.write(";");
@@ -575,17 +581,16 @@ impl<'a> ClassES5Emitter<'a> {
 
             // Check for modifiers that trigger property creation
             if self.has_parameter_property_modifier(&param.modifiers) {
-                let name = self.get_identifier_text(param.name);
-
-                if !name.is_empty() {
-                    self.write_indent();
-                    self.write("this.");
-                    self.write(&name);
-                    self.write(" = ");
-                    self.write(&name);
-                    self.write(";");
-                    self.write_line();
+                if !self.has_identifier_text(param.name) {
+                    continue;
                 }
+                self.write_indent();
+                self.write("this.");
+                self.write_identifier_text(param.name);
+                self.write(" = ");
+                self.write_identifier_text(param.name);
+                self.write(";");
+                self.write_line();
             }
         }
     }
@@ -643,16 +648,16 @@ impl<'a> ClassES5Emitter<'a> {
             let Some(param) = self.arena.get_parameter(param_node) else { continue };
 
             if self.has_parameter_property_modifier(&param.modifiers) {
-                let name = self.get_identifier_text(param.name);
-                if !name.is_empty() {
-                    self.write_indent();
-                    self.write("_this.");
-                    self.write(&name);
-                    self.write(" = ");
-                    self.write(&name);
-                    self.write(";");
-                    self.write_line();
+                if !self.has_identifier_text(param.name) {
+                    continue;
                 }
+                self.write_indent();
+                self.write("_this.");
+                self.write_identifier_text(param.name);
+                self.write(" = ");
+                self.write_identifier_text(param.name);
+                self.write(";");
+                self.write_line();
             }
         }
 
@@ -666,14 +671,13 @@ impl<'a> ClassES5Emitter<'a> {
                 continue;
             }
 
-            let name = self.get_identifier_text(prop_data.name);
-            if name.is_empty() {
+            if !self.has_identifier_text(prop_data.name) {
                 continue;
             }
 
             self.write_indent();
             self.write("_this.");
-            self.write(&name);
+            self.write_identifier_text(prop_data.name);
             self.write(" = ");
 
             // Check if this initializer contains `this` that needs capture
@@ -840,24 +844,19 @@ impl<'a> ClassES5Emitter<'a> {
                     continue;
                 }
 
-                let use_bracket = !self.is_valid_identifier_name(method_data.name);
-                let method_name = if use_bracket {
-                    self.get_computed_property_name(method_data.name)
-                } else {
-                    self.get_identifier_text(method_data.name)
-                };
-
                 // ClassName.prototype.methodName = function () { ... };
                 self.write_indent();
                 self.write(class_name);
                 self.write(".prototype");
+                let use_bracket = !self.is_valid_identifier_name(method_data.name);
                 if use_bracket {
+                    let method_name = self.get_computed_property_name(method_data.name);
                     self.write("[");
                     self.write(&method_name);
                     self.write("]");
                 } else {
                     self.write(".");
-                    self.write(&method_name);
+                    self.write_identifier_text(method_data.name);
                 }
                 self.write(" = function (");
                 let param_transforms = self.emit_parameters(&method_data.parameters);
@@ -1122,13 +1121,11 @@ impl<'a> ClassES5Emitter<'a> {
                     continue;
                 }
 
-                let method_name = self.get_identifier_text(method_data.name);
-
                 // ClassName.staticMethod = function () { ... };
                 self.write_indent();
                 self.write(class_name);
                 self.write(".");
-                self.write(&method_name);
+                self.write_identifier_text(method_data.name);
                 self.write(" = function (");
                 let param_transforms = self.emit_parameters(&method_data.parameters);
                 self.write(") {");
@@ -1153,13 +1150,11 @@ impl<'a> ClassES5Emitter<'a> {
                     continue;
                 }
 
-                let prop_name = self.get_identifier_text(prop_data.name);
-
                 // ClassName.staticProp = value;
                 self.write_indent();
                 self.write(class_name);
                 self.write(".");
-                self.write(&prop_name);
+                self.write_identifier_text(prop_data.name);
                 self.write(" = ");
                 self.emit_expression(prop_data.initializer);
                 self.write(";");
@@ -1340,9 +1335,8 @@ impl<'a> ClassES5Emitter<'a> {
                 self.write("]");
             }
         } else if name_node.kind == SyntaxKind::Identifier as u16 {
-            let name = self.get_identifier_text(key_idx);
             self.write(".");
-            self.write(&name);
+            self.write_identifier_text(key_idx);
         } else if name_node.kind == SyntaxKind::StringLiteral as u16 {
             if let Some(lit) = self.arena.get_literal(name_node) {
                 self.write("[\"");
@@ -1434,8 +1428,7 @@ impl<'a> ClassES5Emitter<'a> {
             return;
         }
 
-        let binding_name = self.get_identifier_text(elem.name);
-        if binding_name.is_empty() {
+        if !self.has_identifier_text(elem.name) {
             return;
         }
 
@@ -1446,7 +1439,7 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(" = ");
             self.emit_binding_element_access(key_idx, temp_name);
             self.write(", ");
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.write(&value_name);
             self.write(" === void 0 ? ");
@@ -1454,7 +1447,7 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(" : ");
             self.write(&value_name);
         } else {
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.emit_binding_element_access(key_idx, temp_name);
         }
@@ -1503,8 +1496,7 @@ impl<'a> ClassES5Emitter<'a> {
             return;
         }
 
-        let binding_name = self.get_identifier_text(elem.name);
-        if binding_name.is_empty() {
+        if !self.has_identifier_text(elem.name) {
             return;
         }
 
@@ -1518,7 +1510,7 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(&index.to_string());
             self.write("]");
             self.write(", ");
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.write(&value_name);
             self.write(" === void 0 ? ");
@@ -1526,7 +1518,7 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(" : ");
             self.write(&value_name);
         } else {
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
@@ -1900,15 +1892,14 @@ impl<'a> ClassES5Emitter<'a> {
             return;
         }
 
-        let binding_name = self.get_identifier_text_clone(elem.name);
-        if binding_name.is_empty() {
+        if !self.has_identifier_text(elem.name) {
             return;
         }
 
         if elem.initializer.is_none() {
             // Emit: , bindingName = temp.propName
             self.write(", ");
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.emit_binding_element_access(key_idx, temp_name);
         } else {
@@ -1918,7 +1909,7 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(" = ");
             self.emit_binding_element_access(key_idx, temp_name);
             self.write(", ");
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.write(&value_name);
             self.write(" === void 0 ? ");
@@ -1963,15 +1954,14 @@ impl<'a> ClassES5Emitter<'a> {
             return;
         }
 
-        let binding_name = self.get_identifier_text_clone(elem.name);
-        if binding_name.is_empty() {
+        if !self.has_identifier_text(elem.name) {
             return;
         }
 
         if elem.initializer.is_none() {
             // Emit: , bindingName = temp[index]
             self.write(", ");
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.write(temp_name);
             self.write("[");
@@ -1987,7 +1977,7 @@ impl<'a> ClassES5Emitter<'a> {
             self.write(&index.to_string());
             self.write("]");
             self.write(", ");
-            self.write(&binding_name);
+            self.write_identifier_text(elem.name);
             self.write(" = ");
             self.write(&value_name);
             self.write(" === void 0 ? ");
@@ -2065,11 +2055,10 @@ impl<'a> ClassES5Emitter<'a> {
         if let Some(ref name) = rest_temp {
             self.write(name);
         } else {
-            let binding_name = self.get_identifier_text_clone(rest_target);
-            if binding_name.is_empty() {
+            if !self.has_identifier_text(rest_target) {
                 return;
             }
-            self.write(&binding_name);
+            self.write_identifier_text(rest_target);
         }
         self.write(" = ");
         self.write(temp_name);
@@ -2157,15 +2146,6 @@ impl<'a> ClassES5Emitter<'a> {
         let name = format!("_{}", (b'a' + (self.temp_var_counter % 26) as u8) as char);
         self.temp_var_counter += 1;
         name
-    }
-
-    /// Get identifier text from a node index, returning an owned String
-    fn get_identifier_text_clone(&self, idx: NodeIndex) -> String {
-        let Some(node) = self.arena.get(idx) else { return String::new() };
-        if let Some(ident) = self.arena.get_identifier(node) {
-            return ident.escaped_text.clone();
-        }
-        String::new()
     }
 
     /// Emit a single variable declaration (for for-loop initializers, etc.)
@@ -3210,12 +3190,11 @@ impl<'a> ClassES5Emitter<'a> {
             }
             k if k == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT => {
                 if let Some(shorthand) = self.arena.get_shorthand_property(node) {
-                    let name = self.get_identifier_text(shorthand.name);
                     self.write(temp_var);
                     self.write(".");
-                    self.write(&name);
+                    self.write_identifier_text(shorthand.name);
                     self.write(" = ");
-                    self.write(&name);
+                    self.write_identifier_text(shorthand.name);
                 }
             }
             k if k == syntax_kind_ext::METHOD_DECLARATION => {
@@ -3324,9 +3303,8 @@ impl<'a> ClassES5Emitter<'a> {
         }
 
         if name_node.kind == SyntaxKind::Identifier as u16 {
-            let name = self.get_identifier_text(name_idx);
             self.write("\"");
-            self.write(&name);
+            self.write_identifier_text(name_idx);
             self.write("\"");
         } else if name_node.kind == SyntaxKind::StringLiteral as u16 {
             if let Some(lit) = self.arena.get_literal(name_node) {
@@ -3399,6 +3377,22 @@ impl<'a> ClassES5Emitter<'a> {
             _ => "",
         };
         self.write(op_str);
+    }
+
+    fn has_identifier_text(&self, idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(idx) else { return false };
+        self.arena.get_identifier(node).is_some() || self.arena.get_literal(node).is_some()
+    }
+
+    fn write_identifier_text(&mut self, idx: NodeIndex) {
+        let Some(node) = self.arena.get(idx) else { return };
+        if let Some(ident) = self.arena.get_identifier(node) {
+            self.write(&ident.escaped_text);
+            return;
+        }
+        if let Some(lit) = self.arena.get_literal(node) {
+            self.write(&lit.text);
+        }
     }
     
     fn get_identifier_text(&self, idx: NodeIndex) -> String {
@@ -3541,11 +3535,9 @@ impl<'a> ClassES5Emitter<'a> {
         let Some(access) = self.arena.get_access_expr(callee_node) else { return };
 
         // Get method name
-        let method_name = self.get_identifier_text(access.name_or_argument);
-
         // Emit _super.prototype.method.call(this, args)
         self.write("_super.prototype.");
-        self.write(&method_name);
+        self.write_identifier_text(access.name_or_argument);
         self.write(".call(this");
 
         if let Some(arg_list) = args {
@@ -3760,3 +3752,7 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "class_es5_tests.rs"]
+mod class_es5_tests;

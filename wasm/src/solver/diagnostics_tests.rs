@@ -144,7 +144,15 @@ fn test_union_member_mismatch_diagnostic_includes_related_members() {
         target_union_members: union_members,
     };
 
-    let pending = reason.to_diagnostic(TypeId::NULL, union);
+    if let SubtypeFailureReason::NoUnionMemberMatches { target_union_members, .. } = &reason {
+        assert_eq!(target_union_members.len(), 4);
+    } else {
+        panic!("Expected NoUnionMemberMatches");
+    }
+
+    let pending = reason
+        .to_diagnostic(TypeId::NULL, union)
+        .with_span(SourceSpan::new("test.ts", 0, 1));
     assert_eq!(pending.related.len(), 3);
 
     let mut formatter = TypeFormatter::new(&interner);

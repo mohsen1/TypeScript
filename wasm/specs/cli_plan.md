@@ -16,6 +16,9 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
   - [x] Cache parsed arenas + binder results per file.
   - [x] Reuse `TypeCache` in `ThinCheckerState::with_cache`.
   - [x] Invalidate dependent files via module graph.
+  - [x] Cache per-file diagnostics to skip rechecking unchanged files.
+  - [x] Emit outputs only for dirty files in cached builds.
+  - [x] Reuse cached dependencies to skip reading unchanged files in watch builds.
   - [ ] Invalidate affected symbols only.
 - [ ] Expand tsconfig support
   - [x] baseUrl

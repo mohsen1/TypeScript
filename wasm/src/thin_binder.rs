@@ -1499,7 +1499,11 @@ impl ThinBinderState {
                     if !clause.name.is_none() {
                         if let Some(name) = self.get_identifier_name(arena, clause.name) {
                             let sym_id = self.symbols.alloc(symbol_flags::ALIAS, name.to_string());
+                            if let Some(sym) = self.symbols.get_mut(sym_id) {
+                                sym.declarations.push(clause.name);
+                            }
                             self.current_scope.set(name.to_string(), sym_id);
+                            self.node_symbols.insert(clause.name.0, sym_id);
                         }
                     }
 
@@ -1509,6 +1513,9 @@ impl ThinBinderState {
                             if bindings_node.kind == SyntaxKind::Identifier as u16 {
                                 if let Some(name) = self.get_identifier_name(arena, clause.named_bindings) {
                                     let sym_id = self.symbols.alloc(symbol_flags::ALIAS, name.to_string());
+                                    if let Some(sym) = self.symbols.get_mut(sym_id) {
+                                        sym.declarations.push(clause.named_bindings);
+                                    }
                                     self.current_scope.set(name.to_string(), sym_id);
                                     self.node_symbols.insert(clause.named_bindings.0, sym_id);
                                 }
@@ -1516,16 +1523,21 @@ impl ThinBinderState {
                                 for &spec_idx in &named.elements.nodes {
                                     if let Some(spec_node) = arena.get(spec_idx) {
                                         if let Some(spec) = arena.get_specifier(spec_node) {
-                                            let local_name = if !spec.name.is_none() {
-                                                self.get_identifier_name(arena, spec.name)
+                                            let local_ident = if !spec.name.is_none() {
+                                                spec.name
                                             } else {
-                                                self.get_identifier_name(arena, spec.property_name)
+                                                spec.property_name
                                             };
+                                            let local_name = self.get_identifier_name(arena, local_ident);
 
                                             if let Some(name) = local_name {
                                                 let sym_id = self.symbols.alloc(symbol_flags::ALIAS, name.to_string());
+                                                if let Some(sym) = self.symbols.get_mut(sym_id) {
+                                                    sym.declarations.push(local_ident);
+                                                }
                                                 self.current_scope.set(name.to_string(), sym_id);
                                                 self.node_symbols.insert(spec_idx.0, sym_id);
+                                                self.node_symbols.insert(local_ident.0, sym_id);
                                             }
                                         }
                                     }
@@ -1662,7 +1674,8 @@ impl ThinBinderState {
         kind == syntax_kind_ext::VARIABLE_STATEMENT ||
         kind == syntax_kind_ext::INTERFACE_DECLARATION ||
         kind == syntax_kind_ext::TYPE_ALIAS_DECLARATION ||
-        kind == syntax_kind_ext::ENUM_DECLARATION
+        kind == syntax_kind_ext::ENUM_DECLARATION ||
+        kind == syntax_kind_ext::MODULE_DECLARATION
     }
 
     fn bind_module_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {

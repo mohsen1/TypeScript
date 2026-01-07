@@ -50,7 +50,7 @@ impl<'a> NarrowingContext<'a> {
     /// 2. Each member has a unique literal type for that property
     pub fn find_discriminants(&self, union_type: TypeId) -> Vec<DiscriminantInfo> {
         let members = match self.interner.lookup(union_type) {
-            Some(TypeKey::Union(m)) => m,
+            Some(TypeKey::Union(m)) => self.interner.type_list(m),
             _ => return vec![],
         };
 
@@ -62,9 +62,10 @@ impl<'a> NarrowingContext<'a> {
         let mut all_properties: Vec<Atom> = Vec::new();
         let mut member_props: Vec<Vec<(Atom, TypeId)>> = Vec::new();
 
-        for &member in &members {
-            if let Some(TypeKey::Object(props)) = self.interner.lookup(member) {
-                let props_vec: Vec<(Atom, TypeId)> = props.iter()
+        for &member in members.iter() {
+            if let Some(TypeKey::Object(shape_id)) = self.interner.lookup(member) {
+                let shape = self.interner.object_shape(shape_id);
+                let props_vec: Vec<(Atom, TypeId)> = shape.properties.iter()
                     .map(|p| (p.name, p.type_id))
                     .collect();
 
@@ -166,15 +167,18 @@ impl<'a> NarrowingContext<'a> {
         excluded_value: TypeId,
     ) -> TypeId {
         let members = match self.interner.lookup(union_type) {
-            Some(TypeKey::Union(m)) => m,
+            Some(TypeKey::Union(m)) => self.interner.type_list(m),
             _ => return union_type,
         };
 
         let mut remaining: Vec<TypeId> = Vec::new();
 
-        for &member in &members {
-            if let Some(TypeKey::Object(props)) = self.interner.lookup(member) {
-                let prop_type = props.iter()
+        for &member in members.iter() {
+            if let Some(TypeKey::Object(shape_id)) = self.interner.lookup(member) {
+                let shape = self.interner.object_shape(shape_id);
+                let prop_type = shape
+                    .properties
+                    .iter()
                     .find(|p| p.name == property_name)
                     .map(|p| p.type_id);
 
@@ -250,6 +254,7 @@ impl<'a> NarrowingContext<'a> {
 
         // If source is a union, filter members
         if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
+            let members = self.interner.type_list(members);
             let matching: Vec<TypeId> = members
                 .iter()
                 .filter_map(|&member| {
@@ -288,6 +293,7 @@ impl<'a> NarrowingContext<'a> {
     pub fn narrow_excluding_type(&self, source_type: TypeId, excluded_type: TypeId) -> TypeId {
         // If source is a union, filter out matching members
         if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
+            let members = self.interner.type_list(members);
             let remaining: Vec<TypeId> = members
                 .iter()
                 .filter_map(|&member| {
@@ -329,6 +335,7 @@ impl<'a> NarrowingContext<'a> {
     /// Narrow to function types only.
     fn narrow_to_function(&self, source_type: TypeId) -> TypeId {
         if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
+            let members = self.interner.type_list(members);
             let functions: Vec<TypeId> = members
                 .iter()
                 .filter_map(|&member| {
@@ -363,13 +370,15 @@ impl<'a> NarrowingContext<'a> {
             source_type
         } else if source_type == TypeId::OBJECT {
             self.function_type()
-        } else if let Some(TypeKey::Object(props)) = self.interner.lookup(source_type) {
-            if props.is_empty() {
+        } else if let Some(TypeKey::Object(shape_id)) = self.interner.lookup(source_type) {
+            let shape = self.interner.object_shape(shape_id);
+            if shape.properties.is_empty() {
                 self.function_type()
             } else {
                 TypeId::NEVER
             }
-        } else if let Some(TypeKey::ObjectWithIndex(shape)) = self.interner.lookup(source_type) {
+        } else if let Some(TypeKey::ObjectWithIndex(shape_id)) = self.interner.lookup(source_type) {
+            let shape = self.interner.object_shape(shape_id);
             if shape.properties.is_empty()
                 && shape.string_index.is_none()
                 && shape.number_index.is_none()
@@ -392,9 +401,12 @@ impl<'a> NarrowingContext<'a> {
     fn is_function_type(&self, type_id: TypeId) -> bool {
         match self.interner.lookup(type_id) {
             Some(TypeKey::Function(_) | TypeKey::Callable(_)) => true,
-            Some(TypeKey::Intersection(members)) => members
-                .iter()
-                .any(|member| self.is_function_type(*member)),
+            Some(TypeKey::Intersection(members)) => {
+                let members = self.interner.type_list(members);
+                members
+                    .iter()
+                    .any(|member| self.is_function_type(*member))
+            }
             _ => false,
         }
     }
@@ -402,6 +414,7 @@ impl<'a> NarrowingContext<'a> {
     /// Narrow a type to exclude function-like members (typeof !== "function").
     pub fn narrow_excluding_function(&self, source_type: TypeId) -> TypeId {
         if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
+            let members = self.interner.type_list(members);
             let remaining: Vec<TypeId> = members
                 .iter()
                 .filter_map(|&member| {
@@ -447,9 +460,12 @@ impl<'a> NarrowingContext<'a> {
             | Some(TypeKey::Tuple(_))
             | Some(TypeKey::Mapped(_)) => true,
             Some(TypeKey::ReadonlyType(inner)) => self.is_object_typeof(inner),
-            Some(TypeKey::Intersection(members)) => members
-                .iter()
-                .all(|member| self.is_object_typeof(*member)),
+            Some(TypeKey::Intersection(members)) => {
+                let members = self.interner.type_list(members);
+                members
+                    .iter()
+                    .all(|member| self.is_object_typeof(*member))
+            }
             Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info
                 .constraint
                 .map(|constraint| self.is_object_typeof(constraint))
@@ -603,6 +619,7 @@ impl<'a> NarrowingContext<'a> {
         }
 
         if let Some(TypeKey::Intersection(members)) = self.interner.lookup(source) {
+            let members = self.interner.type_list(members);
             if members
                 .iter()
                 .any(|member| self.is_assignable_to(*member, target))
