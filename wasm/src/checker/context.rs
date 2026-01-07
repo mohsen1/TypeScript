@@ -4,9 +4,9 @@
 //! This separates state from logic, allowing specialized checkers (expressions, statements)
 //! to borrow the context mutably.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::cell::RefCell;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
@@ -43,6 +43,52 @@ pub struct TypeCache {
 
     /// Cache for type relation results (subtype checking).
     pub relation_cache: FxHashMap<(TypeId, TypeId, u8), bool>,
+
+    /// Symbol dependency graph (symbol -> referenced symbols).
+    pub symbol_dependencies: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
+}
+
+impl TypeCache {
+    /// Invalidate cached symbol types that depend on the provided roots.
+    /// Returns the number of affected symbols.
+    pub fn invalidate_symbols(&mut self, roots: &[SymbolId]) -> usize {
+        if roots.is_empty() {
+            return 0;
+        }
+
+        let mut reverse: FxHashMap<SymbolId, Vec<SymbolId>> = FxHashMap::default();
+        for (symbol, deps) in &self.symbol_dependencies {
+            for dep in deps {
+                reverse.entry(*dep).or_default().push(*symbol);
+            }
+        }
+
+        let mut affected: FxHashSet<SymbolId> = FxHashSet::default();
+        let mut pending = VecDeque::new();
+        for &root in roots {
+            if affected.insert(root) {
+                pending.push_back(root);
+            }
+        }
+
+        while let Some(sym_id) = pending.pop_front() {
+            if let Some(dependents) = reverse.get(&sym_id) {
+                for &dependent in dependents {
+                    if affected.insert(dependent) {
+                        pending.push_back(dependent);
+                    }
+                }
+            }
+        }
+
+        for sym_id in &affected {
+            self.symbol_types.remove(sym_id);
+            self.symbol_dependencies.remove(sym_id);
+        }
+        self.node_types.clear();
+
+        affected.len()
+    }
 }
 
 /// Shared state for type checking.
@@ -72,6 +118,12 @@ pub struct CheckerContext<'a> {
 
     /// Cache for type relation results.
     pub relation_cache: RefCell<FxHashMap<(TypeId, TypeId, u8), bool>>,
+
+    /// Symbol dependency graph (symbol -> referenced symbols).
+    pub symbol_dependencies: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
+
+    /// Stack of symbols currently being evaluated for dependency tracking.
+    pub symbol_dependency_stack: Vec<SymbolId>,
 
     // --- Diagnostics ---
 
@@ -128,6 +180,8 @@ impl<'a> CheckerContext<'a> {
             node_types: FxHashMap::default(),
             type_parameter_names: FxHashMap::default(),
             relation_cache: RefCell::new(FxHashMap::default()),
+            symbol_dependencies: FxHashMap::default(),
+            symbol_dependency_stack: Vec::new(),
             diagnostics: Vec::new(),
             symbol_resolution_stack: Vec::new(),
             symbol_resolution_set: HashSet::new(),
@@ -160,6 +214,8 @@ impl<'a> CheckerContext<'a> {
             node_types: cache.node_types,
             type_parameter_names: cache.type_parameter_names,
             relation_cache: RefCell::new(cache.relation_cache),
+            symbol_dependencies: cache.symbol_dependencies,
+            symbol_dependency_stack: Vec::new(),
             diagnostics: Vec::new(),
             symbol_resolution_stack: Vec::new(),
             symbol_resolution_set: HashSet::new(),
@@ -182,6 +238,7 @@ impl<'a> CheckerContext<'a> {
             node_types: self.node_types,
             type_parameter_names: self.type_parameter_names,
             relation_cache: self.relation_cache.into_inner(),
+            symbol_dependencies: self.symbol_dependencies,
         }
     }
 

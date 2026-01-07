@@ -19,6 +19,7 @@ use crate::parallel::{self, BindResult, BoundFile, MergedProgram};
 use crate::parser::syntax_kind_ext;
 use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
 use crate::parser::NodeIndex;
+use crate::scanner::SyntaxKind;
 use crate::source_map::SourceMapGenerator;
 use crate::thin_parser::ThinParserState;
 use crate::thin_parser::ParseDiagnostic;
@@ -42,6 +43,7 @@ pub(crate) struct CompilationCache {
     reverse_dependencies: HashMap<PathBuf, HashSet<PathBuf>>,
     diagnostics: HashMap<PathBuf, Vec<Diagnostic>>,
     export_hashes: HashMap<PathBuf, u64>,
+    import_symbol_ids: HashMap<PathBuf, HashMap<PathBuf, Vec<SymbolId>>>,
 }
 
 struct BindCacheEntry {
@@ -50,6 +52,7 @@ struct BindCacheEntry {
 }
 
 impl CompilationCache {
+    #[cfg(test)]
     pub(crate) fn invalidate_paths_with_dependents<I>(&mut self, paths: I)
     where
         I: IntoIterator<Item = PathBuf>,
@@ -60,6 +63,46 @@ impl CompilationCache {
             self.bind_cache.remove(&path);
             self.diagnostics.remove(&path);
             self.export_hashes.remove(&path);
+            self.import_symbol_ids.remove(&path);
+        }
+    }
+
+    pub(crate) fn invalidate_paths_with_dependents_symbols<I>(&mut self, paths: I)
+    where
+        I: IntoIterator<Item = PathBuf>,
+    {
+        let changed: HashSet<PathBuf> = paths.into_iter().collect();
+        let affected = self.collect_dependents(changed.iter().cloned());
+        for path in affected {
+            if changed.contains(&path) {
+                self.type_caches.remove(&path);
+                self.bind_cache.remove(&path);
+                self.diagnostics.remove(&path);
+                self.export_hashes.remove(&path);
+                self.import_symbol_ids.remove(&path);
+                continue;
+            }
+
+            self.diagnostics.remove(&path);
+            self.export_hashes.remove(&path);
+
+            let mut roots = Vec::new();
+            if let Some(dep_map) = self.import_symbol_ids.get(&path) {
+                for changed_path in &changed {
+                    if let Some(symbols) = dep_map.get(changed_path) {
+                        roots.extend(symbols.iter().copied());
+                    }
+                }
+            }
+
+            if roots.is_empty() {
+                self.type_caches.remove(&path);
+                continue;
+            }
+
+            if let Some(cache) = self.type_caches.get_mut(&path) {
+                cache.invalidate_symbols(&roots);
+            }
         }
     }
 
@@ -72,6 +115,7 @@ impl CompilationCache {
             self.bind_cache.remove(&path);
             self.diagnostics.remove(&path);
             self.export_hashes.remove(&path);
+            self.import_symbol_ids.remove(&path);
         }
     }
 
@@ -82,6 +126,7 @@ impl CompilationCache {
         self.reverse_dependencies.clear();
         self.diagnostics.clear();
         self.export_hashes.clear();
+        self.import_symbol_ids.clear();
     }
 
     #[cfg(test)]
@@ -102,6 +147,16 @@ impl CompilationCache {
     #[cfg(test)]
     pub(crate) fn export_hash(&self, path: &Path) -> Option<u64> {
         self.export_hashes.get(path).copied()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn symbol_cache_len(&self, path: &Path) -> Option<usize> {
+        self.type_caches.get(path).map(|cache| cache.symbol_types.len())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn node_cache_len(&self, path: &Path) -> Option<usize> {
+        self.type_caches.get(path).map(|cache| cache.node_types.len())
     }
 
     pub(crate) fn update_dependencies(&mut self, dependencies: HashMap<PathBuf, HashSet<PathBuf>>) {
@@ -185,7 +240,7 @@ pub(crate) fn compile_with_cache_and_changes(
         return Ok(result);
     }
 
-    cache.invalidate_paths_with_dependents(canonical_paths.into_iter());
+    cache.invalidate_paths_with_dependents_symbols(canonical_paths.into_iter());
     compile_inner(args, cwd, Some(cache), Some(changed_paths))
 }
 
@@ -266,6 +321,10 @@ fn compile_inner(
             .collect();
         (parallel::compile_files(compile_inputs), None)
     };
+    if let Some(cache) = cache.as_deref_mut() {
+        update_import_symbol_ids(&program, &resolved, &base_dir, cache);
+    }
+
     let mut diagnostics = collect_diagnostics(&program, cache);
     diagnostics.sort_by(|left, right| {
         left.file
@@ -402,6 +461,49 @@ fn build_program_with_cache(
         program: parallel::merge_bind_results_ref(&ordered),
         dirty_paths,
     }
+}
+
+fn update_import_symbol_ids(
+    program: &MergedProgram,
+    options: &ResolvedCompilerOptions,
+    base_dir: &Path,
+    cache: &mut CompilationCache,
+) {
+    let mut resolution_cache = ModuleResolutionCache::default();
+    let mut import_symbol_ids: HashMap<PathBuf, HashMap<PathBuf, Vec<SymbolId>>> = HashMap::new();
+
+    for (file_idx, file) in program.files.iter().enumerate() {
+        let file_path = PathBuf::from(&file.file_name);
+        let mut by_dep: HashMap<PathBuf, Vec<SymbolId>> = HashMap::new();
+        for (specifier, local_names) in collect_import_bindings(&file.arena, file.source_file) {
+            let resolved = resolve_module_specifier(
+                Path::new(&file.file_name),
+                &specifier,
+                options,
+                base_dir,
+                &mut resolution_cache,
+            );
+            let Some(resolved) = resolved else {
+                continue;
+            };
+            let canonical = canonicalize_or_owned(&resolved);
+            let entry = by_dep.entry(canonical).or_insert_with(Vec::new);
+            if let Some(file_locals) = program.file_locals.get(file_idx) {
+                for name in local_names {
+                    if let Some(sym_id) = file_locals.get(&name) {
+                        entry.push(sym_id);
+                    }
+                }
+            }
+        }
+        for symbols in by_dep.values_mut() {
+            symbols.sort_by_key(|sym| sym.0);
+            symbols.dedup();
+        }
+        import_symbol_ids.insert(file_path, by_dep);
+    }
+
+    cache.import_symbol_ids = import_symbol_ids;
 }
 
 fn hash_text(text: &str) -> u64 {
@@ -666,6 +768,96 @@ fn collect_module_specifiers(arena: &ThinNodeArena, source_file: NodeIndex) -> V
     }
 
     specifiers
+}
+
+fn collect_import_bindings(
+    arena: &ThinNodeArena,
+    source_file: NodeIndex,
+) -> Vec<(String, Vec<String>)> {
+    let mut bindings = Vec::new();
+    let Some(node) = arena.get(source_file) else {
+        return bindings;
+    };
+    let Some(source) = arena.get_source_file(node) else {
+        return bindings;
+    };
+
+    for &stmt_idx in &source.statements.nodes {
+        if stmt_idx.is_none() {
+            continue;
+        }
+        let Some(stmt) = arena.get(stmt_idx) else {
+            continue;
+        };
+        let Some(import_decl) = arena.get_import_decl(stmt) else {
+            continue;
+        };
+        let Some(specifier) = arena.get_literal_text(import_decl.module_specifier) else {
+            continue;
+        };
+        let local_names = collect_import_local_names(arena, import_decl);
+        if !local_names.is_empty() {
+            bindings.push((specifier.to_string(), local_names));
+        }
+    }
+
+    bindings
+}
+
+fn collect_import_local_names(arena: &ThinNodeArena, import_decl: &crate::parser::thin_node::ImportDeclData) -> Vec<String> {
+    let mut names = Vec::new();
+    if import_decl.import_clause.is_none() {
+        return names;
+    }
+
+    let clause_idx = import_decl.import_clause;
+    if let Some(clause_node) = arena.get(clause_idx) {
+        if let Some(clause) = arena.get_import_clause(clause_node) {
+            if !clause.name.is_none() {
+                if let Some(name) = arena.get_identifier_text(clause.name) {
+                    names.push(name.to_string());
+                }
+            }
+
+            if !clause.named_bindings.is_none() {
+                if let Some(bindings_node) = arena.get(clause.named_bindings) {
+                    if bindings_node.kind == SyntaxKind::Identifier as u16 {
+                        if let Some(name) = arena.get_identifier_text(clause.named_bindings) {
+                            names.push(name.to_string());
+                        }
+                    } else if let Some(named) = arena.get_named_imports(bindings_node) {
+                        if !named.name.is_none() {
+                            if let Some(name) = arena.get_identifier_text(named.name) {
+                                names.push(name.to_string());
+                            }
+                        }
+                        for &spec_idx in &named.elements.nodes {
+                            let Some(spec_node) = arena.get(spec_idx) else {
+                                continue;
+                            };
+                            let Some(spec) = arena.get_specifier(spec_node) else {
+                                continue;
+                            };
+                            let local_ident = if !spec.name.is_none() {
+                                spec.name
+                            } else {
+                                spec.property_name
+                            };
+                            if let Some(name) = arena.get_identifier_text(local_ident) {
+                                names.push(name.to_string());
+                            }
+                        }
+                    }
+                }
+            }
+        } else if let Some(name) = arena.get_identifier_text(clause_idx) {
+            names.push(name.to_string());
+        }
+    } else if let Some(name) = arena.get_identifier_text(clause_idx) {
+        names.push(name.to_string());
+    }
+
+    names
 }
 
 fn resolve_module_specifier(

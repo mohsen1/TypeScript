@@ -107,6 +107,31 @@ impl<'a> ThinCheckerState<'a> {
         self.ctx.symbol_types.insert(sym_id, type_id);
     }
 
+    fn record_symbol_dependency(&mut self, dependency: SymbolId) {
+        let Some(&current) = self.ctx.symbol_dependency_stack.last() else {
+            return;
+        };
+        if current == dependency {
+            return;
+        }
+        self.ctx
+            .symbol_dependencies
+            .entry(current)
+            .or_default()
+            .insert(dependency);
+    }
+
+    fn push_symbol_dependency(&mut self, sym_id: SymbolId, clear_deps: bool) {
+        if clear_deps {
+            self.ctx.symbol_dependencies.remove(&sym_id);
+        }
+        self.ctx.symbol_dependency_stack.push(sym_id);
+    }
+
+    fn pop_symbol_dependency(&mut self) {
+        self.ctx.symbol_dependency_stack.pop();
+    }
+
     fn cache_parameter_types(
         &mut self,
         params: &[NodeIndex],
@@ -120,6 +145,10 @@ impl<'a> ThinCheckerState<'a> {
                 continue;
             };
 
+            let Some(sym_id) = self.ctx.binder.get_node_symbol(param_idx) else {
+                continue;
+            };
+            self.push_symbol_dependency(sym_id, true);
             let type_id = if let Some(types) = param_types {
                 types.get(i).and_then(|t| *t)
             } else if !param.type_annotation.is_none() {
@@ -127,11 +156,10 @@ impl<'a> ThinCheckerState<'a> {
             } else {
                 Some(TypeId::ANY)
             };
+            self.pop_symbol_dependency();
 
             if let Some(type_id) = type_id {
-                if let Some(sym_id) = self.ctx.binder.get_node_symbol(param_idx) {
-                    self.cache_symbol_type(sym_id, type_id);
-                }
+                self.cache_symbol_type(sym_id, type_id);
             }
         }
     }
@@ -2465,6 +2493,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of a symbol.
     pub fn get_type_of_symbol(&mut self, sym_id: SymbolId) -> TypeId {
+        self.record_symbol_dependency(sym_id);
+
         // Check cache first
         if let Some(&cached) = self.ctx.symbol_types.get(&sym_id) {
             return cached;
@@ -2479,7 +2509,9 @@ impl<'a> ThinCheckerState<'a> {
         self.ctx.symbol_resolution_stack.push(sym_id);
         self.ctx.symbol_resolution_set.insert(sym_id);
 
+        self.push_symbol_dependency(sym_id, true);
         let result = self.compute_type_of_symbol(sym_id);
+        self.pop_symbol_dependency();
 
         // Pop from resolution stack
         self.ctx.symbol_resolution_stack.pop();
@@ -5076,46 +5108,50 @@ impl<'a> ThinCheckerState<'a> {
             None
         };
 
-        // Get declared type from type annotation
-        let declared_type = if !var_decl.type_annotation.is_none() {
-            self.get_type_from_type_node(var_decl.type_annotation)
-        } else {
-            TypeId::ANY
-        };
-
-        // Determine final type (declared or inferred from initializer)
-        let final_type = if !var_decl.initializer.is_none() {
-            let prev_context = self.ctx.contextual_type;
-            if declared_type != TypeId::ANY {
-                self.ctx.contextual_type = Some(declared_type);
-            }
-            let init_type = self.get_type_of_node(var_decl.initializer);
-            self.ctx.contextual_type = prev_context;
-
-            // If there's a type annotation, check that initializer is assignable
-            if !var_decl.type_annotation.is_none() && declared_type != TypeId::ANY {
-                if !self.is_assignable_to(init_type, declared_type) {
-                    // Report type error with elaboration (e.g., "property 'x' is missing")
-                    self.error_type_not_assignable_with_reason_at(init_type, declared_type, var_decl.initializer);
-                }
-
-                // For object literals, also check for excess properties
-                // (missing properties are already handled by error_type_not_assignable_with_reason_at)
-                if let Some(init_node) = self.ctx.arena.get(var_decl.initializer) {
-                    if init_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
-                        self.check_object_literal_excess_properties(init_type, declared_type, var_decl.initializer);
-                    }
-                }
-                declared_type
+        let mut compute_final_type = |checker: &mut ThinCheckerState| -> TypeId {
+            let declared_type = if !var_decl.type_annotation.is_none() {
+                checker.get_type_from_type_node(var_decl.type_annotation)
             } else {
-                // No type annotation - use inferred type from initializer
-                init_type
+                TypeId::ANY
+            };
+
+            if !var_decl.initializer.is_none() {
+                let prev_context = checker.ctx.contextual_type;
+                if declared_type != TypeId::ANY {
+                    checker.ctx.contextual_type = Some(declared_type);
+                }
+                let init_type = checker.get_type_of_node(var_decl.initializer);
+                checker.ctx.contextual_type = prev_context;
+
+                // If there's a type annotation, check that initializer is assignable
+                if !var_decl.type_annotation.is_none() && declared_type != TypeId::ANY {
+                    if !checker.is_assignable_to(init_type, declared_type) {
+                        // Report type error with elaboration (e.g., "property 'x' is missing")
+                        checker.error_type_not_assignable_with_reason_at(init_type, declared_type, var_decl.initializer);
+                    }
+
+                    // For object literals, also check for excess properties
+                    // (missing properties are already handled by error_type_not_assignable_with_reason_at)
+                    if let Some(init_node) = checker.ctx.arena.get(var_decl.initializer) {
+                        if init_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                            checker.check_object_literal_excess_properties(init_type, declared_type, var_decl.initializer);
+                        }
+                    }
+                    declared_type
+                } else {
+                    // No type annotation - use inferred type from initializer
+                    init_type
+                }
+            } else {
+                declared_type
             }
-        } else {
-            declared_type
         };
 
         if let Some(sym_id) = self.ctx.binder.get_node_symbol(decl_idx) {
+            self.push_symbol_dependency(sym_id, true);
+            let final_type = compute_final_type(self);
+            self.pop_symbol_dependency();
+
             // Check for variable redeclaration in the current scope (TS2403).
             // Note: This applies specifically to 'var' merging where types must match.
             // let/const duplicates are caught earlier by the binder (TS2451).
@@ -5128,6 +5164,8 @@ impl<'a> ThinCheckerState<'a> {
             } else {
                 self.cache_symbol_type(sym_id, final_type);
             }
+        } else {
+            compute_final_type(self);
         }
     }
 
