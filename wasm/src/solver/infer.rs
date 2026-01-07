@@ -861,7 +861,64 @@ impl<'a> InferenceContext<'a> {
 
     fn is_numeric_property_name(&self, name: Atom) -> bool {
         let prop_name = self.interner.resolve_atom(name);
-        prop_name.parse::<f64>().is_ok()
+        Self::is_numeric_literal_name(&prop_name)
+    }
+
+    fn is_numeric_literal_name(name: &str) -> bool {
+        if name == "NaN" || name == "Infinity" || name == "-Infinity" {
+            return true;
+        }
+
+        let value: f64 = match name.parse() {
+            Ok(value) => value,
+            Err(_) => return false,
+        };
+        if !value.is_finite() {
+            return false;
+        }
+
+        Self::js_number_to_string(value) == name
+    }
+
+    fn js_number_to_string(value: f64) -> String {
+        if value.is_nan() {
+            return "NaN".to_string();
+        }
+        if value == 0.0 {
+            return "0".to_string();
+        }
+        if value.is_infinite() {
+            return if value.is_sign_negative() {
+                "-Infinity".to_string()
+            } else {
+                "Infinity".to_string()
+            };
+        }
+
+        let abs = value.abs();
+        if abs >= 1e21 || abs < 1e-6 {
+            let mut formatted = format!("{:e}", value);
+            if let Some(split) = formatted.find('e') {
+                let (mantissa, exp) = formatted.split_at(split);
+                let exp_digits = &exp[1..];
+                let (sign, digits) = if exp_digits.starts_with('-') {
+                    ('-', &exp_digits[1..])
+                } else {
+                    ('+', exp_digits)
+                };
+                let trimmed = digits.trim_start_matches('0');
+                let digits = if trimmed.is_empty() { "0" } else { trimmed };
+                formatted = format!("{mantissa}e{sign}{digits}");
+            }
+            return formatted;
+        }
+
+        let formatted = value.to_string();
+        if formatted == "-0" {
+            "0".to_string()
+        } else {
+            formatted
+        }
     }
 
     fn function_like_subtype_of(
