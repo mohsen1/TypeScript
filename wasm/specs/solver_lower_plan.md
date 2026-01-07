@@ -179,6 +179,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: interface extends inherits base properties
   - [x] Test: interface extends applies type arguments to inherited members
   - [x] Test: interface extends type alias applies type arguments
+  - [x] Test: interface extends class applies type arguments
   - [x] Checker: infer function return types from unannotated bodies
   - [x] Test: function return type inference (simple return)
   - [x] Test: function return type inference (union returns)
