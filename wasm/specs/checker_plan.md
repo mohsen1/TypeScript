@@ -145,6 +145,7 @@ Status: Active
   - Use literal key types (e.g. `key: "prop"`) to narrow `obj[key]`.
   - Clear narrowing when computed element assignments use literal keys.
   - Risk: `typeof` operands are now type-checked to populate node types, which can surface missing-name diagnostics.
+  - Re-validated literal key flow tests after merge; stable-name matching holds.
 - [x] Narrow computed element access with numeric literal keys
   - Use numeric literal keys (e.g. `idx: 0`) to narrow `arr[idx]`.
   - Clear narrowing when computed numeric element assignments occur.
