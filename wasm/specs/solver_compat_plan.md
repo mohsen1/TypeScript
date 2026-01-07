@@ -153,6 +153,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Reject object types whose properties conflict with declared index signatures
 - [x] Tests for index signature mismatch during lowering
 
+### Phase 23: Index Access Over Union Objects
+- [x] Evaluate index access on union object types (cross-product behavior)
+- [x] Tests for union object index access with noUncheckedIndexedAccess
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
