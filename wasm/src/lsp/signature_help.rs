@@ -9,6 +9,7 @@ use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeInterner, TypeId, TypeKey, FunctionShape, CallableShape};
 use crate::lsp::position::{Position, LineMap};
 use crate::lsp::utils::find_node_at_offset;
+use crate::lsp::resolver::{ScopeCache, ScopeCacheStats};
 use crate::thin_checker::ThinCheckerState;
 use crate::scanner_impl::ScannerState;
 use crate::scanner::SyntaxKind;
@@ -100,6 +101,28 @@ impl<'a> SignatureHelpProvider<'a> {
         position: Position,
         type_cache: &mut Option<crate::checker::TypeCache>,
     ) -> Option<SignatureHelp> {
+        self.get_signature_help_internal(root, position, type_cache, None, None)
+    }
+
+    pub fn get_signature_help_with_scope_cache(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        type_cache: &mut Option<crate::checker::TypeCache>,
+        scope_cache: &mut ScopeCache,
+        scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<SignatureHelp> {
+        self.get_signature_help_internal(root, position, type_cache, Some(scope_cache), scope_stats)
+    }
+
+    fn get_signature_help_internal(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        type_cache: &mut Option<crate::checker::TypeCache>,
+        scope_cache: Option<&mut ScopeCache>,
+        mut scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<SignatureHelp> {
         let offset = self.line_map.position_to_offset(position, self.source_text)?;
 
         // 1. Find the deepest node at the cursor
@@ -113,7 +136,11 @@ impl<'a> SignatureHelpProvider<'a> {
 
         // 4. Resolve the symbol being called using ScopeWalker
         let mut walker = crate::lsp::resolver::ScopeWalker::new(self.arena, self.binder);
-        let symbol_id = walker.resolve_node(root, call_expr.expression)?;
+        let symbol_id = if let Some(scope_cache) = scope_cache {
+            walker.resolve_node_cached(root, call_expr.expression, scope_cache, scope_stats.as_deref_mut())?
+        } else {
+            walker.resolve_node(root, call_expr.expression)?
+        };
 
         // 5. Create checker with persistent cache if available
         let mut checker = if let Some(cache) = type_cache.take() {

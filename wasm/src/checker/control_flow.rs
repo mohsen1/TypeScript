@@ -22,7 +22,7 @@ use crate::binder::{FlowNode, FlowNodeId, flow_flags};
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::{NodeIndex, syntax_kind_ext};
 use crate::scanner::SyntaxKind;
-use crate::solver::{TypeId, TypeInterner, NarrowingContext};
+use crate::solver::{LiteralValue, TypeId, TypeInterner, TypeKey, NarrowingContext};
 use crate::thin_binder::ThinBinderState;
 
 /// Flow analyzer for control flow-based type narrowing.
@@ -180,6 +180,7 @@ impl<'a> FlowAnalyzer<'a> {
         target: NodeIndex,
         is_true_branch: bool,
     ) -> TypeId {
+        let condition_idx = self.skip_parenthesized(condition_idx);
         let Some(cond_node) = self.arena.get(condition_idx) else {
             return type_id;
         };
@@ -211,11 +212,9 @@ impl<'a> FlowAnalyzer<'a> {
                         // Remove null/undefined (truthy narrowing)
                         let narrowed = narrowing.narrow_excluding_type(type_id, TypeId::NULL);
                         return narrowing.narrow_excluding_type(narrowed, TypeId::UNDEFINED);
-                    } else {
-                        // False branch - could be null/undefined/false/0/""
-                        // For now, don't narrow the false branch of truthiness checks
-                        return type_id;
                     }
+                    // False branch - keep only falsy types
+                    return self.narrow_to_falsy(type_id);
                 }
             }
         }
@@ -245,7 +244,7 @@ impl<'a> FlowAnalyzer<'a> {
                 if effective_truth {
                     return narrowing.narrow_by_typeof(type_id, &type_name);
                 }
-                // TODO: handle false branch (exclude type)
+                return self.narrow_by_typeof_negation(type_id, &type_name, narrowing);
             }
 
             // Check typeof on right side
@@ -253,6 +252,7 @@ impl<'a> FlowAnalyzer<'a> {
                 if effective_truth {
                     return narrowing.narrow_by_typeof(type_id, &type_name);
                 }
+                return self.narrow_by_typeof_negation(type_id, &type_name, narrowing);
             }
 
             // Check for null/undefined comparison
@@ -298,8 +298,108 @@ impl<'a> FlowAnalyzer<'a> {
         type_id
     }
 
+    fn skip_parenthesized(&self, mut idx: NodeIndex) -> NodeIndex {
+        loop {
+            let Some(node) = self.arena.get(idx) else {
+                return idx;
+            };
+            if node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+                if let Some(paren) = self.arena.get_parenthesized(node) {
+                    idx = paren.expression;
+                    continue;
+                }
+            }
+            return idx;
+        }
+    }
+
+    fn narrow_by_typeof_negation(
+        &self,
+        type_id: TypeId,
+        typeof_result: &str,
+        narrowing: &NarrowingContext,
+    ) -> TypeId {
+        match typeof_result {
+            "string" => narrowing.narrow_excluding_type(type_id, TypeId::STRING),
+            "number" => narrowing.narrow_excluding_type(type_id, TypeId::NUMBER),
+            "boolean" => narrowing.narrow_excluding_type(type_id, TypeId::BOOLEAN),
+            "bigint" => narrowing.narrow_excluding_type(type_id, TypeId::BIGINT),
+            "symbol" => narrowing.narrow_excluding_type(type_id, TypeId::SYMBOL),
+            "undefined" => narrowing.narrow_excluding_type(type_id, TypeId::UNDEFINED),
+            "object" => narrowing.narrow_excluding_type(type_id, TypeId::OBJECT),
+            "function" => narrowing.narrow_excluding_function(type_id),
+            _ => type_id,
+        }
+    }
+
+    fn narrow_to_falsy(&self, type_id: TypeId) -> TypeId {
+        if type_id == TypeId::ANY || type_id == TypeId::UNKNOWN {
+            return type_id;
+        }
+
+        match self.falsy_component(type_id) {
+            Some(falsy) => falsy,
+            None => TypeId::NEVER,
+        }
+    }
+
+    fn falsy_component(&self, type_id: TypeId) -> Option<TypeId> {
+        if type_id == TypeId::NULL || type_id == TypeId::UNDEFINED {
+            return Some(type_id);
+        }
+        if type_id == TypeId::BOOLEAN {
+            return Some(self.interner.literal_boolean(false));
+        }
+        if type_id == TypeId::STRING {
+            return Some(self.interner.literal_string(""));
+        }
+        if type_id == TypeId::NUMBER {
+            return Some(self.interner.literal_number(0.0));
+        }
+        if type_id == TypeId::BIGINT {
+            return Some(self.interner.literal_bigint("0"));
+        }
+
+        let key = self.interner.lookup(type_id)?;
+        match key {
+            TypeKey::Literal(literal) => {
+                if self.literal_is_falsy(&literal) {
+                    Some(type_id)
+                } else {
+                    None
+                }
+            }
+            TypeKey::Union(members) => {
+                let mut falsy_members = Vec::new();
+                for member in members {
+                    if let Some(falsy) = self.falsy_component(member) {
+                        falsy_members.push(falsy);
+                    }
+                }
+                match falsy_members.len() {
+                    0 => None,
+                    1 => Some(falsy_members[0]),
+                    _ => Some(self.interner.union(falsy_members)),
+                }
+            }
+            TypeKey::TypeParameter(_) | TypeKey::Infer(_) => Some(type_id),
+            _ => None,
+        }
+    }
+
+    fn literal_is_falsy(&self, literal: &LiteralValue) -> bool {
+        match literal {
+            LiteralValue::Boolean(false) => true,
+            LiteralValue::Number(value) => value.0 == 0.0,
+            LiteralValue::String(atom) => self.interner.resolve_atom(*atom).is_empty(),
+            LiteralValue::BigInt(atom) => self.interner.resolve_atom(*atom) == "0",
+            _ => false,
+        }
+    }
+
     /// Check if an expression is `typeof target` and return the compared type name.
     fn get_typeof_check(&self, expr: NodeIndex, target: NodeIndex) -> Option<String> {
+        let expr = self.skip_parenthesized(expr);
         let node = self.arena.get(expr)?;
 
         // Check for typeof expression
@@ -325,9 +425,15 @@ impl<'a> FlowAnalyzer<'a> {
 
     /// Check if two references point to the same symbol.
     fn is_matching_reference(&self, a: NodeIndex, b: NodeIndex) -> bool {
-        let sym_a = self.binder.get_node_symbol(a);
-        let sym_b = self.binder.get_node_symbol(b);
+        let sym_a = self.reference_symbol(a);
+        let sym_b = self.reference_symbol(b);
         sym_a.is_some() && sym_a == sym_b
+    }
+
+    fn reference_symbol(&self, idx: NodeIndex) -> Option<crate::binder::SymbolId> {
+        let idx = self.skip_parenthesized(idx);
+        self.binder.get_node_symbol(idx)
+            .or_else(|| self.binder.resolve_identifier(self.arena, idx))
     }
 
     /// Check if an expression is null or undefined keyword.
@@ -346,5 +452,88 @@ impl<'a> FlowAnalyzer<'a> {
 
 #[cfg(test)]
 mod tests {
-    // Tests will be added when integrated with the checker
+    use super::*;
+    use crate::thin_parser::ThinParserState;
+
+    fn get_if_condition(arena: &ThinNodeArena, root: NodeIndex, stmt_index: usize) -> NodeIndex {
+        let root_node = arena.get(root).expect("root node");
+        let source_file = arena.get_source_file(root_node).expect("source file");
+        let if_idx = *source_file.statements.nodes.get(stmt_index).expect("if statement");
+        let if_node = arena.get(if_idx).expect("if node");
+        let if_data = arena.get_if_statement(if_node).expect("if data");
+        if_data.expression
+    }
+
+    #[test]
+    fn test_truthiness_false_branch_narrows_to_falsy() {
+        let source = r#"
+let x: string | number | boolean | null | undefined;
+if (x) {}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let arena = parser.get_arena();
+        let types = TypeInterner::new();
+        let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+        let condition_idx = get_if_condition(arena, root, 1);
+        let union = types.union(vec![
+            TypeId::STRING,
+            TypeId::NUMBER,
+            TypeId::BOOLEAN,
+            TypeId::NULL,
+            TypeId::UNDEFINED,
+        ]);
+        let narrowed = analyzer.narrow_type_by_condition(union, condition_idx, condition_idx, false);
+
+        let falsy_string = types.literal_string("");
+        let falsy_number = types.literal_number(0.0);
+        let falsy_boolean = types.literal_boolean(false);
+
+        let key = types.lookup(narrowed).expect("narrowed type");
+        match key {
+            TypeKey::Union(members) => {
+                assert!(members.contains(&falsy_string));
+                assert!(members.contains(&falsy_number));
+                assert!(members.contains(&falsy_boolean));
+                assert!(members.contains(&TypeId::NULL));
+                assert!(members.contains(&TypeId::UNDEFINED));
+            }
+            _ => panic!("Expected falsy union, got {:?}", key),
+        }
+    }
+
+    #[test]
+    fn test_typeof_false_branch_excludes_type() {
+        let source = r#"
+let x: string | number;
+if (typeof x === "string") {}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let arena = parser.get_arena();
+        let types = TypeInterner::new();
+        let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+        let condition_idx = get_if_condition(arena, root, 1);
+        let condition_node = arena.get(condition_idx).expect("condition node");
+        let binary = arena.get_binary_expr(condition_node).expect("binary condition");
+        let typeof_node = arena.get(binary.left).expect("typeof node");
+        let unary = arena.get_unary_expr(typeof_node).expect("typeof data");
+        let target_idx = unary.operand;
+
+        let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+        let narrowed = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, false);
+        assert_eq!(narrowed, TypeId::NUMBER);
+    }
 }
