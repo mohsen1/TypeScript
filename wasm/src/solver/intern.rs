@@ -8,11 +8,11 @@
 //! - Memory efficient (each unique structure stored once)
 //! - Cache-friendly (work with u32 arrays instead of heap objects)
 
-use std::sync::RwLock;
 use std::hash::{Hash, Hasher};
+use std::sync::RwLock;
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use crate::solver::types::*;
-use crate::interner::{Atom, Interner};
+use crate::interner::{Atom, ShardedInterner};
 
 const SHARD_BITS: u32 = 6;
 const SHARD_COUNT: usize = 1 << SHARD_BITS; // 64 shards
@@ -82,32 +82,32 @@ pub struct TypeInterner {
     shards: [TypeShard; SHARD_COUNT],
     /// String interner for property names and string literals
     /// Thread-safe for concurrent access during type construction
-    pub string_interner: RwLock<Interner>,
+    pub string_interner: ShardedInterner,
 }
 
 impl TypeInterner {
     /// Create a new type interner with pre-registered intrinsics
     pub fn new() -> Self {
-        let mut string_interner = Interner::new();
-        // Pre-intern common TypeScript identifiers for better performance
-        string_interner.intern_common();
-
         TypeInterner {
             shards: std::array::from_fn(|_| TypeShard::new()),
-            string_interner: RwLock::new(string_interner),
+            string_interner: {
+                let interner = ShardedInterner::new();
+                interner.intern_common();
+                interner
+            },
         }
     }
 
     /// Intern a string into an Atom.
     /// This is used when constructing types with property names or string literals.
     pub fn intern_string(&self, s: &str) -> Atom {
-        self.string_interner.write().unwrap().intern(s)
+        self.string_interner.intern(s)
     }
 
     /// Resolve an Atom back to its string value.
     /// This is used when formatting types for error messages.
     pub fn resolve_atom(&self, atom: Atom) -> String {
-        self.string_interner.read().unwrap().resolve(atom).to_string()
+        self.string_interner.resolve(atom)
     }
 
     /// Intern a type key and return its TypeId.
@@ -251,7 +251,7 @@ impl TypeInterner {
         let mut value = String::with_capacity(digits.len() + 1);
         value.push('-');
         value.push_str(digits);
-        let atom = self.string_interner.write().unwrap().intern_owned(value);
+        let atom = self.string_interner.intern_owned(value);
         self.intern(TypeKey::Literal(LiteralValue::BigInt(atom)))
     }
 
