@@ -1231,6 +1231,89 @@ fn test_infer_generic_function_param_from_callable() {
 }
 
 #[test]
+fn test_infer_generic_function_param_from_overloaded_callable() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let function_param = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: t_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("cb")),
+            type_id: function_param,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let callable_arg = interner.callable(CallableShape {
+        call_signatures: vec![
+            CallSignature {
+                type_params: Vec::new(),
+                params: vec![ParamInfo {
+                    name: Some(interner.intern_string("value")),
+                    type_id: TypeId::STRING,
+                    optional: false,
+                    rest: false,
+                }],
+                this_type: None,
+                return_type: TypeId::STRING,
+                type_predicate: None,
+            },
+            CallSignature {
+                type_params: Vec::new(),
+                params: vec![
+                    ParamInfo {
+                        name: Some(interner.intern_string("x")),
+                        type_id: TypeId::NUMBER,
+                        optional: false,
+                        rest: false,
+                    },
+                    ParamInfo {
+                        name: Some(interner.intern_string("y")),
+                        type_id: TypeId::NUMBER,
+                        optional: false,
+                        rest: false,
+                    },
+                ],
+                this_type: None,
+                return_type: TypeId::NUMBER,
+                type_predicate: None,
+            },
+        ],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[callable_arg]);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
 fn test_infer_generic_callable_param_from_callable() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
