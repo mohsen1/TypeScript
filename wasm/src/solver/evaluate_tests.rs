@@ -1875,6 +1875,59 @@ fn test_mapped_type_over_symbol_keys() {
 }
 
 #[test]
+fn test_mapped_type_over_bigint_keys() {
+    let interner = TypeInterner::new();
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::BIGINT));
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint,
+        template: TypeId::STRING,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    let key = interner.lookup(result).expect("Expected object type");
+
+    match key {
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
+            let to_string = interner.intern_string("toString");
+            let value_of = interner.intern_string("valueOf");
+            let has_own = interner.intern_string("hasOwnProperty");
+            let mut saw_to_string = false;
+            let mut saw_value_of = false;
+            let mut saw_has_own = false;
+
+            for prop in &shape.properties {
+                if prop.name == to_string {
+                    assert_eq!(prop.type_id, TypeId::STRING);
+                    saw_to_string = true;
+                }
+                if prop.name == value_of {
+                    assert_eq!(prop.type_id, TypeId::STRING);
+                    saw_value_of = true;
+                }
+                if prop.name == has_own {
+                    assert_eq!(prop.type_id, TypeId::STRING);
+                    saw_has_own = true;
+                }
+            }
+
+            assert!(saw_to_string, "missing toString property");
+            assert!(saw_value_of, "missing valueOf property");
+            assert!(saw_has_own, "missing hasOwnProperty property");
+        }
+        other => panic!("Expected object type, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_mapped_type_string_index_signature() {
     let interner = TypeInterner::new();
 
