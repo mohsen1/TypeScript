@@ -56,6 +56,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Tuple indexing now returns rest element types instead of rest containers.
 - [x] Expand keyof for tuples with rest tuples
   - Tuple keyof now includes indices from rest tuple expansions.
+- [x] Reject non-integer/negative tuple indices
+  - Tuple index access now yields undefined for negative or fractional indices.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.

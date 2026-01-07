@@ -770,7 +770,11 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
         // If index is a literal number, return the specific element
         if let Some(TypeKey::Literal(LiteralValue::Number(n))) = self.interner.lookup(index_type) {
-            let idx = n.0 as usize;
+            let value = n.0;
+            if !value.is_finite() || value.fract() != 0.0 || value < 0.0 {
+                return TypeId::UNDEFINED;
+            }
+            let idx = value as usize;
             return self.tuple_index_literal(elements, idx).unwrap_or(TypeId::UNDEFINED);
         }
 
@@ -787,16 +791,12 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         if let Some(TypeKey::Literal(LiteralValue::String(name))) = self.interner.lookup(index_type) {
             if self.is_numeric_property_name(name) {
                 let name_str = self.interner.resolve_atom_ref(name);
-                if let Ok(idx) = name_str.as_ref().parse::<usize>() {
-                    return self.tuple_index_literal(elements, idx).unwrap_or(TypeId::UNDEFINED);
+                if let Ok(idx) = name_str.as_ref().parse::<i64>() {
+                    if let Ok(idx) = usize::try_from(idx) {
+                        return self.tuple_index_literal(elements, idx).unwrap_or(TypeId::UNDEFINED);
+                    }
                 }
-
-                let all_types: Vec<TypeId> = elements.iter().map(|e| self.tuple_element_type(e)).collect();
-                if all_types.is_empty() {
-                    return TypeId::NEVER;
-                }
-                let union = self.interner.union(all_types);
-                return self.add_undefined_if_unchecked(union);
+                return TypeId::UNDEFINED;
             }
 
             let name_str = self.interner.resolve_atom_ref(name);
