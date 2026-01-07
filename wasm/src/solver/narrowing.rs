@@ -328,9 +328,21 @@ impl<'a> NarrowingContext<'a> {
     /// Narrow to function types only.
     fn narrow_to_function(&self, source_type: TypeId) -> TypeId {
         if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
-            let functions: Vec<TypeId> = members.iter()
-                .filter(|&&m| self.is_function_type(m))
-                .copied()
+            let functions: Vec<TypeId> = members
+                .iter()
+                .filter_map(|&member| {
+                    if let Some(narrowed) = self.narrow_type_param_to_function(member) {
+                        if narrowed == TypeId::NEVER {
+                            return None;
+                        }
+                        return Some(narrowed);
+                    }
+                    if self.is_function_type(member) {
+                        Some(member)
+                    } else {
+                        None
+                    }
+                })
                 .collect();
 
             if functions.is_empty() {
@@ -340,6 +352,10 @@ impl<'a> NarrowingContext<'a> {
             } else {
                 return self.interner.union(functions);
             }
+        }
+
+        if let Some(narrowed) = self.narrow_type_param_to_function(source_type) {
+            return narrowed;
         }
 
         if self.is_function_type(source_type) {
@@ -370,8 +386,19 @@ impl<'a> NarrowingContext<'a> {
         if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
             let remaining: Vec<TypeId> = members
                 .iter()
-                .filter(|&&member| !self.is_function_type(member))
-                .copied()
+                .filter_map(|&member| {
+                    if let Some(narrowed) = self.narrow_type_param_excluding_function(member) {
+                        if narrowed == TypeId::NEVER {
+                            return None;
+                        }
+                        return Some(narrowed);
+                    }
+                    if self.is_function_type(member) {
+                        None
+                    } else {
+                        Some(member)
+                    }
+                })
                 .collect();
 
             if remaining.is_empty() {
@@ -381,6 +408,10 @@ impl<'a> NarrowingContext<'a> {
             } else {
                 return self.interner.union(remaining);
             }
+        }
+
+        if let Some(narrowed) = self.narrow_type_param_excluding_function(source_type) {
+            return narrowed;
         }
 
         if self.is_function_type(source_type) {
@@ -433,6 +464,25 @@ impl<'a> NarrowingContext<'a> {
         Some(self.interner.intersection(vec![source, narrowed_constraint]))
     }
 
+    fn narrow_type_param_to_function(&self, source: TypeId) -> Option<TypeId> {
+        let info = match self.interner.lookup(source) {
+            Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info,
+            _ => return None,
+        };
+
+        let constraint = info.constraint.unwrap_or(TypeId::UNKNOWN);
+        if constraint == source || constraint == TypeId::UNKNOWN {
+            return Some(source);
+        }
+
+        let narrowed_constraint = self.narrow_to_function(constraint);
+        if narrowed_constraint == TypeId::NEVER {
+            return None;
+        }
+
+        Some(self.interner.intersection(vec![source, narrowed_constraint]))
+    }
+
     fn narrow_type_param_excluding(&self, source: TypeId, excluded: TypeId) -> Option<TypeId> {
         let info = match self.interner.lookup(source) {
             Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info,
@@ -447,6 +497,28 @@ impl<'a> NarrowingContext<'a> {
         let narrowed_constraint = self.narrow_excluding_type(constraint, excluded);
         if narrowed_constraint == constraint {
             return None;
+        }
+        if narrowed_constraint == TypeId::NEVER {
+            return Some(TypeId::NEVER);
+        }
+
+        Some(self.interner.intersection(vec![source, narrowed_constraint]))
+    }
+
+    fn narrow_type_param_excluding_function(&self, source: TypeId) -> Option<TypeId> {
+        let info = match self.interner.lookup(source) {
+            Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info,
+            _ => return None,
+        };
+
+        let constraint = info.constraint.unwrap_or(TypeId::UNKNOWN);
+        if constraint == source || constraint == TypeId::UNKNOWN {
+            return Some(source);
+        }
+
+        let narrowed_constraint = self.narrow_excluding_function(constraint);
+        if narrowed_constraint == constraint {
+            return Some(source);
         }
         if narrowed_constraint == TypeId::NEVER {
             return Some(TypeId::NEVER);
