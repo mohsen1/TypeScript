@@ -400,6 +400,58 @@ fn test_keyof_object() {
 }
 
 #[test]
+fn test_keyof_object_with_string_index_signature() {
+    let interner = TypeInterner::new();
+
+    let key_x = interner.intern_string("x");
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name: key_x,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::BOOLEAN,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let result = evaluate_keyof(&interner, obj);
+    let expected = interner.union(vec![interner.literal_string("x"), TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_object_with_number_index_signature() {
+    let interner = TypeInterner::new();
+
+    let key_x = interner.intern_string("x");
+    let obj = interner.object_with_index(ObjectShape {
+        properties: vec![PropertyInfo {
+            name: key_x,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }],
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+
+    let result = evaluate_keyof(&interner, obj);
+    let expected = interner.union(vec![interner.literal_string("x"), TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_keyof_empty_object() {
     let interner = TypeInterner::new();
 

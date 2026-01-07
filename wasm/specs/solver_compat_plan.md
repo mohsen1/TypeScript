@@ -136,6 +136,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Include `undefined` when resolving string index signatures
 - [x] Tests for index-signature property access toggle
 
+### Phase 19: Keyof With Index Signatures
+- [x] Include string/number index keys in `keyof` for indexed objects
+- [x] Preserve named properties alongside numeric index keys
+- [x] Tests for `keyof` with index signatures
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

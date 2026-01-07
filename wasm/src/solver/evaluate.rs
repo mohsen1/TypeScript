@@ -445,6 +445,26 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     .collect();
                 self.interner.union(key_types)
             }
+            TypeKey::ObjectWithIndex(shape) => {
+                let mut key_types: Vec<TypeId> = shape
+                    .properties
+                    .iter()
+                    .map(|p| self.interner.intern(TypeKey::Literal(LiteralValue::String(p.name))))
+                    .collect();
+
+                if shape.string_index.is_some() {
+                    key_types.push(TypeId::STRING);
+                    key_types.push(TypeId::NUMBER);
+                } else if shape.number_index.is_some() {
+                    key_types.push(TypeId::NUMBER);
+                }
+
+                if key_types.is_empty() {
+                    TypeId::NEVER
+                } else {
+                    self.interner.union(key_types)
+                }
+            }
             TypeKey::Array(_) => {
                 // keyof T[] = number | array methods
                 // Simplified: just return number for array indices
