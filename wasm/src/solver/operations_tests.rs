@@ -1061,6 +1061,67 @@ fn test_infer_generic_function_identity() {
 }
 
 #[test]
+fn test_infer_generic_callable_param_from_function() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let callable_param = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: Vec::new(),
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: t_type,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("cb")),
+            type_id: callable_param,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let arg_func = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[arg_func]);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
 fn test_infer_generic_array_map() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);

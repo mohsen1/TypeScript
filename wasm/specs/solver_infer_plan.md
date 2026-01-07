@@ -147,6 +147,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Add missing property inference via index signature coverage
 - [x] Add missing numeric property inference via number index signature coverage
 - [x] Infer readonly wrapper type params during constraint collection
+- [x] Infer type params from callable parameter signatures
 - [x] Enforce index signature consistency during bounds validation
 
 ## Architecture Notes
