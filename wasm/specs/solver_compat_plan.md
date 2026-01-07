@@ -267,6 +267,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Evaluate array/tuple index access with string index types
 - [x] Tests for array/tuple string index access and noUncheckedIndexedAccess
 
+### Phase 49: Union Index Access Cross-Product
+- [x] Evaluate union object with union key indexed access (cross-product)
+- [x] Tests for union object + union key with noUncheckedIndexedAccess
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

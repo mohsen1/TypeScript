@@ -261,6 +261,64 @@ fn test_index_access_union_object_literal_key() {
 }
 
 #[test]
+fn test_index_access_union_object_union_key() {
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("y"),
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let union_obj = interner.union(vec![obj_a, obj_b]);
+    let key_x = interner.literal_string("x");
+    let key_y = interner.literal_string("y");
+    let key_union = interner.union(vec![key_x, key_y]);
+
+    let result = evaluate_index_access(&interner, union_obj, key_union);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::STRING]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_index_access_union_object_union_key_no_unchecked() {
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("y"),
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let union_obj = interner.union(vec![obj_a, obj_b]);
+    let key_x = interner.literal_string("x");
+    let key_y = interner.literal_string("y");
+    let key_union = interner.union(vec![key_x, key_y]);
+
+    let mut evaluator = TypeEvaluator::new(&interner);
+    evaluator.set_no_unchecked_indexed_access(true);
+    let result = evaluator.evaluate_index_access(union_obj, key_union);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::STRING, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_index_access_union_object_literal_key_no_unchecked() {
     let interner = TypeInterner::new();
 
