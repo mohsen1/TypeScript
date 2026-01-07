@@ -181,6 +181,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: overload call mismatch reports 2769
   - [x] Checker: build class constructor types with instance property shapes
   - [x] Checker: new expressions use construct signatures for return types
+  - [x] Checker: include class type parameters in constructor signatures for inference
   - [x] Test: new expressions infer class instance property types
   - [x] Test: new expressions report overload mismatch (2769)
   - [x] Checker: include constructor parameter properties in class instance types
@@ -189,6 +190,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: class method overload mismatch reports 2769
   - [x] Checker: merge base class instance properties with type arguments
   - [x] Test: new expressions include generic base class properties
+  - [x] Test: new expressions infer generic class type parameters from constructor args
   - [x] Checker: apply base class type arguments during property inheritance checks
   - [x] Test: property mismatch against generic base triggers 2416
 - [x] Parser: fix interface member parsing to track progress by token position (avoid skipping consecutive identifiers)
