@@ -679,6 +679,64 @@ fn test_tuple_to_array_mixed_types() {
 }
 
 #[test]
+fn test_array_to_variadic_tuple() {
+    // string[] IS assignable to [...string[]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let target = interner.tuple(vec![
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    assert!(checker.is_subtype_of(string_array, target));
+}
+
+#[test]
+fn test_array_to_variadic_tuple_with_required_prefix() {
+    // string[] is NOT assignable to [string, ...string[]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let target = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    assert!(!checker.is_subtype_of(string_array, target));
+}
+
+#[test]
+fn test_array_to_variadic_tuple_with_optional_prefix() {
+    // string[] IS assignable to [string?, ...string[]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let target = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    assert!(checker.is_subtype_of(string_array, target));
+}
+
+#[test]
+fn test_array_to_fixed_optional_tuple() {
+    // string[] is NOT assignable to [string?]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_array = interner.array(TypeId::STRING);
+    let target = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
+    ]);
+
+    assert!(!checker.is_subtype_of(string_array, target));
+}
+
+#[test]
 fn test_number_index_signature_numeric_property() {
     // CRITICAL: { 0: string } should match { [x: number]: string }
     use std::sync::Arc;
@@ -1458,4 +1516,51 @@ fn test_function_rest_tuple_to_rest_array_subtyping() {
     // Function with rest tuple should be subtype of function with rest array
     // (name, mixed, ...args: [any]) should be assignable to (name, mixed, ...args: any[])
     assert!(checker.is_subtype_of(source, target), "Function with rest tuple [any] should be subtype of function with rest array any[]");
+}
+
+#[test]
+fn test_keyof_deferred_not_subtype_of_string() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let type_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    }));
+    let keyof_param = interner.intern(TypeKey::KeyOf(type_param));
+
+    assert!(!checker.is_subtype_of(keyof_param, TypeId::STRING));
+}
+
+#[test]
+fn test_keyof_deferred_subtype_of_string_number_symbol_union() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let type_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    }));
+    let keyof_param = interner.intern(TypeKey::KeyOf(type_param));
+
+    let key_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::SYMBOL]);
+    assert!(checker.is_subtype_of(keyof_param, key_union));
+}
+
+#[test]
+fn test_keyof_deferred_not_subtype_of_string_number_union() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let type_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    }));
+    let keyof_param = interner.intern(TypeKey::KeyOf(type_param));
+
+    let key_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert!(!checker.is_subtype_of(keyof_param, key_union));
 }

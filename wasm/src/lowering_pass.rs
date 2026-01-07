@@ -344,9 +344,25 @@ impl<'a> LoweringPass<'a> {
                     self.visit(cond.when_false);
                 }
             }
-            k if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION
-                || k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION =>
-            {
+            k if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION => {
+                if let Some(lit) = self.arena.get_literal_expr(node) {
+                    if self.ctx.target_es5
+                        && self.needs_es5_object_literal_transform(&lit.elements.nodes)
+                    {
+                        self.transforms.insert(
+                            idx,
+                            TransformDirective::ES5ObjectLiteral {
+                                object_literal: idx,
+                            },
+                        );
+                    }
+
+                    for &elem in &lit.elements.nodes {
+                        self.visit(elem);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION => {
                 if let Some(lit) = self.arena.get_literal_expr(node) {
                     for &elem in &lit.elements.nodes {
                         self.visit(elem);
@@ -476,6 +492,64 @@ impl<'a> LoweringPass<'a> {
 
         if export_decl.export_clause.is_none() {
             return;
+        }
+
+        if export_decl.is_default_export && self.is_commonjs() {
+            if let Some(export_node) = self.arena.get(export_decl.export_clause) {
+                if export_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
+                    if let Some(func) = self.arena.get_function(export_node) {
+                        let func_name = self.get_identifier_text(func.name);
+                        let is_anonymous = func_name == "function"
+                            || !Self::is_valid_identifier_name(&func_name);
+                        if is_anonymous {
+                            self.transforms.insert(
+                                export_decl.export_clause,
+                                TransformDirective::CommonJSExportDefaultExpr,
+                            );
+
+                            if let Some(mods) = &func.modifiers {
+                                for &mod_idx in &mods.nodes {
+                                    self.visit(mod_idx);
+                                }
+                            }
+
+                            for &param_idx in &func.parameters.nodes {
+                                self.visit(param_idx);
+                            }
+
+                            if !func.body.is_none() {
+                                self.visit(func.body);
+                            }
+
+                            return;
+                        }
+                    }
+                }
+
+                if export_node.kind == syntax_kind_ext::CLASS_DECLARATION {
+                    if let Some(class) = self.arena.get_class(export_node) {
+                        let class_name = self.get_identifier_text(class.name);
+                        if !Self::is_valid_identifier_name(&class_name) {
+                            self.transforms.insert(
+                                export_decl.export_clause,
+                                TransformDirective::CommonJSExportDefaultExpr,
+                            );
+
+                            if let Some(mods) = &class.modifiers {
+                                for &mod_idx in &mods.nodes {
+                                    self.visit(mod_idx);
+                                }
+                            }
+
+                            for &member_idx in &class.members.nodes {
+                                self.visit(member_idx);
+                            }
+
+                            return;
+                        }
+                    }
+                }
+            }
         }
 
         if let Some(export_node) = self.arena.get(export_decl.export_clause) {
@@ -802,8 +876,7 @@ impl<'a> LoweringPass<'a> {
         };
 
         if self.ctx.target_es5 {
-            let captures_this = !arrow.body.is_none()
-                && contains_this_reference(self.arena, arrow.body);
+            let captures_this = contains_this_reference(self.arena, idx);
 
             self.transforms.insert(
                 idx,
@@ -991,6 +1064,48 @@ impl<'a> LoweringPass<'a> {
         })
     }
 
+    fn needs_es5_object_literal_transform(&self, elements: &[NodeIndex]) -> bool {
+        elements.iter().any(|&idx| {
+            self.is_computed_property_member(idx) || self.is_spread_element(idx)
+        })
+    }
+
+    fn is_computed_property_member(&self, idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(idx) else {
+            return false;
+        };
+
+        let name_idx = match node.kind {
+            k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
+                self.arena.get_property_assignment(node).map(|p| p.name)
+            }
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                self.arena.get_method_decl(node).map(|m| m.name)
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                self.arena.get_accessor(node).map(|a| a.name)
+            }
+            _ => None,
+        };
+
+        if let Some(name_idx) = name_idx {
+            if let Some(name_node) = self.arena.get(name_idx) {
+                return name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME;
+            }
+        }
+
+        false
+    }
+
+    fn is_spread_element(&self, idx: NodeIndex) -> bool {
+        let Some(node) = self.arena.get(idx) else {
+            return false;
+        };
+
+        node.kind == syntax_kind_ext::SPREAD_ASSIGNMENT
+            || node.kind == syntax_kind_ext::SPREAD_ELEMENT
+    }
+
     /// Get identifier text from a node index
     fn get_identifier_text(&self, idx: NodeIndex) -> String {
         if idx.is_none() {
@@ -1010,6 +1125,17 @@ impl<'a> LoweringPass<'a> {
         };
 
         ident.escaped_text.clone()
+    }
+
+    fn is_valid_identifier_name(name: &str) -> bool {
+        let mut chars = name.chars();
+        let Some(first) = chars.next() else {
+            return false;
+        };
+        if !(first == '_' || first == '$' || first.is_alphabetic()) {
+            return false;
+        }
+        chars.all(|ch| ch == '_' || ch == '$' || ch.is_alphanumeric())
     }
 
     fn get_module_root_name(&self, name_idx: NodeIndex) -> Option<String> {
@@ -1279,7 +1405,7 @@ impl<'a> LoweringPass<'a> {
         };
 
         if clause_node.kind != syntax_kind_ext::IMPORT_CLAUSE {
-            return true;
+            return self.import_equals_has_external_module(import_decl.module_specifier);
         }
 
         let Some(clause) = self.arena.get_import_clause(clause_node) else {
@@ -1326,6 +1452,18 @@ impl<'a> LoweringPass<'a> {
         }
 
         false
+    }
+
+    fn import_equals_has_external_module(&self, module_specifier: NodeIndex) -> bool {
+        if module_specifier.is_none() {
+            return false;
+        }
+
+        let Some(node) = self.arena.get(module_specifier) else {
+            return false;
+        };
+
+        node.kind == SyntaxKind::StringLiteral as u16
     }
 
     fn export_decl_has_runtime_value(

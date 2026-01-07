@@ -187,6 +187,89 @@ fn test_two_phase_emission_es5_class_object_rest_param() {
 }
 
 #[test]
+fn test_lowering_pass_es5_object_literal_directive() {
+    let source = "const obj = { a: 1, [key]: 2 };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let stmt_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected variable statement");
+    let stmt_node = arena.get(stmt_idx).expect("expected variable node");
+    let var_stmt = arena
+        .get_variable(stmt_node)
+        .expect("expected variable statement data");
+    let decl_list_idx = *var_stmt
+        .declarations
+        .nodes
+        .first()
+        .expect("expected declaration list");
+    let decl_list_node = arena.get(decl_list_idx).expect("expected declaration list node");
+    let decl_list = arena
+        .get_variable(decl_list_node)
+        .expect("expected declaration list data");
+    let decl_idx = *decl_list
+        .declarations
+        .nodes
+        .first()
+        .expect("expected variable declaration");
+    let decl_node = arena.get(decl_idx).expect("expected declaration node");
+    let decl = arena
+        .get_variable_declaration(decl_node)
+        .expect("expected declaration data");
+
+    let directive = transforms.get(decl.initializer);
+    assert!(
+        matches!(directive, Some(TransformDirective::ES5ObjectLiteral { .. })),
+        "LoweringPass should emit ES5ObjectLiteral directive for computed property"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_object_literal_computed() {
+    let source = "const obj = { a: 1, [key]: 2 };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("[key] = 2"),
+        "ES5 output should lower computed property assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("= { a: 1 }"),
+        "ES5 output should keep base object literal: {}",
+        output
+    );
+    assert!(
+        !output.contains("[key]:"),
+        "ES5 output should not keep computed property syntax: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_class_for_in_of() {
     let source = "class Foo { method(obj, arr) { for (var k in obj) { k; } for (var v of arr) { v; } } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -384,6 +467,77 @@ fn test_two_phase_emission_es5_arrow_function() {
     assert!(
         !output.contains("=>"),
         "ES5 arrow output should not contain '=>'"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_function_this_capture() {
+    let source = "const fn = () => this.x;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ES5ArrowFunction transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow output should capture this via IIFE: {}",
+        output
+    );
+    assert!(
+        output.contains("_this"),
+        "ES5 arrow output should reference _this: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_async_arrow_function() {
+    let source = "const foo = async () => { await bar(); };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ES5ArrowFunction transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 async arrow output should contain '__awaiter': {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 async arrow output should not contain '=>': {}",
+        output
+    );
+    assert!(
+        !output.contains("async function"),
+        "ES5 async arrow output should not contain async syntax: {}",
+        output
     );
 }
 
@@ -586,6 +740,75 @@ fn test_two_phase_emission_commonjs_async_function_export() {
         1,
         "Expected a single CommonJS export assignment: {}",
         output
+    );
+}
+
+#[test]
+fn test_lowering_pass_commonjs_default_anonymous_function_directive() {
+    let source = "export default function () { return 1; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let stmt_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected export declaration");
+    let stmt_node = arena.get(stmt_idx).expect("expected export node");
+    let export_decl = arena
+        .get_export_decl(stmt_node)
+        .expect("expected export declaration data");
+
+    let directive = transforms.get(export_decl.export_clause);
+    assert!(
+        matches!(directive, Some(TransformDirective::CommonJSExportDefaultExpr)),
+        "LoweringPass should emit default export directive for anonymous function, got: {:?}",
+        directive
+    );
+}
+
+#[test]
+fn test_lowering_pass_commonjs_default_anonymous_class_directive() {
+    let source = "export default class { method() { return 1; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let stmt_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected export declaration");
+    let stmt_node = arena.get(stmt_idx).expect("expected export node");
+    let export_decl = arena
+        .get_export_decl(stmt_node)
+        .expect("expected export declaration data");
+
+    let directive = transforms.get(export_decl.export_clause);
+    assert!(
+        matches!(directive, Some(TransformDirective::CommonJSExportDefaultExpr)),
+        "LoweringPass should emit default export directive for anonymous class"
     );
 }
 

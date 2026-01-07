@@ -74,8 +74,46 @@ const BOOLEAN_METHODS_RETURN_STRING: &[&str] = &["toLocaleString", "toString"];
 
 const BIGINT_METHODS_RETURN_STRING: &[&str] = &["toLocaleString", "toString"];
 
+const OBJECT_METHODS_RETURN_BOOLEAN: &[&str] = &[
+    "hasOwnProperty",
+    "isPrototypeOf",
+    "propertyIsEnumerable",
+];
+
 fn is_member(name: &str, list: &[&str]) -> bool {
     list.iter().any(|&item| item == name)
+}
+
+fn object_member_kind(name: &str, include_to_locale: bool) -> Option<ApparentMemberKind> {
+    if name == "constructor" {
+        return Some(ApparentMemberKind::Value(TypeId::ANY));
+    }
+    if is_member(name, OBJECT_METHODS_RETURN_BOOLEAN) {
+        return Some(ApparentMemberKind::Method(TypeId::BOOLEAN));
+    }
+    if include_to_locale && name == "toLocaleString" {
+        return Some(ApparentMemberKind::Method(TypeId::STRING));
+    }
+    None
+}
+
+fn push_object_members(members: &mut Vec<ApparentMember>, include_to_locale: bool) {
+    members.push(ApparentMember {
+        name: "constructor",
+        kind: ApparentMemberKind::Value(TypeId::ANY),
+    });
+    for &name in OBJECT_METHODS_RETURN_BOOLEAN {
+        members.push(ApparentMember {
+            name,
+            kind: ApparentMemberKind::Method(TypeId::BOOLEAN),
+        });
+    }
+    if include_to_locale {
+        members.push(ApparentMember {
+            name: "toLocaleString",
+            kind: ApparentMemberKind::Method(TypeId::STRING),
+        });
+    }
 }
 
 pub fn apparent_primitive_member_kind(
@@ -104,7 +142,7 @@ pub fn apparent_primitive_member_kind(
                 let string_array = interner.array(TypeId::STRING);
                 return Some(ApparentMemberKind::Method(string_array));
             }
-            None
+            object_member_kind(name, true)
         }
         IntrinsicKind::Number => {
             if is_member(name, NUMBER_METHODS_RETURN_STRING) {
@@ -113,7 +151,7 @@ pub fn apparent_primitive_member_kind(
             if name == "valueOf" {
                 return Some(ApparentMemberKind::Method(TypeId::NUMBER));
             }
-            None
+            object_member_kind(name, false)
         }
         IntrinsicKind::Boolean => {
             if is_member(name, BOOLEAN_METHODS_RETURN_STRING) {
@@ -122,7 +160,7 @@ pub fn apparent_primitive_member_kind(
             if name == "valueOf" {
                 return Some(ApparentMemberKind::Method(TypeId::BOOLEAN));
             }
-            None
+            object_member_kind(name, false)
         }
         IntrinsicKind::Bigint => {
             if is_member(name, BIGINT_METHODS_RETURN_STRING) {
@@ -131,7 +169,7 @@ pub fn apparent_primitive_member_kind(
             if name == "valueOf" {
                 return Some(ApparentMemberKind::Method(TypeId::BIGINT));
             }
-            None
+            object_member_kind(name, false)
         }
         IntrinsicKind::Symbol => {
             if name == "description" {
@@ -144,7 +182,7 @@ pub fn apparent_primitive_member_kind(
             if name == "valueOf" {
                 return Some(ApparentMemberKind::Method(TypeId::SYMBOL));
             }
-            None
+            object_member_kind(name, true)
         }
         _ => None,
     }
@@ -193,6 +231,7 @@ pub fn apparent_primitive_members(
                     kind: ApparentMemberKind::Method(string_array),
                 });
             }
+            push_object_members(&mut members, true);
         }
         IntrinsicKind::Number => {
             for &name in NUMBER_METHODS_RETURN_STRING {
@@ -205,6 +244,7 @@ pub fn apparent_primitive_members(
                 name: "valueOf",
                 kind: ApparentMemberKind::Method(TypeId::NUMBER),
             });
+            push_object_members(&mut members, false);
         }
         IntrinsicKind::Boolean => {
             for &name in BOOLEAN_METHODS_RETURN_STRING {
@@ -217,6 +257,7 @@ pub fn apparent_primitive_members(
                 name: "valueOf",
                 kind: ApparentMemberKind::Method(TypeId::BOOLEAN),
             });
+            push_object_members(&mut members, false);
         }
         IntrinsicKind::Bigint => {
             for &name in BIGINT_METHODS_RETURN_STRING {
@@ -229,6 +270,7 @@ pub fn apparent_primitive_members(
                 name: "valueOf",
                 kind: ApparentMemberKind::Method(TypeId::BIGINT),
             });
+            push_object_members(&mut members, false);
         }
         IntrinsicKind::Symbol => {
             let description = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
@@ -244,6 +286,7 @@ pub fn apparent_primitive_members(
                 name: "valueOf",
                 kind: ApparentMemberKind::Method(TypeId::SYMBOL),
             });
+            push_object_members(&mut members, true);
         }
         _ => {}
     }

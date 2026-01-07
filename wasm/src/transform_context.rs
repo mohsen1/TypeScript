@@ -92,6 +92,19 @@ pub enum TransformDirective {
         inner: Box<TransformDirective>,
     },
 
+    /// CommonJS default export for anonymous class/function declarations.
+    ///
+    /// ```typescript
+    /// export default function () {}
+    /// ```
+    ///
+    /// Becomes:
+    ///
+    /// ```javascript
+    /// exports.default = function () {};
+    /// ```
+    CommonJSExportDefaultExpr,
+
     /// ES5 Arrow Function: Transform arrow to regular function
     ///
     /// ```typescript
@@ -120,6 +133,22 @@ pub enum TransformDirective {
     ES5ForOf {
         /// Original for-of statement node
         for_of_node: NodeIndex,
+    },
+
+    /// ES5 Object Literal: Transform computed properties and spread to assignments
+    ///
+    /// ```typescript
+    /// const obj = { a: 1, [k]: 2, ...rest };
+    /// ```
+    ///
+    /// Becomes:
+    ///
+    /// ```javascript
+    /// var obj = (_a = { a: 1 }, _a[k] = 2, Object.assign(_a, rest), _a);
+    /// ```
+    ES5ObjectLiteral {
+        /// Original object literal node
+        object_literal: NodeIndex,
     },
 
     /// Module Wrapper: Wrap entire file for AMD/System/UMD

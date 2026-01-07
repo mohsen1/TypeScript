@@ -34,6 +34,90 @@ fn make_animal_dog(interner: &TypeInterner) -> (TypeId, TypeId) {
     (animal, dog)
 }
 
+fn make_object_interface(interner: &TypeInterner) -> TypeId {
+    let method = |return_type| FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let method_with_any = |return_type| FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::ANY,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let constructor = PropertyInfo {
+        name: interner.intern_string("constructor"),
+        type_id: TypeId::ANY,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    };
+    let to_string = PropertyInfo {
+        name: interner.intern_string("toString"),
+        type_id: interner.function(method(TypeId::STRING)),
+        optional: false,
+        readonly: false,
+        is_method: true,
+    };
+    let to_locale = PropertyInfo {
+        name: interner.intern_string("toLocaleString"),
+        type_id: interner.function(method(TypeId::STRING)),
+        optional: false,
+        readonly: false,
+        is_method: true,
+    };
+    let value_of = PropertyInfo {
+        name: interner.intern_string("valueOf"),
+        type_id: interner.function(method(TypeId::ANY)),
+        optional: false,
+        readonly: false,
+        is_method: true,
+    };
+    let has_own = PropertyInfo {
+        name: interner.intern_string("hasOwnProperty"),
+        type_id: interner.function(method_with_any(TypeId::BOOLEAN)),
+        optional: false,
+        readonly: false,
+        is_method: true,
+    };
+    let is_proto = PropertyInfo {
+        name: interner.intern_string("isPrototypeOf"),
+        type_id: interner.function(method_with_any(TypeId::BOOLEAN)),
+        optional: false,
+        readonly: false,
+        is_method: true,
+    };
+    let prop_enum = PropertyInfo {
+        name: interner.intern_string("propertyIsEnumerable"),
+        type_id: interner.function(method_with_any(TypeId::BOOLEAN)),
+        optional: false,
+        readonly: false,
+        is_method: true,
+    };
+
+    interner.object(vec![
+        constructor,
+        to_string,
+        to_locale,
+        value_of,
+        has_own,
+        is_proto,
+        prop_enum,
+    ])
+}
+
 #[test]
 fn test_any_assignability() {
     let interner = TypeInterner::new();
@@ -297,6 +381,41 @@ fn test_void_return_assignability() {
 
     assert!(checker.is_assignable(returns_number, returns_void));
     assert!(!checker.is_assignable(returns_void, returns_number));
+}
+
+#[test]
+fn test_constructor_void_return_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let returns_instance = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: instance,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    let returns_void = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(checker.is_assignable(returns_instance, returns_void));
+    assert!(!checker.is_assignable(returns_void, returns_instance));
 }
 
 #[test]
@@ -784,6 +903,18 @@ fn test_object_keyword_rejects_primitives() {
 
     assert!(!checker.is_assignable(TypeId::STRING, TypeId::OBJECT));
     assert!(!checker.is_assignable(TypeId::NUMBER, TypeId::OBJECT));
+}
+
+#[test]
+fn test_object_interface_accepts_primitives() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let object_interface = make_object_interface(&interner);
+    assert!(checker.is_assignable(TypeId::STRING, object_interface));
+    assert!(checker.is_assignable(TypeId::NUMBER, object_interface));
+    assert!(checker.is_assignable(TypeId::BOOLEAN, object_interface));
+    assert!(checker.is_assignable(TypeId::SYMBOL, object_interface));
 }
 
 #[test]

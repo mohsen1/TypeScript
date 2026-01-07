@@ -135,6 +135,23 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Add optional property inference coverage for number index signature inference
 - [x] Add optional property inference coverage for mixed index signatures
 - [x] Add optional non-canonical numeric property coverage for mixed index signatures
+- [x] Add optional argument mismatch coverage for required properties
+- [x] Add missing required property coverage for generic inference
+- [x] Add readonly property mismatch coverage for generic inference
+- [x] Add readonly property mismatch coverage for indexed objects
+- [x] Add readonly index signature mismatch coverage for generic inference
+- [x] Add readonly number index signature mismatch coverage for generic inference
+- [x] Add method property bivariant parameter coverage for generic inference
+- [x] Add function property contravariant parameter coverage for generic inference
+- [x] Add method property bivariant optional parameter coverage for generic inference
+- [x] Add missing property inference via index signature coverage
+- [x] Add missing numeric property inference via number index signature coverage
+- [x] Infer readonly wrapper type params during constraint collection
+- [x] Infer type params from callable parameter signatures
+- [x] Infer type params from callable arguments with single signatures
+- [x] Infer type params from callable parameters with callable arguments
+- [x] Infer type params from function/callable this-type positions
+- [x] Infer type params from constructor call signatures
 - [x] Enforce index signature consistency during bounds validation
 
 ## Architecture Notes

@@ -1834,6 +1834,513 @@ const f: <T>(value: T) => T = (value) => value;
 }
 
 #[test]
+fn test_checker_lowers_generic_function_declaration_uses_type_params() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+function id<T>(value: T): T {
+    return value;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let id_sym = binder.file_locals.get("id").expect("id should exist");
+    let id_type = checker.get_type_of_symbol(id_sym);
+    let id_key = types.lookup(id_type).expect("id type should exist");
+    match id_key {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.type_params.len(), 1);
+            assert_eq!(types.resolve_atom(shape.type_params[0].name), "T");
+            assert_eq!(shape.params.len(), 1);
+
+            let param_key = types.lookup(shape.params[0].type_id).expect("Param type should exist");
+            match param_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected param type to be type parameter, got {:?}", param_key),
+            }
+
+            let return_key = types.lookup(shape.return_type).expect("Return type should exist");
+            match return_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected return type to be type parameter, got {:?}", return_key),
+            }
+        }
+        _ => panic!("Expected id to be Function type, got {:?}", id_key),
+    }
+}
+
+#[test]
+fn test_checker_lowers_element_access_array() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const arr: number[] = [1, 2];
+const value = arr[0];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_lowers_element_access_tuple_literals() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const tup: [string, number] = ["a", 1];
+const first = tup[0];
+const second = tup[1];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let first_sym = binder.file_locals.get("first").expect("first should exist");
+    let second_sym = binder.file_locals.get("second").expect("second should exist");
+
+    let first_type = checker.get_type_of_symbol(first_sym);
+    let second_type = checker.get_type_of_symbol(second_sym);
+
+    assert_eq!(first_type, TypeId::STRING);
+    assert_eq!(second_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_lowers_element_access_string_literal_property() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const obj = { x: 1, y: "hi" };
+const value = obj["x"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_lowers_element_access_array_length() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const arr = [1, 2];
+const length = arr["length"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let length_sym = binder.file_locals.get("length").expect("length should exist");
+    let length_type = checker.get_type_of_symbol(length_sym);
+    assert_eq!(length_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_lowers_element_access_numeric_string_index() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const arr: number[] = [1, 2];
+const value = arr["0"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_lowers_element_access_string_index_signature() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface StringMap {
+    [key: string]: boolean;
+}
+const map: StringMap = {} as any;
+const value = map["foo"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_checker_lowers_element_access_number_index_signature() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface NumberMap {
+    [key: number]: string;
+}
+const map: NumberMap = {} as any;
+const value = map[1];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::STRING);
+}
+
+#[test]
+fn test_checker_element_access_requires_index_signature() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Foo { x: number; }
+const obj: Foo = { x: 1 };
+let key: string = "x";
+const value = obj[key];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&7053), "Expected error 7053 for missing index signature, got: {:?}", codes);
+}
+
+#[test]
+fn test_checker_element_access_union_string_index_requires_signature() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Foo { x: number; }
+const obj: Foo = { x: 1 };
+let key: "x" | string;
+const value = obj[key];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&7053), "Expected error 7053 for union string index, got: {:?}", codes);
+}
+
+#[test]
+fn test_checker_element_access_union_string_number_index_requires_signature() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Foo { x: number; }
+const obj: Foo = { x: 1 };
+let key: string | number;
+const value = obj[key];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&7053), "Expected error 7053 for union string/number index, got: {:?}", codes);
+}
+
+#[test]
+fn test_checker_lowers_element_access_literal_key_union() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+interface Foo { a: number; b: string; }
+const obj: Foo = { a: 1, b: "hi" };
+let key: "a" | "b";
+const value = obj[key];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    let value_key = types.lookup(value_type).expect("value type should exist");
+    match value_key {
+        TypeKey::Union(members) => {
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&TypeId::STRING));
+        }
+        _ => panic!("Expected union type for value, got {:?}", value_key),
+    }
+}
+
+#[test]
+fn test_checker_lowers_element_access_literal_key_type() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Foo { a: number; b: string; }
+const obj: Foo = { a: 1, b: "hi" };
+let key: "a";
+const value = obj[key];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_lowers_element_access_numeric_literal_union() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+const tup: [string, number, boolean] = ["a", 1, true];
+let idx: 0 | 2;
+const value = tup[idx];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    let value_key = types.lookup(value_type).expect("value type should exist");
+    match value_key {
+        TypeKey::Union(members) => {
+            assert!(members.contains(&TypeId::STRING));
+            assert!(members.contains(&TypeId::BOOLEAN));
+            assert_eq!(members.len(), 2);
+        }
+        _ => panic!("Expected union type for value, got {:?}", value_key),
+    }
+}
+
+#[test]
+fn test_checker_lowers_element_access_mixed_literal_key_union() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+const arr: string[] = ["a"];
+let key: "length" | 0;
+const value = arr[key];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    let value_key = types.lookup(value_type).expect("value type should exist");
+    match value_key {
+        TypeKey::Union(members) => {
+            assert!(members.contains(&TypeId::STRING));
+            assert!(members.contains(&TypeId::NUMBER));
+            assert_eq!(members.len(), 2);
+        }
+        _ => panic!("Expected union type for value, got {:?}", value_key),
+    }
+}
+
+#[test]
+fn test_checker_element_access_reports_nullable_object() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Foo = { a: number };
+let obj: Foo | undefined;
+const value = obj["a"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2532), "Expected error 2532 for possibly undefined object, got: {:?}", codes);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_element_access_optional_chain_nullable_object() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+type Foo = { a: number };
+let obj: Foo | undefined;
+const value = obj?.["a"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    let value_key = types.lookup(value_type).expect("value type should exist");
+    match value_key {
+        TypeKey::Union(members) => {
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&TypeId::UNDEFINED));
+        }
+        _ => panic!("Expected union type for value, got {:?}", value_key),
+    }
+}
+
+#[test]
 fn test_checker_namespace_merges_with_class_exports() {
     use crate::thin_parser::ThinParserState;
     use crate::solver::TypeKey;

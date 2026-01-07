@@ -17,6 +17,7 @@ use crate::solver::{apparent_primitive_members, ApparentMemberKind, TypeDatabase
 use crate::solver::infer::InferenceContext;
 use crate::solver::subtype::{SubtypeChecker, TypeResolver, NoopResolver};
 use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
+use rustc_hash::FxHashSet;
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -42,6 +43,98 @@ struct MappedKeys {
     string_literals: Vec<Atom>,
     has_string: bool,
     has_number: bool,
+}
+
+struct KeyofKeySet {
+    string_literals: FxHashSet<Atom>,
+    has_string: bool,
+    has_number: bool,
+    has_symbol: bool,
+}
+
+impl KeyofKeySet {
+    fn new() -> Self {
+        KeyofKeySet {
+            string_literals: FxHashSet::default(),
+            has_string: false,
+            has_number: false,
+            has_symbol: false,
+        }
+    }
+
+    fn insert_type(&mut self, interner: &dyn TypeDatabase, type_id: TypeId) -> bool {
+        let Some(key) = interner.lookup(type_id) else {
+            return false;
+        };
+
+        match key {
+            TypeKey::Union(members) => members
+                .iter()
+                .all(|&member| self.insert_type(interner, member)),
+            TypeKey::Intrinsic(kind) => match kind {
+                IntrinsicKind::String => {
+                    self.has_string = true;
+                    true
+                }
+                IntrinsicKind::Number => {
+                    self.has_number = true;
+                    true
+                }
+                IntrinsicKind::Symbol => {
+                    self.has_symbol = true;
+                    true
+                }
+                IntrinsicKind::Never => true,
+                _ => false,
+            },
+            TypeKey::Literal(LiteralValue::String(atom)) => {
+                self.string_literals.insert(atom);
+                true
+            }
+            _ => false,
+        }
+    }
+}
+
+const ARRAY_METHODS_RETURN_ANY: &[&str] = &[
+    "concat",
+    "filter",
+    "flat",
+    "flatMap",
+    "map",
+    "reverse",
+    "slice",
+    "sort",
+    "splice",
+    "toReversed",
+    "toSorted",
+    "toSpliced",
+    "with",
+    "at",
+    "find",
+    "findLast",
+    "pop",
+    "shift",
+    "entries",
+    "keys",
+    "values",
+    "reduce",
+    "reduceRight",
+];
+const ARRAY_METHODS_RETURN_BOOLEAN: &[&str] = &["every", "includes", "some"];
+const ARRAY_METHODS_RETURN_NUMBER: &[&str] = &[
+    "findIndex",
+    "findLastIndex",
+    "indexOf",
+    "lastIndexOf",
+    "push",
+    "unshift",
+];
+const ARRAY_METHODS_RETURN_UNDEFINED: &[&str] = &["forEach", "copyWithin", "fill"];
+const ARRAY_METHODS_RETURN_STRING: &[&str] = &["join", "toLocaleString", "toString"];
+
+fn is_member(name: &str, list: &[&str]) -> bool {
+    list.iter().any(|&item| item == name)
 }
 
 impl<'a> TypeEvaluator<'a, NoopResolver> {
@@ -246,13 +339,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 self.interner.union(results)
             }
             TypeKey::Array(elem) => {
-                // Array[number] -> element type
-                if self.is_number_like(index_type) {
-                    self.add_undefined_if_unchecked(elem)
-                } else {
-                    // Could be string key for length etc, but for now return element
-                    elem
-                }
+                self.evaluate_array_index(elem, index_type)
             }
             TypeKey::Tuple(elements) => {
                 self.evaluate_tuple_index(&elements, index_type)
@@ -381,6 +468,170 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
     }
 
+    fn array_keyof_keys(&self) -> Vec<TypeId> {
+        let mut keys = Vec::new();
+        keys.push(TypeId::NUMBER);
+        keys.push(self.interner.literal_string("length"));
+        for &name in ARRAY_METHODS_RETURN_ANY {
+            keys.push(self.interner.literal_string(name));
+        }
+        for &name in ARRAY_METHODS_RETURN_BOOLEAN {
+            keys.push(self.interner.literal_string(name));
+        }
+        for &name in ARRAY_METHODS_RETURN_NUMBER {
+            keys.push(self.interner.literal_string(name));
+        }
+        for &name in ARRAY_METHODS_RETURN_UNDEFINED {
+            keys.push(self.interner.literal_string(name));
+        }
+        for &name in ARRAY_METHODS_RETURN_STRING {
+            keys.push(self.interner.literal_string(name));
+        }
+        keys
+    }
+
+    fn intersect_keyof_sets(&self, key_sets: &[TypeId]) -> Option<TypeId> {
+        let mut parsed_sets = Vec::with_capacity(key_sets.len());
+        for &key_set in key_sets {
+            let mut parsed = KeyofKeySet::new();
+            if !parsed.insert_type(self.interner, key_set) {
+                return None;
+            }
+            parsed_sets.push(parsed);
+        }
+
+        let mut all_string = true;
+        let mut string_possible = true;
+        let mut common_literals: Option<FxHashSet<Atom>> = None;
+        let mut all_number = true;
+        let mut all_symbol = true;
+
+        for set in &parsed_sets {
+            if set.has_string {
+                // string index signatures don't restrict literal key overlap
+            } else {
+                all_string = false;
+                if set.string_literals.is_empty() {
+                    string_possible = false;
+                } else {
+                    common_literals = Some(match common_literals {
+                        Some(mut existing) => {
+                            existing.retain(|atom| set.string_literals.contains(atom));
+                            existing
+                        }
+                        None => set.string_literals.clone(),
+                    });
+                }
+            }
+
+            if !set.has_number {
+                all_number = false;
+            }
+            if !set.has_symbol {
+                all_symbol = false;
+            }
+        }
+
+        let mut result_keys = Vec::new();
+        if string_possible {
+            if all_string {
+                result_keys.push(TypeId::STRING);
+            } else if let Some(common) = common_literals {
+                for atom in common {
+                    result_keys.push(self.interner.intern(TypeKey::Literal(LiteralValue::String(atom))));
+                }
+            }
+        }
+        if all_number {
+            result_keys.push(TypeId::NUMBER);
+        }
+        if all_symbol {
+            result_keys.push(TypeId::SYMBOL);
+        }
+
+        if result_keys.is_empty() {
+            Some(TypeId::NEVER)
+        } else if result_keys.len() == 1 {
+            Some(result_keys[0])
+        } else {
+            Some(self.interner.union(result_keys))
+        }
+    }
+
+    fn array_member_types(&self) -> Vec<TypeId> {
+        vec![
+            TypeId::NUMBER,
+            self.apparent_method_type(TypeId::ANY),
+            self.apparent_method_type(TypeId::BOOLEAN),
+            self.apparent_method_type(TypeId::NUMBER),
+            self.apparent_method_type(TypeId::UNDEFINED),
+            self.apparent_method_type(TypeId::STRING),
+        ]
+    }
+
+    fn array_member_kind(&self, name: &str) -> Option<ApparentMemberKind> {
+        if name == "length" {
+            return Some(ApparentMemberKind::Value(TypeId::NUMBER));
+        }
+        if is_member(name, ARRAY_METHODS_RETURN_ANY) {
+            return Some(ApparentMemberKind::Method(TypeId::ANY));
+        }
+        if is_member(name, ARRAY_METHODS_RETURN_BOOLEAN) {
+            return Some(ApparentMemberKind::Method(TypeId::BOOLEAN));
+        }
+        if is_member(name, ARRAY_METHODS_RETURN_NUMBER) {
+            return Some(ApparentMemberKind::Method(TypeId::NUMBER));
+        }
+        if is_member(name, ARRAY_METHODS_RETURN_UNDEFINED) {
+            return Some(ApparentMemberKind::Method(TypeId::UNDEFINED));
+        }
+        if is_member(name, ARRAY_METHODS_RETURN_STRING) {
+            return Some(ApparentMemberKind::Method(TypeId::STRING));
+        }
+        None
+    }
+
+    fn evaluate_array_index(&self, elem: TypeId, index_type: TypeId) -> TypeId {
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(index_type) {
+            let mut results = Vec::new();
+            for &member in &members {
+                let result = self.evaluate_array_index(elem, member);
+                if result != TypeId::UNDEFINED || self.no_unchecked_indexed_access {
+                    results.push(result);
+                }
+            }
+            if results.is_empty() {
+                return TypeId::UNDEFINED;
+            }
+            return self.interner.union(results);
+        }
+
+        if self.is_number_like(index_type) {
+            return self.add_undefined_if_unchecked(elem);
+        }
+
+        if index_type == TypeId::STRING {
+            let union = self.interner.union(self.array_member_types());
+            return self.add_undefined_if_unchecked(union);
+        }
+
+        if let Some(TypeKey::Literal(LiteralValue::String(name))) = self.interner.lookup(index_type) {
+            if self.is_numeric_property_name(name) {
+                return self.add_undefined_if_unchecked(elem);
+            }
+            let name_str = self.interner.resolve_atom(name);
+            if let Some(member) = self.array_member_kind(&name_str) {
+                return match member {
+                    ApparentMemberKind::Value(type_id) => type_id,
+                    ApparentMemberKind::Method(return_type) => self.apparent_method_type(return_type),
+                };
+            }
+            return TypeId::UNDEFINED;
+        }
+
+        elem
+    }
+
     fn add_undefined_if_unchecked(&self, type_id: TypeId) -> TypeId {
         if !self.no_unchecked_indexed_access || type_id == TypeId::UNDEFINED {
             return type_id;
@@ -390,6 +641,20 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
     /// Evaluate index access on a tuple type
     fn evaluate_tuple_index(&self, elements: &[TupleElement], index_type: TypeId) -> TypeId {
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(index_type) {
+            let mut results = Vec::new();
+            for &member in &members {
+                let result = self.evaluate_tuple_index(elements, member);
+                if result != TypeId::UNDEFINED || self.no_unchecked_indexed_access {
+                    results.push(result);
+                }
+            }
+            if results.is_empty() {
+                return TypeId::UNDEFINED;
+            }
+            return self.interner.union(results);
+        }
+
         // If index is a literal number, return the specific element
         if let Some(TypeKey::Literal(LiteralValue::Number(n))) = self.interner.lookup(index_type) {
             let idx = n.0 as usize;
@@ -402,6 +667,50 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     return last.type_id;
                 }
             }
+            return TypeId::UNDEFINED;
+        }
+
+        if index_type == TypeId::STRING {
+            let mut types: Vec<TypeId> = elements.iter().map(|e| e.type_id).collect();
+            types.extend(self.array_member_types());
+            if types.is_empty() {
+                return TypeId::NEVER;
+            }
+            let union = self.interner.union(types);
+            return self.add_undefined_if_unchecked(union);
+        }
+
+        if let Some(TypeKey::Literal(LiteralValue::String(name))) = self.interner.lookup(index_type) {
+            if self.is_numeric_property_name(name) {
+                let name_str = self.interner.resolve_atom(name);
+                if let Ok(idx) = name_str.parse::<usize>() {
+                    if idx < elements.len() {
+                        return elements[idx].type_id;
+                    }
+                    if let Some(last) = elements.last() {
+                        if last.rest {
+                            return last.type_id;
+                        }
+                    }
+                    return TypeId::UNDEFINED;
+                }
+
+                let all_types: Vec<TypeId> = elements.iter().map(|e| e.type_id).collect();
+                if all_types.is_empty() {
+                    return TypeId::NEVER;
+                }
+                let union = self.interner.union(all_types);
+                return self.add_undefined_if_unchecked(union);
+            }
+
+            let name_str = self.interner.resolve_atom(name);
+            if let Some(member) = self.array_member_kind(&name_str) {
+                return match member {
+                    ApparentMemberKind::Value(type_id) => type_id,
+                    ApparentMemberKind::Method(return_type) => self.apparent_method_type(return_type),
+                };
+            }
+
             return TypeId::UNDEFINED;
         }
 
@@ -597,15 +906,14 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
             }
             TypeKey::Array(_) => {
-                // keyof T[] = number | array methods
-                // Simplified: just return number for array indices
-                TypeId::NUMBER
+                self.interner.union(self.array_keyof_keys())
             }
             TypeKey::Tuple(elements) => {
-                // keyof [A, B, C] = "0" | "1" | "2" | number methods
-                let key_types: Vec<TypeId> = (0..elements.len())
+                let mut key_types: Vec<TypeId> = (0..elements.len())
                     .map(|i| self.interner.literal_string(&i.to_string()))
                     .collect();
+                let mut array_keys = self.array_keyof_keys();
+                key_types.append(&mut array_keys);
                 if key_types.is_empty() {
                     return TypeId::NEVER;
                 }
@@ -620,12 +928,16 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     // keyof unknown = never
                     TypeId::NEVER
                 }
+                IntrinsicKind::Never
+                | IntrinsicKind::Void
+                | IntrinsicKind::Null
+                | IntrinsicKind::Undefined
+                | IntrinsicKind::Object => TypeId::NEVER,
                 IntrinsicKind::String
                 | IntrinsicKind::Number
                 | IntrinsicKind::Boolean
                 | IntrinsicKind::Bigint
                 | IntrinsicKind::Symbol => self.apparent_primitive_keyof(kind),
-                _ => self.interner.intern(TypeKey::KeyOf(operand)),
             },
             TypeKey::Literal(literal) => {
                 if let Some(kind) = self.apparent_literal_kind(&literal) {
@@ -639,8 +951,12 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 let key_sets: Vec<TypeId> = members.iter()
                     .map(|&m| self.evaluate_keyof(m))
                     .collect();
-                // Intersection of all key sets
-                self.interner.intersection(key_sets)
+                // Prefer explicit key-set intersection to avoid opaque literal intersections.
+                if let Some(intersection) = self.intersect_keyof_sets(&key_sets) {
+                    intersection
+                } else {
+                    self.interner.intersection(key_sets)
+                }
             }
             TypeKey::Intersection(members) => {
                 // keyof (A & B) = keyof A | keyof B

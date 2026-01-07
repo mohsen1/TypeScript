@@ -94,6 +94,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Contextual typing for variable initializers with annotations
   - [x] Test: Contextual typing selects overloads by call arity
   - [x] Test: Checker lowers generic function type annotations with type params
+  - [x] Test: Checker lowers generic function declarations with type params
 
 ### Phase 4: Generic Types
 - [x] Implement type parameter lowering
@@ -140,6 +141,22 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: typeof lowering uses value resolver (type vs value space)
   - [x] Test: typeof type query with type arguments
   - [x] Test: checker preserves type arguments on typeof type queries
+  - [x] Test: checker element access returns array element type
+  - [x] Test: checker element access returns tuple element types
+  - [x] Element access uses literal index nodes for tuple lookup
+  - [x] Contextual typing for array literals respects tuple element expectations
+  - [x] Test: checker element access handles string literal properties
+  - [x] Test: checker element access handles numeric string indices
+  - [x] Test: checker element access respects index signatures
+  - [x] Test: checker element access reports missing index signature (7053)
+  - [x] Test: checker element access unions literal key types
+  - [x] Test: checker element access uses literal key types from identifiers
+  - [x] Test: checker element access unions numeric literal tuple indices
+  - [x] Test: checker element access reports nullish object (2532)
+  - [x] Test: checker element access optional chain unions undefined
+  - [x] Test: checker element access unions mixed string/number literal keys
+  - [x] Test: checker element access union string index requires signature
+  - [x] Test: checker element access union string/number index requires signature
 - [x] Parser: fix interface member parsing to track progress by token position (avoid skipping consecutive identifiers)
 - [x] Perf: avoid extra String clone when lowering negative bigint literals
 - [x] Perf: avoid extra allocation when normalizing bigint leading zeros

@@ -10,7 +10,7 @@
 
 use std::sync::RwLock;
 use std::hash::{Hash, Hasher};
-use rustc_hash::{FxHashMap, FxHasher};
+use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use crate::solver::types::*;
 use crate::interner::{Atom, Interner};
 
@@ -27,6 +27,38 @@ enum PrimitiveClass {
     Symbol,
     Null,
     Undefined,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum LiteralDomain {
+    String,
+    Number,
+    Boolean,
+    Bigint,
+}
+
+#[derive(Clone, Debug)]
+struct LiteralSet {
+    domain: LiteralDomain,
+    values: FxHashSet<LiteralValue>,
+}
+
+impl LiteralSet {
+    fn from_literal(literal: LiteralValue) -> Self {
+        let domain = literal_domain(&literal);
+        let mut values = FxHashSet::default();
+        values.insert(literal);
+        LiteralSet { domain, values }
+    }
+}
+
+fn literal_domain(literal: &LiteralValue) -> LiteralDomain {
+    match literal {
+        LiteralValue::String(_) => LiteralDomain::String,
+        LiteralValue::Number(_) => LiteralDomain::Number,
+        LiteralValue::Boolean(_) => LiteralDomain::Boolean,
+        LiteralValue::BigInt(_) => LiteralDomain::Bigint,
+    }
 }
 
 struct TypeShard {
@@ -308,6 +340,9 @@ impl TypeInterner {
         if self.intersection_has_disjoint_primitives(&flat) {
             return TypeId::NEVER;
         }
+        if self.intersection_has_disjoint_object_literals(&flat) {
+            return TypeId::NEVER;
+        }
         if flat.is_empty() {
             return TypeId::UNKNOWN;
         }
@@ -335,6 +370,107 @@ impl TypeInterner {
         }
 
         false
+    }
+
+    fn intersection_has_disjoint_object_literals(&self, members: &[TypeId]) -> bool {
+        let mut objects = Vec::new();
+
+        for &member in members {
+            let Some(key) = self.lookup(member) else {
+                continue;
+            };
+            match key {
+                TypeKey::Object(props) => objects.push(props),
+                TypeKey::ObjectWithIndex(shape) => objects.push(shape.properties),
+                _ => {}
+            }
+        }
+
+        if objects.len() < 2 {
+            return false;
+        }
+
+        for i in 0..objects.len() {
+            for j in (i + 1)..objects.len() {
+                if self.object_literals_disjoint(&objects[i], &objects[j]) {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    fn object_literals_disjoint(&self, left: &[PropertyInfo], right: &[PropertyInfo]) -> bool {
+        let (small, large) = if left.len() <= right.len() {
+            (left, right)
+        } else {
+            (right, left)
+        };
+
+        for prop in small {
+            if prop.optional {
+                continue;
+            }
+            let Some(left_set) = self.literal_set_from_type(prop.type_id) else {
+                continue;
+            };
+            let Some(other) = Self::find_property(large, prop.name) else {
+                continue;
+            };
+            if other.optional {
+                continue;
+            }
+            let Some(right_set) = self.literal_set_from_type(other.type_id) else {
+                continue;
+            };
+            if self.literal_sets_disjoint(&left_set, &right_set) {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    fn literal_sets_disjoint(&self, left: &LiteralSet, right: &LiteralSet) -> bool {
+        if left.domain != right.domain {
+            return true;
+        }
+        !left.values.iter().any(|value| right.values.contains(value))
+    }
+
+    fn literal_set_from_type(&self, type_id: TypeId) -> Option<LiteralSet> {
+        let key = self.lookup(type_id)?;
+        match key {
+            TypeKey::Literal(literal) => Some(LiteralSet::from_literal(literal)),
+            TypeKey::Union(members) => {
+                let mut domain: Option<LiteralDomain> = None;
+                let mut values = FxHashSet::default();
+                for member in members {
+                    let Some(TypeKey::Literal(literal)) = self.lookup(member) else {
+                        return None;
+                    };
+                    let literal_domain = literal_domain(&literal);
+                    if let Some(existing) = domain {
+                        if existing != literal_domain {
+                            return None;
+                        }
+                    } else {
+                        domain = Some(literal_domain);
+                    }
+                    values.insert(literal);
+                }
+                domain.map(|domain| LiteralSet { domain, values })
+            }
+            _ => None,
+        }
+    }
+
+    fn find_property(props: &[PropertyInfo], name: Atom) -> Option<&PropertyInfo> {
+        props
+            .binary_search_by(|prop| prop.name.cmp(&name))
+            .ok()
+            .map(|idx| &props[idx])
     }
 
     fn primitive_class_for(&self, type_id: TypeId) -> Option<PrimitiveClass> {

@@ -251,6 +251,50 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Emit string/number index signatures when mapping over `string`/`number` constraints
 - [x] Tests for mapped index signatures and modifiers
 
+### Phase 45: Keyof Array/Tuple Members
+- [x] Include array member keys in `keyof` arrays and tuples
+- [x] Tests for `keyof` array/tuple member unions
+
+### Phase 46: Array/Tuple Index Access Members
+- [x] Resolve array/tuple index access for string literal member keys
+- [x] Tests for array/tuple index access on member keys and numeric strings
+
+### Phase 47: Constructor Void Assignability
+- [x] Allow constructor types returning void to accept concrete constructor returns
+- [x] Tests for constructor void return assignability
+
+### Phase 48: Array/Tuple String Index Access
+- [x] Evaluate array/tuple index access with string index types
+- [x] Tests for array/tuple string index access and noUncheckedIndexedAccess
+
+### Phase 49: Union Index Access Cross-Product
+- [x] Evaluate union object with union key indexed access (cross-product)
+- [x] Tests for union object + union key with noUncheckedIndexedAccess
+
+### Phase 50: Keyof Nullish/Object
+- [x] Treat `keyof object` as `never`
+- [x] Treat `keyof null`/`undefined`/`void`/`never` as `never`
+
+### Phase 51: Keyof Union Key Intersection
+- [x] Intersect union `keyof` key sets using literal/primitive overlap
+- [x] Tests for union `keyof` key intersections
+
+### Phase 52: Keyof Constraint Assignability
+- [x] Treat deferred `keyof` as assignable only to `string | number | symbol`
+- [x] Tests for deferred `keyof` assignability to key unions
+
+### Phase 53: Intersection Discriminant Reduction
+- [x] Reduce intersections with disjoint object literal discriminants to `never`
+- [x] Tests for disjoint object literal intersection reduction
+
+### Phase 54: Object Interface Boxing
+- [x] Include Object prototype members in primitive apparent members
+- [x] Tests for primitive assignability to Object-like interface
+
+### Phase 55: Array to Variadic Tuple Assignability
+- [x] Allow arrays to assign to variadic tuples with no required fixed elements
+- [x] Tests for array-to-variadic tuple assignability and rejection cases
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

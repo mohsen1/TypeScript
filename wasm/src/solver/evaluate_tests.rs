@@ -261,6 +261,64 @@ fn test_index_access_union_object_literal_key() {
 }
 
 #[test]
+fn test_index_access_union_object_union_key() {
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("y"),
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let union_obj = interner.union(vec![obj_a, obj_b]);
+    let key_x = interner.literal_string("x");
+    let key_y = interner.literal_string("y");
+    let key_union = interner.union(vec![key_x, key_y]);
+
+    let result = evaluate_index_access(&interner, union_obj, key_union);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::STRING]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_index_access_union_object_union_key_no_unchecked() {
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("y"),
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let union_obj = interner.union(vec![obj_a, obj_b]);
+    let key_x = interner.literal_string("x");
+    let key_y = interner.literal_string("y");
+    let key_union = interner.union(vec![key_x, key_y]);
+
+    let mut evaluator = TypeEvaluator::new(&interner);
+    evaluator.set_no_unchecked_indexed_access(true);
+    let result = evaluator.evaluate_index_access(union_obj, key_union);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::STRING, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_index_access_union_object_literal_key_no_unchecked() {
     let interner = TypeInterner::new();
 
@@ -468,6 +526,90 @@ fn test_index_access_array() {
 }
 
 #[test]
+fn test_index_access_array_string_index() {
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let includes_key = interner.literal_string("includes");
+    let includes_type = evaluate_index_access(&interner, string_array, includes_key);
+
+    let result = evaluate_index_access(&interner, string_array, TypeId::STRING);
+    let key = interner.lookup(result).expect("expected union for array[string]");
+
+    match key {
+        TypeKey::Union(members) => {
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&includes_type));
+            assert!(!members.contains(&TypeId::STRING));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_index_access_array_string_index_with_no_unchecked_indexed_access() {
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let mut evaluator = TypeEvaluator::new(&interner);
+    evaluator.set_no_unchecked_indexed_access(true);
+
+    let result = evaluator.evaluate_index_access(string_array, TypeId::STRING);
+    let key = interner.lookup(result).expect("expected union for array[string]");
+
+    match key {
+        TypeKey::Union(members) => {
+            assert!(members.contains(&TypeId::UNDEFINED));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_index_access_array_string_literal_length() {
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let length_key = interner.literal_string("length");
+
+    let result = evaluate_index_access(&interner, string_array, length_key);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_index_access_array_string_literal_method() {
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let includes_key = interner.literal_string("includes");
+
+    let result = evaluate_index_access(&interner, string_array, includes_key);
+    match interner.lookup(result) {
+        Some(TypeKey::Function(func)) => {
+            assert_eq!(func.return_type, TypeId::BOOLEAN);
+            assert_eq!(func.params.len(), 1);
+            assert!(func.params[0].rest);
+        }
+        other => panic!("Expected function type, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_index_access_array_string_literal_numeric_key_with_no_unchecked_indexed_access() {
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let zero = interner.literal_string("0");
+
+    let mut evaluator = TypeEvaluator::new(&interner);
+    evaluator.set_no_unchecked_indexed_access(true);
+
+    let result = evaluator.evaluate_index_access(string_array, zero);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_index_access_readonly_array() {
     let interner = TypeInterner::new();
 
@@ -488,6 +630,80 @@ fn test_index_access_tuple_literal() {
         TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
     ]);
     let zero = interner.literal_number(0.0);
+
+    let result = evaluate_index_access(&interner, tuple, zero);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_index_access_tuple_string_index() {
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let map_key = interner.literal_string("map");
+    let map_type = evaluate_index_access(&interner, tuple, map_key);
+
+    let result = evaluate_index_access(&interner, tuple, TypeId::STRING);
+    let key = interner.lookup(result).expect("expected union for tuple[string]");
+
+    match key {
+        TypeKey::Union(members) => {
+            assert!(members.contains(&TypeId::STRING));
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&map_type));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_index_access_tuple_string_index_with_no_unchecked_indexed_access() {
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let mut evaluator = TypeEvaluator::new(&interner);
+    evaluator.set_no_unchecked_indexed_access(true);
+
+    let result = evaluator.evaluate_index_access(tuple, TypeId::STRING);
+    let key = interner.lookup(result).expect("expected union for tuple[string]");
+
+    match key {
+        TypeKey::Union(members) => {
+            assert!(members.contains(&TypeId::UNDEFINED));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_index_access_tuple_string_literal_length() {
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let length_key = interner.literal_string("length");
+
+    let result = evaluate_index_access(&interner, tuple, length_key);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_index_access_tuple_string_literal_numeric_key() {
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let zero = interner.literal_string("0");
 
     let result = evaluate_index_access(&interner, tuple, zero);
     assert_eq!(result, TypeId::STRING);
@@ -578,7 +794,18 @@ fn test_keyof_readonly_array() {
     let readonly_array = interner.intern(TypeKey::ReadonlyType(array));
 
     let result = evaluate_keyof(&interner, readonly_array);
-    assert_eq!(result, TypeId::NUMBER);
+    let key = interner.lookup(result).expect("expected union for keyof readonly array");
+
+    match key {
+        TypeKey::Union(members) => {
+            let length = interner.literal_string("length");
+            let map = interner.literal_string("map");
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&length));
+            assert!(members.contains(&map));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
 }
 
 #[test]
@@ -592,11 +819,22 @@ fn test_keyof_readonly_tuple() {
     let readonly_tuple = interner.intern(TypeKey::ReadonlyType(tuple));
 
     let result = evaluate_keyof(&interner, readonly_tuple);
-    let expected = interner.union(vec![
-        interner.literal_string("0"),
-        interner.literal_string("1"),
-    ]);
-    assert_eq!(result, expected);
+    let key = interner.lookup(result).expect("expected union for keyof readonly tuple");
+
+    match key {
+        TypeKey::Union(members) => {
+            let key_0 = interner.literal_string("0");
+            let key_1 = interner.literal_string("1");
+            let length = interner.literal_string("length");
+            let map = interner.literal_string("map");
+            assert!(members.contains(&key_0));
+            assert!(members.contains(&key_1));
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&length));
+            assert!(members.contains(&map));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
 }
 
 #[test]
@@ -818,6 +1056,100 @@ fn test_keyof_object_with_number_index_signature() {
 }
 
 #[test]
+fn test_keyof_union_disjoint_objects() {
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![obj_a, obj_b]);
+    let result = evaluate_keyof(&interner, union);
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_keyof_union_overlap_objects() {
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    let obj_b = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union = interner.union(vec![obj_a, obj_b]);
+    let result = evaluate_keyof(&interner, union);
+    let expected = interner.literal_string("b");
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_union_string_index_overlap_literal() {
+    let interner = TypeInterner::new();
+
+    let obj_index = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+    let obj_literal = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![obj_index, obj_literal]);
+    let result = evaluate_keyof(&interner, union);
+    let expected = interner.literal_string("a");
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_keyof_empty_object() {
     let interner = TypeInterner::new();
 
@@ -832,18 +1164,29 @@ fn test_keyof_empty_object() {
 fn test_keyof_array() {
     let interner = TypeInterner::new();
 
-    // keyof string[] = number (simplified)
+    // keyof string[] includes number and array members
     let arr = interner.array(TypeId::STRING);
 
     let result = evaluate_keyof(&interner, arr);
-    assert_eq!(result, TypeId::NUMBER);
+    let key = interner.lookup(result).expect("expected union for keyof array");
+
+    match key {
+        TypeKey::Union(members) => {
+            let length = interner.literal_string("length");
+            let map = interner.literal_string("map");
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&length));
+            assert!(members.contains(&map));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
 }
 
 #[test]
 fn test_keyof_tuple() {
     let interner = TypeInterner::new();
 
-    // keyof [string, number] = "0" | "1"
+    // keyof [string, number] includes tuple indices and array members
     let tuple = interner.tuple(vec![
         TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
         TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
@@ -851,10 +1194,22 @@ fn test_keyof_tuple() {
 
     let result = evaluate_keyof(&interner, tuple);
 
-    let key_0 = interner.literal_string("0");
-    let key_1 = interner.literal_string("1");
-    let expected = interner.union(vec![key_0, key_1]);
-    assert_eq!(result, expected);
+    let key = interner.lookup(result).expect("expected union for keyof tuple");
+
+    match key {
+        TypeKey::Union(members) => {
+            let key_0 = interner.literal_string("0");
+            let key_1 = interner.literal_string("1");
+            let length = interner.literal_string("length");
+            let map = interner.literal_string("map");
+            assert!(members.contains(&key_0));
+            assert!(members.contains(&key_1));
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&length));
+            assert!(members.contains(&map));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
 }
 
 #[test]
@@ -875,6 +1230,34 @@ fn test_keyof_unknown() {
     // keyof unknown = never
     let result = evaluate_keyof(&interner, TypeId::UNKNOWN);
     assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_keyof_object_keyword() {
+    let interner = TypeInterner::new();
+
+    // keyof object = never
+    let result = evaluate_keyof(&interner, TypeId::OBJECT);
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_keyof_never() {
+    let interner = TypeInterner::new();
+
+    // keyof never = never
+    let result = evaluate_keyof(&interner, TypeId::NEVER);
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_keyof_nullish() {
+    let interner = TypeInterner::new();
+
+    // keyof null/undefined/void = never
+    assert_eq!(evaluate_keyof(&interner, TypeId::NULL), TypeId::NEVER);
+    assert_eq!(evaluate_keyof(&interner, TypeId::UNDEFINED), TypeId::NEVER);
+    assert_eq!(evaluate_keyof(&interner, TypeId::VOID), TypeId::NEVER);
 }
 
 #[test]

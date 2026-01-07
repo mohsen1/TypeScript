@@ -456,6 +456,9 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     fn resolve_named_type_reference(&mut self, name: &str) -> Option<TypeId> {
+        if let Some(type_id) = self.lookup_type_parameter(name) {
+            return Some(type_id);
+        }
         // Check local scopes first (includes type parameters)
         if let Some(type_id) = self.lookup_local(name) {
             return Some(type_id);
@@ -476,6 +479,10 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         None
+    }
+
+    fn lookup_type_parameter(&self, name: &str) -> Option<TypeId> {
+        self.ctx.type_parameter_scope.get(name).copied()
     }
 
     fn has_named_type_symbol(&self, name: &str) -> bool {
@@ -715,9 +722,8 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
-        // ArrayType uses TypeOperatorData which has the element type
-        if let Some(type_op) = self.ctx.arena.get_type_operator(node) {
-            let elem_type = self.get_type_of_node(type_op.type_node);
+        if let Some(array_type) = self.ctx.arena.get_array_type(node) {
+            let elem_type = self.get_type_from_type_node(array_type.element_type);
             return self.ctx.types.array(elem_type);
         }
 
@@ -738,6 +744,73 @@ impl<'a> ThinCheckerState<'a> {
         );
 
         lowering.lower_type(idx)
+    }
+
+    fn lower_type_parameter_info(&mut self, idx: NodeIndex) -> Option<(crate::solver::TypeParamInfo, String)> {
+        let node = self.ctx.arena.get(idx)?;
+        let data = self.ctx.arena.get_type_parameter(node)?;
+
+        let name = self.ctx.arena.get(data.name)
+            .and_then(|name_node| self.ctx.arena.get_identifier(name_node))
+            .map(|id_data| id_data.escaped_text.clone())
+            .unwrap_or_else(|| "T".to_string());
+        let atom = self.ctx.types.intern_string(&name);
+
+        let constraint = if data.constraint != NodeIndex::NONE {
+            Some(self.get_type_from_type_node(data.constraint))
+        } else {
+            None
+        };
+
+        let default = if data.default != NodeIndex::NONE {
+            Some(self.get_type_from_type_node(data.default))
+        } else {
+            None
+        };
+
+        Some((
+            crate::solver::TypeParamInfo {
+                name: atom,
+                constraint,
+                default,
+            },
+            name,
+        ))
+    }
+
+    fn push_type_parameters(
+        &mut self,
+        type_parameters: &Option<crate::parser::NodeList>,
+    ) -> (Vec<crate::solver::TypeParamInfo>, Vec<(String, Option<TypeId>)>) {
+        use crate::solver::TypeKey;
+
+        let Some(list) = type_parameters else {
+            return (Vec::new(), Vec::new());
+        };
+
+        let mut params = Vec::new();
+        let mut updates = Vec::new();
+
+        for &param_idx in &list.nodes {
+            if let Some((info, name)) = self.lower_type_parameter_info(param_idx) {
+                let type_id = self.ctx.types.intern(TypeKey::TypeParameter(info.clone()));
+                let previous = self.ctx.type_parameter_scope.insert(name.clone(), type_id);
+                updates.push((name, previous));
+                params.push(info);
+            }
+        }
+
+        (params, updates)
+    }
+
+    fn pop_type_parameters(&mut self, updates: Vec<(String, Option<TypeId>)>) {
+        for (name, previous) in updates.into_iter().rev() {
+            if let Some(prev_type) = previous {
+                self.ctx.type_parameter_scope.insert(name, prev_type);
+            } else {
+                self.ctx.type_parameter_scope.remove(&name);
+            }
+        }
     }
 
     /// Get type of an interface declaration.
@@ -1217,10 +1290,9 @@ impl<'a> ThinCheckerState<'a> {
             if !value_decl.is_none() {
                 if let Some(node) = self.ctx.arena.get(value_decl) {
                     if let Some(var_decl) = self.ctx.arena.get_variable_declaration(node) {
-                        // First try type annotation - use get_type_of_node to resolve type references
-                        // through the binder (for interfaces, classes, etc.)
+                        // First try type annotation using type-node lowering (resolves through binder).
                         if !var_decl.type_annotation.is_none() {
-                            return self.get_type_of_node(var_decl.type_annotation);
+                            return self.get_type_from_type_node(var_decl.type_annotation);
                         }
                         // Fall back to inferring from initializer
                         if !var_decl.initializer.is_none() {
@@ -1660,6 +1732,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of element access expression (e.g., arr[0], obj["prop"]).
     fn get_type_of_element_access(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
+
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
         };
@@ -1669,14 +1743,542 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         // Get the type of the object
-        let _object_type = self.get_type_of_node(access.expression);
+        let object_type = self.get_type_of_node(access.expression);
 
-        // Get the index type
-        let _index_type = self.get_type_of_node(access.name_or_argument);
+        // Don't report errors for any/error types
+        if object_type == TypeId::ANY || object_type == TypeId::ERROR {
+            return TypeId::ANY;
+        }
 
-        // For now, return any for element access
-        // TODO: Extract element type from array/tuple types using TypeInterner lookup
-        TypeId::ANY
+        let (object_type_for_access, nullish_cause) = self.split_nullish_type(object_type);
+        let Some(object_type_for_access) = object_type_for_access else {
+            if access.question_dot_token {
+                return TypeId::UNDEFINED;
+            }
+            if let Some(cause) = nullish_cause {
+                self.report_possibly_nullish_object(access.expression, cause);
+            }
+            return TypeId::ERROR;
+        };
+
+        let index_type = self.get_type_of_node(access.name_or_argument);
+        let literal_string_is_none = self.get_literal_string_from_node(access.name_or_argument).is_none();
+        let numeric_string_index = self.get_literal_string_from_node(access.name_or_argument)
+            .and_then(|name| self.get_numeric_index_from_string(name));
+        let literal_index = self.get_literal_index_from_node(access.name_or_argument)
+            .or(numeric_string_index);
+
+        let mut result_type = None;
+        let mut report_no_index = false;
+        let mut use_index_signature_check = true;
+
+        if literal_index.is_none() {
+            if let Some((string_keys, number_keys)) = self.get_literal_key_union_from_type(index_type) {
+                let total_keys = string_keys.len() + number_keys.len();
+                if total_keys > 1 || literal_string_is_none {
+                    if !string_keys.is_empty() && number_keys.is_empty() {
+                        use_index_signature_check = false;
+                    }
+
+                    let mut types = Vec::new();
+                    if !string_keys.is_empty() {
+                        match self.get_element_access_type_for_literal_keys(object_type_for_access, &string_keys) {
+                            Some(result) => types.push(result),
+                            None => report_no_index = true,
+                        }
+                    }
+
+                    if !number_keys.is_empty() {
+                        match self.get_element_access_type_for_literal_number_keys(object_type_for_access, &number_keys) {
+                            Some(result) => types.push(result),
+                            None => report_no_index = true,
+                        }
+                    }
+
+                    if report_no_index {
+                        result_type = Some(TypeId::ANY);
+                    } else if !types.is_empty() {
+                        result_type = Some(if types.len() == 1 {
+                            types[0]
+                        } else {
+                            self.ctx.types.union(types)
+                        });
+                    }
+                }
+            }
+        }
+
+        if result_type.is_none() {
+            if let Some(property_name) = self.get_literal_string_from_node(access.name_or_argument) {
+                if numeric_string_index.is_none() {
+                    use_index_signature_check = false;
+                    let evaluator = PropertyAccessEvaluator::new(self.ctx.types);
+                    let result = evaluator.resolve_property_access(object_type_for_access, property_name);
+                    result_type = Some(match result {
+                        PropertyAccessResult::Success { type_id, .. } => type_id,
+                        PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
+                            property_type.unwrap_or(TypeId::ANY)
+                        }
+                        PropertyAccessResult::IsUnknown => TypeId::ANY,
+                        PropertyAccessResult::PropertyNotFound { .. } => {
+                            report_no_index = true;
+                            TypeId::ANY
+                        }
+                    });
+                }
+            }
+        }
+
+        let mut result_type = result_type.unwrap_or_else(|| {
+            self.get_element_access_type(object_type_for_access, index_type, literal_index)
+        });
+
+        if use_index_signature_check
+            && self.should_report_no_index_signature(object_type_for_access, index_type, literal_index)
+        {
+            report_no_index = true;
+        }
+
+        if report_no_index {
+            self.error_no_index_signature_at(index_type, object_type, access.name_or_argument);
+        }
+
+        if let Some(cause) = nullish_cause {
+            if access.question_dot_token {
+                result_type = self.ctx.types.union(vec![result_type, TypeId::UNDEFINED]);
+            } else if !report_no_index {
+                self.report_possibly_nullish_object(access.expression, cause);
+            }
+        }
+
+        result_type
+    }
+
+    fn get_element_access_type(
+        &mut self,
+        object_type: TypeId,
+        index_type: TypeId,
+        literal_index: Option<usize>,
+    ) -> TypeId {
+        use crate::solver::{LiteralValue, TypeKey};
+
+        let object_key = match self.ctx.types.lookup(object_type) {
+            Some(TypeKey::ReadonlyType(inner)) => self.ctx.types.lookup(inner),
+            other => other,
+        };
+
+        match object_key {
+            Some(TypeKey::Array(element)) => element,
+            Some(TypeKey::Tuple(elements)) => {
+                let literal_index = literal_index.or_else(|| {
+                    match self.ctx.types.lookup(index_type) {
+                        Some(TypeKey::Literal(LiteralValue::Number(num))) => {
+                            let value = num.0;
+                            if value.is_finite() && value.fract() == 0.0 && value >= 0.0 {
+                                Some(value as usize)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    }
+                });
+
+                if let Some(index) = literal_index {
+                    if let Some(element) = elements.get(index) {
+                        return element.type_id;
+                    }
+                    return TypeId::ANY;
+                }
+
+                let mut element_types: Vec<TypeId> = elements.iter().map(|element| element.type_id).collect();
+                if element_types.is_empty() {
+                    TypeId::NEVER
+                } else if element_types.len() == 1 {
+                    element_types[0]
+                } else {
+                    self.ctx.types.union(element_types)
+                }
+            }
+            Some(TypeKey::ObjectWithIndex(shape)) => {
+                if literal_index.is_some() {
+                    if let Some(number_index) = shape.number_index.as_ref() {
+                        return number_index.value_type;
+                    }
+                    if let Some(string_index) = shape.string_index.as_ref() {
+                        return string_index.value_type;
+                    }
+                    return TypeId::ANY;
+                }
+
+                if index_type == TypeId::NUMBER {
+                    if let Some(number_index) = shape.number_index.as_ref() {
+                        return number_index.value_type;
+                    }
+                    if let Some(string_index) = shape.string_index.as_ref() {
+                        return string_index.value_type;
+                    }
+                    return TypeId::ANY;
+                }
+
+                if index_type == TypeId::STRING {
+                    if let Some(string_index) = shape.string_index.as_ref() {
+                        return string_index.value_type;
+                    }
+                }
+
+                TypeId::ANY
+            }
+            Some(TypeKey::Union(members)) => {
+                let mut member_types = Vec::with_capacity(members.len());
+                for member in members {
+                    member_types.push(self.get_element_access_type(member, index_type, literal_index));
+                }
+                if member_types.is_empty() {
+                    TypeId::ANY
+                } else {
+                    self.ctx.types.union(member_types)
+                }
+            }
+            _ => TypeId::ANY,
+        }
+    }
+
+    fn split_nullish_type(&mut self, type_id: TypeId) -> (Option<TypeId>, Option<TypeId>) {
+        use crate::solver::{IntrinsicKind, TypeKey};
+
+        let Some(key) = self.ctx.types.lookup(type_id) else {
+            return (Some(type_id), None);
+        };
+
+        match key {
+            TypeKey::Intrinsic(IntrinsicKind::Null) => (None, Some(TypeId::NULL)),
+            TypeKey::Intrinsic(IntrinsicKind::Undefined | IntrinsicKind::Void) => {
+                (None, Some(TypeId::UNDEFINED))
+            }
+            TypeKey::Union(members) => {
+                let mut non_null = Vec::with_capacity(members.len());
+                let mut nullish = Vec::new();
+
+                for &member in members.iter() {
+                    match self.ctx.types.lookup(member) {
+                        Some(TypeKey::Intrinsic(IntrinsicKind::Null)) => nullish.push(TypeId::NULL),
+                        Some(TypeKey::Intrinsic(IntrinsicKind::Undefined | IntrinsicKind::Void)) => {
+                            nullish.push(TypeId::UNDEFINED);
+                        }
+                        _ => non_null.push(member),
+                    }
+                }
+
+                if nullish.is_empty() {
+                    return (Some(type_id), None);
+                }
+
+                let non_null_type = if non_null.is_empty() {
+                    None
+                } else if non_null.len() == 1 {
+                    Some(non_null[0])
+                } else {
+                    Some(self.ctx.types.union(non_null))
+                };
+
+                let cause = if nullish.len() == 1 {
+                    Some(nullish[0])
+                } else {
+                    Some(self.ctx.types.union(nullish))
+                };
+
+                (non_null_type, cause)
+            }
+            _ => (Some(type_id), None),
+        }
+    }
+
+    fn report_possibly_nullish_object(&mut self, idx: NodeIndex, cause: TypeId) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        let (code, message) = if cause == TypeId::NULL {
+            (diagnostic_codes::OBJECT_IS_POSSIBLY_NULL, "Object is possibly 'null'.")
+        } else if cause == TypeId::UNDEFINED {
+            (diagnostic_codes::OBJECT_IS_POSSIBLY_UNDEFINED, "Object is possibly 'undefined'.")
+        } else {
+            (diagnostic_codes::OBJECT_IS_POSSIBLY_NULL_OR_UNDEFINED, "Object is possibly 'null' or 'undefined'.")
+        };
+
+        self.error_at_node(idx, message, code);
+    }
+
+    fn get_literal_index_from_node(&self, idx: NodeIndex) -> Option<usize> {
+        use crate::scanner::SyntaxKind;
+
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return None;
+        };
+
+        if node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+            if let Some(paren) = self.ctx.arena.get_parenthesized(node) {
+                return self.get_literal_index_from_node(paren.expression);
+            }
+        }
+
+        if node.kind == SyntaxKind::NumericLiteral as u16 {
+            if let Some(lit) = self.ctx.arena.get_literal(node) {
+                if let Some(value) = lit.value {
+                    if value.is_finite() && value.fract() == 0.0 && value >= 0.0 {
+                        return Some(value as usize);
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
+    fn get_literal_string_from_node(&self, idx: NodeIndex) -> Option<&str> {
+        use crate::scanner::SyntaxKind;
+
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return None;
+        };
+
+        if node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+            if let Some(paren) = self.ctx.arena.get_parenthesized(node) {
+                return self.get_literal_string_from_node(paren.expression);
+            }
+        }
+
+        if node.kind == SyntaxKind::StringLiteral as u16
+            || node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+        {
+            return self.ctx.arena.get_literal(node).map(|lit| lit.text.as_str());
+        }
+
+        None
+    }
+
+    fn get_numeric_index_from_string(&self, value: &str) -> Option<usize> {
+        let parsed: f64 = value.parse().ok()?;
+        if !parsed.is_finite() || parsed.fract() != 0.0 || parsed < 0.0 {
+            return None;
+        }
+        if parsed > (usize::MAX as f64) {
+            return None;
+        }
+        Some(parsed as usize)
+    }
+
+    fn get_numeric_index_from_number(&self, value: f64) -> Option<usize> {
+        if !value.is_finite() || value.fract() != 0.0 || value < 0.0 {
+            return None;
+        }
+        if value > (usize::MAX as f64) {
+            return None;
+        }
+        Some(value as usize)
+    }
+
+    fn get_literal_key_union_from_type(&self, index_type: TypeId) -> Option<(Vec<Atom>, Vec<f64>)> {
+        use crate::solver::{LiteralValue, TypeKey};
+
+        match self.ctx.types.lookup(index_type)? {
+            TypeKey::Literal(LiteralValue::String(atom)) => Some((vec![atom], Vec::new())),
+            TypeKey::Literal(LiteralValue::Number(num)) => Some((Vec::new(), vec![num.0])),
+            TypeKey::Union(members) => {
+                let mut string_keys = Vec::with_capacity(members.len());
+                let mut number_keys = Vec::new();
+                for &member in members.iter() {
+                    match self.ctx.types.lookup(member) {
+                        Some(TypeKey::Literal(LiteralValue::String(atom))) => string_keys.push(atom),
+                        Some(TypeKey::Literal(LiteralValue::Number(num))) => number_keys.push(num.0),
+                        _ => return None,
+                    }
+                }
+                Some((string_keys, number_keys))
+            }
+            _ => None,
+        }
+    }
+
+    fn get_element_access_type_for_literal_keys(
+        &mut self,
+        object_type: TypeId,
+        keys: &[Atom],
+    ) -> Option<TypeId> {
+        use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
+
+        if keys.is_empty() {
+            return None;
+        }
+
+        let numeric_as_index = self.is_array_like_type(object_type);
+        let evaluator = PropertyAccessEvaluator::new(self.ctx.types);
+        let mut types = Vec::with_capacity(keys.len());
+
+        for &key in keys {
+            let name = self.ctx.types.resolve_atom(key);
+            if numeric_as_index {
+                if let Some(index) = self.get_numeric_index_from_string(&name) {
+                    let element_type = self.get_element_access_type(object_type, TypeId::NUMBER, Some(index));
+                    types.push(element_type);
+                    continue;
+                }
+            }
+
+            match evaluator.resolve_property_access(object_type, &name) {
+                PropertyAccessResult::Success { type_id, .. } => types.push(type_id),
+                PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
+                    types.push(property_type.unwrap_or(TypeId::ANY));
+                }
+                PropertyAccessResult::IsUnknown => types.push(TypeId::ANY),
+                PropertyAccessResult::PropertyNotFound { .. } => return None,
+            }
+        }
+
+        if types.len() == 1 {
+            Some(types[0])
+        } else {
+            Some(self.ctx.types.union(types))
+        }
+    }
+
+    fn get_element_access_type_for_literal_number_keys(
+        &mut self,
+        object_type: TypeId,
+        keys: &[f64],
+    ) -> Option<TypeId> {
+        if keys.is_empty() {
+            return None;
+        }
+
+        let mut types = Vec::with_capacity(keys.len());
+        for &value in keys {
+            if let Some(index) = self.get_numeric_index_from_number(value) {
+                types.push(self.get_element_access_type(object_type, TypeId::NUMBER, Some(index)));
+            } else {
+                return Some(self.get_element_access_type(object_type, TypeId::NUMBER, None));
+            }
+        }
+
+        if types.len() == 1 {
+            Some(types[0])
+        } else {
+            Some(self.ctx.types.union(types))
+        }
+    }
+
+    fn is_array_like_type(&self, object_type: TypeId) -> bool {
+        use crate::solver::TypeKey;
+
+        match self.ctx.types.lookup(object_type) {
+            Some(TypeKey::Array(_) | TypeKey::Tuple(_)) => true,
+            Some(TypeKey::ReadonlyType(inner)) => self.is_array_like_type(inner),
+            Some(TypeKey::Union(members)) => members.iter().all(|member| self.is_array_like_type(*member)),
+            Some(TypeKey::Intersection(members)) => members.iter().any(|member| self.is_array_like_type(*member)),
+            _ => false,
+        }
+    }
+
+    fn should_report_no_index_signature(
+        &self,
+        object_type: TypeId,
+        index_type: TypeId,
+        literal_index: Option<usize>,
+    ) -> bool {
+        use crate::solver::TypeKey;
+
+        if object_type == TypeId::ANY || object_type == TypeId::UNKNOWN || object_type == TypeId::ERROR {
+            return false;
+        }
+
+        if index_type == TypeId::ANY || index_type == TypeId::UNKNOWN {
+            return false;
+        }
+
+        let index_key_kind = self.get_index_key_kind(index_type);
+        let wants_number = literal_index.is_some()
+            || index_key_kind.as_ref().is_some_and(|(_, wants_number)| *wants_number);
+        let wants_string = index_key_kind.as_ref().is_some_and(|(wants_string, _)| *wants_string);
+        if !wants_number && !wants_string {
+            return false;
+        }
+
+        let object_key = match self.ctx.types.lookup(object_type) {
+            Some(TypeKey::ReadonlyType(inner)) => self.ctx.types.lookup(inner),
+            other => other,
+        };
+
+        !self.is_element_indexable_key(&object_key, wants_string, wants_number)
+    }
+
+    fn get_index_key_kind(&self, index_type: TypeId) -> Option<(bool, bool)> {
+        use crate::solver::{IntrinsicKind, LiteralValue, TypeKey};
+
+        match self.ctx.types.lookup(index_type)? {
+            TypeKey::Intrinsic(IntrinsicKind::String) => Some((true, false)),
+            TypeKey::Intrinsic(IntrinsicKind::Number) => Some((false, true)),
+            TypeKey::Literal(LiteralValue::String(_)) => Some((true, false)),
+            TypeKey::Literal(LiteralValue::Number(_)) => Some((false, true)),
+            TypeKey::Union(members) => {
+                let mut wants_string = false;
+                let mut wants_number = false;
+                for &member in members.iter() {
+                    let (member_string, member_number) = self.get_index_key_kind(member)?;
+                    wants_string |= member_string;
+                    wants_number |= member_number;
+                }
+                Some((wants_string, wants_number))
+            }
+            _ => None,
+        }
+    }
+
+    fn is_element_indexable_key(
+        &self,
+        object_key: &Option<crate::solver::TypeKey>,
+        wants_string: bool,
+        wants_number: bool,
+    ) -> bool {
+        use crate::solver::{IntrinsicKind, LiteralValue, TypeKey};
+
+        match object_key {
+            Some(TypeKey::Array(_)) | Some(TypeKey::Tuple(_)) => wants_number,
+            Some(TypeKey::ObjectWithIndex(shape)) => {
+                let has_string = shape.string_index.is_some();
+                let has_number = shape.number_index.is_some();
+                (wants_string && has_string) || (wants_number && (has_number || has_string))
+            }
+            Some(TypeKey::Union(members)) => members.iter().all(|member| {
+                let key = self.ctx.types.lookup(*member);
+                self.is_element_indexable_key(&key, wants_string, wants_number)
+            }),
+            Some(TypeKey::Intersection(members)) => members.iter().any(|member| {
+                let key = self.ctx.types.lookup(*member);
+                self.is_element_indexable_key(&key, wants_string, wants_number)
+            }),
+            Some(TypeKey::Literal(LiteralValue::String(_))) => wants_number,
+            Some(TypeKey::Intrinsic(IntrinsicKind::String)) => wants_number,
+            _ => false,
+        }
+    }
+
+    fn error_no_index_signature_at(
+        &mut self,
+        index_type: TypeId,
+        object_type: TypeId,
+        idx: NodeIndex,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        use crate::solver::TypeFormatter;
+
+        let mut formatter = TypeFormatter::new(self.ctx.types);
+        let index_str = formatter.format(index_type);
+        let object_str = formatter.format(object_type);
+        let message = format!(
+            "Element implicitly has an 'any' type because expression of type '{}' can't be used to index type '{}'.",
+            index_str, object_str
+        );
+
+        self.error_at_node(idx, &message, diagnostic_codes::NO_INDEX_SIGNATURE);
     }
 
     /// Get type of conditional expression (ternary: a ? b : c).
@@ -1713,23 +2315,7 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
-        let mut has_type_param_scope = false;
-        if let Some(ref type_params) = func.type_parameters {
-            self.push_local_scope();
-            has_type_param_scope = true;
-            for &tp_idx in &type_params.nodes {
-                if let Some(tp_node) = self.ctx.arena.get(tp_idx) {
-                    if let Some(tp) = self.ctx.arena.get_type_parameter(tp_node) {
-                        if let Some(name_node) = self.ctx.arena.get(tp.name) {
-                            if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
-                                // Add type parameter as a type (use ANY as placeholder)
-                                self.add_local(ident.escaped_text.clone(), TypeId::ANY);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        let (type_params, type_param_updates) = self.push_type_parameters(&func.type_parameters);
 
         // Collect parameter info using solver's ParamInfo struct
         let mut params = Vec::new();
@@ -1847,7 +2433,7 @@ impl<'a> ThinCheckerState<'a> {
 
         // Create function type using TypeInterner
         let shape = FunctionShape {
-            type_params: Vec::new(), // TODO: Handle type parameters
+            type_params,
             params,
             this_type,
             return_type,
@@ -1855,15 +2441,15 @@ impl<'a> ThinCheckerState<'a> {
             is_constructor: false,
         };
 
-        let function_type = self.ctx.types.function(shape);
-        if has_type_param_scope {
-            self.pop_local_scope();
-        }
-        function_type
+        self.pop_type_parameters(type_param_updates);
+
+        self.ctx.types.function(shape)
     }
 
     /// Get type of array literal.
     fn get_type_of_array_literal(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::{TupleElement, TypeKey};
+
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
         };
@@ -1880,12 +2466,69 @@ impl<'a> ThinCheckerState<'a> {
             return self.ctx.types.array(TypeId::NEVER);
         }
 
-        // Get types of all elements
+        let tuple_context = match self.ctx.contextual_type {
+            Some(ctx_type) => match self.ctx.types.lookup(ctx_type) {
+                Some(TypeKey::Tuple(elements)) => Some(elements.clone()),
+                _ => None,
+            },
+            None => None,
+        };
+
+        let ctx_helper = if let Some(ctx_type) = self.ctx.contextual_type {
+            Some(ContextualTypeContext::with_expected(self.ctx.types, ctx_type))
+        } else {
+            None
+        };
+
+        // Get types of all elements, applying contextual typing when available.
         let mut element_types = Vec::new();
-        for &elem_idx in &array.elements.nodes {
-            if !elem_idx.is_none() {
-                element_types.push(self.get_type_of_node(elem_idx));
+        let mut tuple_elements = Vec::new();
+        for (index, &elem_idx) in array.elements.nodes.iter().enumerate() {
+            if elem_idx.is_none() {
+                continue;
             }
+
+            let prev_context = self.ctx.contextual_type;
+            if let Some(ref helper) = ctx_helper {
+                if tuple_context.is_some() {
+                    self.ctx.contextual_type = helper.get_tuple_element_type(index);
+                } else {
+                    self.ctx.contextual_type = helper.get_array_element_type();
+                }
+            }
+
+            let elem_type = self.get_type_of_node(elem_idx);
+
+            self.ctx.contextual_type = prev_context;
+
+            if let Some(ref expected) = tuple_context {
+                let (name, optional, rest) = match expected.get(index) {
+                    Some(el) => (el.name, el.optional, el.rest),
+                    None => {
+                        if let Some(last) = expected.last() {
+                            if last.rest {
+                                (last.name, last.optional, last.rest)
+                            } else {
+                                (None, false, false)
+                            }
+                        } else {
+                            (None, false, false)
+                        }
+                    }
+                };
+                tuple_elements.push(TupleElement {
+                    type_id: elem_type,
+                    name,
+                    optional,
+                    rest,
+                });
+            } else {
+                element_types.push(elem_type);
+            }
+        }
+
+        if tuple_context.is_some() {
+            return self.ctx.types.tuple(tuple_elements);
         }
 
         // Create union of element types using TypeInterner
@@ -2696,6 +3339,8 @@ impl<'a> ThinCheckerState<'a> {
             }
             syntax_kind_ext::FUNCTION_DECLARATION => {
                 if let Some(func) = self.ctx.arena.get_function(node) {
+                    let (_type_params, type_param_updates) = self.push_type_parameters(&func.type_parameters);
+
                     // Check for parameter properties (error 2369)
                     // Parameter properties are only allowed in constructors
                     self.check_parameter_properties(&func.parameters.nodes);
@@ -2767,6 +3412,8 @@ impl<'a> ThinCheckerState<'a> {
                         self.pop_return_type();
                         self.pop_local_scope();
                     }
+
+                    self.pop_type_parameters(type_param_updates);
                 }
             }
             syntax_kind_ext::WHILE_STATEMENT | syntax_kind_ext::DO_STATEMENT => {
