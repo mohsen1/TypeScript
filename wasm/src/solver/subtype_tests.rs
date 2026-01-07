@@ -680,7 +680,7 @@ fn test_tuple_to_array_mixed_types() {
 
 #[test]
 fn test_array_to_variadic_tuple() {
-    // string[] IS assignable to [...string[]]
+    // string[] is NOT assignable to [...string[]]
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
@@ -689,7 +689,7 @@ fn test_array_to_variadic_tuple() {
         TupleElement { type_id: string_array, name: None, optional: false, rest: true },
     ]);
 
-    assert!(checker.is_subtype_of(string_array, target));
+    assert!(!checker.is_subtype_of(string_array, target));
 }
 
 #[test]
@@ -709,7 +709,7 @@ fn test_array_to_variadic_tuple_with_required_prefix() {
 
 #[test]
 fn test_array_to_variadic_tuple_with_optional_prefix() {
-    // string[] IS assignable to [string?, ...string[]]
+    // string[] is NOT assignable to [string?, ...string[]]
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
@@ -719,7 +719,7 @@ fn test_array_to_variadic_tuple_with_optional_prefix() {
         TupleElement { type_id: string_array, name: None, optional: false, rest: true },
     ]);
 
-    assert!(checker.is_subtype_of(string_array, target));
+    assert!(!checker.is_subtype_of(string_array, target));
 }
 
 #[test]
@@ -754,6 +754,21 @@ fn test_never_array_to_optional_tuple() {
     assert!(checker.is_subtype_of(never_array, empty_tuple));
     assert!(checker.is_subtype_of(never_array, optional_tuple));
     assert!(!checker.is_subtype_of(never_array, required_tuple));
+}
+
+#[test]
+fn test_never_array_to_variadic_tuple() {
+    // never[] IS assignable to [...string[]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let never_array = interner.array(TypeId::NEVER);
+    let string_array = interner.array(TypeId::STRING);
+    let target = interner.tuple(vec![
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    assert!(checker.is_subtype_of(never_array, target));
 }
 
 #[test]

@@ -987,43 +987,36 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     fn check_array_to_tuple_subtype(&mut self, source_elem: TypeId, target: &[TupleElement]) -> SubtypeResult {
-        if source_elem == TypeId::NEVER && target.iter().all(|elem| elem.optional) {
-            return SubtypeResult::True;
+        if source_elem != TypeId::NEVER {
+            return SubtypeResult::False;
         }
 
-        for (index, t_elem) in target.iter().enumerate() {
-            if t_elem.rest {
-                let expansion = self.expand_tuple_rest(t_elem.type_id);
-                for fixed in expansion.fixed {
-                    if !fixed.optional {
-                        return SubtypeResult::False;
-                    }
-                    if !self.check_subtype(source_elem, fixed.type_id).is_true() {
-                        return SubtypeResult::False;
-                    }
-                }
-                if let Some(variadic) = expansion.variadic {
-                    if !self.check_subtype(source_elem, variadic).is_true() {
-                        return SubtypeResult::False;
-                    }
-                } else {
-                    return SubtypeResult::False;
-                }
+        if self.tuple_allows_empty(target) {
+            SubtypeResult::True
+        } else {
+            SubtypeResult::False
+        }
+    }
+
+    fn tuple_allows_empty(&self, target: &[TupleElement]) -> bool {
+        for (index, elem) in target.iter().enumerate() {
+            if elem.rest {
                 if index + 1 < target.len() {
-                    return SubtypeResult::False;
+                    return false;
                 }
-                return SubtypeResult::True;
+                let expansion = self.expand_tuple_rest(elem.type_id);
+                if expansion.fixed.iter().any(|fixed| !fixed.optional) {
+                    return false;
+                }
+                return true;
             }
 
-            if !t_elem.optional {
-                return SubtypeResult::False;
-            }
-            if !self.check_subtype(source_elem, t_elem.type_id).is_true() {
-                return SubtypeResult::False;
+            if !elem.optional {
+                return false;
             }
         }
 
-        SubtypeResult::False
+        true
     }
 
     fn lookup_property<'props>(
