@@ -250,6 +250,80 @@ fn test_narrow_by_typeof_template_literal() {
     assert_eq!(narrowed, template);
 }
 
+#[test]
+fn test_narrow_by_typeof_object_with_object_literal() {
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let union = interner.union(vec![obj, TypeId::NUMBER]);
+
+    let narrowed = narrow_by_typeof(&interner, union, "object");
+    assert_eq!(narrowed, obj);
+}
+
+#[test]
+fn test_narrow_by_typeof_object_excludes_function() {
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let union = interner.union(vec![obj, func]);
+
+    let narrowed = narrow_by_typeof(&interner, union, "object");
+    assert_eq!(narrowed, obj);
+}
+
+#[test]
+fn test_narrow_by_typeof_function_includes_callable() {
+    let interner = TypeInterner::new();
+
+    let sig = CallSignature {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_predicate: None,
+    };
+    let callable = interner.callable(CallableShape {
+        call_signatures: vec![sig],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+    let union = interner.union(vec![callable, TypeId::NUMBER]);
+
+    let narrowed = narrow_by_typeof(&interner, union, "function");
+    assert_eq!(narrowed, callable);
+}
+
 // =============================================================================
 // General Narrowing Tests
 // =============================================================================
