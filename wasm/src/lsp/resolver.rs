@@ -871,17 +871,41 @@ impl<'a> ScopeWalker<'a> {
     /// are complex and would require tracking function scope boundaries during traversal.
     /// The ThinBinder handles hoisting correctly during the binding phase.
     fn register_local_declarations(&mut self, container: NodeIndex) {
+        let mut skip_name = None;
         if let Some(node) = self.arena.get(container) {
-            if node.kind == syntax_kind_ext::CLASS_DECLARATION
-                || node.kind == syntax_kind_ext::CLASS_EXPRESSION
-            {
-                // Class members are not lexically scoped identifiers.
-                return;
+            match node.kind {
+                k if k == syntax_kind_ext::CLASS_DECLARATION
+                    || k == syntax_kind_ext::CLASS_EXPRESSION => {
+                    if let Some(&sym_id) = self.binder.node_symbols.get(&container.0) {
+                        if let Some(symbol) = self.binder.symbols.get(sym_id) {
+                            self.declare_local(symbol.escaped_name.clone(), sym_id);
+                        }
+                    }
+                    // Class members are not lexically scoped identifiers.
+                    return;
+                }
+                k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                    if let Some(method) = self.arena.get_method_decl(node) {
+                        skip_name = Some(method.name);
+                    }
+                }
+                k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                    if let Some(accessor) = self.arena.get_accessor(node) {
+                        skip_name = Some(accessor.name);
+                    }
+                }
+                _ => {}
             }
         }
 
         // Iterate over direct children to find declarations
         self.for_each_child(container, |walker, child_idx| {
+            if let Some(skip_idx) = skip_name {
+                if child_idx == skip_idx {
+                    return None::<()>;
+                }
+            }
+
             // Check if this child has a symbol associated in the binder
             if let Some(&sym_id) = walker.binder.node_symbols.get(&child_idx.0) {
                 if let Some(symbol) = walker.binder.symbols.get(sym_id) {
