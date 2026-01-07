@@ -216,6 +216,103 @@ fn test_call_rest_parameter_type_mismatch() {
 }
 
 #[test]
+fn test_call_tuple_rest_argument_count_mismatch() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    let tuple_rest = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: tuple_rest,
+            optional: false,
+            rest: true,
+        }],
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let result = evaluator.resolve_call(func, &[TypeId::NUMBER]);
+    match result {
+        CallResult::ArgumentCountMismatch { expected_min, actual, .. } => {
+            assert_eq!(expected_min, 2);
+            assert_eq!(actual, 1);
+        }
+        _ => panic!("Expected ArgumentCountMismatch, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_call_tuple_rest_argument_type_mismatch() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    let tuple_rest = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: tuple_rest,
+            optional: false,
+            rest: true,
+        }],
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let result = evaluator.resolve_call(func, &[TypeId::NUMBER, TypeId::BOOLEAN]);
+    match result {
+        CallResult::ArgumentTypeMismatch { index, expected, actual } => {
+            assert_eq!(index, 1);
+            assert_eq!(expected, TypeId::STRING);
+            assert_eq!(actual, TypeId::BOOLEAN);
+        }
+        _ => panic!("Expected ArgumentTypeMismatch, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_call_tuple_rest_argument_success() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    let tuple_rest = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: tuple_rest,
+            optional: false,
+            rest: true,
+        }],
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let result = evaluator.resolve_call(func, &[TypeId::NUMBER, TypeId::STRING]);
+    match result {
+        CallResult::Success(ret) => assert_eq!(ret, TypeId::STRING),
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_property_access_object() {
     let interner = TypeInterner::new();
     let evaluator = PropertyAccessEvaluator::new(&interner);

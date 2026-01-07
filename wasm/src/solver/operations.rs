@@ -113,12 +113,7 @@ impl<'a> CallEvaluator<'a> {
     /// Resolve a call to a simple function type.
     fn resolve_function_call(&mut self, func: &FunctionShape, arg_types: &[TypeId]) -> CallResult {
         // Check argument count
-        let min_args = func.params.iter().filter(|p| !p.optional && !p.rest).count();
-        let max_args = if func.params.iter().any(|p| p.rest) {
-            None
-        } else {
-            Some(func.params.len())
-        };
+        let (min_args, max_args) = self.arg_count_bounds(&func.params);
 
         if arg_types.len() < min_args {
             return CallResult::ArgumentCountMismatch {
@@ -188,20 +183,8 @@ impl<'a> CallEvaluator<'a> {
 
         // 3. Collect constraints from arguments
         for (i, &arg_type) in arg_types.iter().enumerate() {
-            if i >= instantiated_params.len() && !instantiated_params.last().map_or(false, |p| p.rest) {
+            let Some(target_type) = self.param_type_for_arg_index(&instantiated_params, i) else {
                 break;
-            }
-
-            let param_idx = if i >= instantiated_params.len() { instantiated_params.len() - 1 } else { i };
-            let param = &instantiated_params[param_idx];
-
-            let target_type = if param.rest {
-                match self.interner.lookup(param.type_id) {
-                    Some(TypeKey::Array(elem)) => elem,
-                    _ => param.type_id,
-                }
-            } else {
-                param.type_id
             };
 
             let mut visited = FxHashSet::default();
@@ -266,24 +249,9 @@ impl<'a> CallEvaluator<'a> {
     }
 
     fn check_argument_types(&mut self, params: &[ParamInfo], arg_types: &[TypeId]) -> Option<CallResult> {
-        let rest_param = params.last().filter(|param| param.rest);
         for (i, arg_type) in arg_types.iter().enumerate() {
-            let param = if i < params.len() {
-                &params[i]
-            } else if let Some(rest) = rest_param {
-                rest
-            } else {
-                // Rest parameter or excess args already handled by count check
+            let Some(param_type) = self.param_type_for_arg_index(params, i) else {
                 break;
-            };
-            let param_type = if param.rest {
-                // For rest parameters, unwrap the array type
-                match self.interner.lookup(param.type_id) {
-                    Some(TypeKey::Array(elem)) => elem,
-                    _ => param.type_id,
-                }
-            } else {
-                param.type_id
             };
 
             if !self.subtype.is_assignable_to(*arg_type, param_type) {
@@ -295,6 +263,77 @@ impl<'a> CallEvaluator<'a> {
             }
         }
         None
+    }
+
+    fn arg_count_bounds(&self, params: &[ParamInfo]) -> (usize, Option<usize>) {
+        let required = params.iter().filter(|p| !p.optional && !p.rest).count();
+        let rest_param = params.last().filter(|param| param.rest);
+        let Some(rest_param) = rest_param else {
+            return (required, Some(params.len()));
+        };
+
+        match self.interner.lookup(rest_param.type_id) {
+            Some(TypeKey::Tuple(elements)) => {
+                let mut min = required;
+                let mut max = required;
+                let mut has_rest = false;
+                for elem in elements {
+                    if elem.rest {
+                        has_rest = true;
+                        break;
+                    }
+                    max += 1;
+                    if !elem.optional {
+                        min += 1;
+                    }
+                }
+                (min, if has_rest { None } else { Some(max) })
+            }
+            _ => (required, None),
+        }
+    }
+
+    fn param_type_for_arg_index(&self, params: &[ParamInfo], arg_index: usize) -> Option<TypeId> {
+        let rest_param = params.last().filter(|param| param.rest);
+        let rest_start = if rest_param.is_some() { params.len().saturating_sub(1) } else { params.len() };
+
+        if arg_index < rest_start {
+            return Some(params[arg_index].type_id);
+        }
+
+        let rest_param = rest_param?;
+        let offset = arg_index - rest_start;
+
+        match self.interner.lookup(rest_param.type_id) {
+            Some(TypeKey::Array(elem)) => Some(elem),
+            Some(TypeKey::Tuple(elements)) => {
+                let mut fixed_count = 0usize;
+                let mut rest_elem_type = None;
+                for elem in elements {
+                    if elem.rest {
+                        rest_elem_type = Some(self.rest_element_type(elem.type_id));
+                        break;
+                    }
+                    if fixed_count == offset {
+                        return Some(elem.type_id);
+                    }
+                    fixed_count += 1;
+                }
+                if offset >= fixed_count {
+                    rest_elem_type
+                } else {
+                    None
+                }
+            }
+            _ => Some(rest_param.type_id),
+        }
+    }
+
+    fn rest_element_type(&self, type_id: TypeId) -> TypeId {
+        match self.interner.lookup(type_id) {
+            Some(TypeKey::Array(elem)) => elem,
+            _ => type_id,
+        }
     }
 
     fn type_contains_placeholder(
