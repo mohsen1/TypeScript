@@ -20,7 +20,7 @@
 
 use crate::interner::Atom;
 use crate::solver::types::*;
-use crate::solver::{apparent_primitive_member_kind, ApparentMemberKind, TypeDatabase};
+use crate::solver::{apparent_primitive_member_kind, evaluate_mapped, ApparentMemberKind, TypeDatabase};
 use crate::solver::diagnostics::PendingDiagnostic;
 use crate::solver::infer::InferenceContext;
 use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
@@ -664,6 +664,18 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     if let (TemplateSpan::Type(s_type), TemplateSpan::Type(t_type)) = (s_span, t_span) {
                         self.constrain_types(ctx, var_map, *s_type, *t_type);
                     }
+                }
+            }
+            (Some(TypeKey::Mapped(ref mapped)), _) => {
+                let evaluated = evaluate_mapped(self.interner, mapped);
+                if evaluated != source {
+                    self.constrain_types(ctx, var_map, evaluated, target);
+                }
+            }
+            (_, Some(TypeKey::Mapped(ref mapped))) => {
+                let evaluated = evaluate_mapped(self.interner, mapped);
+                if evaluated != target {
+                    self.constrain_types(ctx, var_map, source, evaluated);
                 }
             }
             (Some(TypeKey::Union(ref s_members)), _) => {
