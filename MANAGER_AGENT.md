@@ -85,6 +85,9 @@ Manager actions:
   - `tmux send-keys -t <session> "your message"`
   - wait 1 second
   - `tmux send-keys -t <session> C-m`
+- Read a track pane to decide next action:
+  - `tmux capture-pane -p -t zang-hub:hub.<pane> -S -200`
+  - Use the output to decide whether to nudge, pause, or redirect a track.
 
 If sessions need to be recreated:
 - `tmux new-session -d -s <track> -c <path>`
