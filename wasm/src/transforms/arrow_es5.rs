@@ -166,6 +166,15 @@ pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bo
                 }
             }
         }
+        k if k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION => {
+            if let Some(tagged) = arena.get_tagged_template(node) {
+                if contains_this_reference(arena, tagged.tag)
+                    || contains_this_reference(arena, tagged.template)
+                {
+                    return true;
+                }
+            }
+        }
         k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
             if let Some(template) = arena.get_template_expr(node) {
                 for &span_idx in &template.template_spans.nodes {
@@ -214,12 +223,23 @@ pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bo
             }
         }
         k if k == syntax_kind_ext::AWAIT_EXPRESSION
-            || k == syntax_kind_ext::YIELD_EXPRESSION =>
+            || k == syntax_kind_ext::YIELD_EXPRESSION
+            || k == syntax_kind_ext::NON_NULL_EXPRESSION =>
         {
             if let Some(unary) = arena.get_unary_expr_ex(node) {
                 if !unary.expression.is_none()
                     && contains_this_reference(arena, unary.expression)
                 {
+                    return true;
+                }
+            }
+        }
+        k if k == syntax_kind_ext::TYPE_ASSERTION
+            || k == syntax_kind_ext::AS_EXPRESSION
+            || k == syntax_kind_ext::SATISFIES_EXPRESSION =>
+        {
+            if let Some(assertion) = arena.get_type_assertion(node) {
+                if contains_this_reference(arena, assertion.expression) {
                     return true;
                 }
             }

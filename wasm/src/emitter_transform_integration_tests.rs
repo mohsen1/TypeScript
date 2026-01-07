@@ -644,6 +644,174 @@ fn test_two_phase_emission_es5_async_arrow_this_capture_await() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_arrow_this_in_type_assertion() {
+    let source = "const foo = () => (this as any).x;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow should capture this in type assertion: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x") || output.contains("(_this).x"),
+        "ES5 arrow should rewrite this in type assertion: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_this_in_satisfies_expression() {
+    let source = "const foo = () => (this satisfies Foo).x;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow should capture this in satisfies expression: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x") || output.contains("(_this).x"),
+        "ES5 arrow should rewrite this in satisfies expression: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_this_in_angle_type_assertion() {
+    let source = "const foo = () => (<any>this).x;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow should capture this in angle type assertion: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x") || output.contains("(_this).x"),
+        "ES5 arrow should rewrite this in angle type assertion: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_this_in_tagged_template_span() {
+    let source = "const foo = () => tag`${this.x}`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow should capture this in tagged template span: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 arrow should rewrite this in tagged template span: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_this_in_tagged_template_tag() {
+    let source = "const foo = () => this.tag`hi`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow should capture this in tagged template tag: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.tag"),
+        "ES5 arrow should rewrite this in tagged template tag: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_this_in_non_null() {
+    let source = "const foo = () => this!.x;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow should capture this in non-null assertion: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 arrow should rewrite this in non-null assertion: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_async_function() {
     let source = "async function foo() { return 1; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

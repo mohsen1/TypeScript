@@ -208,6 +208,23 @@ impl<'a> NarrowingContext<'a> {
         source_type: TypeId,
         typeof_result: &str,
     ) -> TypeId {
+        if source_type == TypeId::ANY {
+            return TypeId::ANY;
+        }
+
+        if source_type == TypeId::UNKNOWN {
+            return match typeof_result {
+                "string" => TypeId::STRING,
+                "number" => TypeId::NUMBER,
+                "boolean" => TypeId::BOOLEAN,
+                "bigint" => TypeId::BIGINT,
+                "symbol" => TypeId::SYMBOL,
+                "undefined" => TypeId::UNDEFINED,
+                "object" => self.interner.union(vec![TypeId::OBJECT, TypeId::NULL]),
+                _ => source_type,
+            };
+        }
+
         let target_type = match typeof_result {
             "string" => TypeId::STRING,
             "number" => TypeId::NUMBER,
@@ -311,7 +328,26 @@ impl<'a> NarrowingContext<'a> {
 
     /// Check if a type is a function type.
     fn is_function_type(&self, type_id: TypeId) -> bool {
-        matches!(self.interner.lookup(type_id), Some(TypeKey::Function(_)))
+        matches!(
+            self.interner.lookup(type_id),
+            Some(TypeKey::Function(_) | TypeKey::Callable(_))
+        )
+    }
+
+    fn is_object_typeof(&self, type_id: TypeId) -> bool {
+        match self.interner.lookup(type_id) {
+            Some(TypeKey::Object(_))
+            | Some(TypeKey::ObjectWithIndex(_))
+            | Some(TypeKey::Array(_))
+            | Some(TypeKey::Tuple(_))
+            | Some(TypeKey::Mapped(_)) => true,
+            Some(TypeKey::ReadonlyType(inner)) => self.is_object_typeof(inner),
+            Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info
+                .constraint
+                .map(|constraint| self.is_object_typeof(constraint))
+                .unwrap_or(false),
+            _ => false,
+        }
     }
 
     /// Simple assignability check for narrowing purposes.
@@ -348,8 +384,13 @@ impl<'a> NarrowingContext<'a> {
         }
 
         // null/undefined to object (for typeof "object" narrowing)
-        if source == TypeId::NULL && target == TypeId::OBJECT {
-            return true;
+        if target == TypeId::OBJECT {
+            if source == TypeId::NULL {
+                return true;
+            }
+            if self.is_object_typeof(source) {
+                return true;
+            }
         }
 
         false

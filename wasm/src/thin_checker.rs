@@ -2448,12 +2448,11 @@ impl<'a> ThinCheckerState<'a> {
         self.check_parameter_properties(&func.parameters.nodes);
 
         // Get return type from annotation or infer
-        let return_type = if !func.type_annotation.is_none() {
+        let mut return_type = if !func.type_annotation.is_none() {
             // Check return type for parameter properties in function types
             self.check_type_for_parameter_properties(func.type_annotation);
             self.get_type_from_type_node(func.type_annotation)
         } else {
-            // TODO: Infer return type from body
             TypeId::ANY
         };
 
@@ -2475,6 +2474,11 @@ impl<'a> ThinCheckerState<'a> {
                         }
                     }
                 }
+            }
+
+            if func.type_annotation.is_none() {
+                let return_context = ctx_helper.as_ref().and_then(|helper| helper.get_return_type());
+                return_type = self.infer_return_type_from_body(func.body, return_context);
             }
 
             self.push_return_type(return_type);
@@ -6493,6 +6497,188 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         true
+    }
+
+    /// Infer the return type of a function body by collecting return expressions.
+    fn infer_return_type_from_body(
+        &mut self,
+        body_idx: NodeIndex,
+        return_context: Option<TypeId>,
+    ) -> TypeId {
+        if body_idx.is_none() {
+            return TypeId::ANY;
+        }
+
+        let Some(node) = self.ctx.arena.get(body_idx) else {
+            return TypeId::ANY;
+        };
+
+        if node.kind != syntax_kind_ext::BLOCK {
+            return self.return_expression_type(body_idx, return_context);
+        }
+
+        let mut return_types = Vec::new();
+        let mut saw_empty = false;
+
+        if let Some(block) = self.ctx.arena.get_block(node) {
+            for &stmt_idx in &block.statements.nodes {
+                self.collect_return_types_in_statement(
+                    stmt_idx,
+                    &mut return_types,
+                    &mut saw_empty,
+                    return_context,
+                );
+            }
+        }
+
+        if return_types.is_empty() {
+            return TypeId::VOID;
+        }
+
+        if saw_empty {
+            return_types.push(TypeId::VOID);
+        }
+
+        self.ctx.types.union(return_types)
+    }
+
+    fn return_expression_type(&mut self, expr_idx: NodeIndex, return_context: Option<TypeId>) -> TypeId {
+        let prev_context = self.ctx.contextual_type;
+        if let Some(ctx_type) = return_context {
+            self.ctx.contextual_type = Some(ctx_type);
+        }
+        let return_type = self.get_type_of_node(expr_idx);
+        self.ctx.contextual_type = prev_context;
+        return_type
+    }
+
+    fn collect_return_types_in_statement(
+        &mut self,
+        stmt_idx: NodeIndex,
+        return_types: &mut Vec<TypeId>,
+        saw_empty: &mut bool,
+        return_context: Option<TypeId>,
+    ) {
+        let Some(node) = self.ctx.arena.get(stmt_idx) else {
+            return;
+        };
+
+        match node.kind {
+            syntax_kind_ext::RETURN_STATEMENT => {
+                if let Some(return_data) = self.ctx.arena.get_return_statement(node) {
+                    if return_data.expression.is_none() {
+                        *saw_empty = true;
+                    } else {
+                        let return_type =
+                            self.return_expression_type(return_data.expression, return_context);
+                        return_types.push(return_type);
+                    }
+                }
+            }
+            syntax_kind_ext::BLOCK => {
+                if let Some(block) = self.ctx.arena.get_block(node) {
+                    for &stmt in &block.statements.nodes {
+                        self.collect_return_types_in_statement(
+                            stmt,
+                            return_types,
+                            saw_empty,
+                            return_context,
+                        );
+                    }
+                }
+            }
+            syntax_kind_ext::IF_STATEMENT => {
+                if let Some(if_data) = self.ctx.arena.get_if_statement(node) {
+                    self.collect_return_types_in_statement(
+                        if_data.then_statement,
+                        return_types,
+                        saw_empty,
+                        return_context,
+                    );
+                    if !if_data.else_statement.is_none() {
+                        self.collect_return_types_in_statement(
+                            if_data.else_statement,
+                            return_types,
+                            saw_empty,
+                            return_context,
+                        );
+                    }
+                }
+            }
+            syntax_kind_ext::SWITCH_STATEMENT => {
+                if let Some(switch_data) = self.ctx.arena.get_switch(node) {
+                    if let Some(case_block_node) = self.ctx.arena.get(switch_data.case_block) {
+                        if let Some(case_block) = self.ctx.arena.get_block(case_block_node) {
+                            for &clause_idx in &case_block.statements.nodes {
+                                if let Some(clause_node) = self.ctx.arena.get(clause_idx) {
+                                    if let Some(clause) = self.ctx.arena.get_case_clause(clause_node) {
+                                        for &stmt_idx in &clause.statements.nodes {
+                                            self.collect_return_types_in_statement(
+                                                stmt_idx,
+                                                return_types,
+                                                saw_empty,
+                                                return_context,
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            syntax_kind_ext::TRY_STATEMENT => {
+                if let Some(try_data) = self.ctx.arena.get_try(node) {
+                    self.collect_return_types_in_statement(
+                        try_data.try_block,
+                        return_types,
+                        saw_empty,
+                        return_context,
+                    );
+                    if !try_data.catch_clause.is_none() {
+                        self.collect_return_types_in_statement(
+                            try_data.catch_clause,
+                            return_types,
+                            saw_empty,
+                            return_context,
+                        );
+                    }
+                    if !try_data.finally_block.is_none() {
+                        self.collect_return_types_in_statement(
+                            try_data.finally_block,
+                            return_types,
+                            saw_empty,
+                            return_context,
+                        );
+                    }
+                }
+            }
+            syntax_kind_ext::CATCH_CLAUSE => {
+                if let Some(catch_data) = self.ctx.arena.get_catch_clause(node) {
+                    self.collect_return_types_in_statement(
+                        catch_data.block,
+                        return_types,
+                        saw_empty,
+                        return_context,
+                    );
+                }
+            }
+            syntax_kind_ext::WHILE_STATEMENT
+            | syntax_kind_ext::DO_STATEMENT
+            | syntax_kind_ext::FOR_STATEMENT
+            | syntax_kind_ext::FOR_IN_STATEMENT
+            | syntax_kind_ext::FOR_OF_STATEMENT => {
+                if let Some(loop_data) = self.ctx.arena.get_loop(node) {
+                    self.collect_return_types_in_statement(
+                        loop_data.statement,
+                        return_types,
+                        saw_empty,
+                        return_context,
+                    );
+                }
+            }
+            _ => {}
+        }
     }
 
     /// Check if a function body has at least one return statement with a value.
