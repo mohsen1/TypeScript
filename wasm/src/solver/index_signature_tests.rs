@@ -257,6 +257,66 @@ fn test_index_signature_with_named_property() {
 }
 
 #[test]
+fn test_index_signature_source_property_mismatch() {
+    let interner = TypeInterner::new();
+
+    // { [key: string]: string, foo: number } NOT <: { [key: string]: string }
+    let source = interner.object_with_index(ObjectShape {
+        properties: vec![
+            PropertyInfo { name: interner.intern_string("foo"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        ],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let target = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    assert!(!is_subtype_of(&interner, source, target));
+}
+
+#[test]
+fn test_number_index_signature_source_property_mismatch() {
+    let interner = TypeInterner::new();
+
+    // { [key: number]: number, "0": string } NOT <: { [key: number]: number }
+    let source = interner.object_with_index(ObjectShape {
+        properties: vec![
+            PropertyInfo { name: interner.intern_string("0"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        ],
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let target = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    assert!(!is_subtype_of(&interner, source, target));
+}
+
+#[test]
 fn test_empty_object_to_index_signature() {
     let interner = TypeInterner::new();
 

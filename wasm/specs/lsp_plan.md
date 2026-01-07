@@ -36,6 +36,8 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
   - [x] Assert prefix symbol stability after append edits.
   - [x] Assert prefix symbol stability after suffix removal.
   - [x] Assert prefix symbol stability after multi-statement append.
+  - [x] Assert multi-prefix symbol stability when editing later statements.
+  - [x] Assert multi-prefix symbol stability after append edits.
 - [x] JSDoc extraction for signature help/hover
   - [x] Parse JSDoc blocks and attach to `SignatureInformation` and `Hover`.
 - [x] Extract variable precedence fix
