@@ -1669,6 +1669,7 @@ impl ThinBinderState {
             // Identifiers - record flow position for type narrowing
             k if k == SyntaxKind::Identifier as u16 => {
                 // Already recorded above
+                return;
             }
 
             // Binary expressions - recurse into operands
@@ -1677,6 +1678,7 @@ impl ThinBinderState {
                     self.bind_expression(arena, bin.left);
                     self.bind_expression(arena, bin.right);
                 }
+                return;
             }
 
             // Prefix unary (e.g., typeof x, !x)
@@ -1684,11 +1686,13 @@ impl ThinBinderState {
                 if let Some(unary) = arena.get_unary_expr(node) {
                     self.bind_expression(arena, unary.operand);
                 }
+                return;
             }
 
             // Property access (e.g., x.foo) or element access (e.g., x[0])
-            k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION ||
-                 k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
+            k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+                || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION =>
+            {
                 if let Some(access) = arena.get_access_expr(node) {
                     self.bind_expression(arena, access.expression);
                     // For element access, also bind the argument
@@ -1696,6 +1700,7 @@ impl ThinBinderState {
                         self.bind_expression(arena, access.name_or_argument);
                     }
                 }
+                return;
             }
 
             // Call expression (e.g., isString(x))
@@ -1708,6 +1713,7 @@ impl ThinBinderState {
                         }
                     }
                 }
+                return;
             }
 
             // Parenthesized expression
@@ -1715,14 +1721,15 @@ impl ThinBinderState {
                 if let Some(paren) = arena.get_parenthesized(node) {
                     self.bind_expression(arena, paren.expression);
                 }
+                return;
             }
 
             // Type assertion (e.g., x as string)
-            k if k == syntax_kind_ext::AS_EXPRESSION ||
-                 k == syntax_kind_ext::TYPE_ASSERTION => {
+            k if k == syntax_kind_ext::AS_EXPRESSION || k == syntax_kind_ext::TYPE_ASSERTION => {
                 if let Some(as_expr) = arena.get_access_expr(node) {
                     self.bind_expression(arena, as_expr.expression);
                 }
+                return;
             }
 
             // Conditional expression (ternary)
@@ -1732,11 +1739,13 @@ impl ThinBinderState {
                     self.bind_expression(arena, cond.when_true);
                     self.bind_expression(arena, cond.when_false);
                 }
+                return;
             }
 
-            // Literals, keywords, etc. - no need to recurse
             _ => {}
         }
+
+        self.bind_node(arena, idx);
     }
 }
 
