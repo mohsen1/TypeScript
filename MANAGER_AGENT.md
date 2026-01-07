@@ -37,17 +37,20 @@ Useful commands:
 ## Operating loop
 1. Sync main:
    - `git pull origin rust`
-2. Summarize changes:
+2. Enforce track sync + merge:
+   - Before any track starts a new task, require `git fetch origin && git merge origin/rust`.
+   - Merge every track's commits (including WIP) into `rust` and push to `origin/rust` so nothing is lost.
+3. Summarize changes:
    - `git log -n 10 --oneline`
    - `git show -1 --stat`
    - Optional: `git diff --stat origin/rust~1..origin/rust`
-3. Quick risk scan:
+4. Quick risk scan:
    - `rg -n "TODO|FIXME|HACK|XXX" wasm/src`
    - Spot-check high-risk areas: `interner.rs`, `solver/intern.rs`, `thin_emitter/mod.rs`,
      `lsp/*`, `cli/*`.
-4. Compare changes to track plans and architecture. If needed dig deep to understand the code.
-5. If a track drifts, update its plan and notify the track.
-6. Produce a concise report (what changed, risks, next checks).
+5. Compare changes to track plans and architecture. If needed dig deep to understand the code.
+6. If a track drifts, update its plan and notify the track.
+7. Produce a concise report (what changed, risks, next checks).
 
 ## Automation (start_management.sh)
 - The manager and all tracks run in one tmux window (six panes). Manager is top-left.
@@ -73,6 +76,8 @@ Manager actions:
 - To create a new track, add `wasm/specs/<name>_plan.md` with `Status: Active`.
 - To stop a track, add `Status: Complete` to its plan file.
 - To delete a worktree, run `git worktree remove <path>` after it is complete.
+- Always merge track changes (including WIP) into `origin/rust`; do not leave work stranded in track branches.
+- Remind tracks to fetch `origin/rust` before starting any new task.
 
 
 ## Communication via tmux

@@ -628,13 +628,15 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     .iter()
                     .any(|prop| self.type_contains_placeholder(prop.type_id, var_map, visited))
             }
-            TypeKey::Conditional(cond) => {
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.interner.conditional_type(cond_id);
                 self.type_contains_placeholder(cond.check_type, var_map, visited)
                     || self.type_contains_placeholder(cond.extends_type, var_map, visited)
                     || self.type_contains_placeholder(cond.true_type, var_map, visited)
                     || self.type_contains_placeholder(cond.false_type, var_map, visited)
             }
-            TypeKey::Mapped(mapped) => {
+            TypeKey::Mapped(mapped_id) => {
+                let mapped = self.interner.mapped_type(mapped_id);
                 mapped
                     .type_param
                     .constraint
@@ -752,26 +754,30 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     self.constrain_types(ctx, var_map, source, evaluated);
                 }
             }
-            (Some(TypeKey::Conditional(ref cond)), _) => {
-                let evaluated = self.interner.evaluate_conditional(cond);
+            (Some(TypeKey::Conditional(cond_id)), _) => {
+                let cond = self.interner.conditional_type(cond_id);
+                let evaluated = self.interner.evaluate_conditional(cond.as_ref());
                 if evaluated != source {
                     self.constrain_types(ctx, var_map, evaluated, target);
                 }
             }
-            (_, Some(TypeKey::Conditional(ref cond))) => {
-                let evaluated = self.interner.evaluate_conditional(cond);
+            (_, Some(TypeKey::Conditional(cond_id))) => {
+                let cond = self.interner.conditional_type(cond_id);
+                let evaluated = self.interner.evaluate_conditional(cond.as_ref());
                 if evaluated != target {
                     self.constrain_types(ctx, var_map, source, evaluated);
                 }
             }
-            (Some(TypeKey::Mapped(ref mapped)), _) => {
-                let evaluated = self.interner.evaluate_mapped(mapped);
+            (Some(TypeKey::Mapped(mapped_id)), _) => {
+                let mapped = self.interner.mapped_type(mapped_id);
+                let evaluated = self.interner.evaluate_mapped(mapped.as_ref());
                 if evaluated != source {
                     self.constrain_types(ctx, var_map, evaluated, target);
                 }
             }
-            (_, Some(TypeKey::Mapped(ref mapped))) => {
-                let evaluated = self.interner.evaluate_mapped(mapped);
+            (_, Some(TypeKey::Mapped(mapped_id))) => {
+                let mapped = self.interner.mapped_type(mapped_id);
+                let evaluated = self.interner.evaluate_mapped(mapped.as_ref());
                 if evaluated != target {
                     self.constrain_types(ctx, var_map, source, evaluated);
                 }

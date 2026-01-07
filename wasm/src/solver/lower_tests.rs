@@ -544,7 +544,8 @@ fn test_lower_conditional_type_with_infer() {
     let type_id = lowering.lower_type(type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Conditional(cond) => {
+        TypeKey::Conditional(cond_id) => {
+            let cond = interner.conditional_type(cond_id);
             assert_eq!(cond.check_type, TypeId::STRING);
             assert_eq!(cond.true_type, TypeId::STRING);
             assert_eq!(cond.false_type, TypeId::NEVER);
@@ -571,13 +572,16 @@ fn test_lower_infer_type_with_constraint() {
     let type_id = lowering.lower_type(type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Conditional(cond) => match interner.lookup(cond.extends_type) {
+        TypeKey::Conditional(cond_id) => {
+            let cond = interner.conditional_type(cond_id);
+            match interner.lookup(cond.extends_type) {
             Some(TypeKey::Infer(info)) => {
                 assert_eq!(interner.resolve_atom(info.name), "R");
                 assert_eq!(info.constraint, Some(TypeId::STRING));
             }
             other => panic!("Expected infer type in extends, got {:?}", other),
-        },
+            }
+        }
         _ => panic!("Expected Conditional type, got {:?}", key),
     }
 }
@@ -591,7 +595,8 @@ fn test_lower_conditional_infer_binding() {
     let type_id = lowering.lower_type(type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Conditional(cond) => {
+        TypeKey::Conditional(cond_id) => {
+            let cond = interner.conditional_type(cond_id);
             assert_eq!(cond.true_type, cond.extends_type);
             match interner.lookup(cond.true_type) {
                 Some(TypeKey::Infer(info)) => {
@@ -613,7 +618,8 @@ fn test_lower_conditional_infer_binding_false_branch() {
     let type_id = lowering.lower_type(type_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Conditional(cond) => {
+        TypeKey::Conditional(cond_id) => {
+            let cond = interner.conditional_type(cond_id);
             assert_eq!(cond.true_type, TypeId::NEVER);
             assert_eq!(cond.false_type, cond.extends_type);
             match interner.lookup(cond.false_type) {
@@ -640,7 +646,10 @@ fn test_lower_conditional_distributive_flag() {
         TypeKey::Function(shape_id) => {
             let shape = interner.function_shape(shape_id);
             match interner.lookup(shape.return_type) {
-                Some(TypeKey::Conditional(cond)) => assert!(cond.is_distributive),
+                Some(TypeKey::Conditional(cond_id)) => {
+                    let cond = interner.conditional_type(cond_id);
+                    assert!(cond.is_distributive);
+                }
                 other => panic!("Expected conditional return type, got {:?}", other),
             }
         }
@@ -661,7 +670,10 @@ fn test_lower_conditional_non_distributive_flag() {
         TypeKey::Function(shape_id) => {
             let shape = interner.function_shape(shape_id);
             match interner.lookup(shape.return_type) {
-                Some(TypeKey::Conditional(cond)) => assert!(!cond.is_distributive),
+                Some(TypeKey::Conditional(cond_id)) => {
+                    let cond = interner.conditional_type(cond_id);
+                    assert!(!cond.is_distributive);
+                }
                 other => panic!("Expected conditional return type, got {:?}", other),
             }
         }
@@ -1571,7 +1583,8 @@ fn test_lower_mapped_type_modifiers_and_constraint() {
     let type_id = lowering.lower_type(mapped_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Mapped(mapped) => {
+        TypeKey::Mapped(mapped_id) => {
+            let mapped = interner.mapped_type(mapped_id);
             assert_eq!(interner.resolve_atom(mapped.type_param.name), "K");
             assert_eq!(mapped.constraint, TypeId::STRING);
             assert_eq!(mapped.template, TypeId::NUMBER);
@@ -1591,7 +1604,8 @@ fn test_lower_mapped_type_remove_modifiers() {
     let type_id = lowering.lower_type(mapped_idx);
     let key = interner.lookup(type_id).expect("Type should exist");
     match key {
-        TypeKey::Mapped(mapped) => {
+        TypeKey::Mapped(mapped_id) => {
+            let mapped = interner.mapped_type(mapped_id);
             assert_eq!(mapped.readonly_modifier, Some(MappedModifier::Remove));
             assert_eq!(mapped.optional_modifier, Some(MappedModifier::Remove));
         }

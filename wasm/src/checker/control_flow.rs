@@ -19,11 +19,13 @@
 //! ```
 
 use crate::binder::{FlowNode, FlowNodeId, flow_flags};
+use crate::interner::Atom;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::{NodeIndex, syntax_kind_ext};
 use crate::scanner::SyntaxKind;
 use crate::solver::{LiteralValue, TypeId, TypeInterner, TypeKey, NarrowingContext};
 use crate::thin_binder::ThinBinderState;
+use std::borrow::Cow;
 
 /// Flow analyzer for control flow-based type narrowing.
 ///
@@ -233,65 +235,60 @@ impl<'a> FlowAnalyzer<'a> {
     ) -> TypeId {
         let operator = bin.operator_token;
 
-        // Handle typeof x === "string"
-        if operator == SyntaxKind::EqualsEqualsEqualsToken as u16 ||
-           operator == SyntaxKind::ExclamationEqualsEqualsToken as u16 {
-            let is_equals = operator == SyntaxKind::EqualsEqualsEqualsToken as u16;
-            let effective_truth = if is_equals { is_true_branch } else { !is_true_branch };
+        let (is_equals, is_strict) = match operator {
+            k if k == SyntaxKind::EqualsEqualsEqualsToken as u16 => (true, true),
+            k if k == SyntaxKind::ExclamationEqualsEqualsToken as u16 => (false, true),
+            k if k == SyntaxKind::EqualsEqualsToken as u16 => (true, false),
+            k if k == SyntaxKind::ExclamationEqualsToken as u16 => (false, false),
+            _ => return type_id,
+        };
 
-            // Check typeof on left side
-            if let Some(type_name) = self.get_typeof_check(bin.left, target) {
+        let effective_truth = if is_equals { is_true_branch } else { !is_true_branch };
+
+        if let Some(type_name) = self.typeof_comparison_literal(bin.left, bin.right, target) {
+            if effective_truth {
+                return narrowing.narrow_by_typeof(type_id, type_name);
+            }
+            return self.narrow_by_typeof_negation(type_id, type_name, narrowing);
+        }
+
+        if let Some(nullish) = self.nullish_comparison(bin.left, bin.right, target) {
+            if is_strict {
                 if effective_truth {
-                    return narrowing.narrow_by_typeof(type_id, &type_name);
+                    return nullish;
                 }
-                return self.narrow_by_typeof_negation(type_id, &type_name, narrowing);
+                return narrowing.narrow_excluding_type(type_id, nullish);
             }
 
-            // Check typeof on right side
-            if let Some(type_name) = self.get_typeof_check(bin.right, target) {
+            let nullish_union = self.interner.union(vec![TypeId::NULL, TypeId::UNDEFINED]);
+            if effective_truth {
+                return nullish_union;
+            }
+
+            let narrowed = narrowing.narrow_excluding_type(type_id, TypeId::NULL);
+            return narrowing.narrow_excluding_type(narrowed, TypeId::UNDEFINED);
+        }
+
+        if is_strict {
+            if let Some((prop_name, literal_type)) = self.discriminant_comparison(bin.left, bin.right, target) {
                 if effective_truth {
-                    return narrowing.narrow_by_typeof(type_id, &type_name);
+                    return narrowing.narrow_by_discriminant(type_id, prop_name, literal_type);
                 }
-                return self.narrow_by_typeof_negation(type_id, &type_name, narrowing);
+                return narrowing.narrow_by_excluding_discriminant(type_id, prop_name, literal_type);
             }
 
-            // Check for null/undefined comparison
-            if self.is_matching_reference(bin.left, target) {
-                if self.is_null_or_undefined(bin.right) {
-                    if effective_truth {
-                        // x === null/undefined -> narrow to null/undefined
-                        return if self.is_null_keyword(bin.right) {
-                            TypeId::NULL
-                        } else {
-                            TypeId::UNDEFINED
-                        };
-                    } else {
-                        // x !== null/undefined -> exclude null/undefined
-                        return if self.is_null_keyword(bin.right) {
-                            narrowing.narrow_excluding_type(type_id, TypeId::NULL)
-                        } else {
-                            narrowing.narrow_excluding_type(type_id, TypeId::UNDEFINED)
-                        };
+            if let Some(literal_type) = self.literal_comparison(bin.left, bin.right, target) {
+                if effective_truth {
+                    let narrowed = narrowing.narrow_to_type(type_id, literal_type);
+                    if narrowed != TypeId::NEVER {
+                        return narrowed;
                     }
-                }
-            }
-
-            if self.is_matching_reference(bin.right, target) {
-                if self.is_null_or_undefined(bin.left) {
-                    if effective_truth {
-                        return if self.is_null_keyword(bin.left) {
-                            TypeId::NULL
-                        } else {
-                            TypeId::UNDEFINED
-                        };
-                    } else {
-                        return if self.is_null_keyword(bin.left) {
-                            narrowing.narrow_excluding_type(type_id, TypeId::NULL)
-                        } else {
-                            narrowing.narrow_excluding_type(type_id, TypeId::UNDEFINED)
-                        };
+                    if self.literal_assignable_to(literal_type, type_id, narrowing) {
+                        return literal_type;
                     }
+                    return TypeId::NEVER;
                 }
+                return narrowing.narrow_excluding_type(type_id, literal_type);
             }
         }
 
@@ -311,6 +308,221 @@ impl<'a> FlowAnalyzer<'a> {
             }
             return idx;
         }
+    }
+
+    fn typeof_comparison_literal(
+        &self,
+        left: NodeIndex,
+        right: NodeIndex,
+        target: NodeIndex,
+    ) -> Option<&str> {
+        if self.is_typeof_target(left, target) {
+            return self.literal_string_from_node(right);
+        }
+        if self.is_typeof_target(right, target) {
+            return self.literal_string_from_node(left);
+        }
+        None
+    }
+
+    fn is_typeof_target(&self, expr: NodeIndex, target: NodeIndex) -> bool {
+        let expr = self.skip_parenthesized(expr);
+        let node = match self.arena.get(expr) {
+            Some(node) => node,
+            None => return false,
+        };
+
+        if node.kind != syntax_kind_ext::PREFIX_UNARY_EXPRESSION {
+            return false;
+        }
+
+        let Some(unary) = self.arena.get_unary_expr(node) else {
+            return false;
+        };
+
+        if unary.operator != SyntaxKind::TypeOfKeyword as u16 {
+            return false;
+        }
+
+        self.is_matching_reference(unary.operand, target)
+    }
+
+    fn literal_string_from_node(&self, idx: NodeIndex) -> Option<&str> {
+        let idx = self.skip_parenthesized(idx);
+        let node = self.arena.get(idx)?;
+
+        if node.kind == SyntaxKind::StringLiteral as u16
+            || node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+        {
+            return self.arena.get_literal(node).map(|lit| lit.text.as_str());
+        }
+
+        None
+    }
+
+    fn literal_type_from_node(&self, idx: NodeIndex) -> Option<TypeId> {
+        let idx = self.skip_parenthesized(idx);
+        let node = self.arena.get(idx)?;
+
+        match node.kind {
+            k if k == SyntaxKind::StringLiteral as u16
+                || k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 =>
+            {
+                let lit = self.arena.get_literal(node)?;
+                Some(self.interner.literal_string(&lit.text))
+            }
+            k if k == SyntaxKind::NumericLiteral as u16 => {
+                let lit = self.arena.get_literal(node)?;
+                let value = self.parse_numeric_literal_value(lit.value, &lit.text)?;
+                Some(self.interner.literal_number(value))
+            }
+            k if k == SyntaxKind::BigIntLiteral as u16 => {
+                let lit = self.arena.get_literal(node)?;
+                let text = lit.text.strip_suffix('n').unwrap_or(&lit.text);
+                let normalized = self.normalize_bigint_literal(text)?;
+                Some(self.interner.literal_bigint(normalized.as_ref()))
+            }
+            k if k == SyntaxKind::TrueKeyword as u16 => Some(self.interner.literal_boolean(true)),
+            k if k == SyntaxKind::FalseKeyword as u16 => Some(self.interner.literal_boolean(false)),
+            k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION => {
+                let unary = self.arena.get_unary_expr(node)?;
+                let op = unary.operator;
+                if op != SyntaxKind::MinusToken as u16 && op != SyntaxKind::PlusToken as u16 {
+                    return None;
+                }
+
+                let operand = self.skip_parenthesized(unary.operand);
+                let operand_node = self.arena.get(operand)?;
+                match operand_node.kind {
+                    k if k == SyntaxKind::NumericLiteral as u16 => {
+                        let lit = self.arena.get_literal(operand_node)?;
+                        let value = self.parse_numeric_literal_value(lit.value, &lit.text)?;
+                        let value = if op == SyntaxKind::MinusToken as u16 { -value } else { value };
+                        Some(self.interner.literal_number(value))
+                    }
+                    k if k == SyntaxKind::BigIntLiteral as u16 => {
+                        let lit = self.arena.get_literal(operand_node)?;
+                        let text = lit.text.strip_suffix('n').unwrap_or(&lit.text);
+                        let normalized = self.normalize_bigint_literal(text)?;
+                        let negative = op == SyntaxKind::MinusToken as u16;
+                        Some(self.interner.literal_bigint_with_sign(negative, normalized.as_ref()))
+                    }
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn literal_assignable_to(
+        &self,
+        literal: TypeId,
+        target: TypeId,
+        narrowing: &NarrowingContext,
+    ) -> bool {
+        if literal == target || target == TypeId::ANY || target == TypeId::UNKNOWN {
+            return true;
+        }
+
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(target) {
+            let members = self.interner.type_list(members);
+            return members
+                .iter()
+                .any(|&member| self.literal_assignable_to(literal, member, narrowing));
+        }
+
+        narrowing.narrow_to_type(literal, target) != TypeId::NEVER
+    }
+
+    fn nullish_literal_type(&self, idx: NodeIndex) -> Option<TypeId> {
+        let idx = self.skip_parenthesized(idx);
+        let node = self.arena.get(idx)?;
+
+        if node.kind == SyntaxKind::NullKeyword as u16 {
+            return Some(TypeId::NULL);
+        }
+        if node.kind == SyntaxKind::UndefinedKeyword as u16 {
+            return Some(TypeId::UNDEFINED);
+        }
+
+        None
+    }
+
+    fn nullish_comparison(
+        &self,
+        left: NodeIndex,
+        right: NodeIndex,
+        target: NodeIndex,
+    ) -> Option<TypeId> {
+        if self.is_matching_reference(left, target) {
+            return self.nullish_literal_type(right);
+        }
+        if self.is_matching_reference(right, target) {
+            return self.nullish_literal_type(left);
+        }
+        None
+    }
+
+    fn discriminant_property(&self, expr: NodeIndex, target: NodeIndex) -> Option<Atom> {
+        let expr = self.skip_parenthesized(expr);
+        let node = self.arena.get(expr)?;
+
+        if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+            let access = self.arena.get_access_expr(node)?;
+            if access.question_dot_token || !self.is_matching_reference(access.expression, target) {
+                return None;
+            }
+            let name_node = self.arena.get(access.name_or_argument)?;
+            let ident = self.arena.get_identifier(name_node)?;
+            return Some(self.interner.intern_string(&ident.escaped_text));
+        }
+
+        if node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION {
+            let access = self.arena.get_access_expr(node)?;
+            if access.question_dot_token || !self.is_matching_reference(access.expression, target) {
+                return None;
+            }
+            let name = self.literal_string_from_node(access.name_or_argument)?;
+            return Some(self.interner.intern_string(name));
+        }
+
+        None
+    }
+
+    fn discriminant_comparison(
+        &self,
+        left: NodeIndex,
+        right: NodeIndex,
+        target: NodeIndex,
+    ) -> Option<(Atom, TypeId)> {
+        if let Some(prop) = self.discriminant_property(left, target) {
+            if let Some(literal) = self.literal_type_from_node(right) {
+                return Some((prop, literal));
+            }
+        }
+
+        if let Some(prop) = self.discriminant_property(right, target) {
+            if let Some(literal) = self.literal_type_from_node(left) {
+                return Some((prop, literal));
+            }
+        }
+
+        None
+    }
+
+    fn literal_comparison(
+        &self,
+        left: NodeIndex,
+        right: NodeIndex,
+        target: NodeIndex,
+    ) -> Option<TypeId> {
+        if self.is_matching_reference(left, target) {
+            return self.literal_type_from_node(right);
+        }
+        if self.is_matching_reference(right, target) {
+            return self.literal_type_from_node(left);
+        }
+        None
     }
 
     fn narrow_by_typeof_negation(
@@ -398,30 +610,163 @@ impl<'a> FlowAnalyzer<'a> {
         }
     }
 
-    /// Check if an expression is `typeof target` and return the compared type name.
-    fn get_typeof_check(&self, expr: NodeIndex, target: NodeIndex) -> Option<String> {
-        let expr = self.skip_parenthesized(expr);
-        let node = self.arena.get(expr)?;
+    fn strip_numeric_separators<'b>(&self, text: &'b str) -> Cow<'b, str> {
+        if !text.as_bytes().contains(&b'_') {
+            return Cow::Borrowed(text);
+        }
 
-        // Check for typeof expression
-        if node.kind == syntax_kind_ext::TYPE_OF_EXPRESSION {
-            if let Some(unary) = self.arena.get_unary_expr(node) {
-                if self.is_matching_reference(unary.operand, target) {
-                    // This is typeof target - now find what it's compared to
-                    // The comparison value should be on the other side of the binary expr
-                    // We'll need to check from the parent context
+        let mut out = String::with_capacity(text.len());
+        for &byte in text.as_bytes() {
+            if byte != b'_' {
+                out.push(byte as char);
+            }
+        }
+        Cow::Owned(out)
+    }
+
+    fn parse_numeric_literal_value(&self, value: Option<f64>, text: &str) -> Option<f64> {
+        if let Some(value) = value {
+            return Some(value);
+        }
+
+        if let Some(rest) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
+            return Self::parse_radix_digits(rest, 16);
+        }
+        if let Some(rest) = text.strip_prefix("0b").or_else(|| text.strip_prefix("0B")) {
+            return Self::parse_radix_digits(rest, 2);
+        }
+        if let Some(rest) = text.strip_prefix("0o").or_else(|| text.strip_prefix("0O")) {
+            return Self::parse_radix_digits(rest, 8);
+        }
+
+        if text.as_bytes().contains(&b'_') {
+            let cleaned = self.strip_numeric_separators(text);
+            return cleaned.as_ref().parse::<f64>().ok();
+        }
+
+        text.parse::<f64>().ok()
+    }
+
+    fn parse_radix_digits(text: &str, base: u32) -> Option<f64> {
+        if text.is_empty() {
+            return None;
+        }
+
+        let mut value = 0f64;
+        let base_value = base as f64;
+        let mut saw_digit = false;
+        for &byte in text.as_bytes() {
+            if byte == b'_' {
+                continue;
+            }
+
+            let digit = match byte {
+                b'0'..=b'9' => (byte - b'0') as u32,
+                b'a'..=b'f' => (byte - b'a' + 10) as u32,
+                b'A'..=b'F' => (byte - b'A' + 10) as u32,
+                _ => return None,
+            };
+            if digit >= base {
+                return None;
+            }
+            saw_digit = true;
+            value = value * base_value + digit as f64;
+        }
+
+        if !saw_digit {
+            return None;
+        }
+
+        Some(value)
+    }
+
+    fn normalize_bigint_literal<'b>(&self, text: &'b str) -> Option<Cow<'b, str>> {
+        if let Some(rest) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
+            return Self::bigint_base_to_decimal(rest, 16).map(Cow::Owned);
+        }
+        if let Some(rest) = text.strip_prefix("0b").or_else(|| text.strip_prefix("0B")) {
+            return Self::bigint_base_to_decimal(rest, 2).map(Cow::Owned);
+        }
+        if let Some(rest) = text.strip_prefix("0o").or_else(|| text.strip_prefix("0O")) {
+            return Self::bigint_base_to_decimal(rest, 8).map(Cow::Owned);
+        }
+
+        match self.strip_numeric_separators(text) {
+            Cow::Borrowed(cleaned) => {
+                let trimmed = cleaned.trim_start_matches('0');
+                if trimmed.is_empty() {
+                    return Some(Cow::Borrowed("0"));
                 }
+                if trimmed.len() == cleaned.len() {
+                    return Some(Cow::Borrowed(cleaned));
+                }
+                Some(Cow::Borrowed(trimmed))
+            }
+            Cow::Owned(mut cleaned) => {
+                let cleaned_ref = cleaned.as_str();
+                let trimmed = cleaned_ref.trim_start_matches('0');
+                if trimmed.is_empty() {
+                    return Some(Cow::Borrowed("0"));
+                }
+                if trimmed.len() == cleaned_ref.len() {
+                    return Some(Cow::Owned(cleaned));
+                }
+
+                let trim_len = cleaned_ref.len() - trimmed.len();
+                cleaned.drain(..trim_len);
+                Some(Cow::Owned(cleaned))
+            }
+        }
+    }
+
+    fn bigint_base_to_decimal(text: &str, base: u32) -> Option<String> {
+        if text.is_empty() {
+            return None;
+        }
+
+        let mut digits: Vec<u8> = vec![0];
+        let mut saw_digit = false;
+        for &byte in text.as_bytes() {
+            if byte == b'_' {
+                continue;
+            }
+
+            let digit = match byte {
+                b'0'..=b'9' => (byte - b'0') as u32,
+                b'a'..=b'f' => (byte - b'a' + 10) as u32,
+                b'A'..=b'F' => (byte - b'A' + 10) as u32,
+                _ => return None,
+            };
+            if digit >= base {
+                return None;
+            }
+            saw_digit = true;
+
+            let mut carry = digit;
+            for slot in &mut digits {
+                let value = (*slot as u32) * base + carry;
+                *slot = (value % 10) as u8;
+                carry = value / 10;
+            }
+            while carry > 0 {
+                digits.push((carry % 10) as u8);
+                carry /= 10;
             }
         }
 
-        // For now, check if this is the string literal being compared
-        if node.kind == SyntaxKind::StringLiteral as u16 {
-            if let Some(lit) = self.arena.get_literal(node) {
-                return Some(lit.text.clone());
-            }
+        if !saw_digit {
+            return None;
         }
 
-        None
+        while digits.len() > 1 && *digits.last().unwrap() == 0 {
+            digits.pop();
+        }
+
+        let mut out = String::with_capacity(digits.len());
+        for digit in digits.iter().rev() {
+            out.push(char::from(b'0' + *digit));
+        }
+        Some(out)
     }
 
     /// Check if two references point to the same symbol.
@@ -436,24 +781,12 @@ impl<'a> FlowAnalyzer<'a> {
         self.binder.get_node_symbol(idx)
             .or_else(|| self.binder.resolve_identifier(self.arena, idx))
     }
-
-    /// Check if an expression is null or undefined keyword.
-    fn is_null_or_undefined(&self, idx: NodeIndex) -> bool {
-        let Some(node) = self.arena.get(idx) else { return false };
-        node.kind == SyntaxKind::NullKeyword as u16 ||
-        node.kind == SyntaxKind::UndefinedKeyword as u16
-    }
-
-    /// Check if an expression is specifically the null keyword.
-    fn is_null_keyword(&self, idx: NodeIndex) -> bool {
-        let Some(node) = self.arena.get(idx) else { return false };
-        node.kind == SyntaxKind::NullKeyword as u16
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::solver::PropertyInfo;
     use crate::thin_parser::ThinParserState;
 
     fn get_if_condition(arena: &ThinNodeArena, root: NodeIndex, stmt_index: usize) -> NodeIndex {
@@ -537,5 +870,109 @@ if (typeof x === "string") {}
         let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
         let narrowed = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, false);
         assert_eq!(narrowed, TypeId::NUMBER);
+    }
+
+    #[test]
+    fn test_discriminant_property_access_narrows_union() {
+        let source = r#"
+let action: any;
+if (action.type === "add") {}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let arena = parser.get_arena();
+        let types = TypeInterner::new();
+        let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+        let condition_idx = get_if_condition(arena, root, 1);
+        let condition_node = arena.get(condition_idx).expect("condition node");
+        let binary = arena.get_binary_expr(condition_node).expect("binary condition");
+        let access_node = arena.get(binary.left).expect("property access node");
+        let access = arena.get_access_expr(access_node).expect("property access data");
+        let target_idx = access.expression;
+
+        let type_key = types.intern_string("type");
+        let type_add = types.literal_string("add");
+        let type_remove = types.literal_string("remove");
+
+        let add_member = types.object(vec![
+            PropertyInfo { name: type_key, type_id: type_add, optional: false, readonly: false, is_method: false },
+        ]);
+        let remove_member = types.object(vec![
+            PropertyInfo { name: type_key, type_id: type_remove, optional: false, readonly: false, is_method: false },
+        ]);
+
+        let union = types.union(vec![add_member, remove_member]);
+        let narrowed_true = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, true);
+        let narrowed_false = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, false);
+
+        assert_eq!(narrowed_true, add_member);
+        assert_eq!(narrowed_false, remove_member);
+    }
+
+    #[test]
+    fn test_literal_equality_narrows_to_literal() {
+        let source = r#"
+let x: string | number;
+if (x === "a") {}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let arena = parser.get_arena();
+        let types = TypeInterner::new();
+        let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+        let condition_idx = get_if_condition(arena, root, 1);
+        let condition_node = arena.get(condition_idx).expect("condition node");
+        let binary = arena.get_binary_expr(condition_node).expect("binary condition");
+        let target_idx = binary.left;
+
+        let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+        let literal_a = types.literal_string("a");
+        let narrowed = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, true);
+
+        assert_eq!(narrowed, literal_a);
+    }
+
+    #[test]
+    fn test_loose_nullish_equality_narrows_to_nullish_union() {
+        let source = r#"
+let x: string | null | undefined;
+if (x == null) {}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let arena = parser.get_arena();
+        let types = TypeInterner::new();
+        let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+        let condition_idx = get_if_condition(arena, root, 1);
+        let condition_node = arena.get(condition_idx).expect("condition node");
+        let binary = arena.get_binary_expr(condition_node).expect("binary condition");
+        let target_idx = binary.left;
+
+        let union = types.union(vec![TypeId::STRING, TypeId::NULL, TypeId::UNDEFINED]);
+        let expected_true = types.union(vec![TypeId::NULL, TypeId::UNDEFINED]);
+
+        let narrowed_true = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, true);
+        let narrowed_false = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, false);
+
+        assert_eq!(narrowed_true, expected_true);
+        assert_eq!(narrowed_false, TypeId::STRING);
     }
 }

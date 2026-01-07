@@ -18,8 +18,8 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
   - [x] Cache `TypeCache` per file for hover/signature help.
   - [x] Extend caches for type-aware completions.
   - [x] Extend caches for diagnostics.
-- [ ] JSDoc extraction for signature help/hover
-  - [ ] Parse JSDoc blocks and attach to `SignatureInformation` and `Hover`.
+- [x] JSDoc extraction for signature help/hover
+  - [x] Parse JSDoc blocks and attach to `SignatureInformation` and `Hover`.
 - [x] Extract variable precedence fix
   - [x] Wrap selected expressions to preserve semantics.
   - [x] Add tests around binary/conditional expressions.

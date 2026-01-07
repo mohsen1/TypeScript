@@ -95,7 +95,7 @@ fn build_conditional_type(interner: &TypeInterner) -> TypeId {
         false_type: TypeId::BOOLEAN,
         is_distributive: true,
     };
-    interner.intern(TypeKey::Conditional(conditional))
+    interner.conditional(conditional)
 }
 
 fn build_infer_fixture(interner: &TypeInterner) -> (FunctionShape, [TypeId; 1]) {

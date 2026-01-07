@@ -1274,13 +1274,13 @@ fn test_deferred_conditional_source_subtyping() {
         default: None,
     }));
 
-    let conditional = interner.intern(TypeKey::Conditional(Box::new(ConditionalType {
+    let conditional = interner.conditional(ConditionalType {
         check_type: t_param,
         extends_type: TypeId::STRING,
         true_type: TypeId::NUMBER,
         false_type: TypeId::BOOLEAN,
         is_distributive: true,
-    })));
+    });
 
     let target_union = interner.union(vec![TypeId::NUMBER, TypeId::BOOLEAN]);
 
@@ -1299,13 +1299,13 @@ fn test_deferred_conditional_target_subtyping() {
         default: None,
     }));
 
-    let conditional = interner.intern(TypeKey::Conditional(Box::new(ConditionalType {
+    let conditional = interner.conditional(ConditionalType {
         check_type: t_param,
         extends_type: TypeId::STRING,
         true_type: TypeId::NUMBER,
         false_type: TypeId::BOOLEAN,
         is_distributive: true,
-    })));
+    });
 
     assert!(!checker.is_subtype_of(TypeId::NUMBER, conditional));
 }
@@ -1321,30 +1321,30 @@ fn test_deferred_conditional_structural_subtyping() {
         default: None,
     }));
 
-    let source = interner.intern(TypeKey::Conditional(Box::new(ConditionalType {
+    let source = interner.conditional(ConditionalType {
         check_type: t_param,
         extends_type: TypeId::STRING,
         true_type: TypeId::NUMBER,
         false_type: TypeId::BOOLEAN,
         is_distributive: true,
-    })));
+    });
 
     let union_nb = interner.union(vec![TypeId::NUMBER, TypeId::BOOLEAN]);
-    let target = interner.intern(TypeKey::Conditional(Box::new(ConditionalType {
+    let target = interner.conditional(ConditionalType {
         check_type: t_param,
         extends_type: TypeId::STRING,
         true_type: union_nb,
         false_type: union_nb,
         is_distributive: true,
-    })));
+    });
 
-    let mismatch = interner.intern(TypeKey::Conditional(Box::new(ConditionalType {
+    let mismatch = interner.conditional(ConditionalType {
         check_type: t_param,
         extends_type: TypeId::NUMBER,
         true_type: union_nb,
         false_type: union_nb,
         is_distributive: true,
-    })));
+    });
 
     assert!(checker.is_subtype_of(source, target));
     assert!(!checker.is_subtype_of(source, mismatch));

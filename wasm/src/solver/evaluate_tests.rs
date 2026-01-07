@@ -164,7 +164,7 @@ fn test_conditional_deferred_type_parameter() {
         is_distributive: true,
     };
 
-    let cond_type = interner.intern(TypeKey::Conditional(Box::new(cond.clone())));
+    let cond_type = interner.conditional(cond.clone());
     let result = evaluate_conditional(&interner, &cond);
 
     // Should return the same conditional (deferred)
@@ -1115,13 +1115,13 @@ fn test_nested_conditional() {
     let no = interner.literal_string("no");
     let outer_no = interner.literal_string("outer-no");
 
-    let inner_cond = interner.intern(TypeKey::Conditional(Box::new(ConditionalType {
+    let inner_cond = interner.conditional(ConditionalType {
         check_type: TypeId::NUMBER,
         extends_type: TypeId::NUMBER,
         true_type: yes,
         false_type: no,
         is_distributive: false,
-    })));
+    });
 
     let cond = ConditionalType {
         check_type: TypeId::STRING,
@@ -1772,7 +1772,7 @@ fn test_mapped_type_deferred() {
         optional_modifier: None,
     };
 
-    let mapped_type = interner.intern(TypeKey::Mapped(Box::new(mapped.clone())));
+    let mapped_type = interner.mapped(mapped.clone());
     let result = evaluate_mapped(&interner, &mapped);
 
     // Should return the same mapped type (deferred)

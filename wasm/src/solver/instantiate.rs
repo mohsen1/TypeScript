@@ -354,7 +354,8 @@ impl<'a> TypeInstantiator<'a> {
             }
 
             // Conditional: instantiate all parts
-            TypeKey::Conditional(cond) => {
+            TypeKey::Conditional(cond_id) => {
+                let cond = self.interner.conditional_type(*cond_id);
                 let instantiated = ConditionalType {
                     check_type: self.instantiate(cond.check_type),
                     extends_type: self.instantiate(cond.extends_type),
@@ -362,11 +363,12 @@ impl<'a> TypeInstantiator<'a> {
                     false_type: self.instantiate(cond.false_type),
                     is_distributive: cond.is_distributive,
                 };
-                self.interner.intern(TypeKey::Conditional(Box::new(instantiated)))
+                self.interner.conditional(instantiated)
             }
 
             // Mapped: instantiate constraint and template
-            TypeKey::Mapped(mapped) => {
+            TypeKey::Mapped(mapped_id) => {
+                let mapped = self.interner.mapped_type(*mapped_id);
                 let shadowed_len = self.shadowed.len();
                 self.shadowed.push(mapped.type_param.name);
 
@@ -384,7 +386,7 @@ impl<'a> TypeInstantiator<'a> {
 
                 self.shadowed.truncate(shadowed_len);
 
-                self.interner.intern(TypeKey::Mapped(Box::new(instantiated)))
+                self.interner.mapped(instantiated)
             }
 
             // Index access: instantiate both parts
