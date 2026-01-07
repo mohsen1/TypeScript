@@ -1769,6 +1769,112 @@ fn test_mapped_type_over_number_keys() {
 }
 
 #[test]
+fn test_mapped_type_over_boolean_keys() {
+    let interner = TypeInterner::new();
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::BOOLEAN));
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint,
+        template: TypeId::NUMBER,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    let key = interner.lookup(result).expect("Expected object type");
+
+    match key {
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
+            let to_string = interner.intern_string("toString");
+            let value_of = interner.intern_string("valueOf");
+            let has_own = interner.intern_string("hasOwnProperty");
+            let mut saw_to_string = false;
+            let mut saw_value_of = false;
+            let mut saw_has_own = false;
+
+            for prop in &shape.properties {
+                if prop.name == to_string {
+                    assert_eq!(prop.type_id, TypeId::NUMBER);
+                    saw_to_string = true;
+                }
+                if prop.name == value_of {
+                    assert_eq!(prop.type_id, TypeId::NUMBER);
+                    saw_value_of = true;
+                }
+                if prop.name == has_own {
+                    assert_eq!(prop.type_id, TypeId::NUMBER);
+                    saw_has_own = true;
+                }
+            }
+
+            assert!(saw_to_string, "missing toString property");
+            assert!(saw_value_of, "missing valueOf property");
+            assert!(saw_has_own, "missing hasOwnProperty property");
+        }
+        other => panic!("Expected object type, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_mapped_type_over_symbol_keys() {
+    let interner = TypeInterner::new();
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::SYMBOL));
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    let key = interner.lookup(result).expect("Expected object type");
+
+    match key {
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
+            let description = interner.intern_string("description");
+            let to_string = interner.intern_string("toString");
+            let value_of = interner.intern_string("valueOf");
+            let mut saw_description = false;
+            let mut saw_to_string = false;
+            let mut saw_value_of = false;
+
+            for prop in &shape.properties {
+                if prop.name == description {
+                    assert_eq!(prop.type_id, TypeId::BOOLEAN);
+                    saw_description = true;
+                }
+                if prop.name == to_string {
+                    assert_eq!(prop.type_id, TypeId::BOOLEAN);
+                    saw_to_string = true;
+                }
+                if prop.name == value_of {
+                    assert_eq!(prop.type_id, TypeId::BOOLEAN);
+                    saw_value_of = true;
+                }
+            }
+
+            assert!(saw_description, "missing description property");
+            assert!(saw_to_string, "missing toString property");
+            assert!(saw_value_of, "missing valueOf property");
+        }
+        other => panic!("Expected object type, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_mapped_type_string_index_signature() {
     let interner = TypeInterner::new();
 

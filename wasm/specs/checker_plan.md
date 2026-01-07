@@ -83,6 +83,8 @@ Status: Active
   - Report TS2693 when accessing interface/type alias exports as values.
 - [x] Enforce type-only namespace aliases in value position
   - Report TS2693 when `import Alias = NS.Type` is used as a value.
+- [x] Enforce type-only namespace members through alias chains
+  - Add coverage for `import Alias = NS; Alias.Foo` and nested alias member access.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
