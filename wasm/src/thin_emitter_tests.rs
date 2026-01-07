@@ -1123,6 +1123,33 @@ fn test_thin_emit_jsx_spread_and_boolean_attribute() {
 }
 
 #[test]
+fn test_thin_emit_jsx_namespaced_and_boolean_attributes() {
+    let source = "const x = <svg xlink:href=\"#id\" focusable />;";
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("xlink:href=\"#id\""),
+        "Expected JSX namespaced attribute in output: {}",
+        output
+    );
+    assert!(
+        output.contains("focusable"),
+        "Expected JSX boolean attribute in output: {}",
+        output
+    );
+    assert!(
+        !output.contains("focusable="),
+        "Expected JSX boolean attribute without initializer: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_enum_declaration() {
     let source = "enum Color { Red, Green, Blue }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
