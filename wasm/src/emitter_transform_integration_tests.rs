@@ -713,6 +713,52 @@ fn test_two_phase_emission_commonjs_export_enum() {
 }
 
 #[test]
+fn test_two_phase_emission_commonjs_export_namespace() {
+    let source = "export namespace N { export function foo() { return 1; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate namespace/CommonJS transforms"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_module_kind(crate::thin_emitter::ModuleKind::CommonJS);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var N"),
+        "CommonJS output should declare namespace variable: {}",
+        output
+    );
+    assert!(
+        output.contains("(function (N)"),
+        "CommonJS output should emit namespace IIFE: {}",
+        output
+    );
+    assert!(
+        output.contains("N.foo = foo;"),
+        "CommonJS output should export namespace member: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.N = N;"),
+        "CommonJS output should export namespace: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_commonjs_auto_detect_exports() {
     let source = "export const x = 1;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

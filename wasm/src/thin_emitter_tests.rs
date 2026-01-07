@@ -1041,3 +1041,23 @@ fn test_commonjs_export_class() {
             "Expected class Foo definition in CommonJS output: {}", output);
     assert!(output.contains("exports.Foo = Foo;"), "Expected 'exports.Foo = Foo;' in CommonJS output: {}", output);
 }
+
+#[test]
+fn test_commonjs_export_namespace() {
+    let source = "export namespace N { export function foo() { return 1; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("(function (N)"),
+            "Expected namespace IIFE in CommonJS output: {}", output);
+    assert!(output.contains("exports.N = N;"),
+            "Expected 'exports.N = N;' in CommonJS output: {}", output);
+}

@@ -30,6 +30,7 @@ use crate::transform_context::TransformDirective;
 use crate::transform_context::TransformContext;
 use crate::transforms::class_es5::ClassES5Emitter;
 use crate::transforms::enum_es5::EnumES5Emitter;
+use crate::transforms::namespace_es5::NamespaceES5Emitter;
 use crate::transforms::arrow_es5::contains_this_reference;
 
 // =============================================================================
@@ -727,6 +728,12 @@ impl<'a> ThinPrinter<'a> {
                 self.write(&es5_output);
             }
 
+            TransformDirective::ES5Namespace { namespace_node } => {
+                let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
+                let output = ns_emitter.emit_namespace(namespace_node);
+                self.write(&output);
+            }
+
             TransformDirective::ES5Enum { enum_node } => {
                 let mut enum_emitter = EnumES5Emitter::new(self.arena);
                 enum_emitter.set_indent_level(self.writer.indent_level());
@@ -862,6 +869,11 @@ impl<'a> ThinPrinter<'a> {
                 let es5_output = es5_emitter.emit_class(*class_node);
                 self.write(&es5_output);
             }
+            TransformDirective::ES5Namespace { namespace_node } => {
+                let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
+                let output = ns_emitter.emit_namespace(*namespace_node);
+                self.write(&output);
+            }
             TransformDirective::ES5Enum { enum_node } => {
                 let mut enum_emitter = EnumES5Emitter::new(self.arena);
                 enum_emitter.set_indent_level(self.writer.indent_level());
@@ -942,6 +954,11 @@ impl<'a> ThinPrinter<'a> {
                 }
                 let es5_output = es5_emitter.emit_class(*class_node);
                 self.write(&es5_output);
+            }
+            TransformDirective::ES5Namespace { namespace_node } => {
+                let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
+                let output = ns_emitter.emit_namespace(*namespace_node);
+                self.write(&output);
             }
             TransformDirective::ES5Enum { enum_node } => {
                 let mut enum_emitter = EnumES5Emitter::new(self.arena);
@@ -4414,7 +4431,8 @@ impl<'a> ThinPrinter<'a> {
             let is_decl = clause_kind == syntax_kind_ext::VARIABLE_STATEMENT
                 || clause_kind == syntax_kind_ext::FUNCTION_DECLARATION
                 || clause_kind == syntax_kind_ext::CLASS_DECLARATION
-                || clause_kind == syntax_kind_ext::ENUM_DECLARATION;
+                || clause_kind == syntax_kind_ext::ENUM_DECLARATION
+                || clause_kind == syntax_kind_ext::MODULE_DECLARATION;
 
             if is_decl && !is_anonymous_default && self.transforms.has_transform(export.export_clause) {
                 self.emit(export.export_clause);
@@ -4554,6 +4572,24 @@ impl<'a> ThinPrinter<'a> {
                         }
                     }
                 }
+                // export namespace N {}
+                k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                    self.emit_module_declaration(clause_node, export.export_clause);
+                    self.write_line();
+
+                    if !self.ctx.module_state.has_export_assignment {
+                        if let Some(module_decl) = self.arena.get_module(clause_node) {
+                            if let Some(name) = self.get_module_root_name(module_decl.name) {
+                                self.write("exports.");
+                                self.write(&name);
+                                self.write(" = ");
+                                self.write(&name);
+                                self.write(";");
+                                self.write_line();
+                            }
+                        }
+                    }
+                }
                 // export { x, y } - local re-export without module specifier
                 k if k == syntax_kind_ext::NAMED_EXPORTS => {
                     // Emit exports.x = x; for each name
@@ -4649,6 +4685,25 @@ impl<'a> ThinPrinter<'a> {
         } else {
             None
         }
+    }
+
+    fn get_module_root_name(&self, name_idx: NodeIndex) -> Option<String> {
+        if name_idx.is_none() {
+            return None;
+        }
+
+        let node = self.arena.get(name_idx)?;
+        if node.kind == SyntaxKind::Identifier as u16 {
+            return self.arena.get_identifier(node).map(|id| id.escaped_text.clone());
+        }
+
+        if node.kind == syntax_kind_ext::QUALIFIED_NAME {
+            if let Some(qn) = self.arena.qualified_names.get(node.data_index as usize) {
+                return self.get_module_root_name(qn.left);
+            }
+        }
+
+        None
     }
 
     /// Get identifier text from a node index
@@ -5066,7 +5121,7 @@ impl<'a> ThinPrinter<'a> {
     fn emit_module_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
         if self.ctx.target_es5 {
             // Use ES5 namespace transform: namespace → IIFE pattern
-            let mut ns_emitter = crate::transforms::namespace_es5::NamespaceES5Emitter::new(self.arena);
+            let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
             let output = ns_emitter.emit_namespace(idx);
             self.write(&output);
             return;
