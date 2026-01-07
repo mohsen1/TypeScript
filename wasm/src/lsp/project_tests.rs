@@ -1727,6 +1727,46 @@ fn test_project_cross_file_function_body_edit_preserves_symbol_and_scope_cache()
 }
 
 #[test]
+fn test_project_scope_cache_reuse_after_other_file_edit() {
+    let mut project = Project::new();
+
+    project.set_file(
+        "a.ts".to_string(),
+        "export const alpha = 1;\nfunction foo() {\n  return 1;\n}\n".to_string(),
+    );
+    project.set_file(
+        "b.ts".to_string(),
+        "import { alpha } from \"./a\";\nalpha;\n".to_string(),
+    );
+    let position = Position::new(1, 0);
+
+    assert!(project.get_hover("b.ts", position).is_some());
+
+    let edit = {
+        let file = project.file("a.ts").unwrap();
+        let range = range_for_substring(file.source_text(), file.line_map(), "return 1");
+        TextEdit::new(range, "return 2".to_string())
+    };
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
+
+    assert!(project.get_definition("b.ts", position).is_some());
+
+    let timing = project
+        .performance()
+        .timing(ProjectRequestKind::Definition)
+        .expect("Expected timing data for definition");
+
+    assert!(timing.scope_hits > 0, "Expected scope cache hit after other file edit");
+    assert_eq!(
+        timing.scope_misses,
+        0,
+        "Expected definition to reuse cached scope after other file edit"
+    );
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 

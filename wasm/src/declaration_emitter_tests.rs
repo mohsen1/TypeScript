@@ -71,6 +71,16 @@ fn test_export_default_function() {
 }
 
 #[test]
+fn test_export_star_as_namespace() {
+    let output = emit_declaration("export * as ns from './module';");
+    assert!(
+        output.contains("export * as ns from \"./module\";"),
+        "Should emit export namespace re-export: {}",
+        output
+    );
+}
+
+#[test]
 fn test_type_only_named_export_reexport() {
     let source = "export type { Foo } from './foo'; export { type Bar as Baz } from './bar';";
     let output = emit_declaration(source);
