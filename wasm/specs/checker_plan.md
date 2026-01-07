@@ -156,6 +156,9 @@ Status: Active
 - [x] Narrow discriminant comparisons for computed element access
   - Use literal key types (e.g. `key: "kind"`) to match discriminant property names.
   - Add focused test for computed element discriminant narrowing.
+- [x] Route tuple literal element access through solver index-access evaluation
+  - Use QueryDatabase `evaluate_index_access` for tuple literal indices to honor optional/rest elements.
+  - Add focused test ensuring optional tuple element access includes `undefined`.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
