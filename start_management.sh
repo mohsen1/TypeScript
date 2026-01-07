@@ -4,7 +4,7 @@ set -euo pipefail
 SESSION_MAIN="zang-hub"
 WINDOW_MAIN="hub"
 CODEX_CMD="${CODEX_CMD:-codex}"
-CODEX_ARGS="${CODEX_ARGS---full-auto}"
+CODEX_ARGS="${CODEX_ARGS---dangerously-bypass-approvals-and-sandbox}"
 CODEX_MANAGER_ARGS="${CODEX_MANAGER_ARGS:-$CODEX_ARGS}"
 CODEX_TRACK_ARGS="${CODEX_TRACK_ARGS:-$CODEX_ARGS}"
 AUTO_FETCH="${AUTO_FETCH:-1}"
