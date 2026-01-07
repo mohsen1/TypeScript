@@ -9,6 +9,7 @@ use crate::cli::config::{load_tsconfig, resolve_compiler_options, ResolvedCompil
 use crate::cli::fs::{discover_ts_files, FileDiscoveryOptions};
 use crate::declaration_emitter::DeclarationEmitter;
 use crate::parallel::{self, BoundFile, MergedProgram};
+use crate::thin_parser::ParseDiagnostic;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
 use crate::thin_emitter::ThinPrinter;
@@ -159,8 +160,8 @@ fn collect_diagnostics(program: &MergedProgram) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
 
     for (file_idx, file) in program.files.iter().enumerate() {
-        for parse_error in &file.parse_errors {
-            diagnostics.push(parse_error_diagnostic(&file.file_name, parse_error));
+        for parse_diagnostic in &file.parse_diagnostics {
+            diagnostics.push(parse_diagnostic_to_checker(&file.file_name, parse_diagnostic));
         }
 
         let binder = create_binder_from_bound_file(file, program, file_idx);
@@ -177,14 +178,14 @@ fn collect_diagnostics(program: &MergedProgram) -> Vec<Diagnostic> {
     diagnostics
 }
 
-fn parse_error_diagnostic(file_name: &str, message: &str) -> Diagnostic {
+fn parse_diagnostic_to_checker(file_name: &str, diagnostic: &ParseDiagnostic) -> Diagnostic {
     Diagnostic {
         file: file_name.to_string(),
-        start: 0,
-        length: 0,
-        message_text: message.to_string(),
+        start: diagnostic.start,
+        length: diagnostic.length,
+        message_text: diagnostic.message.clone(),
         category: DiagnosticCategory::Error,
-        code: 0,
+        code: diagnostic.code,
         related_information: Vec::new(),
     }
 }
