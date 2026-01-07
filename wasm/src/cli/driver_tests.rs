@@ -2,6 +2,7 @@ use super::args::CliArgs;
 use super::driver::{
     compile, compile_with_cache, compile_with_cache_and_changes, CompilationCache,
 };
+use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -100,6 +101,16 @@ fn compile_with_source_map_emits_map_outputs() {
     assert!(map_path.is_file());
     let js_contents = std::fs::read_to_string(&js_path).expect("read js output");
     assert!(js_contents.contains("sourceMappingURL=index.js.map"));
+    let map_contents = std::fs::read_to_string(&map_path).expect("read map output");
+    let map_json: Value = serde_json::from_str(&map_contents).expect("parse map json");
+    let mappings = map_json
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    assert!(
+        mappings.contains(',') || mappings.contains(';'),
+        "expected non-trivial mappings, got: {mappings}"
+    );
 }
 
 #[test]

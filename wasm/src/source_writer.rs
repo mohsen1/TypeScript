@@ -84,6 +84,18 @@ impl SourceWriter {
         writer
     }
 
+    /// Enable source map generation on an existing writer.
+    pub fn enable_source_map(&mut self, output_file: String) {
+        if self.source_map.is_none() {
+            self.source_map = Some(SourceMapGenerator::new(output_file));
+        }
+    }
+
+    /// Check if source map generation is enabled.
+    pub fn has_source_map(&self) -> bool {
+        self.source_map.is_some()
+    }
+
     /// Set the indentation string
     pub fn set_indent_str(&mut self, indent: &str) {
         self.indent_str = indent.to_string();
