@@ -236,6 +236,15 @@ pub trait QueryDatabase: TypeDatabase {
         crate::solver::evaluate::evaluate_keyof(self.as_type_database(), operand)
     }
 
+    fn resolve_property_access(
+        &self,
+        object_type: TypeId,
+        prop_name: &str,
+    ) -> crate::solver::PropertyAccessResult {
+        let evaluator = crate::solver::operations::PropertyAccessEvaluator::new(self.as_type_database());
+        evaluator.resolve_property_access(object_type, prop_name)
+    }
+
     fn is_property_readonly(&self, object_type: TypeId, prop_name: &str) -> bool {
         crate::solver::operations::property_is_readonly(
             self.as_type_database(),

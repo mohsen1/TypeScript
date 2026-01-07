@@ -162,6 +162,9 @@ Status: Active
 - [x] Route readonly index signature checks through solver QueryDatabase
   - Use solver helper for readonly index signature detection in element access.
   - Add focused test for non-literal index assignment.
+- [x] Route property access lookup through solver QueryDatabase
+  - Use QueryDatabase helper for property access resolution in ThinChecker.
+  - Add focused test for optional chained property access.
 - [x] Route tuple/array literal element access through solver index-access evaluation
   - Use QueryDatabase `evaluate_index_access` for tuple/array literal indices to honor optional/rest elements.
   - Add focused test ensuring optional tuple element access includes `undefined`.
