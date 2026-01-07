@@ -22,10 +22,10 @@ engine on top to match TypeScript behavior while preserving correctness where po
 Last updated: 2026-01-07
 
 - Overall: Migration is active; Rust/WASM compiler is under construction and not production-ready.
-- Tracks: CLI now maps import-equals + namespace re-exports for symbol-level invalidation; checker added user-defined type predicate narrowing in flow analysis; solver added SmallVec-backed union/intersection helpers and unknown normalization coverage; emitter split `thin_emitter` into focused modules and is stabilizing APIs/call sites; LSP fixed hover JSDoc matching and added EOF-safe hover/signature help.
+- Tracks: CLI now maps import-equals + namespace + star re-exports for symbol-level invalidation; checker added predicate narrowing plus assignment/mutation flow clearing; solver added SmallVec-backed union/intersection helpers and unknown normalization coverage; emitter split `thin_emitter` into focused modules and confirmed API stability; LSP fixed hover JSDoc matching and added EOF-safe hover/signature help.
 - Baselines (`tests/cases`, first 100): compiler errors 60/77 (77.9%) pass, JS 40/76 (52.6%) pass; conformance errors 18/90 (20.0%) pass, JS 1/88 (1.1%) pass.
-- Risk: ES module imports still resolve to `any` (cross-file types unreliable); symbol-level invalidation still lacks plain `export * from` mapping; source maps remain stubbed to a single 0,0 mapping; parser/arena child enumeration TODOs remain; baseline pass rates are still low on conformance.
-- Next focus: stabilize the `thin_emitter` module split (public API + call sites/tests), extend symbol-level invalidation to plain `export * from`, improve baseline pass rates, validate predicate narrowing with broader tests, and keep correctness ahead of perf tweaks.
+- Risk: ES module imports still resolve to `any` (cross-file types unreliable); source maps remain stubbed to a single 0,0 mapping; parser/arena child enumeration TODOs remain; baseline pass rates are still low on conformance; assignment/mutation clearing uses conservative heuristics.
+- Next focus: module resolution parity + benchmark harness, improve baseline pass rates, build real source maps, type ES imports, validate predicate/assignment flow with broader tests, and keep correctness ahead of perf tweaks.
 
 ## Status
 This project is not ready for general use yet. The interface and distribution are in progress.
