@@ -203,6 +203,17 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     self.interner.intern(TypeKey::IndexAccess(object_type, index_type))
                 }
             }
+            TypeKey::TypeParameter(param) | TypeKey::Infer(param) => {
+                if let Some(constraint) = param.constraint {
+                    if constraint == object_type {
+                        self.interner.intern(TypeKey::IndexAccess(object_type, index_type))
+                    } else {
+                        self.evaluate_index_access(constraint, index_type)
+                    }
+                } else {
+                    self.interner.intern(TypeKey::IndexAccess(object_type, index_type))
+                }
+            }
             TypeKey::Object(props) => {
                 self.evaluate_object_index(&props, index_type)
             }

@@ -210,6 +210,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Resolve Ref types during keyof evaluation
 - [x] Tests for Ref-based index access and keyof
 
+### Phase 35: Type Parameter Index Access Constraints
+- [x] Use type parameter constraints when evaluating indexed access
+- [x] Tests for constrained/unconstrained type parameter index access
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

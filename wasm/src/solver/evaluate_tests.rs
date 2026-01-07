@@ -373,6 +373,47 @@ fn test_index_access_resolves_ref() {
 }
 
 #[test]
+fn test_index_access_type_param_constraint() {
+    let interner = TypeInterner::new();
+
+    let constraint = interner.object(vec![
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+    ]);
+
+    let type_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(constraint),
+        default: None,
+    }));
+
+    let key_x = interner.literal_string("x");
+    let result = evaluate_index_access(&interner, type_param, key_x);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_index_access_type_param_no_constraint_deferred() {
+    let interner = TypeInterner::new();
+
+    let type_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    }));
+
+    let key_x = interner.literal_string("x");
+    let result = evaluate_index_access(&interner, type_param, key_x);
+
+    match interner.lookup(result) {
+        Some(TypeKey::IndexAccess(obj, idx)) => {
+            assert_eq!(obj, type_param);
+            assert_eq!(idx, key_x);
+        }
+        other => panic!("Expected deferred IndexAccess, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_index_access_with_no_unchecked_indexed_access() {
     let interner = TypeInterner::new();
 
