@@ -783,6 +783,46 @@ fn test_index_access_tuple_literal() {
 }
 
 #[test]
+fn test_index_access_tuple_rest_array_literal() {
+    let interner = TypeInterner::new();
+
+    // [string, ...number[]][1] -> number
+    let number_array = interner.array(TypeId::NUMBER);
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+    ]);
+    let one = interner.literal_number(1.0);
+    let two = interner.literal_number(2.0);
+
+    assert_eq!(evaluate_index_access(&interner, tuple, one), TypeId::NUMBER);
+    assert_eq!(evaluate_index_access(&interner, tuple, two), TypeId::NUMBER);
+}
+
+#[test]
+fn test_index_access_tuple_rest_tuple_literal() {
+    let interner = TypeInterner::new();
+
+    // [string, ...[number, boolean]][1] -> number
+    let rest_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+    ]);
+
+    let one = interner.literal_number(1.0);
+    let two = interner.literal_number(2.0);
+    let three = interner.literal_number(3.0);
+
+    assert_eq!(evaluate_index_access(&interner, tuple, one), TypeId::NUMBER);
+    assert_eq!(evaluate_index_access(&interner, tuple, two), TypeId::BOOLEAN);
+    assert_eq!(evaluate_index_access(&interner, tuple, three), TypeId::UNDEFINED);
+}
+
+#[test]
 fn test_index_access_tuple_optional_literal() {
     let interner = TypeInterner::new();
 

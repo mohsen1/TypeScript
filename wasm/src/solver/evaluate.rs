@@ -659,12 +659,63 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         self.interner.union2(type_id, TypeId::UNDEFINED)
     }
 
+    fn rest_element_type(&self, type_id: TypeId) -> TypeId {
+        match self.interner.lookup(type_id) {
+            Some(TypeKey::Array(elem)) => elem,
+            Some(TypeKey::Tuple(elements)) => {
+                let elements = self.interner.tuple_list(elements);
+                let types: Vec<TypeId> = elements
+                    .iter()
+                    .map(|e| self.tuple_element_type(e))
+                    .collect();
+                if types.is_empty() {
+                    TypeId::NEVER
+                } else {
+                    self.interner.union(types)
+                }
+            }
+            _ => type_id,
+        }
+    }
+
     fn tuple_element_type(&self, element: &TupleElement) -> TypeId {
-        if element.optional {
-            self.interner.union2(element.type_id, TypeId::UNDEFINED)
+        let mut type_id = if element.rest {
+            self.rest_element_type(element.type_id)
         } else {
             element.type_id
+        };
+
+        if element.optional {
+            type_id = self.interner.union2(type_id, TypeId::UNDEFINED);
         }
+
+        type_id
+    }
+
+    fn tuple_index_literal(&self, elements: &[TupleElement], idx: usize) -> Option<TypeId> {
+        let mut logical_idx = 0usize;
+
+        for element in elements {
+            if element.rest {
+                match self.interner.lookup(element.type_id) {
+                    Some(TypeKey::Tuple(rest_elements)) => {
+                        let rest_elements = self.interner.tuple_list(rest_elements);
+                        let inner_idx = idx.saturating_sub(logical_idx);
+                        return self.tuple_index_literal(&rest_elements, inner_idx);
+                    }
+                    _ => {
+                        return Some(self.tuple_element_type(element));
+                    }
+                }
+            }
+
+            if logical_idx == idx {
+                return Some(self.tuple_element_type(element));
+            }
+            logical_idx += 1;
+        }
+
+        None
     }
 
     /// Evaluate index access on a tuple type
@@ -687,16 +738,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         // If index is a literal number, return the specific element
         if let Some(TypeKey::Literal(LiteralValue::Number(n))) = self.interner.lookup(index_type) {
             let idx = n.0 as usize;
-            if idx < elements.len() {
-                return self.tuple_element_type(&elements[idx]);
-            }
-            // Check for rest element
-            if let Some(last) = elements.last() {
-                if last.rest {
-                    return self.tuple_element_type(last);
-                }
-            }
-            return TypeId::UNDEFINED;
+            return self.tuple_index_literal(elements, idx).unwrap_or(TypeId::UNDEFINED);
         }
 
         if index_type == TypeId::STRING {
@@ -713,15 +755,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             if self.is_numeric_property_name(name) {
                 let name_str = self.interner.resolve_atom_ref(name);
                 if let Ok(idx) = name_str.as_ref().parse::<usize>() {
-                    if idx < elements.len() {
-                        return self.tuple_element_type(&elements[idx]);
-                    }
-                    if let Some(last) = elements.last() {
-                        if last.rest {
-                            return self.tuple_element_type(last);
-                        }
-                    }
-                    return TypeId::UNDEFINED;
+                    return self.tuple_index_literal(elements, idx).unwrap_or(TypeId::UNDEFINED);
                 }
 
                 let all_types: Vec<TypeId> = elements.iter().map(|e| self.tuple_element_type(e)).collect();
