@@ -18,6 +18,7 @@ Status: Active
   - [x] Emit real CLI JS source map output (no stub).
   - [x] Add emitter + CLI source map tests.
 - [x] Add minimal source map anchors for transform emission paths.
+- [x] Replace declaration map stub with minimal source map output.
 - [ ] Shrink `thin_emitter/mod.rs` for maintainability
   - [x] Extract comment utilities + comment/output helpers into modules (keep API stable).
   - [x] Extract module wrapper emission helpers into a submodule (keep API stable).
