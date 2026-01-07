@@ -205,6 +205,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Evaluate keyof through readonly type operator wrappers
 - [x] Tests for readonly index access and keyof behavior
 
+### Phase 34: Ref Resolution In Index Access/Keyof
+- [x] Resolve Ref types during index access evaluation
+- [x] Resolve Ref types during keyof evaluation
+- [x] Tests for Ref-based index access and keyof
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

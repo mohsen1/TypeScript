@@ -351,6 +351,28 @@ fn test_index_access_object_with_number_index_signature() {
 }
 
 #[test]
+fn test_index_access_resolves_ref() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+    ]);
+
+    let sym = SymbolRef(1);
+    env.insert(sym, obj);
+
+    let ref_type = interner.reference(sym);
+    let key_x = interner.literal_string("x");
+
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate_index_access(ref_type, key_x);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
 fn test_index_access_with_no_unchecked_indexed_access() {
     let interner = TypeInterner::new();
 
@@ -470,6 +492,32 @@ fn test_keyof_readonly_tuple() {
     let expected = interner.union(vec![
         interner.literal_string("0"),
         interner.literal_string("1"),
+    ]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_resolves_ref() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
+    ]);
+
+    let sym = SymbolRef(2);
+    env.insert(sym, obj);
+
+    let ref_type = interner.reference(sym);
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate_keyof(ref_type);
+
+    let expected = interner.union(vec![
+        interner.literal_string("x"),
+        interner.literal_string("y"),
     ]);
     assert_eq!(result, expected);
 }

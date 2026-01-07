@@ -192,6 +192,17 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             TypeKey::ReadonlyType(inner) => {
                 self.evaluate_index_access(inner, index_type)
             }
+            TypeKey::Ref(sym) => {
+                if let Some(resolved) = self.resolver.resolve_ref(sym, self.interner) {
+                    if resolved == object_type {
+                        self.interner.intern(TypeKey::IndexAccess(object_type, index_type))
+                    } else {
+                        self.evaluate_index_access(resolved, index_type)
+                    }
+                } else {
+                    self.interner.intern(TypeKey::IndexAccess(object_type, index_type))
+                }
+            }
             TypeKey::Object(props) => {
                 self.evaluate_object_index(&props, index_type)
             }
@@ -466,6 +477,17 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         match key {
             TypeKey::ReadonlyType(inner) => {
                 self.evaluate_keyof(inner)
+            }
+            TypeKey::Ref(sym) => {
+                if let Some(resolved) = self.resolver.resolve_ref(sym, self.interner) {
+                    if resolved == evaluated_operand {
+                        self.interner.intern(TypeKey::KeyOf(operand))
+                    } else {
+                        self.evaluate_keyof(resolved)
+                    }
+                } else {
+                    self.interner.intern(TypeKey::KeyOf(operand))
+                }
             }
             TypeKey::Object(props) => {
                 // keyof { x: T, y: U } = "x" | "y"
