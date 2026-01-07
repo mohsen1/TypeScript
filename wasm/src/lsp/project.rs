@@ -117,6 +117,18 @@ impl ProjectFile {
         self.parser.get_source_text()
     }
 
+    pub fn update_source(&mut self, source_text: String) {
+        self.parser.reset(self.file_name.clone(), source_text);
+        self.root = self.parser.parse_source_file();
+
+        let arena = self.parser.get_arena();
+        self.binder.reset();
+        self.binder.bind_source_file(arena, self.root);
+
+        self.line_map = LineMap::build(self.parser.get_source_text());
+        self.type_cache = None;
+    }
+
     pub fn get_hover(&mut self, position: Position) -> Option<HoverInfo> {
         let provider = HoverProvider::new(
             self.parser.get_arena(),
@@ -622,8 +634,8 @@ impl Project {
             return Some(());
         }
 
-        let file = ProjectFile::new(file_name.to_string(), updated_source);
-        self.files.insert(file_name.to_string(), file);
+        let file = self.files.get_mut(file_name)?;
+        file.update_source(updated_source);
         Some(())
     }
 

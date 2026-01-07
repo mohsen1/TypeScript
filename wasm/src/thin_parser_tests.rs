@@ -24,6 +24,34 @@ fn test_thin_parser_simple_expression() {
 }
 
 #[test]
+fn test_thin_parser_reset_clears_arena() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "const a = 1;".to_string(),
+    );
+    parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    assert!(
+        arena.identifiers.iter().any(|ident| ident.escaped_text == "a"),
+        "Expected identifier 'a' after first parse"
+    );
+
+    parser.reset("test.ts".to_string(), "const b = 2;".to_string());
+    parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    assert!(
+        arena.identifiers.iter().any(|ident| ident.escaped_text == "b"),
+        "Expected identifier 'b' after reset parse"
+    );
+    assert!(
+        !arena.identifiers.iter().any(|ident| ident.escaped_text == "a"),
+        "Did not expect identifier 'a' after reset parse"
+    );
+}
+
+#[test]
 fn test_thin_parser_numeric_separator_invalid_diagnostic() {
     let source = "let x = 1_;";
     let mut parser = ThinParserState::new(
