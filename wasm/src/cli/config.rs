@@ -32,6 +32,10 @@ pub struct CompilerOptions {
     #[serde(default)]
     pub types_versions_compiler_version: Option<String>,
     #[serde(default)]
+    pub types: Option<Vec<String>>,
+    #[serde(default)]
+    pub type_roots: Option<Vec<String>>,
+    #[serde(default)]
     pub jsx: Option<String>,
     #[serde(default)]
     pub lib: Option<Vec<String>>,
@@ -72,6 +76,8 @@ pub struct ResolvedCompilerOptions {
     pub lib_files: Vec<PathBuf>,
     pub module_resolution: Option<ModuleResolutionKind>,
     pub types_versions_compiler_version: Option<String>,
+    pub types: Option<Vec<String>>,
+    pub type_roots: Option<Vec<PathBuf>>,
     pub base_url: Option<PathBuf>,
     pub paths: Option<Vec<PathMapping>>,
     pub root_dir: Option<PathBuf>,
@@ -157,6 +163,8 @@ impl Default for ResolvedCompilerOptions {
             lib_files: Vec::new(),
             module_resolution: None,
             types_versions_compiler_version: None,
+            types: None,
+            type_roots: None,
             base_url: None,
             paths: None,
             root_dir: None,
@@ -199,6 +207,36 @@ pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<Res
         if !value.is_empty() {
             resolved.types_versions_compiler_version = Some(value.to_string());
         }
+    }
+
+    if let Some(types) = options.types.as_ref() {
+        let list: Vec<String> = types
+            .iter()
+            .filter_map(|value| {
+                let trimmed = value.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed.to_string())
+                }
+            })
+            .collect();
+        resolved.types = Some(list);
+    }
+
+    if let Some(type_roots) = options.type_roots.as_ref() {
+        let roots: Vec<PathBuf> = type_roots
+            .iter()
+            .filter_map(|value| {
+                let trimmed = value.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(PathBuf::from(trimmed))
+                }
+            })
+            .collect();
+        resolved.type_roots = Some(roots);
     }
 
     if let Some(jsx) = options.jsx.as_deref() {
@@ -350,6 +388,8 @@ fn merge_compiler_options(base: CompilerOptions, child: CompilerOptions) -> Comp
         types_versions_compiler_version: child
             .types_versions_compiler_version
             .or(base.types_versions_compiler_version),
+        types: child.types.or(base.types),
+        type_roots: child.type_roots.or(base.type_roots),
         jsx: child.jsx.or(base.jsx),
         lib: child.lib.or(base.lib),
         base_url: child.base_url.or(base.base_url),

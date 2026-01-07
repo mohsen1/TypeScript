@@ -11,7 +11,8 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Watch mode implemented with notify + debounce.
 - Incremental compile in place (cache reuse + export-hash dependent invalidation + symbol-level dependent invalidation).
 - Module resolution supports node/bundler + exports/conditions basics + typesVersions + package.json `imports` mappings (default TS version 6.0.0, override via flag/env/tsconfig; precedence CLI > env > config > default; env var `TSZ_TYPES_VERSIONS_COMPILER_VERSION`).
-- Active: tsconfig `types`/`typeRoots` package inclusion.
+- tsconfig `types`/`typeRoots` packages included in the root file set.
+- Active: benchmarks vs tsc on large repos.
 - Benchmark harness script added for tsz vs tsc comparisons.
 
 ## Current Investigation Notes (Incremental export hash)
@@ -73,6 +74,8 @@ Tests run in this state:
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_empty_env_uses_tsconfig` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_package_imports_wildcard` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_package_imports_prefers_types_condition` (pass).
+- `./wasm/test.sh cli::driver_tests::compile_resolves_tsconfig_types_includes_selected_packages` (pass).
+- `./wasm/test.sh cli::driver_tests::compile_resolves_tsconfig_type_roots_includes_packages` (pass).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
@@ -84,7 +87,7 @@ Tests run in this state:
   - [x] Reuse cached dependencies to skip reading unchanged files in watch builds.
   - [x] Skip dependent invalidation when exported API is unchanged.
   - [x] Invalidate affected symbols only.
-- [ ] Expand tsconfig support
+- [x] Expand tsconfig support
   - [x] baseUrl
   - [x] paths
   - [x] rootDir
@@ -93,8 +96,8 @@ Tests run in this state:
   - [x] declarationMap (basic .d.ts.map output + sourceMappingURL comments)
   - [x] noEmitOnError
   - [x] lib (resolve `compilerOptions.lib` to src/lib and follow references)
-  - [ ] types (include @types packages specified in compilerOptions.types)
-  - [ ] typeRoots (include type packages from compilerOptions.typeRoots)
+  - [x] types (include @types packages specified in compilerOptions.types)
+  - [x] typeRoots (include type packages from compilerOptions.typeRoots)
 - [x] Respect `--project` and tsconfig inheritance in CLI.
   - `--project` accepts file or directory
   - `extends` chain already supported

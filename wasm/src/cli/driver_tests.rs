@@ -419,6 +419,80 @@ fn compile_resolves_node_modules_types() {
 }
 
 #[test]
+fn compile_resolves_tsconfig_types_includes_selected_packages() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "noEmitOnError": true,
+            "types": ["foo"]
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/index.ts"), "export const value = 1;");
+    write_file(
+        &base.join("node_modules/@types/foo/index.d.ts"),
+        "export const foo = ;",
+    );
+    write_file(
+        &base.join("node_modules/@types/bar/index.d.ts"),
+        "export const bar = ;",
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("node_modules/@types/foo/index.d.ts")));
+    assert!(!result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("node_modules/@types/bar/index.d.ts")));
+    assert!(!base.join("dist/src/index.js").is_file());
+}
+
+#[test]
+fn compile_resolves_tsconfig_type_roots_includes_packages() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "noEmitOnError": true,
+            "typeRoots": ["types"]
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/index.ts"), "export const value = 1;");
+    write_file(
+        &base.join("types/foo/index.d.ts"),
+        "export const foo = ;",
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("types/foo/index.d.ts")));
+    assert!(!base.join("dist/src/index.js").is_file());
+}
+
+#[test]
 fn compile_resolves_node_modules_exports_subpath() {
     let temp = TempDir::new().expect("temp dir");
     let base = &temp.path;
