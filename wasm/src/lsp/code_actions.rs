@@ -243,7 +243,7 @@ impl<'a> CodeActionProvider<'a> {
         let target_node = self.arena.get(info.target)?;
 
         let (edits, title) = if target_node.kind == SyntaxKind::ThisKeyword as u16 {
-            let edits = self.class_property_edits(info.access_node, &info.property_name)?;
+            let edits = self.class_property_edits(info.access_node, &info.property_text)?;
             let title = format!("Add property '{}' to class", info.property_name);
             (edits, title)
         } else if target_node.kind == SyntaxKind::Identifier as u16 {
@@ -268,7 +268,7 @@ impl<'a> CodeActionProvider<'a> {
                 }
 
                 let literal = self.arena.get_literal_expr(init_node)?;
-                let edits = self.object_literal_property_edits(init_node, literal, &info.property_name)?;
+                let edits = self.object_literal_property_edits(init_node, literal, &info.property_text)?;
                 let title = format!("Add property '{}' to object literal", info.property_name);
                 result = Some((edits, title));
                 break;
@@ -1340,7 +1340,32 @@ impl<'a> CodeActionProvider<'a> {
                 return Some(PropertyAccessInfo {
                     access_node: current,
                     target: access.expression,
+                    property_name: property_name.clone(),
+                    property_text: property_name,
+                });
+            }
+
+            if node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION {
+                let access = self.arena.get_access_expr(node)?;
+                let arg_node = self.arena.get(access.name_or_argument)?;
+                let (property_name, property_text) = match arg_node.kind {
+                    k if k == SyntaxKind::StringLiteral as u16
+                        || k == SyntaxKind::NumericLiteral as u16 =>
+                    {
+                        let name = self.arena.get_literal_text(access.name_or_argument)?.to_string();
+                        let text = self
+                            .source
+                            .get(arg_node.pos as usize..arg_node.end as usize)?
+                            .to_string();
+                        (name, text)
+                    }
+                    _ => return None,
+                };
+                return Some(PropertyAccessInfo {
+                    access_node: current,
+                    target: access.expression,
                     property_name,
+                    property_text,
                 });
             }
             current = self.arena.get_extended(current)?.parent;
@@ -1353,7 +1378,7 @@ impl<'a> CodeActionProvider<'a> {
         &self,
         object_node: &crate::parser::thin_node::ThinNode,
         literal: &crate::parser::thin_node::LiteralExprData,
-        property_name: &str,
+        property_text: &str,
     ) -> Option<Vec<TextEdit>> {
         let close_offset = self.find_closing_brace_offset(object_node)?;
         let open_pos = self.line_map.offset_to_position(object_node.pos, self.source);
@@ -1388,7 +1413,7 @@ impl<'a> CodeActionProvider<'a> {
             } else {
                 ", "
             };
-            let mut new_text = format!("{}{}: undefined", prefix, property_name);
+            let mut new_text = format!("{}{}: undefined", prefix, property_text);
             if had_trailing_comma {
                 new_text.push(',');
             }
@@ -1444,7 +1469,7 @@ impl<'a> CodeActionProvider<'a> {
 
             let mut line = String::new();
             line.push_str(&prop_indent);
-            line.push_str(property_name);
+            line.push_str(property_text);
             line.push_str(": undefined");
             if had_trailing_comma {
                 line.push(',');
@@ -1461,7 +1486,7 @@ impl<'a> CodeActionProvider<'a> {
 
         let mut line = String::new();
         line.push_str(&prop_indent);
-        line.push_str(property_name);
+        line.push_str(property_text);
         line.push_str(": undefined\n");
         let insert_pos = self.line_map.offset_to_position(close_line_start, self.source);
         edits.push(TextEdit {
@@ -1472,7 +1497,7 @@ impl<'a> CodeActionProvider<'a> {
         Some(edits)
     }
 
-    fn class_property_edits(&self, node_idx: NodeIndex, property_name: &str) -> Option<Vec<TextEdit>> {
+    fn class_property_edits(&self, node_idx: NodeIndex, property_text: &str) -> Option<Vec<TextEdit>> {
         let class_idx = self.find_enclosing_class(node_idx)?;
         let class_node = self.arena.get(class_idx)?;
         let class_data = self.arena.get_class(class_node)?;
@@ -1495,7 +1520,7 @@ impl<'a> CodeActionProvider<'a> {
             }
             let had_trailing_ws = insert_offset != close_offset;
             let trailing_space = if had_trailing_ws { "" } else { " " };
-            let new_text = format!(" {}: any;{}", property_name, trailing_space);
+            let new_text = format!(" {}: any;{}", property_text, trailing_space);
             let insert_pos = self.line_map.offset_to_position(insert_offset, self.source);
             edits.push(TextEdit {
                 range: Range::new(insert_pos, insert_pos),
@@ -1516,7 +1541,7 @@ impl<'a> CodeActionProvider<'a> {
 
         let mut line = String::new();
         line.push_str(&prop_indent);
-        line.push_str(property_name);
+        line.push_str(property_text);
         line.push_str(": any;\n");
 
         let insert_pos = self.line_map.offset_to_position(close_line_start, self.source);
@@ -2295,6 +2320,7 @@ struct PropertyAccessInfo {
     access_node: NodeIndex,
     target: NodeIndex,
     property_name: String,
+    property_text: String,
 }
 
 #[derive(Clone, Debug)]
