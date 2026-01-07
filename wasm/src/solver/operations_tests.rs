@@ -1592,6 +1592,48 @@ fn test_infer_generic_index_access_param_from_index_access_arg() {
 }
 
 #[test]
+fn test_infer_generic_template_literal_param() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let template_param = interner.intern(TypeKey::TemplateLiteral(vec![
+        TemplateSpan::Text(interner.intern_string("prefix")),
+        TemplateSpan::Type(t_type),
+        TemplateSpan::Text(interner.intern_string("suffix")),
+    ]));
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: template_param,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let arg_template = interner.intern(TypeKey::TemplateLiteral(vec![
+        TemplateSpan::Text(interner.intern_string("prefix")),
+        TemplateSpan::Type(TypeId::STRING),
+        TemplateSpan::Text(interner.intern_string("suffix")),
+    ]));
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[arg_template]);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
 fn test_infer_generic_array_map() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
