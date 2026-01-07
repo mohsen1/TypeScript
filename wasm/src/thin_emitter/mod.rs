@@ -1465,7 +1465,10 @@ impl<'a> ThinPrinter<'a> {
     /// Emit a node.
     fn emit_node(&mut self, node: &ThinNode, idx: NodeIndex) {
         // Phase 2 Architecture: Check transform directives first
-        if self.transforms.has_transform(idx) {
+        if !self.transforms.is_empty()
+            && Self::kind_may_have_transform(node.kind)
+            && self.transforms.has_transform(idx)
+        {
             self.apply_transform(node, idx);
             return;
         }
@@ -1473,6 +1476,27 @@ impl<'a> ThinPrinter<'a> {
         // No transform, emit using default logic
         let kind = node.kind;
         self.emit_node_by_kind(node, idx, kind);
+    }
+
+    fn kind_may_have_transform(kind: u16) -> bool {
+        matches!(
+            kind,
+            k if k == syntax_kind_ext::SOURCE_FILE
+                || k == syntax_kind_ext::CLASS_DECLARATION
+                || k == syntax_kind_ext::CLASS_EXPRESSION
+                || k == syntax_kind_ext::MODULE_DECLARATION
+                || k == syntax_kind_ext::ENUM_DECLARATION
+                || k == syntax_kind_ext::FUNCTION_DECLARATION
+                || k == syntax_kind_ext::FUNCTION_EXPRESSION
+                || k == syntax_kind_ext::ARROW_FUNCTION
+                || k == syntax_kind_ext::VARIABLE_STATEMENT
+                || k == syntax_kind_ext::VARIABLE_DECLARATION_LIST
+                || k == syntax_kind_ext::FOR_OF_STATEMENT
+                || k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION
+                || k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION
+                || k == syntax_kind_ext::TEMPLATE_EXPRESSION
+                || k == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+        )
     }
 
     /// Emit a node by kind using default logic (no transforms).
