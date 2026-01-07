@@ -478,7 +478,13 @@ impl ThinBinderState {
             k if k == syntax_kind_ext::WHILE_STATEMENT ||
                  k == syntax_kind_ext::DO_STATEMENT => {
                 if let Some(loop_data) = arena.get_loop(node) {
-                    self.bind_node(arena, loop_data.statement);
+                    if node.kind == syntax_kind_ext::DO_STATEMENT {
+                        self.bind_node(arena, loop_data.statement);
+                        self.bind_expression(arena, loop_data.condition);
+                    } else {
+                        self.bind_expression(arena, loop_data.condition);
+                        self.bind_node(arena, loop_data.statement);
+                    }
                 }
             }
 
@@ -487,7 +493,9 @@ impl ThinBinderState {
                 if let Some(loop_data) = arena.get_loop(node) {
                     self.enter_scope(ContainerKind::Block, idx);
                     self.bind_node(arena, loop_data.initializer);
+                    self.bind_expression(arena, loop_data.condition);
                     self.bind_node(arena, loop_data.statement);
+                    self.bind_expression(arena, loop_data.incrementor);
                     self.exit_scope();
                 }
             }
@@ -498,6 +506,7 @@ impl ThinBinderState {
                 if let Some(for_data) = arena.get_for_in_of(node) {
                     self.enter_scope(ContainerKind::Block, idx);
                     self.bind_node(arena, for_data.initializer);
+                    self.bind_expression(arena, for_data.expression);
                     self.bind_node(arena, for_data.statement);
                     self.exit_scope();
                 }
@@ -1353,12 +1362,14 @@ impl ThinBinderState {
 
     fn bind_switch_statement(&mut self, arena: &ThinNodeArena, node: &ThinNode, _idx: NodeIndex) {
         if let Some(switch_data) = arena.get_switch(node) {
+            self.bind_expression(arena, switch_data.expression);
             // Case block contains case clauses
             if let Some(case_block_node) = arena.get(switch_data.case_block) {
                 if let Some(case_block) = arena.get_block(case_block_node) {
                     for &clause_idx in &case_block.statements.nodes {
                         if let Some(clause_node) = arena.get(clause_idx) {
                             if let Some(clause) = arena.get_case_clause(clause_node) {
+                                self.bind_expression(arena, clause.expression);
                                 for &stmt_idx in &clause.statements.nodes {
                                     self.bind_node(arena, stmt_idx);
                                 }

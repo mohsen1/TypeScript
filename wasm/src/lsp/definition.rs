@@ -411,6 +411,56 @@ mod definition_tests {
     }
 
     #[test]
+    fn test_goto_definition_nested_arrow_in_while_condition() {
+        let source = "while ((() => {\n  const value = 1;\n  return value;\n})()) {}";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let line_map = LineMap::build(source);
+
+        // Position at the 'value' usage (line 2)
+        let position = Position::new(2, 9);
+
+        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let definitions = goto_def.get_definition(root, position);
+
+        assert!(definitions.is_some(), "Should resolve nested arrow locals in while condition");
+        if let Some(defs) = definitions {
+            assert!(!defs.is_empty(), "Should have at least one definition");
+            assert_eq!(defs[0].range.start.line, 1, "Definition should be on line 1");
+        }
+    }
+
+    #[test]
+    fn test_goto_definition_nested_arrow_in_for_of_expression() {
+        let source = "for (const item of (() => {\n  const value = 1;\n  return value;\n})()) {}";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let line_map = LineMap::build(source);
+
+        // Position at the 'value' usage (line 2)
+        let position = Position::new(2, 9);
+
+        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let definitions = goto_def.get_definition(root, position);
+
+        assert!(definitions.is_some(), "Should resolve nested arrow locals in for-of expression");
+        if let Some(defs) = definitions {
+            assert!(!defs.is_empty(), "Should have at least one definition");
+            assert_eq!(defs[0].range.start.line, 1, "Definition should be on line 1");
+        }
+    }
+
+    #[test]
     fn test_goto_definition_nested_arrow_in_object_literal() {
         let source = "const holder = { run: () => {\n  const value = 1;\n  return value;\n} };";
         let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
