@@ -212,22 +212,23 @@ impl<'a> ThinCheckerState<'a> {
     fn resolve_identifier_symbol(&self, idx: NodeIndex) -> Option<SymbolId> {
         let node = self.ctx.arena.get(idx)?;
         let name = self.ctx.arena.get_identifier(node)?.escaped_text.as_str();
-        let mut scope_id = self.find_enclosing_scope(idx)?;
 
-        while !scope_id.is_none() {
-            if let Some(scope) = self.ctx.binder.scopes.get(scope_id.0 as usize) {
-                if let Some(sym_id) = scope.table.get(name) {
-                    if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
-                        if !Self::is_class_member_symbol(symbol.flags) {
+        if let Some(mut scope_id) = self.find_enclosing_scope(idx) {
+            while !scope_id.is_none() {
+                if let Some(scope) = self.ctx.binder.scopes.get(scope_id.0 as usize) {
+                    if let Some(sym_id) = scope.table.get(name) {
+                        if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                            if !Self::is_class_member_symbol(symbol.flags) {
+                                return Some(sym_id);
+                            }
+                        } else {
                             return Some(sym_id);
                         }
-                    } else {
-                        return Some(sym_id);
                     }
+                    scope_id = scope.parent;
+                } else {
+                    break;
                 }
-                scope_id = scope.parent;
-            } else {
-                break;
             }
         }
 

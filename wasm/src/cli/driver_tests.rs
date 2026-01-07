@@ -594,8 +594,6 @@ fn compile_with_cache_updates_dependencies_for_changed_files() {
     write_file(&extra_path, "export const value = ;");
 
     let canonical = std::fs::canonicalize(&index_path).unwrap_or(index_path.clone());
-    cache.invalidate_paths_with_dependents(vec![canonical.clone()]);
-
     let result = compile_with_cache_and_changes(&args, base, &mut cache, &[canonical])
         .expect("compile should succeed");
     assert!(result
@@ -606,6 +604,110 @@ fn compile_with_cache_updates_dependencies_for_changed_files() {
         .diagnostics
         .iter()
         .any(|diag| diag.file.contains("util.ts")));
+}
+
+#[test]
+fn compile_with_cache_skips_dependents_when_exports_unchanged() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+
+    let index_path = base.join("src/index.ts");
+    let util_path = base.join("src/util.ts");
+    write_file(
+        &index_path,
+        "import { value } from './util'; export const output = value;",
+    );
+    write_file(&util_path, "export function value() { return 1; }");
+
+    let mut cache = CompilationCache::default();
+    let args = default_args();
+
+    let result = compile_with_cache(&args, base, &mut cache).expect("compile should succeed");
+    assert!(
+        result.diagnostics.is_empty(),
+        "initial diagnostics (unchanged exports): {:#?}",
+        result.diagnostics
+    );
+
+    write_file(&util_path, "export function value() { return 2; }");
+
+    let util_output = std::fs::canonicalize(base.join("dist/src/util.js"))
+        .unwrap_or_else(|_| base.join("dist/src/util.js"));
+    let index_output = std::fs::canonicalize(base.join("dist/src/index.js"))
+        .unwrap_or_else(|_| base.join("dist/src/index.js"));
+    let canonical = std::fs::canonicalize(&util_path).unwrap_or(util_path.clone());
+
+    let result = compile_with_cache_and_changes(&args, base, &mut cache, &[canonical])
+        .expect("compile should succeed");
+    assert!(result.diagnostics.is_empty());
+    assert!(result.emitted_files.contains(&util_output));
+    assert!(!result.emitted_files.contains(&index_output));
+}
+
+#[test]
+fn compile_with_cache_rechecks_dependents_on_export_change() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+
+    let index_path = base.join("src/index.ts");
+    let util_path = base.join("src/util.ts");
+    write_file(
+        &index_path,
+        "import { value } from './util'; const num: number = value;",
+    );
+    write_file(&util_path, "export const value = 1;");
+
+    let mut cache = CompilationCache::default();
+    let args = default_args();
+
+    let result = compile_with_cache(&args, base, &mut cache).expect("compile should succeed");
+    assert!(
+        result.diagnostics.is_empty(),
+        "initial diagnostics (export change): {:#?}",
+        result.diagnostics
+    );
+
+    write_file(&util_path, "export const value = \"oops\";");
+
+    let util_output = std::fs::canonicalize(base.join("dist/src/util.js"))
+        .unwrap_or_else(|_| base.join("dist/src/util.js"));
+    let index_output = std::fs::canonicalize(base.join("dist/src/index.js"))
+        .unwrap_or_else(|_| base.join("dist/src/index.js"));
+    let canonical = std::fs::canonicalize(&util_path).unwrap_or(util_path.clone());
+
+    let result = compile_with_cache_and_changes(&args, base, &mut cache, &[canonical])
+        .expect("compile should succeed");
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.file.contains("index.ts")),
+        "expected index diagnostics, got diagnostics {:#?} emitted {:#?}",
+        result.diagnostics,
+        result.emitted_files
+    );
+    assert!(result.emitted_files.contains(&util_output));
+    assert!(result.emitted_files.contains(&index_output));
 }
 
 #[test]
