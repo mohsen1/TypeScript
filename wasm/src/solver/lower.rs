@@ -642,6 +642,23 @@ impl<'a> TypeLowering<'a> {
             .map(|ident| self.interner.intern_string(&ident.escaped_text))
     }
 
+    fn lower_return_type(&self, node_idx: NodeIndex) -> (TypeId, Option<TypePredicate>) {
+        if node_idx == NodeIndex::NONE {
+            return (TypeId::ANY, None);
+        }
+
+        let node = match self.arena.get(node_idx) {
+            Some(n) => n,
+            None => return (TypeId::ERROR, None),
+        };
+
+        if node.kind == syntax_kind_ext::TYPE_PREDICATE {
+            return self.lower_type_predicate_return(node_idx);
+        }
+
+        (self.lower_type(node_idx), None)
+    }
+
     /// Lower a function type ((a: T, b: U) => R)
     fn lower_function_type(&self, node_idx: NodeIndex) -> TypeId {
         let node = match self.arena.get(node_idx) {
@@ -650,7 +667,7 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_function_type(node) {
-            let (type_params, (params, return_type)) = self.with_type_params(&data.type_parameters, || {
+            let (type_params, (params, return_type, type_predicate)) = self.with_type_params(&data.type_parameters, || {
                 let params: Vec<ParamInfo> = data.parameters.nodes.iter()
                     .filter_map(|&idx| {
                         if let Some(param_node) = self.arena.get(idx) {
@@ -667,14 +684,15 @@ impl<'a> TypeLowering<'a> {
                     })
                     .collect();
 
-                let return_type = self.lower_type(data.type_annotation);
-                (params, return_type)
+                let (return_type, type_predicate) = self.lower_return_type(data.type_annotation);
+                (params, return_type, type_predicate)
             });
 
             let shape = FunctionShape {
                 type_params,
                 params,
                 return_type,
+                type_predicate,
                 is_constructor: false,
             };
 
@@ -895,30 +913,32 @@ impl<'a> TypeLowering<'a> {
     }
 
     fn lower_call_signature(&self, sig: &SignatureData) -> CallSignature {
-        let (type_params, (params, return_type)) = self.with_type_params(&sig.type_parameters, || {
+        let (type_params, (params, return_type, type_predicate)) = self.with_type_params(&sig.type_parameters, || {
             let params = self.lower_signature_params(sig);
-            let return_type = self.lower_type(sig.type_annotation);
-            (params, return_type)
+            let (return_type, type_predicate) = self.lower_return_type(sig.type_annotation);
+            (params, return_type, type_predicate)
         });
 
         CallSignature {
             type_params,
             params,
             return_type,
+            type_predicate,
         }
     }
 
     fn lower_method_signature(&self, sig: &SignatureData) -> TypeId {
-        let (type_params, (params, return_type)) = self.with_type_params(&sig.type_parameters, || {
+        let (type_params, (params, return_type, type_predicate)) = self.with_type_params(&sig.type_parameters, || {
             let params = self.lower_signature_params(sig);
-            let return_type = self.lower_type(sig.type_annotation);
-            (params, return_type)
+            let (return_type, type_predicate) = self.lower_return_type(sig.type_annotation);
+            (params, return_type, type_predicate)
         });
 
         self.interner.function(FunctionShape {
             type_params,
             params,
             return_type,
+            type_predicate,
             is_constructor: false,
         })
     }
@@ -1936,20 +1956,54 @@ impl<'a> TypeLowering<'a> {
     }
 
     fn lower_type_predicate(&self, node_idx: NodeIndex) -> TypeId {
+        self.lower_type_predicate_return(node_idx).0
+    }
+
+    fn lower_type_predicate_target(&self, node_idx: NodeIndex) -> Option<TypePredicateTarget> {
+        let node = self.arena.get(node_idx)?;
+        if node.kind == SyntaxKind::ThisKeyword as u16 || node.kind == syntax_kind_ext::THIS_TYPE {
+            return Some(TypePredicateTarget::This);
+        }
+
+        self.arena
+            .get_identifier(node)
+            .map(|ident| TypePredicateTarget::Identifier(self.interner.intern_string(&ident.escaped_text)))
+    }
+
+    fn lower_type_predicate_return(&self, node_idx: NodeIndex) -> (TypeId, Option<TypePredicate>) {
         let node = match self.arena.get(node_idx) {
             Some(n) => n,
-            None => return TypeId::ERROR,
+            None => return (TypeId::ERROR, None),
         };
 
-        if let Some(data) = self.arena.get_type_predicate(node) {
-            if data.asserts_modifier {
-                TypeId::VOID
-            } else {
-                TypeId::BOOLEAN
-            }
+        let Some(data) = self.arena.get_type_predicate(node) else {
+            return (TypeId::BOOLEAN, None);
+        };
+
+        let return_type = if data.asserts_modifier {
+            TypeId::VOID
         } else {
             TypeId::BOOLEAN
-        }
+        };
+
+        let target = match self.lower_type_predicate_target(data.parameter_name) {
+            Some(target) => target,
+            None => return (return_type, None),
+        };
+
+        let type_id = if data.type_node != NodeIndex::NONE {
+            Some(self.lower_type(data.type_node))
+        } else {
+            None
+        };
+
+        let predicate = TypePredicate {
+            asserts: data.asserts_modifier,
+            target,
+            type_id,
+        };
+
+        (return_type, Some(predicate))
     }
 
     /// Lower an infer type (infer R)
@@ -2054,7 +2108,7 @@ impl<'a> TypeLowering<'a> {
 
         // Constructor types use the same data structure as function types
         if let Some(data) = self.arena.get_function_type(node) {
-            let (type_params, (params, return_type)) = self.with_type_params(&data.type_parameters, || {
+            let (type_params, (params, return_type, type_predicate)) = self.with_type_params(&data.type_parameters, || {
                 let params: Vec<ParamInfo> = data.parameters.nodes.iter()
                     .filter_map(|&idx| {
                         if let Some(param_node) = self.arena.get(idx) {
@@ -2071,14 +2125,15 @@ impl<'a> TypeLowering<'a> {
                     })
                     .collect();
 
-                let return_type = self.lower_type(data.type_annotation);
-                (params, return_type)
+                let (return_type, type_predicate) = self.lower_return_type(data.type_annotation);
+                (params, return_type, type_predicate)
             });
 
             let shape = FunctionShape {
                 type_params,
                 params,
                 return_type,
+                type_predicate,
                 is_constructor: true, // Mark as constructor
             };
 

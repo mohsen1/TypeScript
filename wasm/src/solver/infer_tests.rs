@@ -593,12 +593,14 @@ fn test_resolve_bounds_function_subtype() {
         type_params: Vec::new(),
         params: vec![source_param],
         return_type: TypeId::NUMBER,
+        type_predicate: None,
         is_constructor: false,
     });
     let upper = interner.function(FunctionShape {
         type_params: Vec::new(),
         params: vec![target_param],
         return_type: TypeId::NUMBER,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -634,6 +636,7 @@ fn test_resolve_bounds_callable_subtype() {
             type_params: Vec::new(),
             params: vec![source_param],
             return_type: TypeId::NUMBER,
+            type_predicate: None,
         }],
         construct_signatures: Vec::new(),
         properties: Vec::new(),
@@ -643,6 +646,7 @@ fn test_resolve_bounds_callable_subtype() {
             type_params: Vec::new(),
             params: vec![target_param],
             return_type: TypeId::NUMBER,
+            type_predicate: None,
         }],
         construct_signatures: Vec::new(),
         properties: Vec::new(),
@@ -679,6 +683,7 @@ fn test_resolve_bounds_function_to_callable() {
         type_params: Vec::new(),
         params: vec![source_param],
         return_type: TypeId::NUMBER,
+        type_predicate: None,
         is_constructor: false,
     });
     let upper = interner.callable(CallableShape {
@@ -686,6 +691,7 @@ fn test_resolve_bounds_function_to_callable() {
             type_params: Vec::new(),
             params: vec![target_param],
             return_type: TypeId::NUMBER,
+            type_predicate: None,
         }],
         construct_signatures: Vec::new(),
         properties: Vec::new(),
@@ -723,6 +729,7 @@ fn test_resolve_bounds_callable_to_function() {
             type_params: Vec::new(),
             params: vec![source_param],
             return_type: TypeId::NUMBER,
+            type_predicate: None,
         }],
         construct_signatures: Vec::new(),
         properties: Vec::new(),
@@ -731,6 +738,7 @@ fn test_resolve_bounds_callable_to_function() {
         type_params: Vec::new(),
         params: vec![target_param],
         return_type: TypeId::NUMBER,
+        type_predicate: None,
         is_constructor: false,
     });
 

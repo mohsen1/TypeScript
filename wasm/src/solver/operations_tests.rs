@@ -20,6 +20,7 @@ fn test_call_simple_function() {
         }],
         return_type: TypeId::STRING,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -47,6 +48,7 @@ fn test_call_argument_count_mismatch() {
         }],
         return_type: TypeId::STRING,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -77,6 +79,7 @@ fn test_call_argument_type_mismatch() {
         }],
         return_type: TypeId::STRING,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -109,6 +112,7 @@ fn test_call_rest_parameter_allows_zero_args() {
         }],
         return_type: TypeId::STRING,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -144,6 +148,7 @@ fn test_call_rest_parameter_min_args_with_required() {
         ],
         return_type: TypeId::STRING,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -174,6 +179,7 @@ fn test_call_rest_parameter_type_match() {
         }],
         return_type: TypeId::STRING,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -201,6 +207,7 @@ fn test_call_rest_parameter_type_mismatch() {
         }],
         return_type: TypeId::STRING,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -235,6 +242,7 @@ fn test_call_tuple_rest_argument_count_mismatch() {
         }],
         return_type: TypeId::STRING,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -268,6 +276,7 @@ fn test_call_tuple_rest_argument_type_mismatch() {
         }],
         return_type: TypeId::STRING,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -302,6 +311,7 @@ fn test_call_tuple_rest_argument_success() {
         }],
         return_type: TypeId::STRING,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -539,6 +549,7 @@ fn test_call_generic_function_identity() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -574,6 +585,7 @@ fn test_call_generic_function_with_string() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -608,6 +620,7 @@ fn test_call_generic_argument_type_mismatch_with_default() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -644,6 +657,7 @@ fn test_call_generic_argument_count_mismatch() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -683,6 +697,7 @@ fn test_call_generic_rest_tuple_constraint_count_mismatch() {
             rest: true,
         }],
         return_type: TypeId::VOID,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -723,6 +738,7 @@ fn test_call_generic_default_rest_tuple_count_mismatch() {
             rest: true,
         }],
         return_type: TypeId::VOID,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -762,6 +778,7 @@ fn test_call_generic_default_rest_tuple_optional_allows_empty() {
             rest: true,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -803,6 +820,7 @@ fn test_call_generic_argument_type_mismatch_non_generic_param() {
             },
         ],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -840,6 +858,7 @@ fn test_call_generic_callable_signature() {
                 rest: false,
             }],
             return_type: t_type,
+            type_predicate: None,
         }],
         construct_signatures: Vec::new(),
         properties: Vec::new(),
@@ -877,6 +896,7 @@ fn test_call_generic_array_function() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -910,6 +930,7 @@ fn test_infer_call_signature_identity() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
     };
 
     let result = infer_call_signature(&interner, &mut subtype, &sig, &[TypeId::NUMBER]);
@@ -937,6 +958,7 @@ fn test_infer_generic_function_identity() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -973,6 +995,7 @@ fn test_infer_generic_array_map() {
             rest: false,
         }],
         return_type: u_type,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -993,6 +1016,7 @@ fn test_infer_generic_array_map() {
             },
         ],
         return_type: array_u,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1006,6 +1030,7 @@ fn test_infer_generic_array_map() {
             rest: false,
         }],
         return_type: TypeId::STRING,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -1043,6 +1068,7 @@ fn test_infer_generic_constructor_instantiation() {
             rest: false,
         }],
         return_type: box_t,
+        type_predicate: None,
         is_constructor: true,
     };
 
@@ -1075,6 +1101,7 @@ fn test_infer_generic_application_param() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1112,6 +1139,7 @@ fn test_infer_generic_object_property() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1152,6 +1180,7 @@ fn test_infer_generic_tuple_element() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1190,6 +1219,7 @@ fn test_infer_generic_tuple_rest_elements() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1228,6 +1258,7 @@ fn test_infer_generic_tuple_rest_parameter() {
             rest: true,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1268,6 +1299,7 @@ fn test_infer_generic_tuple_rest_from_rest_argument() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1313,6 +1345,7 @@ fn test_infer_generic_index_signature() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1359,6 +1392,7 @@ fn test_infer_generic_union_source() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1405,6 +1439,7 @@ fn test_infer_generic_optional_union_target() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1434,6 +1469,7 @@ fn test_infer_generic_optional_union_target_with_null() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1463,6 +1499,7 @@ fn test_infer_generic_rest_parameters() {
             rest: true,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1497,6 +1534,7 @@ fn test_infer_generic_rest_tuple_type_param() {
             rest: true,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1539,6 +1577,7 @@ fn test_infer_generic_tuple_rest_type_param() {
             rest: true,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1581,6 +1620,7 @@ fn test_infer_generic_tuple_rest_in_tuple_param() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1624,6 +1664,7 @@ fn test_infer_generic_tuple_rest_in_tuple_param_from_rest_argument() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1669,6 +1710,7 @@ fn test_infer_generic_tuple_rest_in_tuple_param_from_rest_argument_with_fixed_ta
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1713,6 +1755,7 @@ fn test_infer_generic_tuple_rest_in_tuple_param_empty_tail() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1749,6 +1792,7 @@ fn test_infer_generic_default_type_param() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1784,6 +1828,7 @@ fn test_infer_generic_default_depends_on_prior_param() {
             rest: false,
         }],
         return_type: u_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1812,6 +1857,7 @@ fn test_infer_generic_constraint_fallback() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1840,6 +1886,7 @@ fn test_infer_generic_constraint_violation() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     };
 
@@ -1883,6 +1930,7 @@ fn test_infer_generic_constraint_depends_on_prior_param() {
             },
         ],
         return_type: u_type,
+        type_predicate: None,
         is_constructor: false,
     };
 

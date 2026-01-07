@@ -35,6 +35,7 @@ fn test_contextual_function_parameter() {
             ParamInfo { name: Some(interner.intern_string("i")), type_id: TypeId::NUMBER, optional: false, rest: false },
         ],
         return_type: TypeId::VOID,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -57,6 +58,7 @@ fn test_contextual_function_return() {
         type_params: vec![],
         params: vec![],
         return_type: TypeId::STRING,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -77,6 +79,7 @@ fn test_contextual_function_rest_parameter() {
             ParamInfo { name: Some(interner.intern_string("args")), type_id: number_array, optional: false, rest: true },
         ],
         return_type: TypeId::VOID,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -190,6 +193,7 @@ fn test_contextual_for_parameter() {
             ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
         ],
         return_type: TypeId::VOID,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -255,6 +259,7 @@ fn test_contextual_union_function() {
             ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
         ],
         return_type: TypeId::VOID,
+        type_predicate: None,
         is_constructor: false,
     });
     let fn2 = interner.function(FunctionShape {
@@ -263,6 +268,7 @@ fn test_contextual_union_function() {
             ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::NUMBER, optional: false, rest: false },
         ],
         return_type: TypeId::VOID,
+        type_predicate: None,
         is_constructor: false,
     });
     let union = interner.union(vec![fn1, fn2]);

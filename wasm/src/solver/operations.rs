@@ -82,6 +82,7 @@ impl<'a> CallEvaluator<'a> {
         let func = FunctionShape {
             params: sig.params.clone(),
             return_type: sig.return_type,
+            type_predicate: sig.type_predicate.clone(),
             type_params: sig.type_params.clone(),
             is_constructor: false,
         };
@@ -777,6 +778,7 @@ impl<'a> CallEvaluator<'a> {
             let func = FunctionShape {
                 params: sig.params.clone(),
                 return_type: sig.return_type,
+                type_predicate: sig.type_predicate.clone(),
                 type_params: sig.type_params.clone(),
                 is_constructor: false,
             };
@@ -1131,6 +1133,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
             params: vec![rest_param],
             return_type,
             type_params: Vec::new(),
+            type_predicate: None,
             is_constructor: false,
         })
     }

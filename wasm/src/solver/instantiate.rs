@@ -124,6 +124,10 @@ impl<'a> TypeInstantiator<'a> {
         let shadowed_len = self.shadowed.len();
         self.shadowed.extend(sig.type_params.iter().map(|tp| tp.name));
 
+        let type_predicate = sig
+            .type_predicate
+            .as_ref()
+            .map(|predicate| self.instantiate_type_predicate(predicate));
         let type_params: Vec<TypeParamInfo> = sig.type_params.iter()
             .map(|tp| TypeParamInfo {
                 name: tp.name,
@@ -147,6 +151,15 @@ impl<'a> TypeInstantiator<'a> {
             type_params,
             params,
             return_type,
+            type_predicate,
+        }
+    }
+
+    fn instantiate_type_predicate(&mut self, predicate: &TypePredicate) -> TypePredicate {
+        TypePredicate {
+            asserts: predicate.asserts,
+            target: predicate.target.clone(),
+            type_id: predicate.type_id.map(|type_id| self.instantiate(type_id)),
         }
     }
 
@@ -271,6 +284,10 @@ impl<'a> TypeInstantiator<'a> {
                 let shadowed_len = self.shadowed.len();
                 self.shadowed.extend(shape.type_params.iter().map(|tp| tp.name));
 
+                let type_predicate = shape
+                    .type_predicate
+                    .as_ref()
+                    .map(|predicate| self.instantiate_type_predicate(predicate));
                 let instantiated_type_params: Vec<TypeParamInfo> = shape.type_params.iter()
                     .map(|tp| TypeParamInfo {
                         name: tp.name,
@@ -294,6 +311,7 @@ impl<'a> TypeInstantiator<'a> {
                     type_params: instantiated_type_params,
                     params: instantiated_params,
                     return_type: instantiated_return,
+                    type_predicate,
                     is_constructor: shape.is_constructor,
                 })
             }

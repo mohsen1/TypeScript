@@ -21,6 +21,7 @@ fn test_callable_same_signature() {
             rest: false,
         }],
         return_type: TypeId::NUMBER,
+        type_predicate: None,
     };
 
     let source = interner.callable(CallableShape {
@@ -52,6 +53,7 @@ fn test_callable_more_overloads() {
             rest: false,
         }],
         return_type: TypeId::NUMBER,
+        type_predicate: None,
     };
 
     let sig2 = CallSignature {
@@ -63,6 +65,7 @@ fn test_callable_more_overloads() {
             rest: false,
         }],
         return_type: TypeId::STRING,
+        type_predicate: None,
     };
 
     let source = interner.callable(CallableShape {
@@ -94,6 +97,7 @@ fn test_callable_missing_overload() {
             rest: false,
         }],
         return_type: TypeId::NUMBER,
+        type_predicate: None,
     };
 
     let sig2 = CallSignature {
@@ -105,6 +109,7 @@ fn test_callable_missing_overload() {
             rest: false,
         }],
         return_type: TypeId::STRING,
+        type_predicate: None,
     };
 
     let source = interner.callable(CallableShape {
@@ -135,6 +140,7 @@ fn test_callable_with_construct() {
         type_params: vec![],
         params: vec![],
         return_type: obj_type,
+        type_predicate: None,
     };
 
     let source = interner.callable(CallableShape {
@@ -163,12 +169,14 @@ fn test_callable_covariant_return() {
         type_params: vec![],
         params: vec![],
         return_type: hello,
+        type_predicate: None,
     };
 
     let target_sig = CallSignature {
         type_params: vec![],
         params: vec![],
         return_type: TypeId::STRING,
+        type_predicate: None,
     };
 
     let source = interner.callable(CallableShape {
@@ -200,6 +208,7 @@ fn test_function_to_callable() {
             rest: false,
         }],
         return_type: TypeId::NUMBER,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -213,6 +222,7 @@ fn test_function_to_callable() {
                 rest: false,
             }],
             return_type: TypeId::NUMBER,
+            type_predicate: None,
         }],
         construct_signatures: vec![],
         properties: vec![],
@@ -237,6 +247,7 @@ fn test_callable_to_function() {
                 rest: false,
             }],
             return_type: TypeId::NUMBER,
+            type_predicate: None,
         }],
         construct_signatures: vec![],
         properties: vec![],
@@ -251,6 +262,7 @@ fn test_callable_to_function() {
             rest: false,
         }],
         return_type: TypeId::NUMBER,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -267,6 +279,7 @@ fn test_callable_with_properties() {
             type_params: vec![],
             params: vec![],
             return_type: TypeId::VOID,
+            type_predicate: None,
         }],
         construct_signatures: vec![],
         properties: vec![
@@ -279,6 +292,7 @@ fn test_callable_with_properties() {
             type_params: vec![],
             params: vec![],
             return_type: TypeId::VOID,
+            type_predicate: None,
         }],
         construct_signatures: vec![],
         properties: vec![
@@ -299,6 +313,7 @@ fn test_callable_missing_property() {
             type_params: vec![],
             params: vec![],
             return_type: TypeId::VOID,
+            type_predicate: None,
         }],
         construct_signatures: vec![],
         properties: vec![],
@@ -309,6 +324,7 @@ fn test_callable_missing_property() {
             type_params: vec![],
             params: vec![],
             return_type: TypeId::VOID,
+            type_predicate: None,
         }],
         construct_signatures: vec![],
         properties: vec![

@@ -1039,6 +1039,7 @@ fn test_contextual_typing_for_function_parameters() {
             ParamInfo { name: Some(types.intern_string("y")), type_id: TypeId::NUMBER, optional: false, rest: false },
         ],
         return_type: TypeId::BOOLEAN,
+        type_predicate: None,
         is_constructor: false,
     };
 

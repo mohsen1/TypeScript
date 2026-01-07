@@ -810,6 +810,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             params: Vec::new(),
             return_type,
             type_params: Vec::new(),
+            type_predicate: None,
             is_constructor: false,
         })
     }

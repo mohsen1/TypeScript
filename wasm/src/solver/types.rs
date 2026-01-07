@@ -248,12 +248,27 @@ pub struct TupleElement {
     pub rest: bool,
 }
 
+/// Type predicate information (x is T / asserts x is T).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TypePredicate {
+    pub asserts: bool,
+    pub target: TypePredicateTarget,
+    pub type_id: Option<TypeId>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum TypePredicateTarget {
+    This,
+    Identifier(Atom),
+}
+
 /// Function shape for function types
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FunctionShape {
     pub type_params: Vec<TypeParamInfo>,
     pub params: Vec<ParamInfo>,
     pub return_type: TypeId,
+    pub type_predicate: Option<TypePredicate>,
     pub is_constructor: bool,
 }
 
@@ -264,6 +279,7 @@ pub struct CallSignature {
     pub type_params: Vec<TypeParamInfo>,
     pub params: Vec<ParamInfo>,
     pub return_type: TypeId,
+    pub type_predicate: Option<TypePredicate>,
 }
 
 /// Callable type with multiple overloaded call signatures

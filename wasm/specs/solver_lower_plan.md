@@ -68,6 +68,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - `(x: string) => number` -> TypeKey::Function
   - Store signature: params (Vec<Param>), return type (TypeId)
   - [x] Type predicates lower to boolean/void return types
+  - [x] Preserve type predicate metadata in function/call signatures
 - [x] Handle optional and rest parameters
   - `(x?: string)` -> Param { optional: true }
   - `(...args: string[])` -> Param { rest: true, type: Array<string> }
@@ -78,6 +79,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Overloaded signatures (Vec<Signature>)
   - [x] Test: Type predicates with `this` parameter
   - [x] Test: `asserts this` predicate without type
+  - [x] Test: `asserts x` predicate without type (captures predicate metadata)
 
 ### Phase 4: Generic Types
 - [x] Implement type parameter lowering

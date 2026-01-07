@@ -706,6 +706,7 @@ impl<'a> ThinCheckerState<'a> {
             type_params: Vec::new(), // TODO: Handle type parameters
             params,
             return_type,
+            type_predicate: None,
             is_constructor: false,
         };
 
@@ -778,6 +779,7 @@ impl<'a> ThinCheckerState<'a> {
                         type_params: Vec::new(), // TODO: Handle type parameters
                         params,
                         return_type,
+                        type_predicate: None,
                     });
                 }
             } else if member_node.kind == CONSTRUCT_SIGNATURE {
@@ -794,6 +796,7 @@ impl<'a> ThinCheckerState<'a> {
                         type_params: Vec::new(),
                         params,
                         return_type,
+                        type_predicate: None,
                     });
                 }
             } else if member_node.kind == PROPERTY_SIGNATURE || member_node.kind == METHOD_SIGNATURE {
@@ -989,6 +992,7 @@ impl<'a> ThinCheckerState<'a> {
             type_params: vec![],
             params: vec![description_param],
             return_type: TypeId::SYMBOL,
+            type_predicate: None,
         };
 
         // Callable shape (no construct signatures - can't use `new Symbol()`)
@@ -1741,6 +1745,7 @@ impl<'a> ThinCheckerState<'a> {
             type_params: Vec::new(), // TODO: Handle type parameters
             params,
             return_type,
+            type_predicate: None,
             is_constructor: false,
         };
 
@@ -4437,6 +4442,7 @@ impl<'a> ThinCheckerState<'a> {
                     type_params: Vec::new(),
                     params,
                     return_type,
+                    type_predicate: None,
                     is_constructor: false,
                 };
 

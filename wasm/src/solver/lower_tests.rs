@@ -818,6 +818,15 @@ fn test_lower_function_type_with_type_predicate_return() {
     match key {
         TypeKey::Function(shape) => {
             assert_eq!(shape.return_type, TypeId::BOOLEAN);
+            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(!predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::Identifier(atom) => {
+                    assert_eq!(interner.resolve_atom(atom).as_str(), "x");
+                }
+                _ => panic!("Expected identifier predicate target"),
+            }
+            assert_eq!(predicate.type_id, Some(TypeId::STRING));
         }
         _ => panic!("Expected Function type, got {:?}", key),
     }
@@ -834,6 +843,13 @@ fn test_lower_function_type_with_this_predicate_return() {
     match key {
         TypeKey::Function(shape) => {
             assert_eq!(shape.return_type, TypeId::BOOLEAN);
+            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(!predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::This => {}
+                _ => panic!("Expected this predicate target"),
+            }
+            assert_eq!(predicate.type_id, Some(TypeId::STRING));
         }
         _ => panic!("Expected Function type, got {:?}", key),
     }
@@ -850,6 +866,15 @@ fn test_lower_function_type_with_asserts_predicate_return() {
     match key {
         TypeKey::Function(shape) => {
             assert_eq!(shape.return_type, TypeId::VOID);
+            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::Identifier(atom) => {
+                    assert_eq!(interner.resolve_atom(atom).as_str(), "x");
+                }
+                _ => panic!("Expected identifier predicate target"),
+            }
+            assert_eq!(predicate.type_id, Some(TypeId::STRING));
         }
         _ => panic!("Expected Function type, got {:?}", key),
     }
@@ -866,6 +891,13 @@ fn test_lower_function_type_with_asserts_this_predicate_return() {
     match key {
         TypeKey::Function(shape) => {
             assert_eq!(shape.return_type, TypeId::VOID);
+            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::This => {}
+                _ => panic!("Expected this predicate target"),
+            }
+            assert_eq!(predicate.type_id, Some(TypeId::STRING));
         }
         _ => panic!("Expected Function type, got {:?}", key),
     }
@@ -882,6 +914,38 @@ fn test_lower_function_type_with_asserts_this_predicate_without_is() {
     match key {
         TypeKey::Function(shape) => {
             assert_eq!(shape.return_type, TypeId::VOID);
+            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::This => {}
+                _ => panic!("Expected this predicate target"),
+            }
+            assert_eq!(predicate.type_id, None);
+        }
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_function_type_with_asserts_predicate_without_is() {
+    let (arena, func_type_idx) = parse_type_alias("type F = (x: any) => asserts x;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.return_type, TypeId::VOID);
+            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::Identifier(atom) => {
+                    assert_eq!(interner.resolve_atom(atom).as_str(), "x");
+                }
+                _ => panic!("Expected identifier predicate target"),
+            }
+            assert_eq!(predicate.type_id, None);
         }
         _ => panic!("Expected Function type, got {:?}", key),
     }

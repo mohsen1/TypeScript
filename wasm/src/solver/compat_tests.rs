@@ -70,6 +70,7 @@ fn test_function_bivariance_default() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -82,6 +83,7 @@ fn test_function_bivariance_default() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -105,6 +107,7 @@ fn test_function_variance_strict() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -117,6 +120,7 @@ fn test_function_variance_strict() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -141,6 +145,7 @@ fn test_method_bivariance_even_strict() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -153,6 +158,7 @@ fn test_method_bivariance_even_strict() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -193,6 +199,7 @@ fn test_function_property_stays_strict() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -205,6 +212,7 @@ fn test_function_property_stays_strict() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -238,6 +246,7 @@ fn test_function_return_covariance() {
         params: Vec::new(),
         return_type: dog,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -245,6 +254,7 @@ fn test_function_return_covariance() {
         params: Vec::new(),
         return_type: animal,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -261,6 +271,7 @@ fn test_void_return_assignability() {
         params: Vec::new(),
         return_type: TypeId::NUMBER,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -268,6 +279,7 @@ fn test_void_return_assignability() {
         params: Vec::new(),
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -307,6 +319,7 @@ fn test_explain_failure_parameter_mismatch_strict() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -319,6 +332,7 @@ fn test_explain_failure_parameter_mismatch_strict() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -421,6 +435,7 @@ fn test_rest_any_bivariant_even_strict() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -433,6 +448,7 @@ fn test_rest_any_bivariant_even_strict() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -455,6 +471,7 @@ fn test_rest_unknown_bivariant_even_strict() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -467,6 +484,7 @@ fn test_rest_unknown_bivariant_even_strict() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -488,6 +506,7 @@ fn test_rest_any_still_checks_return_type() {
         }],
         return_type: TypeId::NUMBER,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -500,6 +519,7 @@ fn test_rest_any_still_checks_return_type() {
         }],
         return_type: TypeId::STRING,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -522,6 +542,7 @@ fn test_explain_failure_skips_rest_unknown() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -542,6 +563,7 @@ fn test_explain_failure_skips_rest_unknown() {
         ],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -563,6 +585,7 @@ fn test_explain_failure_reports_rest_mismatch() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -583,6 +606,7 @@ fn test_explain_failure_reports_rest_mismatch() {
         ],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -609,6 +633,7 @@ fn test_empty_object_accepts_non_nullish() {
         params: Vec::new(),
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
     assert!(checker.is_assignable(func, empty_object));
@@ -704,6 +729,7 @@ fn test_object_keyword_accepts_non_primitives() {
         params: Vec::new(),
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
     assert!(checker.is_assignable(func, TypeId::OBJECT));
@@ -729,6 +755,7 @@ fn test_apparent_string_members_assignable() {
         params: Vec::new(),
         return_type: TypeId::STRING,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -782,6 +809,7 @@ fn test_apparent_number_method_assignable() {
         params: Vec::new(),
         return_type: TypeId::STRING,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -806,6 +834,7 @@ fn test_apparent_boolean_members_assignable() {
         params: Vec::new(),
         return_type: TypeId::STRING,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -830,6 +859,7 @@ fn test_apparent_bigint_members_assignable() {
         params: Vec::new(),
         return_type: TypeId::BIGINT,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -856,6 +886,7 @@ fn test_apparent_symbol_members_assignable() {
         params: Vec::new(),
         return_type: TypeId::STRING,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -1059,6 +1090,7 @@ fn test_rest_any_callable_target_from_function() {
                 rest: true,
             }],
             return_type: TypeId::VOID,
+            type_predicate: None,
             type_params: Vec::new(),
         }],
         construct_signatures: Vec::new(),
@@ -1074,6 +1106,7 @@ fn test_rest_any_callable_target_from_function() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -1096,6 +1129,7 @@ fn test_rest_unknown_callable_target_from_callable() {
                 rest: true,
             }],
             return_type: TypeId::VOID,
+            type_predicate: None,
             type_params: Vec::new(),
         }],
         construct_signatures: Vec::new(),
@@ -1111,6 +1145,7 @@ fn test_rest_unknown_callable_target_from_callable() {
                 rest: false,
             }],
             return_type: TypeId::VOID,
+            type_predicate: None,
             type_params: Vec::new(),
         }],
         construct_signatures: Vec::new(),

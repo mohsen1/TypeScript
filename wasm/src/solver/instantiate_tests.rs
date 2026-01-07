@@ -166,6 +166,7 @@ fn test_instantiate_function() {
             rest: false,
         }],
         return_type: type_param_t,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -184,6 +185,7 @@ fn test_instantiate_function() {
             rest: false,
         }],
         return_type: TypeId::STRING,
+        type_predicate: None,
         is_constructor: false,
     });
     assert_eq!(result, expected);
@@ -209,6 +211,7 @@ fn test_instantiate_function_shadowed_type_params() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -225,6 +228,7 @@ fn test_instantiate_function_shadowed_type_params() {
             rest: false,
         }],
         return_type: t_type,
+        type_predicate: None,
         is_constructor: false,
     });
     assert_eq!(result, expected);

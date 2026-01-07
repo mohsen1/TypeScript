@@ -258,6 +258,7 @@ fn test_function_rest_parameter_subtyping() {
             ParamInfo { name: Some(interner.intern_string("c")), type_id: TypeId::ANY, optional: false, rest: false },
         ],
         return_type: TypeId::ANY,
+        type_predicate: None,
         is_constructor: false,
     };
     let fixed_fn = interner.function(fixed_params);
@@ -271,6 +272,7 @@ fn test_function_rest_parameter_subtyping() {
             ParamInfo { name: Some(interner.intern_string("args")), type_id: any_array, optional: false, rest: true },
         ],
         return_type: TypeId::ANY,
+        type_predicate: None,
         is_constructor: false,
     };
     let rest_fn = interner.function(rest_params);
@@ -1149,6 +1151,7 @@ fn test_strict_function_variance() {
             rest: false,
         }],
         return_type: TypeId::VOID,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -1162,6 +1165,7 @@ fn test_strict_function_variance() {
             rest: false,
         }],
         return_type: TypeId::VOID,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -1194,6 +1198,7 @@ fn test_function_fixed_to_rest_subtyping() {
             ParamInfo { name: Some(interner.intern_string("arg")), type_id: TypeId::ANY, optional: false, rest: false },
         ],
         return_type: TypeId::ANY,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -1207,6 +1212,7 @@ fn test_function_fixed_to_rest_subtyping() {
             ParamInfo { name: Some(interner.intern_string("args")), type_id: any_array, optional: false, rest: true },
         ],
         return_type: TypeId::ANY,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -1237,6 +1243,7 @@ fn test_function_rest_tuple_to_rest_array_subtyping() {
             ParamInfo { name: Some(interner.intern_string("args")), type_id: tuple_one_any, optional: false, rest: true },
         ],
         return_type: TypeId::ANY,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -1250,6 +1257,7 @@ fn test_function_rest_tuple_to_rest_array_subtyping() {
             ParamInfo { name: Some(interner.intern_string("args")), type_id: any_array, optional: false, rest: true },
         ],
         return_type: TypeId::ANY,
+        type_predicate: None,
         is_constructor: false,
     });
 

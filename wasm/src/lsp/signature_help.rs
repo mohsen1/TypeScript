@@ -278,6 +278,7 @@ impl<'a> SignatureHelpProvider<'a> {
                             type_params: sig.type_params.clone(),
                             params: sig.params.clone(),
                             return_type: sig.return_type,
+                            type_predicate: None,
                             is_constructor: false,
                         };
                         sigs.push(self.signature_candidate(&func_shape, checker, false));
@@ -290,6 +291,7 @@ impl<'a> SignatureHelpProvider<'a> {
                             type_params: sig.type_params.clone(),
                             params: sig.params.clone(),
                             return_type: sig.return_type,
+                            type_predicate: None,
                             is_constructor: true,
                         };
                         sigs.push(self.signature_candidate(&func_shape, checker, true));
