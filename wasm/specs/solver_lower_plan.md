@@ -34,6 +34,8 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Hex/binary/octal numeric literal types
   - [x] Test: Hex/binary/octal bigint literal types (normalized)
   - [x] Test: `unique symbol` type operator lowering
+  - [x] Test: `keyof` type operator lowering
+  - [x] Test: `readonly` type operator lowering
 
 ### Phase 2: Complex Type Structures
 - [x] Implement object type lowering
