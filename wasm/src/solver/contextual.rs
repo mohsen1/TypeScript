@@ -260,7 +260,7 @@ impl<'a> ContextualTypeContext<'a> {
             TypeKey::Object(shape_id) => {
                 let shape = self.interner.object_shape(shape_id);
                 for prop in &shape.properties {
-                    if self.interner.resolve_atom(prop.name) == name {
+                    if self.interner.resolve_atom_ref(prop.name).as_ref() == name {
                         return Some(prop.type_id);
                     }
                 }

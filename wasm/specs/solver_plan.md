@@ -21,6 +21,9 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
 - [x] Shard the global string interner
   - Replace single `Interner` map with sharded buckets or DashMap.
   - Keep Atom stable and thread-safe.
+- [x] Reduce atom resolution allocations in solver hot paths
+  - Add `resolve_atom_ref` and Arc-backed sharded interner storage.
+  - Use it for numeric/property checks to avoid string cloning.
 - [x] Incremental/query layer prototype
   - Implement a Salsa-backed TypeDatabase or query wrapper.
   - Thread through `lower`, `evaluate`, `infer`, `subtype` entry points.

@@ -4,7 +4,7 @@
 //! when typing arguments in a call expression.
 
 use crate::parser::thin_node::{ThinNodeArena, CallExprData};
-use crate::parser::{NodeIndex, syntax_kind_ext};
+use crate::parser::{NodeIndex, NodeList, syntax_kind_ext};
 use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeInterner, TypeId, TypeKey, FunctionShape};
 use crate::lsp::position::{Position, LineMap};
@@ -12,6 +12,7 @@ use crate::lsp::utils::find_node_at_offset;
 use crate::lsp::resolver::{ScopeCache, ScopeCacheStats};
 use crate::lsp::jsdoc::{jsdoc_for_node, parse_jsdoc, ParsedJsdoc};
 use crate::thin_checker::ThinCheckerState;
+use crate::scanner::SyntaxKind;
 
 /// Represents a parameter in a signature.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -56,6 +57,24 @@ struct SignatureCandidate {
     total_params: usize,
     has_rest: bool,
     param_names: Vec<Option<String>>,
+}
+
+struct SignatureDocCandidate {
+    doc: ParsedJsdoc,
+    required_params: usize,
+    total_params: usize,
+    has_rest: bool,
+}
+
+struct SignatureDocs {
+    candidates: Vec<SignatureDocCandidate>,
+    fallback: Option<ParsedJsdoc>,
+}
+
+impl SignatureDocs {
+    fn is_empty(&self) -> bool {
+        self.candidates.is_empty() && self.fallback.is_none()
+    }
 }
 
 pub struct SignatureHelpProvider<'a> {
@@ -162,17 +181,8 @@ impl<'a> SignatureHelpProvider<'a> {
         // 6. Extract signatures from the type
         let mut signatures = self.get_signatures_from_type(callee_type, &checker, call_kind);
 
-        if let Some(parsed) = self.signature_documentation_for_symbol(root, symbol_id) {
-            for sig in &mut signatures {
-                sig.info.documentation = parsed.summary.clone();
-                for (idx, name) in sig.param_names.iter().enumerate() {
-                    let Some(name) = name else { continue; };
-                    let Some(param_doc) = parsed.params.get(name) else { continue; };
-                    if let Some(param_info) = sig.info.parameters.get_mut(idx) {
-                        param_info.documentation = Some(param_doc.clone());
-                    }
-                }
-            }
+        if let Some(docs) = self.signature_documentation_for_symbol(root, symbol_id) {
+            self.apply_signature_docs(&mut signatures, &docs);
         }
 
         // Extract and save the updated cache for future queries
@@ -457,17 +467,88 @@ impl<'a> SignatureHelpProvider<'a> {
         best_idx as u32
     }
 
+    fn apply_signature_docs(&self, signatures: &mut [SignatureCandidate], docs: &SignatureDocs) {
+        if signatures.is_empty() || docs.is_empty() {
+            return;
+        }
+
+        if docs.candidates.len() == 1 {
+            let doc = &docs.candidates[0].doc;
+            for sig in signatures {
+                self.apply_jsdoc_to_signature(sig, doc, true);
+            }
+            return;
+        }
+
+        if docs.candidates.is_empty() {
+            if let Some(fallback) = docs.fallback.as_ref() {
+                for sig in signatures {
+                    self.apply_jsdoc_to_signature(sig, fallback, true);
+                }
+            }
+            return;
+        }
+
+        let mut used = vec![false; docs.candidates.len()];
+        for sig in signatures {
+            if let Some(idx) = Self::match_doc_candidate(sig, &docs.candidates, &mut used) {
+                let doc = &docs.candidates[idx].doc;
+                self.apply_jsdoc_to_signature(sig, doc, true);
+            } else if let Some(fallback) = docs.fallback.as_ref() {
+                self.apply_jsdoc_to_signature(sig, fallback, false);
+            }
+        }
+    }
+
+    fn apply_jsdoc_to_signature(&self, sig: &mut SignatureCandidate, parsed: &ParsedJsdoc, overwrite: bool) {
+        if overwrite || sig.info.documentation.is_none() {
+            sig.info.documentation = parsed.summary.clone();
+        }
+
+        for (idx, name) in sig.param_names.iter().enumerate() {
+            let Some(name) = name else { continue; };
+            let Some(param_doc) = parsed.params.get(name) else { continue; };
+            if let Some(param_info) = sig.info.parameters.get_mut(idx) {
+                if overwrite || param_info.documentation.is_none() {
+                    param_info.documentation = Some(param_doc.clone());
+                }
+            }
+        }
+    }
+
+    fn match_doc_candidate(
+        sig: &SignatureCandidate,
+        candidates: &[SignatureDocCandidate],
+        used: &mut [bool],
+    ) -> Option<usize> {
+        for (idx, candidate) in candidates.iter().enumerate() {
+            if used[idx] {
+                continue;
+            }
+            if candidate.required_params == sig.required_params
+                && candidate.total_params == sig.total_params
+                && candidate.has_rest == sig.has_rest
+            {
+                used[idx] = true;
+                return Some(idx);
+            }
+        }
+        None
+    }
+
     fn signature_documentation_for_symbol(
         &self,
         root: NodeIndex,
         symbol_id: crate::binder::SymbolId,
-    ) -> Option<ParsedJsdoc> {
+    ) -> Option<SignatureDocs> {
         let symbol = self.binder.get_symbol(symbol_id)?;
-        let mut decls = Vec::new();
-        if !symbol.value_declaration.is_none() {
-            decls.push(symbol.value_declaration);
+        let mut decls = symbol.declarations.clone();
+        if !symbol.value_declaration.is_none() && !decls.contains(&symbol.value_declaration) {
+            decls.insert(0, symbol.value_declaration);
         }
-        decls.extend(symbol.declarations.iter().copied());
+
+        let mut candidates = Vec::new();
+        let mut fallback = None;
 
         for decl in decls {
             if decl.is_none() {
@@ -481,10 +562,66 @@ impl<'a> SignatureHelpProvider<'a> {
             if parsed.is_empty() {
                 continue;
             }
-            return Some(parsed);
+
+            if let Some((required_params, total_params, has_rest)) = self.signature_meta_from_decl(decl) {
+                candidates.push(SignatureDocCandidate {
+                    doc: parsed,
+                    required_params,
+                    total_params,
+                    has_rest,
+                });
+            } else if fallback.is_none() {
+                fallback = Some(parsed);
+            }
         }
 
+        let docs = SignatureDocs { candidates, fallback };
+        if docs.is_empty() {
+            None
+        } else {
+            Some(docs)
+        }
+    }
+
+    fn signature_meta_from_decl(&self, decl: NodeIndex) -> Option<(usize, usize, bool)> {
+        let node = self.arena.get(decl)?;
+        if let Some(func) = self.arena.get_function(node) {
+            return self.signature_meta_from_params(&func.parameters);
+        }
+        if let Some(method) = self.arena.get_method_decl(node) {
+            return self.signature_meta_from_params(&method.parameters);
+        }
+        if let Some(ctor) = self.arena.get_constructor(node) {
+            return self.signature_meta_from_params(&ctor.parameters);
+        }
         None
+    }
+
+    fn signature_meta_from_params(&self, params: &NodeList) -> Option<(usize, usize, bool)> {
+        let mut required_params = 0;
+        let mut total_params = 0;
+        let mut has_rest = false;
+
+        for &param_idx in params.nodes.iter() {
+            let Some(param_node) = self.arena.get(param_idx) else { continue; };
+            let Some(param_data) = self.arena.get_parameter(param_node) else { continue; };
+            if let Some(name_node) = self.arena.get(param_data.name) {
+                if name_node.kind == SyntaxKind::ThisKeyword as u16 {
+                    continue;
+                }
+            }
+
+            total_params += 1;
+            if param_data.dot_dot_dot_token {
+                has_rest = true;
+                continue;
+            }
+            if !param_data.question_token && param_data.initializer.is_none() {
+                required_params += 1;
+            }
+        }
+
+        Some((required_params, total_params, has_rest))
     }
 
 }
@@ -820,5 +957,46 @@ mod signature_help_tests {
             sig.parameters[1].documentation.as_deref(),
             Some("Second number.")
         );
+    }
+
+    #[test]
+    fn test_signature_help_overload_jsdoc() {
+        let source = "/** One arg */\nfunction foo(a: number): void;\n/** Two args */\nfunction foo(a: number, b: string): void;\nfunction foo(a: number, b?: string): void {}\nfoo(1);\nfoo(1, \"x\");";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let interner = TypeInterner::new();
+        let line_map = LineMap::build(source);
+
+        let provider = SignatureHelpProvider::new(
+            parser.get_arena(),
+            &binder,
+            &line_map,
+            &interner,
+            source,
+            "test.ts".to_string(),
+        );
+
+        let mut cache = None;
+        let pos_first = Position::new(5, 4); // At "1"
+        let help_first = provider.get_signature_help(root, pos_first, &mut cache)
+            .expect("Expected signature help for first call");
+        let doc_first = help_first.signatures[help_first.active_signature as usize]
+            .documentation
+            .clone()
+            .unwrap_or_default();
+        assert_eq!(doc_first, "One arg");
+
+        let pos_second = Position::new(6, 8); // At "x"
+        let help_second = provider.get_signature_help(root, pos_second, &mut cache)
+            .expect("Expected signature help for second call");
+        let doc_second = help_second.signatures[help_second.active_signature as usize]
+            .documentation
+            .clone()
+            .unwrap_or_default();
+        assert_eq!(doc_second, "Two args");
     }
 }

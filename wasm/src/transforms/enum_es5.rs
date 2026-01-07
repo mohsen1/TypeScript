@@ -39,6 +39,7 @@ use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::{NodeIndex, NodeList};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
+use crate::transforms::emit_utils;
 
 /// Enum ES5 emitter
 pub struct EnumES5Emitter<'a> {
@@ -187,7 +188,7 @@ impl<'a> EnumES5Emitter<'a> {
                 self.write("[\"");
                 self.write(&member_name);
                 self.write("\"] = ");
-                self.write(&next_val.to_string());
+                self.write_i64(next_val);
                 self.write("] = \"");
                 self.write(&member_name);
                 self.write("\";");
@@ -341,6 +342,10 @@ impl<'a> EnumES5Emitter<'a> {
 
     fn write(&mut self, s: &str) {
         self.output.push_str(s);
+    }
+
+    fn write_i64(&mut self, value: i64) {
+        emit_utils::push_i64(&mut self.output, value);
     }
 
     fn write_line(&mut self) {

@@ -59,6 +59,7 @@
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::{syntax_kind_ext, NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
+use crate::transforms::emit_utils;
 
 /// State for tracking async function transformation
 #[derive(Debug, Default)]
@@ -562,7 +563,7 @@ impl<'a> AsyncES5Emitter<'a> {
         self.decrease_indent();
         self.write_indent();
         self.write("case ");
-        self.write(&label.to_string());
+        self.write_u32(label);
         self.write(":");
         if label > 0 {
             self.write_line();
@@ -714,6 +715,10 @@ impl<'a> AsyncES5Emitter<'a> {
 
     fn write(&mut self, s: &str) {
         self.output.push_str(s);
+    }
+
+    fn write_u32(&mut self, value: u32) {
+        emit_utils::push_u32(&mut self.output, value);
     }
 
     fn write_line(&mut self) {
