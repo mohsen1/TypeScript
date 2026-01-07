@@ -639,8 +639,8 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             if self.is_numeric_property_name(name) {
                 return self.add_undefined_if_unchecked(elem);
             }
-            let name_str = self.interner.resolve_atom(name);
-            if let Some(member) = self.array_member_kind(&name_str) {
+            let name_str = self.interner.resolve_atom_ref(name);
+            if let Some(member) = self.array_member_kind(name_str.as_ref()) {
                 return match member {
                     ApparentMemberKind::Value(type_id) => type_id,
                     ApparentMemberKind::Method(return_type) => self.apparent_method_type(return_type),
@@ -703,8 +703,8 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
         if let Some(TypeKey::Literal(LiteralValue::String(name))) = self.interner.lookup(index_type) {
             if self.is_numeric_property_name(name) {
-                let name_str = self.interner.resolve_atom(name);
-                if let Ok(idx) = name_str.parse::<usize>() {
+                let name_str = self.interner.resolve_atom_ref(name);
+                if let Ok(idx) = name_str.as_ref().parse::<usize>() {
                     if idx < elements.len() {
                         return elements[idx].type_id;
                     }
@@ -724,8 +724,8 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 return self.add_undefined_if_unchecked(union);
             }
 
-            let name_str = self.interner.resolve_atom(name);
-            if let Some(member) = self.array_member_kind(&name_str) {
+            let name_str = self.interner.resolve_atom_ref(name);
+            if let Some(member) = self.array_member_kind(name_str.as_ref()) {
                 return match member {
                     ApparentMemberKind::Value(type_id) => type_id,
                     ApparentMemberKind::Method(return_type) => self.apparent_method_type(return_type),
@@ -1178,8 +1178,8 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     }
 
     fn is_numeric_property_name(&self, name: Atom) -> bool {
-        let prop_name = self.interner.resolve_atom(name);
-        InferenceContext::is_numeric_literal_name(&prop_name)
+        let prop_name = self.interner.resolve_atom_ref(name);
+        InferenceContext::is_numeric_literal_name(prop_name.as_ref())
     }
 }
 

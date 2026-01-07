@@ -14,6 +14,7 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 ## Highest-Impact Next Tasks
 - [ ] Performance tuning: remove obvious hot-path overheads
   - [x] Pre-allocate output buffer from source size; write numeric indices without allocations.
+  - [x] Write numeric values in ES5 transforms without allocating strings.
   - [ ] Profile emit-only pipeline (LoweringPass + helper detection).
   - [ ] Reduce allocations and repeated scans in emit hot paths.
 - [x] Finish transform-only pipeline

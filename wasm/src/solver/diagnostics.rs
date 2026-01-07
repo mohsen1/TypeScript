@@ -402,7 +402,7 @@ impl<'a> TypeFormatter<'a> {
         if let Some(value) = self.atom_cache.get(&atom) {
             return value.clone();
         }
-        let resolved: Arc<str> = self.interner.resolve_atom(atom).into();
+        let resolved = self.interner.resolve_atom_ref(atom);
         self.atom_cache.insert(atom, resolved.clone());
         resolved
     }
