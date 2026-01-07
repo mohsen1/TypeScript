@@ -131,6 +131,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Add exponent-form numeric literal inference coverage for number index signatures
 - [x] Add optional object property inference coverage
 - [x] Add optional property inference coverage for explicit undefined values
+- [x] Add optional property inference coverage for index signature inference
 - [x] Enforce index signature consistency during bounds validation
 
 ## Architecture Notes
