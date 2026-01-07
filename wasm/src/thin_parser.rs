@@ -8129,6 +8129,9 @@ impl ThinParserState {
     /// JSX attribute names can be keywords like "extends", "class", etc.
     fn parse_jsx_attribute_name(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
+        if self.is_token(SyntaxKind::Identifier) {
+            self.scanner.scan_jsx_identifier();
+        }
         // Use parse_identifier_name to allow keywords as attribute names
         let name = self.parse_identifier_name();
 
