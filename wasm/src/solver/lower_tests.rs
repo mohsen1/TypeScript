@@ -249,6 +249,20 @@ fn test_lower_literal_boolean_type() {
 }
 
 #[test]
+fn test_lower_unique_symbol_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = unique symbol;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::UniqueSymbol(_) => {}
+        _ => panic!("Expected unique symbol type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_deduplicates_identical_types() {
     let (arena_one, type_one) = parse_type_alias_type_node("type A = \"same\";");
     let (arena_two, type_two) = parse_type_alias_type_node("type B = \"same\";");

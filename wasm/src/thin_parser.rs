@@ -6291,6 +6291,16 @@ impl ThinParserState {
             return keyof_type;
         }
 
+        // Handle unique type: unique symbol
+        if self.is_token(SyntaxKind::UniqueKeyword) {
+            let unique_type = self.parse_unique_type();
+            // Handle array type on unique: unique symbol[]
+            if self.is_token(SyntaxKind::OpenBracketToken) {
+                return self.parse_array_type(start_pos, unique_type);
+            }
+            return unique_type;
+        }
+
         // Handle readonly type: readonly T[]
         if self.is_token(SyntaxKind::ReadonlyKeyword) {
             return self.parse_readonly_type();
@@ -6618,6 +6628,28 @@ impl ThinParserState {
         self.parse_expected(SyntaxKind::KeyOfKeyword);
 
         // Parse the type operand
+        let type_node = self.parse_primary_type();
+
+        let end_pos = self.token_end();
+
+        self.arena.add_type_operator(
+            syntax_kind_ext::TYPE_OPERATOR,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::TypeOperatorData {
+                operator,
+                type_node,
+            },
+        )
+    }
+
+    /// Parse unique type: unique symbol
+    fn parse_unique_type(&mut self) -> NodeIndex {
+        let start_pos = self.token_pos();
+        let operator = self.token() as u16;
+        self.parse_expected(SyntaxKind::UniqueKeyword);
+
+        // Parse the type operand (unique symbol)
         let type_node = self.parse_primary_type();
 
         let end_pos = self.token_end();
