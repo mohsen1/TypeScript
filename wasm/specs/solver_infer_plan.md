@@ -138,6 +138,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Add optional argument mismatch coverage for required properties
 - [x] Add missing required property coverage for generic inference
 - [x] Add readonly property mismatch coverage for generic inference
+- [x] Add readonly property mismatch coverage for indexed objects
 - [x] Enforce index signature consistency during bounds validation
 
 ## Architecture Notes
