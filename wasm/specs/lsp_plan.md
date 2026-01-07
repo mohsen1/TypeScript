@@ -42,6 +42,7 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
   - [x] Preserve prefix symbols when editing inside function bodies.
   - [x] Preserve cross-file symbols and scope cache after function body edits.
   - [x] Preserve suffix definition scope cache after nested function body edits.
+  - [x] Resolve suffix definition without cache warm after nested function body edits.
 - [x] JSDoc extraction for signature help/hover
   - [x] Parse JSDoc blocks and attach to `SignatureInformation` and `Hover`.
 - [x] Extract variable precedence fix

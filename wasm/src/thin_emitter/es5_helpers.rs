@@ -908,12 +908,6 @@ impl<'a> ThinPrinter<'a> {
         })
     }
 
-    pub(super) fn needs_make_template_object_helper(&self) -> bool {
-        self.arena.nodes.iter().any(|node| {
-            node.kind == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION
-        })
-    }
-
     pub(super) fn tagged_template_var_name(&self, idx: NodeIndex) -> String {
         format!("__templateObject_{}", idx.0)
     }

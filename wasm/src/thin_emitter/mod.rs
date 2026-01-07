@@ -1665,9 +1665,6 @@ impl<'a> ThinPrinter<'a> {
                     helpers.awaiter = true;
                     helpers.generator = true;
                 }
-                if self.needs_make_template_object_helper() {
-                    helpers.make_template_object = true;
-                }
                 if self.needs_class_private_field_helpers() {
                     helpers.class_private_field_get = true;
                     helpers.class_private_field_set = true;
