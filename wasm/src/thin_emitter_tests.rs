@@ -169,6 +169,82 @@ fn test_thin_emit_class_method_destructured_param_es5() {
 }
 
 #[test]
+fn test_thin_emit_function_destructured_param_es5() {
+    let source = "function foo({ x }) { return x; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function foo(_a)"),
+        "Expected temp parameter in ES5 output: {}",
+        output
+    );
+    assert!(
+        output.contains("var x = _a.x"),
+        "Expected destructuring assignment in ES5 output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_thin_emit_function_rest_param_es5() {
+    let source = "function foo(a, ...rest) { return rest.length; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function foo(a)"),
+        "Expected rest parameter to be removed from signature: {}",
+        output
+    );
+    assert!(
+        output.contains("var rest = []"),
+        "Expected rest parameter array initialization in ES5 output: {}",
+        output
+    );
+    assert!(
+        output.contains("arguments.length"),
+        "Expected rest parameter loop over arguments in ES5 output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_thin_emit_class_method_rest_param_es5() {
+    let source = "class Foo { method(...rest) { return rest.length; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("prototype.method"),
+        "Expected ES5 prototype method emit: {}",
+        output
+    );
+    assert!(
+        output.contains("var rest = []"),
+        "Expected rest parameter array initialization in ES5 output: {}",
+        output
+    );
+    assert!(
+        output.contains("arguments.length"),
+        "Expected rest parameter loop over arguments in ES5 output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_object_rest_destructuring_es5() {
     let source = "let { x, ...rest } = obj;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
