@@ -1138,6 +1138,29 @@ fn test_project_performance_scope_cache_hits_signature_help() {
 }
 
 #[test]
+fn test_project_performance_scope_cache_hits_references() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "const value = 1;\nvalue;\n".to_string());
+    let position = Position::new(1, 0);
+
+    assert!(project.find_references("a.ts", position).is_some());
+    let first = project
+        .performance()
+        .timing(ProjectRequestKind::References)
+        .expect("Expected timing data for references");
+
+    assert!(project.find_references("a.ts", position).is_some());
+    let second = project
+        .performance()
+        .timing(ProjectRequestKind::References)
+        .expect("Expected timing data for references");
+
+    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
+    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 
