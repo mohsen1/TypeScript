@@ -932,6 +932,64 @@ fn test_no_unchecked_indexed_access_primitive_index() {
 }
 
 #[test]
+fn test_correlated_union_index_access_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let kind = interner.intern_string("kind");
+    let key_a = interner.intern_string("a");
+    let key_b = interner.intern_string("b");
+
+    let obj_a = interner.object(vec![
+        PropertyInfo {
+            name: kind,
+            type_id: interner.literal_string("a"),
+            write_type: interner.literal_string("a"),
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    let obj_b = interner.object(vec![
+        PropertyInfo {
+            name: kind,
+            type_id: interner.literal_string("b"),
+            write_type: interner.literal_string("b"),
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union_obj = interner.union(vec![obj_a, obj_b]);
+    let key_union = interner.union(vec![
+        interner.literal_string("a"),
+        interner.literal_string("b"),
+    ]);
+    let index_access = interner.intern(TypeKey::IndexAccess(union_obj, key_union));
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::STRING]);
+
+    assert!(checker.is_assignable(index_access, expected));
+    assert!(!checker.is_assignable(index_access, TypeId::NUMBER));
+}
+
+#[test]
 fn test_object_keyword_accepts_non_primitives() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
