@@ -2438,6 +2438,18 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get extended unary expression data (await/yield).
+    /// Returns None if node is not an await/yield expression or has no data.
+    #[inline]
+    pub fn get_unary_expr_ex(&self, node: &ThinNode) -> Option<&UnaryExprDataEx> {
+        use super::syntax_kind_ext::{AWAIT_EXPRESSION, YIELD_EXPRESSION};
+        if node.has_data() && (node.kind == AWAIT_EXPRESSION || node.kind == YIELD_EXPRESSION) {
+            self.unary_exprs_ex.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Get function data.
     /// Returns None if node is not a function-like node or has no data.
     #[inline]
