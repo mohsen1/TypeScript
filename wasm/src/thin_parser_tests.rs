@@ -2,6 +2,7 @@
 //!
 //! Separated from thin_parser.rs as per project conventions.
 
+use crate::checker::types::diagnostics::diagnostic_codes;
 use crate::thin_parser::ThinParserState;
 use std::mem::size_of;
 
@@ -18,6 +19,40 @@ fn test_thin_parser_simple_expression() {
 
     // Should have: SourceFile, ExpressionStatement, BinaryExpression, 2 NumericLiterals
     assert!(parser.arena.len() >= 5, "Expected at least 5 nodes, got {}", parser.arena.len());
+}
+
+#[test]
+fn test_thin_parser_numeric_separator_invalid_diagnostic() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "let x = 1_;".to_string(),
+    );
+    parser.parse_source_file();
+
+    let diagnostics = parser.get_diagnostics();
+    assert!(
+        diagnostics.iter().any(|diag| diag.code == diagnostic_codes::NUMERIC_SEPARATORS_NOT_ALLOWED_HERE),
+        "Expected numeric separator diagnostic, got: {:?}",
+        diagnostics
+    );
+}
+
+#[test]
+fn test_thin_parser_numeric_separator_consecutive_diagnostic() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "let x = 1__0;".to_string(),
+    );
+    parser.parse_source_file();
+
+    let diagnostics = parser.get_diagnostics();
+    assert!(
+        diagnostics.iter().any(|diag| {
+            diag.code == diagnostic_codes::MULTIPLE_CONSECUTIVE_NUMERIC_SEPARATORS_NOT_PERMITTED
+        }),
+        "Expected consecutive separator diagnostic, got: {:?}",
+        diagnostics
+    );
 }
 
 #[test]

@@ -134,6 +134,11 @@ pub mod diagnostic_messages {
     // Module/ambient errors
     pub const AMBIENT_MODULE_DECLARATION_CANNOT_SPECIFY_RELATIVE_MODULE_NAME: &str = "Ambient module declaration cannot specify relative module name.";
     pub const MODULE_HAS_NO_EXPORTED_MEMBER: &str = "Module '{0}' has no exported member '{1}'.";
+
+    // Scanner/parser errors
+    pub const NUMERIC_SEPARATORS_NOT_ALLOWED_HERE: &str = "Numeric separators are not allowed here.";
+    pub const MULTIPLE_CONSECUTIVE_NUMERIC_SEPARATORS_NOT_PERMITTED: &str =
+        "Multiple consecutive numeric separators are not permitted.";
 }
 
 /// TypeScript diagnostic error codes.
@@ -171,6 +176,8 @@ pub mod diagnostic_codes {
     pub const UNEXPECTED_TOKEN_CLASS_MEMBER: u32 = 1068;  // Unexpected token. A constructor, method, accessor, or property was expected.
     pub const DECLARATION_OR_STATEMENT_EXPECTED: u32 = 1128;  // Declaration or statement expected.
     pub const VAR_DECLARATION_NOT_ALLOWED: u32 = 1440;  // Variable declaration not allowed at this location.
+    pub const NUMERIC_SEPARATORS_NOT_ALLOWED_HERE: u32 = 6188;
+    pub const MULTIPLE_CONSECUTIVE_NUMERIC_SEPARATORS_NOT_PERMITTED: u32 = 6189;
 
     // =========================================================================
     // Type checking errors (2xxx)
