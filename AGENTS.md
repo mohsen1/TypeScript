@@ -10,37 +10,39 @@ We have time. No deadlines. Do it right.
 
 ## The Plan
 
-There are 3 tracks running at the same time. Find out which track you are on based on git branch name. Each track manages its progress in a plan file in `wasm/specs`
+There are 5 generic worker tracks running at the same time. Each worker manages its progress in a plan file in `wasm/specs` that matches its worktree name.
 
-- `emitter-track`: `wasm/specs/emitter_plan.md`
-- `cli-track`: `wasm/specs/cli_plan.md`
-- `lsp-track`: `wasm/specs/lsp_plan.md`
+- `worker-1`: `wasm/specs/worker-1_plan.md`
+- `worker-2`: `wasm/specs/worker-2_plan.md`
+- `worker-3`: `wasm/specs/worker-3_plan.md`
+- `worker-4`: `wasm/specs/worker-4_plan.md`
+- `worker-5`: `wasm/specs/worker-5_plan.md`
 
-You must track todo items and progress in the appropriate plan file
+You must track todo items and progress in your worker plan file. The manager assigns tasks and priorities there.
 
 
 ## The Architecture
 
-**`specs/WASM_ARCHITECTURE.md`**. This is the guide for how we do things. **Always read this**
+**`wasm/specs/WASM_ARCHITECTURE.md`**. This is the guide for how we do things. **Always read this**
 
 ## The workflow
 
 Loop:
-  1. Read this track's *_plan.md file - understand current state
-  2. Pick task with HIGHEST IMPACT (not just next in list)
+  1. Read your worker *_plan.md file - understand current state and manager assignment
+  2. Execute the HIGHEST IMPACT task assigned by the manager (do not self-switch workers)
   3. Implement in wasm/src/*.rs (make sure you add test too)
   4. Test: ./wasm/test.sh
-  5. If pass → update *_plan.md, commit
+  5. If pass → update your *_plan.md, commit
   6. **CRITICAL: Continuously sync with origin/rust**
      - Before starting any task
      - After finishing any task
      - Whenever idle (do not wait for conflicts to pile up)
      - Run: `git add . && git commit -m "[wasm] your changes"`
-     - Run: `git push origin rust` (ALL tracks push to shared rust branch)
+     - Run: `git push origin rust` (ALL workers push to shared rust branch)
      - Run: `git fetch origin && git merge origin/rust`
      - Resolve any conflicts if they occur
      - Run: `git push origin rust` (if there were merges)
-     - This keeps all tracks in sync and prevents divergence
+     - This keeps all workers in sync and prevents divergence
   7. Repeat
 `
 
@@ -88,7 +90,7 @@ Commit frequently and atomically
 
 ## 🚨 Rules
 
-1. **STAY ON YOUR TRACK** - NEVER switch tracks. If your track's work is near perfect, PERFECT IT. Add more tests. Clean up todos. Verify architecture compliance. Polish what you have.
+1. **STAY ON YOUR ASSIGNMENT** - NEVER self-switch tasks. If your work is near perfect, PERFECT IT. Add more tests. Clean up todos. Verify architecture compliance. Polish what you have.
 2. **Architecture in mind** - always keep in mind our big picture architecture
 3. **Never break the build** - tests must pass
 4. **ALWAYS use Docker for Rust** - ./wasm/test.sh only, NEVER raw cargo commands
@@ -98,19 +100,19 @@ Commit frequently and atomically
 
 ## 🎯 When Your Track Feels "Done"
 
-If checker work feels complete, that means you have MORE work to do:
-- **Check out review files you wasm/specs** - maybe something we can address now in our track?
-- **Add comprehensive tests** - edge cases, error cases, performance tests
-- **Review architecture adherence** - does your code follow `wasm/WASM_ARCHITECTURE.md`?
-- **Clean up todos** - remove completed items, update progress
-- **Optimize performance** - profile hot paths, reduce allocations
-- **Improve error messages** - make diagnostics more helpful
-- **Document complex logic** - add comments where non-obvious
+If your worker plan is empty or blocked, that means you have MORE work to do:
+- **Ask the manager for the next assignment** and propose high-impact tasks.
+- **Add comprehensive tests** - edge cases, error cases, performance tests.
+- **Review architecture adherence** - does your code follow `wasm/specs/WASM_ARCHITECTURE.md`?
+- **Clean up todos** - remove completed items, update progress.
+- **Optimize performance** - profile hot paths, reduce allocations.
+- **Improve error messages** - make diagnostics more helpful.
+- **Document complex logic** - add comments where non-obvious.
 
-**NEVER** say "my track is done, let me help other tracks". Perfect YOUR track.
+**NEVER** say "my worker plan is done, let me help other workers". Perfect YOUR assignment.
 
 
 ⚠️ **CRITICAL: Keep syncing `origin/rust` branch`**
 1. After each task completion pull in origin/rust
-2. Resolve conflicts. Other tracks are making progress too
+2. Resolve conflicts. Other workers are making progress too
 3. Commit and push

@@ -20,6 +20,8 @@ TRACK_START_PROMPT="${TRACK_START_PROMPT:-$TRACK_POKE}"
 TRACK_START_PAUSE="${TRACK_START_PAUSE:-15}"
 SEND_ENTER_PAUSE="${SEND_ENTER_PAUSE:-1}"
 TRACK_LIMIT="${TRACK_LIMIT:-5}"
+PLAN_GLOB="${PLAN_GLOB:-worker-*_plan.md}"
+FALLBACK_PLAN_GLOB="${FALLBACK_PLAN_GLOB:-*_plan.md}"
 AUTO_ATTACH="${AUTO_ATTACH:-1}"
 
 if [ "${1:-}" = "--kill" ]; then
@@ -95,7 +97,12 @@ fi
 PLAN_FILES=()
 while IFS= read -r plan; do
   PLAN_FILES+=("$plan")
-done < <(find "$SPEC_DIR" -maxdepth 1 -type f -name "*_plan.md" | sort)
+done < <(find "$SPEC_DIR" -maxdepth 1 -type f -name "$PLAN_GLOB" | sort)
+if [ ${#PLAN_FILES[@]} -eq 0 ]; then
+  while IFS= read -r plan; do
+    PLAN_FILES+=("$plan")
+  done < <(find "$SPEC_DIR" -maxdepth 1 -type f -name "$FALLBACK_PLAN_GLOB" | sort)
+fi
 if [ ${#PLAN_FILES[@]} -eq 0 ]; then
   echo "error: no *_plan.md files found in $SPEC_DIR" >&2
   exit 1
@@ -308,6 +315,8 @@ MANAGER_IDLE_SECONDS=__MANAGER_IDLE_SECONDS__
 MANAGER_POKE=__MANAGER_POKE__
 TRACK_IDLE_SECONDS=__TRACK_IDLE_SECONDS__
 TRACK_POKE=__TRACK_POKE__
+PLAN_GLOB=__PLAN_GLOB__
+FALLBACK_PLAN_GLOB=__FALLBACK_PLAN_GLOB__
 
 MANAGER_OPTION="@zang_manager_pane"
 
@@ -355,8 +364,18 @@ while tmux has-session -t "$MAIN_SESSION" 2>/dev/null; do
   tmux select-pane -t "$manager_pane" -T "manager" 2>/dev/null || true
 
   plan_meta=()
+  plan_files=()
   while IFS= read -r plan; do
     [ -n "$plan" ] || continue
+    plan_files+=("$plan")
+  done < <(find "$SPEC_DIR" -maxdepth 1 -type f -name "$PLAN_GLOB" | sort)
+  if [ ${#plan_files[@]} -eq 0 ]; then
+    while IFS= read -r plan; do
+      [ -n "$plan" ] || continue
+      plan_files+=("$plan")
+    done < <(find "$SPEC_DIR" -maxdepth 1 -type f -name "$FALLBACK_PLAN_GLOB" | sort)
+  fi
+  for plan in "${plan_files[@]}"; do
     if plan_is_complete "$plan"; then
       continue
     fi
@@ -364,7 +383,7 @@ while tmux has-session -t "$MAIN_SESSION" 2>/dev/null; do
     name="${base%_plan.md}"
     priority="$(plan_priority "$plan")"
     plan_meta+=("${priority}|${name}|${plan}")
-  done < <(find "$SPEC_DIR" -maxdepth 1 -type f -name "*_plan.md" | sort)
+  done
 
   unset desired
   declare -A desired
@@ -521,6 +540,8 @@ MONITOR_CMD="${MONITOR_CMD/__MANAGER_IDLE_SECONDS__/$MANAGER_IDLE_SECONDS}"
 MONITOR_CMD="${MONITOR_CMD/__MANAGER_POKE__/$(escape_for_bash "$MANAGER_POKE")}"
 MONITOR_CMD="${MONITOR_CMD/__TRACK_IDLE_SECONDS__/$TRACK_IDLE_SECONDS}"
 MONITOR_CMD="${MONITOR_CMD/__TRACK_POKE__/$(escape_for_bash "$TRACK_POKE")}"
+MONITOR_CMD="${MONITOR_CMD/__PLAN_GLOB__/$(escape_for_bash "$PLAN_GLOB")}"
+MONITOR_CMD="${MONITOR_CMD/__FALLBACK_PLAN_GLOB__/$(escape_for_bash "$FALLBACK_PLAN_GLOB")}"
 
 MONITOR_OPTION="@zang_auto_monitor"
 MONITOR_FLAG="$(tmux show-option -gqv "$MONITOR_OPTION" 2>/dev/null || true)"
@@ -533,11 +554,11 @@ fi
 
 echo "Hub session (manager top-left): tmux attach -t $SESSION_MAIN"
 if [ ${#TRACK_NAMES[@]} -eq 0 ]; then
-  echo "Tracks: (none active)"
+  echo "Workers: (none active)"
 else
-  echo "Tracks: ${TRACK_NAMES[*]}"
+  echo "Workers: ${TRACK_NAMES[*]}"
 fi
-echo "Track limit: $TRACK_LIMIT"
+echo "Worker limit: $TRACK_LIMIT"
 echo "Codex auto-update: $CODEX_AUTO_UPDATE"
 echo "Worktrees base: $WORKTREE_BASE"
 
