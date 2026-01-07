@@ -3669,9 +3669,30 @@ impl<'a> ThinCheckerState<'a> {
             return;
         };
 
-        // Only check property access expressions
-        if target_node.kind != syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
-            return;
+        match target_node.kind {
+            syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {}
+            syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
+                if let Some(access) = self.ctx.arena.get_access_expr(target_node) {
+                    let object_type = self.get_type_of_node(access.expression);
+                    if object_type == TypeId::ANY
+                        || object_type == TypeId::UNKNOWN
+                        || object_type == TypeId::ERROR
+                    {
+                        return;
+                    }
+
+                    let index_type = self.get_type_of_node(access.name_or_argument);
+                    if let Some(name) = self.get_readonly_element_access_name(
+                        object_type,
+                        access.name_or_argument,
+                        index_type,
+                    ) {
+                        self.error_readonly_property_at(&name, target_idx);
+                    }
+                }
+                return;
+            }
+            _ => return,
         }
 
         let Some(access) = self.ctx.arena.get_access_expr(target_node) else {
@@ -3855,6 +3876,14 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::TypeKey;
 
         match self.ctx.types.lookup(type_id) {
+            Some(TypeKey::ReadonlyType(inner)) => {
+                if let Some(TypeKey::Array(_) | TypeKey::Tuple(_)) = self.ctx.types.lookup(inner) {
+                    if self.get_numeric_index_from_string(prop_name).is_some() {
+                        return true;
+                    }
+                }
+                self.is_property_readonly(inner, prop_name)
+            }
             Some(TypeKey::Object(props)) => {
                 for prop in props.iter() {
                     if self.ctx.types.resolve_atom(prop.name) == prop_name {
@@ -3883,8 +3912,8 @@ impl<'a> ThinCheckerState<'a> {
                 false
             }
             Some(TypeKey::Union(types)) => {
-                // Property is readonly if readonly in all union members
-                types.iter().all(|t| self.is_property_readonly(*t, prop_name))
+                // Property is readonly if any union member is readonly
+                types.iter().any(|t| self.is_property_readonly(*t, prop_name))
             }
             Some(TypeKey::Intersection(types)) => {
                 // Property is readonly if readonly in any intersection member
@@ -3892,6 +3921,84 @@ impl<'a> ThinCheckerState<'a> {
             }
             _ => false,
         }
+    }
+
+    fn is_readonly_index_signature(
+        &self,
+        type_id: TypeId,
+        wants_string: bool,
+        wants_number: bool,
+    ) -> bool {
+        use crate::solver::TypeKey;
+
+        match self.ctx.types.lookup(type_id) {
+            Some(TypeKey::ReadonlyType(inner)) => {
+                if wants_number {
+                    if let Some(TypeKey::Array(_) | TypeKey::Tuple(_)) = self.ctx.types.lookup(inner) {
+                        return true;
+                    }
+                }
+                self.is_readonly_index_signature(inner, wants_string, wants_number)
+            }
+            Some(TypeKey::ObjectWithIndex(shape)) => {
+                (wants_string && shape.string_index.as_ref().is_some_and(|idx| idx.readonly))
+                    || (wants_number && shape.number_index.as_ref().is_some_and(|idx| idx.readonly))
+            }
+            Some(TypeKey::Union(types)) => types
+                .iter()
+                .any(|t| self.is_readonly_index_signature(*t, wants_string, wants_number)),
+            Some(TypeKey::Intersection(types)) => types
+                .iter()
+                .any(|t| self.is_readonly_index_signature(*t, wants_string, wants_number)),
+            _ => false,
+        }
+    }
+
+    fn get_readonly_element_access_name(
+        &mut self,
+        object_type: TypeId,
+        index_expr: NodeIndex,
+        index_type: TypeId,
+    ) -> Option<String> {
+        if let Some(name) = self.get_literal_string_from_node(index_expr) {
+            if self.is_property_readonly(object_type, name) {
+                return Some(name.to_string());
+            }
+            return None;
+        }
+
+        if let Some(index) = self.get_literal_index_from_node(index_expr) {
+            let name = index.to_string();
+            if self.is_property_readonly(object_type, &name) {
+                return Some(name);
+            }
+            return None;
+        }
+
+        if let Some((string_keys, number_keys)) = self.get_literal_key_union_from_type(index_type) {
+            for key in string_keys {
+                let name = self.ctx.types.resolve_atom(key);
+                if self.is_property_readonly(object_type, &name) {
+                    return Some(name);
+                }
+            }
+
+            for key in number_keys {
+                let name = format!("{}", key);
+                if self.is_property_readonly(object_type, &name) {
+                    return Some(name);
+                }
+            }
+            return None;
+        }
+
+        if let Some((wants_string, wants_number)) = self.get_index_key_kind(index_type) {
+            if self.is_readonly_index_signature(object_type, wants_string, wants_number) {
+                return Some("index signature".to_string());
+            }
+        }
+
+        None
     }
 
     /// Check a return statement.
