@@ -56,6 +56,7 @@ Pick the most doable and impactful
 31. LoweringPass: handle export-declared functions and async detection [done]
 32. Export declarations: CommonJS transforms for vars and transform-aware emission [done]
 33. Export declarations: handle default anonymous function/class + ES6 default emit [done]
+34. CommonJS preamble: include default/named export declarations in exports init [done]
 
 
 ## Quick Reference

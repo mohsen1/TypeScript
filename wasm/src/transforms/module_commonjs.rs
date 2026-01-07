@@ -91,13 +91,31 @@ pub fn collect_export_names(arena: &ThinNodeArena, statements: &[NodeIndex]) -> 
         let Some(node) = arena.get(stmt_idx) else { continue };
 
         match node.kind {
-            // export class C {} / export function f() {} / etc.
+            // export class C {} / export function f() {} / export { x } / export default ...
             // These are wrapped in EXPORT_DECLARATION nodes
             k if k == syntax_kind_ext::EXPORT_DECLARATION => {
                 if let Some(export_decl) = arena.get_export_decl(node) {
-                    // The actual declaration (class, function, etc.) is in export_clause
-                    if let Some(decl_node) = arena.get(export_decl.export_clause) {
-                        collect_export_name_from_declaration(arena, decl_node, &mut exports);
+                    if export_decl.is_default_export {
+                        exports.push("default".to_string());
+                        continue;
+                    }
+
+                    // Only pre-initialize local exports (no module specifier)
+                    if export_decl.module_specifier.is_none() {
+                        if let Some(clause_node) = arena.get(export_decl.export_clause) {
+                            if let Some(named_exports) = arena.get_named_imports(clause_node) {
+                                for &spec_idx in &named_exports.elements.nodes {
+                                    if let Some(spec) = arena.get(spec_idx).and_then(|n| arena.get_specifier(n)) {
+                                        // Use the exported name (name), not the local name (property_name)
+                                        if let Some(name) = get_identifier_text(arena, spec.name) {
+                                            exports.push(name);
+                                        }
+                                    }
+                                }
+                            } else {
+                                collect_export_name_from_declaration(arena, clause_node, &mut exports);
+                            }
+                        }
                     }
                 }
             }
@@ -149,26 +167,6 @@ pub fn collect_export_names(arena: &ThinNodeArena, statements: &[NodeIndex]) -> 
                     if has_export_modifier_from_list(arena, &module.modifiers) {
                         if let Some(name) = get_identifier_text(arena, module.name) {
                             exports.push(name);
-                        }
-                    }
-                }
-            }
-            // export { a, b, c }
-            k if k == syntax_kind_ext::EXPORT_DECLARATION => {
-                if let Some(export_decl) = arena.get_export_decl(node) {
-                    // Only process local exports (no module specifier)
-                    if export_decl.module_specifier.is_none() {
-                        if let Some(clause_node) = arena.get(export_decl.export_clause) {
-                            if let Some(named_exports) = arena.get_named_imports(clause_node) {
-                                for &spec_idx in &named_exports.elements.nodes {
-                                    if let Some(spec) = arena.get(spec_idx).and_then(|n| arena.get_specifier(n)) {
-                                        // Use the exported name (name), not the local name (property_name)
-                                        if let Some(name) = get_identifier_text(arena, spec.name) {
-                                            exports.push(name);
-                                        }
-                                    }
-                                }
-                            }
                         }
                     }
                 }
@@ -574,6 +572,48 @@ mod tests {
             export_names,
             vec!["a", "c"],
             "Expected destructured export names"
+        );
+    }
+
+    #[test]
+    fn test_collect_export_names_with_default_export() {
+        use crate::thin_parser::ThinParserState;
+
+        let source = "export default function () {}";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+            panic!("Failed to get source file");
+        };
+
+        let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+        assert_eq!(
+            export_names,
+            vec!["default"],
+            "Expected default export name"
+        );
+    }
+
+    #[test]
+    fn test_collect_export_names_with_named_exports() {
+        use crate::thin_parser::ThinParserState;
+
+        let source = "const foo = 1; export { foo as bar };";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+            panic!("Failed to get source file");
+        };
+
+        let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+        assert_eq!(
+            export_names,
+            vec!["bar"],
+            "Expected exported name from named export"
         );
     }
 }
