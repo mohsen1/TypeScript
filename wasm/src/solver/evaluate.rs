@@ -189,6 +189,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         };
 
         match obj_key {
+            TypeKey::ReadonlyType(inner) => {
+                self.evaluate_index_access(inner, index_type)
+            }
             TypeKey::Object(props) => {
                 self.evaluate_object_index(&props, index_type)
             }
@@ -461,6 +464,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         };
 
         match key {
+            TypeKey::ReadonlyType(inner) => {
+                self.evaluate_keyof(inner)
+            }
             TypeKey::Object(props) => {
                 // keyof { x: T, y: U } = "x" | "y"
                 if props.is_empty() {

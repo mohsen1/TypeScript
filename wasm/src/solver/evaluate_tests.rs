@@ -405,6 +405,17 @@ fn test_index_access_array() {
 }
 
 #[test]
+fn test_index_access_readonly_array() {
+    let interner = TypeInterner::new();
+
+    let array = interner.array(TypeId::STRING);
+    let readonly_array = interner.intern(TypeKey::ReadonlyType(array));
+
+    let result = evaluate_index_access(&interner, readonly_array, TypeId::NUMBER);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
 fn test_index_access_tuple_literal() {
     let interner = TypeInterner::new();
 
@@ -417,6 +428,50 @@ fn test_index_access_tuple_literal() {
 
     let result = evaluate_index_access(&interner, tuple, zero);
     assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_index_access_readonly_tuple_literal() {
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let readonly_tuple = interner.intern(TypeKey::ReadonlyType(tuple));
+    let one = interner.literal_number(1.0);
+
+    let result = evaluate_index_access(&interner, readonly_tuple, one);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_keyof_readonly_array() {
+    let interner = TypeInterner::new();
+
+    let array = interner.array(TypeId::STRING);
+    let readonly_array = interner.intern(TypeKey::ReadonlyType(array));
+
+    let result = evaluate_keyof(&interner, readonly_array);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_keyof_readonly_tuple() {
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let readonly_tuple = interner.intern(TypeKey::ReadonlyType(tuple));
+
+    let result = evaluate_keyof(&interner, readonly_tuple);
+    let expected = interner.union(vec![
+        interner.literal_string("0"),
+        interner.literal_string("1"),
+    ]);
+    assert_eq!(result, expected);
 }
 
 #[test]

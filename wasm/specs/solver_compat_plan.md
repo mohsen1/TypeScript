@@ -200,6 +200,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Treat tuple property access as array property access
 - [x] Tests for readonly array and tuple property access
 
+### Phase 33: Readonly Index Access/Keyof Evaluation
+- [x] Evaluate index access through readonly type operator wrappers
+- [x] Evaluate keyof through readonly type operator wrappers
+- [x] Tests for readonly index access and keyof behavior
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
