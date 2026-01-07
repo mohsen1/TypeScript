@@ -355,7 +355,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         if let Some(TypeKey::Literal(LiteralValue::String(name))) = self.interner.lookup(index_type) {
             for prop in props {
                 if prop.name == name {
-                    return prop.type_id;
+                    return self.optional_property_type(prop);
                 }
             }
             // Property not found
@@ -379,11 +379,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
         // If index is string, return union of all property types (index signature behavior)
         if index_type == TypeId::STRING {
-            let all_types: Vec<TypeId> = props.iter().map(|p| p.type_id).collect();
-            if all_types.is_empty() {
-                return TypeId::UNDEFINED;
-            }
-            let union = self.interner.union(all_types);
+            let union = self.union_property_types(props);
             return self.add_undefined_if_unchecked(union);
         }
 
@@ -411,7 +407,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         if let Some(TypeKey::Literal(LiteralValue::String(name))) = self.interner.lookup(index_type) {
             for prop in &shape.properties {
                 if prop.name == name {
-                    return prop.type_id;
+                    return self.optional_property_type(prop);
                 }
             }
             if self.is_numeric_property_name(name) {
@@ -460,11 +456,22 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     }
 
     fn union_property_types(&self, props: &[PropertyInfo]) -> TypeId {
-        let all_types: Vec<TypeId> = props.iter().map(|p| p.type_id).collect();
+        let all_types: Vec<TypeId> = props
+            .iter()
+            .map(|prop| self.optional_property_type(prop))
+            .collect();
         if all_types.is_empty() {
             TypeId::UNDEFINED
         } else {
             self.interner.union(all_types)
+        }
+    }
+
+    fn optional_property_type(&self, prop: &PropertyInfo) -> TypeId {
+        if prop.optional {
+            self.interner.union(vec![prop.type_id, TypeId::UNDEFINED])
+        } else {
+            prop.type_id
         }
     }
 
