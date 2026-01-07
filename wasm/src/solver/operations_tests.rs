@@ -208,6 +208,46 @@ fn test_call_rest_parameter_min_args_with_required() {
 }
 
 #[test]
+fn test_binary_overlap_disjoint_primitives() {
+    let interner = TypeInterner::new();
+    let evaluator = BinaryOpEvaluator::new(&interner);
+
+    let result = evaluator.evaluate(TypeId::STRING, TypeId::NUMBER, "===");
+    assert!(matches!(result, BinaryOpResult::TypeError { .. }));
+}
+
+#[test]
+fn test_binary_overlap_disjoint_literals() {
+    let interner = TypeInterner::new();
+    let evaluator = BinaryOpEvaluator::new(&interner);
+
+    let one = interner.literal_number(1.0);
+    let two = interner.literal_number(2.0);
+
+    let result = evaluator.evaluate(one, two, "===");
+    assert!(matches!(result, BinaryOpResult::TypeError { .. }));
+}
+
+#[test]
+fn test_binary_overlap_union_literals() {
+    let interner = TypeInterner::new();
+    let evaluator = BinaryOpEvaluator::new(&interner);
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+
+    let left = interner.union(vec![lit_a, lit_b]);
+    let right = interner.union(vec![lit_b, lit_c]);
+
+    let result = evaluator.evaluate(left, right, "===");
+    match result {
+        BinaryOpResult::Success(result_type) => assert_eq!(result_type, TypeId::BOOLEAN),
+        _ => panic!("Expected boolean result, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_call_rest_parameter_type_match() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);

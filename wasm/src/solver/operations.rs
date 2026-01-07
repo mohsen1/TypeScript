@@ -1671,6 +1671,17 @@ pub struct BinaryOpEvaluator<'a> {
     interner: &'a dyn TypeDatabase,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum PrimitiveClass {
+    String,
+    Number,
+    Boolean,
+    Bigint,
+    Symbol,
+    Null,
+    Undefined,
+}
+
 impl<'a> BinaryOpEvaluator<'a> {
     pub fn new(interner: &'a dyn TypeDatabase) -> Self {
         BinaryOpEvaluator { interner }
@@ -1681,7 +1692,13 @@ impl<'a> BinaryOpEvaluator<'a> {
         match op {
             "+" => self.evaluate_plus(left, right),
             "-" | "*" | "/" | "%" => self.evaluate_arithmetic(left, right),
-            "==" | "!=" | "===" | "!==" => BinaryOpResult::Success(TypeId::BOOLEAN),
+            "==" | "!=" | "===" | "!==" => {
+                if self.has_overlap(left, right) {
+                    BinaryOpResult::Success(TypeId::BOOLEAN)
+                } else {
+                    BinaryOpResult::TypeError { left, right, op }
+                }
+            }
             "<" | ">" | "<=" | ">=" => self.evaluate_comparison(left, right),
             "&&" | "||" => self.evaluate_logical(left, right),
             _ => BinaryOpResult::TypeError { left, right, op },
@@ -1717,6 +1734,79 @@ impl<'a> BinaryOpEvaluator<'a> {
     fn evaluate_logical(&self, left: TypeId, right: TypeId) -> BinaryOpResult {
         // For && and ||, TypeScript returns a union of the two types
         BinaryOpResult::Success(self.interner.union(vec![left, right]))
+    }
+
+    fn has_overlap(&self, left: TypeId, right: TypeId) -> bool {
+        if left == right {
+            return true;
+        }
+        if left == TypeId::ANY
+            || right == TypeId::ANY
+            || left == TypeId::UNKNOWN
+            || right == TypeId::UNKNOWN
+            || left == TypeId::ERROR
+            || right == TypeId::ERROR
+        {
+            return true;
+        }
+        if left == TypeId::NEVER || right == TypeId::NEVER {
+            return false;
+        }
+
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(left) {
+            return members.iter().any(|member| self.has_overlap(*member, right));
+        }
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(right) {
+            return members.iter().any(|member| self.has_overlap(left, *member));
+        }
+
+        if let (Some(TypeKey::Literal(left_lit)), Some(TypeKey::Literal(right_lit))) =
+            (self.interner.lookup(left), self.interner.lookup(right))
+        {
+            return left_lit == right_lit;
+        }
+
+        if self.primitive_classes_disjoint(left, right) {
+            return false;
+        }
+
+        if self.interner.intersection(vec![left, right]) == TypeId::NEVER {
+            return false;
+        }
+
+        true
+    }
+
+    fn primitive_classes_disjoint(&self, left: TypeId, right: TypeId) -> bool {
+        match (self.primitive_class(left), self.primitive_class(right)) {
+            (Some(left_class), Some(right_class)) => left_class != right_class,
+            _ => false,
+        }
+    }
+
+    fn primitive_class(&self, type_id: TypeId) -> Option<PrimitiveClass> {
+        let key = self.interner.lookup(type_id)?;
+        match key {
+            TypeKey::Intrinsic(kind) => match kind {
+                IntrinsicKind::String => Some(PrimitiveClass::String),
+                IntrinsicKind::Number => Some(PrimitiveClass::Number),
+                IntrinsicKind::Boolean => Some(PrimitiveClass::Boolean),
+                IntrinsicKind::Bigint => Some(PrimitiveClass::Bigint),
+                IntrinsicKind::Symbol => Some(PrimitiveClass::Symbol),
+                IntrinsicKind::Null => Some(PrimitiveClass::Null),
+                IntrinsicKind::Undefined | IntrinsicKind::Void => Some(PrimitiveClass::Undefined),
+                _ => None,
+            },
+            TypeKey::Literal(literal) => match literal {
+                LiteralValue::String(_) => Some(PrimitiveClass::String),
+                LiteralValue::Number(_) => Some(PrimitiveClass::Number),
+                LiteralValue::Boolean(_) => Some(PrimitiveClass::Boolean),
+                LiteralValue::BigInt(_) => Some(PrimitiveClass::Bigint),
+            },
+            TypeKey::TemplateLiteral(_) => Some(PrimitiveClass::String),
+            TypeKey::UniqueSymbol(_) => Some(PrimitiveClass::Symbol),
+            _ => None,
+        }
     }
 }
 
