@@ -159,8 +159,8 @@ Status: Active
 - [x] Route readonly property checks through solver QueryDatabase
   - Add solver helper for readonly property detection and call via QueryDatabase.
   - Add focused test for readonly array element assignment.
-- [x] Route tuple literal element access through solver index-access evaluation
-  - Use QueryDatabase `evaluate_index_access` for tuple literal indices to honor optional/rest elements.
+- [x] Route tuple/array literal element access through solver index-access evaluation
+  - Use QueryDatabase `evaluate_index_access` for tuple/array literal indices to honor optional/rest elements.
   - Add focused test ensuring optional tuple element access includes `undefined`.
 
 ## Baseline / Validation

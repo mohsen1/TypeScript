@@ -211,7 +211,12 @@ fn test_thin_binder_exported_const() {
     assert!(binder.file_locals.has("y"), "Exported const 'y' should be in file_locals");
 }
 
-fn assert_bound_state_resolves_param(source: &str, function_name: &str, param_name: &str) {
+fn assert_bound_state_resolves_param_impl(
+    source: &str,
+    function_name: &str,
+    param_name: &str,
+    include_scopes: bool,
+) {
     use crate::binder::SymbolTable;
     use crate::parallel;
     use crate::parser::{syntax_kind_ext, NodeIndex};
@@ -229,13 +234,21 @@ fn assert_bound_state_resolves_param(source: &str, function_name: &str, param_na
         }
     }
 
-    let binder = ThinBinderState::from_bound_state_with_scopes(
-        program.symbols.clone(),
-        file_locals,
-        file.node_symbols.clone(),
-        file.scopes.clone(),
-        file.node_scope_ids.clone(),
-    );
+    let binder = if include_scopes {
+        ThinBinderState::from_bound_state_with_scopes(
+            program.symbols.clone(),
+            file_locals,
+            file.node_symbols.clone(),
+            file.scopes.clone(),
+            file.node_scope_ids.clone(),
+        )
+    } else {
+        ThinBinderState::from_bound_state(
+            program.symbols.clone(),
+            file_locals,
+            file.node_symbols.clone(),
+        )
+    };
 
     let arena = &file.arena;
     let mut param_name_idx = NodeIndex::NONE;
@@ -327,6 +340,18 @@ fn assert_bound_state_resolves_param(source: &str, function_name: &str, param_na
     );
 }
 
+fn assert_bound_state_resolves_param(source: &str, function_name: &str, param_name: &str) {
+    assert_bound_state_resolves_param_impl(source, function_name, param_name, true);
+}
+
+fn assert_bound_state_resolves_param_without_scopes(
+    source: &str,
+    function_name: &str,
+    param_name: &str,
+) {
+    assert_bound_state_resolves_param_impl(source, function_name, param_name, false);
+}
+
 #[test]
 fn test_thin_binder_resolves_parameter_from_bound_state() {
     let source = r#"
@@ -382,6 +407,21 @@ export function getModuleInstanceState(node: ModuleDeclaration, visited?: Map<nu
 "#;
 
     assert_bound_state_resolves_param(source, "getModuleInstanceState", "node");
+}
+
+#[test]
+fn test_thin_binder_resolves_parameter_from_bound_state_binder_ts_331_without_scopes() {
+    let source = r#"
+export function getModuleInstanceState(node: ModuleDeclaration, visited?: Map<number, ModuleInstanceState | undefined>): ModuleInstanceState {
+    if (node.body && !node.body.parent) {
+        setParent(node.body, node);
+        setParentRecursive(node.body, /*incremental*/ false);
+    }
+    return node.body ? getModuleInstanceStateCached(node.body, visited) : ModuleInstanceState.Instantiated;
+}
+"#;
+
+    assert_bound_state_resolves_param_without_scopes(source, "getModuleInstanceState", "node");
 }
 #[test]
 fn test_namespace_binding_debug() {

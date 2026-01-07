@@ -190,23 +190,55 @@ impl ThinBinderState {
             return None;
         };
 
-        // Find the starting scope by walking up the AST to find the nearest scope-creating node
-        let mut scope_id = self.find_enclosing_scope(arena, node_idx)?;
-
-        // Walk up the scope chain
-        while !scope_id.is_none() {
-            if let Some(scope) = self.scopes.get(scope_id.0 as usize) {
-                if let Some(sym_id) = scope.table.get(name) {
-                    return Some(sym_id);
+        if let Some(mut scope_id) = self.find_enclosing_scope(arena, node_idx) {
+            // Walk up the scope chain
+            while !scope_id.is_none() {
+                if let Some(scope) = self.scopes.get(scope_id.0 as usize) {
+                    if let Some(sym_id) = scope.table.get(name) {
+                        return Some(sym_id);
+                    }
+                    scope_id = scope.parent;
+                } else {
+                    break;
                 }
-                scope_id = scope.parent;
-            } else {
-                break;
             }
+        }
+
+        // Fallback for bound-state binders without persistent scopes.
+        if let Some(sym_id) = self.resolve_parameter_fallback(arena, node_idx, name) {
+            return Some(sym_id);
         }
 
         // Finally check file locals / globals
         self.file_locals.get(name)
+    }
+
+    fn resolve_parameter_fallback(
+        &self,
+        arena: &ThinNodeArena,
+        node_idx: NodeIndex,
+        name: &str,
+    ) -> Option<SymbolId> {
+        if self.scopes.is_empty() {
+            let mut current = node_idx;
+            while !current.is_none() {
+                let node = arena.get(current)?;
+                if let Some(func) = arena.get_function(node) {
+                    for &param_idx in &func.parameters.nodes {
+                        let param_node = arena.get(param_idx)?;
+                        let param = arena.get_parameter(param_node)?;
+                        let ident_node = arena.get(param.name)?;
+                        let ident = arena.get_identifier(ident_node)?;
+                        if ident.escaped_text == name {
+                            return self.node_symbols.get(&param.name.0).copied();
+                        }
+                    }
+                }
+                let ext = arena.get_extended(current)?;
+                current = ext.parent;
+            }
+        }
+        None
     }
 
     /// Find the enclosing scope for a given node by walking up the AST.
