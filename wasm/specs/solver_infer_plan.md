@@ -122,6 +122,8 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Use canonical numeric literal checks for index signature properties in subtyping
 - [x] Add subtype tests for index signatures satisfying named properties
 - [x] Cover non-canonical numeric names in index signature subtyping tests
+- [x] Add inference coverage for non-canonical numeric properties in number index inference
+- [x] Infer mixed string/number index signatures from object literal properties
 - [x] Enforce index signature consistency during bounds validation
 
 ## Architecture Notes
