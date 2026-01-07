@@ -238,11 +238,25 @@ impl ProjectFile {
     }
 
     fn apply_incremental_update(&mut self, source_text: String, plan: IncrementalUpdatePlan) -> bool {
+        let old_suffix_nodes = {
+            let arena = self.parser.get_arena();
+            let Some(root_node) = arena.get(self.root) else { return false; };
+            let Some(source_file) = arena.get_source_file(root_node) else { return false; };
+            let prefix_len = plan.prefix_nodes.len();
+            if prefix_len > source_file.statements.nodes.len() {
+                return false;
+            }
+            source_file.statements.nodes[prefix_len..].to_vec()
+        };
+
         let parse_result = self.parser.parse_source_file_statements_from_offset(
             self.file_name.clone(),
             source_text,
             plan.reparse_start,
         );
+        if parse_result.reparse_start != plan.reparse_start {
+            return false;
+        }
 
         let new_text = self.parser.get_source_text().to_string();
         let line_map = LineMap::build(&new_text);
@@ -286,9 +300,17 @@ impl ProjectFile {
         }
 
         self.line_map = line_map;
-        self.binder.reset();
         let arena = self.parser.get_arena();
-        self.binder.bind_source_file(arena, self.root);
+        if !self.binder.bind_source_file_incremental(
+            arena,
+            self.root,
+            &plan.prefix_nodes,
+            &old_suffix_nodes,
+            &parse_result.statements.nodes,
+        ) {
+            self.binder.reset();
+            self.binder.bind_source_file(arena, self.root);
+        }
         self.type_cache = None;
         self.scope_cache.clear();
 
