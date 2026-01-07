@@ -300,6 +300,41 @@ fn test_void_return_assignability() {
 }
 
 #[test]
+fn test_constructor_void_return_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let instance = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let returns_instance = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: instance,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    let returns_void = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: true,
+    });
+
+    assert!(checker.is_assignable(returns_instance, returns_void));
+    assert!(!checker.is_assignable(returns_void, returns_instance));
+}
+
+#[test]
 fn test_explain_failure_missing_property() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
