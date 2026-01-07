@@ -46,6 +46,12 @@ pub struct ParseDiagnostic {
     pub code: u32,
 }
 
+pub(crate) struct IncrementalParseResult {
+    pub statements: NodeList,
+    pub end_pos: u32,
+    pub end_of_file_token: NodeIndex,
+}
+
 // =============================================================================
 // ThinParserState
 // =============================================================================
@@ -472,6 +478,37 @@ impl ThinParserState {
             modifier_flags: 0,
             transform_flags: 0,
         })
+    }
+
+    pub(crate) fn parse_source_file_statements_from_offset(
+        &mut self,
+        file_name: String,
+        source_text: String,
+        start: u32,
+    ) -> IncrementalParseResult {
+        let start = usize::min(start as usize, source_text.len());
+
+        self.file_name = file_name;
+        self.scanner.set_text(source_text, Some(start), None);
+        self.context_flags = 0;
+        self.current_token = SyntaxKind::Unknown;
+        self.parse_diagnostics.clear();
+        self.recursion_depth = 0;
+
+        self.next_token();
+        let statements = self.parse_source_file_statements();
+        let end_pos = self.token_end();
+        let eof_token = self.arena.add_token(
+            SyntaxKind::EndOfFileToken as u16,
+            end_pos,
+            end_pos,
+        );
+
+        IncrementalParseResult {
+            statements,
+            end_pos,
+            end_of_file_token: eof_token,
+        }
     }
 
     /// Parse list of statements for a source file (top-level).

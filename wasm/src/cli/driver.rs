@@ -124,7 +124,7 @@ impl CompilationCache {
 }
 
 pub fn compile(args: &CliArgs, cwd: &Path) -> Result<CompilationResult> {
-    compile_inner(args, cwd, None)
+    compile_inner(args, cwd, None, None)
 }
 
 pub(crate) fn compile_with_cache(
@@ -132,13 +132,23 @@ pub(crate) fn compile_with_cache(
     cwd: &Path,
     cache: &mut CompilationCache,
 ) -> Result<CompilationResult> {
-    compile_inner(args, cwd, Some(cache))
+    compile_inner(args, cwd, Some(cache), None)
+}
+
+pub(crate) fn compile_with_cache_and_changes(
+    args: &CliArgs,
+    cwd: &Path,
+    cache: &mut CompilationCache,
+    changed_paths: &[PathBuf],
+) -> Result<CompilationResult> {
+    compile_inner(args, cwd, Some(cache), Some(changed_paths))
 }
 
 fn compile_inner(
     args: &CliArgs,
     cwd: &Path,
     mut cache: Option<&mut CompilationCache>,
+    changed_paths: Option<&[PathBuf]>,
 ) -> Result<CompilationResult> {
     let cwd = canonicalize_or_owned(cwd);
     let tsconfig_path = resolve_tsconfig_path(&cwd, args.project.as_deref())?;
@@ -173,22 +183,43 @@ fn compile_inner(
         bail!("no input files found");
     }
 
+    let changed_set = changed_paths.map(|paths| {
+        paths
+            .iter()
+            .map(|path| canonicalize_or_owned(path))
+            .collect::<HashSet<_>>()
+    });
     let SourceReadResult {
         sources,
         dependencies,
-    } = read_source_files(&file_paths, &base_dir, &resolved)?;
+    } = {
+        let cache_ref = cache.as_deref();
+        read_source_files(
+            &file_paths,
+            &base_dir,
+            &resolved,
+            cache_ref,
+            changed_set.as_ref(),
+        )?
+    };
     if let Some(cache) = cache.as_deref_mut() {
         cache.update_dependencies(dependencies);
     }
 
-    let program = if let Some(cache) = cache.as_deref_mut() {
-        build_program_with_cache(sources, cache)
+    let (program, dirty_paths) = if let Some(cache) = cache.as_deref_mut() {
+        let result = build_program_with_cache(sources, cache);
+        (result.program, Some(result.dirty_paths))
     } else {
         let compile_inputs: Vec<(String, String)> = sources
             .into_iter()
-            .map(|source| (source.path.to_string_lossy().into_owned(), source.text))
+            .map(|source| {
+                let text = source
+                    .text
+                    .unwrap_or_else(|| panic!("missing source text for {}", source.path.display()));
+                (source.path.to_string_lossy().into_owned(), text)
+            })
             .collect();
-        parallel::compile_files(compile_inputs)
+        (parallel::compile_files(compile_inputs), None)
     };
     let mut diagnostics = collect_diagnostics(&program, cache);
     diagnostics.sort_by(|left, right| {
@@ -213,6 +244,7 @@ fn compile_inner(
             root_dir.as_deref(),
             out_dir.as_deref(),
             declaration_dir.as_deref(),
+            dirty_paths.as_ref(),
         )?;
         write_outputs(&outputs)?
     };
@@ -230,25 +262,42 @@ struct SourceMeta {
     cached_ok: bool,
 }
 
+struct BuildProgramResult {
+    program: MergedProgram,
+    dirty_paths: HashSet<PathBuf>,
+}
+
 fn build_program_with_cache(
-    sources: Vec<SourceFile>,
+    sources: Vec<SourceEntry>,
     cache: &mut CompilationCache,
-) -> MergedProgram {
+) -> BuildProgramResult {
     let mut meta = Vec::with_capacity(sources.len());
     let mut to_parse = Vec::new();
+    let mut dirty_paths = HashSet::new();
 
     for source in sources {
-        let hash = hash_text(&source.text);
         let file_name = source.path.to_string_lossy().into_owned();
-        let cached_ok = cache
-            .bind_cache
-            .get(&source.path)
-            .map(|entry| entry.hash == hash)
-            .unwrap_or(false);
-
-        if !cached_ok {
-            to_parse.push((file_name.clone(), source.text));
-        }
+        let (hash, cached_ok) = match source.text {
+            Some(text) => {
+                let hash = hash_text(&text);
+                let cached_ok = cache
+                    .bind_cache
+                    .get(&source.path)
+                    .map(|entry| entry.hash == hash)
+                    .unwrap_or(false);
+                if !cached_ok {
+                    dirty_paths.insert(source.path.clone());
+                    to_parse.push((file_name.clone(), text));
+                }
+                (hash, cached_ok)
+            }
+            None => {
+                let cached = cache.bind_cache.get(&source.path).unwrap_or_else(|| {
+                    panic!("missing cached bind result for {}", source.path.display());
+                });
+                (cached.hash, true)
+            }
+        };
 
         meta.push(SourceMeta {
             path: source.path,
@@ -304,7 +353,10 @@ fn build_program_with_cache(
         ordered.push(&cached.bind_result);
     }
 
-    parallel::merge_bind_results_ref(&ordered)
+    BuildProgramResult {
+        program: parallel::merge_bind_results_ref(&ordered),
+        dirty_paths,
+    }
 }
 
 fn hash_text(text: &str) -> u64 {
@@ -314,13 +366,13 @@ fn hash_text(text: &str) -> u64 {
 }
 
 #[derive(Debug, Clone)]
-struct SourceFile {
+struct SourceEntry {
     path: PathBuf,
-    text: String,
+    text: Option<String>,
 }
 
 struct SourceReadResult {
-    sources: Vec<SourceFile>,
+    sources: Vec<SourceEntry>,
     dependencies: HashMap<PathBuf, HashSet<PathBuf>>,
 }
 
@@ -463,12 +515,15 @@ fn read_source_files(
     paths: &[PathBuf],
     base_dir: &Path,
     options: &ResolvedCompilerOptions,
+    cache: Option<&CompilationCache>,
+    changed_paths: Option<&HashSet<PathBuf>>,
 ) -> Result<SourceReadResult> {
-    let mut sources = HashMap::new();
+    let mut sources: HashMap<PathBuf, Option<String>> = HashMap::new();
     let mut dependencies: HashMap<PathBuf, HashSet<PathBuf>> = HashMap::new();
     let mut seen = HashSet::new();
     let mut pending = VecDeque::new();
     let mut resolution_cache = ModuleResolutionCache::default();
+    let use_cache = cache.is_some() && changed_paths.is_some();
 
     for path in paths {
         let canonical = canonicalize_or_owned(path);
@@ -478,10 +533,30 @@ fn read_source_files(
     }
 
     while let Some(path) = pending.pop_front() {
+        if use_cache {
+            if let (Some(cache), Some(changed_paths)) = (cache, changed_paths) {
+                if !changed_paths.contains(&path) {
+                    if let (Some(_), Some(cached_deps)) = (
+                        cache.bind_cache.get(&path),
+                        cache.dependencies.get(&path),
+                    ) {
+                        dependencies.insert(path.clone(), cached_deps.clone());
+                        sources.insert(path.clone(), None);
+                        for dep in cached_deps {
+                            if seen.insert(dep.clone()) {
+                                pending.push_back(dep.clone());
+                            }
+                        }
+                        continue;
+                    }
+                }
+            }
+        }
+
         let text = std::fs::read_to_string(&path)
             .with_context(|| format!("failed to read {}", path.display()))?;
         let specifiers = collect_module_specifiers_from_text(&path, &text);
-        sources.insert(path.clone(), text);
+        sources.insert(path.clone(), Some(text));
         let entry = dependencies.entry(path.clone()).or_insert_with(HashSet::new);
 
         for specifier in specifiers {
@@ -497,9 +572,9 @@ fn read_source_files(
         }
     }
 
-    let mut list: Vec<SourceFile> = sources
+    let mut list: Vec<SourceEntry> = sources
         .into_iter()
-        .map(|(path, text)| SourceFile { path, text })
+        .map(|(path, text)| SourceEntry { path, text })
         .collect();
     list.sort_by(|left, right| left.path.to_string_lossy().cmp(&right.path.to_string_lossy()));
     Ok(SourceReadResult {
@@ -1235,11 +1310,17 @@ fn emit_outputs(
     root_dir: Option<&Path>,
     out_dir: Option<&Path>,
     declaration_dir: Option<&Path>,
+    dirty_paths: Option<&HashSet<PathBuf>>,
 ) -> Result<Vec<OutputFile>> {
     let mut outputs = Vec::new();
 
     for file in &program.files {
         let input_path = PathBuf::from(&file.file_name);
+        if let Some(dirty_paths) = dirty_paths {
+            if !dirty_paths.contains(&input_path) {
+                continue;
+            }
+        }
 
         if let Some(js_path) = js_output_path(base_dir, root_dir, out_dir, options.jsx, &input_path) {
             let mut printer = ThinPrinter::with_options(&file.arena, options.printer.clone());

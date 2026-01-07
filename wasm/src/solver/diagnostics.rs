@@ -348,18 +348,19 @@ impl<'a> TypeFormatter<'a> {
             related: Vec::new(),
         };
 
-        // Render related diagnostics
+        // Render related diagnostics.
+        let fallback_span = pending.span.clone()
+            .unwrap_or_else(|| SourceSpan::new("<unknown>", 0, 0));
         for related in &pending.related {
-            if let Some(span) = &related.span {
-                let related_msg = self.render_template(
-                    get_message_template(related.code),
-                    &related.args
-                );
-                diag.related.push(RelatedInformation {
-                    span: span.clone(),
-                    message: related_msg,
-                });
-            }
+            let related_msg = self.render_template(
+                get_message_template(related.code),
+                &related.args
+            );
+            let span = related.span.clone().unwrap_or_else(|| fallback_span.clone());
+            diag.related.push(RelatedInformation {
+                span,
+                message: related_msg,
+            });
         }
 
         diag
