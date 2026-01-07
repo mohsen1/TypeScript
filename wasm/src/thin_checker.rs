@@ -3335,10 +3335,6 @@ impl<'a> ThinCheckerState<'a> {
             None => return false,
         };
 
-        if symbol.flags & symbol_flags::MODULE != 0 {
-            return false;
-        }
-
         let has_value = (symbol.flags & symbol_flags::VALUE) != 0;
         let has_type = (symbol.flags & symbol_flags::TYPE) != 0;
         has_value && !has_type
