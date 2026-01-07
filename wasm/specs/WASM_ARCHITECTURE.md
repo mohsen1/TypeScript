@@ -1,5 +1,7 @@
 # WASM Compiler Architecture (Updated 2026)
 
+Codename Zang (Persian for rust) is the working name for this Rust/WASM compiler effort. The CLI binary is `tsz`.
+
 ## Foundation & parsing
 
 ### 1. Architectural Philosophy

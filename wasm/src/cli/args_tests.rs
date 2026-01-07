@@ -4,20 +4,21 @@ use super::args::{CliArgs, Module, Target};
 
 #[test]
 fn parses_defaults() {
-    let args = CliArgs::try_parse_from(["stc"]).expect("default args should parse");
+    let args = CliArgs::try_parse_from(["tsz"]).expect("default args should parse");
 
     assert_eq!(args.target, None);
     assert_eq!(args.module, None);
     assert!(args.out_dir.is_none());
     assert!(!args.strict);
     assert!(!args.no_emit);
+    assert!(!args.watch);
     assert!(args.files.is_empty());
 }
 
 #[test]
 fn parses_common_flags() {
     let args = CliArgs::try_parse_from([
-        "stc",
+        "tsz",
         "--target",
         "es2020",
         "--module",
@@ -26,6 +27,7 @@ fn parses_common_flags() {
         "dist",
         "--strict",
         "--noEmit",
+        "--watch",
         "src/index.ts",
     ])
     .expect("flagged args should parse");
@@ -35,5 +37,6 @@ fn parses_common_flags() {
     assert_eq!(args.out_dir.as_deref(), Some(std::path::Path::new("dist")));
     assert!(args.strict);
     assert!(args.no_emit);
+    assert!(args.watch);
     assert_eq!(args.files, vec![std::path::PathBuf::from("src/index.ts")]);
 }

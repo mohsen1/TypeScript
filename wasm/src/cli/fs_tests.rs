@@ -13,7 +13,7 @@ impl TempDir {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        path.push(format!("stc_cli_fs_test_{}_{}", std::process::id(), nanos));
+        path.push(format!("tsz_cli_fs_test_{}_{}", std::process::id(), nanos));
         std::fs::create_dir_all(&path)?;
         Ok(Self { path })
     }

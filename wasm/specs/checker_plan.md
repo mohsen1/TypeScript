@@ -1,78 +1,41 @@
+# Checker Track Plan (ThinChecker + Control Flow)
 
-# Migration Plan: TypeScript Compiler → Rust via WebAssembly (Checker)
+## Mission
+Reach compiler-case parity for TypeScript semantics with a performance-first, solver-driven checker.
 
-## Vision
+## Scope
+Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (integration), `wasm/src/thin_binder.rs`.
 
-Incrementally rewrite the TypeScript compiler in Rust, compiled to WebAssembly
-for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
+## Current Status
+- Solver TypeDatabase + lowering/inference/compat layers are integrated.
+- Control flow and narrowing are in place but missing some false-branch logic.
+- TODOs remain in call/construct signatures and readonly modifiers.
+- Checker still uses a local scope stack even though binder now exposes persistent scopes.
 
+## Highest-Impact Next Tasks (pick one at a time)
+- [ ] Replace local scope stack with binder persistent scopes
+  - Use `ThinBinderState::node_scope_ids` + `resolve_identifier` for symbol lookup.
+  - Store types per `SymbolId` instead of per-scope maps.
+  - This unlocks stateless queries and improves LSP random-access behavior.
+- [ ] Handle type parameters in call/construct signatures
+  - Populate `SolverCallSignature.type_params` from interface signature nodes.
+  - Thread through call resolution / inference; add tests for generic call signatures.
+- [ ] Honor readonly modifiers on property/method signatures
+  - Read `readonly` in `thin_checker.rs` when lowering interface members.
+  - Enforce readonly assignment rules in `checker/expr.rs` + subtype checks.
+- [ ] Complete control-flow narrowing for false branches
+  - `typeof` false branch exclusion; truthiness false branch (null/undefined/false/0/"").
+  - Add tests in `checker/control_flow.rs`.
+- [ ] Namespace member resolution parity
+  - Verify 2694/2700 errors for missing members.
+  - Add tests for nested namespaces and `import Alias = ns.Member`.
 
-# Files
+## Baseline / Validation
+- `./wasm/test.sh`
+- `node scripts/baseline-test-rust.mjs`
+- Track pass rate for `tests/cases/compiler`.
 
-src/solver/, src/thin_checker.rs, src/checker/ (legacy removal).
-
-# Goal
-
-Pass tests/cases/compiler.
-
-## Tasks
-
-Our focus is to make wasm checker complete
-**Objective:** Pass `tests/cases/compiler`.
-*   **Current State:** The bridge is being built. The `ThinChecker` is the consumer of the massive work done in the Solver track.
-*   **Critical Path:** The **"Salsa Gap"**. The `TypeDatabase` trait (`src/solver/db.rs`) is the interface that allows the Solver to be query-based. `ThinChecker` needs to fully utilize this abstraction to enable future incremental compilation.
-*   **Action:** Ensure `ThinChecker` delegates *all* semantic questions to `solver::*` modules rather than implementing ad-hoc checks.
-
-### Immediate Priorities
-- [x] **Fix Atom Refactor Compilation Errors** (High Priority)
-  - Fix `solver/lower.rs` (intern strings from AST)
-  - Fix `solver/diagnostics.rs` (resolve atoms for error messages)
-  - Fix `solver/subtype.rs` (property name comparisons)
-- [x] **Shard TypeInterner** (Architecture perf requirement)
-- [x] **Lower tuple metadata** (named elements, rest, optional)
-- [x] **Fix template literal type spans** (TemplateLiteralType lowering)
-- [x] **Lower function parameter names** (ParamInfo.name)
-- [x] **Lower mapped types fully** (constraint + modifiers)
-- [x] **Handle generic type arguments** (TypeRef instantiation or TypeApplication)
-- [x] **Remove unsafe symbol hash fallback** (require binder-based resolver)
-- [x] **Lower type literals with signatures/indexers** (call/construct/index in `{ ... }`)
-- [x] **Respect intrinsic shadowing** (resolve symbols before intrinsic keyword match)
-- [x] **Define TypeDatabase Trait** (Preparation for Salsa)
-
-**Status:** ✅ `./wasm/test.sh` passes.
-**Context:** The `TypeKey` refactor (String -> Atom) was half-finished and broke solver logic; this is now addressed, with follow-up tasks captured above.
-
-**Step 1 (Fix Build):**
-*   **Goal:** Fix ~40 compilation errors in `wasm/src/solver/`.
-*   **Focus:**
-    *   `solver/lower.rs`: Update `lower_literal_type` and `lower_identifier_type` to use `interner.intern_string()`.
-    *   `solver/diagnostics.rs`: Update `TypeFormatter` to resolve Atoms back to strings using `interner.resolve_atom()` before printing.
-    *   `solver/intern.rs`: Ensure `TypeInterner` exposes a thread-safe `resolve_atom` method.
-
-**Step 2 (The "Salsa Gap"):**
-*   **Goal:** Define the `TypeDatabase` trait to prepare for incremental compilation.
-*   **Action:** Create `wasm/src/solver/db.rs`. Define the query interface so the solver stops accessing raw data structures directly.
-
-
-
-
-
-### Current Status (12,408 tests)
-| Baseline | Compiler (100 sample) | Conformance | Crash Rate |
-|----------|----------------------|-------------|------------|
-| .errors.txt | **81.8%** (63/77 subset) | 33.8% (1,741/5,157) | 0.05% |
-| .js emit | **60.5%** (46/76 subset) | ~3% | 0.05% |
-
-
-## Quick Reference
-
-```bash
-# Tests (Docker)
-./wasm/test.sh
-
-# Baseline comparison
-node scripts/baseline-test-rust.mjs
-
-# Build WASM
-./wasm/build-wasm.sh
-```
+## Success Criteria
+- Passes `tests/cases/compiler` with >95% error parity.
+- Checker queries are stateless and SymbolId-based (no manual scope stack).
+- No new allocations in hot paths beyond solver interner.

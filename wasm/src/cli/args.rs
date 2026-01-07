@@ -3,9 +3,9 @@ use std::path::PathBuf;
 
 use crate::thin_emitter::{ModuleKind, ScriptTarget};
 
-/// CLI arguments for the stc binary.
+/// CLI arguments for the tsz binary.
 #[derive(Parser, Debug)]
-#[command(name = "stc", version, about = "Speedy TypeScript Compiler")]
+#[command(name = "tsz", version, about = "Codename Zang (Persian for rust) - TypeScript in Rust")]
 pub struct CliArgs {
     /// ECMAScript target version.
     #[arg(long, value_enum)]
@@ -26,6 +26,10 @@ pub struct CliArgs {
     /// Skip emitting output files.
     #[arg(long = "noEmit", alias = "no-emit")]
     pub no_emit: bool,
+
+    /// Watch input files and recompile on changes.
+    #[arg(short, long)]
+    pub watch: bool,
 
     /// Input files to compile.
     #[arg(value_name = "FILE")]

@@ -1,10 +1,11 @@
-//! Native CLI support for the stc binary.
+//! Native CLI support for the tsz binary.
 
 pub mod args;
 pub mod config;
 pub mod driver;
 pub mod fs;
 pub mod reporter;
+pub mod watch;
 
 #[cfg(test)]
 mod args_tests;
@@ -16,3 +17,5 @@ mod fs_tests;
 mod driver_tests;
 #[cfg(test)]
 mod reporter_tests;
+#[cfg(test)]
+mod watch_tests;
