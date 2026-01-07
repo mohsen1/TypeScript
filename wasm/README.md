@@ -22,10 +22,10 @@ engine on top to match TypeScript behavior while preserving correctness where po
 Last updated: 2026-01-07
 
 - Overall: Migration is active; Rust/WASM compiler is under construction and not production-ready.
-- Tracks: CLI export-hash + symbol-level dependent invalidation; checker is moving toward user-defined type predicate narrowing; solver moved union/intersection buffers to SmallVec; emitter is extracting module wrapper + ES5 template helpers; LSP fixed hover JSDoc matching for exported vars and signature-help trailing commas.
+- Tracks: CLI now maps re-export bindings for symbol-level invalidation; checker added user-defined type predicate narrowing in flow analysis; solver added SmallVec-backed union/intersection helpers and unknown normalization coverage; emitter continues splitting `thin_emitter/mod.rs` (module wrapper + ES5 template helpers, ES5 bindings in progress); LSP fixed hover JSDoc matching for exported vars and signature-help trailing commas.
 - Baselines (`tests/cases`, first 100): compiler errors 60/77 (77.9%) pass, JS 40/76 (52.6%) pass; conformance errors 18/90 (20.0%) pass, JS 1/88 (1.1%) pass.
-- Risk: ES module imports still resolve to `any` (cross-file types unreliable); source maps remain stubbed to a single 0,0 mapping; parser/arena child enumeration TODOs remain; baseline pass rates are still low on conformance.
-- Next focus: finish splitting `thin_emitter/mod.rs`, implement user-defined type predicates, extend symbol-level invalidation to import-equals/re-exports, improve baseline pass rates, and keep correctness ahead of perf tweaks.
+- Risk: ES module imports still resolve to `any` (cross-file types unreliable); symbol-level invalidation still lacks `export *` and `import = require(...)` mapping; source maps remain stubbed to a single 0,0 mapping; parser/arena child enumeration TODOs remain; baseline pass rates are still low on conformance.
+- Next focus: finish splitting `thin_emitter/mod.rs`, extend symbol-level invalidation to import-equals + star re-exports, improve baseline pass rates, validate predicate narrowing with broader tests, and keep correctness ahead of perf tweaks.
 
 ## Status
 This project is not ready for general use yet. The interface and distribution are in progress.
