@@ -35,6 +35,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Expose wasm code actions context (diagnostics + import candidates)
    - [x] Missing import: surface default exports and re-exports
    - [x] Missing import: merge named imports into existing declarations
+   - [x] Missing import: merge default imports into existing declarations
 
 2. **Extend AST Coverage** (if needed)
    - [x] Traverse template expressions in LSP resolver for references/completions
@@ -53,7 +54,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
 #### Testing
 
 Latest run:
-- `./wasm/test.sh` ❌ (`src/emitter_transform_integration_tests.rs` `test_two_phase_emission_commonjs_auto_detect_exports`, `test_two_phase_emission_commonjs_multi_export_vars`; pre-existing on rust)
+- `./wasm/test.sh` ❌ (`src/emitter_transform_integration_tests.rs` `test_two_phase_emission_commonjs_auto_detect_exports`; pre-existing on rust)
 
 ## Quick Reference
 
