@@ -27,6 +27,9 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
   - [x] Cache `TypeCache` per file for hover/signature help.
   - [x] Extend caches for type-aware completions.
   - [x] Extend caches for diagnostics.
+- [x] Incremental binder reuse
+  - [x] Preserve prefix symbols/scopes when rebinding suffix statements.
+  - [x] Gate incremental binding on `IncrementalParseResult.reparse_start`.
 - [x] JSDoc extraction for signature help/hover
   - [x] Parse JSDoc blocks and attach to `SignatureInformation` and `Hover`.
 - [x] Extract variable precedence fix

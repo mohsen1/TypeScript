@@ -182,6 +182,11 @@ impl SymbolTable {
         self.symbols.insert(name, symbol);
     }
 
+    /// Remove a symbol by name.
+    pub fn remove(&mut self, name: &str) -> Option<SymbolId> {
+        self.symbols.remove(name)
+    }
+
     /// Check if a name exists in the table.
     pub fn has(&self, name: &str) -> bool {
         self.symbols.contains_key(name)

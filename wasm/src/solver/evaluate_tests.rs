@@ -883,6 +883,20 @@ fn test_index_access_tuple_negative_string_literal() {
 }
 
 #[test]
+fn test_index_access_tuple_fractional_string_literal() {
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let fractional = interner.literal_string("1.5");
+
+    let result = evaluate_index_access(&interner, tuple, fractional);
+    assert_eq!(result, TypeId::UNDEFINED);
+}
+
+#[test]
 fn test_index_access_tuple_string_index() {
     let interner = TypeInterner::new();
 
