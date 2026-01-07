@@ -1,5 +1,5 @@
 use super::FlowAnalyzer;
-use crate::solver::{PropertyInfo, TypeInterner};
+use crate::solver::{PropertyInfo, TypeId, TypeInterner};
 use crate::thin_binder::ThinBinderState;
 use crate::thin_parser::ThinParserState;
 use crate::parser::thin_node::ThinNodeArena;
@@ -37,6 +37,47 @@ fn get_switch_clause_expression(
         .first()
         .expect("clause statement");
     let stmt_node = arena.get(stmt_idx).expect("statement node");
+    let expr_stmt = arena
+        .get_expression_statement(stmt_node)
+        .expect("expression statement");
+    expr_stmt.expression
+}
+
+fn get_if_branch_expression(
+    arena: &ThinNodeArena,
+    root: NodeIndex,
+    stmt_index: usize,
+    is_then: bool,
+) -> NodeIndex {
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+    let if_idx = *source_file
+        .statements
+        .nodes
+        .get(stmt_index)
+        .expect("if statement");
+    let if_node = arena.get(if_idx).expect("if node");
+    let if_data = arena.get_if_statement(if_node).expect("if data");
+    let branch_idx = if is_then {
+        if_data.then_statement
+    } else {
+        if_data.else_statement
+    };
+    assert!(!branch_idx.is_none(), "missing branch statement");
+    extract_expression_from_statement(arena, branch_idx)
+}
+
+fn extract_expression_from_statement(arena: &ThinNodeArena, stmt_idx: NodeIndex) -> NodeIndex {
+    let stmt_node = arena.get(stmt_idx).expect("statement node");
+    if let Some(block) = arena.get_block(stmt_node) {
+        let inner_idx = *block
+            .statements
+            .nodes
+            .first()
+            .expect("block statement");
+        return extract_expression_from_statement(arena, inner_idx);
+    }
+
     let expr_stmt = arena
         .get_expression_statement(stmt_node)
         .expect("expression statement");
@@ -147,4 +188,154 @@ switch (x.kind) {
     let flow_default = binder.get_node_flow(ident_default).expect("flow for default");
     let narrowed_default = analyzer.get_flow_type(ident_default, union, flow_default);
     assert_eq!(narrowed_default, member_b);
+}
+
+#[test]
+fn test_instanceof_narrows_to_object_union_members() {
+    let source = r#"
+let x: string | { a: number };
+if (x instanceof Foo) {
+  x;
+} else {
+  x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+    let prop_a = types.intern_string("a");
+    let obj_type = types.object(vec![PropertyInfo {
+        name: prop_a,
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let union = types.union(vec![TypeId::STRING, obj_type]);
+
+    let ident_then = get_if_branch_expression(arena, root, 1, true);
+    let ident_else = get_if_branch_expression(arena, root, 1, false);
+
+    let flow_then = binder.get_node_flow(ident_then).expect("flow then");
+    let flow_else = binder.get_node_flow(ident_else).expect("flow else");
+
+    let narrowed_then = analyzer.get_flow_type(ident_then, union, flow_then);
+    assert_eq!(narrowed_then, obj_type);
+
+    let narrowed_else = analyzer.get_flow_type(ident_else, union, flow_else);
+    assert_eq!(narrowed_else, union);
+}
+
+#[test]
+fn test_in_operator_narrows_required_property() {
+    let source = r#"
+let x: { a: number } | { b: string };
+if ("a" in x) {
+  x;
+} else {
+  x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+    let prop_a = types.intern_string("a");
+    let prop_b = types.intern_string("b");
+
+    let type_a = types.object(vec![PropertyInfo {
+        name: prop_a,
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let type_b = types.object(vec![PropertyInfo {
+        name: prop_b,
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let union = types.union(vec![type_a, type_b]);
+
+    let ident_then = get_if_branch_expression(arena, root, 1, true);
+    let ident_else = get_if_branch_expression(arena, root, 1, false);
+
+    let flow_then = binder.get_node_flow(ident_then).expect("flow then");
+    let flow_else = binder.get_node_flow(ident_else).expect("flow else");
+
+    let narrowed_then = analyzer.get_flow_type(ident_then, union, flow_then);
+    assert_eq!(narrowed_then, type_a);
+
+    let narrowed_else = analyzer.get_flow_type(ident_else, union, flow_else);
+    assert_eq!(narrowed_else, type_b);
+}
+
+#[test]
+fn test_in_operator_optional_property_keeps_false_branch_union() {
+    let source = r#"
+let x: { a?: number } | { b: string };
+if ("a" in x) {
+  x;
+} else {
+  x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+    let prop_a = types.intern_string("a");
+    let prop_b = types.intern_string("b");
+
+    let type_a = types.object(vec![PropertyInfo {
+        name: prop_a,
+        type_id: TypeId::NUMBER,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let type_b = types.object(vec![PropertyInfo {
+        name: prop_b,
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let union = types.union(vec![type_a, type_b]);
+
+    let ident_then = get_if_branch_expression(arena, root, 1, true);
+    let ident_else = get_if_branch_expression(arena, root, 1, false);
+
+    let flow_then = binder.get_node_flow(ident_then).expect("flow then");
+    let flow_else = binder.get_node_flow(ident_else).expect("flow else");
+
+    let narrowed_then = analyzer.get_flow_type(ident_then, union, flow_then);
+    assert_eq!(narrowed_then, type_a);
+
+    let narrowed_else = analyzer.get_flow_type(ident_else, union, flow_else);
+    assert_eq!(narrowed_else, union);
 }

@@ -1104,7 +1104,23 @@ impl<'a> ThinCheckerState<'a> {
             let Some(param_node) = self.ctx.arena.get(param_idx) else { continue };
             let Some(param) = self.ctx.arena.get_parameter(param_node) else { continue };
 
-            let name: Option<Atom> = if let Some(name_node) = self.ctx.arena.get(param.name) {
+            let type_id = if !param.type_annotation.is_none() {
+                self.get_type_from_type_node_in_type_literal(param.type_annotation)
+            } else {
+                TypeId::ANY
+            };
+
+            let name_node = self.ctx.arena.get(param.name);
+            if let Some(name_node) = name_node {
+                if name_node.kind == SyntaxKind::ThisKeyword as u16 {
+                    if this_type.is_none() {
+                        this_type = Some(type_id);
+                    }
+                    continue;
+                }
+            }
+
+            let name: Option<Atom> = if let Some(name_node) = name_node {
                 if let Some(name_data) = self.ctx.arena.get_identifier(name_node) {
                     Some(self.ctx.types.intern_string(&name_data.escaped_text))
                 } else {
@@ -1112,12 +1128,6 @@ impl<'a> ThinCheckerState<'a> {
                 }
             } else {
                 None
-            };
-
-            let type_id = if !param.type_annotation.is_none() {
-                self.get_type_from_type_node_in_type_literal(param.type_annotation)
-            } else {
-                TypeId::ANY
             };
 
             let optional = param.question_token || !param.initializer.is_none();
@@ -1850,7 +1860,23 @@ impl<'a> ThinCheckerState<'a> {
             let Some(param_node) = self.ctx.arena.get(param_idx) else { continue };
             let Some(param) = self.ctx.arena.get_parameter(param_node) else { continue };
 
-            let name: Option<Atom> = if let Some(name_node) = self.ctx.arena.get(param.name) {
+            let type_id = if !param.type_annotation.is_none() {
+                self.get_type_from_type_node(param.type_annotation)
+            } else {
+                TypeId::ANY
+            };
+
+            let name_node = self.ctx.arena.get(param.name);
+            if let Some(name_node) = name_node {
+                if name_node.kind == SyntaxKind::ThisKeyword as u16 {
+                    if this_type.is_none() {
+                        this_type = Some(type_id);
+                    }
+                    continue;
+                }
+            }
+
+            let name: Option<Atom> = if let Some(name_node) = name_node {
                 if let Some(name_data) = self.ctx.arena.get_identifier(name_node) {
                     Some(self.ctx.types.intern_string(&name_data.escaped_text))
                 } else {
@@ -1858,12 +1884,6 @@ impl<'a> ThinCheckerState<'a> {
                 }
             } else {
                 None
-            };
-
-            let type_id = if !param.type_annotation.is_none() {
-                self.get_type_from_type_node(param.type_annotation)
-            } else {
-                TypeId::ANY
             };
 
             let optional = param.question_token || !param.initializer.is_none();
