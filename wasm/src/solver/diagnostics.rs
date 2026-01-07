@@ -15,6 +15,7 @@
 //! discarded during overload resolution.
 
 use std::sync::Arc;
+use rustc_hash::FxHashMap;
 use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::TypeDatabase;
@@ -306,6 +307,7 @@ pub struct TypeFormatter<'a> {
     max_depth: u32,
     /// Current depth
     current_depth: u32,
+    atom_cache: FxHashMap<Atom, Arc<str>>,
 }
 
 impl<'a> TypeFormatter<'a> {
@@ -315,6 +317,7 @@ impl<'a> TypeFormatter<'a> {
             symbol_arena: None,
             max_depth: 5,
             current_depth: 0,
+            atom_cache: FxHashMap::default(),
         }
     }
 
@@ -325,6 +328,7 @@ impl<'a> TypeFormatter<'a> {
             symbol_arena: Some(symbol_arena),
             max_depth: 5,
             current_depth: 0,
+            atom_cache: FxHashMap::default(),
         }
     }
 
@@ -367,6 +371,9 @@ impl<'a> TypeFormatter<'a> {
 
         for (i, arg) in args.iter().enumerate() {
             let placeholder = format!("{{{}}}", i);
+            if !template.contains(&placeholder) {
+                continue;
+            }
             let replacement = match arg {
                 DiagnosticArg::Type(type_id) => self.format(*type_id),
                 DiagnosticArg::Symbol(sym_id) => {
@@ -380,7 +387,7 @@ impl<'a> TypeFormatter<'a> {
                         format!("Symbol({})", sym_id.0)
                     }
                 }
-                DiagnosticArg::Atom(atom) => self.interner.resolve_atom(*atom),
+                DiagnosticArg::Atom(atom) => self.atom(*atom).to_string(),
                 DiagnosticArg::String(s) => s.to_string(),
                 DiagnosticArg::Number(n) => n.to_string(),
             };
@@ -388,6 +395,15 @@ impl<'a> TypeFormatter<'a> {
         }
 
         result
+    }
+
+    fn atom(&mut self, atom: Atom) -> Arc<str> {
+        if let Some(value) = self.atom_cache.get(&atom) {
+            return value.clone();
+        }
+        let resolved: Arc<str> = self.interner.resolve_atom(atom).into();
+        self.atom_cache.insert(atom, resolved.clone());
+        resolved
     }
 
     /// Format a type as a human-readable string.
@@ -429,17 +445,39 @@ impl<'a> TypeFormatter<'a> {
         match key {
             TypeKey::Intrinsic(kind) => self.format_intrinsic(*kind),
             TypeKey::Literal(lit) => self.format_literal(lit),
-            TypeKey::Object(props) => self.format_object(props),
-            TypeKey::ObjectWithIndex(shape) => self.format_object_with_index(shape),
-            TypeKey::Union(members) => self.format_union(members),
-            TypeKey::Intersection(members) => self.format_intersection(members),
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(*shape_id);
+                self.format_object(shape.properties.as_slice())
+            }
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(*shape_id);
+                self.format_object_with_index(shape.as_ref())
+            }
+            TypeKey::Union(members) => {
+                let members = self.interner.type_list(*members);
+                self.format_union(members.as_ref())
+            }
+            TypeKey::Intersection(members) => {
+                let members = self.interner.type_list(*members);
+                self.format_intersection(members.as_ref())
+            }
             TypeKey::Array(elem) => format!("{}[]", self.format(*elem)),
-            TypeKey::Tuple(elements) => self.format_tuple(elements),
-            TypeKey::Function(shape) => self.format_function(shape),
-            TypeKey::Callable(shape) => self.format_callable(shape),
-            TypeKey::TypeParameter(info) => self.interner.resolve_atom(info.name),
+            TypeKey::Tuple(elements) => {
+                let elements = self.interner.tuple_list(*elements);
+                self.format_tuple(elements.as_ref())
+            }
+            TypeKey::Function(shape) => {
+                let shape = self.interner.function_shape(*shape);
+                self.format_function(shape.as_ref())
+            }
+            TypeKey::Callable(shape) => {
+                let shape = self.interner.callable_shape(*shape);
+                self.format_callable(shape.as_ref())
+            }
+            TypeKey::TypeParameter(info) => self.atom(info.name).to_string(),
             TypeKey::Ref(sym) => format!("Ref({})", sym.0),
             TypeKey::Application(app) => {
+                let app = self.interner.type_application(*app);
                 let args: Vec<String> = app.args.iter()
                     .map(|&arg| self.format(arg))
                     .collect();
@@ -450,12 +488,15 @@ impl<'a> TypeFormatter<'a> {
             TypeKey::IndexAccess(obj, idx) => {
                 format!("{}[{}]", self.format(*obj), self.format(*idx))
             }
-            TypeKey::TemplateLiteral(spans) => self.format_template_literal(spans),
+            TypeKey::TemplateLiteral(spans) => {
+                let spans = self.interner.template_list(*spans);
+                self.format_template_literal(spans.as_ref())
+            }
             TypeKey::TypeQuery(sym) => format!("typeof Ref({})", sym.0),
             TypeKey::KeyOf(operand) => format!("keyof {}", self.format(*operand)),
             TypeKey::ReadonlyType(inner) => format!("readonly {}", self.format(*inner)),
             TypeKey::UniqueSymbol(sym) => format!("unique symbol ({})", sym.0),
-            TypeKey::Infer(info) => format!("infer {}", self.interner.resolve_atom(info.name)),
+            TypeKey::Infer(info) => format!("infer {}", self.atom(info.name)),
             TypeKey::ThisType => "this".to_string(),
             TypeKey::Error => "error".to_string(),
         }
@@ -478,11 +519,11 @@ impl<'a> TypeFormatter<'a> {
         }.to_string()
     }
 
-    fn format_literal(&self, lit: &LiteralValue) -> String {
+    fn format_literal(&mut self, lit: &LiteralValue) -> String {
         match lit {
-            LiteralValue::String(s) => format!("\"{}\"", self.interner.resolve_atom(*s)),
+            LiteralValue::String(s) => format!("\"{}\"", self.atom(*s)),
             LiteralValue::Number(n) => format!("{}", n.0),
-            LiteralValue::BigInt(b) => format!("{}n", self.interner.resolve_atom(*b)),
+            LiteralValue::BigInt(b) => format!("{}n", self.atom(*b)),
             LiteralValue::Boolean(b) => if *b { "true" } else { "false" }.to_string(),
         }
     }
@@ -506,8 +547,9 @@ impl<'a> TypeFormatter<'a> {
     fn format_property(&mut self, prop: &PropertyInfo) -> String {
         let optional = if prop.optional { "?" } else { "" };
         let readonly = if prop.readonly { "readonly " } else { "" };
-        let name = self.interner.resolve_atom(prop.name);
-        format!("{}{}{}: {}", readonly, name, optional, self.format(prop.type_id))
+        let type_str = self.format(prop.type_id);
+        let name = self.atom(prop.name);
+        format!("{}{}{}: {}", readonly, name, optional, type_str)
     }
 
     fn format_object_with_index(&mut self, shape: &ObjectShape) -> String {
@@ -551,11 +593,12 @@ impl<'a> TypeFormatter<'a> {
             .map(|e| {
                 let rest = if e.rest { "..." } else { "" };
                 let optional = if e.optional { "?" } else { "" };
+                let type_str = self.format(e.type_id);
                 if let Some(name_atom) = e.name {
-                    let name = self.interner.resolve_atom(name_atom);
-                    format!("{}{}: {}{}", name, optional, rest, self.format(e.type_id))
+                    let name = self.atom(name_atom);
+                    format!("{}{}: {}{}", name, optional, rest, type_str)
                 } else {
-                    format!("{}{}{}", rest, self.format(e.type_id), optional)
+                    format!("{}{}{}", rest, type_str, optional)
                 }
             })
             .collect();
@@ -567,12 +610,13 @@ impl<'a> TypeFormatter<'a> {
         if let Some(this_type) = shape.this_type {
             params.push(format!("this: {}", self.format(this_type)));
         }
-        params.extend(shape.params.iter().map(|p| {
-            let name = p.name.map(|atom| self.interner.resolve_atom(atom)).unwrap_or_else(|| "_".to_string());
+        for p in &shape.params {
+            let name = p.name.map(|atom| self.atom(atom)).unwrap_or_else(|| Arc::from("_"));
             let optional = if p.optional { "?" } else { "" };
             let rest = if p.rest { "..." } else { "" };
-            format!("{}{}{}: {}", rest, name, optional, self.format(p.type_id))
-        }));
+            let type_str = self.format(p.type_id);
+            params.push(format!("{}{}{}: {}", rest, name, optional, type_str));
+        }
         let arrow = if shape.is_constructor { "new " } else { "" };
         format!("{}({}) => {}", arrow, params.join(", "), self.format(shape.return_type))
     }
@@ -596,10 +640,11 @@ impl<'a> TypeFormatter<'a> {
         if let Some(this_type) = sig.this_type {
             params.push(format!("this: {}", self.format(this_type)));
         }
-        params.extend(sig.params.iter().map(|p| {
-            let name = p.name.map(|atom| self.interner.resolve_atom(atom)).unwrap_or_else(|| "_".to_string());
-            format!("{}: {}", name, self.format(p.type_id))
-        }));
+        for p in &sig.params {
+            let name = p.name.map(|atom| self.atom(atom)).unwrap_or_else(|| Arc::from("_"));
+            let type_str = self.format(p.type_id);
+            params.push(format!("{}: {}", name, type_str));
+        }
         let prefix = if is_construct { "new " } else { "" };
         format!("{}({}): {}", prefix, params.join(", "), self.format(sig.return_type))
     }
@@ -626,7 +671,10 @@ impl<'a> TypeFormatter<'a> {
         let mut result = String::from("`");
         for span in spans {
             match span {
-                TemplateSpan::Text(text) => result.push_str(&self.interner.resolve_atom(*text)),
+                TemplateSpan::Text(text) => {
+                    let text = self.atom(*text);
+                    result.push_str(text.as_ref());
+                }
                 TemplateSpan::Type(type_id) => {
                     result.push_str("${");
                     result.push_str(&self.format(*type_id));
@@ -936,14 +984,20 @@ impl SubtypeFailureReason {
 
             SubtypeFailureReason::NoUnionMemberMatches {
                 source_type,
-                target_union_members: _,
+                target_union_members,
             } => {
-                // For now, just say type not assignable
-                // TODO: Could elaborate which union members were tried
-                PendingDiagnostic::error(
+                const UNION_MEMBER_DIAGNOSTIC_LIMIT: usize = 3;
+                let mut diag = PendingDiagnostic::error(
                     codes::TYPE_NOT_ASSIGNABLE,
                     vec![(*source_type).into(), target.into()],
-                )
+                );
+                for member in target_union_members.iter().take(UNION_MEMBER_DIAGNOSTIC_LIMIT) {
+                    diag = diag.with_related(PendingDiagnostic::error(
+                        codes::TYPE_NOT_ASSIGNABLE,
+                        vec![(*source_type).into(), (*member).into()],
+                    ));
+                }
+                diag
             }
 
             SubtypeFailureReason::NoCommonProperties { source_type, target_type } => {
