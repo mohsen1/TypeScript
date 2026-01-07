@@ -20,6 +20,15 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
+    /// Write identifier text to output with name mapping when available.
+    pub(super) fn write_identifier(&mut self, text: &str) {
+        if let Some(source_pos) = self.take_pending_source_pos() {
+            self.writer.write_node_with_name(text, source_pos, text);
+        } else {
+            self.writer.write(text);
+        }
+    }
+
     /// Write a single character.
     pub(super) fn write_char(&mut self, ch: char) {
         if let Some(source_pos) = self.take_pending_source_pos() {

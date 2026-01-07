@@ -19,6 +19,7 @@ Status: Active
   - [x] Add emitter + CLI source map tests.
 - [x] Add minimal source map anchors for transform emission paths.
 - [x] Replace declaration map stub with minimal source map output.
+- [x] Add identifier name entries to source maps for transform-path metadata.
 - [ ] Shrink `thin_emitter/mod.rs` for maintainability
   - [x] Extract comment utilities + comment/output helpers into modules (keep API stable).
   - [x] Extract module wrapper emission helpers into a submodule (keep API stable).
