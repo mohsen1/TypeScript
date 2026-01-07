@@ -107,9 +107,11 @@ fn resolve_compiler_options_defaults() {
 
     assert_eq!(resolved.printer.target, ScriptTarget::ESNext);
     assert_eq!(resolved.printer.module, ModuleKind::None);
+    assert!(resolved.root_dir.is_none());
     assert!(resolved.out_dir.is_none());
     assert!(!resolved.checker.strict);
     assert!(!resolved.no_emit);
+    assert!(!resolved.no_emit_on_error);
 }
 
 #[test]
@@ -119,11 +121,13 @@ fn resolve_compiler_options_overrides() {
           "compilerOptions": {
             "target": "ES2020",
             "module": "common-js",
+            "rootDir": "src",
             "outDir": "dist",
             "declaration": true,
             "declarationDir": "types",
             "strict": true,
-            "noEmit": true
+            "noEmit": true,
+            "noEmitOnError": true
           }
         }"#,
     )
@@ -134,11 +138,13 @@ fn resolve_compiler_options_overrides() {
 
     assert_eq!(resolved.printer.target, ScriptTarget::ES2020);
     assert_eq!(resolved.printer.module, ModuleKind::CommonJS);
+    assert_eq!(resolved.root_dir, Some(PathBuf::from("src")));
     assert_eq!(resolved.out_dir, Some(PathBuf::from("dist")));
     assert_eq!(resolved.declaration_dir, Some(PathBuf::from("types")));
     assert!(resolved.emit_declarations);
     assert!(resolved.checker.strict);
     assert!(resolved.no_emit);
+    assert!(resolved.no_emit_on_error);
 }
 
 #[test]

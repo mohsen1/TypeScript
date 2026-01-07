@@ -61,22 +61,29 @@ impl WatchState {
         let ProjectState {
             base_dir,
             resolved,
+            tsconfig_path,
         } = load_project_state(args, cwd).unwrap_or_else(|err| {
             eprintln!("{err}");
             ProjectState {
                 base_dir: canonicalize_or_owned(cwd),
                 resolved: ResolvedCompilerOptions::default(),
+                tsconfig_path: None,
             }
         });
 
         let explicit_files = resolve_explicit_files(&base_dir, &args.files);
         let watch_roots = collect_watch_roots(&base_dir, explicit_files.as_ref());
         let ignore_dirs = compute_ignore_dirs(&base_dir, &resolved);
+        let project_config = if args.project.is_some() {
+            tsconfig_path.clone()
+        } else {
+            None
+        };
 
         WatchState {
             base_dir,
             watch_roots,
-            filter: WatchFilter::new(explicit_files, ignore_dirs),
+            filter: WatchFilter::new(explicit_files, ignore_dirs, project_config),
             debouncer: Debouncer::new(DEFAULT_DEBOUNCE),
         }
     }
@@ -116,6 +123,9 @@ impl WatchState {
 
         if let Ok(project) = load_project_state(args, cwd) {
             self.filter.ignore_dirs = compute_ignore_dirs(&project.base_dir, &project.resolved);
+            if args.project.is_some() {
+                self.filter.project_config = project.tsconfig_path;
+            }
         }
 
         Ok(())
@@ -134,10 +144,11 @@ impl WatchState {
 struct ProjectState {
     base_dir: PathBuf,
     resolved: ResolvedCompilerOptions,
+    tsconfig_path: Option<PathBuf>,
 }
 
 fn load_project_state(args: &CliArgs, cwd: &Path) -> Result<ProjectState> {
-    let tsconfig_path = driver::find_tsconfig(cwd);
+    let tsconfig_path = driver::resolve_tsconfig_path(cwd, args.project.as_deref())?;
     let config = driver::load_config(tsconfig_path.as_deref())?;
 
     let mut resolved =
@@ -147,7 +158,11 @@ fn load_project_state(args: &CliArgs, cwd: &Path) -> Result<ProjectState> {
     let base_dir = driver::config_base_dir(cwd, tsconfig_path.as_deref());
     let base_dir = canonicalize_or_owned(&base_dir);
 
-    Ok(ProjectState { base_dir, resolved })
+    Ok(ProjectState {
+        base_dir,
+        resolved,
+        tsconfig_path,
+    })
 }
 
 fn compute_ignore_dirs(base_dir: &Path, resolved: &ResolvedCompilerOptions) -> Vec<PathBuf> {
@@ -242,17 +257,20 @@ pub(crate) struct WatchFilter {
     explicit_files: Option<HashSet<PathBuf>>,
     ignore_dirs: Vec<PathBuf>,
     last_emitted: HashSet<PathBuf>,
+    project_config: Option<PathBuf>,
 }
 
 impl WatchFilter {
     pub(crate) fn new(
         explicit_files: Option<HashSet<PathBuf>>,
         ignore_dirs: Vec<PathBuf>,
+        project_config: Option<PathBuf>,
     ) -> Self {
         WatchFilter {
             explicit_files,
             ignore_dirs,
             last_emitted: HashSet::new(),
+            project_config,
         }
     }
 
@@ -271,16 +289,20 @@ impl WatchFilter {
             return false;
         }
 
+        if let Some(project_config) = &self.project_config {
+            if path == project_config {
+                return true;
+            }
+        } else if is_tsconfig_path(path) {
+            return true;
+        }
+
         if self.ignore_dirs.iter().any(|dir| path.starts_with(dir)) {
             return false;
         }
 
         if is_default_excluded(path) {
             return false;
-        }
-
-        if is_tsconfig_path(path) {
-            return true;
         }
 
         if !is_ts_file(path) {

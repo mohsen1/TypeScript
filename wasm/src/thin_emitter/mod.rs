@@ -1474,6 +1474,9 @@ impl<'a> ThinPrinter<'a> {
             k if k == SyntaxKind::Identifier as u16 => {
                 self.emit_identifier(node);
             }
+            k if k == syntax_kind_ext::TYPE_PARAMETER => {
+                self.emit_type_parameter(node);
+            }
 
             // Literals
             k if k == SyntaxKind::NumericLiteral as u16 => {
@@ -3003,6 +3006,24 @@ impl<'a> ThinPrinter<'a> {
         if !param.initializer.is_none() {
             self.write(" = ");
             self.emit_expression(param.initializer);
+        }
+    }
+
+    fn emit_type_parameter(&mut self, node: &ThinNode) {
+        let Some(param) = self.arena.get_type_parameter(node) else {
+            return;
+        };
+
+        self.emit(param.name);
+
+        if !param.constraint.is_none() {
+            self.write(" extends ");
+            self.emit(param.constraint);
+        }
+
+        if !param.default.is_none() {
+            self.write(" = ");
+            self.emit(param.default);
         }
     }
 
@@ -6210,7 +6231,13 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // TODO: type parameters
+        if let Some(ref type_params) = sig.type_parameters {
+            if !type_params.nodes.is_empty() {
+                self.write("<");
+                self.emit_comma_separated(&type_params.nodes);
+                self.write(">");
+            }
+        }
 
         self.write("(");
         if let Some(ref params) = sig.parameters {
@@ -6231,7 +6258,13 @@ impl<'a> ThinPrinter<'a> {
 
         self.write("new ");
 
-        // TODO: type parameters
+        if let Some(ref type_params) = sig.type_parameters {
+            if !type_params.nodes.is_empty() {
+                self.write("<");
+                self.emit_comma_separated(&type_params.nodes);
+                self.write(">");
+            }
+        }
 
         self.write("(");
         if let Some(ref params) = sig.parameters {
@@ -6396,23 +6429,25 @@ impl<'a> ThinPrinter<'a> {
             self.detect_commonjs_helpers(&source.statements, &mut helpers);
         }
 
-        // Detect ES5 class helpers
-        if self.ctx.target_es5 && self.needs_extends_helper(&source.statements) {
-            helpers.extends = true;
-        }
+        let has_es5_transforms = self.has_es5_transforms();
+        if has_es5_transforms {
+            if self.needs_extends_helper(&source.statements) {
+                helpers.extends = true;
+            }
 
-        if self.ctx.target_es5 && self.needs_values_helper() {
-            helpers.values = true;
-        }
-        if self.ctx.target_es5 && self.needs_rest_helper() {
-            helpers.rest = true;
-        }
-        if self.ctx.target_es5 && self.needs_async_helpers() {
-            helpers.awaiter = true;
-            helpers.generator = true;
-        }
-        if self.ctx.target_es5 && self.needs_make_template_object_helper() {
-            helpers.make_template_object = true;
+            if self.needs_values_helper() {
+                helpers.values = true;
+            }
+            if self.needs_rest_helper() {
+                helpers.rest = true;
+            }
+            if self.needs_async_helpers() {
+                helpers.awaiter = true;
+                helpers.generator = true;
+            }
+            if self.needs_make_template_object_helper() {
+                helpers.make_template_object = true;
+            }
         }
 
         // Emit all needed helpers
@@ -6422,7 +6457,7 @@ impl<'a> ThinPrinter<'a> {
             // emit_helpers() already adds newlines, no need to add more
         }
 
-        if self.ctx.target_es5 {
+        if has_es5_transforms && helpers.make_template_object {
             let template_vars = self.collect_tagged_template_vars();
             if !template_vars.is_empty() {
                 self.write("var ");
@@ -6892,6 +6927,31 @@ impl<'a> ThinPrinter<'a> {
             }
         }
         false
+    }
+
+    fn has_es5_transforms(&self) -> bool {
+        self.transforms
+            .iter()
+            .any(|(_, directive)| Self::directive_has_es5(directive))
+    }
+
+    fn directive_has_es5(directive: &TransformDirective) -> bool {
+        match directive {
+            TransformDirective::ES5Class { .. }
+            | TransformDirective::ES5Namespace { .. }
+            | TransformDirective::ES5Enum { .. }
+            | TransformDirective::ES5ArrowFunction { .. }
+            | TransformDirective::ES5AsyncFunction { .. }
+            | TransformDirective::ES5ForOf { .. }
+            | TransformDirective::ES5ObjectLiteral { .. }
+            | TransformDirective::ES5VariableDeclarationList { .. }
+            | TransformDirective::ES5FunctionParameters { .. }
+            | TransformDirective::ES5TemplateLiteral { .. }
+            | TransformDirective::CommonJSExportDefaultClassES5 { .. } => true,
+            TransformDirective::CommonJSExport { inner, .. } => Self::directive_has_es5(inner),
+            TransformDirective::Chain(directives) => directives.iter().any(Self::directive_has_es5),
+            _ => false,
+        }
     }
 
     fn needs_values_helper(&self) -> bool {
