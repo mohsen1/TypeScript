@@ -314,6 +314,41 @@ fn test_call_generic_function_with_string() {
 }
 
 #[test]
+fn test_call_generic_callable_signature() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let callable = interner.callable(CallableShape {
+        call_signatures: vec![CallSignature {
+            type_params: vec![t_param],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: t_type,
+                optional: false,
+                rest: false,
+            }],
+            return_type: t_type,
+        }],
+        construct_signatures: Vec::new(),
+        properties: Vec::new(),
+    });
+
+    let result = evaluator.resolve_call(callable, &[TypeId::NUMBER]);
+    match result {
+        CallResult::Success(ret) => assert_eq!(ret, TypeId::NUMBER),
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_call_generic_array_function() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
