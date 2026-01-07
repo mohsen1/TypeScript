@@ -391,11 +391,16 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 // Tuple is subtype of array if all elements are subtypes
                 for elem in elems {
                     if elem.rest {
-                        // For rest elements (...T[]), elem.type_id is an Array type
-                        // We need to unwrap T[] -> T and check T <: U
-                        let rest_elem_type = self.get_array_element_type(elem.type_id);
-                        if !self.check_subtype(rest_elem_type, *t_elem).is_true() {
-                            return SubtypeResult::False;
+                        let expansion = self.expand_tuple_rest(elem.type_id);
+                        for fixed in expansion.fixed {
+                            if !self.check_subtype(fixed.type_id, *t_elem).is_true() {
+                                return SubtypeResult::False;
+                            }
+                        }
+                        if let Some(variadic) = expansion.variadic {
+                            if !self.check_subtype(variadic, *t_elem).is_true() {
+                                return SubtypeResult::False;
+                            }
                         }
                     } else {
                         // Regular element: T <: U
