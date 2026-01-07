@@ -15,7 +15,7 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
 - [ ] Make TypeKey POD with side-table slices
   - Replace Vec-heavy variants with index slices stored in interner side tables.
   - Use SmallVec for tiny lists where beneficial.
-- [ ] Shard the global string interner
+- [x] Shard the global string interner
   - Replace single `Interner` map with sharded buckets or DashMap.
   - Keep Atom stable and thread-safe.
 - [ ] Incremental/query layer prototype

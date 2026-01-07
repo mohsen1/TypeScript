@@ -28,6 +28,8 @@ pub struct CompilerOptions {
     #[serde(default)]
     pub module: Option<String>,
     #[serde(default)]
+    pub root_dir: Option<String>,
+    #[serde(default)]
     pub out_dir: Option<String>,
     #[serde(default)]
     pub declaration: Option<bool>,
@@ -37,6 +39,8 @@ pub struct CompilerOptions {
     pub strict: Option<bool>,
     #[serde(default)]
     pub no_emit: Option<bool>,
+    #[serde(default)]
+    pub no_emit_on_error: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -48,10 +52,12 @@ pub struct CheckerOptions {
 pub struct ResolvedCompilerOptions {
     pub printer: PrinterOptions,
     pub checker: CheckerOptions,
+    pub root_dir: Option<PathBuf>,
     pub out_dir: Option<PathBuf>,
     pub declaration_dir: Option<PathBuf>,
     pub emit_declarations: bool,
     pub no_emit: bool,
+    pub no_emit_on_error: bool,
 }
 
 impl Default for ResolvedCompilerOptions {
@@ -59,10 +65,12 @@ impl Default for ResolvedCompilerOptions {
         ResolvedCompilerOptions {
             printer: PrinterOptions::default(),
             checker: CheckerOptions::default(),
+            root_dir: None,
             out_dir: None,
             declaration_dir: None,
             emit_declarations: false,
             no_emit: false,
+            no_emit_on_error: false,
         }
     }
 }
@@ -79,6 +87,12 @@ pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<Res
 
     if let Some(module) = options.module.as_deref() {
         resolved.printer.module = parse_module_kind(module)?;
+    }
+
+    if let Some(root_dir) = options.root_dir.as_deref() {
+        if !root_dir.is_empty() {
+            resolved.root_dir = Some(PathBuf::from(root_dir));
+        }
     }
 
     if let Some(out_dir) = options.out_dir.as_deref() {
@@ -103,6 +117,10 @@ pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<Res
 
     if let Some(no_emit) = options.no_emit {
         resolved.no_emit = no_emit;
+    }
+
+    if let Some(no_emit_on_error) = options.no_emit_on_error {
+        resolved.no_emit_on_error = no_emit_on_error;
     }
 
     Ok(resolved)
@@ -179,11 +197,13 @@ fn merge_compiler_options(base: CompilerOptions, child: CompilerOptions) -> Comp
     CompilerOptions {
         target: child.target.or(base.target),
         module: child.module.or(base.module),
+        root_dir: child.root_dir.or(base.root_dir),
         out_dir: child.out_dir.or(base.out_dir),
         declaration: child.declaration.or(base.declaration),
         declaration_dir: child.declaration_dir.or(base.declaration_dir),
         strict: child.strict.or(base.strict),
         no_emit: child.no_emit.or(base.no_emit),
+        no_emit_on_error: child.no_emit_on_error.or(base.no_emit_on_error),
     }
 }
 

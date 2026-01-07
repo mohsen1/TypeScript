@@ -19,6 +19,10 @@ pub struct CliArgs {
     #[arg(long = "outDir", alias = "out-dir")]
     pub out_dir: Option<PathBuf>,
 
+    /// Path to tsconfig.json or a directory containing it.
+    #[arg(short = 'p', long = "project")]
+    pub project: Option<PathBuf>,
+
     /// Enable strict type checking.
     #[arg(long)]
     pub strict: bool,

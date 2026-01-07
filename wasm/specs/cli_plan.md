@@ -17,8 +17,17 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
   - Reuse `TypeCache` in `ThinCheckerState::with_cache`.
   - Invalidate affected symbols only.
 - [ ] Expand tsconfig support
-  - `baseUrl`, `paths`, `rootDir`, `jsx`, `sourceMap`, `declarationMap`, `noEmitOnError`, `lib`.
-  - Respect `--project` and tsconfig inheritance in CLI.
+  - [ ] baseUrl
+  - [ ] paths
+  - [x] rootDir
+  - [ ] jsx
+  - [ ] sourceMap
+  - [ ] declarationMap
+  - [x] noEmitOnError
+  - [ ] lib
+- [x] Respect `--project` and tsconfig inheritance in CLI.
+  - `--project` accepts file or directory
+  - `extends` chain already supported
 - [ ] Module resolution parity
   - Support Node16/NodeNext resolution and `.d.ts` lookup.
   - Improve path mapping + extension inference.

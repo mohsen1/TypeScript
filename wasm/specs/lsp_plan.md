@@ -13,13 +13,14 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental file updates
-  - Add `Project::update_file` and reuse parsed arena + binder where possible.
-  - Cache `TypeCache` per file for hover/completions/diagnostics.
+  - [x] Add `Project::update_file` that applies LSP edits and re-parses.
+  - [ ] Reuse parsed arena + binder where possible.
+  - [ ] Cache `TypeCache` per file for hover/completions/diagnostics.
 - [ ] JSDoc extraction for signature help/hover
   - Parse JSDoc blocks and attach to `SignatureInformation` and `Hover`.
-- [ ] Extract variable precedence fix
-  - Wrap selected expressions to preserve semantics.
-  - Add tests around binary/conditional expressions.
+- [x] Extract variable precedence fix
+  - [x] Wrap selected expressions to preserve semantics.
+  - [x] Add tests around binary/conditional expressions.
 - [ ] Type-aware completions
   - Add member completions using `ThinCheckerState` + `format_type`.
   - Include auto-import suggestions from project export index.

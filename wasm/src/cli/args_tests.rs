@@ -9,6 +9,7 @@ fn parses_defaults() {
     assert_eq!(args.target, None);
     assert_eq!(args.module, None);
     assert!(args.out_dir.is_none());
+    assert!(args.project.is_none());
     assert!(!args.strict);
     assert!(!args.no_emit);
     assert!(!args.watch);
@@ -25,6 +26,8 @@ fn parses_common_flags() {
         "commonjs",
         "--outDir",
         "dist",
+        "--project",
+        "configs/tsconfig.json",
         "--strict",
         "--noEmit",
         "--watch",
@@ -35,6 +38,10 @@ fn parses_common_flags() {
     assert_eq!(args.target, Some(Target::Es2020));
     assert_eq!(args.module, Some(Module::CommonJs));
     assert_eq!(args.out_dir.as_deref(), Some(std::path::Path::new("dist")));
+    assert_eq!(
+        args.project.as_deref(),
+        Some(std::path::Path::new("configs/tsconfig.json"))
+    );
     assert!(args.strict);
     assert!(args.no_emit);
     assert!(args.watch);
