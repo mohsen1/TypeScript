@@ -66,6 +66,7 @@ Tests run in this state:
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_respects_env_version_override` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_invalid_env_falls_back` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_respects_tsconfig_version_override` (pass).
+- `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_tsconfig_extends_inherits_override` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_env_overrides_tsconfig` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_cli_overrides_env_and_tsconfig` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_invalid_tsconfig_falls_back` (pass).
