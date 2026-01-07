@@ -1486,7 +1486,9 @@ impl<'a> CodeActionProvider<'a> {
         if !self.statement_allows_lexical_insertion(stmt_idx) {
             return None;
         }
-        // TODO: Validate that extracted expressions don't capture out-of-scope identifiers.
+        if !self.expression_and_statement_share_scope(expr_idx, stmt_idx) {
+            return None;
+        }
 
         // 5. Generate a unique variable name scoped to the insertion point.
         let var_name = self.unique_extracted_name(stmt_idx);
@@ -1562,6 +1564,18 @@ impl<'a> CodeActionProvider<'a> {
             }
             suffix += 1;
         }
+    }
+
+    fn expression_and_statement_share_scope(&self, expr_idx: NodeIndex, stmt_idx: NodeIndex) -> bool {
+        let expr_scope = match self.find_enclosing_scope_id(expr_idx) {
+            Some(scope_id) => scope_id,
+            None => return true,
+        };
+        let stmt_scope = match self.find_enclosing_scope_id(stmt_idx) {
+            Some(scope_id) => scope_id,
+            None => return true,
+        };
+        expr_scope == stmt_scope
     }
 
     fn find_enclosing_scope_id(&self, node_idx: NodeIndex) -> Option<ScopeId> {
