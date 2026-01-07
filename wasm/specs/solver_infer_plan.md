@@ -149,6 +149,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Infer readonly wrapper type params during constraint collection
 - [x] Infer type params from callable parameter signatures
 - [x] Infer type params from callable arguments with single signatures
+- [x] Infer type params from callable parameters with callable arguments
 - [x] Enforce index signature consistency during bounds validation
 
 ## Architecture Notes
