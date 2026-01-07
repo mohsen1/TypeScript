@@ -1674,7 +1674,8 @@ impl ThinBinderState {
         kind == syntax_kind_ext::VARIABLE_STATEMENT ||
         kind == syntax_kind_ext::INTERFACE_DECLARATION ||
         kind == syntax_kind_ext::TYPE_ALIAS_DECLARATION ||
-        kind == syntax_kind_ext::ENUM_DECLARATION
+        kind == syntax_kind_ext::ENUM_DECLARATION ||
+        kind == syntax_kind_ext::MODULE_DECLARATION
     }
 
     fn bind_module_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
