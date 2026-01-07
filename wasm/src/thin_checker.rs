@@ -456,6 +456,9 @@ impl<'a> ThinCheckerState<'a> {
     }
 
     fn resolve_named_type_reference(&mut self, name: &str) -> Option<TypeId> {
+        if let Some(type_id) = self.lookup_type_parameter(name) {
+            return Some(type_id);
+        }
         // Check local scopes first (includes type parameters)
         if let Some(type_id) = self.lookup_local(name) {
             return Some(type_id);
@@ -476,6 +479,10 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         None
+    }
+
+    fn lookup_type_parameter(&self, name: &str) -> Option<TypeId> {
+        self.ctx.type_parameter_scope.get(name).copied()
     }
 
     fn has_named_type_symbol(&self, name: &str) -> bool {
@@ -738,6 +745,73 @@ impl<'a> ThinCheckerState<'a> {
         );
 
         lowering.lower_type(idx)
+    }
+
+    fn lower_type_parameter_info(&mut self, idx: NodeIndex) -> Option<(crate::solver::TypeParamInfo, String)> {
+        let node = self.ctx.arena.get(idx)?;
+        let data = self.ctx.arena.get_type_parameter(node)?;
+
+        let name = self.ctx.arena.get(data.name)
+            .and_then(|name_node| self.ctx.arena.get_identifier(name_node))
+            .map(|id_data| id_data.escaped_text.clone())
+            .unwrap_or_else(|| "T".to_string());
+        let atom = self.ctx.types.intern_string(&name);
+
+        let constraint = if data.constraint != NodeIndex::NONE {
+            Some(self.get_type_from_type_node(data.constraint))
+        } else {
+            None
+        };
+
+        let default = if data.default != NodeIndex::NONE {
+            Some(self.get_type_from_type_node(data.default))
+        } else {
+            None
+        };
+
+        Some((
+            crate::solver::TypeParamInfo {
+                name: atom,
+                constraint,
+                default,
+            },
+            name,
+        ))
+    }
+
+    fn push_type_parameters(
+        &mut self,
+        type_parameters: &Option<crate::parser::NodeList>,
+    ) -> (Vec<crate::solver::TypeParamInfo>, Vec<(String, Option<TypeId>)>) {
+        use crate::solver::TypeKey;
+
+        let Some(list) = type_parameters else {
+            return (Vec::new(), Vec::new());
+        };
+
+        let mut params = Vec::new();
+        let mut updates = Vec::new();
+
+        for &param_idx in &list.nodes {
+            if let Some((info, name)) = self.lower_type_parameter_info(param_idx) {
+                let type_id = self.ctx.types.intern(TypeKey::TypeParameter(info.clone()));
+                let previous = self.ctx.type_parameter_scope.insert(name.clone(), type_id);
+                updates.push((name, previous));
+                params.push(info);
+            }
+        }
+
+        (params, updates)
+    }
+
+    fn pop_type_parameters(&mut self, updates: Vec<(String, Option<TypeId>)>) {
+        for (name, previous) in updates.into_iter().rev() {
+            if let Some(prev_type) = previous {
+                self.ctx.type_parameter_scope.insert(name, prev_type);
+            } else {
+                self.ctx.type_parameter_scope.remove(&name);
+            }
+        }
     }
 
     /// Get type of an interface declaration.
@@ -1701,6 +1775,8 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
+        let (type_params, type_param_updates) = self.push_type_parameters(&func.type_parameters);
+
         // Collect parameter info using solver's ParamInfo struct
         let mut params = Vec::new();
         let mut param_types: Vec<Option<TypeId>> = Vec::new();
@@ -1817,13 +1893,15 @@ impl<'a> ThinCheckerState<'a> {
 
         // Create function type using TypeInterner
         let shape = FunctionShape {
-            type_params: Vec::new(), // TODO: Handle type parameters
+            type_params,
             params,
             this_type,
             return_type,
             type_predicate: None,
             is_constructor: false,
         };
+
+        self.pop_type_parameters(type_param_updates);
 
         self.ctx.types.function(shape)
     }
@@ -2662,6 +2740,8 @@ impl<'a> ThinCheckerState<'a> {
             }
             syntax_kind_ext::FUNCTION_DECLARATION => {
                 if let Some(func) = self.ctx.arena.get_function(node) {
+                    let (_type_params, type_param_updates) = self.push_type_parameters(&func.type_parameters);
+
                     // Check for parameter properties (error 2369)
                     // Parameter properties are only allowed in constructors
                     self.check_parameter_properties(&func.parameters.nodes);
@@ -2733,6 +2813,8 @@ impl<'a> ThinCheckerState<'a> {
                         self.pop_return_type();
                         self.pop_local_scope();
                     }
+
+                    self.pop_type_parameters(type_param_updates);
                 }
             }
             syntax_kind_ext::WHILE_STATEMENT | syntax_kind_ext::DO_STATEMENT => {

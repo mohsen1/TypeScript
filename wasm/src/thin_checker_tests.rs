@@ -1834,6 +1834,57 @@ const f: <T>(value: T) => T = (value) => value;
 }
 
 #[test]
+fn test_checker_lowers_generic_function_declaration_uses_type_params() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+function id<T>(value: T): T {
+    return value;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let id_sym = binder.file_locals.get("id").expect("id should exist");
+    let id_type = checker.get_type_of_symbol(id_sym);
+    let id_key = types.lookup(id_type).expect("id type should exist");
+    match id_key {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.type_params.len(), 1);
+            assert_eq!(types.resolve_atom(shape.type_params[0].name), "T");
+            assert_eq!(shape.params.len(), 1);
+
+            let param_key = types.lookup(shape.params[0].type_id).expect("Param type should exist");
+            match param_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected param type to be type parameter, got {:?}", param_key),
+            }
+
+            let return_key = types.lookup(shape.return_type).expect("Return type should exist");
+            match return_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected return type to be type parameter, got {:?}", return_key),
+            }
+        }
+        _ => panic!("Expected id to be Function type, got {:?}", id_key),
+    }
+}
+
+#[test]
 fn test_checker_namespace_merges_with_class_exports() {
     use crate::thin_parser::ThinParserState;
     use crate::solver::TypeKey;
