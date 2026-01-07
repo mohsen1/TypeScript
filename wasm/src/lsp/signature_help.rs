@@ -619,4 +619,53 @@ mod signature_help_tests {
             "Second call should select two-arg overload"
         );
     }
+
+    #[test]
+    fn test_signature_help_new_overload_selection() {
+        let source = "interface Ctor {\n  new (a: number): Foo;\n  new (a: number, b: string): Foo;\n}\nclass Foo {}\ndeclare const Ctor: Ctor;\nnew Ctor(1);\nnew Ctor(1, \"x\");";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let interner = TypeInterner::new();
+        let line_map = LineMap::build(source);
+
+        let provider = SignatureHelpProvider::new(
+            parser.get_arena(),
+            &binder,
+            &line_map,
+            &interner,
+            source,
+            "test.ts".to_string(),
+        );
+
+        let mut cache = None;
+        let pos_first = Position::new(6, 9); // At "1"
+        let help_first = provider.get_signature_help(root, pos_first, &mut cache);
+        assert!(help_first.is_some(), "Should find signature help for first new");
+        let first = help_first.unwrap();
+        assert!(!first.signatures.is_empty(), "Expected constructor signatures");
+        let first_active = &first.signatures[first.active_signature as usize];
+        assert!(
+            first_active.label.starts_with("new ("),
+            "Constructor signatures should use new() label"
+        );
+        assert!(
+            !first_active.label.contains("b: string"),
+            "First new should select single-arg overload"
+        );
+
+        let pos_second = Position::new(7, 13); // At "x"
+        let help_second = provider.get_signature_help(root, pos_second, &mut cache);
+        assert!(help_second.is_some(), "Should find signature help for second new");
+        let second = help_second.unwrap();
+        assert!(!second.signatures.is_empty(), "Expected constructor signatures");
+        let second_active = &second.signatures[second.active_signature as usize];
+        assert!(
+            second_active.label.contains("b: string"),
+            "Second new should select two-arg overload"
+        );
+    }
 }
