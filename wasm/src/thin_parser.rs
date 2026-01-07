@@ -8002,6 +8002,9 @@ impl ThinParserState {
             let end_pos = self.token_end();
             self.arena.add_token(SyntaxKind::ThisKeyword as u16, pos, end_pos)
         } else {
+            if self.is_token(SyntaxKind::Identifier) {
+                self.scanner.scan_jsx_identifier();
+            }
             let name = self.parse_identifier();
 
             // Check for namespaced name (a:b)

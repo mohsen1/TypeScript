@@ -41,6 +41,7 @@ Status: Active
   - [x] Add JSX namespaced attribute expression coverage in thin emitter tests.
   - [x] Add JSX spread attribute emission coverage in thin emitter tests.
   - [x] Add JSX hyphenated attribute emission coverage in thin emitter tests.
+  - [x] Add JSX hyphenated element name emission coverage in thin emitter tests.
   - [x] Extract template literal emission helpers into a module.
 - [ ] Performance tuning (deferred until correctness parity)
   - [x] Pre-allocate output buffer from source size; write numeric indices without allocations.
