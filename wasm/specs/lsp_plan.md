@@ -55,6 +55,7 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
   - [x] Cover scope cache hit timing for references.
   - [x] Cover scope cache hit timing for rename.
   - [x] Verify scope cache clears after incremental edits.
+  - [x] Verify scope cache reuse across request types.
 - [x] Cross-file rename
   - [x] Project-level rename builds workspace edits from multi-file references.
   - [x] Preserve local alias names when renaming exported symbols.

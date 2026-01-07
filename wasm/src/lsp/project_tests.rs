@@ -1232,6 +1232,25 @@ fn test_project_scope_cache_cleared_after_update() {
 }
 
 #[test]
+fn test_project_scope_cache_reuse_across_requests() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "const value = 1;\nvalue;\n".to_string());
+    let position = Position::new(1, 0);
+
+    assert!(project.get_hover("a.ts", position).is_some());
+    assert!(project.get_definition("a.ts", position).is_some());
+
+    let timing = project
+        .performance()
+        .timing(ProjectRequestKind::Definition)
+        .expect("Expected timing data for definition");
+
+    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover");
+    assert_eq!(timing.scope_misses, 0, "Expected definition to reuse cached scope");
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 
