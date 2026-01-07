@@ -75,6 +75,10 @@ Status: Active
   - Add focused tests for missing namespace value members.
 - [x] Expand namespace member tests for alias resolution
   - Add coverage for missing members through nested namespace aliases.
+- [x] Expand namespace member error coverage for non-exported values
+  - Ensure namespace value access reports TS2339 for non-exported members.
+- [x] Expand namespace member error coverage for nested values
+  - Add coverage for missing nested namespace value members.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
