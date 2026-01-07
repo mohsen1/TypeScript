@@ -269,6 +269,18 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             None => return SubtypeResult::False,
         };
 
+        if let Some(shape) = self.apparent_primitive_shape_for_key(&source_key) {
+            match &target_key {
+                TypeKey::Object(t_props) => {
+                    return self.check_object_subtype(&shape.properties, t_props);
+                }
+                TypeKey::ObjectWithIndex(t_shape) => {
+                    return self.check_object_with_index_subtype(&shape, t_shape);
+                }
+                _ => {}
+            }
+        }
+
         // =========================================================================
         // Structural checks
         // =========================================================================
@@ -641,6 +653,130 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             }
             _ => false,
         }
+    }
+
+    fn apparent_primitive_shape_for_key(&mut self, key: &TypeKey) -> Option<ObjectShape> {
+        let kind = self.apparent_primitive_kind(key)?;
+        Some(self.apparent_primitive_shape(kind))
+    }
+
+    fn apparent_primitive_kind(&self, key: &TypeKey) -> Option<IntrinsicKind> {
+        match key {
+            TypeKey::Intrinsic(kind) => match kind {
+                IntrinsicKind::String
+                | IntrinsicKind::Number
+                | IntrinsicKind::Boolean
+                | IntrinsicKind::Bigint
+                | IntrinsicKind::Symbol => Some(*kind),
+                _ => None,
+            },
+            TypeKey::Literal(literal) => match literal {
+                LiteralValue::String(_) => Some(IntrinsicKind::String),
+                LiteralValue::Number(_) => Some(IntrinsicKind::Number),
+                LiteralValue::BigInt(_) => Some(IntrinsicKind::Bigint),
+                LiteralValue::Boolean(_) => Some(IntrinsicKind::Boolean),
+            },
+            _ => None,
+        }
+    }
+
+    fn apparent_primitive_shape(&mut self, kind: IntrinsicKind) -> ObjectShape {
+        let mut properties = Vec::new();
+
+        match kind {
+            IntrinsicKind::String => {
+                properties.push(self.apparent_value_prop("length", TypeId::NUMBER));
+                for name in [
+                    "at", "charAt", "concat", "padEnd", "padStart", "repeat", "slice",
+                    "substring", "toLocaleLowerCase", "toLocaleUpperCase", "toLowerCase",
+                    "toString", "toUpperCase", "trim", "trimEnd", "trimStart", "valueOf",
+                    "replace", "replaceAll",
+                ] {
+                    properties.push(self.apparent_method_prop(name, TypeId::STRING));
+                }
+                for name in ["charCodeAt", "codePointAt", "indexOf", "lastIndexOf", "search"] {
+                    properties.push(self.apparent_method_prop(name, TypeId::NUMBER));
+                }
+                for name in ["endsWith", "includes", "startsWith"] {
+                    properties.push(self.apparent_method_prop(name, TypeId::BOOLEAN));
+                }
+                for name in ["match", "matchAll"] {
+                    properties.push(self.apparent_method_prop(name, TypeId::ANY));
+                }
+                let string_array = self.interner.array(TypeId::STRING);
+                properties.push(self.apparent_method_prop("split", string_array));
+            }
+            IntrinsicKind::Number => {
+                for name in ["toExponential", "toFixed", "toLocaleString", "toPrecision", "toString"] {
+                    properties.push(self.apparent_method_prop(name, TypeId::STRING));
+                }
+                properties.push(self.apparent_method_prop("valueOf", TypeId::NUMBER));
+            }
+            IntrinsicKind::Boolean => {
+                for name in ["toLocaleString", "toString"] {
+                    properties.push(self.apparent_method_prop(name, TypeId::STRING));
+                }
+                properties.push(self.apparent_method_prop("valueOf", TypeId::BOOLEAN));
+            }
+            IntrinsicKind::Bigint => {
+                for name in ["toLocaleString", "toString"] {
+                    properties.push(self.apparent_method_prop(name, TypeId::STRING));
+                }
+                properties.push(self.apparent_method_prop("valueOf", TypeId::BIGINT));
+            }
+            IntrinsicKind::Symbol => {
+                let description_type = self.interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+                properties.push(self.apparent_value_prop("description", description_type));
+                properties.push(self.apparent_method_prop("toString", TypeId::STRING));
+                properties.push(self.apparent_method_prop("valueOf", TypeId::SYMBOL));
+            }
+            _ => {}
+        }
+
+        let number_index = if kind == IntrinsicKind::String {
+            Some(IndexSignature {
+                key_type: TypeId::NUMBER,
+                value_type: TypeId::STRING,
+                readonly: true,
+            })
+        } else {
+            None
+        };
+
+        ObjectShape {
+            properties,
+            string_index: None,
+            number_index,
+        }
+    }
+
+    fn apparent_method_prop(&mut self, name: &str, return_type: TypeId) -> PropertyInfo {
+        PropertyInfo {
+            name: self.interner.intern_string(name),
+            type_id: self.apparent_method_type(return_type),
+            optional: false,
+            readonly: false,
+            is_method: true,
+        }
+    }
+
+    fn apparent_value_prop(&mut self, name: &str, type_id: TypeId) -> PropertyInfo {
+        PropertyInfo {
+            name: self.interner.intern_string(name),
+            type_id,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }
+    }
+
+    fn apparent_method_type(&mut self, return_type: TypeId) -> TypeId {
+        self.interner.function(FunctionShape {
+            params: Vec::new(),
+            return_type,
+            type_params: Vec::new(),
+            is_constructor: false,
+        })
     }
 
     /// Check literal to intrinsic subtyping
@@ -1371,6 +1507,18 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         source_key: &TypeKey,
         target_key: &TypeKey,
     ) -> Option<SubtypeFailureReason> {
+        if let Some(shape) = self.apparent_primitive_shape_for_key(source_key) {
+            match target_key {
+                TypeKey::Object(t_props) => {
+                    return self.explain_object_failure(source, target, &shape.properties, t_props);
+                }
+                TypeKey::ObjectWithIndex(t_shape) => {
+                    return self.explain_indexed_object_failure(source, target, &shape, t_shape);
+                }
+                _ => {}
+            }
+        }
+
         match (source_key, target_key) {
             // Object to object - find the specific missing/mismatched property
             (TypeKey::Object(s_props), TypeKey::Object(t_props)) => {
@@ -1518,13 +1666,27 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         // Check string index signature
         if let Some(ref t_string_idx) = target_shape.string_index {
-            if let Some(ref s_string_idx) = source_shape.string_index {
-                if !self.check_subtype(s_string_idx.value_type, t_string_idx.value_type).is_true() {
-                    return Some(SubtypeFailureReason::IndexSignatureMismatch {
-                        index_kind: "string",
-                        source_value_type: s_string_idx.value_type,
-                        target_value_type: t_string_idx.value_type,
-                    });
+            match &source_shape.string_index {
+                Some(s_string_idx) => {
+                    if !self.check_subtype(s_string_idx.value_type, t_string_idx.value_type).is_true() {
+                        return Some(SubtypeFailureReason::IndexSignatureMismatch {
+                            index_kind: "string",
+                            source_value_type: s_string_idx.value_type,
+                            target_value_type: t_string_idx.value_type,
+                        });
+                    }
+                }
+                None => {
+                    for prop in &source_shape.properties {
+                        let prop_type = self.optional_property_type(prop);
+                        if !self.check_subtype(prop_type, t_string_idx.value_type).is_true() {
+                            return Some(SubtypeFailureReason::IndexSignatureMismatch {
+                                index_kind: "string",
+                                source_value_type: prop_type,
+                                target_value_type: t_string_idx.value_type,
+                            });
+                        }
+                    }
                 }
             }
         }

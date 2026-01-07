@@ -672,6 +672,84 @@ fn test_object_keyword_rejects_primitives() {
 }
 
 #[test]
+fn test_apparent_string_members_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let length = interner.intern_string("length");
+    let to_upper = interner.intern_string("toUpperCase");
+    let to_upper_type = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let target = interner.object(vec![
+        PropertyInfo {
+            name: length,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: to_upper,
+            type_id: to_upper_type,
+            optional: false,
+            readonly: false,
+            is_method: true,
+        },
+    ]);
+
+    assert!(checker.is_assignable(TypeId::STRING, target));
+
+    let literal = interner.literal_string("hello");
+    assert!(checker.is_assignable(literal, target));
+}
+
+#[test]
+fn test_apparent_string_members_reject_mismatch() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let length = interner.intern_string("length");
+    let target = interner.object(vec![PropertyInfo {
+        name: length,
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(!checker.is_assignable(TypeId::STRING, target));
+}
+
+#[test]
+fn test_apparent_number_method_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let to_fixed = interner.intern_string("toFixed");
+    let to_fixed_type = interner.function(FunctionShape {
+        params: Vec::new(),
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let target = interner.object(vec![PropertyInfo {
+        name: to_fixed,
+        type_id: to_fixed_type,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(checker.is_assignable(TypeId::NUMBER, target));
+}
+
+#[test]
 fn test_optional_property_allows_undefined() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
