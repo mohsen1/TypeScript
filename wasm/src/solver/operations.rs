@@ -672,6 +672,11 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 // Covariant return: source_return <: target_return
                 self.constrain_types(ctx, var_map, s_fn.return_type, t_fn.return_type);
             }
+            (Some(TypeKey::Function(ref s_fn)), Some(TypeKey::Callable(ref t_callable))) => {
+                for sig in &t_callable.call_signatures {
+                    self.constrain_function_to_call_signature(ctx, var_map, s_fn, sig);
+                }
+            }
             (Some(TypeKey::Object(ref s_props)), Some(TypeKey::Object(ref t_props))) => {
                 self.constrain_properties(ctx, var_map, s_props, t_props);
             }
@@ -743,6 +748,19 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 }
             }
         }
+    }
+
+    fn constrain_function_to_call_signature(
+        &self,
+        ctx: &mut InferenceContext,
+        var_map: &FxHashMap<TypeId, crate::solver::infer::InferenceVar>,
+        source: &FunctionShape,
+        target: &CallSignature,
+    ) {
+        for (s_p, t_p) in source.params.iter().zip(target.params.iter()) {
+            self.constrain_types(ctx, var_map, t_p.type_id, s_p.type_id);
+        }
+        self.constrain_types(ctx, var_map, source.return_type, target.return_type);
     }
 
     fn constrain_properties_against_index_signatures(
