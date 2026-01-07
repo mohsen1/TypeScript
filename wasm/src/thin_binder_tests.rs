@@ -211,20 +211,10 @@ fn test_thin_binder_exported_const() {
     assert!(binder.file_locals.has("y"), "Exported const 'y' should be in file_locals");
 }
 
-#[test]
-fn test_thin_binder_resolves_parameter_from_bound_state() {
+fn assert_bound_state_resolves_param(source: &str, function_name: &str, param_name: &str) {
     use crate::binder::SymbolTable;
     use crate::parallel;
     use crate::parser::{syntax_kind_ext, NodeIndex};
-
-    let source = r#"
-export function getModuleInstanceState(node: { body?: { parent?: {} } }) {
-    if (node.body && !node.body.parent) {
-        return node.body;
-    }
-    return node.body;
-}
-"#;
 
     let program = parallel::compile_files(vec![("test.ts".to_string(), source.to_string())]);
     let file = &program.files[0];
@@ -248,7 +238,7 @@ export function getModuleInstanceState(node: { body?: { parent?: {} } }) {
     );
 
     let arena = &file.arena;
-    let mut param_name = NodeIndex::NONE;
+    let mut param_name_idx = NodeIndex::NONE;
     let mut param_symbol = None;
     let mut function_body = NodeIndex::NONE;
 
@@ -263,47 +253,49 @@ export function getModuleInstanceState(node: { body?: { parent?: {} } }) {
             .get(func.name)
             .and_then(|name_node| arena.get_identifier(name_node))
             .map(|ident| ident.escaped_text.as_str());
-        if name != Some("getModuleInstanceState") {
+        if name != Some(function_name) {
             continue;
         }
-        let Some(param_idx) = func.parameters.nodes.first().copied() else { break; };
-        let Some(param_node) = arena.get(param_idx) else { break; };
-        let Some(param) = arena.get_parameter(param_node) else { break; };
-        let param_text = arena
-            .get(param.name)
-            .and_then(|param_name_node| arena.get_identifier(param_name_node))
-            .map(|ident| ident.escaped_text.as_str());
-        if param_text != Some("node") {
+        for &param_idx in &func.parameters.nodes {
+            let Some(param_node) = arena.get(param_idx) else { continue; };
+            let Some(param) = arena.get_parameter(param_node) else { continue; };
+            let param_text = arena
+                .get(param.name)
+                .and_then(|param_name_node| arena.get_identifier(param_name_node))
+                .map(|ident| ident.escaped_text.as_str());
+            if param_text != Some(param_name) {
+                continue;
+            }
+            param_name_idx = param.name;
+            param_symbol = binder.get_node_symbol(param.name);
+            function_body = func.body;
             break;
         }
-        param_name = param.name;
-        param_symbol = binder.get_node_symbol(param.name);
-        function_body = func.body;
         break;
     }
 
     assert!(
-        !param_name.is_none(),
-        "Expected to find parameter name for getModuleInstanceState"
+        !param_name_idx.is_none(),
+        "Expected to find parameter name for {function_name}"
     );
     assert!(
         param_symbol.is_some(),
-        "Expected parameter symbol for getModuleInstanceState"
+        "Expected parameter symbol for {function_name}"
     );
     assert!(
         !function_body.is_none(),
-        "Expected function body for getModuleInstanceState"
+        "Expected function body for {function_name}"
     );
 
     let mut usage_idx = NodeIndex::NONE;
     for i in 0..arena.len() {
         let idx = NodeIndex(i as u32);
-        if idx == param_name {
+        if idx == param_name_idx {
             continue;
         }
         let Some(node) = arena.get(idx) else { continue; };
         let Some(ident) = arena.get_identifier(node) else { continue; };
-        if ident.escaped_text != "node" {
+        if ident.escaped_text != param_name {
             continue;
         }
         let mut current = idx;
@@ -324,7 +316,7 @@ export function getModuleInstanceState(node: { body?: { parent?: {} } }) {
 
     assert!(
         !usage_idx.is_none(),
-        "Expected a 'node' identifier inside the function body"
+        "Expected a '{param_name}' identifier inside the function body"
     );
 
     let resolved = binder.resolve_identifier(arena, usage_idx);
@@ -333,6 +325,48 @@ export function getModuleInstanceState(node: { body?: { parent?: {} } }) {
         param_symbol,
         "Expected body identifier to resolve to the parameter symbol"
     );
+}
+
+#[test]
+fn test_thin_binder_resolves_parameter_from_bound_state() {
+    let source = r#"
+export function f(node: number) {
+    return node;
+}
+"#;
+
+    assert_bound_state_resolves_param(source, "f", "node");
+}
+
+#[test]
+fn test_thin_binder_resolves_parameter_from_bound_state_module_instance_state() {
+    let source = r#"
+export function getModuleInstanceState(node: { body?: { parent?: {} } }) {
+    if (node.body && !node.body.parent) {
+        return node.body;
+    }
+    return node.body;
+}
+"#;
+
+    assert_bound_state_resolves_param(source, "getModuleInstanceState", "node");
+}
+
+#[test]
+fn test_thin_binder_resolves_parameter_from_bound_state_module_instance_state_with_visited() {
+    let source = r#"
+export function getModuleInstanceState(
+    node: { body?: { parent?: {} } },
+    visited?: Map<number, unknown>
+) {
+    if (node.body && !node.body.parent) {
+        return node.body;
+    }
+    return node.body;
+}
+"#;
+
+    assert_bound_state_resolves_param(source, "getModuleInstanceState", "node");
 }
 #[test]
 fn test_namespace_binding_debug() {

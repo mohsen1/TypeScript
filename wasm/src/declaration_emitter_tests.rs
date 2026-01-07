@@ -81,6 +81,22 @@ fn test_export_star_as_namespace() {
 }
 
 #[test]
+fn test_export_default_reexport_forms() {
+    let source = "export { default } from './mod'; export { default as Foo } from './mod';";
+    let output = emit_declaration(source);
+    assert!(
+        output.contains("export { default } from \"./mod\";"),
+        "Should emit default re-export: {}",
+        output
+    );
+    assert!(
+        output.contains("export { default as Foo } from \"./mod\";"),
+        "Should emit default re-export with alias: {}",
+        output
+    );
+}
+
+#[test]
 fn test_type_only_named_export_reexport() {
     let source = "export type { Foo } from './foo'; export { type Bar as Baz } from './bar';";
     let output = emit_declaration(source);
