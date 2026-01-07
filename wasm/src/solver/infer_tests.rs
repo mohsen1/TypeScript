@@ -346,6 +346,198 @@ fn test_resolve_bounds_object_subtype() {
 }
 
 #[test]
+fn test_resolve_bounds_object_readonly_property_mismatch() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name_a = interner.intern_string("a");
+
+    let upper = interner.object(vec![PropertyInfo {
+        name: name_a,
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let lower = interner.object(vec![PropertyInfo {
+        name: name_a,
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower && actual_upper == upper
+    ));
+}
+
+#[test]
+fn test_resolve_bounds_object_readonly_property_ok() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name_a = interner.intern_string("a");
+
+    let upper = interner.object(vec![PropertyInfo {
+        name: name_a,
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let lower = interner.object(vec![PropertyInfo {
+        name: name_a,
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
+fn test_resolve_bounds_method_property_bivariant_params() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name_m = interner.intern_string("m");
+
+    let narrow_param = ParamInfo {
+        name: Some(interner.intern_string("x")),
+        type_id: TypeId::STRING,
+        optional: false,
+        rest: false,
+    };
+    let wide_param = ParamInfo {
+        name: Some(interner.intern_string("x")),
+        type_id: interner.union(vec![TypeId::STRING, TypeId::NUMBER]),
+        optional: false,
+        rest: false,
+    };
+
+    let lower_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![narrow_param],
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let upper_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![wide_param],
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let lower = interner.object(vec![PropertyInfo {
+        name: name_m,
+        type_id: lower_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+    let upper = interner.object(vec![PropertyInfo {
+        name: name_m,
+        type_id: upper_fn,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
+fn test_resolve_bounds_function_property_contravariant_params() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name_f = interner.intern_string("f");
+
+    let narrow_param = ParamInfo {
+        name: Some(interner.intern_string("x")),
+        type_id: TypeId::STRING,
+        optional: false,
+        rest: false,
+    };
+    let wide_param = ParamInfo {
+        name: Some(interner.intern_string("x")),
+        type_id: interner.union(vec![TypeId::STRING, TypeId::NUMBER]),
+        optional: false,
+        rest: false,
+    };
+
+    let lower_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![narrow_param],
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let upper_fn = interner.function(FunctionShape {
+        type_params: Vec::new(),
+        params: vec![wide_param],
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let lower = interner.object(vec![PropertyInfo {
+        name: name_f,
+        type_id: lower_fn,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let upper = interner.object(vec![PropertyInfo {
+        name: name_f,
+        type_id: upper_fn,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower && actual_upper == upper
+    ));
+}
+
+#[test]
 fn test_resolve_bounds_object_keyword_upper_allows_array() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
@@ -390,6 +582,121 @@ fn test_resolve_bounds_object_with_index_subtype() {
         string_index: Some(IndexSignature {
             key_type: TypeId::STRING,
             value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var).unwrap();
+    assert_eq!(result, lower);
+}
+
+#[test]
+fn test_resolve_bounds_index_readonly_property_mismatch() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let name_a = interner.intern_string("a");
+
+    let upper = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let lower = interner.object(vec![PropertyInfo {
+        name: name_a,
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower && actual_upper == upper
+    ));
+}
+
+#[test]
+fn test_resolve_bounds_index_readonly_signature_mismatch() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let upper = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let lower = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: true,
+        }),
+        number_index: None,
+    });
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, upper);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower && actual_upper == upper
+    ));
+}
+
+#[test]
+fn test_resolve_bounds_index_readonly_signature_allows_mutable_source() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+
+    let upper = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: true,
+        }),
+        number_index: None,
+    });
+
+    let lower = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
             readonly: false,
         }),
         number_index: None,
