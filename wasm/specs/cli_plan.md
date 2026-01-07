@@ -1,79 +1,34 @@
-# CLI Track: The Native Interface
+# CLI Track Plan (stc)
 
 ## Mission
-Implement a high-performance, `tsc`-compatible command-line interface. This drives the core Rust compiler logic (Parser -> Binder -> Solver -> Emitter) in a native environment, handling file I/O, configuration parsing, and error reporting.
+High-performance, tsc-compatible CLI driving the Rust compiler in native mode.
 
 ## Scope
-**Files:** 
-- `wasm/src/bin/stc.rs` (Entry point)
-- `wasm/src/cli/` (New module)
-  - `args.rs` (Clap definitions)
-  - `config.rs` (tsconfig.json parsing)
-  - `driver.rs` (Pipeline orchestration)
-  - `fs.rs` (File system abstractions)
-  - `reporter.rs` (Diagnostic formatting)
-
-**Independence:** **High**. Consumes the `wasm` library (Parser/Solver/Emitter) but does not modify core logic.
+Files: `wasm/src/bin/stc.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/src/thin_checker.rs` (integration).
 
 ## Current Status
-**Starting** - Core compiler features (Parallel Parsing, Binding, Emitter) are ready to be wired up to a CLI driver.
+- Args/tsconfig parsing, globbing, compile + emit work.
+- No watch mode or incremental compile.
+- Compiler options surface is minimal (target/module/strict/noEmit/paths).
 
-## Tasks
-
-### Phase 1: Foundation & Arguments
-- [x] **Scaffold Binary**
-  - Add `[[bin]]` entry in `Cargo.toml` for `stc` (Speedy TypeScript Compiler).
-  - Add dependencies: `clap` (derive), `anyhow`, `serde`, `serde_json` (with preserve_order).
-- [x] **Implement Argument Parsing**
-  - Replicate common `tsc` flags: `--target`, `--module`, `--outDir`, `--strict`, `--noEmit`.
-  - Implement `--help` and `--version`.
-
-### Phase 2: Project Configuration (tsconfig)
-- [x] **JSONC Parsing**
-  - [x] Implement `tsconfig.json` parser that handles comments (JSONC).
-  - [x] Support `extends` inheritance (recursive loading).
-- [x] **Option Mapping**
-  - [x] Map `tsconfig` "compilerOptions" to internal `PrinterOptions` (Emitter) and `CheckerOptions`.
-  - [x] Handle `include`, `exclude`, and `files` globs.
-
-### Phase 3: The Driver (Orchestration)
-- [x] **File Discovery**
-  - [x] Implement efficient globbing to find all `.ts` files based on config.
-- [x] **Pipeline Connection**
-  - [x] Wire up `parallel::compile_files` (Parser/Binder) to the discovered files.
-  - [x] Wire up `thin_checker::check_source_file` for type checking.
-  - [x] Wire up `thin_emitter::emit` for output generation.
-- [x] **Output Writer**
-  - [x] Implement parallel file writing for emitted `.js` and `.d.ts` files to `outDir`.
-  - [x] Ensure directory structures are created.
-
-### Phase 4: Diagnostics & Reporting
-- [x] **Diagnostic Formatter**
-  - [x] Implement a reporter that looks like `tsc` (file.ts:line:col - error TS1234: Message).
-  - [x] Add color support (`colored` crate).
-  - [x] Integrate `solver::diagnostics` output into the CLI reporter.
-  - [x] Surface parse diagnostics with source offsets for accurate locations.
-- [x] **Exit Codes**
-  - [x] Return proper exit codes (0 for success, 1 for errors) based on diagnostic severity.
-
-### Phase 5: Watch Mode (The Speed Demon)
-- [ ] **File Watching**
-  - Integrate `notify` crate for filesystem events.
-  - Implement debounce logic.
-- [ ] **Incremental Re-compilation**
-  - Invalidate specific entries in `ThinParserState` / `Binder` when files change.
-  - Re-trigger check/emit only for affected files (and dependents).
-
-### Phase 6: Documentation & Polish
-- [ ] **Documentation Website**
-  - Set up Docusaurus structure.
-  - Auto-generate CLI flag documentation from Clap structs.
-  - Write "Migration from tsc" guide.
-- [ ] **Benchmarks vs tsc**
-  - Create a script to run `stc` vs `tsc` on large open source repos (e.g., Three.js, React).
+## Highest-Impact Next Tasks
+- [ ] Watch mode + debounce
+  - Integrate `notify` and change batching.
+  - Re-run compile on changed files only.
+- [ ] Incremental compilation caches
+  - Cache parsed arenas + binder results per file.
+  - Reuse `TypeCache` in `ThinCheckerState::with_cache`.
+  - Invalidate affected symbols only.
+- [ ] Expand tsconfig support
+  - `baseUrl`, `paths`, `rootDir`, `jsx`, `sourceMap`, `declarationMap`, `noEmitOnError`, `lib`.
+  - Respect `--project` and tsconfig inheritance in CLI.
+- [ ] Module resolution parity
+  - Support Node16/NodeNext resolution and `.d.ts` lookup.
+  - Improve path mapping + extension inference.
+- [ ] Benchmark harness
+  - Script for `stc` vs `tsc` on large repos with timing + memory stats.
 
 ## Success Criteria
-- [ ] **Compatibility:** Can compile a standard `tsconfig.json` project correctly.
-- [ ] **Performance:** Significantly faster than `tsc` (Goal: 10x startup/emit speed).
-- [ ] **UX:** Error messages are clear, colorful, and point to the correct source location.
-- [ ] **Extensibility:** Infrastructure allows adding custom Rust transforms/lints later.
+- `stc --watch` handles large projects without full reparse.
+- CLI builds typical `tsconfig.json` projects with correct output.
+- Consistently faster than `tsc` on real-world repos.
