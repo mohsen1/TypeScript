@@ -108,6 +108,44 @@ fn test_two_phase_emission_es5_class_expression() {
 }
 
 #[test]
+fn test_lowering_pass_sets_es5_helpers() {
+    let source = r#"
+async function foo() { await bar(); }
+const { x, ...rest } = obj;
+for (const v of arr) { v; }
+const t = tag`hi ${name}`;
+class Base {}
+class Derived extends Base { #count = 0; }
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+    let helpers = transforms.helpers();
+
+    assert!(
+        helpers.awaiter && helpers.generator,
+        "Expected async helpers to be set"
+    );
+    assert!(helpers.values, "Expected __values helper to be set");
+    assert!(helpers.rest, "Expected __rest helper to be set");
+    assert!(
+        helpers.make_template_object,
+        "Expected __makeTemplateObject helper to be set"
+    );
+    assert!(helpers.extends, "Expected __extends helper to be set");
+    assert!(
+        helpers.class_private_field_get && helpers.class_private_field_set,
+        "Expected class private field helpers to be set"
+    );
+}
+
+#[test]
 fn test_lowering_pass_es5_class_heritage_clause() {
     let source = "class Base {} class Derived extends Base {}";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

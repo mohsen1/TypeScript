@@ -6491,26 +6491,38 @@ impl<'a> ThinPrinter<'a> {
 
         let has_es5_transforms = self.has_es5_transforms();
         if has_es5_transforms {
-            if self.needs_extends_helper(&source.statements) {
-                helpers.extends = true;
-            }
+            if self.transforms.helpers_populated() {
+                let es5_helpers = self.transforms.helpers();
+                helpers.extends |= es5_helpers.extends;
+                helpers.values |= es5_helpers.values;
+                helpers.rest |= es5_helpers.rest;
+                helpers.awaiter |= es5_helpers.awaiter;
+                helpers.generator |= es5_helpers.generator;
+                helpers.make_template_object |= es5_helpers.make_template_object;
+                helpers.class_private_field_get |= es5_helpers.class_private_field_get;
+                helpers.class_private_field_set |= es5_helpers.class_private_field_set;
+            } else {
+                if self.needs_extends_helper(&source.statements) {
+                    helpers.extends = true;
+                }
 
-            if self.needs_values_helper() {
-                helpers.values = true;
-            }
-            if self.needs_rest_helper() {
-                helpers.rest = true;
-            }
-            if self.needs_async_helpers() {
-                helpers.awaiter = true;
-                helpers.generator = true;
-            }
-            if self.needs_make_template_object_helper() {
-                helpers.make_template_object = true;
-            }
-            if self.needs_class_private_field_helpers() {
-                helpers.class_private_field_get = true;
-                helpers.class_private_field_set = true;
+                if self.needs_values_helper() {
+                    helpers.values = true;
+                }
+                if self.needs_rest_helper() {
+                    helpers.rest = true;
+                }
+                if self.needs_async_helpers() {
+                    helpers.awaiter = true;
+                    helpers.generator = true;
+                }
+                if self.needs_make_template_object_helper() {
+                    helpers.make_template_object = true;
+                }
+                if self.needs_class_private_field_helpers() {
+                    helpers.class_private_field_get = true;
+                    helpers.class_private_field_set = true;
+                }
             }
         }
 
@@ -7235,10 +7247,29 @@ impl<'a> ThinPrinter<'a> {
     }
 
     fn collect_tagged_template_vars(&self) -> Vec<String> {
+        if self.transforms.helpers_populated() {
+            return self.collect_tagged_template_vars_from_transforms();
+        }
+
         let mut vars = Vec::new();
         for (idx, node) in self.arena.nodes.iter().enumerate() {
             if node.kind == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION {
                 vars.push(self.tagged_template_var_name(NodeIndex(idx as u32)));
+            }
+        }
+        vars
+    }
+
+    fn collect_tagged_template_vars_from_transforms(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+        for (&idx, directive) in self.transforms.iter() {
+            if !matches!(directive, TransformDirective::ES5TemplateLiteral { .. }) {
+                continue;
+            }
+
+            let Some(node) = self.arena.get(idx) else { continue };
+            if node.kind == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION {
+                vars.push(self.tagged_template_var_name(idx));
             }
         }
         vars
