@@ -80,6 +80,11 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Constrain optional union targets
 - [x] Use Atom for discriminant property names in narrowing
 - [x] Compare property access names via Atom to avoid resolve_atom churn
+- [x] Store subtype failure property names as Atom for diagnostics
+- [x] Avoid allocation when constraining non-nullish union targets
+- [x] Respect type parameter shadowing in instantiation scopes
+- [x] Use FxHashMap for substitution and inference maps
+- [x] Infer generics for callable overload signatures
 
 ## Architecture Notes
 - Use `ena` crate for union-find data structure

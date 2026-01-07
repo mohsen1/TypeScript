@@ -95,6 +95,7 @@ const bad: Foo = { x: 1, y: 2 };
 
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
     let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
 
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(parser.get_arena(), root);
@@ -1677,6 +1678,69 @@ type Alias = Foo.Bar;
             assert_eq!(prop.type_id, TypeId::NUMBER);
         }
         _ => panic!("Expected Alias to resolve to Object type, got {:?}", alias_key),
+    }
+}
+
+#[test]
+fn test_checker_interface_typeof_value_reference() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::{TypeKey, SymbolRef};
+
+    let source = r#"
+const Foo = 1;
+namespace Ns {
+    export const value = 1;
+}
+interface Bar {
+    x: typeof Foo;
+    y: typeof Ns.value;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let foo_sym = binder.file_locals.get("Foo").expect("Foo should exist");
+    let ns_sym = binder.file_locals.get("Ns").expect("Ns should exist");
+    let value_sym = binder.get_symbol(ns_sym)
+        .and_then(|symbol| symbol.exports.as_ref())
+        .and_then(|exports| exports.get("value"))
+        .expect("Ns.value should exist");
+
+    let bar_sym = binder.file_locals.get("Bar").expect("Bar should exist");
+    let bar_type = checker.get_type_of_symbol(bar_sym);
+    let bar_key = types.lookup(bar_type).expect("Bar type should exist");
+    match bar_key {
+        TypeKey::Object(props) => {
+            let prop_names: Vec<String> = props.iter()
+                .map(|prop| types.resolve_atom(prop.name))
+                .collect();
+            let prop_x = props.iter()
+                .find(|prop| types.resolve_atom(prop.name) == "x")
+                .expect("Expected property x");
+            let prop_y = props.iter()
+                .find(|prop| types.resolve_atom(prop.name) == "y")
+                .expect(&format!("Expected property y, got {:?}", prop_names));
+
+            match types.lookup(prop_x.type_id) {
+                Some(TypeKey::TypeQuery(SymbolRef(sym_id))) => assert_eq!(sym_id, foo_sym.0),
+                other => panic!("Expected x to be typeof Foo, got {:?}", other),
+            }
+
+            match types.lookup(prop_y.type_id) {
+                Some(TypeKey::TypeQuery(SymbolRef(sym_id))) => assert_eq!(sym_id, value_sym.0),
+                other => panic!("Expected y to be typeof Ns.value, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Bar to resolve to Object type, got {:?}", bar_key),
     }
 }
 

@@ -98,6 +98,15 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Mark method signatures and apply bivariant parameter checks regardless of strictFunctionTypes
 - [x] Tests for method vs function property variance
 
+### Phase 12: Exact Optional Property Types
+- [x] Expose compat flag to enable exact optional property checking
+- [x] Tests for exact optional property assignability differences
+
+### Phase 13: Apparent Members of Primitives
+- [x] Resolve property access on primitive intrinsics and literal types via apparent members
+- [x] Return callable types for built-in primitive/array methods
+- [x] Tests for primitive method property access and literal string properties
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
