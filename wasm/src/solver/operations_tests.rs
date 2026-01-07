@@ -108,6 +108,7 @@ fn test_call_assignability_respects_strict_function_types_toggle() {
     let animal = interner.object(vec![PropertyInfo {
         name,
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -116,6 +117,7 @@ fn test_call_assignability_respects_strict_function_types_toggle() {
         PropertyInfo {
             name,
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -123,6 +125,7 @@ fn test_call_assignability_respects_strict_function_types_toggle() {
         PropertyInfo {
             name: breed,
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -194,6 +197,7 @@ fn test_call_weak_type_with_compat_checker() {
     let weak_target = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: true,
         readonly: false,
         is_method: false,
@@ -215,6 +219,7 @@ fn test_call_weak_type_with_compat_checker() {
     let arg = interner.object(vec![PropertyInfo {
         name: interner.intern_string("b"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -627,6 +632,7 @@ fn test_property_access_object() {
         PropertyInfo {
             name: interner.intern_string("x"),
             type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
             optional: false,
             readonly: false,
             is_method: false,
@@ -634,6 +640,7 @@ fn test_property_access_object() {
         PropertyInfo {
             name: interner.intern_string("y"),
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -744,6 +751,7 @@ fn test_property_access_optional_property() {
         PropertyInfo {
             name: interner.intern_string("x"),
             type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
             optional: true,
             readonly: false,
             is_method: false,
@@ -962,6 +970,7 @@ fn test_property_access_object_with_index_optional_property() {
         properties: vec![PropertyInfo {
             name: interner.intern_string("x"),
             type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
             optional: true,
             readonly: false,
             is_method: false,
@@ -2044,6 +2053,7 @@ fn test_infer_generic_keyof_param_from_keyof_arg() {
     let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -2091,6 +2101,7 @@ fn test_infer_generic_index_access_param_from_index_access_arg() {
     let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -2117,6 +2128,7 @@ fn test_infer_generic_index_access_param_from_object_property_arg() {
     let obj = interner.object(vec![PropertyInfo {
         name: interner.intern_string("x"),
         type_id: t_type,
+        write_type: t_type,
         optional: false,
         readonly: false,
         is_method: false,
@@ -2270,6 +2282,7 @@ fn test_infer_generic_mapped_param_from_object_arg() {
         PropertyInfo {
             name: interner.intern_string("x"),
             type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
             optional: false,
             readonly: false,
             is_method: false,
@@ -2277,6 +2290,7 @@ fn test_infer_generic_mapped_param_from_object_arg() {
         PropertyInfo {
             name: interner.intern_string("y"),
             type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
             optional: false,
             readonly: false,
             is_method: false,
@@ -2576,6 +2590,7 @@ fn test_infer_generic_object_property() {
     let boxed_t = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
         type_id: t_type,
+        write_type: t_type,
         optional: false,
         readonly: false,
         is_method: false,
@@ -2598,6 +2613,7 @@ fn test_infer_generic_object_property() {
     let arg = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -2625,6 +2641,7 @@ fn test_infer_generic_optional_property_value() {
             type_id: interner.object(vec![PropertyInfo {
                 name: interner.intern_string("a"),
                 type_id: t_type,
+                write_type: t_type,
                 optional: true,
                 readonly: false,
                 is_method: false,
@@ -2641,6 +2658,7 @@ fn test_infer_generic_optional_property_value() {
     let arg = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -2669,6 +2687,7 @@ fn test_infer_generic_optional_property_undefined_value() {
             type_id: interner.object(vec![PropertyInfo {
                 name: interner.intern_string("a"),
                 type_id: t_type,
+                write_type: t_type,
                 optional: true,
                 readonly: false,
                 is_method: false,
@@ -2685,6 +2704,7 @@ fn test_infer_generic_optional_property_undefined_value() {
     let arg = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: TypeId::UNDEFINED,
+        write_type: TypeId::UNDEFINED,
         optional: false,
         readonly: false,
         is_method: false,
@@ -2713,6 +2733,7 @@ fn test_infer_generic_optional_property_missing() {
             type_id: interner.object(vec![PropertyInfo {
                 name: interner.intern_string("a"),
                 type_id: t_type,
+                write_type: t_type,
                 optional: true,
                 readonly: false,
                 is_method: false,
@@ -2751,6 +2772,7 @@ fn test_infer_generic_required_property_from_optional_argument() {
             type_id: interner.object(vec![PropertyInfo {
                 name: interner.intern_string("a"),
                 type_id: t_type,
+                write_type: t_type,
                 optional: false,
                 readonly: false,
                 is_method: false,
@@ -2767,6 +2789,7 @@ fn test_infer_generic_required_property_from_optional_argument() {
     let arg = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: true,
         readonly: false,
         is_method: false,
@@ -2795,6 +2818,7 @@ fn test_infer_generic_required_property_missing_argument() {
             type_id: interner.object(vec![PropertyInfo {
                 name: interner.intern_string("a"),
                 type_id: t_type,
+                write_type: t_type,
                 optional: false,
                 readonly: false,
                 is_method: false,
@@ -2833,6 +2857,7 @@ fn test_infer_generic_readonly_property_mismatch() {
             type_id: interner.object(vec![PropertyInfo {
                 name: interner.intern_string("a"),
                 type_id: t_type,
+                write_type: t_type,
                 optional: false,
                 readonly: false,
                 is_method: false,
@@ -2849,6 +2874,7 @@ fn test_infer_generic_readonly_property_mismatch() {
     let arg = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: true,
         is_method: false,
@@ -2878,6 +2904,7 @@ fn test_infer_generic_readonly_property_mismatch_with_index_signature() {
                 properties: vec![PropertyInfo {
                     name: interner.intern_string("a"),
                     type_id: t_type,
+                    write_type: t_type,
                     optional: false,
                     readonly: false,
                     is_method: false,
@@ -2902,6 +2929,7 @@ fn test_infer_generic_readonly_property_mismatch_with_index_signature() {
         properties: vec![PropertyInfo {
             name: interner.intern_string("a"),
             type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
             optional: false,
             readonly: true,
             is_method: false,
@@ -3047,6 +3075,7 @@ fn test_infer_generic_method_property_bivariant_param() {
             type_id: interner.object(vec![PropertyInfo {
                 name: interner.intern_string("m"),
                 type_id: method_type,
+                write_type: method_type,
                 optional: false,
                 readonly: false,
                 is_method: true,
@@ -3078,6 +3107,7 @@ fn test_infer_generic_method_property_bivariant_param() {
     let arg = interner.object(vec![PropertyInfo {
         name: interner.intern_string("m"),
         type_id: arg_method_type,
+        write_type: arg_method_type,
         optional: false,
         readonly: false,
         is_method: false,
@@ -3120,6 +3150,7 @@ fn test_infer_generic_function_property_contravariant_param() {
             type_id: interner.object(vec![PropertyInfo {
                 name: interner.intern_string("f"),
                 type_id: function_type,
+                write_type: function_type,
                 optional: false,
                 readonly: false,
                 is_method: false,
@@ -3151,6 +3182,7 @@ fn test_infer_generic_function_property_contravariant_param() {
     let arg = interner.object(vec![PropertyInfo {
         name: interner.intern_string("f"),
         type_id: arg_function_type,
+        write_type: arg_function_type,
         optional: false,
         readonly: false,
         is_method: false,
@@ -3193,6 +3225,7 @@ fn test_infer_generic_method_property_bivariant_optional_param() {
             type_id: interner.object(vec![PropertyInfo {
                 name: interner.intern_string("m"),
                 type_id: method_type,
+                write_type: method_type,
                 optional: false,
                 readonly: false,
                 is_method: true,
@@ -3224,6 +3257,7 @@ fn test_infer_generic_method_property_bivariant_optional_param() {
     let arg = interner.object(vec![PropertyInfo {
         name: interner.intern_string("m"),
         type_id: arg_method_type,
+        write_type: arg_method_type,
         optional: false,
         readonly: false,
         is_method: false,
@@ -3252,6 +3286,7 @@ fn test_infer_generic_missing_property_uses_index_signature() {
             type_id: interner.object(vec![PropertyInfo {
                 name: interner.intern_string("a"),
                 type_id: t_type,
+                write_type: t_type,
                 optional: false,
                 readonly: false,
                 is_method: false,
@@ -3298,6 +3333,7 @@ fn test_infer_generic_missing_numeric_property_uses_number_index_signature() {
             type_id: interner.object(vec![PropertyInfo {
                 name: interner.intern_string("0"),
                 type_id: t_type,
+                write_type: t_type,
                 optional: false,
                 readonly: false,
                 is_method: false,
@@ -3578,6 +3614,7 @@ fn test_infer_generic_index_signature_from_object_literal() {
     let object_literal = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -3626,6 +3663,7 @@ fn test_infer_generic_index_signature_from_optional_property() {
     let object_literal = interner.object(vec![PropertyInfo {
         name: interner.intern_string("a"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: true,
         readonly: false,
         is_method: false,
@@ -3675,6 +3713,7 @@ fn test_infer_generic_number_index_from_optional_property() {
     let object_literal = interner.object(vec![PropertyInfo {
         name: interner.intern_string("0"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: true,
         readonly: false,
         is_method: false,
@@ -3724,6 +3763,7 @@ fn test_infer_generic_number_index_from_numeric_property() {
     let object_literal = interner.object(vec![PropertyInfo {
         name: interner.intern_string("0"),
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -3772,6 +3812,7 @@ fn test_infer_generic_number_index_ignores_noncanonical_numeric_property() {
     let object_literal = interner.object(vec![PropertyInfo {
         name: interner.intern_string("01"),
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -3820,6 +3861,7 @@ fn test_infer_generic_number_index_ignores_negative_zero_property() {
     let object_literal = interner.object(vec![PropertyInfo {
         name: interner.intern_string("-0"),
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -3868,6 +3910,7 @@ fn test_infer_generic_number_index_from_nan_property() {
     let object_literal = interner.object(vec![PropertyInfo {
         name: interner.intern_string("NaN"),
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -3916,6 +3959,7 @@ fn test_infer_generic_number_index_from_exponent_property() {
     let object_literal = interner.object(vec![PropertyInfo {
         name: interner.intern_string("1e-7"),
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -3964,6 +4008,7 @@ fn test_infer_generic_number_index_from_negative_infinity_property() {
     let object_literal = interner.object(vec![PropertyInfo {
         name: interner.intern_string("-Infinity"),
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -4026,6 +4071,7 @@ fn test_infer_generic_index_signatures_from_mixed_properties() {
         PropertyInfo {
             name: interner.intern_string("0"),
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -4033,6 +4079,7 @@ fn test_infer_generic_index_signatures_from_mixed_properties() {
         PropertyInfo {
             name: interner.intern_string("foo"),
             type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
             optional: false,
             readonly: false,
             is_method: false,
@@ -4101,6 +4148,7 @@ fn test_infer_generic_index_signatures_from_optional_mixed_properties() {
         PropertyInfo {
             name: interner.intern_string("0"),
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: true,
             readonly: false,
             is_method: false,
@@ -4108,6 +4156,7 @@ fn test_infer_generic_index_signatures_from_optional_mixed_properties() {
         PropertyInfo {
             name: interner.intern_string("foo"),
             type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
             optional: false,
             readonly: false,
             is_method: false,
@@ -4177,6 +4226,7 @@ fn test_infer_generic_index_signatures_ignore_optional_noncanonical_numeric_prop
         PropertyInfo {
             name: interner.intern_string("0"),
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -4184,6 +4234,7 @@ fn test_infer_generic_index_signatures_ignore_optional_noncanonical_numeric_prop
         PropertyInfo {
             name: interner.intern_string("00"),
             type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
             optional: true,
             readonly: false,
             is_method: false,
@@ -4218,6 +4269,7 @@ fn test_infer_generic_property_from_source_index_signature() {
             type_id: interner.object(vec![PropertyInfo {
                 name: interner.intern_string("a"),
                 type_id: t_type,
+                write_type: t_type,
                 optional: false,
                 readonly: false,
                 is_method: false,
@@ -4264,6 +4316,7 @@ fn test_infer_generic_property_from_number_index_signature_infinity() {
             type_id: interner.object(vec![PropertyInfo {
                 name: interner.intern_string("Infinity"),
                 type_id: t_type,
+                write_type: t_type,
                 optional: false,
                 readonly: false,
                 is_method: false,
@@ -4306,6 +4359,7 @@ fn test_infer_generic_union_source() {
     let boxed_t = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
         type_id: t_type,
+        write_type: t_type,
         optional: false,
         readonly: false,
         is_method: false,
@@ -4328,6 +4382,7 @@ fn test_infer_generic_union_source() {
     let boxed_number = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -4335,6 +4390,7 @@ fn test_infer_generic_union_source() {
     let boxed_string = interner.object(vec![PropertyInfo {
         name: interner.intern_string("value"),
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,

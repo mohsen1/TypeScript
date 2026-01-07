@@ -318,6 +318,7 @@ fn test_resolve_bounds_object_subtype() {
     let upper = interner.object(vec![PropertyInfo {
         name: name_a,
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -326,6 +327,7 @@ fn test_resolve_bounds_object_subtype() {
         PropertyInfo {
             name: name_a,
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -333,6 +335,7 @@ fn test_resolve_bounds_object_subtype() {
         PropertyInfo {
             name: name_b,
             type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
             optional: false,
             readonly: false,
             is_method: false,
@@ -357,6 +360,7 @@ fn test_resolve_bounds_object_readonly_property_mismatch() {
     let upper = interner.object(vec![PropertyInfo {
         name: name_a,
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -365,6 +369,7 @@ fn test_resolve_bounds_object_readonly_property_mismatch() {
     let lower = interner.object(vec![PropertyInfo {
         name: name_a,
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: true,
         is_method: false,
@@ -395,6 +400,7 @@ fn test_resolve_bounds_object_readonly_property_ok() {
     let upper = interner.object(vec![PropertyInfo {
         name: name_a,
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: true,
         is_method: false,
@@ -403,6 +409,7 @@ fn test_resolve_bounds_object_readonly_property_ok() {
     let lower = interner.object(vec![PropertyInfo {
         name: name_a,
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -456,6 +463,7 @@ fn test_resolve_bounds_method_property_bivariant_params() {
     let lower = interner.object(vec![PropertyInfo {
         name: name_m,
         type_id: lower_fn,
+        write_type: lower_fn,
         optional: false,
         readonly: false,
         is_method: true,
@@ -463,6 +471,7 @@ fn test_resolve_bounds_method_property_bivariant_params() {
     let upper = interner.object(vec![PropertyInfo {
         name: name_m,
         type_id: upper_fn,
+        write_type: upper_fn,
         optional: false,
         readonly: false,
         is_method: true,
@@ -516,6 +525,7 @@ fn test_resolve_bounds_function_property_contravariant_params() {
     let lower = interner.object(vec![PropertyInfo {
         name: name_f,
         type_id: lower_fn,
+        write_type: lower_fn,
         optional: false,
         readonly: false,
         is_method: false,
@@ -523,6 +533,7 @@ fn test_resolve_bounds_function_property_contravariant_params() {
     let upper = interner.object(vec![PropertyInfo {
         name: name_f,
         type_id: upper_fn,
+        write_type: upper_fn,
         optional: false,
         readonly: false,
         is_method: false,
@@ -584,6 +595,7 @@ fn test_resolve_bounds_with_assignability_bivariant_function_property() {
     let lower = interner.object(vec![PropertyInfo {
         name: name_f,
         type_id: lower_fn,
+        write_type: lower_fn,
         optional: false,
         readonly: false,
         is_method: false,
@@ -591,6 +603,7 @@ fn test_resolve_bounds_with_assignability_bivariant_function_property() {
     let upper = interner.object(vec![PropertyInfo {
         name: name_f,
         type_id: upper_fn,
+        write_type: upper_fn,
         optional: false,
         readonly: false,
         is_method: false,
@@ -645,6 +658,7 @@ fn test_resolve_bounds_object_with_index_subtype() {
         properties: vec![PropertyInfo {
             name: name_a,
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -685,6 +699,7 @@ fn test_resolve_bounds_index_readonly_property_mismatch() {
     let lower = interner.object(vec![PropertyInfo {
         name: name_a,
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: true,
         is_method: false,
@@ -801,6 +816,7 @@ fn test_resolve_bounds_number_index_allows_non_numeric_property() {
         properties: vec![PropertyInfo {
             name: name_a,
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -838,6 +854,7 @@ fn test_resolve_bounds_number_index_numeric_property_mismatch() {
         properties: vec![PropertyInfo {
             name: name_zero,
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -882,6 +899,7 @@ fn test_resolve_bounds_number_index_ignores_non_canonical_numeric_name() {
         properties: vec![PropertyInfo {
             name,
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,
@@ -919,6 +937,7 @@ fn test_resolve_bounds_number_index_accepts_exponent_name() {
         properties: vec![PropertyInfo {
             name,
             type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
             optional: false,
             readonly: false,
             is_method: false,

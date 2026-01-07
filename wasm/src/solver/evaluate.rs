@@ -884,6 +884,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             properties.push(PropertyInfo {
                 name: key_name,
                 type_id: property_type,
+                write_type: property_type,
                 optional,
                 readonly,
                 is_method: false,
@@ -1186,6 +1187,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 ApparentMemberKind::Value(type_id) => properties.push(PropertyInfo {
                     name,
                     type_id,
+                    write_type: type_id,
                     optional: false,
                     readonly: false,
                     is_method: false,
@@ -1193,6 +1195,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 ApparentMemberKind::Method(return_type) => properties.push(PropertyInfo {
                     name,
                     type_id: self.apparent_method_type(return_type),
+                    write_type: self.apparent_method_type(return_type),
                     optional: false,
                     readonly: false,
                     is_method: true,

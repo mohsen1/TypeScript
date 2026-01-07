@@ -179,6 +179,7 @@ switch (x.kind) {
     let member_a = types.object(vec![PropertyInfo {
         name: kind_name,
         type_id: lit_a,
+        write_type: lit_a,
         optional: false,
         readonly: false,
         is_method: false,
@@ -186,6 +187,7 @@ switch (x.kind) {
     let member_b = types.object(vec![PropertyInfo {
         name: kind_name,
         type_id: lit_b,
+        write_type: lit_b,
         optional: false,
         readonly: false,
         is_method: false,
@@ -231,6 +233,7 @@ if (x instanceof Foo) {
     let obj_type = types.object(vec![PropertyInfo {
         name: prop_a,
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -277,6 +280,7 @@ if ("a" in x) {
     let type_a = types.object(vec![PropertyInfo {
         name: prop_a,
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: false,
         readonly: false,
         is_method: false,
@@ -284,6 +288,7 @@ if ("a" in x) {
     let type_b = types.object(vec![PropertyInfo {
         name: prop_b,
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,
@@ -330,6 +335,7 @@ if ("a" in x) {
     let type_a = types.object(vec![PropertyInfo {
         name: prop_a,
         type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
         optional: true,
         readonly: false,
         is_method: false,
@@ -337,6 +343,7 @@ if ("a" in x) {
     let type_b = types.object(vec![PropertyInfo {
         name: prop_b,
         type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
         optional: false,
         readonly: false,
         is_method: false,

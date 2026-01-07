@@ -83,6 +83,7 @@ impl InterfaceParts {
                 match entry.get_mut() {
                     PropertyMerge::Property(existing) => {
                         if existing.type_id == prop.type_id
+                            && existing.write_type == prop.write_type
                             && existing.optional == prop.optional
                             && existing.readonly == prop.readonly
                             && existing.is_method == prop.is_method
@@ -92,6 +93,7 @@ impl InterfaceParts {
                         let conflict = PropertyInfo {
                             name: prop.name,
                             type_id: TypeId::ERROR,
+                            write_type: TypeId::ERROR,
                             optional: existing.optional && prop.optional,
                             readonly: existing.readonly && prop.readonly,
                             is_method: false,
@@ -102,6 +104,7 @@ impl InterfaceParts {
                         let conflict = PropertyInfo {
                             name: prop.name,
                             type_id: TypeId::ERROR,
+                            write_type: TypeId::ERROR,
                             optional: methods.optional && prop.optional,
                             readonly: false,
                             is_method: false,
@@ -136,6 +139,7 @@ impl InterfaceParts {
                         let conflict = PropertyInfo {
                             name,
                             type_id: TypeId::ERROR,
+                            write_type: TypeId::ERROR,
                             optional: prop.optional && optional,
                             readonly: false,
                             is_method: false,
@@ -753,6 +757,7 @@ impl<'a> TypeLowering<'a> {
                                 properties.push(PropertyInfo {
                                     name,
                                     type_id,
+                                    write_type: type_id,
                                     optional: sig.question_token,
                                     readonly: self.has_readonly_modifier(&sig.modifiers),
                                     is_method: true,
@@ -912,6 +917,7 @@ impl<'a> TypeLowering<'a> {
                     properties.push(PropertyInfo {
                         name,
                         type_id,
+                        write_type: type_id,
                         optional: methods.optional,
                         readonly: methods.readonly,
                         is_method: true,
@@ -1254,6 +1260,7 @@ impl<'a> TypeLowering<'a> {
             Some(PropertyInfo {
                 name,
                 type_id: self.lower_type(sig.type_annotation),
+                write_type: self.lower_type(sig.type_annotation),
                 optional: sig.question_token,
                 readonly,
                 is_method: false,
