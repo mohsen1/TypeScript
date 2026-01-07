@@ -328,6 +328,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Narrow generic parameters using constraints during typeof checks
 - [x] Tests for constrained/unconstrained type param typeof narrowing
 
+### Phase 64: Typeof Narrowing Negation
+- [x] Exclude function-like types for typeof !== "function"
+- [x] Tests for typeof negation of function types
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

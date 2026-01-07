@@ -276,6 +276,69 @@ fn test_narrow_by_typeof_unknown_object() {
 }
 
 #[test]
+fn test_narrow_by_typeof_negation_function() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("value"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let union = interner.union(vec![func, obj]);
+
+    let narrowed = ctx.narrow_excluding_function(union);
+    assert_eq!(narrowed, obj);
+}
+
+#[test]
+fn test_narrow_by_typeof_negation_function_branded_intersection() {
+    let interner = TypeInterner::new();
+    let ctx = NarrowingContext::new(&interner);
+
+    let brand = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("__brand"),
+        type_id: interner.literal_string("Tagged"),
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let branded = interner.intersection(vec![func, brand]);
+    let union = interner.union(vec![branded, TypeId::NUMBER]);
+
+    let narrowed = ctx.narrow_excluding_function(union);
+    assert_eq!(narrowed, TypeId::NUMBER);
+}
+
+#[test]
 fn test_narrow_by_typeof_type_param_with_union_constraint() {
     let interner = TypeInterner::new();
     let constraint = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);

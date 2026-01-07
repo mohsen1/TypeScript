@@ -3042,6 +3042,7 @@ impl<'a> ThinCheckerState<'a> {
             "symbol" => TypeId::SYMBOL,
             "undefined" => TypeId::UNDEFINED,
             "object" => TypeId::OBJECT,
+            "function" => return ctx.narrow_excluding_function(source),
             _ => return source,
         };
 

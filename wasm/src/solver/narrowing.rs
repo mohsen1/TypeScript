@@ -349,6 +349,31 @@ impl<'a> NarrowingContext<'a> {
         }
     }
 
+    /// Narrow a type to exclude function-like members (typeof !== "function").
+    pub fn narrow_excluding_function(&self, source_type: TypeId) -> TypeId {
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
+            let remaining: Vec<TypeId> = members
+                .iter()
+                .filter(|&&member| !self.is_function_type(member))
+                .copied()
+                .collect();
+
+            if remaining.is_empty() {
+                return TypeId::NEVER;
+            } else if remaining.len() == 1 {
+                return remaining[0];
+            } else {
+                return self.interner.union(remaining);
+            }
+        }
+
+        if self.is_function_type(source_type) {
+            TypeId::NEVER
+        } else {
+            source_type
+        }
+    }
+
     fn is_object_typeof(&self, type_id: TypeId) -> bool {
         match self.interner.lookup(type_id) {
             Some(TypeKey::Object(_))
