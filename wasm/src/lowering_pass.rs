@@ -309,13 +309,39 @@ impl<'a> LoweringPass<'a> {
                     self.visit(decorator.expression);
                 }
             }
+            k if k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 => {
+                if self.ctx.target_es5 {
+                    self.transforms.insert(
+                        idx,
+                        TransformDirective::ES5TemplateLiteral {
+                            template_node: idx,
+                        },
+                    );
+                }
+            }
             k if k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION => {
+                if self.ctx.target_es5 {
+                    self.transforms.insert(
+                        idx,
+                        TransformDirective::ES5TemplateLiteral {
+                            template_node: idx,
+                        },
+                    );
+                }
                 if let Some(tagged) = self.arena.get_tagged_template(node) {
                     self.visit(tagged.tag);
                     self.visit(tagged.template);
                 }
             }
             k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
+                if self.ctx.target_es5 {
+                    self.transforms.insert(
+                        idx,
+                        TransformDirective::ES5TemplateLiteral {
+                            template_node: idx,
+                        },
+                    );
+                }
                 if let Some(template) = self.arena.get_template_expr(node) {
                     self.visit(template.head);
                     for &span_idx in &template.template_spans.nodes {
