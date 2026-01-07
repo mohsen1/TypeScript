@@ -8,7 +8,8 @@ use crate::binder::SymbolTable;
 use crate::checker::types::diagnostics::{Diagnostic, DiagnosticCategory};
 use crate::cli::args::CliArgs;
 use crate::cli::config::{
-    load_tsconfig, resolve_compiler_options, JsxEmit, PathMapping, ResolvedCompilerOptions, TsConfig,
+    load_tsconfig, resolve_compiler_options, JsxEmit, ModuleResolutionKind, PathMapping,
+    ResolvedCompilerOptions, TsConfig,
 };
 use crate::cli::fs::{discover_ts_files, is_ts_file, FileDiscoveryOptions};
 use crate::declaration_emitter::DeclarationEmitter;
@@ -424,8 +425,16 @@ struct PackageJson {
 }
 
 fn export_conditions(options: &ResolvedCompilerOptions) -> Vec<&'static str> {
+    let resolution = options.effective_module_resolution();
     let mut conditions = Vec::new();
     push_condition(&mut conditions, "types");
+
+    match resolution {
+        ModuleResolutionKind::Bundler => push_condition(&mut conditions, "browser"),
+        ModuleResolutionKind::Node | ModuleResolutionKind::Node16 | ModuleResolutionKind::NodeNext => {
+            push_condition(&mut conditions, "node");
+        }
+    }
 
     match options.printer.module {
         ModuleKind::CommonJS | ModuleKind::AMD | ModuleKind::UMD | ModuleKind::System => {
@@ -443,8 +452,18 @@ fn export_conditions(options: &ResolvedCompilerOptions) -> Vec<&'static str> {
     }
 
     push_condition(&mut conditions, "default");
-    push_condition(&mut conditions, "import");
-    push_condition(&mut conditions, "require");
+    match resolution {
+        ModuleResolutionKind::Bundler => {
+            push_condition(&mut conditions, "import");
+            push_condition(&mut conditions, "require");
+            push_condition(&mut conditions, "node");
+        }
+        ModuleResolutionKind::Node | ModuleResolutionKind::Node16 | ModuleResolutionKind::NodeNext => {
+            push_condition(&mut conditions, "import");
+            push_condition(&mut conditions, "require");
+            push_condition(&mut conditions, "browser");
+        }
+    }
 
     conditions
 }

@@ -28,6 +28,8 @@ pub struct CompilerOptions {
     #[serde(default)]
     pub module: Option<String>,
     #[serde(default)]
+    pub module_resolution: Option<String>,
+    #[serde(default)]
     pub jsx: Option<String>,
     #[serde(default)]
     pub lib: Option<Vec<String>>,
@@ -62,6 +64,7 @@ pub struct ResolvedCompilerOptions {
     pub checker: CheckerOptions,
     pub jsx: Option<JsxEmit>,
     pub lib_files: Vec<PathBuf>,
+    pub module_resolution: Option<ModuleResolutionKind>,
     pub base_url: Option<PathBuf>,
     pub paths: Option<Vec<PathMapping>>,
     pub root_dir: Option<PathBuf>,
@@ -76,6 +79,14 @@ pub struct ResolvedCompilerOptions {
 pub enum JsxEmit {
     Preserve,
     ReactNative,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModuleResolutionKind {
+    Node,
+    Node16,
+    NodeNext,
+    Bundler,
 }
 
 #[derive(Debug, Clone)]
@@ -114,6 +125,20 @@ impl PathMapping {
     }
 }
 
+impl ResolvedCompilerOptions {
+    pub(crate) fn effective_module_resolution(&self) -> ModuleResolutionKind {
+        if let Some(resolution) = self.module_resolution {
+            return resolution;
+        }
+
+        match self.printer.module {
+            ModuleKind::Node16 => ModuleResolutionKind::Node16,
+            ModuleKind::NodeNext => ModuleResolutionKind::NodeNext,
+            _ => ModuleResolutionKind::Node,
+        }
+    }
+}
+
 impl Default for ResolvedCompilerOptions {
     fn default() -> Self {
         ResolvedCompilerOptions {
@@ -121,6 +146,7 @@ impl Default for ResolvedCompilerOptions {
             checker: CheckerOptions::default(),
             jsx: None,
             lib_files: Vec::new(),
+            module_resolution: None,
             base_url: None,
             paths: None,
             root_dir: None,
@@ -145,6 +171,13 @@ pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<Res
 
     if let Some(module) = options.module.as_deref() {
         resolved.printer.module = parse_module_kind(module)?;
+    }
+
+    if let Some(module_resolution) = options.module_resolution.as_deref() {
+        let value = module_resolution.trim();
+        if !value.is_empty() {
+            resolved.module_resolution = Some(parse_module_resolution(value)?);
+        }
     }
 
     if let Some(jsx) = options.jsx.as_deref() {
@@ -284,6 +317,7 @@ fn merge_compiler_options(base: CompilerOptions, child: CompilerOptions) -> Comp
     CompilerOptions {
         target: child.target.or(base.target),
         module: child.module.or(base.module),
+        module_resolution: child.module_resolution.or(base.module_resolution),
         jsx: child.jsx.or(base.jsx),
         lib: child.lib.or(base.lib),
         base_url: child.base_url.or(base.base_url),
@@ -336,6 +370,19 @@ fn parse_module_kind(value: &str) -> Result<ModuleKind> {
     };
 
     Ok(module)
+}
+
+fn parse_module_resolution(value: &str) -> Result<ModuleResolutionKind> {
+    let normalized = normalize_option(value);
+    let resolution = match normalized.as_str() {
+        "node" | "node10" => ModuleResolutionKind::Node,
+        "node16" => ModuleResolutionKind::Node16,
+        "nodenext" => ModuleResolutionKind::NodeNext,
+        "bundler" => ModuleResolutionKind::Bundler,
+        _ => bail!("unsupported compilerOptions.moduleResolution '{}'", value),
+    };
+
+    Ok(resolution)
 }
 
 fn parse_jsx_emit(value: &str) -> Result<JsxEmit> {
