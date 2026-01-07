@@ -776,23 +776,7 @@ impl<'a> InferenceContext<'a> {
         if !self.object_subtype_of(source, &target.properties) {
             return false;
         }
-        if let Some(t_string_idx) = &target.string_index {
-            for prop in source {
-                let prop_type = self.optional_property_type(prop);
-                if !self.is_subtype(prop_type, t_string_idx.value_type) {
-                    return false;
-                }
-            }
-        }
-        if let Some(t_number_idx) = &target.number_index {
-            for prop in source {
-                let prop_type = self.optional_property_type(prop);
-                if !self.is_subtype(prop_type, t_number_idx.value_type) {
-                    return false;
-                }
-            }
-        }
-        true
+        self.check_properties_against_index_signatures(source, target)
     }
 
     fn object_with_index_subtype_of(&self, source: &ObjectShape, target: &ObjectShape) -> bool {
@@ -801,19 +785,9 @@ impl<'a> InferenceContext<'a> {
         }
 
         if let Some(t_string_idx) = &target.string_index {
-            match &source.string_index {
-                Some(s_string_idx) => {
-                    if !self.is_subtype(s_string_idx.value_type, t_string_idx.value_type) {
-                        return false;
-                    }
-                }
-                None => {
-                    for prop in &source.properties {
-                        let prop_type = self.optional_property_type(prop);
-                        if !self.is_subtype(prop_type, t_string_idx.value_type) {
-                            return false;
-                        }
-                    }
+            if let Some(s_string_idx) = &source.string_index {
+                if !self.is_subtype(s_string_idx.value_type, t_string_idx.value_type) {
+                    return false;
                 }
             }
         }
@@ -825,13 +799,39 @@ impl<'a> InferenceContext<'a> {
                         return false;
                     }
                 }
-                None => {
-                    for prop in &source.properties {
-                        let prop_type = self.optional_property_type(prop);
-                        if !self.is_subtype(prop_type, t_number_idx.value_type) {
-                            return false;
-                        }
-                    }
+                None => {}
+            }
+        }
+
+        self.check_properties_against_index_signatures(&source.properties, target)
+    }
+
+    fn check_properties_against_index_signatures(
+        &self,
+        source: &[PropertyInfo],
+        target: &ObjectShape,
+    ) -> bool {
+        let string_index = target.string_index.as_ref();
+        let number_index = target.number_index.as_ref();
+
+        if string_index.is_none() && number_index.is_none() {
+            return true;
+        }
+
+        for prop in source {
+            let prop_type = self.optional_property_type(prop);
+
+            if let Some(number_idx) = number_index {
+                if self.is_numeric_property_name(prop.name)
+                    && !self.is_subtype(prop_type, number_idx.value_type)
+                {
+                    return false;
+                }
+            }
+
+            if let Some(string_idx) = string_index {
+                if !self.is_subtype(prop_type, string_idx.value_type) {
+                    return false;
                 }
             }
         }
@@ -851,6 +851,11 @@ impl<'a> InferenceContext<'a> {
 
     fn are_parameters_compatible(&self, source: TypeId, target: TypeId) -> bool {
         self.is_subtype(target, source)
+    }
+
+    fn is_numeric_property_name(&self, name: Atom) -> bool {
+        let prop_name = self.interner.resolve_atom(name);
+        prop_name.parse::<f64>().is_ok()
     }
 
     fn function_like_subtype_of(

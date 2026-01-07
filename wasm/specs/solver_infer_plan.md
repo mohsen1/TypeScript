@@ -108,6 +108,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Allow object keyword bounds during inference resolution
 - [x] Validate index signature bounds during inference resolution
 - [x] Add negative index signature bounds coverage
+- [x] Refine number index property checks during bounds validation
 
 ## Architecture Notes
 - Use `ena` crate for union-find data structure
