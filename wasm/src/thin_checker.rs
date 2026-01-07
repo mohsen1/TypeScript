@@ -2153,8 +2153,16 @@ impl<'a> ThinCheckerState<'a> {
             if !decl_idx.is_none() {
                 if let Some(node) = self.ctx.arena.get(decl_idx) {
                     if let Some(type_alias) = self.ctx.arena.get_type_alias(node) {
-                        // Use checker's type resolution which can resolve type references through binder
-                        return self.get_type_from_type_node(type_alias.type_node);
+                        // Use TypeLowering with type parameter scope for generic aliases.
+                        let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
+                        let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
+                        let lowering = TypeLowering::with_resolvers(
+                            self.ctx.arena,
+                            self.ctx.types,
+                            &type_resolver,
+                            &value_resolver,
+                        );
+                        return lowering.lower_type_alias_declaration(type_alias);
                     }
                 }
             }
