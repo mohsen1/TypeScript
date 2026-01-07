@@ -144,6 +144,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Add method property bivariant parameter coverage for generic inference
 - [x] Add function property contravariant parameter coverage for generic inference
 - [x] Add method property bivariant optional parameter coverage for generic inference
+- [x] Add missing property inference via index signature coverage
 - [x] Enforce index signature consistency during bounds validation
 
 ## Architecture Notes
