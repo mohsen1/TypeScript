@@ -504,6 +504,29 @@ fn test_two_phase_emission_es5_arrow_function_this_capture() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_nested_arrow_this_capture() {
+    let source = "const outer = () => { const inner = () => this.x; };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("})(_this)"),
+        "ES5 nested arrow should pass outer _this into inner capture: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_async_arrow_function() {
     let source = "const foo = async () => { await bar(); };";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
