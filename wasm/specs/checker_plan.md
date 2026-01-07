@@ -96,8 +96,8 @@ Status: Active
   - Error when `typeof` references interface/type alias exports.
   - Add focused tests for type-query usage.
 - [x] Report TS2749 for value-only symbols in type positions
-  - Error on local value names and namespace value members used as types.
-  - Add coverage for namespace alias chains.
+  - Error on local value names, functions, and namespace symbols used as types.
+  - Add coverage for namespace alias chains and namespace-as-type usage.
 - [x] Add loop flow labels for while/do statements
   - Enable narrowing within `while` bodies and keep `do` bodies conservative.
   - Add focused flow tests for loop narrowing.

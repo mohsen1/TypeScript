@@ -122,6 +122,28 @@ fn test_thin_emit_function_declaration() {
 }
 
 #[test]
+fn test_thin_emit_function_expression() {
+    let source = "const fnExpr = function() { return 1; };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function ("),
+        "Expected function expression in output: {}",
+        output
+    );
+    assert!(
+        output.contains("{ return 1; }"),
+        "Expected single-line return block in output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_string_literal_single_quote() {
     let source = "const s = \"hi\";";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
