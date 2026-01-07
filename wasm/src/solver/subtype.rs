@@ -351,6 +351,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             // Union target: source must be subtype of at least one member
             (_, TypeKey::Union(members)) => {
+                if matches!(source_key, TypeKey::KeyOf(_))
+                    && self.union_includes_keyof_primitives(members)
+                {
+                    return SubtypeResult::True;
+                }
                 for &member in members {
                     if self.check_subtype(source, member).is_true() {
                         return SubtypeResult::True;
@@ -585,8 +590,6 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 // keyof T <: keyof U when U <: T (contravariant in T)
                 self.check_subtype(*t_inner, *s_inner)
             }
-            // keyof T is a subtype of string | number | symbol
-            (TypeKey::KeyOf(_), TypeKey::Intrinsic(IntrinsicKind::String)) => SubtypeResult::True,
             // Note: KeyOf vs Union is handled by the general Union target case above
 
             // Readonly types - readonly T[] <: readonly U[] if T <: U
@@ -694,6 +697,26 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
     fn types_equivalent(&mut self, left: TypeId, right: TypeId) -> bool {
         self.check_subtype(left, right).is_true() && self.check_subtype(right, left).is_true()
+    }
+
+    fn union_includes_keyof_primitives(&self, members: &[TypeId]) -> bool {
+        let mut has_string = false;
+        let mut has_number = false;
+        let mut has_symbol = false;
+
+        for &member in members {
+            match member {
+                TypeId::STRING => has_string = true,
+                TypeId::NUMBER => has_number = true,
+                TypeId::SYMBOL => has_symbol = true,
+                _ => {}
+            }
+            if has_string && has_number && has_symbol {
+                return true;
+            }
+        }
+
+        false
     }
 
     fn is_object_keyword_type(&mut self, source: TypeId) -> bool {

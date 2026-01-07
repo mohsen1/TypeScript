@@ -279,6 +279,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Intersect union `keyof` key sets using literal/primitive overlap
 - [x] Tests for union `keyof` key intersections
 
+### Phase 52: Keyof Constraint Assignability
+- [x] Treat deferred `keyof` as assignable only to `string | number | symbol`
+- [x] Tests for deferred `keyof` assignability to key unions
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
