@@ -9,7 +9,7 @@ Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (in
 ## Current Status
 - Solver TypeDatabase + lowering/inference/compat layers are integrated.
 - Control flow narrowing includes false-branch logic for typeof/truthiness.
-- TODOs remain in namespace member resolution.
+- Namespace member resolution covers nested namespaces and import-equals aliases.
 - Checker uses binder persistent scopes with SymbolId type caching; local scope stack removed.
 - Solver inference skips constraining defaulted placeholders in union targets to preserve defaults.
 - Type literal lowering uses checker paths for type params while preserving ref semantics for named members.
@@ -29,7 +29,7 @@ Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (in
 - [x] Complete control-flow narrowing for false branches
   - `typeof` false branch exclusion; truthiness false branch (null/undefined/false/0/"").
   - Add tests in `checker/control_flow.rs`.
-- [ ] Namespace member resolution parity
+- [x] Namespace member resolution parity
   - Verify 2694/2700 errors for missing members.
   - Add tests for nested namespaces and `import Alias = ns.Member`.
 

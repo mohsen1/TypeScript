@@ -3839,6 +3839,67 @@ var x: Alias;
 }
 
 #[test]
+fn test_nested_namespace_member_resolution() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Outer {
+    export namespace Inner {
+        export interface Box<T> { value: T; }
+    }
+}
+let ok: Outer.Inner.Box<number> = { value: 1 };
+let bad: Outer.Inner.Box<number> = { value: "oops" };
+let missing: Outer.Inner.Missing;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    assert!(codes.contains(&2694), "Expected error 2694 for missing nested namespace member, got: {:?}", codes);
+    assert!(codes.contains(&2322), "Expected error 2322 for nested namespace generic mismatch, got: {:?}", codes);
+}
+
+#[test]
+fn test_import_alias_namespace_member_resolution() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace NS {
+    export interface Box<T> { value: T; }
+}
+import Alias = NS;
+let ok: Alias.Box<number> = { value: 1 };
+let bad: Alias.Box<number> = { value: "oops" };
+let missing: Alias.Missing;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    assert!(codes.contains(&2694), "Expected error 2694 for alias missing member, got: {:?}", codes);
+    assert!(codes.contains(&2322), "Expected error 2322 for alias generic mismatch, got: {:?}", codes);
+}
+
+#[test]
 fn test_deep_binary_expression_type_check() {
     use crate::thin_parser::ThinParserState;
 

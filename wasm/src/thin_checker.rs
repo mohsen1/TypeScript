@@ -559,10 +559,20 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Resolve a qualified name or identifier to a symbol ID.
     fn resolve_qualified_symbol(&self, idx: NodeIndex) -> Option<SymbolId> {
+        let mut visited_aliases = Vec::new();
+        self.resolve_qualified_symbol_inner(idx, &mut visited_aliases)
+    }
+
+    fn resolve_qualified_symbol_inner(
+        &self,
+        idx: NodeIndex,
+        visited_aliases: &mut Vec<SymbolId>,
+    ) -> Option<SymbolId> {
         let node = self.ctx.arena.get(idx)?;
 
         if node.kind == SyntaxKind::Identifier as u16 {
-            return self.resolve_identifier_symbol(idx);
+            let sym_id = self.resolve_identifier_symbol(idx)?;
+            return self.resolve_alias_symbol(sym_id, visited_aliases);
         }
 
         if node.kind != syntax_kind_ext::QUALIFIED_NAME {
@@ -570,14 +580,43 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         let qn = self.ctx.arena.get_qualified_name(node)?;
-        let left_sym = self.resolve_qualified_symbol(qn.left)?;
+        let left_sym = self.resolve_qualified_symbol_inner(qn.left, visited_aliases)?;
+        let left_sym = self.resolve_alias_symbol(left_sym, visited_aliases)?;
         let right_name = self.ctx.arena.get(qn.right)
             .and_then(|node| self.ctx.arena.get_identifier(node))
             .map(|ident| ident.escaped_text.as_str())?;
 
         let left_symbol = self.ctx.binder.get_symbol(left_sym)?;
         let exports = left_symbol.exports.as_ref()?;
-        exports.get(right_name)
+        let member_sym = exports.get(right_name)?;
+        self.resolve_alias_symbol(member_sym, visited_aliases)
+    }
+
+    fn resolve_alias_symbol(
+        &self,
+        sym_id: SymbolId,
+        visited_aliases: &mut Vec<SymbolId>,
+    ) -> Option<SymbolId> {
+        let symbol = self.ctx.binder.get_symbol(sym_id)?;
+        if symbol.flags & symbol_flags::ALIAS == 0 {
+            return Some(sym_id);
+        }
+        if visited_aliases.iter().any(|&seen| seen == sym_id) {
+            return None;
+        }
+        visited_aliases.push(sym_id);
+
+        let decl_idx = if !symbol.value_declaration.is_none() {
+            symbol.value_declaration
+        } else {
+            *symbol.declarations.first()?
+        };
+        let decl_node = self.ctx.arena.get(decl_idx)?;
+        if decl_node.kind == syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
+            let import = self.ctx.arena.get_import_decl(decl_node)?;
+            return self.resolve_qualified_symbol_inner(import.module_specifier, visited_aliases);
+        }
+        None
     }
 
     fn entity_name_text(&self, idx: NodeIndex) -> Option<String> {
@@ -721,7 +760,9 @@ impl<'a> ThinCheckerState<'a> {
                 }
 
                 // Not found - report TS2694
-                self.error_namespace_no_export(&symbol.escaped_name, &right_name, qn.right);
+                let namespace_name = self.entity_name_text(qn.left)
+                    .unwrap_or_else(|| symbol.escaped_name.clone());
+                self.error_namespace_no_export(&namespace_name, &right_name, qn.right);
                 return TypeId::ERROR;
             }
         }
