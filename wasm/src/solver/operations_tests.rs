@@ -675,6 +675,114 @@ fn test_property_access_tuple_length() {
 }
 
 #[test]
+fn test_property_access_array_map_signature() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let array = interner.array(TypeId::NUMBER);
+    let result = evaluator.resolve_property_access(array, "map");
+    match result {
+        PropertyAccessResult::Success { type_id, .. } => match interner.lookup(type_id) {
+            Some(TypeKey::Function(func_id)) => {
+                let func = interner.function_shape(func_id);
+                assert_eq!(func.type_params.len(), 1);
+                assert_eq!(func.params.len(), 2);
+                let u_param = &func.type_params[0];
+                let u_type = interner.intern(TypeKey::TypeParameter(u_param.clone()));
+                let expected_return = interner.array(u_type);
+                assert_eq!(func.return_type, expected_return);
+
+                let callback_type = func.params[0].type_id;
+                match interner.lookup(callback_type) {
+                    Some(TypeKey::Function(cb_id)) => {
+                        let callback = interner.function_shape(cb_id);
+                        assert_eq!(callback.return_type, u_type);
+                        assert_eq!(callback.params[0].type_id, TypeId::NUMBER);
+                        assert_eq!(callback.params[1].type_id, TypeId::NUMBER);
+                        assert_eq!(callback.params[2].type_id, array);
+                    }
+                    other => panic!("Expected callback function, got {:?}", other),
+                }
+            }
+            other => panic!("Expected function, got {:?}", other),
+        },
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_property_access_array_at_returns_optional_element() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let array = interner.array(TypeId::NUMBER);
+    let result = evaluator.resolve_property_access(array, "at");
+    match result {
+        PropertyAccessResult::Success { type_id, .. } => match interner.lookup(type_id) {
+            Some(TypeKey::Function(func_id)) => {
+                let func = interner.function_shape(func_id);
+                let expected = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+                assert_eq!(func.return_type, expected);
+            }
+            other => panic!("Expected function, got {:?}", other),
+        },
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_property_access_array_entries_returns_tuple_array() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let array = interner.array(TypeId::BOOLEAN);
+    let result = evaluator.resolve_property_access(array, "entries");
+    match result {
+        PropertyAccessResult::Success { type_id, .. } => match interner.lookup(type_id) {
+            Some(TypeKey::Function(func_id)) => {
+                let func = interner.function_shape(func_id);
+                let Some(TypeKey::Array(return_elem)) = interner.lookup(func.return_type) else {
+                    panic!("Expected array return type");
+                };
+                let Some(TypeKey::Tuple(tuple_id)) = interner.lookup(return_elem) else {
+                    panic!("Expected tuple element type");
+                };
+                let tuple = interner.tuple_list(tuple_id);
+                assert_eq!(tuple.len(), 2);
+                assert_eq!(tuple[0].type_id, TypeId::NUMBER);
+                assert_eq!(tuple[1].type_id, TypeId::BOOLEAN);
+            }
+            other => panic!("Expected function, got {:?}", other),
+        },
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_property_access_array_reduce_callable() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let array = interner.array(TypeId::STRING);
+    let result = evaluator.resolve_property_access(array, "reduce");
+    match result {
+        PropertyAccessResult::Success { type_id, .. } => match interner.lookup(type_id) {
+            Some(TypeKey::Callable(callable_id)) => {
+                let callable = interner.callable_shape(callable_id);
+                assert_eq!(callable.call_signatures.len(), 2);
+                assert_eq!(callable.call_signatures[0].return_type, TypeId::STRING);
+                let generic_sig = &callable.call_signatures[1];
+                assert_eq!(generic_sig.type_params.len(), 1);
+                let u_type = interner.intern(TypeKey::TypeParameter(generic_sig.type_params[0].clone()));
+                assert_eq!(generic_sig.return_type, u_type);
+            }
+            other => panic!("Expected callable, got {:?}", other),
+        },
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_property_access_void() {
     let interner = TypeInterner::new();
     let evaluator = PropertyAccessEvaluator::new(&interner);
