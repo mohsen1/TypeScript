@@ -14,7 +14,7 @@ use crate::lsp::code_actions::{
     CodeAction, CodeActionContext, CodeActionKind, CodeActionProvider, ImportCandidate,
     ImportCandidateKind,
 };
-use crate::lsp::completions::{CompletionItem, Completions};
+use crate::lsp::completions::{CompletionItem, CompletionItemKind, Completions};
 use crate::lsp::diagnostics::LspDiagnostic;
 use crate::lsp::hover::{HoverInfo, HoverProvider};
 use crate::lsp::signature_help::{SignatureHelp, SignatureHelpProvider};
@@ -632,8 +632,48 @@ impl Project {
 
     /// Completions within a single file.
     pub fn get_completions(&mut self, file_name: &str, position: Position) -> Option<Vec<CompletionItem>> {
-        let file = self.files.get_mut(file_name)?;
-        file.get_completions(position)
+        let mut completions = {
+            let file = self.files.get_mut(file_name)?;
+            file.get_completions(position).unwrap_or_default()
+        };
+
+        let mut existing = FxHashSet::default();
+        for item in &completions {
+            existing.insert(item.label.clone());
+        }
+
+        let (missing_name, skip_auto_import) = {
+            let file = self.files.get(file_name)?;
+            if let Some((node_idx, name)) = self.identifier_at_position(file, position) {
+                let skip = self.is_member_access_node(file.arena(), node_idx);
+                (Some(name), skip)
+            } else {
+                (None, false)
+            }
+        };
+
+        if let Some(missing_name) = missing_name {
+            if !skip_auto_import && !existing.contains(&missing_name) {
+                let file = self.files.get(file_name)?;
+                let mut candidates = Vec::new();
+                let mut seen = FxHashSet::default();
+                self.collect_import_candidates_for_name(file, &missing_name, &mut candidates, &mut seen);
+
+                for candidate in candidates {
+                    if existing.contains(&candidate.local_name) {
+                        continue;
+                    }
+                    completions.push(self.completion_from_import_candidate(&candidate));
+                }
+            }
+        }
+
+        if completions.is_empty() {
+            None
+        } else {
+            completions.sort_by(|a, b| a.label.cmp(&b.label));
+            Some(completions)
+        }
     }
 
     /// Code actions for a file (project-aware).
@@ -1213,6 +1253,60 @@ impl Project {
         }
     }
 
+    fn completion_from_import_candidate(&self, candidate: &ImportCandidate) -> CompletionItem {
+        let detail = self.auto_import_detail(candidate);
+        let documentation = self.auto_import_documentation(candidate);
+
+        let mut item = CompletionItem::new(candidate.local_name.clone(), CompletionItemKind::Variable);
+        item = item.with_detail(detail);
+        if let Some(doc) = documentation {
+            item = item.with_documentation(doc);
+        }
+        item
+    }
+
+    fn auto_import_detail(&self, candidate: &ImportCandidate) -> String {
+        let prefix = if candidate.is_type_only {
+            "auto-import type"
+        } else {
+            "auto-import"
+        };
+
+        match candidate.kind {
+            ImportCandidateKind::Named { .. } => {
+                format!("{} from {}", prefix, candidate.module_specifier)
+            }
+            ImportCandidateKind::Default => {
+                format!("{} default from {}", prefix, candidate.module_specifier)
+            }
+            ImportCandidateKind::Namespace => {
+                format!("{} namespace from {}", prefix, candidate.module_specifier)
+            }
+        }
+    }
+
+    fn auto_import_documentation(&self, candidate: &ImportCandidate) -> Option<String> {
+        let import_kw = if candidate.is_type_only {
+            "import type"
+        } else {
+            "import"
+        };
+
+        let snippet = match &candidate.kind {
+            ImportCandidateKind::Named { export_name } => {
+                format!("{} {{ {} }} from \"{}\";", import_kw, export_name, candidate.module_specifier)
+            }
+            ImportCandidateKind::Default => {
+                format!("{} {} from \"{}\";", import_kw, candidate.local_name, candidate.module_specifier)
+            }
+            ImportCandidateKind::Namespace => {
+                format!("{} * as {} from \"{}\";", import_kw, candidate.local_name, candidate.module_specifier)
+            }
+        };
+
+        Some(snippet)
+    }
+
     fn matching_exports_in_file(
         &self,
         file_name: &str,
@@ -1392,6 +1486,43 @@ impl Project {
         file.arena()
             .get_identifier_text(node_idx)
             .map(|text| text.to_string())
+    }
+
+    fn identifier_at_position(&self, file: &ProjectFile, position: Position) -> Option<(NodeIndex, String)> {
+        let offset = file.line_map().position_to_offset(position, file.source_text())?;
+        let mut node_idx = find_node_at_offset(file.arena(), offset);
+        if node_idx.is_none() && offset > 0 {
+            node_idx = find_node_at_offset(file.arena(), offset - 1);
+        }
+        if node_idx.is_none() {
+            return None;
+        }
+
+        let node = file.arena().get(node_idx)?;
+        if node.kind != SyntaxKind::Identifier as u16 {
+            return None;
+        }
+
+        let text = file.arena().get_identifier_text(node_idx)?.to_string();
+        Some((node_idx, text))
+    }
+
+    fn is_member_access_node(&self, arena: &ThinNodeArena, node_idx: NodeIndex) -> bool {
+        let mut current = node_idx;
+        while !current.is_none() {
+            let Some(node) = arena.get(current) else { break; };
+            if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+                || node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION
+                || node.kind == syntax_kind_ext::QUALIFIED_NAME
+            {
+                return true;
+            }
+
+            let Some(ext) = arena.get_extended(current) else { break; };
+            current = ext.parent;
+        }
+
+        false
     }
 
     fn import_target_at_position(&self, file: &ProjectFile, position: Position) -> Option<ImportTarget> {
