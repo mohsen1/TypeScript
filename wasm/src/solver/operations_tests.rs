@@ -334,6 +334,39 @@ fn test_binary_overlap_union_literals() {
 }
 
 #[test]
+fn test_binary_overlap_with_any_unknown_never() {
+    let interner = TypeInterner::new();
+    let evaluator = BinaryOpEvaluator::new(&interner);
+
+    let any_result = evaluator.evaluate(TypeId::ANY, TypeId::NUMBER, "===");
+    assert!(matches!(any_result, BinaryOpResult::Success(TypeId::BOOLEAN)));
+
+    let unknown_result = evaluator.evaluate(TypeId::UNKNOWN, TypeId::NUMBER, "===");
+    assert!(matches!(unknown_result, BinaryOpResult::Success(TypeId::BOOLEAN)));
+
+    let never_result = evaluator.evaluate(TypeId::NEVER, TypeId::NUMBER, "===");
+    assert!(matches!(never_result, BinaryOpResult::TypeError { .. }));
+}
+
+#[test]
+fn test_binary_overlap_template_literal() {
+    let interner = TypeInterner::new();
+    let evaluator = BinaryOpEvaluator::new(&interner);
+
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("prefix")),
+        TemplateSpan::Type(TypeId::STRING),
+        TemplateSpan::Text(interner.intern_string("suffix")),
+    ]);
+
+    let ok_result = evaluator.evaluate(template, TypeId::STRING, "===");
+    assert!(matches!(ok_result, BinaryOpResult::Success(TypeId::BOOLEAN)));
+
+    let bad_result = evaluator.evaluate(template, TypeId::NUMBER, "===");
+    assert!(matches!(bad_result, BinaryOpResult::TypeError { .. }));
+}
+
+#[test]
 fn test_binary_overlap_generic_constraint_disjoint() {
     let interner = TypeInterner::new();
     let evaluator = BinaryOpEvaluator::new(&interner);
