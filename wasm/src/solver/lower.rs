@@ -1830,7 +1830,10 @@ impl<'a> TypeLowering<'a> {
             if let Some(name_node) = self.arena.get(data.type_name) {
                 if let Some(ident) = self.arena.get_identifier(name_node) {
                     let name = ident.escaped_text.as_str();
-                    if name == "Array" || name == "ReadonlyArray" {
+                    if (name == "Array" || name == "ReadonlyArray")
+                        && self.lookup_type_param(name).is_none()
+                        && self.resolve_type_symbol(data.type_name).is_none()
+                    {
                         let elem_type = data.type_arguments
                             .as_ref()
                             .and_then(|args| args.nodes.first().copied())

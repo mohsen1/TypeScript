@@ -467,6 +467,72 @@ fn test_lower_readonly_array_type_reference() {
 }
 
 #[test]
+fn test_lower_array_type_reference_respects_resolver() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = Array<string>;");
+    let interner = TypeInterner::new();
+
+    let type_resolver = |node_idx: NodeIndex| {
+        arena.get(node_idx)
+            .and_then(|node| arena.get_identifier(node))
+            .and_then(|ident| {
+                if ident.escaped_text == "Array" {
+                    Some(1)
+                } else {
+                    None
+                }
+            })
+    };
+    let value_resolver = |_node_idx: NodeIndex| None;
+    let lowering = TypeLowering::with_resolvers(&arena, &interner, &type_resolver, &value_resolver);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Application(app) => {
+            assert_eq!(app.args, vec![TypeId::STRING]);
+            match interner.lookup(app.base) {
+                Some(TypeKey::Ref(SymbolRef(sym_id))) => assert_eq!(sym_id, 1),
+                other => panic!("Expected Ref base type, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Application type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_readonly_array_type_reference_respects_resolver() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = ReadonlyArray<string>;");
+    let interner = TypeInterner::new();
+
+    let type_resolver = |node_idx: NodeIndex| {
+        arena.get(node_idx)
+            .and_then(|node| arena.get_identifier(node))
+            .and_then(|ident| {
+                if ident.escaped_text == "ReadonlyArray" {
+                    Some(2)
+                } else {
+                    None
+                }
+            })
+    };
+    let value_resolver = |_node_idx: NodeIndex| None;
+    let lowering = TypeLowering::with_resolvers(&arena, &interner, &type_resolver, &value_resolver);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Application(app) => {
+            assert_eq!(app.args, vec![TypeId::STRING]);
+            match interner.lookup(app.base) {
+                Some(TypeKey::Ref(SymbolRef(sym_id))) => assert_eq!(sym_id, 2),
+                other => panic!("Expected Ref base type, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Application type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_conditional_type_with_infer() {
     let (arena, type_idx) =
         parse_type_alias_type_node("type T = string extends infer R ? string : never;");

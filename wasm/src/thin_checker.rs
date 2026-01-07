@@ -371,8 +371,26 @@ impl<'a> ThinCheckerState<'a> {
         // Get the identifier for the type name
         if let Some(name_node) = self.ctx.arena.get(type_name_idx) {
             if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                let name = ident.escaped_text.as_str();
+
+                if name == "Array" || name == "ReadonlyArray" {
+                    if let Some(type_id) = self.resolve_named_type_reference(name) {
+                        return type_id;
+                    }
+                    let elem_type = type_ref.type_arguments
+                        .as_ref()
+                        .and_then(|args| args.nodes.first().copied())
+                        .map(|idx| self.get_type_from_type_node(idx))
+                        .unwrap_or(TypeId::ANY);
+                    let array_type = self.ctx.types.array(elem_type);
+                    if name == "ReadonlyArray" {
+                        return self.ctx.types.intern(crate::solver::TypeKey::ReadonlyType(array_type));
+                    }
+                    return array_type;
+                }
+
                 // Check for built-in types
-                match ident.escaped_text.as_str() {
+                match name {
                     "number" => return TypeId::NUMBER,
                     "string" => return TypeId::STRING,
                     "boolean" => return TypeId::BOOLEAN,
@@ -385,53 +403,41 @@ impl<'a> ThinCheckerState<'a> {
                     "object" => return TypeId::OBJECT,
                     "bigint" => return TypeId::BIGINT,
                     "symbol" => return TypeId::SYMBOL,
-                    "Array" => {
-                        let elem_type = type_ref.type_arguments
-                            .as_ref()
-                            .and_then(|args| args.nodes.first().copied())
-                            .map(|idx| self.get_type_from_type_node(idx))
-                            .unwrap_or(TypeId::ANY);
-                        return self.ctx.types.array(elem_type);
-                    }
-                    "ReadonlyArray" => {
-                        let elem_type = type_ref.type_arguments
-                            .as_ref()
-                            .and_then(|args| args.nodes.first().copied())
-                            .map(|idx| self.get_type_from_type_node(idx))
-                            .unwrap_or(TypeId::ANY);
-                        let array_type = self.ctx.types.array(elem_type);
-                        return self.ctx.types.intern(crate::solver::TypeKey::ReadonlyType(array_type));
-                    }
-                    name => {
-                        // Look up user-defined types from symbol table
-                        // Check local scopes first (includes type parameters)
-                        if let Some(type_id) = self.lookup_local(name) {
-                            return type_id;
-                        }
-                        // Check file locals
-                        if let Some(sym_id) = self.ctx.binder.file_locals.get(name) {
-                            return self.get_type_of_symbol(sym_id);
-                        }
-                        // Check all symbols (excluding class members)
-                        if let Some(sym_id) = self.ctx.binder.get_symbols().find_by_name(name) {
-                            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
-                                use crate::binder::symbol_flags;
-                                let is_class_member = (symbol.flags & symbol_flags::PROPERTY) != 0
-                                    || (symbol.flags & symbol_flags::METHOD) != 0;
-                                if !is_class_member {
-                                    return self.get_type_of_symbol(sym_id);
-                                }
-                            }
-                        }
-                        // Not found - report error
-                        self.error_cannot_find_name_at(name, type_name_idx);
-                        return TypeId::ERROR;
-                    }
+                    _ => {}
                 }
+
+                if let Some(type_id) = self.resolve_named_type_reference(name) {
+                    return type_id;
+                }
+                self.error_cannot_find_name_at(name, type_name_idx);
+                return TypeId::ERROR;
             }
         }
 
         TypeId::ANY
+    }
+
+    fn resolve_named_type_reference(&mut self, name: &str) -> Option<TypeId> {
+        // Check local scopes first (includes type parameters)
+        if let Some(type_id) = self.lookup_local(name) {
+            return Some(type_id);
+        }
+        // Check file locals
+        if let Some(sym_id) = self.ctx.binder.file_locals.get(name) {
+            return Some(self.get_type_of_symbol(sym_id));
+        }
+        // Check all symbols (excluding class members)
+        if let Some(sym_id) = self.ctx.binder.get_symbols().find_by_name(name) {
+            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                use crate::binder::symbol_flags;
+                let is_class_member = (symbol.flags & symbol_flags::PROPERTY) != 0
+                    || (symbol.flags & symbol_flags::METHOD) != 0;
+                if !is_class_member {
+                    return Some(self.get_type_of_symbol(sym_id));
+                }
+            }
+        }
+        None
     }
 
     /// Resolve a qualified name or identifier to a symbol ID.
