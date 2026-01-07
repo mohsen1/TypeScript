@@ -1641,6 +1641,9 @@ impl<'a> FlowAnalyzer<'a> {
         if let Some(name) = self.literal_string_from_node(idx) {
             return Some(self.interner.intern_string(name));
         }
+        if let Some(value) = self.literal_number_from_node(idx) {
+            return Some(self.atom_from_numeric_value(value));
+        }
         self.literal_atom_from_type(idx)
     }
 
@@ -1649,8 +1652,48 @@ impl<'a> FlowAnalyzer<'a> {
         let type_id = *node_types.get(&idx.0)?;
         match self.interner.lookup(type_id)? {
             TypeKey::Literal(LiteralValue::String(atom)) => Some(atom),
+            TypeKey::Literal(LiteralValue::Number(num)) => Some(self.atom_from_numeric_value(num.0)),
             _ => None,
         }
+    }
+
+    fn literal_number_from_node(&self, idx: NodeIndex) -> Option<f64> {
+        let idx = self.skip_parenthesized(idx);
+        let node = self.arena.get(idx)?;
+
+        match node.kind {
+            k if k == SyntaxKind::NumericLiteral as u16 => {
+                let lit = self.arena.get_literal(node)?;
+                self.parse_numeric_literal_value(lit.value, &lit.text)
+            }
+            k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION => {
+                let unary = self.arena.get_unary_expr(node)?;
+                let op = unary.operator;
+                if op != SyntaxKind::MinusToken as u16 && op != SyntaxKind::PlusToken as u16 {
+                    return None;
+                }
+                let operand = self.skip_parenthesized(unary.operand);
+                let operand_node = self.arena.get(operand)?;
+                if operand_node.kind != SyntaxKind::NumericLiteral as u16 {
+                    return None;
+                }
+                let lit = self.arena.get_literal(operand_node)?;
+                let value = self.parse_numeric_literal_value(lit.value, &lit.text)?;
+                Some(if op == SyntaxKind::MinusToken as u16 { -value } else { value })
+            }
+            _ => None,
+        }
+    }
+
+    fn atom_from_numeric_value(&self, value: f64) -> Atom {
+        let name = if value == 0.0 && value.is_sign_negative() {
+            "-0".to_string()
+        } else if value.fract() == 0.0 {
+            format!("{:.0}", value)
+        } else {
+            format!("{}", value)
+        };
+        self.interner.intern_string(&name)
     }
 
     fn reference_base(&self, idx: NodeIndex) -> Option<NodeIndex> {

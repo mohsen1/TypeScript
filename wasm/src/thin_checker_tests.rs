@@ -5633,6 +5633,90 @@ if (typeof obj[key] === "string") {
 }
 
 #[test]
+fn test_flow_narrowing_applies_for_computed_element_access_numeric_literal_key() {
+    use crate::thin_parser::ThinParserState;
+    use crate::parser::syntax_kind_ext;
+
+    let source = r#"
+let arr: (string | number)[] = ["ok", 1];
+let idx: 0 = 0;
+if (typeof arr[idx] === "string") {
+    arr[idx].toUpperCase();
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    let if_idx = source_file.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::IF_STATEMENT))
+        .expect("if statement");
+    let if_node = arena.get(if_idx).expect("if node");
+    let if_data = arena.get_if_statement(if_node).expect("if data");
+
+    let then_node = arena.get(if_data.then_statement).expect("then node");
+    let block = arena.get_block(then_node).expect("then block");
+    let expr_stmt_idx = block.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::EXPRESSION_STATEMENT))
+        .expect("expression statement");
+    let expr_stmt = arena.get_expression_statement(arena.get(expr_stmt_idx).expect("expr node"))
+        .expect("expression data");
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let expr_type = checker.get_type_of_node(expr_stmt.expression);
+    assert_eq!(
+        expr_type,
+        TypeId::STRING,
+        "Expected computed element access with numeric literal key to narrow to string, got: {:?}",
+        expr_type
+    );
+}
+
+#[test]
+fn test_flow_narrowing_cleared_by_computed_numeric_element_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+let arr: (string | number)[] = ["ok", 1];
+let idx: 0 = 0;
+if (typeof arr[idx] === "string") {
+    arr[idx].toUpperCase();
+    arr[idx] = 1;
+    arr[idx].toUpperCase();
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = codes.iter().filter(|&&code| code == 2339).count();
+    assert_eq!(
+        count,
+        1,
+        "Expected one 2339 after computed numeric element assignment clears narrowing, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_flow_narrowing_applies_for_literal_element_access() {
     use crate::thin_parser::ThinParserState;
     use crate::parser::syntax_kind_ext;
