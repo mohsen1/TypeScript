@@ -33,6 +33,7 @@ Status: Active
   - [x] Extract declaration emission helpers into a module.
   - [x] Extract function emission helpers into a module.
   - [x] Extract type emission helpers into a module.
+  - [x] Extract JSX emission helpers into a module.
 - [ ] Performance tuning (deferred until correctness parity)
   - [x] Pre-allocate output buffer from source size; write numeric indices without allocations.
   - [x] Write numeric values in ES5 transforms without allocating strings.
