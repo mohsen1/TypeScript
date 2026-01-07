@@ -104,6 +104,10 @@ Status: Active
 - [x] Add loop flow labels for while/do statements
   - Enable narrowing within `while` bodies and keep `do` bodies conservative.
   - Add focused flow tests for loop narrowing.
+- [x] Add loop flow labels for for/for-in/for-of statements
+  - Narrow within `for` condition bodies and keep iterator loops conservative.
+  - Add focused flow tests for `for` condition narrowing.
+  - Risk: loop exit narrowing remains conservative (no fixed point for assignments).
 
 ## Baseline / Validation
 - `./wasm/test.sh`
