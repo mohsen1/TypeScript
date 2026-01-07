@@ -126,6 +126,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Infer mixed string/number index signatures from object literal properties
 - [x] Cover numeric literal special cases in index signature inference
 - [x] Add NaN numeric literal inference coverage for number index signatures
+- [x] Add -Infinity numeric literal inference coverage for number index signatures
 - [x] Enforce index signature consistency during bounds validation
 
 ## Architecture Notes
