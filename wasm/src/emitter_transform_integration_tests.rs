@@ -471,6 +471,77 @@ fn test_two_phase_emission_es5_arrow_function() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_arrow_function_this_capture() {
+    let source = "const fn = () => this.x;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ES5ArrowFunction transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow output should capture this via IIFE: {}",
+        output
+    );
+    assert!(
+        output.contains("_this"),
+        "ES5 arrow output should reference _this: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_async_arrow_function() {
+    let source = "const foo = async () => { await bar(); };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ES5ArrowFunction transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 async arrow output should contain '__awaiter': {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 async arrow output should not contain '=>': {}",
+        output
+    );
+    assert!(
+        !output.contains("async function"),
+        "ES5 async arrow output should not contain async syntax: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_async_function() {
     let source = "async function foo() { return 1; }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

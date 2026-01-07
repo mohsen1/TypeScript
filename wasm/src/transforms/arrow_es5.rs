@@ -113,8 +113,21 @@ pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bo
             }
         }
         k if k == syntax_kind_ext::ARROW_FUNCTION => {
-            // Arrow functions don't capture their own `this`, so we don't recurse
-            // into nested arrow functions for this check
+            if let Some(func) = arena.get_function(node) {
+                for &param_idx in &func.parameters.nodes {
+                    let Some(param_node) = arena.get(param_idx) else { continue };
+                    let Some(param) = arena.get_parameter(param_node) else { continue };
+                    if !param.initializer.is_none()
+                        && contains_this_reference(arena, param.initializer)
+                    {
+                        return true;
+                    }
+                }
+
+                if !func.body.is_none() && contains_this_reference(arena, func.body) {
+                    return true;
+                }
+            }
             return false;
         }
         k if k == syntax_kind_ext::FUNCTION_EXPRESSION || 
