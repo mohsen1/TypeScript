@@ -17,7 +17,7 @@
 //! }
 //! ```
 
-use std::sync::Arc;
+use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::TypeDatabase;
 
@@ -28,7 +28,7 @@ use crate::solver::TypeInterner;
 #[derive(Clone, Debug)]
 pub struct DiscriminantInfo {
     /// The name of the discriminant property
-    pub property_name: Arc<str>,
+    pub property_name: Atom,
     /// Map from literal value to the union member type
     pub variants: Vec<(TypeId, TypeId)>, // (literal_type, member_type)
 }
@@ -59,22 +59,19 @@ impl<'a> NarrowingContext<'a> {
         }
 
         // Collect all property names from all members
-        let mut all_properties: Vec<Arc<str>> = Vec::new();
-        let mut member_props: Vec<Vec<(Arc<str>, TypeId)>> = Vec::new();
+        let mut all_properties: Vec<Atom> = Vec::new();
+        let mut member_props: Vec<Vec<(Atom, TypeId)>> = Vec::new();
 
         for &member in &members {
             if let Some(TypeKey::Object(props)) = self.interner.lookup(member) {
-                let props_vec: Vec<(Arc<str>, TypeId)> = props.iter()
-                    .map(|p| {
-                        let name_str = self.interner.resolve_atom(p.name);
-                        (Arc::from(name_str.as_str()), p.type_id)
-                    })
+                let props_vec: Vec<(Atom, TypeId)> = props.iter()
+                    .map(|p| (p.name, p.type_id))
                     .collect();
 
                 // Track all property names
                 for (name, _) in &props_vec {
                     if !all_properties.contains(name) {
-                        all_properties.push(name.clone());
+                        all_properties.push(*name);
                     }
                 }
                 member_props.push(props_vec);
@@ -139,13 +136,13 @@ impl<'a> NarrowingContext<'a> {
     pub fn narrow_by_discriminant(
         &self,
         union_type: TypeId,
-        property_name: &str,
+        property_name: Atom,
         literal_value: TypeId,
     ) -> TypeId {
         let discriminants = self.find_discriminants(union_type);
 
         for disc in &discriminants {
-            if disc.property_name.as_ref() == property_name {
+            if disc.property_name == property_name {
                 // Find the variant matching this literal
                 for (lit, member) in &disc.variants {
                     if *lit == literal_value {
@@ -165,7 +162,7 @@ impl<'a> NarrowingContext<'a> {
     pub fn narrow_by_excluding_discriminant(
         &self,
         union_type: TypeId,
-        property_name: &str,
+        property_name: Atom,
         excluded_value: TypeId,
     ) -> TypeId {
         let members = match self.interner.lookup(union_type) {
@@ -178,7 +175,7 @@ impl<'a> NarrowingContext<'a> {
         for &member in &members {
             if let Some(TypeKey::Object(props)) = self.interner.lookup(member) {
                 let prop_type = props.iter()
-                    .find(|p| self.interner.resolve_atom(p.name) == property_name)
+                    .find(|p| p.name == property_name)
                     .map(|p| p.type_id);
 
                 match prop_type {
@@ -211,6 +208,24 @@ impl<'a> NarrowingContext<'a> {
         source_type: TypeId,
         typeof_result: &str,
     ) -> TypeId {
+        if source_type == TypeId::ANY {
+            return TypeId::ANY;
+        }
+
+        if source_type == TypeId::UNKNOWN {
+            return match typeof_result {
+                "string" => TypeId::STRING,
+                "number" => TypeId::NUMBER,
+                "boolean" => TypeId::BOOLEAN,
+                "bigint" => TypeId::BIGINT,
+                "symbol" => TypeId::SYMBOL,
+                "undefined" => TypeId::UNDEFINED,
+                "object" => self.interner.union(vec![TypeId::OBJECT, TypeId::NULL]),
+                "function" => self.function_type(),
+                _ => source_type,
+            };
+        }
+
         let target_type = match typeof_result {
             "string" => TypeId::STRING,
             "number" => TypeId::NUMBER,
@@ -235,9 +250,17 @@ impl<'a> NarrowingContext<'a> {
 
         // If source is a union, filter members
         if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
-            let matching: Vec<TypeId> = members.iter()
-                .filter(|&&m| self.is_assignable_to(m, target_type))
-                .copied()
+            let matching: Vec<TypeId> = members
+                .iter()
+                .filter_map(|&member| {
+                    if let Some(narrowed) = self.narrow_type_param(member, target_type) {
+                        return Some(narrowed);
+                    }
+                    if self.is_assignable_to(member, target_type) {
+                        return Some(member);
+                    }
+                    None
+                })
                 .collect();
 
             if matching.is_empty() {
@@ -247,6 +270,10 @@ impl<'a> NarrowingContext<'a> {
             } else {
                 return self.interner.union(matching);
             }
+        }
+
+        if let Some(narrowed) = self.narrow_type_param(source_type, target_type) {
+            return narrowed;
         }
 
         // Check if source is assignable to target
@@ -261,9 +288,21 @@ impl<'a> NarrowingContext<'a> {
     pub fn narrow_excluding_type(&self, source_type: TypeId, excluded_type: TypeId) -> TypeId {
         // If source is a union, filter out matching members
         if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
-            let remaining: Vec<TypeId> = members.iter()
-                .filter(|&&m| !self.is_assignable_to(m, excluded_type))
-                .copied()
+            let remaining: Vec<TypeId> = members
+                .iter()
+                .filter_map(|&member| {
+                    if let Some(narrowed) = self.narrow_type_param_excluding(member, excluded_type) {
+                        if narrowed == TypeId::NEVER {
+                            return None;
+                        }
+                        return Some(narrowed);
+                    }
+                    if self.is_assignable_to(member, excluded_type) {
+                        None
+                    } else {
+                        Some(member)
+                    }
+                })
                 .collect();
 
             if remaining.is_empty() {
@@ -273,6 +312,10 @@ impl<'a> NarrowingContext<'a> {
             } else {
                 return self.interner.union(remaining);
             }
+        }
+
+        if let Some(narrowed) = self.narrow_type_param_excluding(source_type, excluded_type) {
+            return narrowed;
         }
 
         // If source is assignable to excluded, return never
@@ -286,9 +329,21 @@ impl<'a> NarrowingContext<'a> {
     /// Narrow to function types only.
     fn narrow_to_function(&self, source_type: TypeId) -> TypeId {
         if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
-            let functions: Vec<TypeId> = members.iter()
-                .filter(|&&m| self.is_function_type(m))
-                .copied()
+            let functions: Vec<TypeId> = members
+                .iter()
+                .filter_map(|&member| {
+                    if let Some(narrowed) = self.narrow_type_param_to_function(member) {
+                        if narrowed == TypeId::NEVER {
+                            return None;
+                        }
+                        return Some(narrowed);
+                    }
+                    if self.is_function_type(member) {
+                        Some(member)
+                    } else {
+                        None
+                    }
+                })
                 .collect();
 
             if functions.is_empty() {
@@ -300,8 +355,29 @@ impl<'a> NarrowingContext<'a> {
             }
         }
 
+        if let Some(narrowed) = self.narrow_type_param_to_function(source_type) {
+            return narrowed;
+        }
+
         if self.is_function_type(source_type) {
             source_type
+        } else if source_type == TypeId::OBJECT {
+            self.function_type()
+        } else if let Some(TypeKey::Object(props)) = self.interner.lookup(source_type) {
+            if props.is_empty() {
+                self.function_type()
+            } else {
+                TypeId::NEVER
+            }
+        } else if let Some(TypeKey::ObjectWithIndex(shape)) = self.interner.lookup(source_type) {
+            if shape.properties.is_empty()
+                && shape.string_index.is_none()
+                && shape.number_index.is_none()
+            {
+                self.function_type()
+            } else {
+                TypeId::NEVER
+            }
         } else {
             TypeId::NEVER
         }
@@ -314,7 +390,178 @@ impl<'a> NarrowingContext<'a> {
 
     /// Check if a type is a function type.
     fn is_function_type(&self, type_id: TypeId) -> bool {
-        matches!(self.interner.lookup(type_id), Some(TypeKey::Function(_)))
+        match self.interner.lookup(type_id) {
+            Some(TypeKey::Function(_) | TypeKey::Callable(_)) => true,
+            Some(TypeKey::Intersection(members)) => members
+                .iter()
+                .any(|member| self.is_function_type(*member)),
+            _ => false,
+        }
+    }
+
+    /// Narrow a type to exclude function-like members (typeof !== "function").
+    pub fn narrow_excluding_function(&self, source_type: TypeId) -> TypeId {
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
+            let remaining: Vec<TypeId> = members
+                .iter()
+                .filter_map(|&member| {
+                    if let Some(narrowed) = self.narrow_type_param_excluding_function(member) {
+                        if narrowed == TypeId::NEVER {
+                            return None;
+                        }
+                        return Some(narrowed);
+                    }
+                    if self.is_function_type(member) {
+                        None
+                    } else {
+                        Some(member)
+                    }
+                })
+                .collect();
+
+            if remaining.is_empty() {
+                return TypeId::NEVER;
+            } else if remaining.len() == 1 {
+                return remaining[0];
+            } else {
+                return self.interner.union(remaining);
+            }
+        }
+
+        if let Some(narrowed) = self.narrow_type_param_excluding_function(source_type) {
+            return narrowed;
+        }
+
+        if self.is_function_type(source_type) {
+            TypeId::NEVER
+        } else {
+            source_type
+        }
+    }
+
+    fn is_object_typeof(&self, type_id: TypeId) -> bool {
+        match self.interner.lookup(type_id) {
+            Some(TypeKey::Object(_))
+            | Some(TypeKey::ObjectWithIndex(_))
+            | Some(TypeKey::Array(_))
+            | Some(TypeKey::Tuple(_))
+            | Some(TypeKey::Mapped(_)) => true,
+            Some(TypeKey::ReadonlyType(inner)) => self.is_object_typeof(inner),
+            Some(TypeKey::Intersection(members)) => members
+                .iter()
+                .all(|member| self.is_object_typeof(*member)),
+            Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info
+                .constraint
+                .map(|constraint| self.is_object_typeof(constraint))
+                .unwrap_or(false),
+            _ => false,
+        }
+    }
+
+    fn narrow_type_param(&self, source: TypeId, target: TypeId) -> Option<TypeId> {
+        let info = match self.interner.lookup(source) {
+            Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info,
+            _ => return None,
+        };
+
+        let constraint = info.constraint.unwrap_or(TypeId::UNKNOWN);
+        if constraint == source {
+            return None;
+        }
+
+        let narrowed_constraint = if constraint == TypeId::UNKNOWN {
+            target
+        } else {
+            self.narrow_to_type(constraint, target)
+        };
+
+        if narrowed_constraint == TypeId::NEVER {
+            return None;
+        }
+
+        Some(self.interner.intersection(vec![source, narrowed_constraint]))
+    }
+
+    fn narrow_type_param_to_function(&self, source: TypeId) -> Option<TypeId> {
+        let info = match self.interner.lookup(source) {
+            Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info,
+            _ => return None,
+        };
+
+        let constraint = info.constraint.unwrap_or(TypeId::UNKNOWN);
+        if constraint == source || constraint == TypeId::UNKNOWN {
+            let function_type = self.function_type();
+            return Some(self.interner.intersection(vec![source, function_type]));
+        }
+
+        let narrowed_constraint = self.narrow_to_function(constraint);
+        if narrowed_constraint == TypeId::NEVER {
+            return None;
+        }
+
+        Some(self.interner.intersection(vec![source, narrowed_constraint]))
+    }
+
+    fn narrow_type_param_excluding(&self, source: TypeId, excluded: TypeId) -> Option<TypeId> {
+        let info = match self.interner.lookup(source) {
+            Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info,
+            _ => return None,
+        };
+
+        let constraint = info.constraint?;
+        if constraint == source || constraint == TypeId::UNKNOWN {
+            return None;
+        }
+
+        let narrowed_constraint = self.narrow_excluding_type(constraint, excluded);
+        if narrowed_constraint == constraint {
+            return None;
+        }
+        if narrowed_constraint == TypeId::NEVER {
+            return Some(TypeId::NEVER);
+        }
+
+        Some(self.interner.intersection(vec![source, narrowed_constraint]))
+    }
+
+    fn narrow_type_param_excluding_function(&self, source: TypeId) -> Option<TypeId> {
+        let info = match self.interner.lookup(source) {
+            Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info,
+            _ => return None,
+        };
+
+        let constraint = info.constraint.unwrap_or(TypeId::UNKNOWN);
+        if constraint == source || constraint == TypeId::UNKNOWN {
+            return Some(source);
+        }
+
+        let narrowed_constraint = self.narrow_excluding_function(constraint);
+        if narrowed_constraint == constraint {
+            return Some(source);
+        }
+        if narrowed_constraint == TypeId::NEVER {
+            return Some(TypeId::NEVER);
+        }
+
+        Some(self.interner.intersection(vec![source, narrowed_constraint]))
+    }
+
+    fn function_type(&self) -> TypeId {
+        let rest_array = self.interner.array(TypeId::ANY);
+        let rest_param = ParamInfo {
+            name: None,
+            type_id: rest_array,
+            optional: false,
+            rest: true,
+        };
+        self.interner.function(FunctionShape {
+            params: vec![rest_param],
+            this_type: None,
+            return_type: TypeId::ANY,
+            type_params: Vec::new(),
+            type_predicate: None,
+            is_constructor: false,
+        })
     }
 
     /// Simple assignability check for narrowing purposes.
@@ -344,9 +591,30 @@ impl<'a> NarrowingContext<'a> {
             }
         }
 
-        // null/undefined to object (for typeof "object" narrowing)
-        if source == TypeId::NULL && target == TypeId::OBJECT {
-            return true;
+        // object/null for typeof "object"
+        if target == TypeId::OBJECT {
+            if source == TypeId::NULL {
+                return true;
+            }
+            if self.is_object_typeof(source) {
+                return true;
+            }
+            return false;
+        }
+
+        if let Some(TypeKey::Intersection(members)) = self.interner.lookup(source) {
+            if members
+                .iter()
+                .any(|member| self.is_assignable_to(*member, target))
+            {
+                return true;
+            }
+        }
+
+        if target == TypeId::STRING {
+            if matches!(self.interner.lookup(source), Some(TypeKey::TemplateLiteral(_))) {
+                return true;
+            }
         }
 
         false
@@ -363,7 +631,7 @@ pub fn find_discriminants(interner: &dyn TypeDatabase, union_type: TypeId) -> Ve
 pub fn narrow_by_discriminant(
     interner: &dyn TypeDatabase,
     union_type: TypeId,
-    property_name: &str,
+    property_name: Atom,
     literal_value: TypeId,
 ) -> TypeId {
     let ctx = NarrowingContext::new(interner);

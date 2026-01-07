@@ -59,6 +59,18 @@ pub enum TransformDirective {
         members: Vec<NodeIndex>,
     },
 
+    /// ES5 Namespace: Transform namespace to IIFE pattern
+    ES5Namespace {
+        /// Original namespace node index
+        namespace_node: NodeIndex,
+    },
+
+    /// ES5 Enum: Transform enum to IIFE pattern
+    ES5Enum {
+        /// Original enum node index
+        enum_node: NodeIndex,
+    },
+
     /// CommonJS Export: Wrap declaration with exports assignment
     ///
     /// ```typescript
@@ -72,12 +84,42 @@ pub enum TransformDirective {
     /// exports.Foo = Foo;
     /// ```
     CommonJSExport {
-        /// Name to export
-        name: String,
+        /// Names to export
+        names: Vec<String>,
         /// Whether this is a default export
         is_default: bool,
         /// The inner directive to apply first
         inner: Box<TransformDirective>,
+    },
+
+    /// CommonJS default export for anonymous class/function declarations.
+    ///
+    /// ```typescript
+    /// export default function () {}
+    /// ```
+    ///
+    /// Becomes:
+    ///
+    /// ```javascript
+    /// exports.default = function () {};
+    /// ```
+    CommonJSExportDefaultExpr,
+
+    /// CommonJS default export for anonymous class declarations in ES5.
+    ///
+    /// ```typescript
+    /// export default class { method() {} }
+    /// ```
+    ///
+    /// Becomes:
+    ///
+    /// ```javascript
+    /// var _a = /** @class */ (function () { ... }());
+    /// exports.default = _a;
+    /// ```
+    CommonJSExportDefaultClassES5 {
+        /// Original class node index
+        class_node: NodeIndex,
     },
 
     /// ES5 Arrow Function: Transform arrow to regular function
@@ -102,6 +144,46 @@ pub enum TransformDirective {
     ES5AsyncFunction {
         /// Original async function node
         function_node: NodeIndex,
+    },
+
+    /// ES5 For-Of: Transform to iterator loop with __values helper
+    ES5ForOf {
+        /// Original for-of statement node
+        for_of_node: NodeIndex,
+    },
+
+    /// ES5 Object Literal: Transform computed properties and spread to assignments
+    ///
+    /// ```typescript
+    /// const obj = { a: 1, [k]: 2, ...rest };
+    /// ```
+    ///
+    /// Becomes:
+    ///
+    /// ```javascript
+    /// var obj = (_a = { a: 1 }, _a[k] = 2, Object.assign(_a, rest), _a);
+    /// ```
+    ES5ObjectLiteral {
+        /// Original object literal node
+        object_literal: NodeIndex,
+    },
+
+    /// ES5 Variable Declaration List: Transform destructuring declarations to assignments.
+    ES5VariableDeclarationList {
+        /// Original variable declaration list node
+        decl_list: NodeIndex,
+    },
+
+    /// ES5 Function Parameters: Transform default/rest/destructuring params.
+    ES5FunctionParameters {
+        /// Original function declaration/expression node
+        function_node: NodeIndex,
+    },
+
+    /// ES5 Template Literal: Transform template literals/tagged templates to ES5 output.
+    ES5TemplateLiteral {
+        /// Original template node (template expression, tagged template, or no-sub literal)
+        template_node: NodeIndex,
     },
 
     /// Module Wrapper: Wrap entire file for AMD/System/UMD
@@ -130,6 +212,7 @@ pub enum ModuleFormat {
 }
 
 /// Transform context maps node indices to their transform directives
+#[derive(Clone)]
 pub struct TransformContext {
     /// Map of NodeIndex -> TransformDirective
     /// Only contains entries for nodes that need transformation
@@ -243,7 +326,7 @@ mod tests {
 
         // Chain ES5 class transform with CommonJS export
         let directive = TransformDirective::CommonJSExport {
-            name: "MyClass".to_string(),
+            names: vec!["MyClass".to_string()],
             is_default: false,
             inner: Box::new(TransformDirective::ES5Class {
                 class_node,
@@ -257,8 +340,8 @@ mod tests {
 
         let retrieved = ctx.get(class_node).unwrap();
         match retrieved {
-            TransformDirective::CommonJSExport { name, inner, .. } => {
-                assert_eq!(name, "MyClass");
+            TransformDirective::CommonJSExport { names, inner, .. } => {
+                assert_eq!(names, &["MyClass".to_string()]);
                 assert!(matches!(**inner, TransformDirective::ES5Class { .. }));
             }
             _ => panic!("Expected CommonJSExport directive"),

@@ -213,6 +213,7 @@ pub struct PropertyInfo {
     pub type_id: TypeId,
     pub optional: bool,
     pub readonly: bool,
+    pub is_method: bool,
 }
 
 /// Index signature information for object types
@@ -247,12 +248,28 @@ pub struct TupleElement {
     pub rest: bool,
 }
 
+/// Type predicate information (x is T / asserts x is T).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct TypePredicate {
+    pub asserts: bool,
+    pub target: TypePredicateTarget,
+    pub type_id: Option<TypeId>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum TypePredicateTarget {
+    This,
+    Identifier(Atom),
+}
+
 /// Function shape for function types
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct FunctionShape {
     pub type_params: Vec<TypeParamInfo>,
     pub params: Vec<ParamInfo>,
+    pub this_type: Option<TypeId>,
     pub return_type: TypeId,
+    pub type_predicate: Option<TypePredicate>,
     pub is_constructor: bool,
 }
 
@@ -262,7 +279,9 @@ pub struct FunctionShape {
 pub struct CallSignature {
     pub type_params: Vec<TypeParamInfo>,
     pub params: Vec<ParamInfo>,
+    pub this_type: Option<TypeId>,
     pub return_type: TypeId,
+    pub type_predicate: Option<TypePredicate>,
 }
 
 /// Callable type with multiple overloaded call signatures
@@ -311,6 +330,7 @@ pub struct ConditionalType {
     pub extends_type: TypeId,
     pub true_type: TypeId,
     pub false_type: TypeId,
+    pub is_distributive: bool,
 }
 
 /// Mapped type structure

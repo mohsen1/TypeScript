@@ -15,6 +15,7 @@
 //! discarded during overload resolution.
 
 use std::sync::Arc;
+use crate::interner::Atom;
 use crate::solver::types::*;
 use crate::solver::TypeDatabase;
 use crate::binder::SymbolId;
@@ -45,6 +46,8 @@ pub enum DiagnosticArg {
     Type(TypeId),
     /// A symbol reference (will be looked up by name)
     Symbol(SymbolId),
+    /// An interned string
+    Atom(Atom),
     /// A plain string
     String(Arc<str>),
     /// A number
@@ -60,6 +63,12 @@ impl From<TypeId> for DiagnosticArg {
 impl From<SymbolId> for DiagnosticArg {
     fn from(s: SymbolId) -> Self {
         DiagnosticArg::Symbol(s)
+    }
+}
+
+impl From<Atom> for DiagnosticArg {
+    fn from(a: Atom) -> Self {
+        DiagnosticArg::Atom(a)
     }
 }
 
@@ -371,6 +380,7 @@ impl<'a> TypeFormatter<'a> {
                         format!("Symbol({})", sym_id.0)
                     }
                 }
+                DiagnosticArg::Atom(atom) => self.interner.resolve_atom(*atom),
                 DiagnosticArg::String(s) => s.to_string(),
                 DiagnosticArg::Number(n) => n.to_string(),
             };
@@ -553,14 +563,16 @@ impl<'a> TypeFormatter<'a> {
     }
 
     fn format_function(&mut self, shape: &FunctionShape) -> String {
-        let params: Vec<String> = shape.params.iter()
-            .map(|p| {
-                let name = p.name.map(|atom| self.interner.resolve_atom(atom)).unwrap_or_else(|| "_".to_string());
-                let optional = if p.optional { "?" } else { "" };
-                let rest = if p.rest { "..." } else { "" };
-                format!("{}{}{}: {}", rest, name, optional, self.format(p.type_id))
-            })
-            .collect();
+        let mut params: Vec<String> = Vec::new();
+        if let Some(this_type) = shape.this_type {
+            params.push(format!("this: {}", self.format(this_type)));
+        }
+        params.extend(shape.params.iter().map(|p| {
+            let name = p.name.map(|atom| self.interner.resolve_atom(atom)).unwrap_or_else(|| "_".to_string());
+            let optional = if p.optional { "?" } else { "" };
+            let rest = if p.rest { "..." } else { "" };
+            format!("{}{}{}: {}", rest, name, optional, self.format(p.type_id))
+        }));
         let arrow = if shape.is_constructor { "new " } else { "" };
         format!("{}({}) => {}", arrow, params.join(", "), self.format(shape.return_type))
     }
@@ -580,12 +592,14 @@ impl<'a> TypeFormatter<'a> {
     }
 
     fn format_call_signature(&mut self, sig: &CallSignature, is_construct: bool) -> String {
-        let params: Vec<String> = sig.params.iter()
-            .map(|p| {
-                let name = p.name.map(|atom| self.interner.resolve_atom(atom)).unwrap_or_else(|| "_".to_string());
-                format!("{}: {}", name, self.format(p.type_id))
-            })
-            .collect();
+        let mut params: Vec<String> = Vec::new();
+        if let Some(this_type) = sig.this_type {
+            params.push(format!("this: {}", self.format(this_type)));
+        }
+        params.extend(sig.params.iter().map(|p| {
+            let name = p.name.map(|atom| self.interner.resolve_atom(atom)).unwrap_or_else(|| "_".to_string());
+            format!("{}: {}", name, self.format(p.type_id))
+        }));
         let prefix = if is_construct { "new " } else { "" };
         format!("{}({}): {}", prefix, params.join(", "), self.format(sig.return_type))
     }
@@ -762,7 +776,7 @@ impl SubtypeFailureReason {
                 PendingDiagnostic::error(
                     codes::PROPERTY_MISSING,
                     vec![
-                        property_name.as_ref().into(),
+                        (*property_name).into(),
                         (*source_type).into(),
                         (*target_type).into(),
                     ],
@@ -785,7 +799,7 @@ impl SubtypeFailureReason {
                 let elaboration = PendingDiagnostic::error(
                     codes::NESTED_TYPE_MISMATCH,
                     vec![
-                        property_name.as_ref().into(),
+                        (*property_name).into(),
                         (*source_property_type).into(),
                         (*target_property_type).into(),
                     ],
@@ -808,7 +822,18 @@ impl SubtypeFailureReason {
                     vec![source.into(), target.into()],
                 ).with_related(PendingDiagnostic::error(
                     codes::PROPERTY_MISSING, // Close enough - property is "missing" because it's optional
-                    vec![property_name.as_ref().into(), source.into(), target.into()],
+                    vec![(*property_name).into(), source.into(), target.into()],
+                ))
+            }
+
+            SubtypeFailureReason::ReadonlyPropertyMismatch { property_name } => {
+                PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![source.into(), target.into()],
+                )
+                .with_related(PendingDiagnostic::error(
+                    codes::READONLY_PROPERTY,
+                    vec![(*property_name).into()],
                 ))
             }
 
@@ -918,6 +943,13 @@ impl SubtypeFailureReason {
                 PendingDiagnostic::error(
                     codes::TYPE_NOT_ASSIGNABLE,
                     vec![(*source_type).into(), target.into()],
+                )
+            }
+
+            SubtypeFailureReason::NoCommonProperties { source_type, target_type } => {
+                PendingDiagnostic::error(
+                    codes::NO_COMMON_PROPERTIES,
+                    vec![(*source_type).into(), (*target_type).into()],
                 )
             }
 

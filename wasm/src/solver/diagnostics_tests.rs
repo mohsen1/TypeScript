@@ -43,8 +43,8 @@ fn test_format_object_type() {
     let mut formatter = TypeFormatter::new(&interner);
 
     let obj = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: true, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::STRING, optional: true, readonly: false, is_method: false },
     ]);
 
     let formatted = formatter.format(obj);
@@ -84,13 +84,36 @@ fn test_format_function_type() {
         params: vec![
             ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::STRING, optional: false, rest: false },
         ],
+        this_type: None,
         return_type: TypeId::NUMBER,
+        type_predicate: None,
         is_constructor: false,
     });
 
     let formatted = formatter.format(func);
     assert!(formatted.contains("x: string"));
     assert!(formatted.contains("=> number"));
+}
+
+#[test]
+fn test_format_function_type_with_this() {
+    let interner = TypeInterner::new();
+    let mut formatter = TypeFormatter::new(&interner);
+
+    let func = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![
+            ParamInfo { name: Some(interner.intern_string("x")), type_id: TypeId::NUMBER, optional: false, rest: false },
+        ],
+        this_type: Some(TypeId::STRING),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let formatted = formatter.format(func);
+    assert!(formatted.contains("this: string"));
+    assert!(formatted.contains("x: number"));
 }
 
 #[test]
@@ -112,7 +135,7 @@ fn test_property_missing_diagnostic() {
 
     let obj1 = interner.object(vec![]);
     let obj2 = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
 
     let diag = builder.property_missing("x", obj1, obj2);

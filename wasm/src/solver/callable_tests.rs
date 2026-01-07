@@ -20,7 +20,9 @@ fn test_callable_same_signature() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::NUMBER,
+        type_predicate: None,
     };
 
     let source = interner.callable(CallableShape {
@@ -51,7 +53,9 @@ fn test_callable_more_overloads() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::NUMBER,
+        type_predicate: None,
     };
 
     let sig2 = CallSignature {
@@ -62,7 +66,9 @@ fn test_callable_more_overloads() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::STRING,
+        type_predicate: None,
     };
 
     let source = interner.callable(CallableShape {
@@ -93,7 +99,9 @@ fn test_callable_missing_overload() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::NUMBER,
+        type_predicate: None,
     };
 
     let sig2 = CallSignature {
@@ -104,7 +112,9 @@ fn test_callable_missing_overload() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::STRING,
+        type_predicate: None,
     };
 
     let source = interner.callable(CallableShape {
@@ -128,13 +138,15 @@ fn test_callable_with_construct() {
 
     // { new(): Foo } <: { new(): Foo }
     let obj_type = interner.object(vec![
-        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
 
     let sig = CallSignature {
         type_params: vec![],
         params: vec![],
+        this_type: None,
         return_type: obj_type,
+        type_predicate: None,
     };
 
     let source = interner.callable(CallableShape {
@@ -162,13 +174,17 @@ fn test_callable_covariant_return() {
     let source_sig = CallSignature {
         type_params: vec![],
         params: vec![],
+        this_type: None,
         return_type: hello,
+        type_predicate: None,
     };
 
     let target_sig = CallSignature {
         type_params: vec![],
         params: vec![],
+        this_type: None,
         return_type: TypeId::STRING,
+        type_predicate: None,
     };
 
     let source = interner.callable(CallableShape {
@@ -199,7 +215,9 @@ fn test_function_to_callable() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::NUMBER,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -212,7 +230,9 @@ fn test_function_to_callable() {
                 optional: false,
                 rest: false,
             }],
+            this_type: None,
             return_type: TypeId::NUMBER,
+            type_predicate: None,
         }],
         construct_signatures: vec![],
         properties: vec![],
@@ -236,7 +256,9 @@ fn test_callable_to_function() {
                 optional: false,
                 rest: false,
             }],
+            this_type: None,
             return_type: TypeId::NUMBER,
+            type_predicate: None,
         }],
         construct_signatures: vec![],
         properties: vec![],
@@ -250,7 +272,9 @@ fn test_callable_to_function() {
             optional: false,
             rest: false,
         }],
+        this_type: None,
         return_type: TypeId::NUMBER,
+        type_predicate: None,
         is_constructor: false,
     });
 
@@ -266,11 +290,13 @@ fn test_callable_with_properties() {
         call_signatures: vec![CallSignature {
             type_params: vec![],
             params: vec![],
+            this_type: None,
             return_type: TypeId::VOID,
+            type_predicate: None,
         }],
         construct_signatures: vec![],
         properties: vec![
-            PropertyInfo { name: interner.intern_string("length"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+            PropertyInfo { name: interner.intern_string("length"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
         ],
     });
 
@@ -278,11 +304,13 @@ fn test_callable_with_properties() {
         call_signatures: vec![CallSignature {
             type_params: vec![],
             params: vec![],
+            this_type: None,
             return_type: TypeId::VOID,
+            type_predicate: None,
         }],
         construct_signatures: vec![],
         properties: vec![
-            PropertyInfo { name: interner.intern_string("length"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+            PropertyInfo { name: interner.intern_string("length"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
         ],
     });
 
@@ -298,7 +326,9 @@ fn test_callable_missing_property() {
         call_signatures: vec![CallSignature {
             type_params: vec![],
             params: vec![],
+            this_type: None,
             return_type: TypeId::VOID,
+            type_predicate: None,
         }],
         construct_signatures: vec![],
         properties: vec![],
@@ -308,11 +338,13 @@ fn test_callable_missing_property() {
         call_signatures: vec![CallSignature {
             type_params: vec![],
             params: vec![],
+            this_type: None,
             return_type: TypeId::VOID,
+            type_predicate: None,
         }],
         construct_signatures: vec![],
         properties: vec![
-            PropertyInfo { name: interner.intern_string("length"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+            PropertyInfo { name: interner.intern_string("length"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
         ],
     });
 

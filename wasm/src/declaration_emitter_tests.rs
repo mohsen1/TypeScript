@@ -57,6 +57,15 @@ fn test_class_declaration() {
 }
 
 #[test]
+fn test_class_heritage_clauses() {
+    let source = "export class Child extends Base<T> implements IFace, Other {}";
+    let output = emit_declaration(source);
+    assert!(output.contains("class Child"), "Should contain class Child: {}", output);
+    assert!(output.contains("extends Base<T>"), "Should contain extends clause: {}", output);
+    assert!(output.contains("implements IFace, Other"), "Should contain implements clause: {}", output);
+}
+
+#[test]
 fn test_interface_with_methods() {
     let output = emit_declaration("export interface Service { start(): void; stop(): Promise<void>; }");
     assert!(output.contains("interface Service"), "Should contain interface Service: {}", output);
@@ -68,6 +77,18 @@ fn test_generic_interface() {
     let output = emit_declaration("export interface Container<T> { value: T; }");
     assert!(output.contains("interface Container"), "Should contain interface Container: {}", output);
     assert!(output.contains("<T>") || output.contains("< T >"), "Should contain generic param: {}", output);
+}
+
+#[test]
+fn test_interface_heritage_clauses() {
+    let source = "export interface Child extends Base<T>, ns.Other {}";
+    let output = emit_declaration(source);
+    assert!(output.contains("interface Child"), "Should contain interface Child: {}", output);
+    assert!(
+        output.contains("extends Base<T>, ns.Other"),
+        "Should contain extends clause list: {}",
+        output
+    );
 }
 
 #[test]

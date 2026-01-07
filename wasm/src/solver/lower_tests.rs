@@ -16,6 +16,666 @@ fn test_lowering_new() {
     let _lowering = TypeLowering::new(&arena, &interner);
 }
 
+#[test]
+fn test_lower_intrinsic_type_annotation() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = string;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    assert_eq!(type_id, TypeId::STRING);
+}
+
+#[test]
+fn test_lower_literal_string_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = \"hello\";");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::String(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "hello");
+        }
+        _ => panic!("Expected string literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_number_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 42;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 42.0);
+        }
+        _ => panic!("Expected number literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_hex_number_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0xFF;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 255.0);
+        }
+        _ => panic!("Expected hex literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_binary_number_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0b1010;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 10.0);
+        }
+        _ => panic!("Expected binary literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_octal_number_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0o77;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 63.0);
+        }
+        _ => panic!("Expected octal literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_number_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 1_234_567;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 1_234_567.0);
+        }
+        _ => panic!("Expected number literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_hex_number_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0xFF_FF;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 65_535.0);
+        }
+        _ => panic!("Expected hex literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_binary_number_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0b1010_0101;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 165.0);
+        }
+        _ => panic!("Expected binary literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_octal_number_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0o12_34;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, 668.0);
+        }
+        _ => panic!("Expected octal literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_bigint_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 123n;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "123");
+        }
+        _ => panic!("Expected bigint literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_hex_bigint_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0xFFn;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "255");
+        }
+        _ => panic!("Expected hex bigint literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_binary_bigint_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0b1010n;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "10");
+        }
+        _ => panic!("Expected binary bigint literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_octal_bigint_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0o77n;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "63");
+        }
+        _ => panic!("Expected octal bigint literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_bigint_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 1_000n;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "1000");
+        }
+        _ => panic!("Expected bigint literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_hex_bigint_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0xFF_FFn;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "65535");
+        }
+        _ => panic!("Expected hex bigint literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_binary_bigint_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0b1010_0101n;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "165");
+        }
+        _ => panic!("Expected binary bigint literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_octal_bigint_with_separators() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = 0o12_34n;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "668");
+        }
+        _ => panic!("Expected octal bigint literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_negative_number_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = -42;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, -42.0);
+        }
+        _ => panic!("Expected negative number literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_negative_hex_number_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = -0x2A;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Number(num)) => {
+            assert_eq!(num.0, -42.0);
+        }
+        _ => panic!("Expected negative hex literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_negative_bigint_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = -123n;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "-123");
+        }
+        _ => panic!("Expected negative bigint literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_negative_hex_bigint_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = -0x2An;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::BigInt(atom)) => {
+            assert_eq!(interner.resolve_atom(atom), "-42");
+        }
+        _ => panic!("Expected negative hex bigint literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_literal_boolean_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = true;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Literal(LiteralValue::Boolean(true)) => {}
+        _ => panic!("Expected boolean literal type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_unique_symbol_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = unique symbol;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::UniqueSymbol(_) => {}
+        _ => panic!("Expected unique symbol type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_keyof_type_operator() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = keyof string;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::KeyOf(inner) => {
+            assert_eq!(inner, TypeId::STRING);
+        }
+        _ => panic!("Expected keyof type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_readonly_type_operator() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = readonly string[];");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::ReadonlyType(inner) => {
+            let inner_key = interner.lookup(inner).expect("Inner type should exist");
+            match inner_key {
+                TypeKey::Array(element) => {
+                    assert_eq!(element, TypeId::STRING);
+                }
+                _ => panic!("Expected readonly array type, got {:?}", inner_key),
+            }
+        }
+        _ => panic!("Expected readonly type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_array_type_reference() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = Array<string>;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Array(element) => {
+            assert_eq!(element, TypeId::STRING);
+        }
+        _ => panic!("Expected array type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_readonly_array_type_reference() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = ReadonlyArray<string>;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::ReadonlyType(inner) => {
+            let inner_key = interner.lookup(inner).expect("Inner type should exist");
+            match inner_key {
+                TypeKey::Array(element) => {
+                    assert_eq!(element, TypeId::STRING);
+                }
+                _ => panic!("Expected readonly array type, got {:?}", inner_key),
+            }
+        }
+        _ => panic!("Expected readonly type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_array_type_reference_respects_resolver() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = Array<string>;");
+    let interner = TypeInterner::new();
+
+    let type_resolver = |node_idx: NodeIndex| {
+        arena.get(node_idx)
+            .and_then(|node| arena.get_identifier(node))
+            .and_then(|ident| {
+                if ident.escaped_text == "Array" {
+                    Some(1)
+                } else {
+                    None
+                }
+            })
+    };
+    let value_resolver = |_node_idx: NodeIndex| None;
+    let lowering = TypeLowering::with_resolvers(&arena, &interner, &type_resolver, &value_resolver);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Application(app) => {
+            assert_eq!(app.args, vec![TypeId::STRING]);
+            match interner.lookup(app.base) {
+                Some(TypeKey::Ref(SymbolRef(sym_id))) => assert_eq!(sym_id, 1),
+                other => panic!("Expected Ref base type, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Application type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_readonly_array_type_reference_respects_resolver() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = ReadonlyArray<string>;");
+    let interner = TypeInterner::new();
+
+    let type_resolver = |node_idx: NodeIndex| {
+        arena.get(node_idx)
+            .and_then(|node| arena.get_identifier(node))
+            .and_then(|ident| {
+                if ident.escaped_text == "ReadonlyArray" {
+                    Some(2)
+                } else {
+                    None
+                }
+            })
+    };
+    let value_resolver = |_node_idx: NodeIndex| None;
+    let lowering = TypeLowering::with_resolvers(&arena, &interner, &type_resolver, &value_resolver);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Application(app) => {
+            assert_eq!(app.args, vec![TypeId::STRING]);
+            match interner.lookup(app.base) {
+                Some(TypeKey::Ref(SymbolRef(sym_id))) => assert_eq!(sym_id, 2),
+                other => panic!("Expected Ref base type, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Application type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_conditional_type_with_infer() {
+    let (arena, type_idx) =
+        parse_type_alias_type_node("type T = string extends infer R ? string : never;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Conditional(cond) => {
+            assert_eq!(cond.check_type, TypeId::STRING);
+            assert_eq!(cond.true_type, TypeId::STRING);
+            assert_eq!(cond.false_type, TypeId::NEVER);
+            match interner.lookup(cond.extends_type) {
+                Some(TypeKey::Infer(info)) => {
+                    assert_eq!(interner.resolve_atom(info.name), "R");
+                    assert!(info.constraint.is_none());
+                }
+                other => panic!("Expected infer type in extends, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Conditional type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_infer_type_with_constraint() {
+    let (arena, type_idx) = parse_type_alias_type_node(
+        "type T = string extends infer R extends string ? string : never;",
+    );
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Conditional(cond) => match interner.lookup(cond.extends_type) {
+            Some(TypeKey::Infer(info)) => {
+                assert_eq!(interner.resolve_atom(info.name), "R");
+                assert_eq!(info.constraint, Some(TypeId::STRING));
+            }
+            other => panic!("Expected infer type in extends, got {:?}", other),
+        },
+        _ => panic!("Expected Conditional type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_conditional_infer_binding() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = string extends infer R ? R : never;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Conditional(cond) => {
+            assert_eq!(cond.true_type, cond.extends_type);
+            match interner.lookup(cond.true_type) {
+                Some(TypeKey::Infer(info)) => {
+                    assert_eq!(interner.resolve_atom(info.name), "R");
+                }
+                other => panic!("Expected infer type in true branch, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Conditional type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_conditional_infer_binding_false_branch() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = string extends infer R ? never : R;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Conditional(cond) => {
+            assert_eq!(cond.true_type, TypeId::NEVER);
+            assert_eq!(cond.false_type, cond.extends_type);
+            match interner.lookup(cond.false_type) {
+                Some(TypeKey::Infer(info)) => {
+                    assert_eq!(interner.resolve_atom(info.name), "R");
+                }
+                other => panic!("Expected infer type in false branch, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Conditional type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_conditional_distributive_flag() {
+    let (arena, func_idx) =
+        parse_type_alias("type F = <T>() => T extends string ? number : boolean;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => match interner.lookup(shape.return_type) {
+            Some(TypeKey::Conditional(cond)) => assert!(cond.is_distributive),
+            other => panic!("Expected conditional return type, got {:?}", other),
+        },
+        _ => panic!("Expected function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_conditional_non_distributive_flag() {
+    let (arena, func_idx) =
+        parse_type_alias("type F = <T>() => [T] extends [string] ? number : boolean;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => match interner.lookup(shape.return_type) {
+            Some(TypeKey::Conditional(cond)) => assert!(!cond.is_distributive),
+            other => panic!("Expected conditional return type, got {:?}", other),
+        },
+        _ => panic!("Expected function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_deduplicates_identical_types() {
+    let (arena_one, type_one) = parse_type_alias_type_node("type A = \"same\";");
+    let (arena_two, type_two) = parse_type_alias_type_node("type B = \"same\";");
+    let interner = TypeInterner::new();
+
+    let lowering_one = TypeLowering::new(&arena_one, &interner);
+    let lowering_two = TypeLowering::new(&arena_two, &interner);
+
+    let type_id_one = lowering_one.lower_type(type_one);
+    let type_id_two = lowering_two.lower_type(type_two);
+
+    assert_eq!(type_id_one, type_id_two);
+}
+
 // =============================================================================
 // Type Parameter Lowering Tests
 // =============================================================================
@@ -45,6 +705,36 @@ fn parse_type_alias(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIn
     }
 
     panic!("Could not find function type in parsed AST");
+}
+
+/// Helper to parse a type alias and return its type node index
+fn parse_type_alias_type_node(source: &str) -> (ThinNodeArena, crate::parser::base::NodeIndex) {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        source.to_string(),
+    );
+    let _root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let arena = std::mem::take(&mut parser.arena);
+    let mut type_node = crate::parser::base::NodeIndex::NONE;
+    for i in 0..arena.len() {
+        let idx = crate::parser::base::NodeIndex(i as u32);
+        if let Some(node) = arena.get(idx) {
+            if node.kind == syntax_kind_ext::TYPE_ALIAS_DECLARATION {
+                if let Some(alias) = arena.get_type_alias(node) {
+                    type_node = alias.type_node;
+                    break;
+                }
+            }
+        }
+    }
+
+    if type_node == crate::parser::base::NodeIndex::NONE {
+        panic!("Could not find type alias in parsed AST");
+    }
+
+    (arena, type_node)
 }
 
 /// Helper to parse a type alias and return the tuple type node index
@@ -165,6 +855,38 @@ fn parse_type_literal(source: &str) -> (ThinNodeArena, crate::parser::base::Node
     panic!("Could not find type literal in parsed AST");
 }
 
+/// Helper to parse interface declarations by name.
+fn parse_interface_declarations(source: &str, name: &str) -> (ThinNodeArena, Vec<NodeIndex>) {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        source.to_string(),
+    );
+    let _root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let arena = std::mem::take(&mut parser.arena);
+    let mut declarations = Vec::new();
+    for i in 0..arena.len() {
+        let idx = crate::parser::base::NodeIndex(i as u32);
+        if let Some(node) = arena.get(idx) {
+            if node.kind == syntax_kind_ext::INTERFACE_DECLARATION {
+                if let Some(interface) = arena.get_interface(node) {
+                    if let Some(name_node) = arena.get(interface.name) {
+                        if let Some(ident) = arena.get_identifier(name_node) {
+                            if ident.escaped_text == name {
+                                declarations.push(idx);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    assert!(!declarations.is_empty(), "Could not find interface '{}'", name);
+    (arena, declarations)
+}
+
 #[test]
 fn test_lower_function_type_with_type_parameter() {
     // Parse: type F = <T>(x: T) => T
@@ -190,6 +912,195 @@ fn test_lower_function_type_with_type_parameter() {
 }
 
 #[test]
+fn test_lower_function_type_with_type_predicate_return() {
+    let (arena, func_type_idx) = parse_type_alias("type F = (x: any) => x is string;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.return_type, TypeId::BOOLEAN);
+            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(!predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::Identifier(atom) => {
+                    assert_eq!(interner.resolve_atom(atom).as_str(), "x");
+                }
+                _ => panic!("Expected identifier predicate target"),
+            }
+            assert_eq!(predicate.type_id, Some(TypeId::STRING));
+        }
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_function_type_with_this_predicate_return() {
+    let (arena, func_type_idx) = parse_type_alias("type F = (this: any) => this is string;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.return_type, TypeId::BOOLEAN);
+            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(!predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::This => {}
+                _ => panic!("Expected this predicate target"),
+            }
+            assert_eq!(predicate.type_id, Some(TypeId::STRING));
+        }
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_function_type_with_asserts_predicate_return() {
+    let (arena, func_type_idx) = parse_type_alias("type F = (x: any) => asserts x is string;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.return_type, TypeId::VOID);
+            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::Identifier(atom) => {
+                    assert_eq!(interner.resolve_atom(atom).as_str(), "x");
+                }
+                _ => panic!("Expected identifier predicate target"),
+            }
+            assert_eq!(predicate.type_id, Some(TypeId::STRING));
+        }
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_function_type_with_asserts_this_predicate_return() {
+    let (arena, func_type_idx) = parse_type_alias("type F = (this: any) => asserts this is string;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.return_type, TypeId::VOID);
+            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::This => {}
+                _ => panic!("Expected this predicate target"),
+            }
+            assert_eq!(predicate.type_id, Some(TypeId::STRING));
+        }
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_function_type_with_asserts_this_predicate_without_is() {
+    let (arena, func_type_idx) = parse_type_alias("type F = (this: any) => asserts this;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.return_type, TypeId::VOID);
+            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::This => {}
+                _ => panic!("Expected this predicate target"),
+            }
+            assert_eq!(predicate.type_id, None);
+        }
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_function_type_with_asserts_predicate_without_is() {
+    let (arena, func_type_idx) = parse_type_alias("type F = (x: any) => asserts x;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.return_type, TypeId::VOID);
+            let predicate = shape.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::Identifier(atom) => {
+                    assert_eq!(interner.resolve_atom(atom).as_str(), "x");
+                }
+                _ => panic!("Expected identifier predicate target"),
+            }
+            assert_eq!(predicate.type_id, None);
+        }
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_function_type_with_this_param_separate() {
+    let (arena, func_type_idx) = parse_type_alias("type F = (this: any, x: string) => number;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.this_type, Some(TypeId::ANY));
+            assert_eq!(shape.params.len(), 1);
+            assert_eq!(shape.params[0].type_id, TypeId::STRING);
+            let name = shape.params[0].name.expect("Expected parameter name");
+            assert_eq!(interner.resolve_atom(name).as_str(), "x");
+        }
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_function_type_parameter_usage() {
+    let (arena, func_type_idx) = parse_type_alias("type F = <T>(x: T) => T;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.params.len(), 1);
+            assert_eq!(shape.params[0].type_id, shape.return_type);
+
+            let param_key = interner.lookup(shape.params[0].type_id).expect("Type should exist");
+            match param_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(interner.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected type parameter type, got {:?}", param_key),
+            }
+        }
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_function_type_with_constrained_type_parameter() {
     // Parse: type F = <T extends string>(x: T) => T
     let (arena, func_type_idx) = parse_type_alias("type F = <T extends string>(x: T) => T;");
@@ -208,6 +1119,28 @@ fn test_lower_function_type_with_constrained_type_parameter() {
             assert!(shape.type_params[0].constraint.is_some(), "T should have constraint");
             let constraint = shape.type_params[0].constraint.unwrap();
             assert_eq!(constraint, TypeId::STRING, "Constraint should be string");
+        }
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_constrained_type_parameter_usage() {
+    let (arena, func_type_idx) = parse_type_alias("type F = <T extends string>(x: T) => T;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => {
+            let param_key = interner.lookup(shape.params[0].type_id).expect("Type should exist");
+            match param_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(info.constraint, Some(TypeId::STRING));
+                }
+                _ => panic!("Expected type parameter type, got {:?}", param_key),
+            }
         }
         _ => panic!("Expected Function type, got {:?}", key),
     }
@@ -341,6 +1274,32 @@ fn test_lower_tuple_type_metadata() {
 }
 
 #[test]
+fn test_lower_union_type_normalization() {
+    let (arena, union_idx) = parse_type_alias_type_node("type T = string | number | string;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(union_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Union(members) => {
+            assert_eq!(members, vec![TypeId::NUMBER, TypeId::STRING]);
+        }
+        _ => panic!("Expected Union type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_intersection_type_normalization() {
+    let (arena, intersection_idx) = parse_type_alias_type_node("type T = string & number & string;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(intersection_idx);
+    assert_eq!(type_id, TypeId::NEVER);
+}
+
+#[test]
 fn test_lower_function_parameter_names() {
     let (arena, func_type_idx) = parse_type_alias("type F = (x: string, y?: number) => void;");
 
@@ -361,6 +1320,81 @@ fn test_lower_function_parameter_names() {
             assert!(shape.params[1].optional);
 
             assert_eq!(shape.return_type, TypeId::VOID);
+        }
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_function_rest_parameter() {
+    let (arena, func_type_idx) = parse_type_alias("type F = (...args: string[]) => void;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.params.len(), 1);
+            let param = &shape.params[0];
+            assert_eq!(param.name.map(|a| interner.resolve_atom(a)), Some("args".to_string()));
+            assert!(!param.optional);
+            assert!(param.rest);
+
+            let param_key = interner.lookup(param.type_id).expect("Param type should exist");
+            match param_key {
+                TypeKey::Array(element) => {
+                    assert_eq!(element, TypeId::STRING);
+                }
+                _ => panic!("Expected rest param to be array type, got {:?}", param_key),
+            }
+        }
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_generic_type_reference_uses_type_parameter_args() {
+    let (arena, func_type_idx) = parse_type_alias("type F = <T>(x: T) => Box<T>;");
+    let interner = TypeInterner::new();
+
+    let resolver = |node_idx: NodeIndex| {
+        arena.get(node_idx)
+            .and_then(|node| arena.get_identifier(node))
+            .and_then(|ident| {
+                if ident.escaped_text == "Box" {
+                    Some(1)
+                } else {
+                    None
+                }
+            })
+    };
+
+    let lowering = TypeLowering::with_resolver(&arena, &interner, &resolver);
+    let type_id = lowering.lower_type(func_type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => {
+            let return_key = interner.lookup(shape.return_type).expect("Type should exist");
+            match return_key {
+                TypeKey::Application(app) => {
+                    let base_key = interner.lookup(app.base).expect("Type should exist");
+                    match base_key {
+                        TypeKey::Ref(SymbolRef(1)) => {}
+                        _ => panic!("Expected reference base type, got {:?}", base_key),
+                    }
+
+                    assert_eq!(app.args.len(), 1);
+                    let arg_key = interner.lookup(app.args[0]).expect("Type should exist");
+                    match arg_key {
+                        TypeKey::TypeParameter(info) => {
+                            assert_eq!(interner.resolve_atom(info.name), "T");
+                        }
+                        _ => panic!("Expected type parameter argument, got {:?}", arg_key),
+                    }
+                }
+                _ => panic!("Expected application type, got {:?}", return_key),
+            }
         }
         _ => panic!("Expected Function type, got {:?}", key),
     }
@@ -392,6 +1426,74 @@ fn test_lower_type_reference_with_arguments() {
             match interner.lookup(app.base) {
                 Some(TypeKey::Ref(SymbolRef(sym_id))) => assert_eq!(sym_id, 1),
                 other => panic!("Expected Ref base type, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Application type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_query_uses_value_resolver() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = Foo | typeof Foo;");
+    let interner = TypeInterner::new();
+
+    let type_resolver = |_node_idx: NodeIndex| Some(1);
+    let value_resolver = |_node_idx: NodeIndex| Some(2);
+    let lowering = TypeLowering::with_resolvers(&arena, &interner, &type_resolver, &value_resolver);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Union(members) => {
+            let mut saw_ref = false;
+            let mut saw_query = false;
+            for member in members {
+                match interner.lookup(member) {
+                    Some(TypeKey::Ref(SymbolRef(sym_id))) => {
+                        assert_eq!(sym_id, 1);
+                        saw_ref = true;
+                    }
+                    Some(TypeKey::TypeQuery(SymbolRef(sym_id))) => {
+                        assert_eq!(sym_id, 2);
+                        saw_query = true;
+                    }
+                    other => panic!("Unexpected union member {:?}", other),
+                }
+            }
+            assert!(saw_ref, "Expected union to include type reference");
+            assert!(saw_query, "Expected union to include typeof query");
+        }
+        _ => panic!("Expected Union type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_query_with_type_arguments() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = typeof Foo<string>;");
+    let interner = TypeInterner::new();
+
+    let type_resolver = |_node_idx: NodeIndex| None;
+    let value_resolver = |node_idx: NodeIndex| {
+        arena.get(node_idx)
+            .and_then(|node| arena.get_identifier(node))
+            .and_then(|ident| {
+                if ident.escaped_text == "Foo" {
+                    Some(2)
+                } else {
+                    None
+                }
+            })
+    };
+    let lowering = TypeLowering::with_resolvers(&arena, &interner, &type_resolver, &value_resolver);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Application(app) => {
+            assert_eq!(app.args, vec![TypeId::STRING]);
+            match interner.lookup(app.base) {
+                Some(TypeKey::TypeQuery(SymbolRef(sym_id))) => assert_eq!(sym_id, 2),
+                other => panic!("Expected TypeQuery base type, got {:?}", other),
             }
         }
         _ => panic!("Expected Application type, got {:?}", key),
@@ -465,6 +1567,71 @@ fn test_lower_mapped_type_remove_modifiers() {
 }
 
 #[test]
+fn test_lower_type_literal_object_properties() {
+    let (arena, literal_idx) = parse_type_literal("type T = { readonly foo?: string; bar: number; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Object(properties) => {
+            let foo = properties.iter()
+                .find(|prop| interner.resolve_atom(prop.name) == "foo")
+                .expect("Expected foo property");
+            assert_eq!(foo.type_id, TypeId::STRING);
+            assert!(foo.optional);
+            assert!(foo.readonly);
+
+            let bar = properties.iter()
+                .find(|prop| interner.resolve_atom(prop.name) == "bar")
+                .expect("Expected bar property");
+            assert_eq!(bar.type_id, TypeId::NUMBER);
+            assert!(!bar.optional);
+            assert!(!bar.readonly);
+        }
+        _ => panic!("Expected Object type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_nested_object() {
+    let (arena, literal_idx) = parse_type_alias_type_node(
+        "type T = { config: { enabled: boolean; retries?: number }; };"
+    );
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Object(properties) => {
+            let config = properties.iter()
+                .find(|prop| interner.resolve_atom(prop.name) == "config")
+                .expect("Expected config property");
+
+            match interner.lookup(config.type_id) {
+                Some(TypeKey::Object(nested)) => {
+                    let enabled = nested.iter()
+                        .find(|prop| interner.resolve_atom(prop.name) == "enabled")
+                        .expect("Expected enabled property");
+                    assert_eq!(enabled.type_id, TypeId::BOOLEAN);
+                    assert!(!enabled.optional);
+
+                    let retries = nested.iter()
+                        .find(|prop| interner.resolve_atom(prop.name) == "retries")
+                        .expect("Expected retries property");
+                    assert_eq!(retries.type_id, TypeId::NUMBER);
+                    assert!(retries.optional);
+                }
+                other => panic!("Expected nested Object type, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Object type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_type_literal_call_signature() {
     let (arena, literal_idx) = parse_type_literal("type T = { (x: string): number; foo: string; };");
     let interner = TypeInterner::new();
@@ -479,6 +1646,108 @@ fn test_lower_type_literal_call_signature() {
             assert_eq!(callable.properties.len(), 1);
             assert_eq!(interner.resolve_atom(callable.properties[0].name), "foo");
             assert_eq!(callable.properties[0].type_id, TypeId::STRING);
+        }
+        _ => panic!("Expected Callable type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_call_signature_this_param() {
+    let (arena, literal_idx) = parse_type_literal("type T = { (this: any, x: string): number; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Callable(callable) => {
+            assert_eq!(callable.call_signatures.len(), 1);
+            let sig = &callable.call_signatures[0];
+            assert_eq!(sig.this_type, Some(TypeId::ANY));
+            assert_eq!(sig.params.len(), 1);
+            assert_eq!(sig.params[0].type_id, TypeId::STRING);
+        }
+        _ => panic!("Expected Callable type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_call_signature_type_predicate() {
+    let (arena, literal_idx) = parse_type_literal("type T = { (x: any): x is string; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Callable(callable) => {
+            assert_eq!(callable.call_signatures.len(), 1);
+            let sig = &callable.call_signatures[0];
+            assert_eq!(sig.return_type, TypeId::BOOLEAN);
+            let predicate = sig.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(!predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::Identifier(atom) => {
+                    assert_eq!(interner.resolve_atom(atom).as_str(), "x");
+                }
+                _ => panic!("Expected identifier predicate target"),
+            }
+            assert_eq!(predicate.type_id, Some(TypeId::STRING));
+        }
+        _ => panic!("Expected Callable type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_call_signature_asserts_predicate_without_is() {
+    let (arena, literal_idx) = parse_type_literal("type T = { (x: any): asserts x; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Callable(callable) => {
+            assert_eq!(callable.call_signatures.len(), 1);
+            let sig = &callable.call_signatures[0];
+            assert_eq!(sig.return_type, TypeId::VOID);
+            let predicate = sig.type_predicate.as_ref().expect("Expected type predicate");
+            assert!(predicate.asserts);
+            match predicate.target {
+                TypePredicateTarget::Identifier(atom) => {
+                    assert_eq!(interner.resolve_atom(atom).as_str(), "x");
+                }
+                _ => panic!("Expected identifier predicate target"),
+            }
+            assert_eq!(predicate.type_id, None);
+        }
+        _ => panic!("Expected Callable type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_overloaded_call_signatures() {
+    let (arena, literal_idx) = parse_type_literal(
+        "type T = { (x: string): number; (x: number): string; };",
+    );
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Callable(shape) => {
+            assert_eq!(shape.call_signatures.len(), 2);
+
+            let first = &shape.call_signatures[0];
+            assert_eq!(first.params.len(), 1);
+            assert_eq!(first.params[0].type_id, TypeId::STRING);
+            assert_eq!(first.return_type, TypeId::NUMBER);
+
+            let second = &shape.call_signatures[1];
+            assert_eq!(second.params.len(), 1);
+            assert_eq!(second.params[0].type_id, TypeId::NUMBER);
+            assert_eq!(second.return_type, TypeId::STRING);
         }
         _ => panic!("Expected Callable type, got {:?}", key),
     }
@@ -503,7 +1772,7 @@ fn test_lower_type_literal_construct_signature() {
 
 #[test]
 fn test_lower_type_literal_index_signature() {
-    let (arena, literal_idx) = parse_type_literal("type T = { [key: string]: number; foo: string; };");
+    let (arena, literal_idx) = parse_type_literal("type T = { [key: string]: number; foo: number; };");
     let interner = TypeInterner::new();
     let lowering = TypeLowering::new(&arena, &interner);
 
@@ -518,5 +1787,115 @@ fn test_lower_type_literal_index_signature() {
             assert_eq!(string_index.value_type, TypeId::NUMBER);
         }
         _ => panic!("Expected ObjectWithIndex type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_type_literal_index_signature_mismatch() {
+    let (arena, literal_idx) =
+        parse_type_literal("type T = { [key: string]: number; foo: string; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    assert_eq!(type_id, TypeId::ERROR);
+}
+
+#[test]
+fn test_lower_interface_index_signature_mismatch() {
+    let source = "interface Foo { [key: string]: number; foo: string; }";
+    let (arena, declarations) = parse_interface_declarations(source, "Foo");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_interface_declarations(&declarations);
+    assert_eq!(type_id, TypeId::ERROR);
+}
+
+#[test]
+fn test_lower_interface_merges_properties() {
+    let source = "interface Foo { a: string; } interface Foo { b?: number; }";
+    let (arena, declarations) = parse_interface_declarations(source, "Foo");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_interface_declarations(&declarations);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Object(properties) => {
+            let mut found_a = None;
+            let mut found_b = None;
+            for prop in &properties {
+                match interner.resolve_atom(prop.name).as_str() {
+                    "a" => found_a = Some(prop),
+                    "b" => found_b = Some(prop),
+                    _ => {}
+                }
+            }
+
+            let a = found_a.expect("Expected property a");
+            let b = found_b.expect("Expected property b");
+            assert_eq!(a.type_id, TypeId::STRING);
+            assert!(!a.optional);
+            assert_eq!(b.type_id, TypeId::NUMBER);
+            assert!(b.optional);
+        }
+        _ => panic!("Expected Object type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_interface_conflicting_property_types() {
+    let source = "interface Foo { a: string; } interface Foo { a: number; }";
+    let (arena, declarations) = parse_interface_declarations(source, "Foo");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_interface_declarations(&declarations);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Object(properties) => {
+            let prop = properties
+                .iter()
+                .find(|prop| interner.resolve_atom(prop.name) == "a")
+                .expect("Expected property a");
+            assert_eq!(prop.type_id, TypeId::ERROR);
+        }
+        _ => panic!("Expected Object type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_interface_method_overload_accumulates() {
+    let source = "interface Foo { bar(x: string): number; } interface Foo { bar(x: number): string; }";
+    let (arena, declarations) = parse_interface_declarations(source, "Foo");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_interface_declarations(&declarations);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Object(properties) => {
+            let prop = properties
+                .iter()
+                .find(|prop| interner.resolve_atom(prop.name) == "bar")
+                .expect("Expected property bar");
+            let prop_key = interner.lookup(prop.type_id).expect("Type should exist");
+            match prop_key {
+                TypeKey::Callable(callable) => {
+                    assert_eq!(callable.call_signatures.len(), 2);
+                    let mut combos: Vec<(TypeId, TypeId)> = callable.call_signatures.iter()
+                        .map(|sig| (sig.params[0].type_id, sig.return_type))
+                        .collect();
+                    combos.sort_by_key(|(param, _)| param.0);
+                    assert_eq!(
+                        combos,
+                        vec![(TypeId::NUMBER, TypeId::STRING), (TypeId::STRING, TypeId::NUMBER)]
+                    );
+                }
+                _ => panic!("Expected Callable type, got {:?}", prop_key),
+            }
+        }
+        _ => panic!("Expected Object type, got {:?}", key),
     }
 }

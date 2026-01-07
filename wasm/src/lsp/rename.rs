@@ -62,6 +62,7 @@ pub struct RenameProvider<'a> {
     binder: &'a ThinBinderState,
     line_map: &'a LineMap,
     file_name: String,
+    source_text: &'a str,
 }
 
 impl<'a> RenameProvider<'a> {
@@ -71,36 +72,25 @@ impl<'a> RenameProvider<'a> {
         binder: &'a ThinBinderState,
         line_map: &'a LineMap,
         file_name: String,
+        source_text: &'a str,
     ) -> Self {
         Self {
             arena,
             binder,
             line_map,
             file_name,
+            source_text,
         }
     }
 
     /// Check if the symbol at the position can be renamed.
     /// Returns the Range of the identifier if valid, or None.
     pub fn prepare_rename(&self, position: Position) -> Option<Range> {
-        let offset = self.line_map.position_to_offset(position);
-        let node_idx = find_node_at_offset(self.arena, offset);
-
-        if node_idx.is_none() {
-            return None;
-        }
-
+        let node_idx = self.rename_target_node(position)?;
         let node = self.arena.get(node_idx)?;
-
-        // Only allow renaming identifiers
-        if node.kind == SyntaxKind::Identifier as u16 ||
-           node.kind == SyntaxKind::PrivateIdentifier as u16 {
-            let start = self.line_map.offset_to_position(node.pos);
-            let end = self.line_map.offset_to_position(node.end);
-            return Some(Range::new(start, end));
-        }
-
-        None
+        let start = self.line_map.offset_to_position(node.pos, self.source_text);
+        let end = self.line_map.offset_to_position(node.end, self.source_text);
+        Some(Range::new(start, end))
     }
 
     /// Perform the rename operation.
@@ -113,19 +103,21 @@ impl<'a> RenameProvider<'a> {
         position: Position,
         new_name: String,
     ) -> Result<WorkspaceEdit, String> {
-        // 1. Validate the new name
-        if !self.is_valid_identifier(&new_name) {
-            return Err(format!("'{}' is not a valid identifier name", new_name));
-        }
-
-        // 2. Prepare check (ensure we are on a valid node)
-        if self.prepare_rename(position).is_none() {
-            return Err("You cannot rename this element.".to_string());
-        }
+        let node_idx = self
+            .rename_target_node(position)
+            .ok_or_else(|| "You cannot rename this element.".to_string())?;
+        let node = self.arena.get(node_idx).ok_or_else(|| "You cannot rename this element.".to_string())?;
+        let normalized_name = self.normalize_rename_name(node.kind, &new_name)?;
 
         // 3. Find all references (declarations + usages)
         // We reuse the existing FindReferences logic to ensure consistency
-        let finder = FindReferences::new(self.arena, self.binder, self.line_map, self.file_name.clone());
+        let finder = FindReferences::new(
+            self.arena,
+            self.binder,
+            self.line_map,
+            self.file_name.clone(),
+            self.source_text,
+        );
 
         // We use find_references which includes the definition
         let locations = finder.find_references(root, position)
@@ -137,11 +129,28 @@ impl<'a> RenameProvider<'a> {
         for loc in locations {
             workspace_edit.add_edit(
                 loc.file_path,
-                TextEdit::new(loc.range, new_name.clone()),
+                TextEdit::new(loc.range, normalized_name.clone()),
             );
         }
 
         Ok(workspace_edit)
+    }
+
+    fn rename_target_node(&self, position: Position) -> Option<NodeIndex> {
+        let offset = self.line_map.position_to_offset(position, self.source_text)?;
+        let node_idx = find_node_at_offset(self.arena, offset);
+        if node_idx.is_none() {
+            return None;
+        }
+
+        let node = self.arena.get(node_idx)?;
+        if node.kind == SyntaxKind::Identifier as u16
+            || node.kind == SyntaxKind::PrivateIdentifier as u16
+        {
+            return Some(node_idx);
+        }
+
+        None
     }
 
     /// Validate that a string is a valid identifier.
@@ -184,6 +193,23 @@ impl<'a> RenameProvider<'a> {
 
         true
     }
+
+    fn normalize_rename_name(&self, node_kind: u16, new_name: &str) -> Result<String, String> {
+        let is_private = node_kind == SyntaxKind::PrivateIdentifier as u16;
+        if is_private {
+            let stripped = new_name.strip_prefix('#').unwrap_or(new_name);
+            if !is_valid_private_identifier(stripped) {
+                return Err(format!("'{}' is not a valid private identifier name", new_name));
+            }
+            return Ok(format!("#{}", stripped));
+        }
+
+        if new_name.starts_with('#') || !self.is_valid_identifier(new_name) {
+            return Err(format!("'{}' is not a valid identifier name", new_name));
+        }
+
+        Ok(new_name.to_string())
+    }
 }
 
 // Helpers for identifier validation (mirrors scanner logic)
@@ -196,6 +222,28 @@ fn is_identifier_start(ch: char) -> bool {
 /// Check if a character can be part of an identifier.
 fn is_identifier_part(ch: char) -> bool {
     ch == '$' || ch == '_' || ch.is_alphanumeric()
+}
+
+fn is_valid_private_identifier(name: &str) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !is_identifier_start(first) {
+        return false;
+    }
+
+    for ch in chars {
+        if !is_identifier_part(ch) {
+            return false;
+        }
+    }
+
+    true
 }
 
 #[cfg(test)]
@@ -217,7 +265,7 @@ mod rename_tests {
         binder.bind_source_file(arena, root);
 
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string());
+        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         // Rename 'oldName' at declaration (0, 4)
         let pos = Position::new(0, 4);
@@ -251,7 +299,7 @@ mod rename_tests {
         let mut binder = ThinBinderState::new();
         binder.bind_source_file(arena, root);
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string());
+        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         let pos = Position::new(0, 4);
 
@@ -269,7 +317,7 @@ mod rename_tests {
         let mut binder = ThinBinderState::new();
         binder.bind_source_file(arena, root);
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string());
+        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         let pos = Position::new(0, 4);
 
@@ -290,7 +338,7 @@ mod rename_tests {
         binder.bind_source_file(arena, root);
 
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string());
+        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         // Rename 'foo' at the call site (1, 0)
         let pos = Position::new(1, 0);
@@ -311,6 +359,67 @@ mod rename_tests {
     }
 
     #[test]
+    fn test_rename_private_identifier() {
+        let source = "class Foo {\n  #bar = 1;\n  method() {\n    this.#bar;\n  }\n}\n";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let line_map = LineMap::build(source);
+        let rename_provider = RenameProvider::new(
+            arena,
+            &binder,
+            &line_map,
+            "test.ts".to_string(),
+            source,
+        );
+
+        let pos = Position::new(3, 9); // on '#bar'
+        let result = rename_provider.provide_rename_edits(root, pos, "baz".to_string());
+        assert!(result.is_ok(), "Rename should succeed for private identifier");
+
+        let workspace_edit = result.unwrap();
+        let edits = workspace_edit.changes.get("test.ts").unwrap();
+        assert!(edits.len() >= 2, "Should rename declaration and usage");
+        for edit in edits {
+            assert_eq!(edit.new_text, "#baz");
+        }
+    }
+
+    #[test]
+    fn test_rename_private_identifier_with_hash() {
+        let source = "class Foo {\n  #bar = 1;\n  method() {\n    this.#bar;\n  }\n}\n";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let line_map = LineMap::build(source);
+        let rename_provider = RenameProvider::new(
+            arena,
+            &binder,
+            &line_map,
+            "test.ts".to_string(),
+            source,
+        );
+
+        let pos = Position::new(3, 9); // on '#bar'
+        let result = rename_provider.provide_rename_edits(root, pos, "#qux".to_string());
+        assert!(result.is_ok(), "Rename should accept '#qux' for private identifier");
+
+        let workspace_edit = result.unwrap();
+        let edits = workspace_edit.changes.get("test.ts").unwrap();
+        for edit in edits {
+            assert_eq!(edit.new_text, "#qux");
+        }
+    }
+
+    #[test]
     fn test_prepare_rename_invalid_position() {
         let source = "let x = 1;";
         let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -319,13 +428,35 @@ mod rename_tests {
         let mut binder = ThinBinderState::new();
         binder.bind_source_file(arena, root);
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string());
+        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         // Position on the number literal '1', not an identifier
         let pos = Position::new(0, 8);
 
         let range = rename_provider.prepare_rename(pos);
         assert!(range.is_none(), "Should not be able to rename non-identifier");
+    }
+
+    #[test]
+    fn test_rename_rejects_private_name_for_identifier() {
+        let source = "let x = 1;";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+        let line_map = LineMap::build(source);
+        let rename_provider = RenameProvider::new(
+            arena,
+            &binder,
+            &line_map,
+            "test.ts".to_string(),
+            source,
+        );
+
+        let pos = Position::new(0, 4);
+        let result = rename_provider.provide_rename_edits(root, pos, "#foo".to_string());
+        assert!(result.is_err(), "Should not allow private names for identifiers");
     }
 
     #[test]
@@ -338,7 +469,7 @@ mod rename_tests {
         let mut binder = ThinBinderState::new();
         binder.bind_source_file(arena, root);
         let line_map = LineMap::build(source);
-        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string());
+        let rename_provider = RenameProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
 
         let pos = Position::new(0, 4);
 

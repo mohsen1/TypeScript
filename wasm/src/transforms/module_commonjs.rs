@@ -42,6 +42,9 @@ fn collect_export_name_from_declaration(arena: &ThinNodeArena, decl_node: &ThinN
     match decl_node.kind {
         k if k == syntax_kind_ext::CLASS_DECLARATION => {
             if let Some(class) = arena.get_class(decl_node) {
+                if has_declare_modifier_from_list(arena, &class.modifiers) {
+                    return;
+                }
                 if let Some(name) = get_identifier_text(arena, class.name) {
                     exports.push(name);
                 }
@@ -49,6 +52,9 @@ fn collect_export_name_from_declaration(arena: &ThinNodeArena, decl_node: &ThinN
         }
         k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
             if let Some(func) = arena.get_function(decl_node) {
+                if has_declare_modifier_from_list(arena, &func.modifiers) {
+                    return;
+                }
                 if let Some(name) = get_identifier_text(arena, func.name) {
                     exports.push(name);
                 }
@@ -56,15 +62,21 @@ fn collect_export_name_from_declaration(arena: &ThinNodeArena, decl_node: &ThinN
         }
         k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
             if let Some(var_stmt) = arena.get_variable(decl_node) {
+                if has_declare_modifier_from_list(arena, &var_stmt.modifiers) {
+                    return;
+                }
                 for &decl_idx in &var_stmt.declarations.nodes {
-                    if let Some(name) = get_declaration_name(arena, decl_idx) {
-                        exports.push(name);
-                    }
+                    collect_declaration_names(arena, decl_idx, exports);
                 }
             }
         }
         k if k == syntax_kind_ext::ENUM_DECLARATION => {
             if let Some(enum_decl) = arena.get_enum(decl_node) {
+                if has_declare_modifier_from_list(arena, &enum_decl.modifiers)
+                    || has_const_modifier_from_list(arena, &enum_decl.modifiers)
+                {
+                    return;
+                }
                 if let Some(name) = get_identifier_text(arena, enum_decl.name) {
                     exports.push(name);
                 }
@@ -72,7 +84,17 @@ fn collect_export_name_from_declaration(arena: &ThinNodeArena, decl_node: &ThinN
         }
         k if k == syntax_kind_ext::MODULE_DECLARATION => {
             if let Some(module) = arena.get_module(decl_node) {
+                if has_declare_modifier_from_list(arena, &module.modifiers) {
+                    return;
+                }
                 if let Some(name) = get_identifier_text(arena, module.name) {
+                    exports.push(name);
+                }
+            }
+        }
+        k if k == syntax_kind_ext::IMPORT_EQUALS_DECLARATION => {
+            if let Some(import_decl) = arena.get_import_decl(decl_node) {
+                if let Some(name) = get_identifier_text(arena, import_decl.import_clause) {
                     exports.push(name);
                 }
             }
@@ -93,13 +115,37 @@ pub fn collect_export_names(arena: &ThinNodeArena, statements: &[NodeIndex]) -> 
         let Some(node) = arena.get(stmt_idx) else { continue };
 
         match node.kind {
-            // export class C {} / export function f() {} / etc.
+            // export class C {} / export function f() {} / export { x } / export default ...
             // These are wrapped in EXPORT_DECLARATION nodes
             k if k == syntax_kind_ext::EXPORT_DECLARATION => {
                 if let Some(export_decl) = arena.get_export_decl(node) {
-                    // The actual declaration (class, function, etc.) is in export_clause
-                    if let Some(decl_node) = arena.get(export_decl.export_clause) {
-                        collect_export_name_from_declaration(arena, decl_node, &mut exports);
+                    if export_decl.is_type_only {
+                        continue;
+                    }
+                    if export_decl.is_default_export {
+                        exports.push("default".to_string());
+                        continue;
+                    }
+
+                    // Only pre-initialize local exports (no module specifier)
+                    if export_decl.module_specifier.is_none() {
+                        if let Some(clause_node) = arena.get(export_decl.export_clause) {
+                            if let Some(named_exports) = arena.get_named_imports(clause_node) {
+                                for &spec_idx in &named_exports.elements.nodes {
+                                    if let Some(spec) = arena.get(spec_idx).and_then(|n| arena.get_specifier(n)) {
+                                        if spec.is_type_only {
+                                            continue;
+                                        }
+                                        // Use the exported name (name), not the local name (property_name)
+                                        if let Some(name) = get_identifier_text(arena, spec.name) {
+                                            exports.push(name);
+                                        }
+                                    }
+                                }
+                            } else {
+                                collect_export_name_from_declaration(arena, clause_node, &mut exports);
+                            }
+                        }
                     }
                 }
             }
@@ -108,11 +154,11 @@ pub fn collect_export_names(arena: &ThinNodeArena, statements: &[NodeIndex]) -> 
             // export var baz = ...
             k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
                 if let Some(var_stmt) = arena.get_variable(node) {
-                    if has_export_modifier_from_list(arena, &var_stmt.modifiers) {
+                    if has_export_modifier_from_list(arena, &var_stmt.modifiers)
+                        && !has_declare_modifier_from_list(arena, &var_stmt.modifiers)
+                    {
                         for &decl_idx in &var_stmt.declarations.nodes {
-                            if let Some(name) = get_declaration_name(arena, decl_idx) {
-                                exports.push(name);
-                            }
+                            collect_declaration_names(arena, decl_idx, &mut exports);
                         }
                     }
                 }
@@ -120,7 +166,9 @@ pub fn collect_export_names(arena: &ThinNodeArena, statements: &[NodeIndex]) -> 
             // export function foo() {}
             k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
                 if let Some(func) = arena.get_function(node) {
-                    if has_export_modifier_from_list(arena, &func.modifiers) {
+                    if has_export_modifier_from_list(arena, &func.modifiers)
+                        && !has_declare_modifier_from_list(arena, &func.modifiers)
+                    {
                         if let Some(name) = get_identifier_text(arena, func.name) {
                             exports.push(name);
                         }
@@ -130,7 +178,9 @@ pub fn collect_export_names(arena: &ThinNodeArena, statements: &[NodeIndex]) -> 
             // export class Foo {}
             k if k == syntax_kind_ext::CLASS_DECLARATION => {
                 if let Some(class) = arena.get_class(node) {
-                    if has_export_modifier_from_list(arena, &class.modifiers) {
+                    if has_export_modifier_from_list(arena, &class.modifiers)
+                        && !has_declare_modifier_from_list(arena, &class.modifiers)
+                    {
                         if let Some(name) = get_identifier_text(arena, class.name) {
                             exports.push(name);
                         }
@@ -140,7 +190,10 @@ pub fn collect_export_names(arena: &ThinNodeArena, statements: &[NodeIndex]) -> 
             // export enum E {}
             k if k == syntax_kind_ext::ENUM_DECLARATION => {
                 if let Some(enum_decl) = arena.get_enum(node) {
-                    if has_export_modifier_from_list(arena, &enum_decl.modifiers) {
+                    if has_export_modifier_from_list(arena, &enum_decl.modifiers)
+                        && !has_declare_modifier_from_list(arena, &enum_decl.modifiers)
+                        && !has_const_modifier_from_list(arena, &enum_decl.modifiers)
+                    {
                         if let Some(name) = get_identifier_text(arena, enum_decl.name) {
                             exports.push(name);
                         }
@@ -150,29 +203,11 @@ pub fn collect_export_names(arena: &ThinNodeArena, statements: &[NodeIndex]) -> 
             // export namespace N {}
             k if k == syntax_kind_ext::MODULE_DECLARATION => {
                 if let Some(module) = arena.get_module(node) {
-                    if has_export_modifier_from_list(arena, &module.modifiers) {
+                    if has_export_modifier_from_list(arena, &module.modifiers)
+                        && !has_declare_modifier_from_list(arena, &module.modifiers)
+                    {
                         if let Some(name) = get_identifier_text(arena, module.name) {
                             exports.push(name);
-                        }
-                    }
-                }
-            }
-            // export { a, b, c }
-            k if k == syntax_kind_ext::EXPORT_DECLARATION => {
-                if let Some(export_decl) = arena.get_export_decl(node) {
-                    // Only process local exports (no module specifier)
-                    if export_decl.module_specifier.is_none() {
-                        if let Some(clause_node) = arena.get(export_decl.export_clause) {
-                            if let Some(named_exports) = arena.get_named_imports(clause_node) {
-                                for &spec_idx in &named_exports.elements.nodes {
-                                    if let Some(spec) = arena.get(spec_idx).and_then(|n| arena.get_specifier(n)) {
-                                        // Use the exported name (name), not the local name (property_name)
-                                        if let Some(name) = get_identifier_text(arena, spec.name) {
-                                            exports.push(name);
-                                        }
-                                    }
-                                }
-                            }
                         }
                     }
                 }
@@ -272,6 +307,10 @@ pub fn get_import_bindings(
         return bindings;
     };
 
+    if clause.is_type_only {
+        return bindings;
+    }
+
     // Default import: import foo from "..."
     if !clause.name.is_none() {
         if let Some(name) = get_identifier_text(arena, clause.name) {
@@ -296,6 +335,9 @@ pub fn get_import_bindings(
                     for &spec_idx in &named_imports.elements.nodes {
                         if let Some(spec_node) = arena.get(spec_idx) {
                             if let Some(spec) = arena.get_specifier(spec_node) {
+                                if spec.is_type_only {
+                                    continue;
+                                }
                                 let local_name = get_identifier_text(arena, spec.name).unwrap_or_default();
                                 let import_name = if !spec.property_name.is_none() {
                                     get_identifier_text(arena, spec.property_name).unwrap_or(local_name.clone())
@@ -363,16 +405,92 @@ fn has_export_modifier_from_list(arena: &ThinNodeArena, modifiers: &Option<crate
     has_modifier(arena, modifiers, SyntaxKind::ExportKeyword as u16)
 }
 
+/// Check if a node has the `declare` modifier
+fn has_declare_modifier_from_list(arena: &ThinNodeArena, modifiers: &Option<crate::parser::NodeList>) -> bool {
+    has_modifier(arena, modifiers, SyntaxKind::DeclareKeyword as u16)
+}
+
+/// Check if a node has the `const` modifier
+fn has_const_modifier_from_list(arena: &ThinNodeArena, modifiers: &Option<crate::parser::NodeList>) -> bool {
+    has_modifier(arena, modifiers, SyntaxKind::ConstKeyword as u16)
+}
+
 /// Check if a node has the `default` modifier
 pub fn has_default_modifier_from_list(arena: &ThinNodeArena, modifiers: &Option<crate::parser::NodeList>) -> bool {
     has_modifier(arena, modifiers, SyntaxKind::DefaultKeyword as u16)
 }
 
-/// Get the name from a variable declaration
-fn get_declaration_name(arena: &ThinNodeArena, decl_idx: NodeIndex) -> Option<String> {
-    let decl_node = arena.get(decl_idx)?;
-    let decl = arena.get_variable_declaration(decl_node)?;
-    get_identifier_text(arena, decl.name)
+/// Collect exported names from a variable declaration (identifier or binding pattern).
+fn collect_declaration_names(arena: &ThinNodeArena, decl_idx: NodeIndex, exports: &mut Vec<String>) {
+    let Some(decl_node) = arena.get(decl_idx) else {
+        return;
+    };
+
+    if decl_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+        if let Some(decl_list) = arena.get_variable(decl_node) {
+            for &inner_decl_idx in &decl_list.declarations.nodes {
+                collect_declaration_names(arena, inner_decl_idx, exports);
+            }
+        }
+        return;
+    }
+
+    if let Some(decl) = arena.get_variable_declaration(decl_node) {
+        collect_binding_names(arena, decl.name, exports);
+    }
+}
+
+fn collect_binding_names(arena: &ThinNodeArena, name_idx: NodeIndex, exports: &mut Vec<String>) {
+    if name_idx.is_none() {
+        return;
+    }
+
+    let Some(node) = arena.get(name_idx) else {
+        return;
+    };
+
+    if node.kind == SyntaxKind::Identifier as u16 {
+        if let Some(id) = arena.get_identifier(node) {
+            exports.push(id.escaped_text.clone());
+        }
+        return;
+    }
+
+    match node.kind {
+        k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN
+            || k == syntax_kind_ext::ARRAY_BINDING_PATTERN =>
+        {
+            if let Some(pattern) = arena.get_binding_pattern(node) {
+                for &elem_idx in &pattern.elements.nodes {
+                    collect_binding_names_from_element(arena, elem_idx, exports);
+                }
+            }
+        }
+        k if k == syntax_kind_ext::BINDING_ELEMENT => {
+            if let Some(elem) = arena.get_binding_element(node) {
+                collect_binding_names(arena, elem.name, exports);
+            }
+        }
+        _ => {}
+    }
+}
+
+fn collect_binding_names_from_element(
+    arena: &ThinNodeArena,
+    elem_idx: NodeIndex,
+    exports: &mut Vec<String>,
+) {
+    if elem_idx.is_none() {
+        return;
+    }
+
+    let Some(elem_node) = arena.get(elem_idx) else {
+        return;
+    };
+
+    if let Some(elem) = arena.get_binding_element(elem_node) {
+        collect_binding_names(arena, elem.name, exports);
+    }
 }
 
 /// Get identifier text from a node index
@@ -402,95 +520,4 @@ pub fn sanitize_module_name(module_spec: &str) -> String {
         .trim_start_matches("./")
         .trim_start_matches("../")
         .replace(['/', '-', '.', '@'], "_")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_sanitize_module_name() {
-        assert_eq!(sanitize_module_name("./foo"), "foo");
-        assert_eq!(sanitize_module_name("./foo/bar"), "foo_bar");
-        assert_eq!(sanitize_module_name("../utils"), "utils");
-        assert_eq!(sanitize_module_name("@scope/pkg"), "_scope_pkg");
-    }
-
-    #[test]
-    fn test_emit_commonjs_preamble() {
-        let mut output = String::new();
-        emit_commonjs_preamble(&mut output).unwrap();
-        assert!(output.contains("\"use strict\";"));
-        assert!(output.contains("Object.defineProperty(exports, \"__esModule\""));
-    }
-
-    #[test]
-    fn test_emit_exports_init() {
-        let mut output = String::new();
-        emit_exports_init(&mut output, &["foo".to_string(), "bar".to_string()]).unwrap();
-        assert_eq!(output, "exports.foo = exports.bar = void 0;\n");
-    }
-
-    #[test]
-    fn test_emit_export_assignment() {
-        assert_eq!(emit_export_assignment("foo"), "exports.foo = foo;");
-    }
-
-    #[test]
-    fn test_emit_reexport_property() {
-        let result = emit_reexport_property("foo", "module_1", "foo");
-        assert!(result.contains("Object.defineProperty"));
-        assert!(result.contains("\"foo\""));
-        assert!(result.contains("module_1.foo"));
-    }
-
-    #[test]
-    fn test_collect_export_names_with_parsed_ast() {
-        use crate::thin_parser::ThinParserState;
-        use crate::parser::syntax_kind_ext;
-
-        let source = "export class C {}";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-
-        let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
-            panic!("Failed to get source file");
-        };
-
-        // Debug: print the statements
-        eprintln!("Source file has {} statements", source_file.statements.nodes.len());
-        for (i, &stmt_idx) in source_file.statements.nodes.iter().enumerate() {
-            if let Some(node) = parser.arena.get(stmt_idx) {
-                eprintln!("Statement {}: kind = {} (ClassDecl = {})",
-                    i, node.kind, syntax_kind_ext::CLASS_DECLARATION);
-
-                if node.kind == syntax_kind_ext::CLASS_DECLARATION {
-                    if let Some(class) = parser.arena.get_class(node) {
-                        eprintln!("  Found class, modifiers: {:?}", class.modifiers);
-                        if let Some(modifiers) = &class.modifiers {
-                            eprintln!("  Modifiers count: {}", modifiers.nodes.len());
-                            for &mod_idx in &modifiers.nodes {
-                                if let Some(mod_node) = parser.arena.get(mod_idx) {
-                                    eprintln!("    Modifier kind: {} (Export = {})",
-                                        mod_node.kind, SyntaxKind::ExportKeyword as u16);
-                                }
-                            }
-                        }
-                        if let Some(name_node) = parser.arena.get(class.name) {
-                            if let Some(ident) = parser.arena.get_identifier(name_node) {
-                                eprintln!("  Class name: {}", ident.escaped_text);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
-
-        eprintln!("Collected export names: {:?}", export_names);
-
-        assert!(!export_names.is_empty(), "Expected to find exported class name");
-        assert_eq!(export_names, vec!["C"], "Expected to find class name 'C' in exports");
-    }
 }

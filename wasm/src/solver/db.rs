@@ -24,6 +24,7 @@ pub trait TypeDatabase {
     fn literal_number(&self, value: f64) -> TypeId;
     fn literal_boolean(&self, value: bool) -> TypeId;
     fn literal_bigint(&self, value: &str) -> TypeId;
+    fn literal_bigint_with_sign(&self, negative: bool, digits: &str) -> TypeId;
 
     fn union(&self, members: Vec<TypeId>) -> TypeId;
     fn intersection(&self, members: Vec<TypeId>) -> TypeId;
@@ -68,6 +69,10 @@ impl TypeDatabase for TypeInterner {
 
     fn literal_bigint(&self, value: &str) -> TypeId {
         TypeInterner::literal_bigint(self, value)
+    }
+
+    fn literal_bigint_with_sign(&self, negative: bool, digits: &str) -> TypeId {
+        TypeInterner::literal_bigint_with_sign(self, negative, digits)
     }
 
     fn union(&self, members: Vec<TypeId>) -> TypeId {

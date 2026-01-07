@@ -91,12 +91,13 @@ impl DocumentSymbol {
 pub struct DocumentSymbolProvider<'a> {
     arena: &'a ThinNodeArena,
     line_map: &'a LineMap,
+    source_text: &'a str,
 }
 
 impl<'a> DocumentSymbolProvider<'a> {
     /// Create a new document symbol provider.
-    pub fn new(arena: &'a ThinNodeArena, line_map: &'a LineMap) -> Self {
-        Self { arena, line_map }
+    pub fn new(arena: &'a ThinNodeArena, line_map: &'a LineMap, source_text: &'a str) -> Self {
+        Self { arena, line_map, source_text }
     }
 
     /// Get all symbols in the document.
@@ -506,8 +507,8 @@ impl<'a> DocumentSymbolProvider<'a> {
     /// Convert node range to LSP Range.
     fn get_range(&self, node_idx: NodeIndex) -> Range {
         if let Some(node) = self.arena.get(node_idx) {
-            let start = self.line_map.offset_to_position(node.pos);
-            let end = self.line_map.offset_to_position(node.end);
+            let start = self.line_map.offset_to_position(node.pos, self.source_text);
+            let end = self.line_map.offset_to_position(node.end, self.source_text);
             Range::new(start, end)
         } else {
             Range::new(Position::new(0, 0), Position::new(0, 0))
@@ -517,8 +518,8 @@ impl<'a> DocumentSymbolProvider<'a> {
     /// Get range for a keyword (when no identifier exists, e.g. "constructor").
     fn get_range_keyword(&self, node_idx: NodeIndex, len: u32) -> Range {
         if let Some(node) = self.arena.get(node_idx) {
-            let start = self.line_map.offset_to_position(node.pos);
-            let end = self.line_map.offset_to_position(node.pos + len);
+            let start = self.line_map.offset_to_position(node.pos, self.source_text);
+            let end = self.line_map.offset_to_position(node.pos + len, self.source_text);
             Range::new(start, end)
         } else {
             Range::new(Position::new(0, 0), Position::new(0, 0))
@@ -555,7 +556,7 @@ mod document_symbols_tests {
         let root = parser.parse_source_file();
         let line_map = LineMap::build(source);
 
-        let provider = DocumentSymbolProvider::new(parser.get_arena(), &line_map);
+        let provider = DocumentSymbolProvider::new(parser.get_arena(), &line_map, source);
         let symbols = provider.get_document_symbols(root);
 
         assert_eq!(symbols.len(), 1);
@@ -577,7 +578,7 @@ mod document_symbols_tests {
         let root = parser.parse_source_file();
         let line_map = LineMap::build(source);
 
-        let provider = DocumentSymbolProvider::new(parser.get_arena(), &line_map);
+        let provider = DocumentSymbolProvider::new(parser.get_arena(), &line_map, source);
         let symbols = provider.get_document_symbols(root);
 
         assert_eq!(symbols.len(), 2);
@@ -596,7 +597,7 @@ mod document_symbols_tests {
         let root = parser.parse_source_file();
         let line_map = LineMap::build(source);
 
-        let provider = DocumentSymbolProvider::new(parser.get_arena(), &line_map);
+        let provider = DocumentSymbolProvider::new(parser.get_arena(), &line_map, source);
         let symbols = provider.get_document_symbols(root);
 
         assert_eq!(symbols.len(), 1);
@@ -611,7 +612,7 @@ mod document_symbols_tests {
         let root = parser.parse_source_file();
         let line_map = LineMap::build(source);
 
-        let provider = DocumentSymbolProvider::new(parser.get_arena(), &line_map);
+        let provider = DocumentSymbolProvider::new(parser.get_arena(), &line_map, source);
         let symbols = provider.get_document_symbols(root);
 
         assert_eq!(symbols.len(), 1);
@@ -630,7 +631,7 @@ mod document_symbols_tests {
         let root = parser.parse_source_file();
         let line_map = LineMap::build(source);
 
-        let provider = DocumentSymbolProvider::new(parser.get_arena(), &line_map);
+        let provider = DocumentSymbolProvider::new(parser.get_arena(), &line_map, source);
         let symbols = provider.get_document_symbols(root);
 
         // Should have 3 symbols: a (const), b (const), c (var)

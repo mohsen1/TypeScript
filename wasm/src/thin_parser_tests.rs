@@ -2,6 +2,9 @@
 //!
 //! Separated from thin_parser.rs as per project conventions.
 
+use crate::checker::types::diagnostics::diagnostic_codes;
+use crate::parser::syntax_kind_ext;
+use crate::scanner::SyntaxKind;
 use crate::thin_parser::ThinParserState;
 use std::mem::size_of;
 
@@ -18,6 +21,46 @@ fn test_thin_parser_simple_expression() {
 
     // Should have: SourceFile, ExpressionStatement, BinaryExpression, 2 NumericLiterals
     assert!(parser.arena.len() >= 5, "Expected at least 5 nodes, got {}", parser.arena.len());
+}
+
+#[test]
+fn test_thin_parser_numeric_separator_invalid_diagnostic() {
+    let source = "let x = 1_;";
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        source.to_string(),
+    );
+    parser.parse_source_file();
+
+    let diagnostics = parser.get_diagnostics();
+    let diag = diagnostics
+        .iter()
+        .find(|diag| diag.code == diagnostic_codes::NUMERIC_SEPARATORS_NOT_ALLOWED_HERE)
+        .expect(&format!("Expected numeric separator diagnostic, got: {:?}", diagnostics));
+    let underscore_pos = source.find('_').expect("underscore not found") as u32;
+    assert_eq!(diag.start, underscore_pos);
+    assert_eq!(diag.length, 1);
+}
+
+#[test]
+fn test_thin_parser_numeric_separator_consecutive_diagnostic() {
+    let source = "let x = 1__0;";
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        source.to_string(),
+    );
+    parser.parse_source_file();
+
+    let diagnostics = parser.get_diagnostics();
+    let diag = diagnostics
+        .iter()
+        .find(|diag| {
+            diag.code == diagnostic_codes::MULTIPLE_CONSECUTIVE_NUMERIC_SEPARATORS_NOT_PERMITTED
+        })
+        .expect(&format!("Expected consecutive separator diagnostic, got: {:?}", diagnostics));
+    let underscore_pos = source.find("__").expect("double underscore not found") as u32 + 1;
+    assert_eq!(diag.start, underscore_pos);
+    assert_eq!(diag.length, 1);
 }
 
 #[test]
@@ -102,6 +145,120 @@ fn test_thin_parser_array_literal() {
 
     assert!(!root.is_none());
     assert!(parser.get_diagnostics().is_empty());
+}
+
+#[test]
+fn test_thin_parser_array_binding_pattern_span() {
+    let source = "const [foo] = bar;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let binding = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN)
+        .expect("array binding pattern not found");
+    let expected_end = source.find(']').expect("] not found") as u32 + 1;
+    assert!(
+        binding.end == expected_end,
+        "span: '{}' ({}..{})",
+        &source[binding.pos as usize..binding.end as usize],
+        binding.pos,
+        binding.end
+    );
+}
+
+#[test]
+fn test_thin_parser_object_binding_pattern_span() {
+    let source = "const { foo } = bar;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let binding = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN)
+        .expect("object binding pattern not found");
+    let expected_end = source.find('}').expect("} not found") as u32 + 1;
+    assert!(
+        binding.end == expected_end,
+        "span: '{}' ({}..{})",
+        &source[binding.pos as usize..binding.end as usize],
+        binding.pos,
+        binding.end
+    );
+}
+
+#[test]
+fn test_thin_parser_no_substitution_template_literal_span() {
+    let source = "const message = `hello`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let literal = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16)
+        .expect("template literal not found");
+    let expected_end = source.rfind('`').expect("` not found") as u32 + 1;
+    assert!(
+        literal.end == expected_end,
+        "span: '{}' ({}..{})",
+        &source[literal.pos as usize..literal.end as usize],
+        literal.pos,
+        literal.end
+    );
+}
+
+#[test]
+fn test_thin_parser_template_expression_spans() {
+    let source = "const message = `hello ${name}!`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let expr = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == syntax_kind_ext::TEMPLATE_EXPRESSION)
+        .expect("template expression not found");
+    let head = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == SyntaxKind::TemplateHead as u16)
+        .expect("template head not found");
+    let tail = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == SyntaxKind::TemplateTail as u16)
+        .expect("template tail not found");
+
+    let expected_head_end = source.find("${").expect("${ not found") as u32 + 2;
+    let expected_tail_end = source.rfind('`').expect("` not found") as u32 + 1;
+    assert!(
+        head.end == expected_head_end,
+        "span: '{}' ({}..{})",
+        &source[head.pos as usize..head.end as usize],
+        head.pos,
+        head.end
+    );
+    assert!(
+        tail.end == expected_tail_end,
+        "span: '{}' ({}..{})",
+        &source[tail.pos as usize..tail.end as usize],
+        tail.pos,
+        tail.end
+    );
+    assert!(
+        expr.end == expected_tail_end,
+        "span: '{}' ({}..{})",
+        &source[expr.pos as usize..expr.end as usize],
+        expr.pos,
+        expr.end
+    );
 }
 
 #[test]
@@ -994,6 +1151,42 @@ fn test_thin_parser_arrow_type_predicate() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),
         "const isString = (x: unknown): x is string => typeof x === \"string\";".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+}
+
+#[test]
+fn test_thin_parser_this_type_predicate() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "function isString(this: any): this is string { return true; }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+}
+
+#[test]
+fn test_thin_parser_asserts_this_type_predicate() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "function assertString(this: any): asserts this is string { }".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty(), "Errors: {:?}", parser.get_diagnostics());
+}
+
+#[test]
+fn test_thin_parser_asserts_this_type_predicate_without_is() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "function assertThis(this: any): asserts this { }".to_string(),
     );
     let root = parser.parse_source_file();
 

@@ -64,13 +64,7 @@ impl<'a> ContextualTypeContext<'a> {
         match key {
             TypeKey::Function(shape) => self.get_parameter_type_from_params(&shape.params, index),
             TypeKey::Callable(shape) => {
-                // Use the first call signature for contextual typing
-                // TODO: Support overload selection based on argument count if available
-                if let Some(sig) = shape.call_signatures.first() {
-                    self.get_parameter_type_from_params(&sig.params, index)
-                } else {
-                    None
-                }
+                self.get_parameter_type_from_signatures(&shape.call_signatures, index)
             }
             // For union of function types, try to find common parameter type
             TypeKey::Union(members) => {
@@ -94,6 +88,64 @@ impl<'a> ContextualTypeContext<'a> {
         }
     }
 
+    /// Get the contextual type for a call argument at the given index and arity.
+    pub fn get_parameter_type_for_call(&self, index: usize, arg_count: usize) -> Option<TypeId> {
+        let expected = self.expected?;
+        let key = self.interner.lookup(expected)?;
+
+        match key {
+            TypeKey::Function(shape) => self.get_parameter_type_from_params(&shape.params, index),
+            TypeKey::Callable(shape) => {
+                self.get_parameter_type_from_signatures_for_call(&shape.call_signatures, index, arg_count)
+            }
+            TypeKey::Union(members) => {
+                let param_types: Vec<TypeId> = members.iter()
+                    .filter_map(|&m| {
+                        let ctx = ContextualTypeContext::with_expected(self.interner, m);
+                        ctx.get_parameter_type_for_call(index, arg_count)
+                    })
+                    .collect();
+
+                if param_types.is_empty() {
+                    None
+                } else if param_types.len() == 1 {
+                    Some(param_types[0])
+                } else {
+                    Some(self.interner.union(param_types))
+                }
+            }
+            _ => None,
+        }
+    }
+
+    /// Get the contextual type for a `this` parameter, if present on the expected type.
+    pub fn get_this_type(&self) -> Option<TypeId> {
+        let expected = self.expected?;
+        let key = self.interner.lookup(expected)?;
+
+        match key {
+            TypeKey::Function(shape) => shape.this_type,
+            TypeKey::Callable(shape) => self.get_this_type_from_signatures(&shape.call_signatures),
+            TypeKey::Union(members) => {
+                let this_types: Vec<TypeId> = members.iter()
+                    .filter_map(|&m| {
+                        let ctx = ContextualTypeContext::with_expected(self.interner, m);
+                        ctx.get_this_type()
+                    })
+                    .collect();
+
+                if this_types.is_empty() {
+                    None
+                } else if this_types.len() == 1 {
+                    Some(this_types[0])
+                } else {
+                    Some(self.interner.union(this_types))
+                }
+            }
+            _ => None,
+        }
+    }
+
     /// Get the contextual return type for a function.
     pub fn get_return_type(&self) -> Option<TypeId> {
         let expected = self.expected?;
@@ -101,6 +153,9 @@ impl<'a> ContextualTypeContext<'a> {
 
         match key {
             TypeKey::Function(shape) => Some(shape.return_type),
+            TypeKey::Callable(shape) => {
+                self.get_return_type_from_signatures(&shape.call_signatures)
+            }
             TypeKey::Union(members) => {
                 let return_types: Vec<TypeId> = members.iter()
                     .filter_map(|&m| {
@@ -273,6 +328,112 @@ impl<'a> ContextualTypeContext<'a> {
             None
         } else {
             None
+        }
+    }
+
+    fn get_parameter_type_from_signatures(
+        &self,
+        signatures: &[CallSignature],
+        index: usize,
+    ) -> Option<TypeId> {
+        let param_types: Vec<TypeId> = signatures
+            .iter()
+            .filter_map(|sig| self.get_parameter_type_from_params(&sig.params, index))
+            .collect();
+
+        if param_types.is_empty() {
+            None
+        } else if param_types.len() == 1 {
+            Some(param_types[0])
+        } else {
+            Some(self.interner.union(param_types))
+        }
+    }
+
+    fn get_parameter_type_from_signatures_for_call(
+        &self,
+        signatures: &[CallSignature],
+        index: usize,
+        arg_count: usize,
+    ) -> Option<TypeId> {
+        let mut matched = false;
+        let mut param_types: Vec<TypeId> = Vec::new();
+
+        for sig in signatures {
+            if self.signature_accepts_arg_count(&sig.params, arg_count) {
+                matched = true;
+                if let Some(param_type) = self.get_parameter_type_from_params(&sig.params, index) {
+                    param_types.push(param_type);
+                }
+            }
+        }
+
+        if param_types.is_empty() && !matched {
+            param_types = signatures
+                .iter()
+                .filter_map(|sig| self.get_parameter_type_from_params(&sig.params, index))
+                .collect();
+        }
+
+        if param_types.is_empty() {
+            None
+        } else if param_types.len() == 1 {
+            Some(param_types[0])
+        } else {
+            Some(self.interner.union(param_types))
+        }
+    }
+
+    fn signature_accepts_arg_count(&self, params: &[ParamInfo], arg_count: usize) -> bool {
+        let mut min = 0usize;
+        let mut max = 0usize;
+        let mut has_rest = false;
+
+        for param in params {
+            if param.rest {
+                has_rest = true;
+                break;
+            }
+            max += 1;
+            if !param.optional {
+                min += 1;
+            }
+        }
+
+        if arg_count < min {
+            return false;
+        }
+        if has_rest {
+            return true;
+        }
+        arg_count <= max
+    }
+
+    fn get_this_type_from_signatures(&self, signatures: &[CallSignature]) -> Option<TypeId> {
+        let this_types: Vec<TypeId> = signatures
+            .iter()
+            .filter_map(|sig| sig.this_type)
+            .collect();
+
+        if this_types.is_empty() {
+            None
+        } else if this_types.len() == 1 {
+            Some(this_types[0])
+        } else {
+            Some(self.interner.union(this_types))
+        }
+    }
+
+    fn get_return_type_from_signatures(&self, signatures: &[CallSignature]) -> Option<TypeId> {
+        if signatures.is_empty() {
+            return None;
+        }
+
+        let return_types: Vec<TypeId> = signatures.iter().map(|sig| sig.return_type).collect();
+        if return_types.len() == 1 {
+            Some(return_types[0])
+        } else {
+            Some(self.interner.union(return_types))
         }
     }
 }

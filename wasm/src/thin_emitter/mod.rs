@@ -22,13 +22,16 @@
 
 use crate::emit_context::EmitContext;
 use crate::parser::{NodeIndex, NodeList};
-use crate::parser::thin_node::{ThinNode, ThinNodeArena};
+use crate::parser::thin_node::{ThinNode, ThinNodeArena, TemplateExprData, MethodDeclData};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::source_writer::SourceWriter;
+use crate::lowering_pass::LoweringPass;
+use crate::transform_context::TransformDirective;
 use crate::transform_context::TransformContext;
 use crate::transforms::class_es5::ClassES5Emitter;
-use crate::transforms::arrow_es5::contains_this_reference;
+use crate::transforms::enum_es5::EnumES5Emitter;
+use crate::transforms::namespace_es5::NamespaceES5Emitter;
 
 // =============================================================================
 // Comment Utilities
@@ -342,6 +345,36 @@ impl Default for PrinterOptions {
     }
 }
 
+#[derive(Default)]
+struct ParamTransformPlan {
+    params: Vec<ParamTransform>,
+    rest: Option<RestParamTransform>,
+}
+
+impl ParamTransformPlan {
+    fn has_transforms(&self) -> bool {
+        !self.params.is_empty() || self.rest.is_some()
+    }
+}
+
+struct ParamTransform {
+    name: String,
+    pattern: Option<NodeIndex>,
+    initializer: Option<NodeIndex>,
+}
+
+struct RestParamTransform {
+    name: String,
+    pattern: Option<NodeIndex>,
+    index: usize,
+}
+
+struct TemplateParts {
+    cooked: Vec<String>,
+    raw: Vec<String>,
+    expressions: Vec<NodeIndex>,
+}
+
 // =============================================================================
 // ThinPrinter
 // =============================================================================
@@ -363,6 +396,9 @@ pub struct ThinPrinter<'a> {
 
     /// Transform directives from lowering pass (optional, defaults to empty)
     pub(super) transforms: TransformContext,
+
+    /// Auto-run LoweringPass for source files when transforms are missing.
+    pub(super) auto_lower: bool,
 
     /// Source text for detecting single-line constructs
     pub(super) source_text: Option<&'a str>,
@@ -402,6 +438,7 @@ impl<'a> ThinPrinter<'a> {
             writer,
             ctx,
             transforms: TransformContext::new(), // Empty by default, can be set later
+            auto_lower: true,
             source_text: None,
             last_processed_pos: 0,
         }
@@ -412,6 +449,7 @@ impl<'a> ThinPrinter<'a> {
     pub fn with_transforms(arena: &'a ThinNodeArena, transforms: TransformContext) -> Self {
         let mut printer = Self::new(arena);
         printer.transforms = transforms;
+        printer.auto_lower = printer.transforms.is_empty();
         printer
     }
 
@@ -423,6 +461,7 @@ impl<'a> ThinPrinter<'a> {
     ) -> Self {
         let mut printer = Self::with_options(arena, options);
         printer.transforms = transforms;
+        printer.auto_lower = printer.transforms.is_empty();
         printer
     }
 
@@ -701,73 +740,511 @@ impl<'a> ThinPrinter<'a> {
                 self.write(&es5_output);
             }
 
+            TransformDirective::ES5Namespace { namespace_node } => {
+                let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
+                let output = ns_emitter.emit_namespace(namespace_node);
+                self.write(&output);
+            }
+
+            TransformDirective::ES5Enum { enum_node } => {
+                let mut enum_emitter = EnumES5Emitter::new(self.arena);
+                enum_emitter.set_indent_level(self.writer.indent_level());
+                let output = enum_emitter.emit_enum(enum_node);
+                self.write(&output);
+            }
+
             TransformDirective::CommonJSExport {
-                name,
+                names,
                 is_default,
                 inner,
             } => {
-                // First apply the inner transform/emit
-                match &*inner {
-                    TransformDirective::ES5Class { class_node, .. } => {
-                        let mut es5_emitter = ClassES5Emitter::new(self.arena);
-                        es5_emitter.set_indent_level(self.writer.indent_level());
-                        if let Some(source_text) = self.source_text {
-                            es5_emitter.set_source_text(source_text);
-                        }
-                        let es5_output = es5_emitter.emit_class(*class_node);
-                        self.write(&es5_output);
-                    }
-                    TransformDirective::Identity => {
-                        self.emit_node_default(node, idx);
-                    }
-                    _ => {
-                        // For other inner transforms, emit normally for now
-                        self.emit_node_default(node, idx);
-                    }
-                }
-
-                // Then add the export assignment
-                self.write_line();
-                if is_default {
-                    self.write("exports.default = ");
-                } else {
-                    self.write("exports.");
-                    self.write(&name);
-                    self.write(" = ");
-                }
-                self.write(&name);
-                self.write(";");
+                let export_name = names.first().map(|name| name.as_str());
+                self.emit_commonjs_export(names.as_slice(), is_default, |this| {
+                    this.emit_commonjs_inner(node, idx, &inner, export_name);
+                });
             }
 
-            TransformDirective::ES5ArrowFunction { arrow_node, .. } => {
-                // TODO: Implement arrow function transform
-                // For now, fall back to default emit
-                self.emit_node_default(node, arrow_node);
+            TransformDirective::CommonJSExportDefaultExpr => {
+                self.emit_commonjs_default_export_expr(node, idx);
+            }
+
+            TransformDirective::CommonJSExportDefaultClassES5 { class_node } => {
+                self.emit_commonjs_default_export_class_es5(class_node);
+            }
+
+            TransformDirective::ES5ArrowFunction {
+                arrow_node,
+                captures_this,
+            } => {
+                if let Some(arrow_node) = self.arena.get(arrow_node) {
+                    if let Some(func) = self.arena.get_function(arrow_node) {
+                        self.emit_arrow_function_es5(arrow_node, func, captures_this);
+                        return;
+                    }
+                }
+
+                self.emit_node_default(node, idx);
             }
 
             TransformDirective::ES5AsyncFunction { function_node } => {
-                // TODO: Implement async function transform
-                // For now, fall back to default emit
-                self.emit_node_default(node, function_node);
+                if let Some(func_node) = self.arena.get(function_node) {
+                    if let Some(func) = self.arena.get_function(func_node) {
+                        let func_name = if !func.name.is_none() {
+                            self.get_identifier_text_idx(func.name)
+                        } else {
+                            String::new()
+                        };
+
+                        self.emit_async_function_es5(func, &func_name, "this");
+                        return;
+                    }
+                }
+
+                self.emit_node_default(node, idx);
             }
 
-            TransformDirective::ModuleWrapper { .. } => {
-                // TODO: Implement module wrapper transform
-                // For now, fall back to default emit
+            TransformDirective::ES5ForOf { for_of_node } => {
+                if let Some(for_of_node) = self.arena.get(for_of_node) {
+                    if let Some(for_in_of) = self.arena.get_for_in_of(for_of_node) {
+                        if !for_in_of.await_modifier {
+                            self.emit_for_of_statement_es5(for_in_of);
+                            return;
+                        }
+                    }
+                }
+
+                self.emit_node_default(node, idx);
+            }
+
+            TransformDirective::ES5ObjectLiteral { object_literal } => {
+                if let Some(literal_node) = self.arena.get(object_literal) {
+                    if let Some(literal) = self.arena.get_literal_expr(literal_node) {
+                        self.emit_object_literal_es5(&literal.elements.nodes);
+                        return;
+                    }
+                }
+
+                self.emit_node_default(node, idx);
+            }
+
+            TransformDirective::ES5VariableDeclarationList { decl_list } => {
+                if let Some(list_node) = self.arena.get(decl_list) {
+                    self.emit_variable_declaration_list_es5(list_node);
+                    return;
+                }
+
+                self.emit_node_default(node, idx);
+            }
+
+            TransformDirective::ES5FunctionParameters { function_node } => {
+                if let Some(func_node) = self.arena.get(function_node) {
+                    match func_node.kind {
+                        k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                            self.emit_function_declaration_es5_params(func_node);
+                            return;
+                        }
+                        k if k == syntax_kind_ext::FUNCTION_EXPRESSION => {
+                            self.emit_function_expression_es5_params(func_node);
+                            return;
+                        }
+                        _ => {}
+                    }
+                }
+
+                self.emit_node_default(node, idx);
+            }
+
+            TransformDirective::ES5TemplateLiteral { .. } => {
+                if !self.emit_template_literal_es5(node, idx) {
+                    self.emit_node_default(node, idx);
+                }
+            }
+
+            TransformDirective::ModuleWrapper {
+                format,
+                dependencies,
+                ..
+            } => {
+                if let Some(source) = self.arena.get_source_file(node) {
+                    self.emit_module_wrapper(&format, &dependencies, node, source);
+                    return;
+                }
+
                 self.emit_node_default(node, idx);
             }
 
             TransformDirective::Chain(directives) => {
-                // Apply transforms in sequence
-                // For now, just apply the first directive
-                // TODO: Implement proper chaining
-                if let Some(first) = directives.first() {
-                    // This is a simplified version - proper implementation would need
-                    // to thread transforms through properly
-                    self.emit_node_default(node, idx);
-                } else {
-                    self.emit_node_default(node, idx);
+                self.emit_chained_directives(node, idx, directives);
+            }
+        }
+    }
+
+    fn emit_commonjs_export<F>(&mut self, names: &[String], is_default: bool, mut emit_inner: F)
+    where
+        F: FnMut(&mut Self),
+    {
+        if names.is_empty() {
+            emit_inner(self);
+            return;
+        }
+
+        let prev_module = self.ctx.options.module;
+        self.ctx.options.module = ModuleKind::None;
+
+        emit_inner(self);
+
+        self.ctx.options.module = prev_module;
+
+        self.write_line();
+        if is_default {
+            self.write("exports.default = ");
+            self.write(&names[0]);
+            self.write(";");
+        } else {
+            for (i, name) in names.iter().enumerate() {
+                if i > 0 {
+                    self.write_line();
                 }
+                self.write("exports.");
+                self.write(name);
+                self.write(" = ");
+                self.write(name);
+                self.write(";");
+            }
+        }
+    }
+
+    fn emit_commonjs_default_export_expr(&mut self, node: &ThinNode, idx: NodeIndex) {
+        self.emit_commonjs_default_export_assignment(|this| {
+            this.emit_commonjs_default_export_expr_inner(node, idx);
+        });
+    }
+
+    fn emit_commonjs_default_export_expr_inner(&mut self, node: &ThinNode, idx: NodeIndex) {
+        match node.kind {
+            k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                self.emit_function_expression(node, idx);
+            }
+            k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                self.emit_class_es6(node, idx);
+            }
+            _ => {
+                self.emit_node_default(node, idx);
+            }
+        }
+    }
+
+    fn emit_commonjs_default_export_assignment<F>(&mut self, mut emit_inner: F)
+    where
+        F: FnMut(&mut Self),
+    {
+        self.write("exports.default = ");
+        emit_inner(self);
+        self.write_semicolon();
+        self.write_line();
+    }
+
+    fn emit_commonjs_default_export_class_es5(&mut self, class_node: NodeIndex) {
+        let Some(node) = self.arena.get(class_node) else {
+            return;
+        };
+
+        if node.kind != syntax_kind_ext::CLASS_DECLARATION {
+            self.emit_node_default(node, class_node);
+            return;
+        }
+
+        let temp_name = format!("{}_default", self.get_temp_var_name());
+        let mut es5_emitter = ClassES5Emitter::new(self.arena);
+        es5_emitter.set_indent_level(self.writer.indent_level());
+        if let Some(source_text) = self.source_text {
+            es5_emitter.set_source_text(source_text);
+        }
+        let es5_output = es5_emitter.emit_class_with_name(class_node, &temp_name);
+        self.write(&es5_output);
+        self.write_line();
+        self.write("exports.default = ");
+        self.write(&temp_name);
+        self.write(";");
+        self.write_line();
+    }
+
+    fn emit_commonjs_inner(
+        &mut self,
+        node: &ThinNode,
+        idx: NodeIndex,
+        inner: &TransformDirective,
+        export_name: Option<&str>,
+    ) {
+        match inner {
+            TransformDirective::ES5Class { class_node, .. } => {
+                let mut es5_emitter = ClassES5Emitter::new(self.arena);
+                es5_emitter.set_indent_level(self.writer.indent_level());
+                if let Some(source_text) = self.source_text {
+                    es5_emitter.set_source_text(source_text);
+                }
+                let es5_output = es5_emitter.emit_class(*class_node);
+                self.write(&es5_output);
+            }
+            TransformDirective::ES5Namespace { namespace_node } => {
+                let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
+                let output = ns_emitter.emit_namespace(*namespace_node);
+                self.write(&output);
+            }
+            TransformDirective::ES5Enum { enum_node } => {
+                let mut enum_emitter = EnumES5Emitter::new(self.arena);
+                enum_emitter.set_indent_level(self.writer.indent_level());
+                let output = enum_emitter.emit_enum(*enum_node);
+                self.write(&output);
+            }
+            TransformDirective::ES5AsyncFunction { function_node } => {
+                if let Some(func_node) = self.arena.get(*function_node) {
+                    if let Some(func) = self.arena.get_function(func_node) {
+                        if !func.name.is_none() {
+                            let func_name = self.get_identifier_text_idx(func.name);
+                            self.emit_async_function_es5(func, &func_name, "this");
+                        } else {
+                            self.emit_async_function_es5(func, export_name.unwrap_or(""), "this");
+                        }
+                    }
+                }
+            }
+            TransformDirective::ES5ArrowFunction {
+                arrow_node,
+                captures_this,
+            } => {
+                if let Some(arrow_node) = self.arena.get(*arrow_node) {
+                    if let Some(func) = self.arena.get_function(arrow_node) {
+                        self.emit_arrow_function_es5(arrow_node, func, *captures_this);
+                    }
+                }
+            }
+            TransformDirective::ES5FunctionParameters { function_node } => {
+                if let Some(func_node) = self.arena.get(*function_node) {
+                    match func_node.kind {
+                        k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                            self.emit_function_declaration_es5_params(func_node);
+                        }
+                        k if k == syntax_kind_ext::FUNCTION_EXPRESSION => {
+                            self.emit_function_expression_es5_params(func_node);
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            TransformDirective::Identity => {
+                self.emit_node_default(node, idx);
+            }
+            TransformDirective::Chain(directives) => {
+                self.emit_chained_directives(node, idx, directives.clone());
+            }
+            _ => {
+                self.emit_node_default(node, idx);
+            }
+        }
+    }
+
+    fn emit_chained_directives(
+        &mut self,
+        node: &ThinNode,
+        idx: NodeIndex,
+        directives: Vec<TransformDirective>,
+    ) {
+        let mut flattened = Vec::new();
+        Self::flatten_chain(directives, &mut flattened);
+
+        if flattened.is_empty() {
+            self.emit_node_default(node, idx);
+            return;
+        }
+
+        let last = flattened.len() - 1;
+        self.emit_chained_directive(node, idx, &flattened, last);
+    }
+
+    fn emit_chained_directive(
+        &mut self,
+        node: &ThinNode,
+        idx: NodeIndex,
+        directives: &[TransformDirective],
+        index: usize,
+    ) {
+        let directive = &directives[index];
+        match directive {
+            TransformDirective::Identity => {
+                self.emit_chained_previous(node, idx, directives, index);
+            }
+            TransformDirective::ES5Class { class_node, .. } => {
+                let mut es5_emitter = ClassES5Emitter::new(self.arena);
+                es5_emitter.set_indent_level(self.writer.indent_level());
+                if let Some(source_text) = self.source_text {
+                    es5_emitter.set_source_text(source_text);
+                }
+                let es5_output = es5_emitter.emit_class(*class_node);
+                self.write(&es5_output);
+            }
+            TransformDirective::ES5Namespace { namespace_node } => {
+                let mut ns_emitter = NamespaceES5Emitter::with_commonjs(self.arena, self.ctx.is_commonjs());
+                let output = ns_emitter.emit_namespace(*namespace_node);
+                self.write(&output);
+            }
+            TransformDirective::ES5Enum { enum_node } => {
+                let mut enum_emitter = EnumES5Emitter::new(self.arena);
+                enum_emitter.set_indent_level(self.writer.indent_level());
+                let output = enum_emitter.emit_enum(*enum_node);
+                self.write(&output);
+            }
+            TransformDirective::CommonJSExport {
+                names,
+                is_default,
+                inner,
+            } => {
+                let export_name = names.first().map(|name| name.as_str());
+                self.emit_commonjs_export(names.as_slice(), *is_default, |this| {
+                    if index == 0 {
+                        this.emit_commonjs_inner(node, idx, inner, export_name);
+                    } else {
+                        this.emit_chained_directive(node, idx, directives, index - 1);
+                    }
+                });
+            }
+            TransformDirective::CommonJSExportDefaultExpr => {
+                self.emit_commonjs_default_export_assignment(|this| {
+                    if index == 0 {
+                        this.emit_commonjs_default_export_expr_inner(node, idx);
+                    } else {
+                        this.emit_chained_directive(node, idx, directives, index - 1);
+                    }
+                });
+            }
+            TransformDirective::CommonJSExportDefaultClassES5 { class_node } => {
+                self.emit_commonjs_default_export_class_es5(*class_node);
+            }
+            TransformDirective::ES5ArrowFunction {
+                arrow_node,
+                captures_this,
+            } => {
+                if let Some(arrow_node) = self.arena.get(*arrow_node) {
+                    if let Some(func) = self.arena.get_function(arrow_node) {
+                        self.emit_arrow_function_es5(arrow_node, func, *captures_this);
+                        return;
+                    }
+                }
+
+                self.emit_chained_previous(node, idx, directives, index);
+            }
+            TransformDirective::ES5AsyncFunction { function_node } => {
+                if let Some(func_node) = self.arena.get(*function_node) {
+                    if let Some(func) = self.arena.get_function(func_node) {
+                        let func_name = if !func.name.is_none() {
+                            self.get_identifier_text_idx(func.name)
+                        } else {
+                            String::new()
+                        };
+
+                        self.emit_async_function_es5(func, &func_name, "this");
+                        return;
+                    }
+                }
+
+                self.emit_chained_previous(node, idx, directives, index);
+            }
+            TransformDirective::ES5ForOf { for_of_node } => {
+                if let Some(for_of_node) = self.arena.get(*for_of_node) {
+                    if let Some(for_in_of) = self.arena.get_for_in_of(for_of_node) {
+                        if !for_in_of.await_modifier {
+                            self.emit_for_of_statement_es5(for_in_of);
+                            return;
+                        }
+                    }
+                }
+
+                self.emit_chained_previous(node, idx, directives, index);
+            }
+            TransformDirective::ES5ObjectLiteral { object_literal } => {
+                if let Some(literal_node) = self.arena.get(*object_literal) {
+                    if let Some(literal) = self.arena.get_literal_expr(literal_node) {
+                        self.emit_object_literal_es5(&literal.elements.nodes);
+                        return;
+                    }
+                }
+
+                self.emit_chained_previous(node, idx, directives, index);
+            }
+            TransformDirective::ES5VariableDeclarationList { decl_list } => {
+                if let Some(list_node) = self.arena.get(*decl_list) {
+                    self.emit_variable_declaration_list_es5(list_node);
+                    return;
+                }
+
+                self.emit_chained_previous(node, idx, directives, index);
+            }
+            TransformDirective::ES5FunctionParameters { function_node } => {
+                if let Some(func_node) = self.arena.get(*function_node) {
+                    match func_node.kind {
+                        k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                            self.emit_function_declaration_es5_params(func_node);
+                            return;
+                        }
+                        k if k == syntax_kind_ext::FUNCTION_EXPRESSION => {
+                            self.emit_function_expression_es5_params(func_node);
+                            return;
+                        }
+                        _ => {}
+                    }
+                }
+
+                self.emit_chained_previous(node, idx, directives, index);
+            }
+            TransformDirective::ES5TemplateLiteral { .. } => {
+                if self.emit_template_literal_es5(node, idx) {
+                    return;
+                }
+
+                self.emit_chained_previous(node, idx, directives, index);
+            }
+            TransformDirective::ModuleWrapper {
+                format,
+                dependencies,
+                ..
+            } => {
+                if let Some(source) = self.arena.get_source_file(node) {
+                    self.emit_module_wrapper(&format, dependencies.as_slice(), node, source);
+                    return;
+                }
+
+                self.emit_chained_previous(node, idx, directives, index);
+            }
+            TransformDirective::Chain(nested) => {
+                self.emit_chained_directives(node, idx, nested.clone());
+            }
+        }
+    }
+
+    fn emit_chained_previous(
+        &mut self,
+        node: &ThinNode,
+        idx: NodeIndex,
+        directives: &[TransformDirective],
+        index: usize,
+    ) {
+        if index == 0 {
+            self.emit_node_default(node, idx);
+        } else {
+            self.emit_chained_directive(node, idx, directives, index - 1);
+        }
+    }
+
+    fn flatten_chain(
+        directives: Vec<TransformDirective>,
+        out: &mut Vec<TransformDirective>,
+    ) {
+        for directive in directives {
+            match directive {
+                TransformDirective::Chain(inner) => {
+                    Self::flatten_chain(inner, out);
+                }
+                other => out.push(other),
             }
         }
     }
@@ -782,6 +1259,148 @@ impl<'a> ThinPrinter<'a> {
         self.emit_node_by_kind(node, idx, kind);
     }
 
+    fn emit_module_wrapper(
+        &mut self,
+        format: &crate::transform_context::ModuleFormat,
+        dependencies: &[String],
+        source_node: &ThinNode,
+        source: &crate::parser::thin_node::SourceFileData,
+    ) {
+        match format {
+            crate::transform_context::ModuleFormat::AMD => {
+                self.emit_amd_wrapper(dependencies, source_node);
+            }
+            crate::transform_context::ModuleFormat::UMD => {
+                self.emit_umd_wrapper(source_node);
+            }
+            crate::transform_context::ModuleFormat::System => {
+                self.emit_system_wrapper(dependencies, source_node);
+            }
+            _ => {
+                for &stmt_idx in &source.statements.nodes {
+                    self.emit(stmt_idx);
+                    self.write_line();
+                }
+            }
+        }
+    }
+
+    fn emit_amd_wrapper(
+        &mut self,
+        dependencies: &[String],
+        source_node: &ThinNode,
+    ) {
+        use crate::transforms::module_commonjs;
+
+        self.write("define([\"require\", \"exports\"");
+        for dep in dependencies {
+            self.write(", \"");
+            self.write(dep);
+            self.write("\"");
+        }
+        self.write("], function (require, exports");
+        for dep in dependencies {
+            let name = module_commonjs::sanitize_module_name(dep);
+            self.write(", ");
+            self.write(&name);
+        }
+        self.write(") {");
+        self.write_line();
+        self.increase_indent();
+
+        self.emit_module_wrapper_body(source_node);
+
+        self.decrease_indent();
+        self.write("});");
+    }
+
+    fn emit_umd_wrapper(
+        &mut self,
+        source_node: &ThinNode,
+    ) {
+        self.write("(function (factory) {");
+        self.write_line();
+        self.increase_indent();
+        self.write("if (typeof module === \"object\" && typeof module.exports === \"object\") {");
+        self.write_line();
+        self.increase_indent();
+        self.write("var v = factory(require, exports);");
+        self.write_line();
+        self.write("if (v !== undefined) module.exports = v;");
+        self.write_line();
+        self.decrease_indent();
+        self.write("}");
+        self.write_line();
+        self.write("else if (typeof define === \"function\" && define.amd) {");
+        self.write_line();
+        self.increase_indent();
+        self.write("define([\"require\", \"exports\"], factory);");
+        self.write_line();
+        self.decrease_indent();
+        self.write("}");
+        self.write_line();
+        self.decrease_indent();
+        self.write("})(function (require, exports) {");
+        self.write_line();
+        self.increase_indent();
+
+        self.emit_module_wrapper_body(source_node);
+
+        self.decrease_indent();
+        self.write("});");
+    }
+
+    fn emit_system_wrapper(
+        &mut self,
+        dependencies: &[String],
+        source_node: &ThinNode,
+    ) {
+        self.write("System.register([");
+        for (i, dep) in dependencies.iter().enumerate() {
+            if i > 0 {
+                self.write(", ");
+            }
+            self.write("\"");
+            self.write(dep);
+            self.write("\"");
+        }
+        self.write("], function (exports_1, context_1) {");
+        self.write_line();
+        self.increase_indent();
+        self.write("return {");
+        self.write_line();
+        self.increase_indent();
+        self.write("setters: [],");
+        self.write_line();
+        self.write("execute: function () {");
+        self.write_line();
+        self.increase_indent();
+
+        self.emit_module_wrapper_body(source_node);
+
+        self.decrease_indent();
+        self.write("}");
+        self.write_line();
+        self.decrease_indent();
+        self.write("};");
+        self.write_line();
+        self.decrease_indent();
+        self.write("});");
+    }
+
+    fn emit_module_wrapper_body(&mut self, source_node: &ThinNode) {
+        let prev_module = self.ctx.options.module;
+        let prev_auto_detect = self.ctx.auto_detect_module;
+
+        self.ctx.options.module = ModuleKind::CommonJS;
+        self.ctx.auto_detect_module = false;
+
+        self.emit_source_file(source_node);
+
+        self.ctx.options.module = prev_module;
+        self.ctx.auto_detect_module = prev_auto_detect;
+    }
+
     // =========================================================================
     // Main Emit Method
     // =========================================================================
@@ -790,6 +1409,17 @@ impl<'a> ThinPrinter<'a> {
     pub fn emit(&mut self, idx: NodeIndex) {
         if idx.is_none() {
             return;
+        }
+
+        if self.auto_lower && self.transforms.is_empty() {
+            let should_lower = self
+                .arena
+                .get(idx)
+                .is_some_and(|node| node.kind == syntax_kind_ext::SOURCE_FILE);
+            if should_lower {
+                let lowering = LoweringPass::new(self.arena, &self.ctx);
+                self.transforms = lowering.run(idx);
+            }
         }
 
         let Some(node) = self.arena.get(idx) else {
@@ -898,6 +1528,15 @@ impl<'a> ThinPrinter<'a> {
             // Parenthesized expression
             k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
                 self.emit_parenthesized(node);
+            }
+            k if k == syntax_kind_ext::TYPE_ASSERTION
+                || k == syntax_kind_ext::AS_EXPRESSION
+                || k == syntax_kind_ext::SATISFIES_EXPRESSION =>
+            {
+                self.emit_type_assertion_expression(node);
+            }
+            k if k == syntax_kind_ext::NON_NULL_EXPRESSION => {
+                self.emit_non_null_expression(node);
             }
 
             // Conditional expression
@@ -1108,10 +1747,13 @@ impl<'a> ThinPrinter<'a> {
             k if k == syntax_kind_ext::IMPORT_DECLARATION => {
                 self.emit_import_declaration(node);
             }
+            k if k == syntax_kind_ext::IMPORT_EQUALS_DECLARATION => {
+                self.emit_import_equals_declaration(node);
+            }
             k if k == syntax_kind_ext::IMPORT_CLAUSE => {
                 self.emit_import_clause(node);
             }
-            k if k == syntax_kind_ext::NAMED_IMPORTS => {
+            k if k == syntax_kind_ext::NAMED_IMPORTS || k == syntax_kind_ext::NAMESPACE_IMPORT => {
                 self.emit_named_imports(node);
             }
             k if k == syntax_kind_ext::IMPORT_SPECIFIER => {
@@ -1148,6 +1790,9 @@ impl<'a> ThinPrinter<'a> {
             }
             k if k == syntax_kind_ext::DEFAULT_CLAUSE => {
                 self.emit_default_clause(node);
+            }
+            k if k == syntax_kind_ext::CASE_BLOCK => {
+                self.emit_case_block(node);
             }
             k if k == syntax_kind_ext::BREAK_STATEMENT => {
                 self.emit_break_statement();
@@ -1219,6 +1864,9 @@ impl<'a> ThinPrinter<'a> {
             }
 
             // Template literals
+            k if k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION => {
+                self.emit_tagged_template_expression(node, idx);
+            }
             k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
                 self.emit_template_expression(node);
             }
@@ -1257,7 +1905,7 @@ impl<'a> ThinPrinter<'a> {
             // Other tokens and keywords - emit their text
             k if k == SyntaxKind::ThisKeyword as u16 => {
                 // In ES5 mode inside an arrow function body, use _this instead of this
-                if self.ctx.target_es5 && self.ctx.arrow_state.this_capture_depth > 0 {
+                if self.ctx.arrow_state.this_capture_depth > 0 {
                     self.write("_this")
                 } else {
                     self.write("this")
@@ -1305,6 +1953,13 @@ impl<'a> ThinPrinter<'a> {
             self.emit_escaped_string(&lit.text, quote);
             self.write_char(quote);
         }
+    }
+
+    fn emit_string_literal_text(&mut self, text: &str) {
+        let quote = if self.ctx.options.single_quote { '\'' } else { '"' };
+        self.write_char(quote);
+        self.emit_escaped_string(text, quote);
+        self.write_char(quote);
     }
 
     fn emit_escaped_string(&mut self, s: &str, quote_char: char) {
@@ -1415,6 +2070,24 @@ impl<'a> ThinPrinter<'a> {
         self.write(")");
     }
 
+    fn emit_type_assertion_expression(&mut self, node: &ThinNode) {
+        let Some(assertion) = self.arena.get_type_assertion(node) else {
+            self.write("void 0");
+            return;
+        };
+
+        self.emit_expression(assertion.expression);
+    }
+
+    fn emit_non_null_expression(&mut self, node: &ThinNode) {
+        let Some(unary) = self.arena.get_unary_expr_ex(node) else {
+            self.write("void 0");
+            return;
+        };
+
+        self.emit_expression(unary.expression);
+    }
+
     fn emit_conditional(&mut self, node: &ThinNode) {
         let Some(cond) = self.arena.get_conditional_expr(node) else {
             return;
@@ -1447,11 +2120,7 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        // Check if we need ES5 computed property transform
-        if self.ctx.target_es5 && self.has_computed_property_in_object(&obj.elements.nodes) {
-            self.emit_object_literal_es5(&obj.elements.nodes);
-            return;
-        }
+        // ES5 computed/spread lowering is handled via TransformDirective::ES5ObjectLiteral.
 
         // Multi-line format for object literals with multiple properties
         if obj.elements.nodes.len() > 1 {
@@ -1475,20 +2144,78 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
-    /// Check if any property in the object literal has a computed property name
-    fn has_computed_property_in_object(&self, elements: &[NodeIndex]) -> bool {
-        for &idx in elements {
-            if self.is_computed_property_member(idx) {
-                return true;
+    fn emit_object_literal_entries_es5(&mut self, elements: &[NodeIndex]) {
+        if elements.is_empty() {
+            self.write("{}");
+            return;
+        }
+
+        if elements.len() > 1 {
+            self.write("{");
+            self.write_line();
+            self.increase_indent();
+            for (i, &prop) in elements.iter().enumerate() {
+                self.emit_object_literal_member_es5(prop);
+                if i < elements.len() - 1 {
+                    self.write(",");
+                }
+                self.write_line();
             }
-            // Also check for spread elements which need ES5 transform
-            if let Some(node) = self.arena.get(idx) {
-                if node.kind == syntax_kind_ext::SPREAD_ASSIGNMENT {
-                    return true;
+            self.decrease_indent();
+            self.write("}");
+        } else {
+            self.write("{ ");
+            self.emit_object_literal_member_es5(elements[0]);
+            self.write(" }");
+        }
+    }
+
+    fn emit_object_literal_member_es5(&mut self, prop_idx: NodeIndex) {
+        let Some(node) = self.arena.get(prop_idx) else { return };
+
+        match node.kind {
+            k if k == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT => {
+                if let Some(shorthand) = self.arena.get_shorthand_property(node) {
+                    self.emit(shorthand.name);
+                    self.write(": ");
+                    self.emit(shorthand.name);
                 }
             }
+            k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                if let Some(method) = self.arena.get_method_decl(node) {
+                    self.emit(method.name);
+                    self.write(": ");
+                    self.emit_object_literal_method_value_es5(method);
+                }
+            }
+            _ => self.emit(prop_idx),
         }
-        false
+    }
+
+    fn emit_object_literal_method_value_es5(&mut self, method: &MethodDeclData) {
+        if method.body.is_none() {
+            self.write("function () {}");
+            return;
+        }
+
+        let is_async = self.has_modifier(&method.modifiers, SyntaxKind::AsyncKeyword as u16);
+        if is_async {
+            self.emit_async_function_es5_body("", &method.parameters.nodes, method.body, "this");
+            return;
+        }
+
+        self.write("function");
+        if method.asterisk_token {
+            self.write("*");
+        }
+        self.write(" (");
+        let param_transforms = self.emit_function_parameters_es5(&method.parameters.nodes);
+        self.write(") ");
+        if param_transforms.has_transforms() {
+            self.emit_block_with_param_prologue(method.body, &param_transforms);
+        } else {
+            self.emit(method.body);
+        }
     }
 
     /// Check if a property member has a computed property name
@@ -1520,15 +2247,28 @@ impl<'a> ThinPrinter<'a> {
     /// Pattern: { [k]: v } → (_a = {}, _a[k] = v, _a)
     /// Pattern: { a: 1, [k]: v, b: 2 } → (_a = { a: 1 }, _a[k] = v, _a.b = 2, _a)
     fn emit_object_literal_es5(&mut self, elements: &[NodeIndex]) {
-        // Get temp variable name
-        let temp_var = self.ctx.destructuring_state.next_temp_var();
+        if elements.is_empty() {
+            self.write("{}");
+            return;
+        }
 
         // Find the index of the first computed property
         let first_computed_idx = elements.iter()
             .position(|&idx| self.is_computed_property_member(idx) || {
-                self.arena.get(idx).map(|n| n.kind == syntax_kind_ext::SPREAD_ASSIGNMENT).unwrap_or(false)
+                self.arena.get(idx).map(|n| {
+                    n.kind == syntax_kind_ext::SPREAD_ASSIGNMENT
+                        || n.kind == syntax_kind_ext::SPREAD_ELEMENT
+                }).unwrap_or(false)
             })
             .unwrap_or(elements.len());
+
+        if first_computed_idx == elements.len() {
+            self.emit_object_literal_entries_es5(elements);
+            return;
+        }
+
+        // Get temp variable name
+        let temp_var = self.ctx.destructuring_state.next_temp_var();
 
         self.write("(");
         self.write(&temp_var);
@@ -1536,28 +2276,7 @@ impl<'a> ThinPrinter<'a> {
 
         // Emit initial non-computed properties as the object literal
         if first_computed_idx > 0 {
-            self.write("{");
-            if first_computed_idx > 1 {
-                self.write_line();
-                self.increase_indent();
-            } else {
-                self.write(" ");
-            }
-            for i in 0..first_computed_idx {
-                let prop_idx = elements[i];
-                self.emit(prop_idx);
-                if i < first_computed_idx - 1 {
-                    self.write(",");
-                    self.write_line();
-                }
-            }
-            if first_computed_idx > 1 {
-                self.write_line();
-                self.decrease_indent();
-            } else {
-                self.write(" ");
-            }
-            self.write("}");
+            self.emit_object_literal_entries_es5(&elements[..first_computed_idx]);
         } else {
             self.write("{}");
         }
@@ -1600,14 +2319,8 @@ impl<'a> ThinPrinter<'a> {
             k if k == syntax_kind_ext::METHOD_DECLARATION => {
                 if let Some(method) = self.arena.get_method_decl(node) {
                     self.emit_assignment_target_es5(method.name, temp_var);
-                    self.write(" = function");
-                    if method.asterisk_token {
-                        self.write("*");
-                    }
-                    self.write(" (");
-                    self.emit_function_parameters_js(&method.parameters.nodes);
-                    self.write(") ");
-                    self.emit(method.body);
+                    self.write(" = ");
+                    self.emit_object_literal_method_value_es5(method);
                 }
             }
             k if k == syntax_kind_ext::GET_ACCESSOR => {
@@ -1641,6 +2354,16 @@ impl<'a> ThinPrinter<'a> {
                     self.write(temp_var);
                     self.write(", ");
                     self.emit(spread.expression);
+                    self.write(")");
+                }
+            }
+            k if k == syntax_kind_ext::SPREAD_ELEMENT => {
+                // Spread: { ...x } → Object.assign(_a, x)
+                if let Some(spread) = self.arena.unary_exprs_ex.get(node.data_index as usize) {
+                    self.write("Object.assign(");
+                    self.write(temp_var);
+                    self.write(", ");
+                    self.emit_expression(spread.expression);
                     self.write(")");
                 }
             }
@@ -1747,64 +2470,94 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Transform arrow function to regular function for ES5
-        if self.ctx.target_es5 {
-            self.emit_arrow_function_es5(node, func);
-        } else {
-            self.emit_arrow_function_native(func);
-        }
+        self.emit_arrow_function_native(func);
     }
 
     /// Emit ES5-compatible function expression for arrow function
     /// Arrow: (x) => x + 1  →  function (x) { return x + 1; }
-    fn emit_arrow_function_es5(&mut self, _node: &ThinNode, func: &crate::parser::thin_node::FunctionData) {
-        // Check if arrow body uses `this` - if so, we need _this capture
-        let body_uses_this = !func.body.is_none()
-            && contains_this_reference(self.arena, func.body);
+    fn emit_arrow_function_es5(
+        &mut self,
+        _node: &ThinNode,
+        func: &crate::parser::thin_node::FunctionData,
+        captures_this: bool,
+    ) {
+        let needs_this_capture = captures_this;
+        let parent_this_expr = if self.ctx.arrow_state.this_capture_depth > 0 {
+            "_this"
+        } else {
+            "this"
+        };
 
-        // Track that we're inside an arrow function body with `this`
-        if body_uses_this {
+        if needs_this_capture {
+            self.write("(function (_this) { return ");
             self.ctx.arrow_state.this_capture_depth += 1;
         }
 
         if func.is_async {
-            self.write("async ");
-        }
+            let this_expr = if needs_this_capture {
+                "_this"
+            } else {
+                parent_this_expr
+            };
+            self.emit_async_function_es5(func, "", this_expr);
+        } else {
+            self.write("function (");
+            let param_transforms = self.emit_function_parameters_es5(&func.parameters.nodes);
+            self.write(") ");
 
-        self.write("function (");
-        self.emit_function_parameters_js(&func.parameters.nodes);
-        self.write(") ");
+            // If body is not a block (concise arrow), wrap with return
+            let body_node = self.arena.get(func.body);
+            let is_block = body_node.map(|n| n.kind == syntax_kind_ext::BLOCK).unwrap_or(false);
+            let needs_param_prologue = param_transforms.has_transforms();
 
-        // If body is not a block (concise arrow), wrap with return
-        let body_node = self.arena.get(func.body);
-        let is_block = body_node.map(|n| n.kind == syntax_kind_ext::BLOCK).unwrap_or(false);
-
-        if is_block {
-            // Check if it's a simple single-return block
-            if let Some(block_node) = self.arena.get(func.body) {
-                if let Some(block) = self.arena.get_block(block_node) {
-                    if block.statements.nodes.len() == 1
-                        && self.is_simple_return_statement(block.statements.nodes[0]) {
-                        self.emit_single_line_block(func.body);
+            if is_block {
+                // Check if it's a simple single-return block
+                if let Some(block_node) = self.arena.get(func.body) {
+                    if let Some(block) = self.arena.get_block(block_node) {
+                        if !needs_param_prologue
+                            && block.statements.nodes.len() == 1
+                            && self.is_simple_return_statement(block.statements.nodes[0])
+                        {
+                            self.emit_single_line_block(func.body);
+                        } else if needs_param_prologue {
+                            self.emit_block_with_param_prologue(func.body, &param_transforms);
+                        } else {
+                            self.emit(func.body);
+                        }
+                    } else if needs_param_prologue {
+                        self.emit_block_with_param_prologue(func.body, &param_transforms);
                     } else {
                         self.emit(func.body);
                     }
+                } else if needs_param_prologue {
+                    self.emit_block_with_param_prologue(func.body, &param_transforms);
                 } else {
                     self.emit(func.body);
                 }
-            } else {
+            } else if needs_param_prologue {
+                self.write("{");
+                self.write_line();
+                self.increase_indent();
+                self.emit_param_prologue(&param_transforms);
+                self.write("return ");
                 self.emit(func.body);
+                self.write(";");
+                self.write_line();
+                self.decrease_indent();
+                self.write("}");
+            } else {
+                // Concise body: (x) => x + 1  →  function (x) { return x + 1; }
+                self.write("{ return ");
+                self.emit(func.body);
+                self.write("; }");
             }
-        } else {
-            // Concise body: (x) => x + 1  →  function (x) { return x + 1; }
-            self.write("{ return ");
-            self.emit(func.body);
-            self.write("; }");
         }
 
-        // Restore this capture depth
-        if body_uses_this {
+        if needs_this_capture {
             self.ctx.arrow_state.this_capture_depth -= 1;
+            self.write("; })(");
+            self.write(parent_this_expr);
+            self.write("))");
         }
     }
 
@@ -1905,6 +2658,28 @@ impl<'a> ThinPrinter<'a> {
         self.write(" }");
     }
 
+    fn emit_block_with_param_prologue(&mut self, block_idx: NodeIndex, transforms: &ParamTransformPlan) {
+        let Some(block_node) = self.arena.get(block_idx) else { return };
+        let Some(block) = self.arena.get_block(block_node) else { return };
+
+        self.write("{");
+        self.write_line();
+        self.increase_indent();
+        self.emit_param_prologue(transforms);
+
+        for &stmt_idx in &block.statements.nodes {
+            let before_len = self.writer.len();
+            self.emit(stmt_idx);
+            if self.writer.len() > before_len {
+                self.write_line();
+            }
+        }
+
+        self.decrease_indent();
+        self.write("}");
+        self.emit_trailing_comments(block_node.end);
+    }
+
     fn emit_function_declaration(&mut self, node: &ThinNode, _idx: NodeIndex) {
         let Some(func) = self.arena.get_function(node) else {
             return;
@@ -1918,24 +2693,6 @@ impl<'a> ThinPrinter<'a> {
         // For JavaScript emit: skip declaration-only functions (no body)
         // These are just type information in TypeScript
         if func.body.is_none() {
-            return;
-        }
-
-        let is_exported = self.ctx.is_commonjs()
-            && self.has_export_modifier(&func.modifiers)
-            && !self.ctx.module_state.has_export_assignment;
-        let is_default = self.has_default_modifier(&func.modifiers);
-
-        // Get function name for export
-        let func_name = if !func.name.is_none() {
-            self.get_identifier_text_idx(func.name)
-        } else {
-            String::new()
-        };
-
-        // ES5 async transform: wrap in __awaiter/__generator
-        if self.ctx.target_es5 && func.is_async {
-            self.emit_async_function_es5(func, &func_name, is_exported, is_default);
             return;
         }
 
@@ -1964,19 +2721,95 @@ impl<'a> ThinPrinter<'a> {
 
         self.write_space();
         self.emit(func.body);
+    }
 
-        // CommonJS: emit exports.funcName = funcName; after the function
-        if is_exported && !func_name.is_empty() {
-            self.write_line();
-            if is_default {
-                self.write("exports.default = ");
+    fn emit_function_expression_es5_params(&mut self, node: &ThinNode) {
+        let Some(func) = self.arena.get_function(node) else {
+            return;
+        };
+
+        self.write("function");
+
+        if func.asterisk_token {
+            self.write("*");
+        }
+
+        // Name (if any) - add space before open paren whether or not there's a name
+        if !func.name.is_none() {
+            self.write_space();
+            self.emit(func.name);
+        }
+
+        // Space before ( for TypeScript compatibility: function (x) vs function(x)
+        self.write(" ");
+
+        // Parameters (without types for JavaScript)
+        self.write("(");
+        let param_transforms = self.emit_function_parameters_es5(&func.parameters.nodes);
+        self.write(") ");
+
+        // Emit body - check if it's a simple single-statement body
+        let body_node = self.arena.get(func.body);
+        let is_simple_body = if let Some(body) = body_node {
+            if let Some(block) = self.arena.get_block(body) {
+                // Single return statement = simple body
+                block.statements.nodes.len() == 1
+                    && self.is_simple_return_statement(block.statements.nodes[0])
             } else {
-                self.write("exports.");
-                self.write(&func_name);
-                self.write(" = ");
+                false
             }
-            self.write(&func_name);
-            self.write(";");
+        } else {
+            false
+        };
+
+        if param_transforms.has_transforms() {
+            self.emit_block_with_param_prologue(func.body, &param_transforms);
+        } else if is_simple_body {
+            self.emit_single_line_block(func.body);
+        } else {
+            self.emit(func.body);
+        }
+    }
+
+    fn emit_function_declaration_es5_params(&mut self, node: &ThinNode) {
+        let Some(func) = self.arena.get_function(node) else {
+            return;
+        };
+
+        // Skip ambient declarations (declare function)
+        if self.has_declare_modifier(&func.modifiers) {
+            return;
+        }
+
+        // For JavaScript emit: skip declaration-only functions (no body)
+        if func.body.is_none() {
+            return;
+        }
+
+        self.write("function");
+
+        if func.asterisk_token {
+            self.write("*");
+        }
+
+        // Name
+        if !func.name.is_none() {
+            self.write_space();
+            self.emit(func.name);
+        }
+
+        // Parameters - only emit names, not types for JavaScript
+        self.write("(");
+        let param_transforms = self.emit_function_parameters_es5(&func.parameters.nodes);
+        self.write(")");
+
+        // No return type for JavaScript
+
+        self.write_space();
+        if param_transforms.has_transforms() {
+            self.emit_block_with_param_prologue(func.body, &param_transforms);
+        } else {
+            self.emit(func.body);
         }
     }
 
@@ -1985,8 +2818,22 @@ impl<'a> ThinPrinter<'a> {
         &mut self,
         func: &crate::parser::thin_node::FunctionData,
         func_name: &str,
-        is_exported: bool,
-        is_default: bool,
+        this_expr: &str,
+    ) {
+        self.emit_async_function_es5_body(
+            func_name,
+            &func.parameters.nodes,
+            func.body,
+            this_expr,
+        );
+    }
+
+    fn emit_async_function_es5_body(
+        &mut self,
+        func_name: &str,
+        params: &[NodeIndex],
+        body: NodeIndex,
+        this_expr: &str,
     ) {
         // function name(params) {
         self.write("function");
@@ -1995,47 +2842,117 @@ impl<'a> ThinPrinter<'a> {
             self.write(func_name);
         }
         self.write("(");
-        self.emit_function_parameters_js(&func.parameters.nodes);
+        let param_transforms = self.emit_function_parameters_es5(params);
         self.write(") {");
         self.write_line();
+        self.increase_indent();
+
+        self.emit_param_prologue(&param_transforms);
 
         // Emit indented __awaiter body
         //     return __awaiter(this, void 0, void 0, function () {
         //         return __generator(this, function (_a) { ... });
         //     });
         let mut async_emitter = crate::transforms::async_es5::AsyncES5Emitter::new(self.arena);
-        // Transform emitter handles its own indentation, starting from level 1 (inside function)
-        async_emitter.set_indent_level(1);
+        // Transform emitter handles its own indentation inside __awaiter
+        async_emitter.set_indent_level(self.writer.indent_level() + 1);
 
-        let generator_body = if async_emitter.body_contains_await(func.body) {
-            async_emitter.emit_generator_body_with_await(func.body)
+        let generator_body = if async_emitter.body_contains_await(body) {
+            async_emitter.emit_generator_body_with_await(body)
         } else {
-            async_emitter.emit_simple_generator_body(func.body)
+            async_emitter.emit_simple_generator_body(body)
         };
 
         // Write with surrounding __awaiter wrapper
-        self.write("    return __awaiter(this, void 0, void 0, function () {");
+        self.write("return __awaiter(");
+        self.write(this_expr);
+        self.write(", void 0, void 0, function () {");
         self.write_line();
-        self.write("        ");
+        self.increase_indent();
         self.write(&generator_body);
+        self.decrease_indent();
         self.write_line();
-        self.write("    });");
+        self.write("});");
         self.write_line();
+        self.decrease_indent();
         self.write("}");
+    }
 
-        // CommonJS: emit exports.funcName = funcName; after the function
-        if is_exported && !func_name.is_empty() {
-            self.write_line();
-            if is_default {
-                self.write("exports.default = ");
-            } else {
-                self.write("exports.");
-                self.write(func_name);
-                self.write(" = ");
+    fn function_parameters_need_es5_transform(&self, params: &[NodeIndex]) -> bool {
+        params.iter().any(|&param_idx| {
+            let Some(param_node) = self.arena.get(param_idx) else {
+                return false;
+            };
+            let Some(param) = self.arena.get_parameter(param_node) else {
+                return false;
+            };
+
+            param.dot_dot_dot_token
+                || !param.initializer.is_none()
+                || self.is_binding_pattern(param.name)
+        })
+    }
+
+    fn emit_function_parameters_es5(&mut self, params: &[NodeIndex]) -> ParamTransformPlan {
+        let mut plan = ParamTransformPlan::default();
+        let mut first = true;
+
+        for (index, &param_idx) in params.iter().enumerate() {
+            let Some(param_node) = self.arena.get(param_idx) else { continue };
+            let Some(param) = self.arena.get_parameter(param_node) else { continue };
+
+            if param.dot_dot_dot_token {
+                let rest_target = param.name;
+                let rest_is_pattern = self.is_binding_pattern(rest_target);
+                let rest_name = if rest_is_pattern {
+                    self.get_temp_var_name()
+                } else {
+                    self.get_identifier_text(rest_target)
+                };
+
+                if !rest_name.is_empty() {
+                    plan.rest = Some(RestParamTransform {
+                        name: rest_name,
+                        pattern: if rest_is_pattern { Some(rest_target) } else { None },
+                        index,
+                    });
+                }
+                break;
             }
-            self.write(func_name);
-            self.write(";");
+
+            if !first {
+                self.write(", ");
+            }
+            first = false;
+
+            if self.is_binding_pattern(param.name) {
+                let temp_name = self.get_temp_var_name();
+                self.write(&temp_name);
+                plan.params.push(ParamTransform {
+                    name: temp_name,
+                    pattern: Some(param.name),
+                    initializer: if param.initializer.is_none() {
+                        None
+                    } else {
+                        Some(param.initializer)
+                    },
+                });
+            } else {
+                self.emit(param.name);
+                if !param.initializer.is_none() {
+                    let name = self.get_identifier_text(param.name);
+                    if !name.is_empty() {
+                        plan.params.push(ParamTransform {
+                            name,
+                            pattern: None,
+                            initializer: Some(param.initializer),
+                        });
+                    }
+                }
+            }
         }
+
+        plan
     }
 
     /// Emit function parameters for JavaScript (no types)
@@ -2194,25 +3111,58 @@ impl<'a> ThinPrinter<'a> {
             for &decl_idx in &decl_list.declarations.nodes {
                 let Some(decl_node) = self.arena.get(decl_idx) else { continue };
                 let Some(decl) = self.arena.get_variable_declaration(decl_node) else { continue };
-
-                // Get the name - for simple identifiers
-                if let Some(name) = self.get_binding_name(decl.name) {
-                    names.push(name);
-                }
+                self.collect_binding_names(decl.name, &mut names);
             }
         }
         names
     }
 
-    /// Get the name from a binding pattern or identifier
-    fn get_binding_name(&self, name_idx: NodeIndex) -> Option<String> {
-        let node = self.arena.get(name_idx)?;
+    fn collect_binding_names(&self, name_idx: NodeIndex, names: &mut Vec<String>) {
+        if name_idx.is_none() {
+            return;
+        }
+
+        let Some(node) = self.arena.get(name_idx) else {
+            return;
+        };
+
         if node.kind == SyntaxKind::Identifier as u16 {
-            let id = self.arena.get_identifier(node)?;
-            Some(id.escaped_text.clone())
-        } else {
-            // TODO: handle binding patterns (destructuring)
-            None
+            if let Some(id) = self.arena.get_identifier(node) {
+                names.push(id.escaped_text.clone());
+            }
+            return;
+        }
+
+        match node.kind {
+            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                || k == syntax_kind_ext::ARRAY_BINDING_PATTERN =>
+            {
+                if let Some(pattern) = self.arena.get_binding_pattern(node) {
+                    for &elem_idx in &pattern.elements.nodes {
+                        self.collect_binding_names_from_element(elem_idx, names);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::BINDING_ELEMENT => {
+                if let Some(elem) = self.arena.get_binding_element(node) {
+                    self.collect_binding_names(elem.name, names);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn collect_binding_names_from_element(&self, elem_idx: NodeIndex, names: &mut Vec<String>) {
+        if elem_idx.is_none() {
+            return;
+        }
+
+        let Some(elem_node) = self.arena.get(elem_idx) else {
+            return;
+        };
+
+        if let Some(elem) = self.arena.get_binding_element(elem_node) {
+            self.collect_binding_names(elem.name, names);
         }
     }
 
@@ -2222,11 +3172,9 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Emit keyword based on node flags - for ES5, always use "var"
+        // Emit keyword based on node flags.
         let flags = node.flags as u32;
-        let keyword = if self.ctx.target_es5 {
-            "var"
-        } else if flags & crate::parser::node_flags::CONST != 0 {
+        let keyword = if flags & crate::parser::node_flags::CONST != 0 {
             "const"
         } else if flags & crate::parser::node_flags::LET != 0 {
             "let"
@@ -2236,27 +3184,30 @@ impl<'a> ThinPrinter<'a> {
         self.write(keyword);
         self.write(" ");
 
-        // For ES5, check if any declaration uses destructuring
-        if self.ctx.target_es5 {
-            let mut first = true;
-            for &decl_idx in &decl_list.declarations.nodes {
-                let Some(decl_node) = self.arena.get(decl_idx) else { continue };
-                let Some(decl) = self.arena.get_variable_declaration(decl_node) else { continue };
+        self.emit_comma_separated(&decl_list.declarations.nodes);
+    }
 
-                if self.is_binding_pattern(decl.name) && !decl.initializer.is_none() {
-                    // ES5 destructuring transform
-                    self.emit_es5_destructuring(decl_idx, &mut first);
-                } else {
-                    // Normal variable declaration
-                    if !first {
-                        self.write(", ");
-                    }
-                    first = false;
-                    self.emit(decl_idx);
+    fn emit_variable_declaration_list_es5(&mut self, node: &ThinNode) {
+        let Some(decl_list) = self.arena.get_variable(node) else {
+            return;
+        };
+
+        self.write("var ");
+
+        let mut first = true;
+        for &decl_idx in &decl_list.declarations.nodes {
+            let Some(decl_node) = self.arena.get(decl_idx) else { continue };
+            let Some(decl) = self.arena.get_variable_declaration(decl_node) else { continue };
+
+            if self.is_binding_pattern(decl.name) && !decl.initializer.is_none() {
+                self.emit_es5_destructuring(decl_idx, &mut first);
+            } else {
+                if !first {
+                    self.write(", ");
                 }
+                first = false;
+                self.emit(decl_idx);
             }
-        } else {
-            self.emit_comma_separated(&decl_list.declarations.nodes);
         }
     }
 
@@ -2293,19 +3244,45 @@ impl<'a> ThinPrinter<'a> {
         self.write(" = ");
         self.emit(decl.initializer);
 
-        // Now emit each binding element
-        if pattern_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN {
-            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
-                for &elem_idx in &pattern.elements.nodes {
-                    self.emit_es5_binding_element(elem_idx, &temp_name);
-                }
+        self.emit_es5_destructuring_pattern(pattern_node, &temp_name);
+    }
+
+    fn emit_es5_destructuring_from_value(&mut self, pattern_idx: NodeIndex, result_name: &str, first: &mut bool) {
+        let Some(pattern_node) = self.arena.get(pattern_idx) else { return };
+
+        let temp_name = self.get_temp_var_name();
+
+        if !*first {
+            self.write(", ");
+        }
+        *first = false;
+        self.write(&temp_name);
+        self.write(" = ");
+        self.write(result_name);
+        self.write(".value");
+
+        self.emit_es5_destructuring_pattern(pattern_node, &temp_name);
+    }
+
+    fn get_binding_element_property_key(
+        &self,
+        elem: &crate::parser::thin_node::BindingElementData,
+    ) -> Option<NodeIndex> {
+        let key_idx = if !elem.property_name.is_none() {
+            elem.property_name
+        } else {
+            elem.name
+        };
+        let Some(key_node) = self.arena.get(key_idx) else { return None };
+        match key_node.kind {
+            k if k == syntax_kind_ext::COMPUTED_PROPERTY_NAME
+                || k == SyntaxKind::Identifier as u16
+                || k == SyntaxKind::StringLiteral as u16
+                || k == SyntaxKind::NumericLiteral as u16 =>
+            {
+                Some(key_idx)
             }
-        } else if pattern_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN {
-            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
-                for (i, &elem_idx) in pattern.elements.nodes.iter().enumerate() {
-                    self.emit_es5_array_binding_element(elem_idx, &temp_name, i);
-                }
-            }
+            _ => None,
         }
     }
 
@@ -2313,28 +3290,62 @@ impl<'a> ThinPrinter<'a> {
     fn emit_es5_binding_element(&mut self, elem_idx: NodeIndex, temp_name: &str) {
         let Some(elem_node) = self.arena.get(elem_idx) else { return };
         let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
-
-        // Get the property name (or use the binding name if no propertyName)
-        let prop_name = if !elem.property_name.is_none() {
-            self.get_identifier_text(elem.property_name)
-        } else {
-            self.get_identifier_text(elem.name)
-        };
-
-        // Get the binding name
-        let binding_name = self.get_identifier_text(elem.name);
-
-        if prop_name.is_empty() || binding_name.is_empty() {
+        if elem.dot_dot_dot_token {
             return;
         }
 
-        // Emit: , bindingName = temp.propName
-        self.write(", ");
-        self.write(&binding_name);
-        self.write(" = ");
-        self.write(temp_name);
-        self.write(".");
-        self.write(&prop_name);
+        let Some(key_idx) = self.get_binding_element_property_key(elem) else {
+            return;
+        };
+
+        if self.is_binding_pattern(elem.name) {
+            let value_name = self.get_temp_var_name();
+            self.write(", ");
+            self.write(&value_name);
+            self.write(" = ");
+            self.emit_assignment_target_es5(key_idx, temp_name);
+
+            if !elem.initializer.is_none() {
+                self.write(", ");
+                self.write(&value_name);
+                self.write(" = ");
+                self.write(&value_name);
+                self.write(" === void 0 ? ");
+                self.emit_expression(elem.initializer);
+                self.write(" : ");
+                self.write(&value_name);
+            }
+
+            self.emit_es5_destructuring_pattern_idx(elem.name, &value_name);
+            return;
+        }
+
+        let binding_name = self.get_identifier_text(elem.name);
+        if binding_name.is_empty() {
+            return;
+        }
+
+        if elem.initializer.is_none() {
+            // Emit: , bindingName = temp.propName
+            self.write(", ");
+            self.write(&binding_name);
+            self.write(" = ");
+            self.emit_assignment_target_es5(key_idx, temp_name);
+        } else {
+            let value_name = self.get_temp_var_name();
+            self.write(", ");
+            self.write(&value_name);
+            self.write(" = ");
+            self.emit_assignment_target_es5(key_idx, temp_name);
+            self.write(", ");
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(&value_name);
+            self.write(" === void 0 ? ");
+            self.emit_expression(elem.initializer);
+            self.write(" : ");
+            self.write(&value_name);
+        }
     }
 
     /// Emit a single binding element for ES5 array destructuring
@@ -2342,19 +3353,544 @@ impl<'a> ThinPrinter<'a> {
         let Some(elem_node) = self.arena.get(elem_idx) else { return };
         let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
 
+        if elem.dot_dot_dot_token {
+            self.emit_es5_array_rest_element(elem.name, temp_name, index);
+            return;
+        }
+
+        if self.is_binding_pattern(elem.name) {
+            let value_name = self.get_temp_var_name();
+            self.write(", ");
+            self.write(&value_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write("[");
+            self.write(&index.to_string());
+            self.write("]");
+
+            if !elem.initializer.is_none() {
+                self.write(", ");
+                self.write(&value_name);
+                self.write(" = ");
+                self.write(&value_name);
+                self.write(" === void 0 ? ");
+                self.emit_expression(elem.initializer);
+                self.write(" : ");
+                self.write(&value_name);
+            }
+
+            self.emit_es5_destructuring_pattern_idx(elem.name, &value_name);
+            return;
+        }
+
         let binding_name = self.get_identifier_text(elem.name);
         if binding_name.is_empty() {
             return;
         }
 
-        // Emit: , bindingName = temp[index]
+        if elem.initializer.is_none() {
+            // Emit: , bindingName = temp[index]
+            self.write(", ");
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write("[");
+            self.write(&index.to_string());
+            self.write("]");
+        } else {
+            let value_name = self.get_temp_var_name();
+            self.write(", ");
+            self.write(&value_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write("[");
+            self.write(&index.to_string());
+            self.write("]");
+            self.write(", ");
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(&value_name);
+            self.write(" === void 0 ? ");
+            self.emit_expression(elem.initializer);
+            self.write(" : ");
+            self.write(&value_name);
+        }
+    }
+
+    fn emit_es5_destructuring_pattern(&mut self, pattern_node: &ThinNode, temp_name: &str) {
+        if pattern_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN {
+            let Some(pattern) = self.arena.get_binding_pattern(pattern_node) else { return };
+            let rest_props = self.collect_object_rest_props(pattern);
+            for &elem_idx in &pattern.elements.nodes {
+                if elem_idx.is_none() {
+                    continue;
+                }
+                let Some(elem_node) = self.arena.get(elem_idx) else { continue };
+                let Some(elem) = self.arena.get_binding_element(elem_node) else { continue };
+                if elem.dot_dot_dot_token {
+                    self.emit_es5_object_rest_element(elem, &rest_props, temp_name);
+                } else {
+                    self.emit_es5_binding_element(elem_idx, temp_name);
+                }
+            }
+        } else if pattern_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN {
+            if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                for (i, &elem_idx) in pattern.elements.nodes.iter().enumerate() {
+                    self.emit_es5_array_binding_element(elem_idx, temp_name, i);
+                }
+            }
+        }
+    }
+
+    fn emit_param_prologue(&mut self, transforms: &ParamTransformPlan) {
+        for param in &transforms.params {
+            if let Some(initializer) = param.initializer {
+                self.emit_param_default_assignment(&param.name, initializer);
+            }
+            if let Some(pattern) = param.pattern {
+                let mut started = false;
+                self.emit_param_binding_assignments(pattern, &param.name, &mut started);
+                if started {
+                    self.write(";");
+                    self.write_line();
+                }
+            }
+        }
+
+        if let Some(rest) = &transforms.rest {
+            if !rest.name.is_empty() {
+                self.write("var ");
+                self.write(&rest.name);
+                self.write(" = [];");
+                self.write_line();
+
+                let iter_name = self.get_temp_var_name();
+                self.write("for (var ");
+                self.write(&iter_name);
+                self.write(" = ");
+                self.write(&rest.index.to_string());
+                self.write("; ");
+                self.write(&iter_name);
+                self.write(" < arguments.length; ");
+                self.write(&iter_name);
+                self.write("++) ");
+                self.write(&rest.name);
+                self.write("[");
+                self.write(&iter_name);
+                self.write(" - ");
+                self.write(&rest.index.to_string());
+                self.write("] = arguments[");
+                self.write(&iter_name);
+                self.write("];");
+                self.write_line();
+            }
+
+            if let Some(pattern) = rest.pattern {
+                let mut started = false;
+                self.emit_param_binding_assignments(pattern, &rest.name, &mut started);
+                if started {
+                    self.write(";");
+                    self.write_line();
+                }
+            }
+        }
+    }
+
+    fn emit_param_default_assignment(&mut self, name: &str, initializer: NodeIndex) {
+        if name.is_empty() {
+            return;
+        }
+        self.write("if (");
+        self.write(name);
+        self.write(" === void 0) { ");
+        self.write(name);
+        self.write(" = ");
+        self.emit_expression(initializer);
+        self.write("; }");
+        self.write_line();
+    }
+
+    fn emit_param_binding_assignments(
+        &mut self,
+        pattern_idx: NodeIndex,
+        temp_name: &str,
+        started: &mut bool,
+    ) {
+        let Some(pattern_node) = self.arena.get(pattern_idx) else { return };
+
+        match pattern_node.kind {
+            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN => {
+                if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                    let rest_props = self.collect_object_rest_props(pattern);
+                    for &elem_idx in &pattern.elements.nodes {
+                        if elem_idx.is_none() {
+                            continue;
+                        }
+                        let Some(elem_node) = self.arena.get(elem_idx) else { continue };
+                        let Some(elem) = self.arena.get_binding_element(elem_node) else { continue };
+                        if elem.dot_dot_dot_token {
+                            self.emit_param_object_rest_element(elem, &rest_props, temp_name, started);
+                        } else {
+                            self.emit_param_object_binding_element(elem_idx, temp_name, started);
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
+                if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                    for (i, &elem_idx) in pattern.elements.nodes.iter().enumerate() {
+                        self.emit_param_array_binding_element(elem_idx, temp_name, i, started);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn emit_param_object_binding_element(
+        &mut self,
+        elem_idx: NodeIndex,
+        temp_name: &str,
+        started: &mut bool,
+    ) {
+        let Some(elem_node) = self.arena.get(elem_idx) else { return };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+
+        if elem.dot_dot_dot_token {
+            return;
+        }
+
+        let Some(key_idx) = self.get_binding_element_property_key(elem) else {
+            return;
+        };
+
+        if self.is_binding_pattern(elem.name) {
+            let value_name = self.get_temp_var_name();
+            self.emit_param_assignment_prefix(started);
+            self.write(&value_name);
+            self.write(" = ");
+            self.emit_assignment_target_es5(key_idx, temp_name);
+
+            if !elem.initializer.is_none() {
+                self.write(", ");
+                self.write(&value_name);
+                self.write(" = ");
+                self.write(&value_name);
+                self.write(" === void 0 ? ");
+                self.emit_expression(elem.initializer);
+                self.write(" : ");
+                self.write(&value_name);
+            }
+
+            self.emit_param_binding_assignments(elem.name, &value_name, started);
+            return;
+        }
+
+        let binding_name = self.get_identifier_text(elem.name);
+        if binding_name.is_empty() {
+            return;
+        }
+
+        self.emit_param_assignment_prefix(started);
+        if !elem.initializer.is_none() {
+            let value_name = self.get_temp_var_name();
+            self.write(&value_name);
+            self.write(" = ");
+            self.emit_assignment_target_es5(key_idx, temp_name);
+            self.write(", ");
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(&value_name);
+            self.write(" === void 0 ? ");
+            self.emit_expression(elem.initializer);
+            self.write(" : ");
+            self.write(&value_name);
+        } else {
+            self.write(&binding_name);
+            self.write(" = ");
+            self.emit_assignment_target_es5(key_idx, temp_name);
+        }
+    }
+
+    fn emit_param_array_binding_element(
+        &mut self,
+        elem_idx: NodeIndex,
+        temp_name: &str,
+        index: usize,
+        started: &mut bool,
+    ) {
+        if elem_idx.is_none() {
+            return;
+        }
+        let Some(elem_node) = self.arena.get(elem_idx) else { return };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+
+        if elem.dot_dot_dot_token {
+            self.emit_param_array_rest_element(elem.name, temp_name, index, started);
+            return;
+        }
+
+        if self.is_binding_pattern(elem.name) {
+            let value_name = self.get_temp_var_name();
+            self.emit_param_assignment_prefix(started);
+            self.write(&value_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write("[");
+            self.write(&index.to_string());
+            self.write("]");
+
+            if !elem.initializer.is_none() {
+                self.write(", ");
+                self.write(&value_name);
+                self.write(" = ");
+                self.write(&value_name);
+                self.write(" === void 0 ? ");
+                self.emit_expression(elem.initializer);
+                self.write(" : ");
+                self.write(&value_name);
+            }
+
+            self.emit_param_binding_assignments(elem.name, &value_name, started);
+            return;
+        }
+
+        let binding_name = self.get_identifier_text(elem.name);
+        if binding_name.is_empty() {
+            return;
+        }
+
+        self.emit_param_assignment_prefix(started);
+        if !elem.initializer.is_none() {
+            let value_name = self.get_temp_var_name();
+            self.write(&value_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write("[");
+            self.write(&index.to_string());
+            self.write("]");
+            self.write(", ");
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(&value_name);
+            self.write(" === void 0 ? ");
+            self.emit_expression(elem.initializer);
+            self.write(" : ");
+            self.write(&value_name);
+        } else {
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write("[");
+            self.write(&index.to_string());
+            self.write("]");
+        }
+    }
+
+    fn emit_param_object_rest_element(
+        &mut self,
+        elem: &crate::parser::thin_node::BindingElementData,
+        rest_props: &[NodeIndex],
+        temp_name: &str,
+        started: &mut bool,
+    ) {
+        let rest_target = elem.name;
+        let is_pattern = self.is_binding_pattern(rest_target);
+        let rest_temp = if is_pattern {
+            Some(self.get_temp_var_name())
+        } else {
+            None
+        };
+
+        self.emit_param_assignment_prefix(started);
+        if let Some(ref name) = rest_temp {
+            self.write(name);
+        } else {
+            self.emit(rest_target);
+        }
+        self.write(" = __rest(");
+        self.write(temp_name);
         self.write(", ");
-        self.write(&binding_name);
+        self.emit_rest_exclude_list(rest_props);
+        self.write(")");
+
+        if let Some(ref name) = rest_temp {
+            self.emit_param_binding_assignments(rest_target, name, started);
+        }
+    }
+
+    fn emit_param_array_rest_element(
+        &mut self,
+        rest_target: NodeIndex,
+        temp_name: &str,
+        index: usize,
+        started: &mut bool,
+    ) {
+        let is_pattern = self.is_binding_pattern(rest_target);
+        let rest_temp = if is_pattern {
+            Some(self.get_temp_var_name())
+        } else {
+            None
+        };
+
+        self.emit_param_assignment_prefix(started);
+        if let Some(ref name) = rest_temp {
+            self.write(name);
+        } else {
+            let binding_name = self.get_identifier_text(rest_target);
+            if binding_name.is_empty() {
+                return;
+            }
+            self.write(&binding_name);
+        }
         self.write(" = ");
         self.write(temp_name);
-        self.write("[");
+        self.write(".slice(");
         self.write(&index.to_string());
+        self.write(")");
+
+        if let Some(ref name) = rest_temp {
+            self.emit_param_binding_assignments(rest_target, name, started);
+        }
+    }
+
+    fn emit_param_assignment_prefix(&mut self, started: &mut bool) {
+        if !*started {
+            self.write("var ");
+            *started = true;
+        } else {
+            self.write(", ");
+        }
+    }
+
+    fn emit_es5_object_rest_element(
+        &mut self,
+        elem: &crate::parser::thin_node::BindingElementData,
+        rest_props: &[NodeIndex],
+        temp_name: &str,
+    ) {
+        let rest_target = elem.name;
+        let is_pattern = self.is_binding_pattern(rest_target);
+        let rest_temp = if is_pattern {
+            Some(self.get_temp_var_name())
+        } else {
+            None
+        };
+
+        self.write(", ");
+        if let Some(ref name) = rest_temp {
+            self.write(name);
+        } else {
+            self.emit(rest_target);
+        }
+        self.write(" = __rest(");
+        self.write(temp_name);
+        self.write(", ");
+        self.emit_rest_exclude_list(rest_props);
+        self.write(")");
+
+        if let Some(ref name) = rest_temp {
+            self.emit_es5_destructuring_pattern_idx(rest_target, name);
+        }
+    }
+
+    fn emit_es5_array_rest_element(&mut self, rest_target: NodeIndex, temp_name: &str, index: usize) {
+        let is_pattern = self.is_binding_pattern(rest_target);
+        let rest_temp = if is_pattern {
+            Some(self.get_temp_var_name())
+        } else {
+            None
+        };
+
+        self.write(", ");
+        if let Some(ref name) = rest_temp {
+            self.write(name);
+        } else {
+            let binding_name = self.get_identifier_text(rest_target);
+            if binding_name.is_empty() {
+                return;
+            }
+            self.write(&binding_name);
+        }
+        self.write(" = ");
+        self.write(temp_name);
+        self.write(".slice(");
+        self.write(&index.to_string());
+        self.write(")");
+
+        if let Some(ref name) = rest_temp {
+            self.emit_es5_destructuring_pattern_idx(rest_target, name);
+        }
+    }
+
+    fn emit_es5_destructuring_pattern_idx(&mut self, pattern_idx: NodeIndex, temp_name: &str) {
+        let Some(pattern_node) = self.arena.get(pattern_idx) else { return };
+        self.emit_es5_destructuring_pattern(pattern_node, temp_name);
+    }
+
+    fn collect_object_rest_props(&self, pattern: &crate::parser::thin_node::BindingPatternData) -> Vec<NodeIndex> {
+        let mut props = Vec::new();
+        for &elem_idx in &pattern.elements.nodes {
+            let Some(elem_node) = self.arena.get(elem_idx) else { continue };
+            let Some(elem) = self.arena.get_binding_element(elem_node) else { continue };
+            if elem.dot_dot_dot_token {
+                continue;
+            }
+            let key_idx = if !elem.property_name.is_none() {
+                elem.property_name
+            } else {
+                elem.name
+            };
+            if let Some(key_node) = self.arena.get(key_idx) {
+                if key_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                    || key_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+                {
+                    continue;
+                }
+            }
+            props.push(key_idx);
+        }
+        props
+    }
+
+    fn emit_rest_exclude_list(&mut self, props: &[NodeIndex]) {
+        self.write("[");
+        let mut first = true;
+        for &prop_idx in props {
+            if !first {
+                self.write(", ");
+            }
+            first = false;
+            self.emit_rest_property_key(prop_idx);
+        }
         self.write("]");
+    }
+
+    fn emit_rest_property_key(&mut self, key_idx: NodeIndex) {
+        let Some(key_node) = self.arena.get(key_idx) else { return };
+
+        if key_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+            if let Some(computed) = self.arena.get_computed_property(key_node) {
+                self.emit_expression(computed.expression);
+            }
+            return;
+        }
+
+        if let Some(ident) = self.arena.get_identifier(key_node) {
+            self.write("\"");
+            self.write(&ident.escaped_text);
+            self.write("\"");
+            return;
+        }
+
+        if let Some(lit) = self.arena.get_literal(key_node) {
+            self.write("\"");
+            self.write(&lit.text);
+            self.write("\"");
+            return;
+        }
+
+        self.emit_expression(key_idx);
     }
 
     /// Get identifier text from a node index
@@ -2486,6 +4022,159 @@ impl<'a> ThinPrinter<'a> {
         self.emit(for_in_of.statement);
     }
 
+    fn emit_for_of_statement_es5(&mut self, for_in_of: &crate::parser::thin_node::ForInOfData) {
+        let error_name = self.get_temp_var_name();
+        let return_name = self.get_temp_var_name();
+        let iterator_name = self.get_temp_var_name();
+        let result_name = self.get_temp_var_name();
+
+        self.write("var ");
+        self.write(&error_name);
+        self.write(", ");
+        self.write(&return_name);
+        self.write_semicolon();
+        self.write_line();
+
+        self.write("try {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write("for (var ");
+        self.write(&iterator_name);
+        self.write(" = __values(");
+        self.emit_expression(for_in_of.expression);
+        self.write("), ");
+        self.write(&result_name);
+        self.write(" = ");
+        self.write(&iterator_name);
+        self.write(".next(); !");
+        self.write(&result_name);
+        self.write(".done; ");
+        self.write(&result_name);
+        self.write(" = ");
+        self.write(&iterator_name);
+        self.write(".next()) ");
+
+        self.write("{");
+        self.write_line();
+        self.increase_indent();
+        self.emit_for_of_value_binding_es5(for_in_of.initializer, &result_name);
+        self.write_line();
+        self.emit(for_in_of.statement);
+        self.write_line();
+        self.decrease_indent();
+        self.write("}");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("}");
+        self.write_line();
+
+        self.write("catch (");
+        self.write(&error_name);
+        self.write("_1) { ");
+        self.write(&error_name);
+        self.write(" = { error: ");
+        self.write(&error_name);
+        self.write("_1 }; }");
+        self.write_line();
+
+        self.write("finally {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write("try {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write("if (");
+        self.write(&result_name);
+        self.write(" && !");
+        self.write(&result_name);
+        self.write(".done && (");
+        self.write(&return_name);
+        self.write(" = ");
+        self.write(&iterator_name);
+        self.write(".return)) ");
+        self.write(&return_name);
+        self.write(".call(");
+        self.write(&iterator_name);
+        self.write(")");
+        self.write_semicolon();
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("} finally {");
+        self.write_line();
+        self.increase_indent();
+
+        self.write("if (");
+        self.write(&error_name);
+        self.write(") throw ");
+        self.write(&error_name);
+        self.write(".error");
+        self.write_semicolon();
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("}");
+        self.write_line();
+
+        self.decrease_indent();
+        self.write("}");
+    }
+
+    fn emit_for_of_value_binding_es5(&mut self, initializer: NodeIndex, result_name: &str) {
+        if initializer.is_none() {
+            return;
+        }
+
+        let Some(init_node) = self.arena.get(initializer) else {
+            return;
+        };
+
+        if init_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+            self.write("var ");
+            if let Some(decl_list) = self.arena.get_variable(init_node) {
+                let mut first = true;
+                for &decl_idx in &decl_list.declarations.nodes {
+                    self.emit_for_of_declaration_value_es5(decl_idx, result_name, &mut first);
+                }
+            }
+            self.write_semicolon();
+        } else if self.is_binding_pattern(initializer) {
+            self.write("var ");
+            let mut first = true;
+            self.emit_es5_destructuring_from_value(initializer, result_name, &mut first);
+            self.write_semicolon();
+        } else {
+            self.emit_expression(initializer);
+            self.write(" = ");
+            self.write(result_name);
+            self.write(".value");
+            self.write_semicolon();
+        }
+    }
+
+    fn emit_for_of_declaration_value_es5(&mut self, decl_idx: NodeIndex, result_name: &str, first: &mut bool) {
+        let Some(decl_node) = self.arena.get(decl_idx) else { return };
+        let Some(decl) = self.arena.get_variable_declaration(decl_node) else { return };
+
+        if self.is_binding_pattern(decl.name) {
+            self.emit_es5_destructuring_from_value(decl.name, result_name, first);
+            return;
+        }
+
+        if !*first {
+            self.write(", ");
+        }
+        *first = false;
+        self.emit(decl.name);
+        self.write(" = ");
+        self.write(result_name);
+        self.write(".value");
+    }
+
     fn emit_return_statement(&mut self, node: &ThinNode) {
         let Some(ret) = self.arena.get_return_statement(node) else {
             self.write("return");
@@ -2507,11 +4196,6 @@ impl<'a> ThinPrinter<'a> {
 
     /// Emit a class declaration.
     ///
-    /// **Architecture Note**: This method contains the old inline transform logic for
-    /// backward compatibility. When transforms are provided via TransformContext,
-    /// the transform system handles ES5/CommonJS transforms and this method is NOT called.
-    ///
-    /// New code should use: LoweringPass → TransformContext → apply_transform()
     fn emit_class_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
         let Some(class) = self.arena.get_class(node) else {
             return;
@@ -2522,62 +4206,7 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
-        let is_exported = self.ctx.is_commonjs()
-            && self.has_export_modifier(&class.modifiers)
-            && !self.ctx.module_state.has_export_assignment;
-        let is_default = self.has_default_modifier(&class.modifiers);
-
-        // Get class name for export
-        let class_name = if !class.name.is_none() {
-            self.get_identifier_text_idx(class.name)
-        } else {
-            String::new()
-        };
-
-        // Use ES5 IIFE transform when targeting ES5 (OLD PATH - for backward compatibility)
-        // When TransformContext is used, this is handled by TransformDirective::ES5Class
-        if self.ctx.target_es5 {
-            let mut es5_emitter = ClassES5Emitter::new(self.arena);
-            es5_emitter.set_indent_level(self.writer.indent_level());
-            if let Some(source_text) = self.source_text {
-                es5_emitter.set_source_text(source_text);
-            }
-            let es5_output = es5_emitter.emit_class(idx);
-            self.write(&es5_output);
-
-            // CommonJS: emit exports.ClassName = ClassName; after the ES5 class
-            if is_exported && !class_name.is_empty() {
-                self.write_line();
-                if is_default {
-                    self.write("exports.default = ");
-                } else {
-                    self.write("exports.");
-                    self.write(&class_name);
-                    self.write(" = ");
-                }
-                self.write(&class_name);
-                self.write(";");
-            }
-            return;
-        }
-
-        // ES6+ path: emit native class syntax
         self.emit_class_es6(node, idx);
-
-        // CommonJS: emit exports.ClassName = ClassName; after the class (OLD PATH)
-        // When TransformContext is used, this is handled by TransformDirective::CommonJSExport
-        if is_exported && !class_name.is_empty() {
-            self.write_line();
-            if is_default {
-                self.write("exports.default = ");
-            } else {
-                self.write("exports.");
-                self.write(&class_name);
-                self.write(" = ");
-            }
-            self.write(&class_name);
-            self.write(";");
-        }
     }
 
     /// Emit a class using ES6 native class syntax (no transforms).
@@ -2617,7 +4246,25 @@ impl<'a> ThinPrinter<'a> {
             self.emit(class.name);
         }
 
-        // TODO: Emit heritage clause
+        if let Some(ref heritage_clauses) = class.heritage_clauses {
+            for &clause_idx in &heritage_clauses.nodes {
+                let Some(clause_node) = self.arena.get(clause_idx) else {
+                    continue;
+                };
+                let Some(heritage) = self.arena.get_heritage(clause_node) else {
+                    continue;
+                };
+                if heritage.token != SyntaxKind::ExtendsKeyword as u16 {
+                    continue;
+                }
+
+                if let Some(&extends_type) = heritage.types.nodes.first() {
+                    self.write(" extends ");
+                    self.emit_heritage_expression(extends_type);
+                }
+                break;
+            }
+        }
 
         self.write(" {");
         self.write_line();
@@ -2663,6 +4310,22 @@ impl<'a> ThinPrinter<'a> {
                 self.write(", ");
             }
             first = false;
+            self.emit(idx);
+        }
+    }
+
+    fn emit_heritage_expression(&mut self, idx: NodeIndex) {
+        if idx.is_none() {
+            return;
+        }
+
+        let Some(node) = self.arena.get(idx) else {
+            return;
+        };
+
+        if let Some(expr) = self.arena.get_expr_type_args(node) {
+            self.emit(expr.expression);
+        } else {
             self.emit(idx);
         }
     }
@@ -2808,13 +4471,74 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        self.write("import ");
-
-        if !import.import_clause.is_none() {
-            self.emit(import.import_clause);
-            self.write(" from ");
+        if import.import_clause.is_none() {
+            self.write("import ");
+            self.emit(import.module_specifier);
+            self.write_semicolon();
+            return;
         }
 
+        let Some(clause_node) = self.arena.get(import.import_clause) else {
+            return;
+        };
+        let Some(clause) = self.arena.get_import_clause(clause_node) else {
+            return;
+        };
+
+        if clause.is_type_only {
+            return;
+        }
+
+        let mut has_default = false;
+        let mut namespace_name = None;
+        let mut value_specs = Vec::new();
+        let mut raw_named_bindings = None;
+
+        if !clause.name.is_none() {
+            has_default = true;
+        }
+
+        if !clause.named_bindings.is_none() {
+            if let Some(bindings_node) = self.arena.get(clause.named_bindings) {
+                if let Some(named_imports) = self.arena.get_named_imports(bindings_node) {
+                    if !named_imports.name.is_none() && named_imports.elements.nodes.is_empty() {
+                        namespace_name = Some(named_imports.name);
+                    } else {
+                        value_specs = self.collect_value_specifiers(&named_imports.elements);
+                    }
+                } else {
+                    raw_named_bindings = Some(clause.named_bindings);
+                }
+            }
+        }
+
+        let has_named = namespace_name.is_some() || !value_specs.is_empty() || raw_named_bindings.is_some();
+        if !has_default && !has_named {
+            return;
+        }
+
+        self.write("import ");
+        if has_default {
+            self.emit(clause.name);
+        }
+
+        if has_named {
+            if has_default {
+                self.write(", ");
+            }
+            if let Some(name) = namespace_name {
+                self.write("* as ");
+                self.emit(name);
+            } else if !value_specs.is_empty() {
+                self.write("{ ");
+                self.emit_comma_separated(&value_specs);
+                self.write(" }");
+            } else if let Some(raw_node) = raw_named_bindings {
+                self.emit(raw_node);
+            }
+        }
+
+        self.write(" from ");
         self.emit(import.module_specifier);
         self.write_semicolon();
     }
@@ -2826,9 +4550,52 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Skip type-only imports in CommonJS
-        if import.import_clause.is_none() {
-            return; // Side-effect import: import "module"; -> skip or emit require
+        let Some(clause_node) = self.arena.get(import.import_clause) else {
+            // Side-effect import: import "module"; -> emit require
+            let module_spec = if let Some(spec_node) = self.arena.get(import.module_specifier) {
+                if let Some(lit) = self.arena.get_literal(spec_node) {
+                    lit.text.clone()
+                } else {
+                    return;
+                }
+            } else {
+                return;
+            };
+
+            self.write("require(\"");
+            self.write(&module_spec);
+            self.write("\");");
+            self.write_line();
+            return;
+        };
+        let Some(clause) = self.arena.get_import_clause(clause_node) else {
+            return;
+        };
+
+        if clause.is_type_only {
+            return;
+        }
+
+        let mut has_value_binding = !clause.name.is_none();
+        if !clause.named_bindings.is_none() {
+            if let Some(bindings_node) = self.arena.get(clause.named_bindings) {
+                if let Some(named_imports) = self.arena.get_named_imports(bindings_node) {
+                    if !named_imports.name.is_none() && named_imports.elements.nodes.is_empty() {
+                        has_value_binding = true;
+                    } else {
+                        let value_specs = self.collect_value_specifiers(&named_imports.elements);
+                        if !value_specs.is_empty() {
+                            has_value_binding = true;
+                        }
+                    }
+                } else {
+                    has_value_binding = true;
+                }
+            }
+        }
+
+        if !has_value_binding {
+            return;
         }
 
         // Get module specifier and generate var name
@@ -2861,6 +4628,40 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
+    fn emit_import_equals_declaration(&mut self, node: &ThinNode) {
+        self.emit_import_equals_declaration_inner(node);
+        self.write_semicolon();
+    }
+
+    fn emit_import_equals_declaration_inner(&mut self, node: &ThinNode) {
+        let Some(import) = self.arena.get_import_decl(node) else {
+            return;
+        };
+
+        if import.import_clause.is_none() {
+            return;
+        }
+
+        self.write("var ");
+        self.emit(import.import_clause);
+        self.write(" = ");
+
+        let Some(module_node) = self.arena.get(import.module_specifier) else {
+            return;
+        };
+
+        if module_node.kind == SyntaxKind::StringLiteral as u16 {
+            if let Some(lit) = self.arena.get_literal(module_node) {
+                self.write("require(\"");
+                self.write(&lit.text);
+                self.write("\")");
+            }
+            return;
+        }
+
+        self.emit_entity_name(import.module_specifier);
+    }
+
     fn emit_import_clause(&mut self, node: &ThinNode) {
         let Some(clause) = self.arena.get_import_clause(node) else {
             return;
@@ -2887,6 +4688,12 @@ impl<'a> ThinPrinter<'a> {
         let Some(imports) = self.arena.get_named_imports(node) else {
             return;
         };
+
+        if !imports.name.is_none() && imports.elements.nodes.is_empty() {
+            self.write("* as ");
+            self.emit(imports.name);
+            return;
+        }
 
         self.write("{ ");
         self.emit_comma_separated(&imports.elements.nodes);
@@ -2918,13 +4725,62 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        self.write("export ");
-
-        if !export.export_clause.is_none() {
-            self.emit(export.export_clause);
-        } else {
-            self.write("*");
+        if export.is_type_only {
+            return;
         }
+
+        if export.is_default_export {
+            self.write("export default ");
+            self.emit(export.export_clause);
+            self.write_semicolon();
+            return;
+        }
+
+        if export.export_clause.is_none() {
+            self.write("export *");
+            if !export.module_specifier.is_none() {
+                self.write(" from ");
+                self.emit(export.module_specifier);
+            }
+            self.write_semicolon();
+            return;
+        }
+
+        let Some(clause_node) = self.arena.get(export.export_clause) else {
+            return;
+        };
+
+        if clause_node.kind == syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
+            self.write("export ");
+            self.emit_import_equals_declaration_inner(clause_node);
+            self.write_semicolon();
+            return;
+        }
+
+        if clause_node.kind == syntax_kind_ext::NAMED_EXPORTS {
+            if let Some(named_exports) = self.arena.get_named_imports(clause_node) {
+                let value_specs = self.collect_value_specifiers(&named_exports.elements);
+                if value_specs.is_empty() {
+                    return;
+                }
+                self.write("export { ");
+                self.emit_comma_separated(&value_specs);
+                self.write(" }");
+                if !export.module_specifier.is_none() {
+                    self.write(" from ");
+                    self.emit(export.module_specifier);
+                }
+                self.write_semicolon();
+                return;
+            }
+        }
+
+        if self.export_clause_is_type_only(clause_node) {
+            return;
+        }
+
+        self.write("export ");
+        self.emit(export.export_clause);
 
         if !export.module_specifier.is_none() {
             self.write(" from ");
@@ -2941,6 +4797,10 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
+        if export.is_type_only {
+            return;
+        }
+
         // Re-export from another module: export { x } from "module";
         if !export.module_specifier.is_none() {
             let module_spec = if let Some(spec_node) = self.arena.get(export.module_specifier) {
@@ -2955,20 +4815,44 @@ impl<'a> ThinPrinter<'a> {
 
             let module_var = format!("{}_1", module_commonjs::sanitize_module_name(&module_spec));
 
-            // First emit the require
-            self.write("var ");
-            self.write(&module_var);
-            self.write(" = require(\"");
-            self.write(&module_spec);
-            self.write("\");");
-            self.write_line();
+            if export.export_clause.is_none() {
+                // First emit the require
+                self.write("var ");
+                self.write(&module_var);
+                self.write(" = require(\"");
+                self.write(&module_spec);
+                self.write("\");");
+                self.write_line();
+
+                self.write("__exportStar(");
+                self.write(&module_var);
+                self.write(", exports);");
+                self.write_line();
+                return;
+            }
 
             // Then emit Object.defineProperty for each export
             if let Some(clause_node) = self.arena.get(export.export_clause) {
                 if let Some(named_exports) = self.arena.get_named_imports(clause_node) {
+                    let value_specs = self.collect_value_specifiers(&named_exports.elements);
+                    if value_specs.is_empty() {
+                        return;
+                    }
+
+                    // First emit the require
+                    self.write("var ");
+                    self.write(&module_var);
+                    self.write(" = require(\"");
+                    self.write(&module_spec);
+                    self.write("\");");
+                    self.write_line();
+
                     for &spec_idx in &named_exports.elements.nodes {
                         if let Some(spec_node) = self.arena.get(spec_idx) {
                             if let Some(spec) = self.arena.get_specifier(spec_node) {
+                                if spec.is_type_only {
+                                    continue;
+                                }
                                 // Get export name and import name
                                 let export_name = self.get_identifier_text_idx(spec.name);
                                 let import_name = if !spec.property_name.is_none() {
@@ -2990,15 +4874,74 @@ impl<'a> ThinPrinter<'a> {
                         }
                     }
                 }
-            } else {
-                // export * from "module" - need __exportStar helper
-                // TODO: implement export star
             }
             return;
         }
 
+        let mut is_anonymous_default = false;
+        if export.is_default_export {
+            if let Some(clause_node) = self.arena.get(export.export_clause) {
+                match clause_node.kind {
+                    k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                        if let Some(func) = self.arena.get_function(clause_node) {
+                            let func_name = self.get_identifier_text_idx(func.name);
+                            is_anonymous_default = func_name == "function"
+                                || !is_valid_identifier_name(&func_name);
+                        }
+                    }
+                    k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                        if let Some(class) = self.arena.get_class(clause_node) {
+                            let class_name = self.get_identifier_text_idx(class.name);
+                            is_anonymous_default = !is_valid_identifier_name(&class_name);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
         // Check if export_clause contains a declaration (export const x, export function f, etc.)
         if let Some(clause_node) = self.arena.get(export.export_clause) {
+            if self.export_clause_is_type_only(clause_node) {
+                return;
+            }
+
+            if clause_node.kind == syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
+                self.emit_import_equals_declaration(clause_node);
+                if !self.ctx.module_state.has_export_assignment {
+                    if let Some(import_decl) = self.arena.get_import_decl(clause_node) {
+                        let name = self.get_identifier_text_idx(import_decl.import_clause);
+                        if !name.is_empty() {
+                            self.write_line();
+                            self.write("exports.");
+                            self.write(&name);
+                            self.write(" = ");
+                            self.write(&name);
+                            self.write(";");
+                            self.write_line();
+                        }
+                    }
+                }
+                return;
+            }
+
+            let clause_kind = clause_node.kind;
+            let is_decl = clause_kind == syntax_kind_ext::VARIABLE_STATEMENT
+                || clause_kind == syntax_kind_ext::FUNCTION_DECLARATION
+                || clause_kind == syntax_kind_ext::CLASS_DECLARATION
+                || clause_kind == syntax_kind_ext::ENUM_DECLARATION
+                || clause_kind == syntax_kind_ext::MODULE_DECLARATION;
+
+            if is_decl && self.transforms.has_transform(export.export_clause) {
+                self.emit(export.export_clause);
+                return;
+            }
+
+            if is_anonymous_default {
+                self.emit_commonjs_default_export_expr(clause_node, export.export_clause);
+                return;
+            }
+
             match clause_node.kind {
                 // export const/let/var x = ...
                 k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
@@ -3069,11 +5012,56 @@ impl<'a> ThinPrinter<'a> {
                         }
                     }
                 }
+                // export enum E {}
+                k if k == syntax_kind_ext::ENUM_DECLARATION => {
+                    self.emit_enum_declaration(clause_node, export.export_clause);
+                    self.write_line();
+
+                    if !self.ctx.module_state.has_export_assignment {
+                        if let Some(enum_decl) = self.arena.get_enum(clause_node) {
+                            if let Some(name) = self.get_identifier_text_opt(enum_decl.name) {
+                                if export.is_default_export {
+                                    self.write("exports.default = ");
+                                } else {
+                                    self.write("exports.");
+                                    self.write(&name);
+                                    self.write(" = ");
+                                }
+                                self.write(&name);
+                                self.write(";");
+                                self.write_line();
+                            }
+                        }
+                    }
+                }
+                // export namespace N {}
+                k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                    self.emit_module_declaration(clause_node, export.export_clause);
+                    self.write_line();
+
+                    if !self.ctx.module_state.has_export_assignment {
+                        if let Some(module_decl) = self.arena.get_module(clause_node) {
+                            if let Some(name) = self.get_module_root_name(module_decl.name) {
+                                self.write("exports.");
+                                self.write(&name);
+                                self.write(" = ");
+                                self.write(&name);
+                                self.write(";");
+                                self.write_line();
+                            }
+                        }
+                    }
+                }
                 // export { x, y } - local re-export without module specifier
                 k if k == syntax_kind_ext::NAMED_EXPORTS => {
                     // Emit exports.x = x; for each name
                     if let Some(named_exports) = self.arena.get_named_imports(clause_node) {
-                        for &spec_idx in &named_exports.elements.nodes {
+                        let value_specs = self.collect_value_specifiers(&named_exports.elements);
+                        if value_specs.is_empty() {
+                            return;
+                        }
+
+                        for &spec_idx in &value_specs {
                             if let Some(spec_node) = self.arena.get(spec_idx) {
                                 if let Some(spec) = self.arena.get_specifier(spec_node) {
                                     let export_name = self.get_identifier_text_idx(spec.name);
@@ -3145,9 +5133,7 @@ impl<'a> ThinPrinter<'a> {
                         for &decl_idx in &decl_list.declarations.nodes {
                             if let Some(decl_node) = self.arena.get(decl_idx) {
                                 if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
-                                    if let Some(name) = self.get_binding_name(decl.name) {
-                                        names.push(name);
-                                    }
+                                    self.collect_binding_names(decl.name, &mut names);
                                 }
                             }
                         }
@@ -3168,6 +5154,25 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
+    fn get_module_root_name(&self, name_idx: NodeIndex) -> Option<String> {
+        if name_idx.is_none() {
+            return None;
+        }
+
+        let node = self.arena.get(name_idx)?;
+        if node.kind == SyntaxKind::Identifier as u16 {
+            return self.arena.get_identifier(node).map(|id| id.escaped_text.clone());
+        }
+
+        if node.kind == syntax_kind_ext::QUALIFIED_NAME {
+            if let Some(qn) = self.arena.qualified_names.get(node.data_index as usize) {
+                return self.get_module_root_name(qn.left);
+            }
+        }
+
+        None
+    }
+
     /// Get identifier text from a node index
     fn get_identifier_text_idx(&self, idx: NodeIndex) -> String {
         if let Some(node) = self.arena.get(idx) {
@@ -3178,6 +5183,34 @@ impl<'a> ThinPrinter<'a> {
             }
         }
         String::new()
+    }
+
+    fn emit_entity_name(&mut self, idx: NodeIndex) {
+        if idx.is_none() {
+            return;
+        }
+
+        let Some(node) = self.arena.get(idx) else {
+            return;
+        };
+
+        match node.kind {
+            k if k == SyntaxKind::Identifier as u16 => {
+                if let Some(id) = self.arena.get_identifier(node) {
+                    self.write(&id.escaped_text);
+                }
+            }
+            k if k == SyntaxKind::ThisKeyword as u16 => self.write("this"),
+            k if k == SyntaxKind::SuperKeyword as u16 => self.write("super"),
+            k if k == syntax_kind_ext::QUALIFIED_NAME => {
+                if let Some(name) = self.arena.get_qualified_name(node) {
+                    self.emit_entity_name(name.left);
+                    self.write(".");
+                    self.emit_entity_name(name.right);
+                }
+            }
+            _ => {}
+        }
     }
 
     fn emit_named_exports(&mut self, node: &ThinNode) {
@@ -3202,6 +5235,60 @@ impl<'a> ThinPrinter<'a> {
             self.write(" as ");
         }
         self.emit(spec.name);
+    }
+
+    fn collect_value_specifiers(&self, elements: &NodeList) -> Vec<NodeIndex> {
+        let mut specs = Vec::new();
+        for &spec_idx in &elements.nodes {
+            if let Some(spec_node) = self.arena.get(spec_idx) {
+                if let Some(spec) = self.arena.get_specifier(spec_node) {
+                    if spec.is_type_only {
+                        continue;
+                    }
+                }
+            }
+            specs.push(spec_idx);
+        }
+        specs
+    }
+
+    fn export_clause_is_type_only(&self, clause_node: &ThinNode) -> bool {
+        match clause_node.kind {
+            k if k == syntax_kind_ext::INTERFACE_DECLARATION => true,
+            k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => true,
+            k if k == syntax_kind_ext::ENUM_DECLARATION => {
+                let Some(enum_decl) = self.arena.get_enum(clause_node) else {
+                    return false;
+                };
+                self.has_declare_modifier(&enum_decl.modifiers)
+                    || self.has_modifier(&enum_decl.modifiers, SyntaxKind::ConstKeyword as u16)
+            }
+            k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                let Some(class_decl) = self.arena.get_class(clause_node) else {
+                    return false;
+                };
+                self.has_declare_modifier(&class_decl.modifiers)
+            }
+            k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                let Some(func_decl) = self.arena.get_function(clause_node) else {
+                    return false;
+                };
+                self.has_declare_modifier(&func_decl.modifiers)
+            }
+            k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+                let Some(var_decl) = self.arena.get_variable(clause_node) else {
+                    return false;
+                };
+                self.has_declare_modifier(&var_decl.modifiers)
+            }
+            k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                let Some(module_decl) = self.arena.get_module(clause_node) else {
+                    return false;
+                };
+                self.has_declare_modifier(&module_decl.modifiers)
+            }
+            _ => false,
+        }
     }
 
     // =========================================================================
@@ -3267,6 +5354,27 @@ impl<'a> ThinPrinter<'a> {
         self.write(") ");
         // case_block is a NodeIndex pointing to a CaseBlock node
         self.emit(switch.case_block);
+    }
+
+    fn emit_case_block(&mut self, node: &ThinNode) {
+        if !node.has_data() || node.kind != syntax_kind_ext::CASE_BLOCK {
+            return;
+        }
+        let Some(case_block) = self.arena.blocks.get(node.data_index as usize) else {
+            return;
+        };
+
+        self.write("{");
+        self.write_line();
+        self.increase_indent();
+
+        for &clause_idx in &case_block.statements.nodes {
+            self.emit(clause_idx);
+            self.write_line();
+        }
+
+        self.decrease_indent();
+        self.write("}");
     }
 
     fn emit_case_clause(&mut self, node: &ThinNode) {
@@ -3449,26 +5557,19 @@ impl<'a> ThinPrinter<'a> {
     // Declarations - Enum, Interface, Type Alias
     // =========================================================================
 
-    fn emit_enum_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
+    fn emit_enum_declaration(&mut self, node: &ThinNode, _idx: NodeIndex) {
         let Some(enum_decl) = self.arena.get_enum(node) else {
             return;
         };
 
-        // Skip ambient declarations (declare enum)
-        if self.has_declare_modifier(&enum_decl.modifiers) {
+        // Skip ambient and const enums (declare/const enums are erased)
+        if self.has_declare_modifier(&enum_decl.modifiers)
+            || self.has_modifier(&enum_decl.modifiers, SyntaxKind::ConstKeyword as u16)
+        {
             return;
         }
 
-        // For ES5 target: transform to IIFE pattern
-        if self.ctx.target_es5 {
-            let mut enum_emitter = crate::transforms::enum_es5::EnumES5Emitter::new(self.arena);
-            enum_emitter.set_indent_level(self.writer.indent_level());
-            let output = enum_emitter.emit_enum(idx);
-            self.write(&output);
-            return;
-        }
-
-        // For modern targets: emit TypeScript-style enum
+        // Emit TypeScript-style enum
         self.write("enum ");
         self.emit(enum_decl.name);
         self.write(" {");
@@ -3559,15 +5660,7 @@ impl<'a> ThinPrinter<'a> {
         self.write_semicolon();
     }
 
-    fn emit_module_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
-        if self.ctx.target_es5 {
-            // Use ES5 namespace transform: namespace → IIFE pattern
-            let mut ns_emitter = crate::transforms::namespace_es5::NamespaceES5Emitter::new(self.arena);
-            let output = ns_emitter.emit_namespace(idx);
-            self.write(&output);
-            return;
-        }
-
+    fn emit_module_declaration(&mut self, node: &ThinNode, _idx: NodeIndex) {
         let Some(module) = self.arena.get_module(node) else {
             return;
         };
@@ -3581,6 +5674,41 @@ impl<'a> ThinPrinter<'a> {
     // =========================================================================
     // Template Literals
     // =========================================================================
+
+    fn emit_tagged_template_expression(&mut self, node: &ThinNode, _idx: NodeIndex) {
+        let Some(tagged) = self.arena.get_tagged_template(node) else {
+            return;
+        };
+
+        self.emit_expression(tagged.tag);
+        self.emit(tagged.template);
+    }
+
+    fn emit_tagged_template_expression_es5(&mut self, tagged: &crate::parser::thin_node::TaggedTemplateData, idx: NodeIndex) {
+        let Some(parts) = self.collect_template_parts(tagged.template) else {
+            self.emit_expression(tagged.tag);
+            self.emit(tagged.template);
+            return;
+        };
+
+        let temp_var = self.tagged_template_var_name(idx);
+
+        self.emit_expression(tagged.tag);
+        self.write("(");
+        self.write(&temp_var);
+        self.write(" || (");
+        self.write(&temp_var);
+        self.write(" = __makeTemplateObject(");
+        self.emit_string_array_literal(&parts.cooked);
+        self.write(", ");
+        self.emit_string_array_literal(&parts.raw);
+        self.write("))");
+        for expr in parts.expressions {
+            self.write(", ");
+            self.emit_expression(expr);
+        }
+        self.write(")");
+    }
 
     fn emit_template_expression(&mut self, node: &ThinNode) {
         let Some(tpl) = self.arena.get_template_expr(node) else {
@@ -3602,6 +5730,33 @@ impl<'a> ThinPrinter<'a> {
             self.write("`");
             self.write(&lit.text);
             self.write("`");
+        }
+    }
+
+    fn emit_template_literal_es5(&mut self, node: &ThinNode, idx: NodeIndex) -> bool {
+        match node.kind {
+            k if k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 => {
+                if let Some(lit) = self.arena.get_literal(node) {
+                    self.emit_string_literal_text(&lit.text);
+                    return true;
+                }
+                false
+            }
+            k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
+                if let Some(tpl) = self.arena.get_template_expr(node) {
+                    self.emit_template_expression_es5(tpl);
+                    return true;
+                }
+                false
+            }
+            k if k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION => {
+                if let Some(tagged) = self.arena.get_tagged_template(node) {
+                    self.emit_tagged_template_expression_es5(tagged, idx);
+                    return true;
+                }
+                false
+            }
+            _ => false,
         }
     }
 
@@ -3639,6 +5794,159 @@ impl<'a> ThinPrinter<'a> {
             self.write(&lit.text);
             self.write("`");
         }
+    }
+
+    fn emit_template_expression_es5(&mut self, tpl: &TemplateExprData) {
+        let head_text = self
+            .arena
+            .get(tpl.head)
+            .and_then(|node| self.arena.get_literal(node))
+            .map(|lit| lit.text.as_str())
+            .unwrap_or("");
+
+        self.write("(");
+        self.emit_string_literal_text(head_text);
+
+        for &span_idx in &tpl.template_spans.nodes {
+            let Some(span_node) = self.arena.get(span_idx) else {
+                continue;
+            };
+            let Some(span) = self.arena.get_template_span(span_node) else {
+                continue;
+            };
+
+            self.write(" + ");
+            self.write("(");
+            self.emit_expression(span.expression);
+            self.write(")");
+
+            let literal_text = self
+                .arena
+                .get(span.literal)
+                .and_then(|node| self.arena.get_literal(node))
+                .map(|lit| lit.text.as_str())
+                .unwrap_or("");
+            self.write(" + ");
+            self.emit_string_literal_text(literal_text);
+        }
+
+        self.write(")");
+    }
+
+    fn emit_string_array_literal(&mut self, parts: &[String]) {
+        let quote = if self.ctx.options.single_quote { '\'' } else { '"' };
+        self.write("[");
+        for (i, part) in parts.iter().enumerate() {
+            if i > 0 {
+                self.write(", ");
+            }
+            self.write_char(quote);
+            self.emit_escaped_string(part, quote);
+            self.write_char(quote);
+        }
+        self.write("]");
+    }
+
+    fn collect_template_parts(&self, template_idx: NodeIndex) -> Option<TemplateParts> {
+        let node = self.arena.get(template_idx)?;
+        match node.kind {
+            k if k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 => {
+                let cooked = self
+                    .arena
+                    .get_literal(node)
+                    .map(|lit| lit.text.clone())
+                    .unwrap_or_default();
+                let raw = self.template_raw_text(node, &cooked);
+                Some(TemplateParts {
+                    cooked: vec![cooked],
+                    raw: vec![raw],
+                    expressions: Vec::new(),
+                })
+            }
+            k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
+                let tpl = self.arena.get_template_expr(node)?;
+                let mut cooked = Vec::with_capacity(tpl.template_spans.nodes.len() + 1);
+                let mut raw = Vec::with_capacity(tpl.template_spans.nodes.len() + 1);
+                let mut expressions = Vec::with_capacity(tpl.template_spans.nodes.len());
+
+                let head_node = self.arena.get(tpl.head)?;
+                let head_text = self
+                    .arena
+                    .get_literal(head_node)
+                    .map(|lit| lit.text.clone())
+                    .unwrap_or_default();
+                let head_raw = self.template_raw_text(head_node, &head_text);
+                cooked.push(head_text);
+                raw.push(head_raw);
+
+                for &span_idx in &tpl.template_spans.nodes {
+                    let span_node = self.arena.get(span_idx)?;
+                    let span = self.arena.get_template_span(span_node)?;
+                    expressions.push(span.expression);
+
+                    let literal_node = self.arena.get(span.literal)?;
+                    let literal_text = self
+                        .arena
+                        .get_literal(literal_node)
+                        .map(|lit| lit.text.clone())
+                        .unwrap_or_default();
+                    let literal_raw = self.template_raw_text(literal_node, &literal_text);
+                    cooked.push(literal_text);
+                    raw.push(literal_raw);
+                }
+
+                Some(TemplateParts {
+                    cooked,
+                    raw,
+                    expressions,
+                })
+            }
+            _ => None,
+        }
+    }
+
+    fn template_raw_text(&self, node: &ThinNode, cooked_fallback: &str) -> String {
+        let Some(text) = self.source_text else {
+            return cooked_fallback.to_string();
+        };
+
+        let (skip_leading, allow_dollar_brace, allow_backtick) = match node.kind {
+            k if k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 => (1_usize, false, true),
+            k if k == SyntaxKind::TemplateHead as u16 => (1_usize, true, true),
+            k if k == SyntaxKind::TemplateMiddle as u16 => (1_usize, true, true),
+            k if k == SyntaxKind::TemplateTail as u16 => (1_usize, false, true),
+            _ => return cooked_fallback.to_string(),
+        };
+
+        let start = node.pos as usize;
+        if start >= text.len() {
+            return cooked_fallback.to_string();
+        }
+
+        let bytes = text.as_bytes();
+        let mut i = start + skip_leading;
+        while i < bytes.len() {
+            let ch = bytes[i];
+            if ch == b'\\' {
+                i += 1;
+                if i < bytes.len() {
+                    i += 1;
+                }
+                continue;
+            }
+
+            if allow_backtick && ch == b'`' {
+                return text[start + skip_leading..i].to_string();
+            }
+
+            if allow_dollar_brace && ch == b'$' && i + 1 < bytes.len() && bytes[i + 1] == b'{' {
+                return text[start + skip_leading..i].to_string();
+            }
+
+            i += 1;
+        }
+
+        cooked_fallback.to_string()
     }
 
     // =========================================================================
@@ -4093,11 +6401,35 @@ impl<'a> ThinPrinter<'a> {
             helpers.extends = true;
         }
 
+        if self.ctx.target_es5 && self.needs_values_helper() {
+            helpers.values = true;
+        }
+        if self.ctx.target_es5 && self.needs_rest_helper() {
+            helpers.rest = true;
+        }
+        if self.ctx.target_es5 && self.needs_async_helpers() {
+            helpers.awaiter = true;
+            helpers.generator = true;
+        }
+        if self.ctx.target_es5 && self.needs_make_template_object_helper() {
+            helpers.make_template_object = true;
+        }
+
         // Emit all needed helpers
         let helpers_code = crate::transforms::helpers::emit_helpers(&helpers);
         if !helpers_code.is_empty() {
             self.write(&helpers_code);
             // emit_helpers() already adds newlines, no need to add more
+        }
+
+        if self.ctx.target_es5 {
+            let template_vars = self.collect_tagged_template_vars();
+            if !template_vars.is_empty() {
+                self.write("var ");
+                self.write(&template_vars.join(", "));
+                self.write(";");
+                self.write_line();
+            }
         }
 
         // CommonJS: Emit __esModule and exports initialization (AFTER helpers)
@@ -4183,60 +6515,71 @@ impl<'a> ThinPrinter<'a> {
         false
     }
 
-    /// Check if a file is a module (has import/export statements)
+    /// Check if a file is a runtime module (has value imports/exports).
     fn file_is_module(&self, statements: &NodeList) -> bool {
         for &stmt_idx in &statements.nodes {
             if let Some(node) = self.arena.get(stmt_idx) {
                 match node.kind {
-                    k if k == syntax_kind_ext::IMPORT_DECLARATION => return true,
-                    k if k == syntax_kind_ext::EXPORT_DECLARATION => return true,
+                    k if k == syntax_kind_ext::IMPORT_DECLARATION
+                        || k == syntax_kind_ext::IMPORT_EQUALS_DECLARATION =>
+                    {
+                        if let Some(import_decl) = self.arena.get_import_decl(node) {
+                            if self.import_decl_has_runtime_value(import_decl) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::EXPORT_DECLARATION => {
+                        if let Some(export_decl) = self.arena.get_export_decl(node) {
+                            if self.export_decl_has_runtime_value(export_decl) {
+                                return true;
+                            }
+                        }
+                    }
                     k if k == syntax_kind_ext::EXPORT_ASSIGNMENT => return true,
                     // Check for export modifier on declarations
                     k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
                         if let Some(var_stmt) = self.arena.get_variable(node) {
-                            if self.has_export_modifier(&var_stmt.modifiers) {
+                            if self.has_export_modifier(&var_stmt.modifiers)
+                                && !self.has_declare_modifier(&var_stmt.modifiers)
+                            {
                                 return true;
                             }
                         }
                     }
                     k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
                         if let Some(func) = self.arena.get_function(node) {
-                            if self.has_export_modifier(&func.modifiers) {
+                            if self.has_export_modifier(&func.modifiers)
+                                && !self.has_declare_modifier(&func.modifiers)
+                            {
                                 return true;
                             }
                         }
                     }
                     k if k == syntax_kind_ext::CLASS_DECLARATION => {
                         if let Some(class) = self.arena.get_class(node) {
-                            if self.has_export_modifier(&class.modifiers) {
+                            if self.has_export_modifier(&class.modifiers)
+                                && !self.has_declare_modifier(&class.modifiers)
+                            {
                                 return true;
                             }
                         }
                     }
                     k if k == syntax_kind_ext::ENUM_DECLARATION => {
                         if let Some(enum_decl) = self.arena.get_enum(node) {
-                            if self.has_export_modifier(&enum_decl.modifiers) {
-                                return true;
-                            }
-                        }
-                    }
-                    k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
-                        if let Some(iface) = self.arena.get_interface(node) {
-                            if self.has_export_modifier(&iface.modifiers) {
-                                return true;
-                            }
-                        }
-                    }
-                    k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
-                        if let Some(type_alias) = self.arena.get_type_alias(node) {
-                            if self.has_export_modifier(&type_alias.modifiers) {
+                            if self.has_export_modifier(&enum_decl.modifiers)
+                                && !self.has_declare_modifier(&enum_decl.modifiers)
+                                && !self.has_modifier(&enum_decl.modifiers, SyntaxKind::ConstKeyword as u16)
+                            {
                                 return true;
                             }
                         }
                     }
                     k if k == syntax_kind_ext::MODULE_DECLARATION => {
                         if let Some(module) = self.arena.get_module(node) {
-                            if self.has_export_modifier(&module.modifiers) {
+                            if self.has_export_modifier(&module.modifiers)
+                                && !self.has_declare_modifier(&module.modifiers)
+                            {
                                 return true;
                             }
                         }
@@ -4246,6 +6589,130 @@ impl<'a> ThinPrinter<'a> {
             }
         }
         false
+    }
+
+    fn import_decl_has_runtime_value(
+        &self,
+        import_decl: &crate::parser::thin_node::ImportDeclData,
+    ) -> bool {
+        if import_decl.import_clause.is_none() {
+            return true;
+        }
+
+        let Some(clause_node) = self.arena.get(import_decl.import_clause) else {
+            return true;
+        };
+
+        if clause_node.kind != syntax_kind_ext::IMPORT_CLAUSE {
+            return self.import_equals_has_external_module(import_decl.module_specifier);
+        }
+
+        let Some(clause) = self.arena.get_import_clause(clause_node) else {
+            return true;
+        };
+
+        if clause.is_type_only {
+            return false;
+        }
+
+        if !clause.name.is_none() {
+            return true;
+        }
+
+        if clause.named_bindings.is_none() {
+            return false;
+        }
+
+        let Some(bindings_node) = self.arena.get(clause.named_bindings) else {
+            return false;
+        };
+
+        let Some(named) = self.arena.get_named_imports(bindings_node) else {
+            return true;
+        };
+
+        if !named.name.is_none() {
+            return true;
+        }
+
+        if named.elements.nodes.is_empty() {
+            return true;
+        }
+
+        for &spec_idx in &named.elements.nodes {
+            let Some(spec_node) = self.arena.get(spec_idx) else {
+                continue;
+            };
+            if let Some(spec) = self.arena.get_specifier(spec_node) {
+                if !spec.is_type_only {
+                    return true;
+                }
+            }
+        }
+
+        false
+    }
+
+    fn import_equals_has_external_module(&self, module_specifier: NodeIndex) -> bool {
+        if module_specifier.is_none() {
+            return false;
+        }
+
+        let Some(node) = self.arena.get(module_specifier) else {
+            return false;
+        };
+
+        node.kind == SyntaxKind::StringLiteral as u16
+    }
+
+    fn export_decl_has_runtime_value(
+        &self,
+        export_decl: &crate::parser::thin_node::ExportDeclData,
+    ) -> bool {
+        if export_decl.is_type_only {
+            return false;
+        }
+
+        if export_decl.is_default_export {
+            return true;
+        }
+
+        if export_decl.export_clause.is_none() {
+            return true;
+        }
+
+        let Some(clause_node) = self.arena.get(export_decl.export_clause) else {
+            return false;
+        };
+
+        if let Some(named) = self.arena.get_named_imports(clause_node) {
+            if !named.name.is_none() {
+                return true;
+            }
+
+            if named.elements.nodes.is_empty() {
+                return true;
+            }
+
+            for &spec_idx in &named.elements.nodes {
+                let Some(spec_node) = self.arena.get(spec_idx) else {
+                    continue;
+                };
+                if let Some(spec) = self.arena.get_specifier(spec_node) {
+                    if !spec.is_type_only {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        if self.export_clause_is_type_only(clause_node) {
+            return false;
+        }
+
+        true
     }
 
     /// Check if we should emit the __esModule marker.
@@ -4261,59 +6728,70 @@ impl<'a> ThinPrinter<'a> {
             }
         }
 
-        // Second check: look for ES6 module syntax
+        // Second check: look for runtime module syntax
         for &stmt_idx in &statements.nodes {
             if let Some(node) = self.arena.get(stmt_idx) {
                 match node.kind {
-                    k if k == syntax_kind_ext::IMPORT_DECLARATION => return true,
-                    k if k == syntax_kind_ext::EXPORT_DECLARATION => return true,
+                    k if k == syntax_kind_ext::IMPORT_DECLARATION
+                        || k == syntax_kind_ext::IMPORT_EQUALS_DECLARATION =>
+                    {
+                        if let Some(import_decl) = self.arena.get_import_decl(node) {
+                            if self.import_decl_has_runtime_value(import_decl) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::EXPORT_DECLARATION => {
+                        if let Some(export_decl) = self.arena.get_export_decl(node) {
+                            if self.export_decl_has_runtime_value(export_decl) {
+                                return true;
+                            }
+                        }
+                    }
                     // Note: EXPORT_ASSIGNMENT (export =) is excluded - it's CommonJS style
                     // Check for export modifier on declarations
                     k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
                         if let Some(var_stmt) = self.arena.get_variable(node) {
-                            if self.has_export_modifier(&var_stmt.modifiers) {
+                            if self.has_export_modifier(&var_stmt.modifiers)
+                                && !self.has_declare_modifier(&var_stmt.modifiers)
+                            {
                                 return true;
                             }
                         }
                     }
                     k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
                         if let Some(func) = self.arena.get_function(node) {
-                            if self.has_export_modifier(&func.modifiers) {
+                            if self.has_export_modifier(&func.modifiers)
+                                && !self.has_declare_modifier(&func.modifiers)
+                            {
                                 return true;
                             }
                         }
                     }
                     k if k == syntax_kind_ext::CLASS_DECLARATION => {
                         if let Some(class) = self.arena.get_class(node) {
-                            if self.has_export_modifier(&class.modifiers) {
+                            if self.has_export_modifier(&class.modifiers)
+                                && !self.has_declare_modifier(&class.modifiers)
+                            {
                                 return true;
                             }
                         }
                     }
                     k if k == syntax_kind_ext::ENUM_DECLARATION => {
                         if let Some(enum_decl) = self.arena.get_enum(node) {
-                            if self.has_export_modifier(&enum_decl.modifiers) {
+                            if self.has_export_modifier(&enum_decl.modifiers)
+                                && !self.has_declare_modifier(&enum_decl.modifiers)
+                                && !self.has_modifier(&enum_decl.modifiers, SyntaxKind::ConstKeyword as u16)
+                            {
                                 return true;
                             }
                         }
                     }
                     k if k == syntax_kind_ext::MODULE_DECLARATION => {
                         if let Some(module) = self.arena.get_module(node) {
-                            if self.has_export_modifier(&module.modifiers) {
-                                return true;
-                            }
-                        }
-                    }
-                    k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
-                        if let Some(iface) = self.arena.get_interface(node) {
-                            if self.has_export_modifier(&iface.modifiers) {
-                                return true;
-                            }
-                        }
-                    }
-                    k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
-                        if let Some(type_alias) = self.arena.get_type_alias(node) {
-                            if self.has_export_modifier(&type_alias.modifiers) {
+                            if self.has_export_modifier(&module.modifiers)
+                                && !self.has_declare_modifier(&module.modifiers)
+                            {
                                 return true;
                             }
                         }
@@ -4370,11 +6848,19 @@ impl<'a> ThinPrinter<'a> {
                         // Check for: import * as ns from "mod"
                         if let Some(clause_node) = self.arena.get(import.import_clause) {
                             if let Some(clause) = self.arena.get_import_clause(clause_node) {
+                                if clause.is_type_only {
+                                    continue;
+                                }
                                 if let Some(bindings_node) = self.arena.get(clause.named_bindings) {
                                     // NAMESPACE_IMPORT = 275
                                     if bindings_node.kind == syntax_kind_ext::NAMESPACE_IMPORT {
                                         helpers.import_star = true;
                                         helpers.create_binding = true; // __importStar depends on __createBinding
+                                    } else if let Some(named_imports) = self.arena.get_named_imports(bindings_node) {
+                                        if !named_imports.name.is_none() && named_imports.elements.nodes.is_empty() {
+                                            helpers.import_star = true;
+                                            helpers.create_binding = true;
+                                        }
                                     }
                                 }
                             }
@@ -4383,6 +6869,9 @@ impl<'a> ThinPrinter<'a> {
                 }
                 k if k == syntax_kind_ext::EXPORT_DECLARATION => {
                     if let Some(export) = self.arena.get_export_decl(node) {
+                        if export.is_type_only {
+                            continue;
+                        }
                         // Check for: export * from "mod" (module_specifier present, no export_clause)
                         if !export.module_specifier.is_none() && export.export_clause.is_none() {
                             helpers.export_star = true;
@@ -4403,6 +6892,78 @@ impl<'a> ThinPrinter<'a> {
             }
         }
         false
+    }
+
+    fn needs_values_helper(&self) -> bool {
+        self.arena.nodes.iter().any(|node| {
+            if node.kind != syntax_kind_ext::FOR_OF_STATEMENT {
+                return false;
+            }
+
+            if let Some(for_in_of) = self.arena.get_for_in_of(node) {
+                return !for_in_of.await_modifier;
+            }
+
+            false
+        })
+    }
+
+    fn needs_rest_helper(&self) -> bool {
+        self.arena.nodes.iter().any(|node| {
+            if node.kind != syntax_kind_ext::OBJECT_BINDING_PATTERN {
+                return false;
+            }
+
+            let Some(pattern) = self.arena.get_binding_pattern(node) else {
+                return false;
+            };
+
+            for &elem_idx in &pattern.elements.nodes {
+                let Some(elem_node) = self.arena.get(elem_idx) else { continue };
+                let Some(elem) = self.arena.get_binding_element(elem_node) else { continue };
+                if elem.dot_dot_dot_token {
+                    return true;
+                }
+            }
+
+            false
+        })
+    }
+
+    fn needs_async_helpers(&self) -> bool {
+        self.arena.nodes.iter().any(|node| {
+            if let Some(func) = self.arena.get_function(node) {
+                return func.is_async;
+            }
+
+            if node.kind == syntax_kind_ext::METHOD_DECLARATION {
+                if let Some(method) = self.arena.get_method_decl(node) {
+                    return self.has_modifier(&method.modifiers, SyntaxKind::AsyncKeyword as u16);
+                }
+            }
+
+            false
+        })
+    }
+
+    fn needs_make_template_object_helper(&self) -> bool {
+        self.arena.nodes.iter().any(|node| {
+            node.kind == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION
+        })
+    }
+
+    fn tagged_template_var_name(&self, idx: NodeIndex) -> String {
+        format!("__templateObject_{}", idx.0)
+    }
+
+    fn collect_tagged_template_vars(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+        for (idx, node) in self.arena.nodes.iter().enumerate() {
+            if node.kind == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION {
+                vars.push(self.tagged_template_var_name(NodeIndex(idx as u32)));
+            }
+        }
+        vars
     }
 
     /// Check if a statement contains a class that extends another (recursive)
@@ -4641,6 +7202,17 @@ impl<'a> ThinPrinter<'a> {
 // =============================================================================
 // Operator Text Helper
 // =============================================================================
+
+fn is_valid_identifier_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !(first == '_' || first == '$' || first.is_alphabetic()) {
+        return false;
+    }
+    chars.all(|ch| ch == '_' || ch == '$' || ch.is_alphanumeric())
+}
 
 fn get_operator_text(op: u16) -> &'static str {
     match op {

@@ -89,18 +89,106 @@ fn test_interner_intersection_normalization() {
 }
 
 #[test]
+fn test_interner_intersection_disjoint_primitives() {
+    let interner = TypeInterner::new();
+
+    let disjoint = interner.intersection(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(disjoint, TypeId::NEVER);
+
+    let literal = interner.literal_string("a");
+    let disjoint_literal = interner.intersection(vec![literal, TypeId::BOOLEAN]);
+    assert_eq!(disjoint_literal, TypeId::NEVER);
+}
+
+#[test]
+fn test_interner_intersection_disjoint_object_literals() {
+    let interner = TypeInterner::new();
+
+    let kind = interner.intern_string("kind");
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: kind,
+        type_id: interner.literal_string("a"),
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: kind,
+        type_id: interner.literal_string("b"),
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let disjoint = interner.intersection(vec![obj_a, obj_b]);
+    assert_eq!(disjoint, TypeId::NEVER);
+}
+
+#[test]
+fn test_interner_intersection_disjoint_object_literal_union() {
+    let interner = TypeInterner::new();
+
+    let kind = interner.intern_string("kind");
+    let union = interner.union(vec![
+        interner.literal_string("a"),
+        interner.literal_string("b"),
+    ]);
+    let obj_union = interner.object(vec![PropertyInfo {
+        name: kind,
+        type_id: union,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_c = interner.object(vec![PropertyInfo {
+        name: kind,
+        type_id: interner.literal_string("c"),
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let disjoint = interner.intersection(vec![obj_union, obj_c]);
+    assert_eq!(disjoint, TypeId::NEVER);
+}
+
+#[test]
+fn test_interner_intersection_optional_object_literals_not_reduced() {
+    let interner = TypeInterner::new();
+
+    let kind = interner.intern_string("kind");
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: kind,
+        type_id: interner.literal_string("a"),
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: kind,
+        type_id: interner.literal_string("b"),
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let intersection = interner.intersection(vec![obj_a, obj_b]);
+    assert_ne!(intersection, TypeId::NEVER);
+}
+
+#[test]
 fn test_interner_object_sorting() {
     let interner = TypeInterner::new();
     use std::sync::Arc;
 
     // Properties in different order should produce same TypeId
     let props1 = vec![
-        PropertyInfo { name: interner.intern_string("a"), type_id: TypeId::STRING, optional: false, readonly: false },
-        PropertyInfo { name: interner.intern_string("b"), type_id: TypeId::NUMBER, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("a"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("b"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ];
     let props2 = vec![
-        PropertyInfo { name: interner.intern_string("b"), type_id: TypeId::NUMBER, optional: false, readonly: false },
-        PropertyInfo { name: interner.intern_string("a"), type_id: TypeId::STRING, optional: false, readonly: false },
+        PropertyInfo { name: interner.intern_string("b"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("a"), type_id: TypeId::STRING, optional: false, readonly: false, is_method: false },
     ];
 
     let id1 = interner.object(props1);

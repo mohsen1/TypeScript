@@ -28,9 +28,15 @@ pub mod document_symbols;
 pub mod rename;
 pub mod semantic_tokens;
 pub mod code_actions;
+pub mod project;
+pub mod diagnostics;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod code_actions_tests;
+#[cfg(test)]
+mod project_tests;
 
 pub use definition::GoToDefinition;
 pub use references::FindReferences;
@@ -40,5 +46,10 @@ pub use signature_help::{SignatureHelpProvider, SignatureHelp, SignatureInformat
 pub use document_symbols::{DocumentSymbolProvider, DocumentSymbol, SymbolKind};
 pub use rename::{RenameProvider, WorkspaceEdit, TextEdit};
 pub use semantic_tokens::{SemanticTokensProvider, SemanticTokenType, semantic_token_modifiers};
-pub use code_actions::{CodeActionProvider, CodeAction, CodeActionKind, CodeActionContext};
+pub use code_actions::{
+    CodeActionProvider, CodeAction, CodeActionKind, CodeActionContext, ImportCandidate,
+    ImportCandidateKind,
+};
 pub use position::{Position, Location, SourceLocation, Range};
+pub use project::{Project, ProjectFile};
+pub use diagnostics::{LspDiagnostic, DiagnosticSeverity};

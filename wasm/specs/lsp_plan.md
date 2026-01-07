@@ -1,59 +1,32 @@
+# LSP Track Plan (Language Service)
 
-# Migration Plan: TypeScript Compiler → Rust via WebAssembly (LSP)
+## Mission
+Fast, correct LSP features for TS/TSX with minimal allocations and stable incremental behavior.
 
-## Vision
+## Scope
+Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
 
-Incrementally rewrite the TypeScript compiler in Rust, compiled to WebAssembly
-for seamless Node.js/browser interop. **Beat TypeScript-Go in performance.**
+## Current Status
+- Major features implemented (definitions, references, rename, organize imports, extract variable, signature help).
+- Remaining TODOs: JSDoc extraction, operator precedence in extract variable.
+- No incremental reparse or type cache reuse between edits.
 
+## Highest-Impact Next Tasks
+- [ ] Incremental file updates
+  - Add `Project::update_file` and reuse parsed arena + binder where possible.
+  - Cache `TypeCache` per file for hover/completions/diagnostics.
+- [ ] JSDoc extraction for signature help/hover
+  - Parse JSDoc blocks and attach to `SignatureInformation` and `Hover`.
+- [ ] Extract variable precedence fix
+  - Wrap selected expressions to preserve semantics.
+  - Add tests around binary/conditional expressions.
+- [ ] Type-aware completions
+  - Add member completions using `ThinCheckerState` + `format_type`.
+  - Include auto-import suggestions from project export index.
+- [ ] Performance instrumentation
+  - Measure per-request timing and memoize scope walkers.
 
-# Files
-
-src/lsp/ (New), src/thin_binder.rs
-
-# Goal
-
-"Go to Definition" and "Find References".
-
-## Tasks
-
-Our focus is to make wasm Language Service Protocol (LSP) complete
-
-- [ ] **Code Action: Organize Imports** (Sort-only first)
-- [ ] **Diagnostic Integration**: Surface Checker errors in LSP
-- [ ] **Multi-File Context**: Create `Project` struct to hold multiple source files
-
-#### Remaining Optimizations
-   - All major LSP performance optimizations complete!
-   - Future: Consider incremental re-parsing on edits
-
-3. **Add More LSP Features**
-   - Code actions (complete implementation)
-
-2. **Extend AST Coverage** (if needed)
-   - Add more expression types as needed (template literals, JSX, etc.)
-   - Add import/export handling for cross-file navigation
-
-3. **Multi-File Support**
-   - Extend to handle cross-file references
-   - Implement project-wide find references
-
-#### Testing
-
-All tests pass (691/691):
-```bash
-./wasm/test.sh  # ✅ All pass
-```
-
-## Quick Reference
-
-```bash
-# Tests (Docker)
-./wasm/test.sh
-
-# Baseline comparison
-node scripts/baseline-test-rust.mjs
-
-# Build WASM
-./wasm/build-wasm.sh
-```
+## Success Criteria
+- Edits <50ms for medium projects.
+- Correct docs and signatures for overloaded functions.
+- Stable rename/organize imports across files.

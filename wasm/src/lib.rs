@@ -53,6 +53,10 @@ mod thin_emitter_tests;
 mod emitter_edge_case_tests;
 #[cfg(test)]
 mod emitter_transform_integration_tests;
+#[cfg(test)]
+mod transform_api_tests;
+#[cfg(test)]
+mod emitter_parity_tests;
 
 
 // Parallel processing with Rayon (Phase 0.4)
@@ -94,6 +98,10 @@ pub mod solver;
 // LSP (Language Server Protocol) support
 pub mod lsp;
 
+// Native CLI (non-wasm targets only)
+#[cfg(not(target_arch = "wasm32"))]
+pub mod cli;
+
 // =============================================================================
 // Scanner Factory Function
 // =============================================================================
@@ -120,17 +128,79 @@ pub fn create_binder() -> binder::BinderState {
 // ThinParser WASM Interface (High-Performance Parser)
 // =============================================================================
 
+use crate::emit_context::EmitContext;
+use crate::lowering_pass::LoweringPass;
 use crate::thin_parser::ThinParserState;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
-use crate::thin_emitter::ThinPrinter;
+use crate::thin_emitter::{ModuleKind, PrinterOptions, ScriptTarget, ThinPrinter};
+use crate::transform_context::TransformContext;
 use crate::solver::TypeInterner;
 use crate::lsp::position::{LineMap, Position, Range};
 use crate::lsp::{
     GoToDefinition, FindReferences, Completions, HoverProvider, SignatureHelpProvider,
     DocumentSymbolProvider, RenameProvider, SemanticTokensProvider, CodeActionProvider,
-    CodeActionContext,
+    CodeActionContext, ImportCandidate, ImportCandidateKind,
 };
+use crate::lsp::diagnostics::convert_diagnostic;
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ImportCandidateInput {
+    module_specifier: String,
+    local_name: String,
+    kind: String,
+    export_name: Option<String>,
+    #[serde(default)]
+    is_type_only: bool,
+}
+
+impl TryFrom<ImportCandidateInput> for ImportCandidate {
+    type Error = JsValue;
+
+    fn try_from(input: ImportCandidateInput) -> Result<Self, Self::Error> {
+        let local_name = input.local_name;
+        let kind = match input.kind.as_str() {
+            "named" => {
+                let export_name = input.export_name.unwrap_or_else(|| local_name.clone());
+                ImportCandidateKind::Named { export_name }
+            }
+            "default" => ImportCandidateKind::Default,
+            "namespace" => ImportCandidateKind::Namespace,
+            other => {
+                return Err(JsValue::from_str(&format!(
+                    "Unsupported import candidate kind: {}",
+                    other
+                )));
+            }
+        };
+
+        Ok(ImportCandidate {
+            module_specifier: input.module_specifier,
+            local_name,
+            kind,
+            is_type_only: input.is_type_only,
+        })
+    }
+}
+
+/// Opaque wrapper for transform directives across the wasm boundary.
+#[wasm_bindgen]
+pub struct WasmTransformContext {
+    inner: TransformContext,
+    target_es5: bool,
+    module_kind: ModuleKind,
+}
+
+#[wasm_bindgen]
+impl WasmTransformContext {
+    /// Get the number of transform directives generated.
+    #[wasm_bindgen(js_name = getCount)]
+    pub fn get_count(&self) -> usize {
+        self.inner.len()
+    }
+}
 
 /// High-performance parser using ThinNode architecture (16 bytes/node).
 /// This is the optimized path for Phase 8 test suite evaluation.
@@ -233,27 +303,41 @@ impl ThinParser {
 
         if let (Some(root_idx), Some(binder)) = (self.source_file_idx, &self.binder) {
             let file_name = self.parser.get_file_name().to_string();
-            let mut checker = ThinCheckerState::new(
-                self.parser.get_arena(),
-                binder,
-                &self.type_interner,
-                file_name,
-            );
+            let mut checker = if let Some(cache) = self.type_cache.take() {
+                ThinCheckerState::with_cache(
+                    self.parser.get_arena(),
+                    binder,
+                    &self.type_interner,
+                    file_name,
+                    cache,
+                )
+            } else {
+                ThinCheckerState::new(
+                    self.parser.get_arena(),
+                    binder,
+                    &self.type_interner,
+                    file_name,
+                )
+            };
 
             // Full source file type checking - traverse all statements
             checker.check_source_file(root_idx);
 
+            let diagnostics = checker.ctx.diagnostics.iter().map(|d| {
+                serde_json::json!({
+                    "message_text": d.message_text.clone(),
+                    "code": d.code,
+                    "start": d.start,
+                    "length": d.length,
+                    "category": format!("{:?}", d.category),
+                })
+            }).collect::<Vec<_>>();
+
+            self.type_cache = Some(checker.extract_cache());
+
             let result = serde_json::json!({
                 "typeCount": self.type_interner.len(),
-                "diagnostics": checker.ctx.diagnostics.iter().map(|d| {
-                    serde_json::json!({
-                        "message_text": d.message_text.clone(),
-                        "code": d.code,
-                        "start": d.start,
-                        "length": d.length,
-                        "category": format!("{:?}", d.category),
-                    })
-                }).collect::<Vec<_>>(),
+                "diagnostics": diagnostics,
             });
 
             serde_json::to_string(&result).unwrap_or_else(|_| "{}".to_string())
@@ -267,16 +351,28 @@ impl ThinParser {
     pub fn get_type_of_node(&mut self, node_idx: u32) -> String {
         if let (Some(_), Some(binder)) = (self.source_file_idx, &self.binder) {
             let file_name = self.parser.get_file_name().to_string();
-            let mut checker = ThinCheckerState::new(
-                self.parser.get_arena(),
-                binder,
-                &self.type_interner,
-                file_name,
-            );
+            let mut checker = if let Some(cache) = self.type_cache.take() {
+                ThinCheckerState::with_cache(
+                    self.parser.get_arena(),
+                    binder,
+                    &self.type_interner,
+                    file_name,
+                    cache,
+                )
+            } else {
+                ThinCheckerState::new(
+                    self.parser.get_arena(),
+                    binder,
+                    &self.type_interner,
+                    file_name,
+                )
+            };
 
             let type_id = checker.get_type_of_node(parser::NodeIndex(node_idx));
             // Use format_type for human-readable output
-            checker.format_type(type_id)
+            let result = checker.format_type(type_id);
+            self.type_cache = Some(checker.extract_cache());
+            result
         } else {
             "unknown".to_string()
         }
@@ -286,13 +382,13 @@ impl ThinParser {
     #[wasm_bindgen(js_name = emit)]
     pub fn emit(&self) -> String {
         if let Some(root_idx) = self.source_file_idx {
-            let mut printer = ThinPrinter::new(self.parser.get_arena());
-            printer.set_target_es5(true); // Match TypeScript baselines
-            // Detect if file is a module and apply CommonJS transform
-            printer.set_auto_detect_module(true);
-            printer.set_source_text(self.parser.get_source_text());
-            printer.emit(root_idx);
-            printer.get_output().to_string()
+            let mut options = PrinterOptions::default();
+            options.target = ScriptTarget::ES5;
+
+            let mut ctx = EmitContext::with_options(options);
+            ctx.auto_detect_module = true;
+
+            self.emit_with_context(root_idx, ctx)
         } else {
             String::new()
         }
@@ -302,8 +398,90 @@ impl ThinParser {
     #[wasm_bindgen(js_name = emitModern)]
     pub fn emit_modern(&self) -> String {
         if let Some(root_idx) = self.source_file_idx {
-            // Use new_es6 to avoid downleveling to ES5
-            let mut printer = ThinPrinter::new_es6(self.parser.get_arena());
+            let mut options = PrinterOptions::default();
+            options.target = ScriptTarget::ES2015;
+
+            let ctx = EmitContext::with_options(options);
+
+            self.emit_with_context(root_idx, ctx)
+        } else {
+            String::new()
+        }
+    }
+
+    fn emit_with_context(&self, root_idx: parser::NodeIndex, ctx: EmitContext) -> String {
+        let transforms = LoweringPass::new(self.parser.get_arena(), &ctx).run(root_idx);
+
+        let mut printer = ThinPrinter::with_transforms_and_options(
+            self.parser.get_arena(),
+            transforms,
+            ctx.options.clone(),
+        );
+        printer.set_target_es5(ctx.target_es5);
+        printer.set_auto_detect_module(ctx.auto_detect_module);
+        printer.set_source_text(self.parser.get_source_text());
+        printer.emit(root_idx);
+        printer.get_output().to_string()
+    }
+
+    /// Generate transform directives based on compiler options.
+    #[wasm_bindgen(js_name = generateTransforms)]
+    pub fn generate_transforms(&self, target: u32, module: u32) -> WasmTransformContext {
+        let mut options = PrinterOptions::default();
+        options.target = match target {
+            0 => ScriptTarget::ES3,
+            1 => ScriptTarget::ES5,
+            2 => ScriptTarget::ES2015,
+            3 => ScriptTarget::ES2016,
+            4 => ScriptTarget::ES2017,
+            5 => ScriptTarget::ES2018,
+            6 => ScriptTarget::ES2019,
+            7 => ScriptTarget::ES2020,
+            8 => ScriptTarget::ES2021,
+            9 => ScriptTarget::ES2022,
+            _ => ScriptTarget::ESNext,
+        };
+        options.module = match module {
+            0 => ModuleKind::None,
+            1 => ModuleKind::CommonJS,
+            2 => ModuleKind::AMD,
+            3 => ModuleKind::UMD,
+            4 => ModuleKind::System,
+            5 => ModuleKind::ES2015,
+            6 => ModuleKind::ES2020,
+            7 => ModuleKind::ES2022,
+            99 => ModuleKind::ESNext,
+            100 => ModuleKind::Node16,
+            199 => ModuleKind::NodeNext,
+            _ => ModuleKind::None,
+        };
+
+        let ctx = EmitContext::with_options(options);
+        let transforms = if let Some(root_idx) = self.source_file_idx {
+            let lowering = LoweringPass::new(self.parser.get_arena(), &ctx);
+            lowering.run(root_idx)
+        } else {
+            TransformContext::new()
+        };
+
+        WasmTransformContext {
+            inner: transforms,
+            target_es5: ctx.target_es5,
+            module_kind: ctx.options.module,
+        }
+    }
+
+    /// Emit the source file using pre-computed transforms.
+    #[wasm_bindgen(js_name = emitWithTransforms)]
+    pub fn emit_with_transforms(&self, context: &WasmTransformContext) -> String {
+        if let Some(root_idx) = self.source_file_idx {
+            let mut printer = ThinPrinter::with_transforms(
+                self.parser.get_arena(),
+                context.inner.clone(),
+            );
+            printer.set_target_es5(context.target_es5);
+            printer.set_module_kind(context.module_kind);
+            printer.set_source_text(self.parser.get_source_text());
             printer.emit(root_idx);
             printer.get_output().to_string()
         } else {
@@ -354,8 +532,9 @@ impl ThinParser {
         let binder = self.binder.as_ref().unwrap();
         let line_map = self.line_map.as_ref().unwrap();
         let file_name = self.parser.get_file_name().to_string();
+        let source_text = self.parser.get_source_text();
 
-        let provider = GoToDefinition::new(self.parser.get_arena(), binder, line_map, file_name);
+        let provider = GoToDefinition::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
         let pos = Position::new(line, character);
 
         let result = provider.get_definition(root, pos);
@@ -372,8 +551,9 @@ impl ThinParser {
         let binder = self.binder.as_ref().unwrap();
         let line_map = self.line_map.as_ref().unwrap();
         let file_name = self.parser.get_file_name().to_string();
+        let source_text = self.parser.get_source_text();
 
-        let provider = FindReferences::new(self.parser.get_arena(), binder, line_map, file_name);
+        let provider = FindReferences::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
         let pos = Position::new(line, character);
 
         let result = provider.find_references(root, pos);
@@ -389,8 +569,9 @@ impl ThinParser {
         let root = self.source_file_idx.unwrap();
         let binder = self.binder.as_ref().unwrap();
         let line_map = self.line_map.as_ref().unwrap();
+        let source_text = self.parser.get_source_text();
 
-        let provider = Completions::new(self.parser.get_arena(), binder, line_map);
+        let provider = Completions::new(self.parser.get_arena(), binder, line_map, source_text);
         let pos = Position::new(line, character);
 
         let result = provider.get_completions(root, pos);
@@ -457,8 +638,9 @@ impl ThinParser {
 
         let root = self.source_file_idx.unwrap();
         let line_map = self.line_map.as_ref().unwrap();
+        let source_text = self.parser.get_source_text();
 
-        let provider = DocumentSymbolProvider::new(self.parser.get_arena(), line_map);
+        let provider = DocumentSymbolProvider::new(self.parser.get_arena(), line_map, source_text);
 
         let result = provider.get_document_symbols(root);
         Ok(serde_wasm_bindgen::to_value(&result)?)
@@ -473,8 +655,9 @@ impl ThinParser {
         let root = self.source_file_idx.unwrap();
         let binder = self.binder.as_ref().unwrap();
         let line_map = self.line_map.as_ref().unwrap();
+        let source_text = self.parser.get_source_text();
 
-        let mut provider = SemanticTokensProvider::new(self.parser.get_arena(), binder, line_map);
+        let mut provider = SemanticTokensProvider::new(self.parser.get_arena(), binder, line_map, source_text);
 
         Ok(provider.get_semantic_tokens(root))
     }
@@ -488,8 +671,9 @@ impl ThinParser {
         let binder = self.binder.as_ref().unwrap();
         let line_map = self.line_map.as_ref().unwrap();
         let file_name = self.parser.get_file_name().to_string();
+        let source_text = self.parser.get_source_text();
 
-        let provider = RenameProvider::new(self.parser.get_arena(), binder, line_map, file_name);
+        let provider = RenameProvider::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
         let pos = Position::new(line, character);
 
         let result = provider.prepare_rename(pos);
@@ -506,8 +690,9 @@ impl ThinParser {
         let binder = self.binder.as_ref().unwrap();
         let line_map = self.line_map.as_ref().unwrap();
         let file_name = self.parser.get_file_name().to_string();
+        let source_text = self.parser.get_source_text();
 
-        let provider = RenameProvider::new(self.parser.get_arena(), binder, line_map, file_name);
+        let provider = RenameProvider::new(self.parser.get_arena(), binder, line_map, file_name, source_text);
         let pos = Position::new(line, character);
 
         match provider.provide_rename_edits(root, pos, new_name) {
@@ -542,12 +727,122 @@ impl ThinParser {
         );
 
         let context = CodeActionContext {
-            diagnostics: Vec::new(), // TODO: Pass diagnostics from checker
+            diagnostics: Vec::new(),
             only: None,
+            import_candidates: Vec::new(),
         };
 
         let result = provider.provide_code_actions(root, range, context);
         Ok(serde_wasm_bindgen::to_value(&result)?)
+    }
+
+    /// Code Actions: Get code actions for a range with diagnostics context.
+    #[wasm_bindgen(js_name = getCodeActionsWithContext)]
+    pub fn get_code_actions_with_context(
+        &mut self,
+        start_line: u32,
+        start_char: u32,
+        end_line: u32,
+        end_char: u32,
+        diagnostics: JsValue,
+        only: JsValue,
+        import_candidates: JsValue,
+    ) -> Result<JsValue, JsValue> {
+        self.ensure_bound()?;
+        self.ensure_line_map();
+
+        let diagnostics = if diagnostics.is_null() || diagnostics.is_undefined() {
+            Vec::new()
+        } else {
+            serde_wasm_bindgen::from_value(diagnostics)?
+        };
+
+        let only = if only.is_null() || only.is_undefined() {
+            None
+        } else {
+            Some(serde_wasm_bindgen::from_value(only)?)
+        };
+
+        let import_candidates = if import_candidates.is_null() || import_candidates.is_undefined() {
+            Vec::new()
+        } else {
+            let inputs: Vec<ImportCandidateInput> = serde_wasm_bindgen::from_value(import_candidates)?;
+            inputs
+                .into_iter()
+                .map(ImportCandidate::try_from)
+                .collect::<Result<Vec<_>, _>>()?
+        };
+
+        let root = self.source_file_idx.unwrap();
+        let binder = self.binder.as_ref().unwrap();
+        let line_map = self.line_map.as_ref().unwrap();
+        let file_name = self.parser.get_file_name().to_string();
+        let source_text = self.parser.get_source_text();
+
+        let provider = CodeActionProvider::new(
+            self.parser.get_arena(),
+            binder,
+            line_map,
+            file_name,
+            source_text,
+        );
+
+        let range = Range::new(
+            Position::new(start_line, start_char),
+            Position::new(end_line, end_char),
+        );
+
+        let context = CodeActionContext {
+            diagnostics,
+            only,
+            import_candidates,
+        };
+
+        let result = provider.provide_code_actions(root, range, context);
+        Ok(serde_wasm_bindgen::to_value(&result)?)
+    }
+
+    /// Diagnostics: Get checker diagnostics in LSP format.
+    #[wasm_bindgen(js_name = getLspDiagnostics)]
+    pub fn get_lsp_diagnostics(&mut self) -> Result<JsValue, JsValue> {
+        self.ensure_bound()?;
+        self.ensure_line_map();
+
+        let root = self.source_file_idx.unwrap();
+        let binder = self.binder.as_ref().unwrap();
+        let line_map = self.line_map.as_ref().unwrap();
+        let file_name = self.parser.get_file_name().to_string();
+        let source_text = self.parser.get_source_text();
+
+        let mut checker = if let Some(cache) = self.type_cache.take() {
+            ThinCheckerState::with_cache(
+                self.parser.get_arena(),
+                binder,
+                &self.type_interner,
+                file_name.clone(),
+                cache,
+            )
+        } else {
+            ThinCheckerState::new(
+                self.parser.get_arena(),
+                binder,
+                &self.type_interner,
+                file_name.clone(),
+            )
+        };
+
+        checker.check_source_file(root);
+
+        let lsp_diagnostics: Vec<_> = checker
+            .ctx
+            .diagnostics
+            .iter()
+            .map(|diag| convert_diagnostic(diag, line_map, source_text))
+            .collect();
+
+        self.type_cache = Some(checker.extract_cache());
+
+        Ok(serde_wasm_bindgen::to_value(&lsp_diagnostics)?)
     }
 }
 
@@ -571,15 +866,6 @@ pub enum Comparison {
     LessThan = -1,
     EqualTo = 0,
     GreaterThan = 1,
-}
-
-// =============================================================================
-// POC function (keep for verification)
-// =============================================================================
-
-#[wasm_bindgen]
-pub fn add(a: i32, b: i32) -> i32 {
-    a + b
 }
 
 // =============================================================================

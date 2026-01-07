@@ -6,8 +6,11 @@
 
 use crate::emit_context::EmitContext;
 use crate::lowering_pass::LoweringPass;
+use crate::parser::NodeIndex;
+use crate::scanner::SyntaxKind;
 use crate::thin_emitter::ThinPrinter;
 use crate::thin_parser::ThinParserState;
+use crate::transform_context::{TransformContext, TransformDirective};
 
 #[test]
 fn test_two_phase_emission_es5_class() {
@@ -91,6 +94,618 @@ fn test_two_phase_emission_es6_class_no_transform() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_try_throw_parenthesized() {
+    let source = "class Foo { method() { try { throw new Error(\"x\"); } catch (e) { return (e); } } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("try {"),
+        "ES5 output should contain try block: {}",
+        output
+    );
+    assert!(
+        output.contains("throw new Error(\"x\")"),
+        "ES5 output should contain throw statement: {}",
+        output
+    );
+    assert!(
+        output.contains("catch (e)"),
+        "ES5 output should contain catch clause: {}",
+        output
+    );
+    assert!(
+        output.contains("return (e);"),
+        "ES5 output should preserve parenthesized return: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_template_literal_downlevel() {
+    let source = "class Foo { method(name) { return `hi ${name}`; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let source_text = parser.get_source_text().to_string();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.set_source_text(&source_text);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("\"hi \""),
+        "ES5 class output should emit string literal head: {}",
+        output
+    );
+    assert!(
+        output.contains("+ (name)"),
+        "ES5 class output should concatenate template expression: {}",
+        output
+    );
+    assert!(
+        !output.contains('`'),
+        "ES5 class output should not emit backticks: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_tagged_template_downlevel() {
+    let source = "class Foo { method(name) { return tag`hi ${name}`; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let source_text = parser.get_source_text().to_string();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.set_source_text(&source_text);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__makeTemplateObject"),
+        "ES5 class output should emit __makeTemplateObject helper: {}",
+        output
+    );
+    assert!(
+        output.contains("tag(__templateObject_"),
+        "ES5 class output should call tag with template object cache: {}",
+        output
+    );
+    assert!(
+        !output.contains('`'),
+        "ES5 class output should not emit backticks: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_for_destructuring() {
+    let source = "class Foo { method(obj) { for (var { x, y } = obj; ; ) { return x + y; } } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("for (var _a = obj, x = _a.x, y = _a.y;"),
+        "ES5 output should destructure for-loop initializer: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_object_rest_param() {
+    let source = "class Foo { method({ x, ...rest }) { return rest; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var __rest"),
+        "ES5 output should include __rest helper: {}",
+        output
+    );
+    assert!(
+        output.contains("rest = __rest(_a, [\"x\"])"),
+        "ES5 output should downlevel object rest parameter: {}",
+        output
+    );
+}
+
+#[test]
+fn test_lowering_pass_es5_object_literal_directive() {
+    let source = "const obj = { a: 1, [key]: 2 };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let stmt_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected variable statement");
+    let stmt_node = arena.get(stmt_idx).expect("expected variable node");
+    let var_stmt = arena
+        .get_variable(stmt_node)
+        .expect("expected variable statement data");
+    let decl_list_idx = *var_stmt
+        .declarations
+        .nodes
+        .first()
+        .expect("expected declaration list");
+    let decl_list_node = arena.get(decl_list_idx).expect("expected declaration list node");
+    let decl_list = arena
+        .get_variable(decl_list_node)
+        .expect("expected declaration list data");
+    let decl_idx = *decl_list
+        .declarations
+        .nodes
+        .first()
+        .expect("expected variable declaration");
+    let decl_node = arena.get(decl_idx).expect("expected declaration node");
+    let decl = arena
+        .get_variable_declaration(decl_node)
+        .expect("expected declaration data");
+
+    let directive = transforms.get(decl.initializer);
+    assert!(
+        matches!(directive, Some(TransformDirective::ES5ObjectLiteral { .. })),
+        "LoweringPass should emit ES5ObjectLiteral directive for computed property"
+    );
+}
+
+#[test]
+fn test_lowering_pass_es5_template_literal_directive() {
+    let source = "const msg = `hi ${name}`; const plain = `bye`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut template_expr = None;
+    let mut no_sub = None;
+    for (idx, node) in arena.nodes.iter().enumerate() {
+        let node_idx = NodeIndex(idx as u32);
+        if node.kind == crate::parser::syntax_kind_ext::TEMPLATE_EXPRESSION {
+            template_expr = Some(node_idx);
+        } else if node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16 {
+            no_sub = Some(node_idx);
+        }
+    }
+
+    let template_expr = template_expr.expect("expected template expression node");
+    let no_sub = no_sub.expect("expected no-substitution template node");
+
+    assert!(
+        matches!(
+            transforms.get(template_expr),
+            Some(TransformDirective::ES5TemplateLiteral { .. })
+        ),
+        "LoweringPass should emit ES5TemplateLiteral directive for template expression"
+    );
+    assert!(
+        matches!(
+            transforms.get(no_sub),
+            Some(TransformDirective::ES5TemplateLiteral { .. })
+        ),
+        "LoweringPass should emit ES5TemplateLiteral directive for no-substitution template"
+    );
+}
+
+#[test]
+fn test_lowering_pass_es5_variable_declaration_list_directive() {
+    let source = "let { x, y } = obj;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let stmt_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected variable statement");
+    let stmt_node = arena.get(stmt_idx).expect("expected variable node");
+    let var_stmt = arena
+        .get_variable(stmt_node)
+        .expect("expected variable statement data");
+    let decl_list_idx = *var_stmt
+        .declarations
+        .nodes
+        .first()
+        .expect("expected declaration list");
+
+    let directive = transforms.get(decl_list_idx);
+    assert!(
+        matches!(
+            directive,
+            Some(TransformDirective::ES5VariableDeclarationList { .. })
+        ),
+        "LoweringPass should emit ES5VariableDeclarationList directive for destructuring"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_variable_declaration_list_uses_var() {
+    let source = "let x = 1; const y = 2;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var x = 1;"),
+        "ES5 output should emit var for let: {}",
+        output
+    );
+    assert!(
+        output.contains("var y = 2;"),
+        "ES5 output should emit var for const: {}",
+        output
+    );
+}
+
+#[test]
+fn test_lowering_pass_es5_function_parameters_directive() {
+    let source = "function foo(x = 1) { return x; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let func_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected function declaration");
+
+    let directive = transforms.get(func_idx);
+    assert!(
+        matches!(
+            directive,
+            Some(TransformDirective::ES5FunctionParameters { .. })
+        ),
+        "LoweringPass should emit ES5FunctionParameters directive for default params"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_object_literal_computed() {
+    let source = "const obj = { a: 1, [key]: 2 };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("[key] = 2"),
+        "ES5 output should lower computed property assignment: {}",
+        output
+    );
+    assert!(
+        output.contains("= { a: 1 }"),
+        "ES5 output should keep base object literal: {}",
+        output
+    );
+    assert!(
+        !output.contains("[key]:"),
+        "ES5 output should not keep computed property syntax: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_variable_destructuring() {
+    let source = "let { x, y } = obj;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var _a = obj"),
+        "ES5 output should introduce temp for destructuring: {}",
+        output
+    );
+    assert!(
+        output.contains("x = _a.x"),
+        "ES5 output should assign destructured properties: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_function_parameters_downlevel() {
+    let source = "function foo(x = 1) { return x; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("if (x === void 0) { x = 1; }"),
+        "ES5 output should downlevel default parameters: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_object_literal_shorthand_method() {
+    let source = "var x = 1; var obj = { x, method(y = 1) { return y + x; } };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("x: x"),
+        "ES5 output should expand shorthand properties: {}",
+        output
+    );
+    assert!(
+        output.contains("method: function"),
+        "ES5 output should downlevel object literal methods: {}",
+        output
+    );
+    assert!(
+        output.contains("if (y === void 0) { y = 1; }"),
+        "ES5 output should downlevel default parameters: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_for_in_of() {
+    let source = "class Foo { method(obj, arr) { for (var k in obj) { k; } for (var v of arr) { v; } } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("for (var k in obj)"),
+        "ES5 output should contain for-in loop: {}",
+        output
+    );
+    assert!(
+        output.contains("__values(arr)"),
+        "ES5 output should downlevel for-of with __values helper: {}",
+        output
+    );
+    assert!(
+        output.contains("var v ="),
+        "ES5 output should bind iterator values: {}",
+        output
+    );
+    assert!(
+        output.contains(".return"),
+        "ES5 output should close iterators: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_for_of_statement() {
+    let source = "for (var v of arr) { v; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__values(arr)"),
+        "ES5 output should downlevel for-of with __values helper: {}",
+        output
+    );
+    assert!(
+        output.contains(".return"),
+        "ES5 output should close iterators: {}",
+        output
+    );
+    assert!(
+        !output.contains("for (var v of arr)"),
+        "ES5 output should not contain raw for-of: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_switch_break_continue_do() {
+    let source = "class Foo { method(x) { while (x) { continue; } switch (x) { case 1: break; default: return; } do { x--; } while (x); } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("while (x)"),
+        "ES5 output should contain while loop: {}",
+        output
+    );
+    assert!(
+        output.contains("continue;"),
+        "ES5 output should contain continue statement: {}",
+        output
+    );
+    assert!(
+        output.contains("switch (x)"),
+        "ES5 output should contain switch statement: {}",
+        output
+    );
+    assert!(
+        output.contains("case 1:"),
+        "ES5 output should contain case clause: {}",
+        output
+    );
+    assert!(
+        output.contains("break;"),
+        "ES5 output should contain break statement: {}",
+        output
+    );
+    assert!(
+        output.contains("default:"),
+        "ES5 output should contain default clause: {}",
+        output
+    );
+    assert!(
+        output.contains("return;"),
+        "ES5 output should contain return statement: {}",
+        output
+    );
+    assert!(
+        output.contains("do {"),
+        "ES5 output should contain do statement: {}",
+        output
+    );
+    assert!(
+        output.contains("} while (x);"),
+        "ES5 output should contain do-while condition: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_backward_compatibility() {
     // Parse source
     let source = "class Foo {}";
@@ -119,10 +734,1142 @@ fn test_two_phase_backward_compatibility() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_arrow_function() {
+    let source = "const add = (a, b) => a + b;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ES5ArrowFunction transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function"),
+        "ES5 arrow output should contain 'function'"
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 arrow output should not contain '=>'"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_function_this_capture() {
+    let source = "const fn = () => this.x;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ES5ArrowFunction transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow output should capture this via IIFE: {}",
+        output
+    );
+    assert!(
+        output.contains("_this"),
+        "ES5 arrow output should reference _this: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_nested_arrow_this_capture() {
+    let source = "const outer = () => { const inner = () => this.x; };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("})(_this)"),
+        "ES5 nested arrow should pass outer _this into inner capture: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_this_in_object_literal_property() {
+    let source = "const fn = () => ({ foo: this.x });";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow output should capture this in object literal property: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 arrow output should rewrite this in object literal property: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_object_literal_method_no_capture() {
+    let source = "const fn = () => ({ method() { return this.x; } });";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        !output.contains("_this"),
+        "ES5 arrow output should not capture this for object literal method bodies: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_async_arrow_function() {
+    let source = "const foo = async () => { await bar(); };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ES5ArrowFunction transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 async arrow output should contain '__awaiter': {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 async arrow output should not contain '=>': {}",
+        output
+    );
+    assert!(
+        !output.contains("async function"),
+        "ES5 async arrow output should not contain async syntax: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_async_arrow_this_capture_await() {
+    let source = "const foo = async () => await this.bar;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 async arrow should capture this via IIFE: {}",
+        output
+    );
+    assert!(
+        output.contains("__awaiter(_this"),
+        "ES5 async arrow should pass _this to __awaiter: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_this_in_type_assertion() {
+    let source = "const foo = () => (this as any).x;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow should capture this in type assertion: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x") || output.contains("(_this).x"),
+        "ES5 arrow should rewrite this in type assertion: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_this_in_satisfies_expression() {
+    let source = "const foo = () => (this satisfies Foo).x;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow should capture this in satisfies expression: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x") || output.contains("(_this).x"),
+        "ES5 arrow should rewrite this in satisfies expression: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_this_in_angle_type_assertion() {
+    let source = "const foo = () => (<any>this).x;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow should capture this in angle type assertion: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x") || output.contains("(_this).x"),
+        "ES5 arrow should rewrite this in angle type assertion: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_this_in_tagged_template_span() {
+    let source = "const foo = () => tag`${this.x}`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow should capture this in tagged template span: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 arrow should rewrite this in tagged template span: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_this_in_tagged_template_tag() {
+    let source = "const foo = () => this.tag`hi`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow should capture this in tagged template tag: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.tag"),
+        "ES5 arrow should rewrite this in tagged template tag: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_tagged_template_downlevel() {
+    let source = "const msg = tag`hi ${name}!`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let source_text = parser.get_source_text().to_string();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.set_source_text(&source_text);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__makeTemplateObject"),
+        "ES5 tagged template should use __makeTemplateObject helper: {}",
+        output
+    );
+    assert!(
+        output.contains("tag(__templateObject_"),
+        "ES5 tagged template should call tag with template object cache: {}",
+        output
+    );
+    assert!(
+        !output.contains('`'),
+        "ES5 tagged template should not emit backticks: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_template_expression_downlevel() {
+    let source = "const msg = `hi ${name}`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let source_text = parser.get_source_text().to_string();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.set_source_text(&source_text);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("\"hi \""),
+        "ES5 template expression should emit string literal head: {}",
+        output
+    );
+    assert!(
+        output.contains("+ (name)"),
+        "ES5 template expression should concatenate expression: {}",
+        output
+    );
+    assert!(
+        !output.contains('`'),
+        "ES5 template expression should not emit backticks: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_no_substitution_template_downlevel() {
+    let source = "const msg = `hello`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let source_text = parser.get_source_text().to_string();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.set_source_text(&source_text);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("\"hello\""),
+        "ES5 no-substitution template should emit string literal: {}",
+        output
+    );
+    assert!(
+        !output.contains('`'),
+        "ES5 no-substitution template should not emit backticks: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_this_in_non_null() {
+    let source = "const foo = () => this!.x;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow should capture this in non-null assertion: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 arrow should rewrite this in non-null assertion: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_async_function() {
+    let source = "async function foo() { return 1; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ES5AsyncFunction transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var __awaiter"),
+        "ES5 async output should contain '__awaiter' helper: {}",
+        output
+    );
+    assert!(
+        output.contains("var __generator"),
+        "ES5 async output should contain '__generator' helper: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_amd_module_wrapper() {
+    let source = "import { foo } from \"./bar\"; export const x = foo;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::AMD;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ModuleWrapper transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("define([\"require\", \"exports\", \"./bar\"]"),
+        "AMD output should include define dependency list"
+    );
+    assert!(
+        output.contains("function (require, exports"),
+        "AMD output should include factory signature"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_umd_module_wrapper() {
+    let source = "export const x = 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::UMD;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ModuleWrapper transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("(function (factory) {"),
+        "UMD output should include wrapper header"
+    );
+    assert!(
+        output.contains("factory(require, exports)"),
+        "UMD output should include CommonJS factory path"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_system_module_wrapper() {
+    let source = "import { foo } from \"./bar\"; export const x = foo;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::System;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ModuleWrapper transform"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("System.register([\"./bar\"]"),
+        "System output should include System.register dependency list"
+    );
+    assert!(
+        output.contains("execute: function ()"),
+        "System output should include execute block"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_commonjs_multi_export_vars() {
+    let source = "export const a = 1, b = 2;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate CommonJS export transforms"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("exports.a = a;"),
+        "CommonJS output should export a"
+    );
+    assert!(
+        output.contains("exports.b = b;"),
+        "CommonJS output should export b"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_commonjs_async_function_export() {
+    let source = "export async function foo() { await bar(); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate async/CommonJS transforms"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should contain __awaiter: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.foo = foo;"),
+        "CommonJS output should export foo: {}",
+        output
+    );
+    assert_eq!(
+        output.matches("exports.foo = foo;").count(),
+        1,
+        "Expected a single CommonJS export assignment: {}",
+        output
+    );
+}
+
+#[test]
+fn test_lowering_pass_commonjs_default_anonymous_function_directive() {
+    let source = "export default function () { return 1; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let stmt_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected export declaration");
+    let stmt_node = arena.get(stmt_idx).expect("expected export node");
+    let export_decl = arena
+        .get_export_decl(stmt_node)
+        .expect("expected export declaration data");
+
+    let directive = transforms.get(export_decl.export_clause);
+    assert!(
+        matches!(directive, Some(TransformDirective::CommonJSExportDefaultExpr)),
+        "LoweringPass should emit default export directive for anonymous function, got: {:?}",
+        directive
+    );
+}
+
+#[test]
+fn test_lowering_pass_commonjs_default_anonymous_class_directive() {
+    let source = "export default class { method() { return 1; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let stmt_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected export declaration");
+    let stmt_node = arena.get(stmt_idx).expect("expected export node");
+    let export_decl = arena
+        .get_export_decl(stmt_node)
+        .expect("expected export declaration data");
+
+    let directive = transforms.get(export_decl.export_clause);
+    assert!(
+        matches!(directive, Some(TransformDirective::CommonJSExportDefaultExpr)),
+        "LoweringPass should emit default export directive for anonymous class"
+    );
+}
+
+#[test]
+fn test_lowering_pass_commonjs_default_anonymous_class_directive_es5() {
+    let source = "export default class { method() { return 1; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let stmt_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected export declaration");
+    let stmt_node = arena.get(stmt_idx).expect("expected export node");
+    let export_decl = arena
+        .get_export_decl(stmt_node)
+        .expect("expected export declaration data");
+
+    let directive = transforms.get(export_decl.export_clause);
+    assert!(
+        matches!(directive, Some(TransformDirective::CommonJSExportDefaultClassES5 { .. })),
+        "LoweringPass should emit ES5 default export directive for anonymous class"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_commonjs_default_anonymous_async_function_export() {
+    let source = "export default async function () { await bar(); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ES5 async transforms"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_module_kind(crate::thin_emitter::ModuleKind::CommonJS);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__awaiter"),
+        "ES5 output should contain __awaiter: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.default = function"),
+        "CommonJS output should export default function: {}",
+        output
+    );
+    assert!(
+        !output.contains("export default"),
+        "CommonJS output should not contain ES module syntax: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_commonjs_default_anonymous_class_export() {
+    let source = "export default class { method() { return 1; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate ES5 class transforms"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_module_kind(crate::thin_emitter::ModuleKind::CommonJS);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var _a_default = /** @class */"),
+        "CommonJS output should downlevel default class: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.default = _a_default;"),
+        "CommonJS output should export default class temp: {}",
+        output
+    );
+    assert!(
+        !output.contains("export default"),
+        "CommonJS output should not contain ES module syntax: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_commonjs_export_enum() {
+    let source = "export enum E { A, B = 2 }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate enum/CommonJS transforms"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_module_kind(crate::thin_emitter::ModuleKind::CommonJS);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var E"),
+        "CommonJS output should declare enum variable: {}",
+        output
+    );
+    assert!(
+        output.contains("(function (E)"),
+        "CommonJS output should emit enum IIFE: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.E = E;"),
+        "CommonJS output should export enum: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_commonjs_export_const_enum_is_erased() {
+    let source = "export const enum E { A = 0 }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_module_kind(crate::thin_emitter::ModuleKind::CommonJS);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        !output.contains("var E"),
+        "CommonJS output should not emit const enum: {}",
+        output
+    );
+    assert!(
+        !output.contains("exports.E"),
+        "CommonJS output should not export const enum: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_commonjs_export_namespace() {
+    let source = "export namespace N { export function foo() { return 1; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate namespace/CommonJS transforms"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_module_kind(crate::thin_emitter::ModuleKind::CommonJS);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var N"),
+        "CommonJS output should declare namespace variable: {}",
+        output
+    );
+    assert!(
+        output.contains("(function (N)"),
+        "CommonJS output should emit namespace IIFE: {}",
+        output
+    );
+    assert!(
+        output.contains("N.foo = foo;"),
+        "CommonJS output should export namespace member: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.N = N;"),
+        "CommonJS output should export namespace: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_commonjs_auto_detect_exports() {
+    let source = "export const x = 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.auto_detect_module = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate CommonJS export transforms via auto-detect"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_auto_detect_module(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("exports.x = x;"),
+        "CommonJS auto-detect should export x"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_commonjs_export_assignment_suppresses_named_exports() {
+    let source = "export = foo;\nexport const x = 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.auto_detect_module = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_auto_detect_module(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("module.exports = foo;"),
+        "CommonJS export assignment should emit module.exports"
+    );
+    assert!(
+        !output.contains("exports.x = x;"),
+        "Named exports should be suppressed when export assignment is present"
+    );
+}
+
+#[test]
+fn test_two_phase_emission_commonjs_export_default_arrow() {
+    let source = "export default () => this.x;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_module_kind(crate::thin_emitter::ModuleKind::CommonJS);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("exports.default ="),
+        "CommonJS default export should emit exports.default: {}",
+        output
+    );
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow export should capture this via IIFE: {}",
+        output
+    );
+    assert!(
+        !output.contains("=>"),
+        "ES5 arrow export should not contain '=>': {}",
+        output
+    );
+}
+
+#[test]
+fn test_transform_directive_chain_es5_class_commonjs_export() {
+    let source = "class Foo {}";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected class declaration");
+
+    let mut transforms = TransformContext::new();
+    transforms.insert(
+        class_idx,
+        TransformDirective::Chain(vec![
+            TransformDirective::ES5Class {
+                class_node: class_idx,
+                class_name: Some("Foo".to_string()),
+                heritage: None,
+                members: Vec::new(),
+            },
+            TransformDirective::CommonJSExport {
+                names: vec!["Foo".to_string()],
+                is_default: false,
+                inner: Box::new(TransformDirective::Identity),
+            },
+        ]),
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var Foo = /** @class */"),
+        "Chained ES5 class transform should emit IIFE: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.Foo = Foo;"),
+        "Chained CommonJS export should emit assignment: {}",
+        output
+    );
+    assert!(
+        !output.contains("class Foo"),
+        "Chained transforms should downlevel class syntax: {}",
+        output
+    );
+}
+
+#[test]
 fn test_transform_directive_composability() {
     // This test verifies that the architecture supports composable transforms
     // For now, we just verify that the TransformContext can be created and passed around
-    use crate::transform_context::{TransformContext, TransformDirective};
     use crate::parser::NodeIndex;
 
     let mut ctx = TransformContext::new();

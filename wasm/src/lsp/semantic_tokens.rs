@@ -125,6 +125,7 @@ pub struct SemanticTokensProvider<'a> {
     arena: &'a ThinNodeArena,
     binder: &'a ThinBinderState,
     line_map: &'a LineMap,
+    source_text: &'a str,
     builder: SemanticTokensBuilder,
 }
 
@@ -134,11 +135,13 @@ impl<'a> SemanticTokensProvider<'a> {
         arena: &'a ThinNodeArena,
         binder: &'a ThinBinderState,
         line_map: &'a LineMap,
+        source_text: &'a str,
     ) -> Self {
         Self {
             arena,
             binder,
             line_map,
+            source_text,
             builder: SemanticTokensBuilder::new(),
         }
     }
@@ -368,7 +371,7 @@ impl<'a> SemanticTokensProvider<'a> {
     fn emit_token_for_name(&mut self, node_idx: NodeIndex, symbol: &Symbol, is_declaration: bool) {
         let Some(node) = self.arena.get(node_idx) else { return };
 
-        let pos = self.line_map.offset_to_position(node.pos);
+        let pos = self.line_map.offset_to_position(node.pos, self.source_text);
         let length = node.end - node.pos;
 
         let (token_type, mut modifiers) = self.map_symbol_to_token(symbol);
@@ -458,7 +461,7 @@ mod semantic_tokens_tests {
         binder.bind_source_file(arena, root);
 
         let line_map = LineMap::build(source);
-        let mut provider = SemanticTokensProvider::new(arena, &binder, &line_map);
+        let mut provider = SemanticTokensProvider::new(arena, &binder, &line_map, source);
 
         let tokens = provider.get_semantic_tokens(root);
 
@@ -481,7 +484,7 @@ mod semantic_tokens_tests {
         binder.bind_source_file(arena, root);
 
         let line_map = LineMap::build(source);
-        let mut provider = SemanticTokensProvider::new(arena, &binder, &line_map);
+        let mut provider = SemanticTokensProvider::new(arena, &binder, &line_map, source);
 
         let tokens = provider.get_semantic_tokens(root);
 
@@ -506,7 +509,7 @@ mod semantic_tokens_tests {
         binder.bind_source_file(arena, root);
 
         let line_map = LineMap::build(source);
-        let mut provider = SemanticTokensProvider::new(arena, &binder, &line_map);
+        let mut provider = SemanticTokensProvider::new(arena, &binder, &line_map, source);
 
         let tokens = provider.get_semantic_tokens(root);
 
@@ -528,7 +531,7 @@ mod semantic_tokens_tests {
         binder.bind_source_file(arena, root);
 
         let line_map = LineMap::build(source);
-        let mut provider = SemanticTokensProvider::new(arena, &binder, &line_map);
+        let mut provider = SemanticTokensProvider::new(arena, &binder, &line_map, source);
 
         let tokens = provider.get_semantic_tokens(root);
 

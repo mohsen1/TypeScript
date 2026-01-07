@@ -27,7 +27,7 @@
 //! ```
 
 use rayon::prelude::*;
-use crate::thin_parser::ThinParserState;
+use crate::thin_parser::{ParseDiagnostic, ThinParserState};
 use crate::thin_binder::ThinBinderState;
 use crate::binder::{SymbolArena, SymbolTable, SymbolId};
 use crate::parser::NodeIndex;
@@ -42,8 +42,8 @@ pub struct ParseResult {
     pub source_file: NodeIndex,
     /// The arena containing all nodes
     pub arena: ThinNodeArena,
-    /// Parse errors
-    pub errors: Vec<String>,
+    /// Parse diagnostics
+    pub parse_diagnostics: Vec<ParseDiagnostic>,
 }
 
 /// Parse multiple files in parallel using ThinParser
@@ -63,20 +63,14 @@ pub fn parse_files_parallel(files: Vec<(String, String)>) -> Vec<ParseResult> {
             let mut parser = ThinParserState::new(file_name.clone(), source_text);
             let source_file = parser.parse_source_file();
 
-            // Extract errors before consuming parser
-            let errors: Vec<String> = parser.get_diagnostics()
-                .iter()
-                .map(|d| d.message.clone())
-                .collect();
-
-            // Consume the parser and take its arena
-            let (arena, _) = parser.into_parts();
+            // Consume the parser and take its arena/diagnostics
+            let (arena, parse_diagnostics) = parser.into_parts();
 
             ParseResult {
                 file_name,
                 source_file,
                 arena,
-                errors,
+                parse_diagnostics,
             }
         })
         .collect()
@@ -87,19 +81,14 @@ pub fn parse_file_single(file_name: String, source_text: String) -> ParseResult 
     let mut parser = ThinParserState::new(file_name.clone(), source_text);
     let source_file = parser.parse_source_file();
 
-    let errors: Vec<String> = parser.get_diagnostics()
-        .iter()
-        .map(|d| d.message.clone())
-        .collect();
-
-    // Consume the parser and take its arena
-    let (arena, _) = parser.into_parts();
+    // Consume the parser and take its arena/diagnostics
+    let (arena, parse_diagnostics) = parser.into_parts();
 
     ParseResult {
         file_name,
         source_file,
         arena,
-        errors,
+        parse_diagnostics,
     }
 }
 
@@ -134,8 +123,8 @@ pub struct BindResult {
     pub file_locals: SymbolTable,
     /// Node-to-symbol mapping
     pub node_symbols: FxHashMap<u32, SymbolId>,
-    /// Parse errors
-    pub parse_errors: Vec<String>,
+    /// Parse diagnostics
+    pub parse_diagnostics: Vec<ParseDiagnostic>,
 }
 
 /// Parse and bind multiple files in parallel
@@ -156,12 +145,7 @@ pub fn parse_and_bind_parallel(files: Vec<(String, String)>) -> Vec<BindResult> 
             let mut parser = ThinParserState::new(file_name.clone(), source_text);
             let source_file = parser.parse_source_file();
 
-            let parse_errors: Vec<String> = parser.get_diagnostics()
-                .iter()
-                .map(|d| d.message.clone())
-                .collect();
-
-            let (arena, _) = parser.into_parts();
+            let (arena, parse_diagnostics) = parser.into_parts();
 
             // Bind
             let mut binder = ThinBinderState::new();
@@ -174,7 +158,7 @@ pub fn parse_and_bind_parallel(files: Vec<(String, String)>) -> Vec<BindResult> 
                 symbols: binder.symbols,
                 file_locals: binder.file_locals,
                 node_symbols: binder.node_symbols,
-                parse_errors,
+                parse_diagnostics,
             }
         })
         .collect()
@@ -185,12 +169,7 @@ pub fn parse_and_bind_single(file_name: String, source_text: String) -> BindResu
     let mut parser = ThinParserState::new(file_name.clone(), source_text);
     let source_file = parser.parse_source_file();
 
-    let parse_errors: Vec<String> = parser.get_diagnostics()
-        .iter()
-        .map(|d| d.message.clone())
-        .collect();
-
-    let (arena, _) = parser.into_parts();
+    let (arena, parse_diagnostics) = parser.into_parts();
 
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(&arena, source_file);
@@ -202,7 +181,7 @@ pub fn parse_and_bind_single(file_name: String, source_text: String) -> BindResu
         symbols: binder.symbols,
         file_locals: binder.file_locals,
         node_symbols: binder.node_symbols,
-        parse_errors,
+        parse_diagnostics,
     }
 }
 
@@ -226,7 +205,7 @@ pub fn parse_and_bind_with_stats(files: Vec<(String, String)>) -> (Vec<BindResul
 
     let total_nodes: usize = results.iter().map(|r| r.arena.len()).sum();
     let total_symbols: usize = results.iter().map(|r| r.symbols.len()).sum();
-    let parse_error_count: usize = results.iter().map(|r| r.parse_errors.len()).sum();
+    let parse_error_count: usize = results.iter().map(|r| r.parse_diagnostics.len()).sum();
 
     let stats = BindStats {
         file_count,
@@ -252,8 +231,8 @@ pub struct BoundFile {
     pub arena: ThinNodeArena,
     /// Node-to-symbol mapping (symbol IDs are global after merge)
     pub node_symbols: FxHashMap<u32, SymbolId>,
-    /// Parse errors
-    pub parse_errors: Vec<String>,
+    /// Parse diagnostics
+    pub parse_diagnostics: Vec<ParseDiagnostic>,
 }
 
 use crate::solver::TypeInterner;
@@ -330,7 +309,7 @@ pub fn merge_bind_results(results: Vec<BindResult>) -> MergedProgram {
             source_file: result.source_file,
             arena: result.arena,
             node_symbols: remapped_node_symbols,
-            parse_errors: result.parse_errors,
+            parse_diagnostics: result.parse_diagnostics,
         });
     }
 
@@ -631,7 +610,7 @@ pub fn parse_files_with_stats(files: Vec<(String, String)>) -> (Vec<ParseResult>
     let results = parse_files_parallel(files);
 
     let total_nodes: usize = results.iter().map(|r| r.arena.len()).sum();
-    let error_count: usize = results.iter().map(|r| r.errors.len()).sum();
+    let error_count: usize = results.iter().map(|r| r.parse_diagnostics.len()).sum();
 
     let stats = ParallelStats {
         file_count,

@@ -5,14 +5,17 @@
 //!
 //! Lowering is lazy - types are only computed when queried.
 
-use crate::parser::thin_node::{ThinNodeArena, SignatureData, IndexSignatureData};
+use crate::parser::thin_node::{ThinNodeArena, SignatureData, IndexSignatureData, TypeAliasData};
 use crate::parser::base::NodeIndex;
 use crate::parser::NodeList;
 use crate::scanner::SyntaxKind;
 use crate::parser::syntax_kind_ext;
 use crate::solver::types::*;
 use crate::solver::TypeDatabase;
+use crate::solver::subtype::{SubtypeChecker, TypeResolver};
 use crate::interner::Atom;
+use std::cell::RefCell;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -22,14 +25,153 @@ use crate::solver::TypeInterner;
 pub struct TypeLowering<'a> {
     arena: &'a ThinNodeArena,
     interner: &'a dyn TypeDatabase,
-    /// Optional symbol resolver - resolves identifier nodes to SymbolIds.
+    /// Optional type resolver - resolves identifier nodes to SymbolIds.
     /// If provided, this enables correct abstract class detection.
-    resolver: Option<&'a dyn Fn(NodeIndex) -> Option<u32>>,
+    type_resolver: Option<&'a dyn Fn(NodeIndex) -> Option<u32>>,
+    /// Optional value resolver for typeof queries.
+    value_resolver: Option<&'a dyn Fn(NodeIndex) -> Option<u32>>,
+    type_param_scopes: RefCell<Vec<Vec<(Atom, TypeId)>>>,
+}
+
+struct InterfaceParts {
+    properties: FxHashMap<Atom, PropertyMerge>,
+    call_signatures: Vec<CallSignature>,
+    construct_signatures: Vec<CallSignature>,
+    string_index: Option<IndexSignature>,
+    number_index: Option<IndexSignature>,
+}
+
+enum PropertyMerge {
+    Property(PropertyInfo),
+    Method(MethodOverloads),
+    Conflict(PropertyInfo),
+}
+
+struct MethodOverloads {
+    signatures: Vec<CallSignature>,
+    optional: bool,
+}
+
+struct IndexSignatureResolver;
+
+impl TypeResolver for IndexSignatureResolver {
+    fn resolve_ref(&self, _symbol: SymbolRef, _interner: &dyn TypeDatabase) -> Option<TypeId> {
+        Some(TypeId::ANY)
+    }
+}
+
+impl InterfaceParts {
+    fn new() -> Self {
+        InterfaceParts {
+            properties: FxHashMap::default(),
+            call_signatures: Vec::new(),
+            construct_signatures: Vec::new(),
+            string_index: None,
+            number_index: None,
+        }
+    }
+
+    fn merge_property(&mut self, prop: PropertyInfo) {
+        use std::collections::hash_map::Entry;
+
+        match self.properties.entry(prop.name) {
+            Entry::Vacant(entry) => {
+                entry.insert(PropertyMerge::Property(prop));
+            }
+            Entry::Occupied(mut entry) => {
+                match entry.get_mut() {
+                    PropertyMerge::Property(existing) => {
+                        if existing.type_id == prop.type_id
+                            && existing.optional == prop.optional
+                            && existing.readonly == prop.readonly
+                            && existing.is_method == prop.is_method
+                        {
+                            return;
+                        }
+                        let conflict = PropertyInfo {
+                            name: prop.name,
+                            type_id: TypeId::ERROR,
+                            optional: existing.optional && prop.optional,
+                            readonly: existing.readonly && prop.readonly,
+                            is_method: false,
+                        };
+                        entry.insert(PropertyMerge::Conflict(conflict));
+                    }
+                    PropertyMerge::Method(methods) => {
+                        let conflict = PropertyInfo {
+                            name: prop.name,
+                            type_id: TypeId::ERROR,
+                            optional: methods.optional && prop.optional,
+                            readonly: false,
+                            is_method: false,
+                        };
+                        entry.insert(PropertyMerge::Conflict(conflict));
+                    }
+                    PropertyMerge::Conflict(_) => {}
+                }
+            }
+        }
+    }
+
+    fn merge_method(&mut self, name: Atom, signature: CallSignature, optional: bool) {
+        use std::collections::hash_map::Entry;
+
+        match self.properties.entry(name) {
+            Entry::Vacant(entry) => {
+                entry.insert(PropertyMerge::Method(MethodOverloads {
+                    signatures: vec![signature],
+                    optional,
+                }));
+            }
+            Entry::Occupied(mut entry) => {
+                match entry.get_mut() {
+                    PropertyMerge::Method(methods) => {
+                        methods.signatures.push(signature);
+                        methods.optional |= optional;
+                    }
+                    PropertyMerge::Property(prop) => {
+                        let conflict = PropertyInfo {
+                            name,
+                            type_id: TypeId::ERROR,
+                            optional: prop.optional && optional,
+                            readonly: false,
+                            is_method: false,
+                        };
+                        entry.insert(PropertyMerge::Conflict(conflict));
+                    }
+                    PropertyMerge::Conflict(_) => {}
+                }
+            }
+        }
+    }
+
+    fn merge_index_signature(&mut self, index: IndexSignature) {
+        let target = if index.key_type == TypeId::NUMBER {
+            &mut self.number_index
+        } else {
+            &mut self.string_index
+        };
+
+        if let Some(existing) = target.as_mut() {
+            if existing.value_type != index.value_type || existing.readonly != index.readonly {
+                existing.value_type = TypeId::ERROR;
+                existing.readonly = false;
+            }
+        } else {
+            *target = Some(index);
+        }
+    }
 }
 
 impl<'a> TypeLowering<'a> {
     pub fn new(arena: &'a ThinNodeArena, interner: &'a dyn TypeDatabase) -> Self {
-        TypeLowering { arena, interner, resolver: None }
+        TypeLowering {
+            arena,
+            interner,
+            type_resolver: None,
+            value_resolver: None,
+            type_param_scopes: RefCell::new(Vec::new()),
+        }
     }
 
     /// Create a TypeLowering with a symbol resolver.
@@ -39,12 +181,70 @@ impl<'a> TypeLowering<'a> {
         interner: &'a dyn TypeDatabase,
         resolver: &'a dyn Fn(NodeIndex) -> Option<u32>,
     ) -> Self {
-        TypeLowering { arena, interner, resolver: Some(resolver) }
+        TypeLowering {
+            arena,
+            interner,
+            type_resolver: Some(resolver),
+            value_resolver: Some(resolver),
+            type_param_scopes: RefCell::new(Vec::new()),
+        }
     }
 
-    /// Resolve a node to a symbol ID if a resolver is provided.
-    fn resolve_symbol(&self, node_idx: NodeIndex) -> Option<u32> {
-        self.resolver.and_then(|resolver| resolver(node_idx))
+    /// Create a TypeLowering with separate type/value resolvers.
+    pub fn with_resolvers(
+        arena: &'a ThinNodeArena,
+        interner: &'a dyn TypeDatabase,
+        type_resolver: &'a dyn Fn(NodeIndex) -> Option<u32>,
+        value_resolver: &'a dyn Fn(NodeIndex) -> Option<u32>,
+    ) -> Self {
+        TypeLowering {
+            arena,
+            interner,
+            type_resolver: Some(type_resolver),
+            value_resolver: Some(value_resolver),
+            type_param_scopes: RefCell::new(Vec::new()),
+        }
+    }
+
+    /// Resolve a node to a type symbol ID if a resolver is provided.
+    fn resolve_type_symbol(&self, node_idx: NodeIndex) -> Option<u32> {
+        self.type_resolver.and_then(|resolver| resolver(node_idx))
+    }
+
+    /// Resolve a node to a value symbol ID if a resolver is provided.
+    fn resolve_value_symbol(&self, node_idx: NodeIndex) -> Option<u32> {
+        if let Some(resolver) = self.value_resolver {
+            resolver(node_idx)
+        } else {
+            self.resolve_type_symbol(node_idx)
+        }
+    }
+
+    fn push_type_param_scope(&self) {
+        self.type_param_scopes.borrow_mut().push(Vec::new());
+    }
+
+    fn pop_type_param_scope(&self) {
+        let _ = self.type_param_scopes.borrow_mut().pop();
+    }
+
+    fn add_type_param_binding(&self, name: Atom, type_id: TypeId) {
+        if let Some(scope) = self.type_param_scopes.borrow_mut().last_mut() {
+            scope.push((name, type_id));
+        }
+    }
+
+    fn lookup_type_param(&self, name: &str) -> Option<TypeId> {
+        let atom = self.interner.intern_string(name);
+        let scopes = self.type_param_scopes.borrow();
+        for scope in scopes.iter().rev() {
+            for (scope_name, type_id) in scope.iter().rev() {
+                if *scope_name == atom {
+                    return Some(*type_id);
+                }
+            }
+        }
+        None
     }
 
     /// Lower a type node to a TypeId.
@@ -156,6 +356,13 @@ impl<'a> TypeLowering<'a> {
             }
 
             // =========================================================================
+            // Qualified name (A.B)
+            // =========================================================================
+            k if k == syntax_kind_ext::QUALIFIED_NAME => {
+                self.lower_qualified_name_type(node_idx)
+            }
+
+            // =========================================================================
             // Identifier (simple type reference without type arguments)
             // =========================================================================
             k if k == SyntaxKind::Identifier as u16 => {
@@ -184,6 +391,13 @@ impl<'a> TypeLowering<'a> {
             // =========================================================================
             k if k == syntax_kind_ext::TYPE_QUERY => {
                 self.lower_type_query(node_idx)
+            }
+
+            // =========================================================================
+            // Type predicate (x is T / asserts x is T)
+            // =========================================================================
+            k if k == syntax_kind_ext::TYPE_PREDICATE => {
+                self.lower_type_predicate(node_idx)
             }
 
             // =========================================================================
@@ -312,48 +526,41 @@ impl<'a> TypeLowering<'a> {
             };
         };
 
-        match node.kind {
-            k if k == syntax_kind_ext::NAMED_TUPLE_MEMBER => {
-                if let Some(data) = self.arena.get_named_tuple_member(node) {
-                    let name = if let Some(name_node) = self.arena.get(data.name) {
-                        if let Some(id_data) = self.arena.get_identifier(name_node) {
-                            Some(self.interner.intern_string(&id_data.escaped_text))
-                        } else {
-                            None
-                        }
+        if node.kind == syntax_kind_ext::NAMED_TUPLE_MEMBER {
+            if let Some(data) = self.arena.get_named_tuple_member(node) {
+                let name = if let Some(name_node) = self.arena.get(data.name) {
+                    if let Some(id_data) = self.arena.get_identifier(name_node) {
+                        Some(self.interner.intern_string(&id_data.escaped_text))
                     } else {
                         None
-                    };
+                    }
+                } else {
+                    None
+                };
 
-                    return TupleElement {
-                        type_id: self.lower_type(data.type_node),
-                        name,
-                        optional: data.question_token,
-                        rest: data.dot_dot_dot_token,
-                    };
-                }
+                return TupleElement {
+                    type_id: self.lower_type(data.type_node),
+                    name,
+                    optional: data.question_token,
+                    rest: data.dot_dot_dot_token,
+                };
             }
-            k if k == syntax_kind_ext::REST_TYPE => {
-                if let Some(data) = self.arena.type_operators.get(node.data_index as usize) {
-                    return TupleElement {
-                        type_id: self.lower_type(data.type_node),
-                        name: None,
-                        optional: false,
-                        rest: true,
-                    };
-                }
-            }
-            k if k == syntax_kind_ext::OPTIONAL_TYPE => {
-                if let Some(data) = self.arena.type_operators.get(node.data_index as usize) {
-                    return TupleElement {
-                        type_id: self.lower_type(data.type_node),
-                        name: None,
-                        optional: true,
-                        rest: false,
-                    };
-                }
-            }
-            _ => {}
+        }
+
+        if node.kind == syntax_kind_ext::REST_TYPE || node.kind == syntax_kind_ext::OPTIONAL_TYPE {
+            let wrapped = if let Some(data) = self.arena.get_wrapped_type(node) {
+                Some(data.type_node)
+            } else {
+                self.arena.type_operators.get(node.data_index as usize)
+                    .map(|data| data.type_node)
+            };
+
+            return TupleElement {
+                type_id: wrapped.map_or_else(|| self.lower_type(node_idx), |inner| self.lower_type(inner)),
+                name: None,
+                optional: node.kind == syntax_kind_ext::OPTIONAL_TYPE,
+                rest: node.kind == syntax_kind_ext::REST_TYPE,
+            };
         }
 
         TupleElement {
@@ -364,55 +571,67 @@ impl<'a> TypeLowering<'a> {
         }
     }
 
-    /// Lower type parameters from a NodeList.
-    /// Returns a Vec<TypeParamInfo> for use in FunctionShape.
-    fn lower_type_parameters(&self, type_params: &Option<NodeList>) -> Vec<TypeParamInfo> {
-        match type_params {
-            None => vec![],
-            Some(list) => {
-                list.nodes.iter()
-                    .filter_map(|&idx| {
-                        let node = self.arena.get(idx)?;
-                        let data = self.arena.get_type_parameter(node)?;
+    fn with_type_params<R>(
+        &self,
+        type_params: &Option<NodeList>,
+        f: impl FnOnce() -> R,
+    ) -> (Vec<TypeParamInfo>, R) {
+        let Some(list) = type_params else {
+            return (Vec::new(), f());
+        };
 
-                        // Get the name from the identifier node
-                        let name = if data.name != NodeIndex::NONE {
-                            if let Some(name_node) = self.arena.get(data.name) {
-                                if let Some(id_data) = self.arena.get_identifier(name_node) {
-                                    self.interner.intern_string(&id_data.escaped_text)
-                                } else {
-                                    return None;
-                                }
-                            } else {
-                                return None;
-                            }
-                        } else {
-                            return None;
-                        };
+        if list.nodes.is_empty() {
+            return (Vec::new(), f());
+        }
 
-                        // Lower constraint if present (e.g., T extends SomeType)
-                        let constraint = if data.constraint != NodeIndex::NONE {
-                            Some(self.lower_type(data.constraint))
-                        } else {
-                            None
-                        };
+        self.push_type_param_scope();
+        let params = self.collect_type_parameters(list);
+        let result = f();
+        self.pop_type_param_scope();
 
-                        // Lower default if present (e.g., T = DefaultType)
-                        let default = if data.default != NodeIndex::NONE {
-                            Some(self.lower_type(data.default))
-                        } else {
-                            None
-                        };
+        (params, result)
+    }
 
-                        Some(TypeParamInfo {
-                            name,
-                            constraint,
-                            default,
-                        })
-                    })
-                    .collect()
+    fn collect_type_parameters(&self, list: &NodeList) -> Vec<TypeParamInfo> {
+        let mut params = Vec::with_capacity(list.nodes.len());
+        for &idx in &list.nodes {
+            if let Some(info) = self.lower_type_parameter(idx) {
+                let type_id = self.interner.intern(TypeKey::TypeParameter(info.clone()));
+                self.add_type_param_binding(info.name, type_id);
+                params.push(info);
             }
         }
+        params
+    }
+
+    fn lower_type_parameter(&self, node_idx: NodeIndex) -> Option<TypeParamInfo> {
+        let node = self.arena.get(node_idx)?;
+        let data = self.arena.get_type_parameter(node)?;
+
+        let name = self
+            .arena
+            .get(data.name)
+            .and_then(|name_node| self.arena.get_identifier(name_node))
+            .map(|id_data| self.interner.intern_string(&id_data.escaped_text))
+            .unwrap_or_else(|| self.interner.intern_string("T"));
+
+        let constraint = if data.constraint != NodeIndex::NONE {
+            Some(self.lower_type(data.constraint))
+        } else {
+            None
+        };
+
+        let default = if data.default != NodeIndex::NONE {
+            Some(self.lower_type(data.default))
+        } else {
+            None
+        };
+
+        Some(TypeParamInfo {
+            name,
+            constraint,
+            default,
+        })
     }
 
     /// Extract a parameter name if it is an identifier.
@@ -423,6 +642,53 @@ impl<'a> TypeLowering<'a> {
             .map(|ident| self.interner.intern_string(&ident.escaped_text))
     }
 
+    fn lower_params_with_this(&self, params: &NodeList) -> (Vec<ParamInfo>, Option<TypeId>) {
+        let mut lowered = Vec::new();
+        let mut this_type = None;
+
+        for &idx in &params.nodes {
+            let Some(param_node) = self.arena.get(idx) else { continue };
+            let Some(param_data) = self.arena.get_parameter(param_node) else { continue };
+
+            if let Some(name_node) = self.arena.get(param_data.name) {
+                if let Some(id_data) = self.arena.get_identifier(name_node) {
+                    if id_data.escaped_text == "this" {
+                        if this_type.is_none() {
+                            this_type = Some(self.lower_type(param_data.type_annotation));
+                        }
+                        continue;
+                    }
+                }
+            }
+
+            lowered.push(ParamInfo {
+                name: self.lower_parameter_name(param_data.name),
+                type_id: self.lower_type(param_data.type_annotation),
+                optional: param_data.question_token,
+                rest: param_data.dot_dot_dot_token,
+            });
+        }
+
+        (lowered, this_type)
+    }
+
+    fn lower_return_type(&self, node_idx: NodeIndex) -> (TypeId, Option<TypePredicate>) {
+        if node_idx == NodeIndex::NONE {
+            return (TypeId::ANY, None);
+        }
+
+        let node = match self.arena.get(node_idx) {
+            Some(n) => n,
+            None => return (TypeId::ERROR, None),
+        };
+
+        if node.kind == syntax_kind_ext::TYPE_PREDICATE {
+            return self.lower_type_predicate_return(node_idx);
+        }
+
+        (self.lower_type(node_idx), None)
+    }
+
     /// Lower a function type ((a: T, b: U) => R)
     fn lower_function_type(&self, node_idx: NodeIndex) -> TypeId {
         let node = match self.arena.get(node_idx) {
@@ -431,33 +697,19 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_function_type(node) {
-            // Lower parameters
-            let params: Vec<ParamInfo> = data.parameters.nodes.iter()
-                .filter_map(|&idx| {
-                    if let Some(param_node) = self.arena.get(idx) {
-                        if let Some(param_data) = self.arena.get_parameter(param_node) {
-                            return Some(ParamInfo {
-                                name: self.lower_parameter_name(param_data.name),
-                                type_id: self.lower_type(param_data.type_annotation),
-                                optional: param_data.question_token,
-                                rest: param_data.dot_dot_dot_token,
-                            });
-                        }
-                    }
-                    None
-                })
-                .collect();
+            let (type_params, (params, this_type, return_type, type_predicate)) = self.with_type_params(&data.type_parameters, || {
+                let (params, this_type) = self.lower_params_with_this(&data.parameters);
 
-            // Lower return type
-            let return_type = self.lower_type(data.type_annotation);
-
-            // Lower type parameters
-            let type_params = self.lower_type_parameters(&data.type_parameters);
+                let (return_type, type_predicate) = self.lower_return_type(data.type_annotation);
+                (params, this_type, return_type, type_predicate)
+            });
 
             let shape = FunctionShape {
                 type_params,
                 params,
+                this_type,
                 return_type,
+                type_predicate,
                 is_constructor: false,
             };
 
@@ -500,6 +752,7 @@ impl<'a> TypeLowering<'a> {
                                     type_id,
                                     optional: sig.question_token,
                                     readonly: self.has_readonly_modifier(&sig.modifiers),
+                                    is_method: true,
                                 });
                             }
                         }
@@ -532,6 +785,13 @@ impl<'a> TypeLowering<'a> {
             }
 
             if string_index.is_some() || number_index.is_some() {
+                if !self.index_signature_properties_compatible(
+                    &properties,
+                    string_index.as_ref(),
+                    number_index.as_ref(),
+                ) {
+                    return TypeId::ERROR;
+                }
                 return self.interner.object_with_index(ObjectShape {
                     properties,
                     string_index,
@@ -545,43 +805,180 @@ impl<'a> TypeLowering<'a> {
         }
     }
 
+    pub fn lower_interface_declarations(&self, declarations: &[NodeIndex]) -> TypeId {
+        if declarations.is_empty() {
+            return TypeId::ERROR;
+        }
+
+        let mut parts = InterfaceParts::new();
+        let mut type_params: Option<&NodeList> = None;
+        let mut found = false;
+
+        for &decl_idx in declarations {
+            let Some(node) = self.arena.get(decl_idx) else { continue };
+            let Some(interface) = self.arena.get_interface(node) else { continue };
+            found = true;
+            if type_params.is_none() {
+                type_params = interface.type_parameters.as_ref();
+            }
+        }
+
+        if !found {
+            return TypeId::ERROR;
+        }
+
+        if let Some(params) = type_params {
+            self.push_type_param_scope();
+            let _ = self.collect_type_parameters(params);
+        }
+
+        for &decl_idx in declarations {
+            let Some(node) = self.arena.get(decl_idx) else { continue };
+            let Some(interface) = self.arena.get_interface(node) else { continue };
+            self.collect_interface_members(&interface.members, &mut parts);
+        }
+
+        if type_params.is_some() {
+            self.pop_type_param_scope();
+        }
+
+        self.finish_interface_parts(parts)
+    }
+
+    pub fn lower_type_alias_declaration(&self, alias: &TypeAliasData) -> TypeId {
+        if let Some(params) = alias.type_parameters.as_ref() {
+            if !params.nodes.is_empty() {
+                self.push_type_param_scope();
+                let _ = self.collect_type_parameters(params);
+                let result = self.lower_type(alias.type_node);
+                self.pop_type_param_scope();
+                return result;
+            }
+        }
+
+        self.lower_type(alias.type_node)
+    }
+
+    fn collect_interface_members(&self, members: &NodeList, parts: &mut InterfaceParts) {
+        for &idx in &members.nodes {
+            let Some(member) = self.arena.get(idx) else { continue };
+
+            if let Some(sig) = self.arena.get_signature(member) {
+                match member.kind {
+                    k if k == syntax_kind_ext::CALL_SIGNATURE => {
+                        parts.call_signatures.push(self.lower_call_signature(sig));
+                    }
+                    k if k == syntax_kind_ext::CONSTRUCT_SIGNATURE => {
+                        parts.construct_signatures.push(self.lower_call_signature(sig));
+                    }
+                    k if k == syntax_kind_ext::METHOD_SIGNATURE => {
+                        if let Some(name) = self.lower_signature_name(sig.name) {
+                            let signature = self.lower_call_signature(sig);
+                            parts.merge_method(name, signature, sig.question_token);
+                        }
+                    }
+                    _ => {
+                        if let Some(prop) = self.lower_type_element(idx) {
+                            parts.merge_property(prop);
+                        }
+                    }
+                }
+                continue;
+            }
+
+            if let Some(index_sig) = self.arena.get_index_signature(member) {
+                if let Some(index_info) = self.lower_index_signature(index_sig) {
+                    parts.merge_index_signature(index_info);
+                }
+            }
+        }
+    }
+
+    fn finish_interface_parts(&self, parts: InterfaceParts) -> TypeId {
+        let mut properties = Vec::with_capacity(parts.properties.len());
+        for (name, entry) in parts.properties {
+            match entry {
+                PropertyMerge::Property(prop) => properties.push(prop),
+                PropertyMerge::Method(methods) => {
+                    let type_id = self.interner.callable(CallableShape {
+                        call_signatures: methods.signatures,
+                        construct_signatures: Vec::new(),
+                        properties: Vec::new(),
+                    });
+                    properties.push(PropertyInfo {
+                        name,
+                        type_id,
+                        optional: methods.optional,
+                        readonly: false,
+                        is_method: true,
+                    });
+                }
+                PropertyMerge::Conflict(prop) => properties.push(prop),
+            }
+        }
+
+        if !parts.call_signatures.is_empty() || !parts.construct_signatures.is_empty() {
+            return self.interner.callable(CallableShape {
+                call_signatures: parts.call_signatures,
+                construct_signatures: parts.construct_signatures,
+                properties,
+            });
+        }
+
+        if parts.string_index.is_some() || parts.number_index.is_some() {
+            if !self.index_signature_properties_compatible(
+                &properties,
+                parts.string_index.as_ref(),
+                parts.number_index.as_ref(),
+            ) {
+                return TypeId::ERROR;
+            }
+            return self.interner.object_with_index(ObjectShape {
+                properties,
+                string_index: parts.string_index,
+                number_index: parts.number_index,
+            });
+        }
+
+        self.interner.object(properties)
+    }
+
     fn lower_call_signature(&self, sig: &SignatureData) -> CallSignature {
-        let params = self.lower_signature_params(sig);
-        let return_type = self.lower_type(sig.type_annotation);
-        let type_params = self.lower_type_parameters(&sig.type_parameters);
+        let (type_params, (params, this_type, return_type, type_predicate)) = self.with_type_params(&sig.type_parameters, || {
+            let (params, this_type) = self.lower_signature_params(sig);
+            let (return_type, type_predicate) = self.lower_return_type(sig.type_annotation);
+            (params, this_type, return_type, type_predicate)
+        });
 
         CallSignature {
             type_params,
             params,
+            this_type,
             return_type,
+            type_predicate,
         }
     }
 
     fn lower_method_signature(&self, sig: &SignatureData) -> TypeId {
-        let params = self.lower_signature_params(sig);
-        let return_type = self.lower_type(sig.type_annotation);
-        let type_params = self.lower_type_parameters(&sig.type_parameters);
+        let (type_params, (params, this_type, return_type, type_predicate)) = self.with_type_params(&sig.type_parameters, || {
+            let (params, this_type) = self.lower_signature_params(sig);
+            let (return_type, type_predicate) = self.lower_return_type(sig.type_annotation);
+            (params, this_type, return_type, type_predicate)
+        });
 
         self.interner.function(FunctionShape {
             type_params,
             params,
+            this_type,
             return_type,
+            type_predicate,
             is_constructor: false,
         })
     }
 
-    fn lower_signature_params(&self, sig: &SignatureData) -> Vec<ParamInfo> {
-        let Some(params) = &sig.parameters else { return Vec::new() };
-        params.nodes.iter().filter_map(|&idx| {
-            let param_node = self.arena.get(idx)?;
-            let param_data = self.arena.get_parameter(param_node)?;
-            Some(ParamInfo {
-                name: self.lower_parameter_name(param_data.name),
-                type_id: self.lower_type(param_data.type_annotation),
-                optional: param_data.question_token,
-                rest: param_data.dot_dot_dot_token,
-            })
-        }).collect()
+    fn lower_signature_params(&self, sig: &SignatureData) -> (Vec<ParamInfo>, Option<TypeId>) {
+        let Some(params) = &sig.parameters else { return (Vec::new(), None) };
+        self.lower_params_with_this(params)
     }
 
     fn lower_signature_name(&self, node_idx: NodeIndex) -> Option<Atom> {
@@ -612,6 +1009,215 @@ impl<'a> TypeLowering<'a> {
         })
     }
 
+    fn index_signature_properties_compatible(
+        &self,
+        properties: &[PropertyInfo],
+        string_index: Option<&IndexSignature>,
+        number_index: Option<&IndexSignature>,
+    ) -> bool {
+        if string_index.is_none() && number_index.is_none() {
+            return true;
+        }
+
+        let skip_string = string_index
+            .map(|idx| self.contains_meta_type(idx.value_type))
+            .unwrap_or(false);
+        let skip_number = number_index
+            .map(|idx| self.contains_meta_type(idx.value_type))
+            .unwrap_or(false);
+
+        let resolver = IndexSignatureResolver;
+        let mut checker = SubtypeChecker::with_resolver(self.interner, &resolver);
+
+        for prop in properties {
+            let prop_type = if prop.optional {
+                self.interner.union(vec![prop.type_id, TypeId::UNDEFINED])
+            } else {
+                prop.type_id
+            };
+
+            if self.contains_meta_type(prop_type) {
+                continue;
+            }
+
+            if let Some(number_idx) = number_index {
+                if !skip_number {
+                    let prop_name = self.interner.resolve_atom(prop.name);
+                    let is_numeric = prop_name.parse::<f64>().is_ok();
+                    if is_numeric && !checker.is_subtype_of(prop_type, number_idx.value_type) {
+                        return false;
+                    }
+                }
+            }
+
+            if let Some(string_idx) = string_index {
+                if !skip_string && !checker.is_subtype_of(prop_type, string_idx.value_type) {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
+
+    fn contains_meta_type(&self, type_id: TypeId) -> bool {
+        let mut visited = FxHashSet::default();
+        self.contains_meta_type_inner(type_id, &mut visited)
+    }
+
+    fn contains_meta_type_inner(&self, type_id: TypeId, visited: &mut FxHashSet<TypeId>) -> bool {
+        if !visited.insert(type_id) {
+            return false;
+        }
+
+        let key = match self.interner.lookup(type_id) {
+            Some(key) => key,
+            None => return false,
+        };
+
+        match key {
+            TypeKey::TypeParameter(_)
+            | TypeKey::Infer(_)
+            | TypeKey::ThisType
+            | TypeKey::TypeQuery(_)
+            | TypeKey::Conditional(_)
+            | TypeKey::Mapped(_)
+            | TypeKey::IndexAccess(_, _)
+            | TypeKey::KeyOf(_) => true,
+            TypeKey::Union(members) | TypeKey::Intersection(members) => members
+                .iter()
+                .any(|member| self.contains_meta_type_inner(*member, visited)),
+            TypeKey::Array(elem) => self.contains_meta_type_inner(elem, visited),
+            TypeKey::Tuple(elements) => elements
+                .iter()
+                .any(|elem| self.contains_meta_type_inner(elem.type_id, visited)),
+            TypeKey::Object(props) => props
+                .iter()
+                .any(|prop| self.contains_meta_type_inner(prop.type_id, visited)),
+            TypeKey::ObjectWithIndex(shape) => {
+                if shape
+                    .properties
+                    .iter()
+                    .any(|prop| self.contains_meta_type_inner(prop.type_id, visited))
+                {
+                    return true;
+                }
+                if let Some(index) = &shape.string_index {
+                    if self.contains_meta_type_inner(index.value_type, visited)
+                        || self.contains_meta_type_inner(index.key_type, visited)
+                    {
+                        return true;
+                    }
+                }
+                if let Some(index) = &shape.number_index {
+                    if self.contains_meta_type_inner(index.value_type, visited)
+                        || self.contains_meta_type_inner(index.key_type, visited)
+                    {
+                        return true;
+                    }
+                }
+                false
+            }
+            TypeKey::Function(shape) => {
+                if shape
+                    .params
+                    .iter()
+                    .any(|param| self.contains_meta_type_inner(param.type_id, visited))
+                {
+                    return true;
+                }
+                if self.contains_meta_type_inner(shape.return_type, visited) {
+                    return true;
+                }
+                for param in &shape.type_params {
+                    if let Some(constraint) = param.constraint {
+                        if self.contains_meta_type_inner(constraint, visited) {
+                            return true;
+                        }
+                    }
+                    if let Some(default) = param.default {
+                        if self.contains_meta_type_inner(default, visited) {
+                            return true;
+                        }
+                    }
+                }
+                false
+            }
+            TypeKey::Callable(shape) => {
+                for sig in &shape.call_signatures {
+                    if sig
+                        .params
+                        .iter()
+                        .any(|param| self.contains_meta_type_inner(param.type_id, visited))
+                    {
+                        return true;
+                    }
+                    if self.contains_meta_type_inner(sig.return_type, visited) {
+                        return true;
+                    }
+                    for param in &sig.type_params {
+                        if let Some(constraint) = param.constraint {
+                            if self.contains_meta_type_inner(constraint, visited) {
+                                return true;
+                            }
+                        }
+                        if let Some(default) = param.default {
+                            if self.contains_meta_type_inner(default, visited) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                for sig in &shape.construct_signatures {
+                    if sig
+                        .params
+                        .iter()
+                        .any(|param| self.contains_meta_type_inner(param.type_id, visited))
+                    {
+                        return true;
+                    }
+                    if self.contains_meta_type_inner(sig.return_type, visited) {
+                        return true;
+                    }
+                    for param in &sig.type_params {
+                        if let Some(constraint) = param.constraint {
+                            if self.contains_meta_type_inner(constraint, visited) {
+                                return true;
+                            }
+                        }
+                        if let Some(default) = param.default {
+                            if self.contains_meta_type_inner(default, visited) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                shape
+                    .properties
+                    .iter()
+                    .any(|prop| self.contains_meta_type_inner(prop.type_id, visited))
+            }
+            TypeKey::Application(app) => {
+                if self.contains_meta_type_inner(app.base, visited) {
+                    return true;
+                }
+                app.args
+                    .iter()
+                    .any(|arg| self.contains_meta_type_inner(*arg, visited))
+            }
+            TypeKey::ReadonlyType(inner) => self.contains_meta_type_inner(inner, visited),
+            TypeKey::TemplateLiteral(spans) => spans.iter().any(|span| match span {
+                TemplateSpan::Text(_) => false,
+                TemplateSpan::Type(inner) => self.contains_meta_type_inner(*inner, visited),
+            }),
+            TypeKey::Ref(_)
+            | TypeKey::Intrinsic(_)
+            | TypeKey::Literal(_)
+            | TypeKey::UniqueSymbol(_)
+            | TypeKey::Error => false,
+        }
+    }
+
     /// Lower a type element (property signature, method signature, etc.)
     fn lower_type_element(&self, node_idx: NodeIndex) -> Option<PropertyInfo> {
         let node = self.arena.get(node_idx)?;
@@ -629,6 +1235,7 @@ impl<'a> TypeLowering<'a> {
                 type_id: self.lower_type(sig.type_annotation),
                 optional: sig.question_token,
                 readonly,
+                is_method: false,
             })
         } else {
             None
@@ -659,15 +1266,211 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_conditional_type(node) {
+            let is_distributive = self.is_naked_type_param(data.check_type);
+            let check_type = self.lower_type(data.check_type);
+            let extends_type = self.lower_type(data.extends_type);
+
+            self.push_type_param_scope();
+            let mut visited = FxHashSet::default();
+            self.collect_infer_bindings(extends_type, &mut visited);
+            let true_type = self.lower_type(data.true_type);
+            let false_type = self.lower_type(data.false_type);
+            self.pop_type_param_scope();
+
             let cond = ConditionalType {
-                check_type: self.lower_type(data.check_type),
-                extends_type: self.lower_type(data.extends_type),
-                true_type: self.lower_type(data.true_type),
-                false_type: self.lower_type(data.false_type),
+                check_type,
+                extends_type,
+                true_type,
+                false_type,
+                is_distributive,
             };
             self.interner.intern(TypeKey::Conditional(Box::new(cond)))
         } else {
             TypeId::ERROR
+        }
+    }
+
+    fn is_naked_type_param(&self, node_idx: NodeIndex) -> bool {
+        let mut current = node_idx;
+        loop {
+            let Some(node) = self.arena.get(current) else { return false };
+            match node.kind {
+                k if k == syntax_kind_ext::PARENTHESIZED_TYPE => {
+                    if let Some(data) = self.arena.get_wrapped_type(node) {
+                        current = data.type_node;
+                        continue;
+                    }
+                    return false;
+                }
+                k if k == syntax_kind_ext::TYPE_REFERENCE => {
+                    let Some(data) = self.arena.get_type_ref(node) else { return false };
+                    if let Some(args) = &data.type_arguments {
+                        if !args.nodes.is_empty() {
+                            return false;
+                        }
+                    }
+                    let Some(name_node) = self.arena.get(data.type_name) else { return false };
+                    if let Some(ident) = self.arena.get_identifier(name_node) {
+                        return self.lookup_type_param(&ident.escaped_text).is_some();
+                    }
+                    return false;
+                }
+                k if k == SyntaxKind::Identifier as u16 => {
+                    let Some(ident) = self.arena.get_identifier(node) else { return false };
+                    return self.lookup_type_param(&ident.escaped_text).is_some();
+                }
+                _ => return false,
+            }
+        }
+    }
+
+    fn collect_infer_bindings(&self, type_id: TypeId, visited: &mut FxHashSet<TypeId>) {
+        if !visited.insert(type_id) {
+            return;
+        }
+
+        let key = match self.interner.lookup(type_id) {
+            Some(key) => key,
+            None => return,
+        };
+
+        match key {
+            TypeKey::Infer(info) => {
+                self.add_type_param_binding(info.name, type_id);
+                if let Some(constraint) = info.constraint {
+                    self.collect_infer_bindings(constraint, visited);
+                }
+                if let Some(default) = info.default {
+                    self.collect_infer_bindings(default, visited);
+                }
+            }
+            TypeKey::Array(elem) => self.collect_infer_bindings(elem, visited),
+            TypeKey::Tuple(elements) => {
+                for element in elements {
+                    self.collect_infer_bindings(element.type_id, visited);
+                }
+            }
+            TypeKey::Union(members) | TypeKey::Intersection(members) => {
+                for member in members {
+                    self.collect_infer_bindings(member, visited);
+                }
+            }
+            TypeKey::Object(props) => {
+                for prop in props {
+                    self.collect_infer_bindings(prop.type_id, visited);
+                }
+            }
+            TypeKey::ObjectWithIndex(shape) => {
+                for prop in &shape.properties {
+                    self.collect_infer_bindings(prop.type_id, visited);
+                }
+                if let Some(index) = &shape.string_index {
+                    self.collect_infer_bindings(index.key_type, visited);
+                    self.collect_infer_bindings(index.value_type, visited);
+                }
+                if let Some(index) = &shape.number_index {
+                    self.collect_infer_bindings(index.key_type, visited);
+                    self.collect_infer_bindings(index.value_type, visited);
+                }
+            }
+            TypeKey::Function(shape) => {
+                for param in &shape.params {
+                    self.collect_infer_bindings(param.type_id, visited);
+                }
+                self.collect_infer_bindings(shape.return_type, visited);
+                for param in &shape.type_params {
+                    if let Some(constraint) = param.constraint {
+                        self.collect_infer_bindings(constraint, visited);
+                    }
+                    if let Some(default) = param.default {
+                        self.collect_infer_bindings(default, visited);
+                    }
+                }
+            }
+            TypeKey::Callable(shape) => {
+                for sig in &shape.call_signatures {
+                    for param in &sig.params {
+                        self.collect_infer_bindings(param.type_id, visited);
+                    }
+                    self.collect_infer_bindings(sig.return_type, visited);
+                    for param in &sig.type_params {
+                        if let Some(constraint) = param.constraint {
+                            self.collect_infer_bindings(constraint, visited);
+                        }
+                        if let Some(default) = param.default {
+                            self.collect_infer_bindings(default, visited);
+                        }
+                    }
+                }
+                for sig in &shape.construct_signatures {
+                    for param in &sig.params {
+                        self.collect_infer_bindings(param.type_id, visited);
+                    }
+                    self.collect_infer_bindings(sig.return_type, visited);
+                    for param in &sig.type_params {
+                        if let Some(constraint) = param.constraint {
+                            self.collect_infer_bindings(constraint, visited);
+                        }
+                        if let Some(default) = param.default {
+                            self.collect_infer_bindings(default, visited);
+                        }
+                    }
+                }
+                for prop in &shape.properties {
+                    self.collect_infer_bindings(prop.type_id, visited);
+                }
+            }
+            TypeKey::TypeParameter(info) => {
+                if let Some(constraint) = info.constraint {
+                    self.collect_infer_bindings(constraint, visited);
+                }
+                if let Some(default) = info.default {
+                    self.collect_infer_bindings(default, visited);
+                }
+            }
+            TypeKey::Application(app) => {
+                self.collect_infer_bindings(app.base, visited);
+                for &arg in &app.args {
+                    self.collect_infer_bindings(arg, visited);
+                }
+            }
+            TypeKey::Conditional(cond) => {
+                self.collect_infer_bindings(cond.check_type, visited);
+                self.collect_infer_bindings(cond.extends_type, visited);
+                self.collect_infer_bindings(cond.true_type, visited);
+                self.collect_infer_bindings(cond.false_type, visited);
+            }
+            TypeKey::Mapped(mapped) => {
+                if let Some(constraint) = mapped.type_param.constraint {
+                    self.collect_infer_bindings(constraint, visited);
+                }
+                if let Some(default) = mapped.type_param.default {
+                    self.collect_infer_bindings(default, visited);
+                }
+                self.collect_infer_bindings(mapped.constraint, visited);
+                self.collect_infer_bindings(mapped.template, visited);
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                self.collect_infer_bindings(obj, visited);
+                self.collect_infer_bindings(idx, visited);
+            }
+            TypeKey::KeyOf(inner) | TypeKey::ReadonlyType(inner) => {
+                self.collect_infer_bindings(inner, visited);
+            }
+            TypeKey::TemplateLiteral(spans) => {
+                for span in spans {
+                    if let TemplateSpan::Type(inner) = span {
+                        self.collect_infer_bindings(inner, visited);
+                    }
+                }
+            }
+            TypeKey::Intrinsic(_)
+            | TypeKey::Literal(_)
+            | TypeKey::Ref(_)
+            | TypeKey::TypeQuery(_)
+            | TypeKey::UniqueSymbol(_)
+            | TypeKey::ThisType
+            | TypeKey::Error => {}
         }
     }
 
@@ -680,10 +1483,15 @@ impl<'a> TypeLowering<'a> {
 
         if let Some(data) = self.arena.get_mapped_type(node) {
             let (type_param, constraint) = self.lower_mapped_type_param(data.type_parameter);
+            self.push_type_param_scope();
+            let type_param_id = self.interner.intern(TypeKey::TypeParameter(type_param.clone()));
+            self.add_type_param_binding(type_param.name, type_param_id);
+            let template = self.lower_type(data.type_node);
+            self.pop_type_param_scope();
             let mapped = MappedType {
                 type_param,
                 constraint,
-                template: self.lower_type(data.type_node),
+                template,
                 readonly_modifier: self.lower_mapped_modifier(data.readonly_token, SyntaxKind::ReadonlyKeyword as u16),
                 optional_modifier: self.lower_mapped_modifier(data.question_token, SyntaxKind::QuestionToken as u16),
             };
@@ -771,6 +1579,165 @@ impl<'a> TypeLowering<'a> {
         }
     }
 
+    fn strip_numeric_separators<'b>(text: &'b str) -> std::borrow::Cow<'b, str> {
+        if !text.as_bytes().contains(&b'_') {
+            return std::borrow::Cow::Borrowed(text);
+        }
+
+        let mut out = String::with_capacity(text.len());
+        for &byte in text.as_bytes() {
+            if byte != b'_' {
+                out.push(byte as char);
+            }
+        }
+        std::borrow::Cow::Owned(out)
+    }
+
+    fn parse_numeric_literal_value(&self, value: Option<f64>, text: &str) -> Option<f64> {
+        if let Some(value) = value {
+            return Some(value);
+        }
+
+        if let Some(rest) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
+            return Self::parse_radix_digits(rest, 16);
+        }
+        if let Some(rest) = text.strip_prefix("0b").or_else(|| text.strip_prefix("0B")) {
+            return Self::parse_radix_digits(rest, 2);
+        }
+        if let Some(rest) = text.strip_prefix("0o").or_else(|| text.strip_prefix("0O")) {
+            return Self::parse_radix_digits(rest, 8);
+        }
+
+        if text.as_bytes().contains(&b'_') {
+            let cleaned = Self::strip_numeric_separators(text);
+            return cleaned.as_ref().parse::<f64>().ok();
+        }
+
+        text.parse::<f64>().ok()
+    }
+
+    fn parse_radix_digits(text: &str, base: u32) -> Option<f64> {
+        if text.is_empty() {
+            return None;
+        }
+
+        let mut value = 0f64;
+        let base_value = base as f64;
+        let mut saw_digit = false;
+        for &byte in text.as_bytes() {
+            if byte == b'_' {
+                continue;
+            }
+
+            let digit = match byte {
+                b'0'..=b'9' => (byte - b'0') as u32,
+                b'a'..=b'f' => (byte - b'a' + 10) as u32,
+                b'A'..=b'F' => (byte - b'A' + 10) as u32,
+                _ => return None,
+            };
+            if digit >= base {
+                return None;
+            }
+            saw_digit = true;
+            value = value * base_value + digit as f64;
+        }
+
+        if !saw_digit {
+            return None;
+        }
+
+        Some(value)
+    }
+
+    fn normalize_bigint_literal<'b>(&self, text: &'b str) -> Option<std::borrow::Cow<'b, str>> {
+        if let Some(rest) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
+            return Self::bigint_base_to_decimal(rest, 16).map(std::borrow::Cow::Owned);
+        }
+        if let Some(rest) = text.strip_prefix("0b").or_else(|| text.strip_prefix("0B")) {
+            return Self::bigint_base_to_decimal(rest, 2).map(std::borrow::Cow::Owned);
+        }
+        if let Some(rest) = text.strip_prefix("0o").or_else(|| text.strip_prefix("0O")) {
+            return Self::bigint_base_to_decimal(rest, 8).map(std::borrow::Cow::Owned);
+        }
+
+        match Self::strip_numeric_separators(text) {
+            std::borrow::Cow::Borrowed(cleaned) => {
+                let trimmed = cleaned.trim_start_matches('0');
+                if trimmed.is_empty() {
+                    return Some(std::borrow::Cow::Borrowed("0"));
+                }
+                if trimmed.len() == cleaned.len() {
+                    return Some(std::borrow::Cow::Borrowed(cleaned));
+                }
+                Some(std::borrow::Cow::Borrowed(trimmed))
+            }
+            std::borrow::Cow::Owned(mut cleaned) => {
+                let cleaned_ref = cleaned.as_str();
+                let trimmed = cleaned_ref.trim_start_matches('0');
+                if trimmed.is_empty() {
+                    return Some(std::borrow::Cow::Borrowed("0"));
+                }
+                if trimmed.len() == cleaned_ref.len() {
+                    return Some(std::borrow::Cow::Owned(cleaned));
+                }
+
+                let trim_len = cleaned_ref.len() - trimmed.len();
+                cleaned.drain(..trim_len);
+                Some(std::borrow::Cow::Owned(cleaned))
+            }
+        }
+    }
+
+    fn bigint_base_to_decimal(text: &str, base: u32) -> Option<String> {
+        if text.is_empty() {
+            return None;
+        }
+
+        let mut digits: Vec<u8> = vec![0];
+        let mut saw_digit = false;
+        for &byte in text.as_bytes() {
+            if byte == b'_' {
+                continue;
+            }
+
+            let digit = match byte {
+                b'0'..=b'9' => (byte - b'0') as u32,
+                b'a'..=b'f' => (byte - b'a' + 10) as u32,
+                b'A'..=b'F' => (byte - b'A' + 10) as u32,
+                _ => return None,
+            };
+            if digit >= base {
+                return None;
+            }
+            saw_digit = true;
+
+            let mut carry = digit;
+            for slot in &mut digits {
+                let value = (*slot as u32) * base + carry;
+                *slot = (value % 10) as u8;
+                carry = value / 10;
+            }
+            while carry > 0 {
+                digits.push((carry % 10) as u8);
+                carry /= 10;
+            }
+        }
+
+        if !saw_digit {
+            return None;
+        }
+
+        while digits.len() > 1 && *digits.last().unwrap() == 0 {
+            digits.pop();
+        }
+
+        let mut out = String::with_capacity(digits.len());
+        for digit in digits.iter().rev() {
+            out.push(char::from(b'0' + *digit));
+        }
+        Some(out)
+    }
+
     /// Lower a literal type ("foo", 42, etc.)
     fn lower_literal_type(&self, node_idx: NodeIndex) -> TypeId {
         let node = match self.arena.get(node_idx) {
@@ -791,8 +1758,8 @@ impl<'a> TypeLowering<'a> {
                     }
                     k if k == SyntaxKind::NumericLiteral as u16 => {
                         if let Some(lit_data) = self.arena.get_literal(literal_node) {
-                            if let Ok(n) = lit_data.text.parse::<f64>() {
-                                self.interner.literal_number(n)
+                            if let Some(value) = self.parse_numeric_literal_value(lit_data.value, &lit_data.text) {
+                                self.interner.literal_number(value)
                             } else {
                                 TypeId::NUMBER
                             }
@@ -803,7 +1770,11 @@ impl<'a> TypeLowering<'a> {
                     k if k == SyntaxKind::BigIntLiteral as u16 => {
                         if let Some(lit_data) = self.arena.get_literal(literal_node) {
                             let text = lit_data.text.strip_suffix('n').unwrap_or(&lit_data.text);
-                            self.interner.literal_bigint(text)
+                            if let Some(normalized) = self.normalize_bigint_literal(text) {
+                                self.interner.literal_bigint(normalized.as_ref())
+                            } else {
+                                TypeId::BIGINT
+                            }
                         } else {
                             TypeId::BIGINT
                         }
@@ -813,6 +1784,44 @@ impl<'a> TypeLowering<'a> {
                     }
                     k if k == SyntaxKind::FalseKeyword as u16 => {
                         self.interner.literal_boolean(false)
+                    }
+                    k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION => {
+                        if let Some(unary) = self.arena.get_unary_expr(literal_node) {
+                            let op = unary.operator;
+                            let Some(operand_node) = self.arena.get(unary.operand) else {
+                                return TypeId::ANY;
+                            };
+                            match operand_node.kind {
+                                k if k == SyntaxKind::NumericLiteral as u16 => {
+                                    if let Some(lit_data) = self.arena.get_literal(operand_node) {
+                                        if let Some(value) = self.parse_numeric_literal_value(lit_data.value, &lit_data.text) {
+                                            let value = if op == SyntaxKind::MinusToken as u16 { -value } else { value };
+                                            self.interner.literal_number(value)
+                                        } else {
+                                            TypeId::NUMBER
+                                        }
+                                    } else {
+                                        TypeId::NUMBER
+                                    }
+                                }
+                                k if k == SyntaxKind::BigIntLiteral as u16 => {
+                                    if let Some(lit_data) = self.arena.get_literal(operand_node) {
+                                        let text = lit_data.text.strip_suffix('n').unwrap_or(&lit_data.text);
+                                        let negative = op == SyntaxKind::MinusToken as u16;
+                                        if let Some(normalized) = self.normalize_bigint_literal(text) {
+                                            self.interner.literal_bigint_with_sign(negative, normalized.as_ref())
+                                        } else {
+                                            TypeId::BIGINT
+                                        }
+                                    } else {
+                                        TypeId::BIGINT
+                                    }
+                                }
+                                _ => TypeId::ANY,
+                            }
+                        } else {
+                            TypeId::ANY
+                        }
                     }
                     _ => TypeId::ANY,
                 }
@@ -832,6 +1841,27 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_type_ref(node) {
+            if let Some(name_node) = self.arena.get(data.type_name) {
+                if let Some(ident) = self.arena.get_identifier(name_node) {
+                    let name = ident.escaped_text.as_str();
+                    if (name == "Array" || name == "ReadonlyArray")
+                        && self.lookup_type_param(name).is_none()
+                        && self.resolve_type_symbol(data.type_name).is_none()
+                    {
+                        let elem_type = data.type_arguments
+                            .as_ref()
+                            .and_then(|args| args.nodes.first().copied())
+                            .map(|idx| self.lower_type(idx))
+                            .unwrap_or(TypeId::ANY);
+                        let array_type = self.interner.array(elem_type);
+                        if name == "ReadonlyArray" {
+                            return self.interner.intern(TypeKey::ReadonlyType(array_type));
+                        }
+                        return array_type;
+                    }
+                }
+            }
+
             // For now, just lower the type name as an identifier
             let base_type = self.lower_type(data.type_name);
             if let Some(args) = &data.type_arguments {
@@ -848,6 +1878,14 @@ impl<'a> TypeLowering<'a> {
         }
     }
 
+    /// Lower a qualified name type (A.B).
+    fn lower_qualified_name_type(&self, node_idx: NodeIndex) -> TypeId {
+        if let Some(symbol_id) = self.resolve_type_symbol(node_idx) {
+            return self.interner.reference(SymbolRef(symbol_id));
+        }
+        TypeId::ERROR
+    }
+
     /// Lower an identifier as a type (simple type reference)
     fn lower_identifier_type(&self, node_idx: NodeIndex) -> TypeId {
         let node = match self.arena.get(node_idx) {
@@ -858,7 +1896,11 @@ impl<'a> TypeLowering<'a> {
         if let Some(data) = self.arena.get_identifier(node) {
             let name = &data.escaped_text;
 
-            if let Some(symbol_id) = self.resolve_symbol(node_idx) {
+            if let Some(type_param) = self.lookup_type_param(name) {
+                return type_param;
+            }
+
+            if let Some(symbol_id) = self.resolve_type_symbol(node_idx) {
                 return self.interner.reference(SymbolRef(symbol_id));
             }
 
@@ -909,8 +1951,19 @@ impl<'a> TypeLowering<'a> {
 
         if let Some(data) = self.arena.get_type_query(node) {
             // Create a symbol reference from the expression name
-            if let Some(symbol_id) = self.resolve_symbol(data.expr_name) {
-                return self.interner.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)));
+            if let Some(symbol_id) = self.resolve_value_symbol(data.expr_name) {
+                let base = self.interner.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)));
+                if let Some(args) = &data.type_arguments {
+                    if !args.nodes.is_empty() {
+                        let type_args: Vec<TypeId> = args
+                            .nodes
+                            .iter()
+                            .map(|&idx| self.lower_type(idx))
+                            .collect();
+                        return self.interner.application(base, type_args);
+                    }
+                }
+                return base;
             }
             TypeId::ERROR
         } else {
@@ -947,6 +2000,57 @@ impl<'a> TypeLowering<'a> {
         }
     }
 
+    fn lower_type_predicate(&self, node_idx: NodeIndex) -> TypeId {
+        self.lower_type_predicate_return(node_idx).0
+    }
+
+    fn lower_type_predicate_target(&self, node_idx: NodeIndex) -> Option<TypePredicateTarget> {
+        let node = self.arena.get(node_idx)?;
+        if node.kind == SyntaxKind::ThisKeyword as u16 || node.kind == syntax_kind_ext::THIS_TYPE {
+            return Some(TypePredicateTarget::This);
+        }
+
+        self.arena
+            .get_identifier(node)
+            .map(|ident| TypePredicateTarget::Identifier(self.interner.intern_string(&ident.escaped_text)))
+    }
+
+    fn lower_type_predicate_return(&self, node_idx: NodeIndex) -> (TypeId, Option<TypePredicate>) {
+        let node = match self.arena.get(node_idx) {
+            Some(n) => n,
+            None => return (TypeId::ERROR, None),
+        };
+
+        let Some(data) = self.arena.get_type_predicate(node) else {
+            return (TypeId::BOOLEAN, None);
+        };
+
+        let return_type = if data.asserts_modifier {
+            TypeId::VOID
+        } else {
+            TypeId::BOOLEAN
+        };
+
+        let target = match self.lower_type_predicate_target(data.parameter_name) {
+            Some(target) => target,
+            None => return (return_type, None),
+        };
+
+        let type_id = if data.type_node != NodeIndex::NONE {
+            Some(self.lower_type(data.type_node))
+        } else {
+            None
+        };
+
+        let predicate = TypePredicate {
+            asserts: data.asserts_modifier,
+            target,
+            type_id,
+        };
+
+        (return_type, Some(predicate))
+    }
+
     /// Lower an infer type (infer R)
     fn lower_infer_type(&self, node_idx: NodeIndex) -> TypeId {
         let node = match self.arena.get(node_idx) {
@@ -955,20 +2059,13 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_infer_type(node) {
-            // Get the type parameter name
+            if let Some(info) = self.lower_type_parameter(data.type_parameter) {
+                return self.interner.intern(TypeKey::Infer(info));
+            }
+
+            // Fallback: synthesize a name if the node isn't a type parameter.
             let name = if let Some(tp_node) = self.arena.get(data.type_parameter) {
-                // Type parameter node should have an identifier
-                if let Some(tp_data) = self.arena.get_type_parameter(tp_node) {
-                    if let Some(name_node) = self.arena.get(tp_data.name) {
-                        if let Some(id_data) = self.arena.get_identifier(name_node) {
-                            self.interner.intern_string(&id_data.escaped_text)
-                        } else {
-                            self.interner.intern_string("infer")
-                        }
-                    } else {
-                        self.interner.intern_string("infer")
-                    }
-                } else if let Some(id_data) = self.arena.get_identifier(tp_node) {
+                if let Some(id_data) = self.arena.get_identifier(tp_node) {
                     self.interner.intern_string(&id_data.escaped_text)
                 } else {
                     self.interner.intern_string("infer")
@@ -1056,33 +2153,19 @@ impl<'a> TypeLowering<'a> {
 
         // Constructor types use the same data structure as function types
         if let Some(data) = self.arena.get_function_type(node) {
-            // Lower parameters
-            let params: Vec<ParamInfo> = data.parameters.nodes.iter()
-                .filter_map(|&idx| {
-                    if let Some(param_node) = self.arena.get(idx) {
-                        if let Some(param_data) = self.arena.get_parameter(param_node) {
-                            return Some(ParamInfo {
-                                name: self.lower_parameter_name(param_data.name),
-                                type_id: self.lower_type(param_data.type_annotation),
-                                optional: param_data.question_token,
-                                rest: param_data.dot_dot_dot_token,
-                            });
-                        }
-                    }
-                    None
-                })
-                .collect();
+            let (type_params, (params, this_type, return_type, type_predicate)) = self.with_type_params(&data.type_parameters, || {
+                let (params, this_type) = self.lower_params_with_this(&data.parameters);
 
-            // Lower return type
-            let return_type = self.lower_type(data.type_annotation);
-
-            // Lower type parameters
-            let type_params = self.lower_type_parameters(&data.type_parameters);
+                let (return_type, type_predicate) = self.lower_return_type(data.type_annotation);
+                (params, this_type, return_type, type_predicate)
+            });
 
             let shape = FunctionShape {
                 type_params,
                 params,
+                this_type,
                 return_type,
+                type_predicate,
                 is_constructor: true, // Mark as constructor
             };
 
@@ -1100,12 +2183,14 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_wrapped_type(node) {
-            // Just unwrap and lower the inner type
-            // The optional/rest nature is handled at the tuple level
-            self.lower_type(data.type_node)
-        } else {
-            TypeId::ERROR
+            return self.lower_type(data.type_node);
         }
+
+        if let Some(data) = self.arena.type_operators.get(node.data_index as usize) {
+            return self.lower_type(data.type_node);
+        }
+
+        TypeId::ERROR
     }
 }
 

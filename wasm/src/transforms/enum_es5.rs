@@ -412,7 +412,9 @@ mod tests {
         assert!(!output.contains("S[S["), "String enums should not have reverse mapping");
     }
 
-    // Note: test_const_enum_erased is skipped because the parser currently
-    // doesn't attach the `const` modifier to enum nodes parsed via `const enum`.
-    // The is_const_enum() check is in place for when the parser is fixed.
+    #[test]
+    fn test_const_enum_erased() {
+        let output = emit_enum("const enum CE { A = 0 }");
+        assert!(output.trim().is_empty(), "Const enums should be erased: {}", output);
+    }
 }
