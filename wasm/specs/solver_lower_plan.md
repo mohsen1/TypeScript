@@ -141,6 +141,10 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: typeof lowering uses value resolver (type vs value space)
   - [x] Test: typeof type query with type arguments
   - [x] Test: checker preserves type arguments on typeof type queries
+  - [x] Test: checker element access returns array element type
+  - [x] Test: checker element access returns tuple element types
+  - [x] Element access uses literal index nodes for tuple lookup
+  - [x] Contextual typing for array literals respects tuple element expectations
 - [x] Parser: fix interface member parsing to track progress by token position (avoid skipping consecutive identifiers)
 - [x] Perf: avoid extra String clone when lowering negative bigint literals
 - [x] Perf: avoid extra allocation when normalizing bigint leading zeros

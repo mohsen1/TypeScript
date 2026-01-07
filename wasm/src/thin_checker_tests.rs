@@ -1885,6 +1885,62 @@ function id<T>(value: T): T {
 }
 
 #[test]
+fn test_checker_lowers_element_access_array() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const arr: number[] = [1, 2];
+const value = arr[0];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_lowers_element_access_tuple_literals() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const tup: [string, number] = ["a", 1];
+const first = tup[0];
+const second = tup[1];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let first_sym = binder.file_locals.get("first").expect("first should exist");
+    let second_sym = binder.file_locals.get("second").expect("second should exist");
+
+    let first_type = checker.get_type_of_symbol(first_sym);
+    let second_type = checker.get_type_of_symbol(second_sym);
+
+    assert_eq!(first_type, TypeId::STRING);
+    assert_eq!(second_type, TypeId::NUMBER);
+}
+
+#[test]
 fn test_checker_namespace_merges_with_class_exports() {
     use crate::thin_parser::ThinParserState;
     use crate::solver::TypeKey;

@@ -722,9 +722,8 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ANY;
         };
 
-        // ArrayType uses TypeOperatorData which has the element type
-        if let Some(type_op) = self.ctx.arena.get_type_operator(node) {
-            let elem_type = self.get_type_of_node(type_op.type_node);
+        if let Some(array_type) = self.ctx.arena.get_array_type(node) {
+            let elem_type = self.get_type_from_type_node(array_type.element_type);
             return self.ctx.types.array(elem_type);
         }
 
@@ -1279,10 +1278,9 @@ impl<'a> ThinCheckerState<'a> {
             if !value_decl.is_none() {
                 if let Some(node) = self.ctx.arena.get(value_decl) {
                     if let Some(var_decl) = self.ctx.arena.get_variable_declaration(node) {
-                        // First try type annotation - use get_type_of_node to resolve type references
-                        // through the binder (for interfaces, classes, etc.)
+                        // First try type annotation using type-node lowering (resolves through binder).
                         if !var_decl.type_annotation.is_none() {
-                            return self.get_type_of_node(var_decl.type_annotation);
+                            return self.get_type_from_type_node(var_decl.type_annotation);
                         }
                         // Fall back to inferring from initializer
                         if !var_decl.initializer.is_none() {
@@ -1731,14 +1729,100 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         // Get the type of the object
-        let _object_type = self.get_type_of_node(access.expression);
+        let object_type = self.get_type_of_node(access.expression);
 
         // Get the index type
-        let _index_type = self.get_type_of_node(access.name_or_argument);
+        let literal_index = self.get_literal_index_from_node(access.name_or_argument);
+        let index_type = self.get_type_of_node(access.name_or_argument);
 
-        // For now, return any for element access
-        // TODO: Extract element type from array/tuple types using TypeInterner lookup
-        TypeId::ANY
+        self.get_element_access_type(object_type, index_type, literal_index)
+    }
+
+    fn get_element_access_type(
+        &mut self,
+        object_type: TypeId,
+        index_type: TypeId,
+        literal_index: Option<usize>,
+    ) -> TypeId {
+        use crate::solver::{LiteralValue, TypeKey};
+
+        let object_key = match self.ctx.types.lookup(object_type) {
+            Some(TypeKey::ReadonlyType(inner)) => self.ctx.types.lookup(inner),
+            other => other,
+        };
+
+        match object_key {
+            Some(TypeKey::Array(element)) => element,
+            Some(TypeKey::Tuple(elements)) => {
+                let literal_index = literal_index.or_else(|| {
+                    match self.ctx.types.lookup(index_type) {
+                        Some(TypeKey::Literal(LiteralValue::Number(num))) => {
+                            let value = num.0;
+                            if value.is_finite() && value.fract() == 0.0 && value >= 0.0 {
+                                Some(value as usize)
+                            } else {
+                                None
+                            }
+                        }
+                        _ => None,
+                    }
+                });
+
+                if let Some(index) = literal_index {
+                    if let Some(element) = elements.get(index) {
+                        return element.type_id;
+                    }
+                    return TypeId::ANY;
+                }
+
+                let mut element_types: Vec<TypeId> = elements.iter().map(|element| element.type_id).collect();
+                if element_types.is_empty() {
+                    TypeId::NEVER
+                } else if element_types.len() == 1 {
+                    element_types[0]
+                } else {
+                    self.ctx.types.union(element_types)
+                }
+            }
+            Some(TypeKey::Union(members)) => {
+                let mut member_types = Vec::with_capacity(members.len());
+                for member in members {
+                    member_types.push(self.get_element_access_type(member, index_type, literal_index));
+                }
+                if member_types.is_empty() {
+                    TypeId::ANY
+                } else {
+                    self.ctx.types.union(member_types)
+                }
+            }
+            _ => TypeId::ANY,
+        }
+    }
+
+    fn get_literal_index_from_node(&self, idx: NodeIndex) -> Option<usize> {
+        use crate::scanner::SyntaxKind;
+
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return None;
+        };
+
+        if node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+            if let Some(paren) = self.ctx.arena.get_parenthesized(node) {
+                return self.get_literal_index_from_node(paren.expression);
+            }
+        }
+
+        if node.kind == SyntaxKind::NumericLiteral as u16 {
+            if let Some(lit) = self.ctx.arena.get_literal(node) {
+                if let Some(value) = lit.value {
+                    if value.is_finite() && value.fract() == 0.0 && value >= 0.0 {
+                        return Some(value as usize);
+                    }
+                }
+            }
+        }
+
+        None
     }
 
     /// Get type of conditional expression (ternary: a ? b : c).
@@ -1908,6 +1992,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of array literal.
     fn get_type_of_array_literal(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::{TupleElement, TypeKey};
+
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
         };
@@ -1924,12 +2010,69 @@ impl<'a> ThinCheckerState<'a> {
             return self.ctx.types.array(TypeId::NEVER);
         }
 
-        // Get types of all elements
+        let tuple_context = match self.ctx.contextual_type {
+            Some(ctx_type) => match self.ctx.types.lookup(ctx_type) {
+                Some(TypeKey::Tuple(elements)) => Some(elements.clone()),
+                _ => None,
+            },
+            None => None,
+        };
+
+        let ctx_helper = if let Some(ctx_type) = self.ctx.contextual_type {
+            Some(ContextualTypeContext::with_expected(self.ctx.types, ctx_type))
+        } else {
+            None
+        };
+
+        // Get types of all elements, applying contextual typing when available.
         let mut element_types = Vec::new();
-        for &elem_idx in &array.elements.nodes {
-            if !elem_idx.is_none() {
-                element_types.push(self.get_type_of_node(elem_idx));
+        let mut tuple_elements = Vec::new();
+        for (index, &elem_idx) in array.elements.nodes.iter().enumerate() {
+            if elem_idx.is_none() {
+                continue;
             }
+
+            let prev_context = self.ctx.contextual_type;
+            if let Some(ref helper) = ctx_helper {
+                if tuple_context.is_some() {
+                    self.ctx.contextual_type = helper.get_tuple_element_type(index);
+                } else {
+                    self.ctx.contextual_type = helper.get_array_element_type();
+                }
+            }
+
+            let elem_type = self.get_type_of_node(elem_idx);
+
+            self.ctx.contextual_type = prev_context;
+
+            if let Some(ref expected) = tuple_context {
+                let (name, optional, rest) = match expected.get(index) {
+                    Some(el) => (el.name, el.optional, el.rest),
+                    None => {
+                        if let Some(last) = expected.last() {
+                            if last.rest {
+                                (last.name, last.optional, last.rest)
+                            } else {
+                                (None, false, false)
+                            }
+                        } else {
+                            (None, false, false)
+                        }
+                    }
+                };
+                tuple_elements.push(TupleElement {
+                    type_id: elem_type,
+                    name,
+                    optional,
+                    rest,
+                });
+            } else {
+                element_types.push(elem_type);
+            }
+        }
+
+        if tuple_context.is_some() {
+            return self.ctx.types.tuple(tuple_elements);
         }
 
         // Create union of element types using TypeInterner
