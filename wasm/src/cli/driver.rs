@@ -802,6 +802,14 @@ fn collect_module_specifiers(arena: &ThinNodeArena, source_file: NodeIndex) -> V
         if let Some(export_decl) = arena.get_export_decl(stmt) {
             if let Some(text) = arena.get_literal_text(export_decl.module_specifier) {
                 specifiers.push(text.to_string());
+            } else if !export_decl.export_clause.is_none() {
+                if let Some(clause_node) = arena.get(export_decl.export_clause) {
+                    if let Some(import_decl) = arena.get_import_decl(clause_node) {
+                        if let Some(text) = arena.get_literal_text(import_decl.module_specifier) {
+                            specifiers.push(text.to_string());
+                        }
+                    }
+                }
             }
         }
     }
@@ -865,9 +873,6 @@ fn collect_export_binding_nodes(
         let Some(export_decl) = arena.get_export_decl(stmt) else {
             continue;
         };
-        let Some(specifier) = arena.get_literal_text(export_decl.module_specifier) else {
-            continue;
-        };
         if export_decl.export_clause.is_none() {
             continue;
         }
@@ -876,8 +881,25 @@ fn collect_export_binding_nodes(
             continue;
         };
 
+        let import_decl = arena.get_import_decl(clause_node);
+        let mut specifier = arena
+            .get_literal_text(export_decl.module_specifier)
+            .map(|text| text.to_string());
+        if specifier.is_none() {
+            if let Some(import_decl) = import_decl {
+                if let Some(text) = arena.get_literal_text(import_decl.module_specifier) {
+                    specifier = Some(text.to_string());
+                }
+            }
+        }
+        let Some(specifier) = specifier else {
+            continue;
+        };
+
         let mut nodes = Vec::new();
-        if let Some(named) = arena.get_named_imports(clause_node) {
+        if import_decl.is_some() {
+            nodes.push(clause_idx);
+        } else if let Some(named) = arena.get_named_imports(clause_node) {
             for &spec_idx in &named.elements.nodes {
                 if !spec_idx.is_none() {
                     nodes.push(spec_idx);
