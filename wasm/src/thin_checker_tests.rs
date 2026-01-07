@@ -1482,6 +1482,39 @@ map["a"] = 2;
 }
 
 #[test]
+fn test_readonly_index_signature_variable_access_assignment_2540() {
+    // Error 2540: Cannot assign via readonly index signature.
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface ReadonlyMap {
+    readonly [key: string]: number;
+}
+let map: ReadonlyMap = { a: 1 };
+let key: string = "a";
+map[key] = 2;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    let count_2540 = codes.iter().filter(|&&c| c == 2540).count();
+    assert!(count_2540 >= 1,
+        "Expected at least 1 error 2540 for readonly index signature assignment, got {} in: {:?}", count_2540, codes);
+}
+
+#[test]
 fn test_abstractPropertyNegative_errors() {
     // Test the full abstractPropertyNegative test case to verify expected errors
     use crate::thin_parser::ThinParserState;
@@ -1707,6 +1740,30 @@ fn test_contextual_typing_for_object_properties() {
     assert_eq!(ctx.get_property_type("name"), Some(TypeId::STRING));
     assert_eq!(ctx.get_property_type("age"), Some(TypeId::NUMBER));
     assert_eq!(ctx.get_property_type("unknown"), None);
+}
+
+#[test]
+fn test_contextual_property_type_infers_callback_param() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Handler = { cb: (x: number) => void };
+const h: Handler = { cb: x => x.toUpperCase() };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2339),
+        "Expected error 2339 for contextual property param mismatch, got: {:?}", codes);
 }
 
 #[test]
@@ -3464,6 +3521,76 @@ const value = obj?.["a"];
             let members = types.type_list(members);
             assert!(members.contains(&TypeId::NUMBER));
             assert!(members.contains(&TypeId::UNDEFINED));
+        }
+        _ => panic!("Expected union type for value, got {:?}", value_key),
+    }
+}
+
+#[test]
+fn test_checker_property_access_optional_chain_nullable_object() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+type Foo = { a: number };
+let obj: Foo | undefined;
+const value = obj?.a;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    let value_key = types.lookup(value_type).expect("value type should exist");
+    match value_key {
+        TypeKey::Union(members) => {
+            let members = types.type_list(members);
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&TypeId::UNDEFINED));
+        }
+        _ => panic!("Expected union type for value, got {:?}", value_key),
+    }
+}
+
+#[test]
+fn test_checker_property_access_union_type() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+type U = { a: number } | { a: string };
+const obj: U = { a: 1 };
+const value = obj.a;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    let value_key = types.lookup(value_type).expect("value type should exist");
+    match value_key {
+        TypeKey::Union(members) => {
+            let members = types.type_list(members);
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&TypeId::STRING));
         }
         _ => panic!("Expected union type for value, got {:?}", value_key),
     }

@@ -1287,6 +1287,10 @@ fn test_two_phase_emission_es5_tagged_template_downlevel() {
     let ctx = EmitContext::es5();
     let lowering = LoweringPass::new(&arena, &ctx);
     let transforms = lowering.run(root);
+    assert!(
+        transforms.helpers().make_template_object,
+        "Expected __makeTemplateObject helper to be set for tagged template"
+    );
 
     let mut printer = ThinPrinter::with_transforms(&arena, transforms);
     printer.set_target_es5(true);
