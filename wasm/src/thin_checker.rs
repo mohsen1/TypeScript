@@ -3496,7 +3496,7 @@ impl<'a> ThinCheckerState<'a> {
             let property_name = &ident.escaped_text;
 
             if let Some(member_type) = self.resolve_namespace_value_member(object_type, property_name) {
-                return member_type;
+                return self.apply_flow_narrowing(idx, member_type);
             }
             if self.namespace_has_type_only_member(object_type, property_name) {
                 self.error_type_only_value_at(property_name, access.name_or_argument);
@@ -3521,7 +3521,7 @@ impl<'a> ThinCheckerState<'a> {
                             diagnostic_codes::PROPERTY_ACCESS_FROM_INDEX_SIGNATURE,
                         );
                     }
-                    prop_type
+                    self.apply_flow_narrowing(idx, prop_type)
                 }
 
                 PropertyAccessResult::PropertyNotFound { .. } => {
@@ -3552,7 +3552,7 @@ impl<'a> ThinCheckerState<'a> {
                     self.error_at_node(access.expression, message, code);
 
                     // Error recovery: return the property type found in valid members
-                    property_type.unwrap_or(TypeId::ERROR)
+                    self.apply_flow_narrowing(idx, property_type.unwrap_or(TypeId::ERROR))
                 }
 
                 PropertyAccessResult::IsUnknown => {
