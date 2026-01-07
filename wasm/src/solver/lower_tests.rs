@@ -1400,7 +1400,7 @@ fn test_lower_type_literal_construct_signature() {
 
 #[test]
 fn test_lower_type_literal_index_signature() {
-    let (arena, literal_idx) = parse_type_literal("type T = { [key: string]: number; foo: string; };");
+    let (arena, literal_idx) = parse_type_literal("type T = { [key: string]: number; foo: number; };");
     let interner = TypeInterner::new();
     let lowering = TypeLowering::new(&arena, &interner);
 
@@ -1416,6 +1416,28 @@ fn test_lower_type_literal_index_signature() {
         }
         _ => panic!("Expected ObjectWithIndex type, got {:?}", key),
     }
+}
+
+#[test]
+fn test_lower_type_literal_index_signature_mismatch() {
+    let (arena, literal_idx) =
+        parse_type_literal("type T = { [key: string]: number; foo: string; };");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(literal_idx);
+    assert_eq!(type_id, TypeId::ERROR);
+}
+
+#[test]
+fn test_lower_interface_index_signature_mismatch() {
+    let source = "interface Foo { [key: string]: number; foo: string; }";
+    let (arena, declarations) = parse_interface_declarations(source, "Foo");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_interface_declarations(&declarations);
+    assert_eq!(type_id, TypeId::ERROR);
 }
 
 #[test]

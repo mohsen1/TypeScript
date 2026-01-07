@@ -149,6 +149,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Validate explicit properties against target index signatures even with source index signatures
 - [x] Tests for object-with-index property vs index signature compatibility
 
+### Phase 22: Index Signature Consistency (Lowering)
+- [x] Reject object types whose properties conflict with declared index signatures
+- [x] Tests for index signature mismatch during lowering
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
