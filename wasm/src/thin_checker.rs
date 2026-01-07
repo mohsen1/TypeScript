@@ -1301,8 +1301,7 @@ impl<'a> ThinCheckerState<'a> {
     /// to build a callable type if the interface has call signatures.
     fn get_type_of_interface(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{CallSignature as SolverCallSignature, CallableShape, PropertyInfo, TypeKey};
-        use crate::parser::syntax_kind_ext::{CALL_SIGNATURE, CONSTRUCT_SIGNATURE, PROPERTY_SIGNATURE, METHOD_SIGNATURE, HERITAGE_CLAUSE, EXPRESSION_WITH_TYPE_ARGUMENTS};
-        use std::sync::Arc;
+        use crate::parser::syntax_kind_ext::{CALL_SIGNATURE, CONSTRUCT_SIGNATURE, PROPERTY_SIGNATURE, METHOD_SIGNATURE, HERITAGE_CLAUSE};
 
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
@@ -1311,6 +1310,9 @@ impl<'a> ThinCheckerState<'a> {
         let Some(interface) = self.ctx.arena.get_interface(node) else {
             return TypeId::ANY;
         };
+
+        let (_interface_type_params, interface_type_param_updates) =
+            self.push_type_parameters(&interface.type_parameters);
 
         let mut call_signatures: Vec<SolverCallSignature> = Vec::new();
         let mut construct_signatures: Vec<SolverCallSignature> = Vec::new();
@@ -1351,6 +1353,7 @@ impl<'a> ThinCheckerState<'a> {
             if member_node.kind == CALL_SIGNATURE {
                 // Extract call signature
                 if let Some(sig) = self.ctx.arena.get_signature(member_node) {
+                    let (type_params, type_param_updates) = self.push_type_parameters(&sig.type_parameters);
                     let (params, this_type) = self.extract_params_from_signature(sig);
                     let return_type = if !sig.type_annotation.is_none() {
                         self.get_type_of_node(sig.type_annotation)
@@ -1359,16 +1362,18 @@ impl<'a> ThinCheckerState<'a> {
                     };
 
                     call_signatures.push(SolverCallSignature {
-                        type_params: Vec::new(), // TODO: Handle type parameters
+                        type_params,
                         params,
                         this_type,
                         return_type,
                         type_predicate: None,
                     });
+                    self.pop_type_parameters(type_param_updates);
                 }
             } else if member_node.kind == CONSTRUCT_SIGNATURE {
                 // Extract construct signature
                 if let Some(sig) = self.ctx.arena.get_signature(member_node) {
+                    let (type_params, type_param_updates) = self.push_type_parameters(&sig.type_parameters);
                     let (params, this_type) = self.extract_params_from_signature(sig);
                     let return_type = if !sig.type_annotation.is_none() {
                         self.get_type_of_node(sig.type_annotation)
@@ -1377,12 +1382,13 @@ impl<'a> ThinCheckerState<'a> {
                     };
 
                     construct_signatures.push(SolverCallSignature {
-                        type_params: Vec::new(),
+                        type_params,
                         params,
                         this_type,
                         return_type,
                         type_predicate: None,
                     });
+                    self.pop_type_parameters(type_param_updates);
                 }
             } else if member_node.kind == PROPERTY_SIGNATURE || member_node.kind == METHOD_SIGNATURE {
                 // Extract property
@@ -1399,7 +1405,7 @@ impl<'a> ThinCheckerState<'a> {
                                 name: self.ctx.types.intern_string(&id_data.escaped_text),
                                 type_id,
                                 optional: sig.question_token,
-                                readonly: false, // TODO: Check for readonly modifier,
+                                readonly: self.has_readonly_modifier(&sig.modifiers),
                                 is_method: member_node.kind == METHOD_SIGNATURE,
                             });
                         }
@@ -1408,22 +1414,21 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // If we have call signatures, build a callable type
-        if !call_signatures.is_empty() || !construct_signatures.is_empty() {
+        let result = if !call_signatures.is_empty() || !construct_signatures.is_empty() {
             let shape = CallableShape {
                 call_signatures,
                 construct_signatures,
                 properties,
             };
-            return self.ctx.types.callable(shape);
-        }
+            self.ctx.types.callable(shape)
+        } else if !properties.is_empty() {
+            self.ctx.types.object(properties)
+        } else {
+            TypeId::ANY
+        };
 
-        // Otherwise, just return an object type with the properties
-        if !properties.is_empty() {
-            return self.ctx.types.object(properties);
-        }
-
-        TypeId::ANY
+        self.pop_type_parameters(interface_type_param_updates);
+        result
     }
 
     fn merge_interface_heritage_types(
@@ -6729,7 +6734,7 @@ impl<'a> ThinCheckerState<'a> {
                     name: name_atom,
                     type_id: self.ctx.types.function(shape),
                     optional: sig.question_token,
-                    readonly: false,
+                    readonly: self.has_readonly_modifier(&sig.modifiers),
                     is_method: true,
                 };
                 return self.ctx.types.object(vec![prop]);

@@ -35,6 +35,9 @@ pub struct CompilationResult {
 pub(crate) struct CompilationCache {
     type_caches: HashMap<PathBuf, TypeCache>,
     bind_cache: HashMap<PathBuf, BindCacheEntry>,
+    dependencies: HashMap<PathBuf, HashSet<PathBuf>>,
+    reverse_dependencies: HashMap<PathBuf, HashSet<PathBuf>>,
+    diagnostics: HashMap<PathBuf, Vec<Diagnostic>>,
 }
 
 struct BindCacheEntry {
@@ -43,19 +46,24 @@ struct BindCacheEntry {
 }
 
 impl CompilationCache {
-    pub(crate) fn invalidate_paths<I>(&mut self, paths: I)
+    pub(crate) fn invalidate_paths_with_dependents<I>(&mut self, paths: I)
     where
         I: IntoIterator<Item = PathBuf>,
     {
-        for path in paths {
+        let affected = self.collect_dependents(paths);
+        for path in affected {
             self.type_caches.remove(&path);
             self.bind_cache.remove(&path);
+            self.diagnostics.remove(&path);
         }
     }
 
     pub(crate) fn clear(&mut self) {
         self.type_caches.clear();
         self.bind_cache.clear();
+        self.dependencies.clear();
+        self.reverse_dependencies.clear();
+        self.diagnostics.clear();
     }
 
     #[cfg(test)]
@@ -66,6 +74,52 @@ impl CompilationCache {
     #[cfg(test)]
     pub(crate) fn bind_len(&self) -> usize {
         self.bind_cache.len()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn diagnostics_len(&self) -> usize {
+        self.diagnostics.len()
+    }
+
+    pub(crate) fn update_dependencies(&mut self, dependencies: HashMap<PathBuf, HashSet<PathBuf>>) {
+        let mut reverse = HashMap::new();
+        for (source, deps) in &dependencies {
+            for dep in deps {
+                reverse
+                    .entry(dep.clone())
+                    .or_insert_with(HashSet::new)
+                    .insert(source.clone());
+            }
+        }
+        self.dependencies = dependencies;
+        self.reverse_dependencies = reverse;
+    }
+
+    fn collect_dependents<I>(&self, paths: I) -> HashSet<PathBuf>
+    where
+        I: IntoIterator<Item = PathBuf>,
+    {
+        let mut pending = VecDeque::new();
+        let mut affected = HashSet::new();
+
+        for path in paths {
+            if affected.insert(path.clone()) {
+                pending.push_back(path);
+            }
+        }
+
+        while let Some(path) = pending.pop_front() {
+            let Some(dependents) = self.reverse_dependencies.get(&path) else {
+                continue;
+            };
+            for dependent in dependents {
+                if affected.insert(dependent.clone()) {
+                    pending.push_back(dependent.clone());
+                }
+            }
+        }
+
+        affected
     }
 }
 
@@ -119,7 +173,14 @@ fn compile_inner(
         bail!("no input files found");
     }
 
-    let sources = read_source_files(&file_paths, &base_dir, &resolved)?;
+    let SourceReadResult {
+        sources,
+        dependencies,
+    } = read_source_files(&file_paths, &base_dir, &resolved)?;
+    if let Some(cache) = cache.as_deref_mut() {
+        cache.update_dependencies(dependencies);
+    }
+
     let program = if let Some(cache) = cache.as_deref_mut() {
         build_program_with_cache(sources, cache)
     } else {
@@ -256,6 +317,11 @@ fn hash_text(text: &str) -> u64 {
 struct SourceFile {
     path: PathBuf,
     text: String,
+}
+
+struct SourceReadResult {
+    sources: Vec<SourceFile>,
+    dependencies: HashMap<PathBuf, HashSet<PathBuf>>,
 }
 
 #[derive(Debug, Clone)]
@@ -397,8 +463,9 @@ fn read_source_files(
     paths: &[PathBuf],
     base_dir: &Path,
     options: &ResolvedCompilerOptions,
-) -> Result<Vec<SourceFile>> {
+) -> Result<SourceReadResult> {
     let mut sources = HashMap::new();
+    let mut dependencies: HashMap<PathBuf, HashSet<PathBuf>> = HashMap::new();
     let mut seen = HashSet::new();
     let mut pending = VecDeque::new();
     let mut resolution_cache = ModuleResolutionCache::default();
@@ -415,12 +482,14 @@ fn read_source_files(
             .with_context(|| format!("failed to read {}", path.display()))?;
         let specifiers = collect_module_specifiers_from_text(&path, &text);
         sources.insert(path.clone(), text);
+        let entry = dependencies.entry(path.clone()).or_insert_with(HashSet::new);
 
         for specifier in specifiers {
             if let Some(resolved) =
                 resolve_module_specifier(&path, &specifier, options, base_dir, &mut resolution_cache)
             {
                 let canonical = canonicalize_or_owned(&resolved);
+                entry.insert(canonical.clone());
                 if seen.insert(canonical.clone()) {
                     pending.push_back(canonical);
                 }
@@ -433,7 +502,10 @@ fn read_source_files(
         .map(|(path, text)| SourceFile { path, text })
         .collect();
     list.sort_by(|left, right| left.path.to_string_lossy().cmp(&right.path.to_string_lossy()));
-    Ok(list)
+    Ok(SourceReadResult {
+        sources: list,
+        dependencies,
+    })
 }
 
 fn collect_module_specifiers_from_text(path: &Path, text: &str) -> Vec<String> {
@@ -1063,8 +1135,12 @@ fn collect_diagnostics(
     for (file_idx, file) in program.files.iter().enumerate() {
         let file_path = PathBuf::from(&file.file_name);
         used_paths.insert(file_path.clone());
-        for parse_diagnostic in &file.parse_diagnostics {
-            diagnostics.push(parse_diagnostic_to_checker(&file.file_name, parse_diagnostic));
+        if let Some(cached) = cache
+            .as_deref()
+            .and_then(|cache| cache.diagnostics.get(&file_path))
+        {
+            diagnostics.extend(cached.clone());
+            continue;
         }
 
         let binder = create_binder_from_bound_file(file, program, file_idx);
@@ -1087,16 +1163,28 @@ fn collect_diagnostics(
                 file.file_name.clone(),
             )
         };
+        let mut file_diagnostics = Vec::new();
+        for parse_diagnostic in &file.parse_diagnostics {
+            file_diagnostics.push(parse_diagnostic_to_checker(
+                &file.file_name,
+                parse_diagnostic,
+            ));
+        }
         checker.check_source_file(file.source_file);
-        diagnostics.extend(std::mem::take(&mut checker.ctx.diagnostics));
+        file_diagnostics.extend(std::mem::take(&mut checker.ctx.diagnostics));
+        diagnostics.extend(file_diagnostics.clone());
 
         if let Some(cache) = cache.as_deref_mut() {
-            cache.type_caches.insert(file_path, checker.extract_cache());
+            cache
+                .type_caches
+                .insert(file_path.clone(), checker.extract_cache());
+            cache.diagnostics.insert(file_path, file_diagnostics);
         }
     }
 
     if let Some(cache) = cache {
         cache.type_caches.retain(|path, _| used_paths.contains(path));
+        cache.diagnostics.retain(|path, _| used_paths.contains(path));
     }
 
     diagnostics

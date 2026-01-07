@@ -94,6 +94,22 @@ impl<'a> RenameProvider<'a> {
         Some(Range::new(start, end))
     }
 
+    /// Validate and normalize a rename request for the symbol at the position.
+    pub fn normalize_rename_at_position(
+        &self,
+        position: Position,
+        new_name: &str,
+    ) -> Result<String, String> {
+        let node_idx = self
+            .rename_target_node(position)
+            .ok_or_else(|| "You cannot rename this element.".to_string())?;
+        let node = self
+            .arena
+            .get(node_idx)
+            .ok_or_else(|| "You cannot rename this element.".to_string())?;
+        self.normalize_rename_name(node.kind, new_name)
+    }
+
     /// Perform the rename operation.
     ///
     /// Returns a WorkspaceEdit with all the changes needed to rename the symbol,

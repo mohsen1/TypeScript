@@ -1333,6 +1333,38 @@ config["name"] = "error";
 }
 
 #[test]
+fn test_readonly_method_signature_assignment_2540() {
+    // Error 2540: Cannot assign to 'run' because it is a read-only property.
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface Service {
+    readonly run(): void;
+}
+let svc: Service = { run() {} };
+svc.run = () => {};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    let count_2540 = codes.iter().filter(|&&c| c == 2540).count();
+    assert!(count_2540 >= 1,
+        "Expected at least 1 error 2540 for readonly method signature assignment, got {} in: {:?}", count_2540, codes);
+}
+
+#[test]
 fn test_readonly_index_signature_element_access_assignment_2540() {
     // Error 2540: Cannot assign to 'a' because it is a read-only property.
     use crate::thin_parser::ThinParserState;
@@ -2551,6 +2583,112 @@ const f: <T>(value: T) => T = (value) => value;
             }
         }
         _ => panic!("Expected f to be Function type, got {:?}", f_key),
+    }
+}
+
+#[test]
+fn test_interface_generic_call_signature_uses_type_params() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+interface Callable {
+    <T>(value: T): T;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let callable_sym = binder.file_locals.get("Callable").expect("Callable should exist");
+    let callable_type = checker.get_type_of_symbol(callable_sym);
+    let callable_key = types.lookup(callable_type).expect("Callable type should exist");
+    match callable_key {
+        TypeKey::Callable(shape) => {
+            assert_eq!(shape.call_signatures.len(), 1);
+            let sig = &shape.call_signatures[0];
+            assert_eq!(sig.type_params.len(), 1);
+            assert_eq!(types.resolve_atom(sig.type_params[0].name), "T");
+            assert_eq!(sig.params.len(), 1);
+
+            let param_key = types.lookup(sig.params[0].type_id).expect("Param type should exist");
+            match param_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected param type to be type parameter, got {:?}", param_key),
+            }
+
+            let return_key = types.lookup(sig.return_type).expect("Return type should exist");
+            match return_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected return type to be type parameter, got {:?}", return_key),
+            }
+        }
+        _ => panic!("Expected Callable to be Callable type, got {:?}", callable_key),
+    }
+}
+
+#[test]
+fn test_interface_generic_construct_signature_uses_type_params() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+interface Factory {
+    new <T>(value: T): T;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let factory_sym = binder.file_locals.get("Factory").expect("Factory should exist");
+    let factory_type = checker.get_type_of_symbol(factory_sym);
+    let factory_key = types.lookup(factory_type).expect("Factory type should exist");
+    match factory_key {
+        TypeKey::Callable(shape) => {
+            assert_eq!(shape.construct_signatures.len(), 1);
+            let sig = &shape.construct_signatures[0];
+            assert_eq!(sig.type_params.len(), 1);
+            assert_eq!(types.resolve_atom(sig.type_params[0].name), "T");
+            assert_eq!(sig.params.len(), 1);
+
+            let param_key = types.lookup(sig.params[0].type_id).expect("Param type should exist");
+            match param_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected param type to be type parameter, got {:?}", param_key),
+            }
+
+            let return_key = types.lookup(sig.return_type).expect("Return type should exist");
+            match return_key {
+                TypeKey::TypeParameter(info) => {
+                    assert_eq!(types.resolve_atom(info.name), "T");
+                }
+                _ => panic!("Expected return type to be type parameter, got {:?}", return_key),
+            }
+        }
+        _ => panic!("Expected Factory to be Callable type, got {:?}", factory_key),
     }
 }
 
