@@ -35,7 +35,7 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Add tests for strict/unsound toggles.
 - [x] Benchmarks
   - Add microbench for subtype/evaluate/infer to `./wasm/bench.sh`.
-- [ ] Introduce SmallVec (or stack-first buffers) for short union/intersection/member lists
+- [x] Introduce SmallVec (or stack-first buffers) for short union/intersection/member lists
   - Reduce Vec churn in interner normalization and hot-path unions.
 - [x] Add fast-path property lookup for large object shapes
   - Cached per-shape map in TypeInterner; wired into subtype/infer/property access.
