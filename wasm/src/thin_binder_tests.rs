@@ -248,35 +248,90 @@ export function getModuleInstanceState(node: { body?: { parent?: {} } }) {
     );
 
     let arena = &file.arena;
-    let mut resolved = false;
+    let mut param_name = NodeIndex::NONE;
+    let mut param_symbol = None;
+    let mut function_body = NodeIndex::NONE;
+
     for i in 0..arena.len() {
         let idx = NodeIndex(i as u32);
+        let Some(node) = arena.get(idx) else { continue; };
+        if node.kind != syntax_kind_ext::FUNCTION_DECLARATION {
+            continue;
+        }
+        let Some(func) = arena.get_function(node) else { continue; };
+        let name = arena
+            .get(func.name)
+            .and_then(|name_node| arena.get_identifier(name_node))
+            .map(|ident| ident.escaped_text.as_str());
+        if name != Some("getModuleInstanceState") {
+            continue;
+        }
+        let Some(param_idx) = func.parameters.nodes.first().copied() else { break; };
+        let Some(param_node) = arena.get(param_idx) else { break; };
+        let Some(param) = arena.get_parameter(param_node) else { break; };
+        let param_text = arena
+            .get(param.name)
+            .and_then(|param_name_node| arena.get_identifier(param_name_node))
+            .map(|ident| ident.escaped_text.as_str());
+        if param_text != Some("node") {
+            break;
+        }
+        param_name = param.name;
+        param_symbol = binder.get_node_symbol(param.name);
+        function_body = func.body;
+        break;
+    }
+
+    assert!(
+        !param_name.is_none(),
+        "Expected to find parameter name for getModuleInstanceState"
+    );
+    assert!(
+        param_symbol.is_some(),
+        "Expected parameter symbol for getModuleInstanceState"
+    );
+    assert!(
+        !function_body.is_none(),
+        "Expected function body for getModuleInstanceState"
+    );
+
+    let mut usage_idx = NodeIndex::NONE;
+    for i in 0..arena.len() {
+        let idx = NodeIndex(i as u32);
+        if idx == param_name {
+            continue;
+        }
         let Some(node) = arena.get(idx) else { continue; };
         let Some(ident) = arena.get_identifier(node) else { continue; };
         if ident.escaped_text != "node" {
             continue;
         }
-        let parent_idx = match arena.get_extended(idx) {
-            Some(ext) => ext.parent,
-            None => continue,
-        };
-        if parent_idx.is_none() {
-            continue;
-        }
-        if let Some(parent) = arena.get(parent_idx) {
-            if parent.kind == syntax_kind_ext::PARAMETER {
-                continue;
+        let mut current = idx;
+        let mut in_body = false;
+        while !current.is_none() {
+            if current == function_body {
+                in_body = true;
+                break;
             }
+            let Some(ext) = arena.get_extended(current) else { break; };
+            current = ext.parent;
         }
-        if binder.resolve_identifier(arena, idx).is_some() {
-            resolved = true;
+        if in_body {
+            usage_idx = idx;
             break;
         }
     }
 
     assert!(
+        !usage_idx.is_none(),
+        "Expected a 'node' identifier inside the function body"
+    );
+
+    let resolved = binder.resolve_identifier(arena, usage_idx);
+    assert_eq!(
         resolved,
-        "Expected to resolve 'node' identifier in function body from bound state"
+        param_symbol,
+        "Expected body identifier to resolve to the parameter symbol"
     );
 }
 #[test]
