@@ -237,6 +237,7 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 ### Phase 41: Unchecked Primitive Index Access
 - [x] Include `undefined` for primitive index access when noUncheckedIndexedAccess is enabled
 - [x] Tests for unchecked primitive index access
+- [x] Compat assignability coverage for unchecked primitive index access
 
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
