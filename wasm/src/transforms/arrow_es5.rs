@@ -53,7 +53,7 @@ pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bo
                 }
             }
         }
-        k if k == syntax_kind_ext::CALL_EXPRESSION => {
+        k if k == syntax_kind_ext::CALL_EXPRESSION || k == syntax_kind_ext::NEW_EXPRESSION => {
             if let Some(call) = arena.get_call_expr(node) {
                 if contains_this_reference(arena, call.expression) {
                     return true;
@@ -67,9 +67,117 @@ pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bo
                 }
             }
         }
-        k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
+        k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+            || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION =>
+        {
             if let Some(access) = arena.get_access_expr(node) {
                 if contains_this_reference(arena, access.expression) {
+                    return true;
+                }
+                if contains_this_reference(arena, access.name_or_argument) {
+                    return true;
+                }
+            }
+        }
+        k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
+            if let Some(paren) = arena.get_parenthesized(node) {
+                return contains_this_reference(arena, paren.expression);
+            }
+        }
+        k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
+            if let Some(cond) = arena.get_conditional_expr(node) {
+                return contains_this_reference(arena, cond.condition)
+                    || contains_this_reference(arena, cond.when_true)
+                    || contains_this_reference(arena, cond.when_false);
+            }
+        }
+        k if k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION => {
+            if let Some(lit) = arena.get_literal_expr(node) {
+                for &elem_idx in &lit.elements.nodes {
+                    if !elem_idx.is_none() && contains_this_reference(arena, elem_idx) {
+                        return true;
+                    }
+                }
+            }
+        }
+        k if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION => {
+            if let Some(lit) = arena.get_literal_expr(node) {
+                for &elem_idx in &lit.elements.nodes {
+                    if !elem_idx.is_none() && contains_this_reference(arena, elem_idx) {
+                        return true;
+                    }
+                }
+            }
+        }
+        k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
+            if let Some(prop) = arena.get_property_assignment(node) {
+                if contains_this_reference(arena, prop.name) {
+                    return true;
+                }
+                if !prop.initializer.is_none()
+                    && contains_this_reference(arena, prop.initializer)
+                {
+                    return true;
+                }
+            }
+        }
+        k if k == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT => {
+            if let Some(prop) = arena.get_shorthand_property(node) {
+                if contains_this_reference(arena, prop.name) {
+                    return true;
+                }
+                if prop.equals_token
+                    && !prop.object_assignment_initializer.is_none()
+                    && contains_this_reference(arena, prop.object_assignment_initializer)
+                {
+                    return true;
+                }
+            }
+        }
+        k if k == syntax_kind_ext::SPREAD_ELEMENT
+            || k == syntax_kind_ext::SPREAD_ASSIGNMENT =>
+        {
+            if let Some(spread) = arena.get_spread(node) {
+                if contains_this_reference(arena, spread.expression) {
+                    return true;
+                }
+            }
+        }
+        k if k == syntax_kind_ext::METHOD_DECLARATION => {
+            if let Some(method) = arena.get_method_decl(node) {
+                if contains_this_reference(arena, method.name) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+            if let Some(accessor) = arena.get_accessor(node) {
+                if contains_this_reference(arena, accessor.name) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        k if k == syntax_kind_ext::COMPUTED_PROPERTY_NAME => {
+            if let Some(computed) = arena.get_computed_property(node) {
+                if contains_this_reference(arena, computed.expression) {
+                    return true;
+                }
+            }
+        }
+        k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
+            if let Some(template) = arena.get_template_expr(node) {
+                for &span_idx in &template.template_spans.nodes {
+                    if contains_this_reference(arena, span_idx) {
+                        return true;
+                    }
+                }
+            }
+        }
+        k if k == syntax_kind_ext::TEMPLATE_SPAN => {
+            if let Some(span) = arena.get_template_span(node) {
+                if contains_this_reference(arena, span.expression) {
                     return true;
                 }
             }
@@ -93,6 +201,15 @@ pub fn contains_this_reference(arena: &ThinNodeArena, node_idx: NodeIndex) -> bo
             if let Some(ret) = arena.get_return_statement(node) {
                 if !ret.expression.is_none() {
                     return contains_this_reference(arena, ret.expression);
+                }
+            }
+        }
+        k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
+            || k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION =>
+        {
+            if let Some(unary) = arena.get_unary_expr(node) {
+                if contains_this_reference(arena, unary.operand) {
+                    return true;
                 }
             }
         }
