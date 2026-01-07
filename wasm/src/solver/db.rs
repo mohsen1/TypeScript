@@ -245,6 +245,14 @@ pub trait QueryDatabase: TypeDatabase {
         evaluator.resolve_property_access(object_type, prop_name)
     }
 
+    fn contextual_property_type(&self, expected: TypeId, prop_name: &str) -> Option<TypeId> {
+        let ctx = crate::solver::ContextualTypeContext::with_expected(
+            self.as_type_database(),
+            expected,
+        );
+        ctx.get_property_type(prop_name)
+    }
+
     fn is_property_readonly(&self, object_type: TypeId, prop_name: &str) -> bool {
         crate::solver::operations::property_is_readonly(
             self.as_type_database(),

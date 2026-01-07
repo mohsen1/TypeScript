@@ -1743,6 +1743,30 @@ fn test_contextual_typing_for_object_properties() {
 }
 
 #[test]
+fn test_contextual_property_type_infers_callback_param() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Handler = { cb: (x: number) => void };
+const h: Handler = { cb: x => x.toUpperCase() };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(codes.contains(&2339),
+        "Expected error 2339 for contextual property param mismatch, got: {:?}", codes);
+}
+
+#[test]
 fn test_strict_null_checks_property_access() {
     use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult, PropertyInfo};
     use std::sync::Arc;

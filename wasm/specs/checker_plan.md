@@ -165,6 +165,9 @@ Status: Active
 - [x] Route property access lookup through solver QueryDatabase
   - Use QueryDatabase helper for property access resolution in ThinChecker.
   - Add focused test for optional chained property access.
+- [x] Route contextual property type lookup through solver QueryDatabase
+  - Add QueryDatabase helper for contextual property type resolution.
+  - Add focused test for contextual callback param typing.
 - [x] Route tuple/array literal element access through solver index-access evaluation
   - Use QueryDatabase `evaluate_index_access` for tuple/array literal indices to honor optional/rest elements.
   - Add focused test ensuring optional tuple element access includes `undefined`.
