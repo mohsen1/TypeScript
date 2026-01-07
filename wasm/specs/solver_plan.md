@@ -76,6 +76,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Binary comparison handles top/bottom types and template literals.
 - [x] Add index signature property consistency coverage
   - Source properties must satisfy target index signatures even with source index signatures.
+- [x] Add coverage for global Function type assignability
+  - Callables assignable to Function; Function not assignable to specific signatures.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.

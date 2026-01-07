@@ -12,6 +12,7 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Incremental compile in place (cache reuse + export-hash dependent invalidation + symbol-level dependent invalidation).
 - Module resolution supports node/bundler + exports/conditions basics + typesVersions + package.json `imports` mappings (default TS version 6.0.0, override via flag/env/tsconfig; precedence CLI > env > config > default; env var `TSZ_TYPES_VERSIONS_COMPILER_VERSION`).
 - tsconfig `types`/`typeRoots` packages included in the root file set.
+- package.json `imports` condition selection coverage (require vs import).
 - Active: benchmarks vs tsc on large repos.
 - Benchmark harness script added for tsz vs tsc comparisons.
 
@@ -74,6 +75,8 @@ Tests run in this state:
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_empty_env_uses_tsconfig` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_package_imports_wildcard` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_package_imports_prefers_types_condition` (pass).
+- `./wasm/test.sh cli::driver_tests::compile_resolves_package_imports_prefers_require_condition_for_commonjs` (pass).
+- `./wasm/test.sh cli::driver_tests::compile_resolves_package_imports_prefers_import_condition_for_esm` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_tsconfig_types_includes_selected_packages` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_tsconfig_type_roots_includes_packages` (pass).
 
@@ -108,6 +111,7 @@ Tests run in this state:
   - [x] Expand exports conditions (node/browser) + moduleResolution-specific ordering.
   - [x] Honor package.json `type` + Node16/NodeNext extension rules.
   - [x] Apply `typesVersions` mappings for package subpaths.
+  - [x] `imports` condition selection coverage (require vs import).
 - [x] typesVersions range selection/fallback + fixed version doc.
 - [x] typesVersions compiler version override (flag/env) + fallback tests.
 - [x] typesVersions compiler version override via tsconfig + docs.

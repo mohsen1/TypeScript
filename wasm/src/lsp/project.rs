@@ -307,6 +307,7 @@ impl ProjectFile {
             &plan.prefix_nodes,
             &old_suffix_nodes,
             &parse_result.statements.nodes,
+            plan.reparse_start,
         ) {
             self.binder.reset();
             self.binder.bind_source_file(arena, self.root);

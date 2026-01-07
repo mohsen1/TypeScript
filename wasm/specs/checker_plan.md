@@ -98,6 +98,9 @@ Status: Active
 - [x] Report TS2749 for value-only symbols in type positions
   - Error on local value names and namespace value members used as types.
   - Add coverage for namespace alias chains.
+- [x] Add loop flow labels for while/do statements
+  - Enable narrowing within `while` bodies and keep `do` bodies conservative.
+  - Add focused flow tests for loop narrowing.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
