@@ -92,6 +92,19 @@ pub enum TransformDirective {
         inner: Box<TransformDirective>,
     },
 
+    /// CommonJS default export for anonymous class/function declarations.
+    ///
+    /// ```typescript
+    /// export default function () {}
+    /// ```
+    ///
+    /// Becomes:
+    ///
+    /// ```javascript
+    /// exports.default = function () {};
+    /// ```
+    CommonJSExportDefaultExpr,
+
     /// ES5 Arrow Function: Transform arrow to regular function
     ///
     /// ```typescript

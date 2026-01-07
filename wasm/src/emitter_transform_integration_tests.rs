@@ -590,6 +590,75 @@ fn test_two_phase_emission_commonjs_async_function_export() {
 }
 
 #[test]
+fn test_lowering_pass_commonjs_default_anonymous_function_directive() {
+    let source = "export default function () { return 1; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let stmt_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected export declaration");
+    let stmt_node = arena.get(stmt_idx).expect("expected export node");
+    let export_decl = arena
+        .get_export_decl(stmt_node)
+        .expect("expected export declaration data");
+
+    let directive = transforms.get(export_decl.export_clause);
+    assert!(
+        matches!(directive, Some(TransformDirective::CommonJSExportDefaultExpr)),
+        "LoweringPass should emit default export directive for anonymous function, got: {:?}",
+        directive
+    );
+}
+
+#[test]
+fn test_lowering_pass_commonjs_default_anonymous_class_directive() {
+    let source = "export default class { method() { return 1; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let stmt_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected export declaration");
+    let stmt_node = arena.get(stmt_idx).expect("expected export node");
+    let export_decl = arena
+        .get_export_decl(stmt_node)
+        .expect("expected export declaration data");
+
+    let directive = transforms.get(export_decl.export_clause);
+    assert!(
+        matches!(directive, Some(TransformDirective::CommonJSExportDefaultExpr)),
+        "LoweringPass should emit default export directive for anonymous class"
+    );
+}
+
+#[test]
 fn test_two_phase_emission_commonjs_default_anonymous_async_function_export() {
     let source = "export default async function () { await bar(); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
