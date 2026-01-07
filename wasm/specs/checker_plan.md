@@ -18,6 +18,7 @@ Status: Active
 - Type literal lowering uses checker paths for type params while preserving ref semantics for named members.
 - Solver diagnostics rendering preserves related messages without spans via fallback span.
 - TS2693 namespace type-only access coverage re-validated.
+- Alias type-only namespace value error test re-validated.
 
 ## Highest-Impact Next Tasks (pick one at a time)
 - [x] Replace local scope stack with binder persistent scopes
@@ -94,6 +95,9 @@ Status: Active
 - [x] Report TS2693 for type-only symbols in `typeof` type queries
   - Error when `typeof` references interface/type alias exports.
   - Add focused tests for type-query usage.
+- [x] Report TS2749 for value-only symbols in type positions
+  - Error on local value names and namespace value members used as types.
+  - Add coverage for namespace alias chains.
 
 ## Baseline / Validation
 - `./wasm/test.sh`

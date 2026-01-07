@@ -177,6 +177,20 @@ fn test_thin_emit_if_statement() {
 }
 
 #[test]
+fn test_thin_emit_while_statement() {
+    let source = "while (x < 10) { x++; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.contains("while ("), "Expected 'while' in output: {}", output);
+    assert!(output.contains("x++"), "Expected increment in output: {}", output);
+}
+
+#[test]
 fn test_thin_emit_switch_statement() {
     let source = "switch (x) { case 1: y(); break; default: z(); }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

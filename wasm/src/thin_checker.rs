@@ -485,8 +485,13 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(name_node) = self.ctx.arena.get(type_name_idx) {
             if name_node.kind == syntax_kind_ext::QUALIFIED_NAME {
                 if has_type_args {
-                    if self.resolve_qualified_symbol(type_name_idx).is_none() {
+                    let Some(sym_id) = self.resolve_qualified_symbol(type_name_idx) else {
                         let _ = self.resolve_qualified_name(type_name_idx);
+                        return TypeId::ERROR;
+                    };
+                    if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
+                        let name = self.entity_name_text(type_name_idx).unwrap_or_else(|| "<unknown>".to_string());
+                        self.error_value_only_type_at(&name, type_name_idx);
                         return TypeId::ERROR;
                     }
                     let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
@@ -516,6 +521,14 @@ impl<'a> ThinCheckerState<'a> {
                     {
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
+                    }
+                    if !is_builtin_array {
+                        if let Some(sym_id) = self.resolve_identifier_symbol(type_name_idx) {
+                            if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
+                                self.error_value_only_type_at(name, type_name_idx);
+                                return TypeId::ERROR;
+                            }
+                        }
                     }
                     let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
                     let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
@@ -559,6 +572,15 @@ impl<'a> ThinCheckerState<'a> {
                     "bigint" => return TypeId::BIGINT,
                     "symbol" => return TypeId::SYMBOL,
                     _ => {}
+                }
+
+                if name != "Array" && name != "ReadonlyArray" {
+                    if let Some(sym_id) = self.resolve_identifier_symbol(type_name_idx) {
+                        if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
+                            self.error_value_only_type_at(name, type_name_idx);
+                            return TypeId::ERROR;
+                        }
+                    }
                 }
 
                 if let Some(type_id) = self.resolve_named_type_reference(name, type_name_idx) {
@@ -784,6 +806,10 @@ impl<'a> ThinCheckerState<'a> {
                 // Check exports table
                 if let Some(ref exports) = symbol.exports {
                     if let Some(member_sym_id) = exports.get(&right_name) {
+                        if self.alias_resolves_to_value_only(member_sym_id) || self.symbol_is_value_only(member_sym_id) {
+                            self.error_value_only_type_at(&right_name, qn.right);
+                            return TypeId::ERROR;
+                        }
                         return self.get_type_of_symbol(member_sym_id);
                     }
                 }
@@ -978,6 +1004,11 @@ impl<'a> ThinCheckerState<'a> {
                     let _ = self.resolve_qualified_name(type_name_idx);
                     return TypeId::ERROR;
                 };
+                if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
+                    let name = self.entity_name_text(type_name_idx).unwrap_or_else(|| "<unknown>".to_string());
+                    self.error_value_only_type_at(&name, type_name_idx);
+                    return TypeId::ERROR;
+                }
                 let base_type = self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)));
                 if has_type_args {
                     let type_args = type_ref.type_arguments.as_ref()
@@ -1016,6 +1047,14 @@ impl<'a> ThinCheckerState<'a> {
                     if !is_builtin_array && type_param.is_none() && sym_id.is_none() {
                         self.error_cannot_find_name_at(name, type_name_idx);
                         return TypeId::ERROR;
+                    }
+                    if !is_builtin_array {
+                        if let Some(sym_id) = sym_id {
+                            if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
+                                self.error_value_only_type_at(name, type_name_idx);
+                                return TypeId::ERROR;
+                            }
+                        }
                     }
 
                     let base_type = if let Some(type_param) = type_param {
@@ -1067,6 +1106,15 @@ impl<'a> ThinCheckerState<'a> {
                     "bigint" => return TypeId::BIGINT,
                     "symbol" => return TypeId::SYMBOL,
                     _ => {}
+                }
+
+                if name != "Array" && name != "ReadonlyArray" {
+                    if let Some(sym_id) = self.resolve_identifier_symbol(type_name_idx) {
+                        if self.alias_resolves_to_value_only(sym_id) || self.symbol_is_value_only(sym_id) {
+                            self.error_value_only_type_at(name, type_name_idx);
+                            return TypeId::ERROR;
+                        }
+                    }
                 }
 
                 if let Some(type_param) = self.lookup_type_parameter(name) {
@@ -3281,6 +3329,40 @@ impl<'a> ThinCheckerState<'a> {
         has_type && !has_value
     }
 
+    fn symbol_is_value_only(&self, sym_id: SymbolId) -> bool {
+        let symbol = match self.ctx.binder.get_symbol(sym_id) {
+            Some(symbol) => symbol,
+            None => return false,
+        };
+
+        if symbol.flags & symbol_flags::MODULE != 0 {
+            return false;
+        }
+
+        let has_value = (symbol.flags & symbol_flags::VALUE) != 0;
+        let has_type = (symbol.flags & symbol_flags::TYPE) != 0;
+        has_value && !has_type
+    }
+
+    fn alias_resolves_to_value_only(&self, sym_id: SymbolId) -> bool {
+        let symbol = match self.ctx.binder.get_symbol(sym_id) {
+            Some(symbol) => symbol,
+            None => return false,
+        };
+
+        if symbol.flags & symbol_flags::ALIAS == 0 {
+            return false;
+        }
+
+        let mut visited = Vec::new();
+        let target = match self.resolve_alias_symbol(sym_id, &mut visited) {
+            Some(target) => target,
+            None => return false,
+        };
+
+        self.symbol_is_value_only(target)
+    }
+
     /// Get type of property access expression.
     fn get_type_of_property_access(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
@@ -5023,6 +5105,27 @@ impl<'a> ThinCheckerState<'a> {
             );
             self.ctx.diagnostics.push(Diagnostic {
                 code: diagnostic_codes::ONLY_REFERS_TO_A_TYPE_BUT_IS_BEING_USED_AS_A_VALUE_HERE,
+                category: DiagnosticCategory::Error,
+                message_text: message,
+                start: loc.start,
+                length: loc.length(),
+                file: self.ctx.file_name.clone(),
+                related_information: Vec::new(),
+            });
+        }
+    }
+
+    /// Report TS2749: Symbol refers to a value, but is used as a type.
+    pub fn error_value_only_type_at(&mut self, name: &str, idx: NodeIndex) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+
+        if let Some(loc) = self.get_source_location(idx) {
+            let message = format_message(
+                diagnostic_messages::ONLY_REFERS_TO_A_VALUE_BUT_IS_BEING_USED_AS_A_TYPE_HERE,
+                &[name],
+            );
+            self.ctx.diagnostics.push(Diagnostic {
+                code: diagnostic_codes::ONLY_REFERS_TO_A_VALUE_BUT_IS_BEING_USED_AS_A_TYPE_HERE,
                 category: DiagnosticCategory::Error,
                 message_text: message,
                 start: loc.start,
