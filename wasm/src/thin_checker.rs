@@ -1972,67 +1972,88 @@ impl<'a> ThinCheckerState<'a> {
     fn get_type_of_binary_expression(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::{BinaryOpEvaluator, BinaryOpResult};
 
-        let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
-        };
-
-        let Some(binary) = self.ctx.arena.get_binary_expr(node) else {
-            return TypeId::ANY;
-        };
-
-        let op_kind = binary.operator_token;
-
-        // Special case: Assignment operator (not a type operation)
-        if op_kind == SyntaxKind::EqualsToken as u16 {
-            // Check for readonly property assignment
-            self.check_readonly_assignment(binary.left, idx);
-            return self.get_type_of_node(binary.right);
-        }
-
-        // Get operand types
-        let left_type = self.get_type_of_node(binary.left);
-        let right_type = self.get_type_of_node(binary.right);
-
-        // Map SyntaxKind to operation string
-        let op_str = match op_kind {
-            k if k == SyntaxKind::PlusToken as u16 => "+",
-            k if k == SyntaxKind::MinusToken as u16 => "-",
-            k if k == SyntaxKind::AsteriskToken as u16 => "*",
-            k if k == SyntaxKind::SlashToken as u16 => "/",
-            k if k == SyntaxKind::PercentToken as u16 => "%",
-            k if k == SyntaxKind::LessThanToken as u16 => "<",
-            k if k == SyntaxKind::GreaterThanToken as u16 => ">",
-            k if k == SyntaxKind::LessThanEqualsToken as u16 => "<=",
-            k if k == SyntaxKind::GreaterThanEqualsToken as u16 => ">=",
-            k if k == SyntaxKind::EqualsEqualsToken as u16 => "==",
-            k if k == SyntaxKind::ExclamationEqualsToken as u16 => "!=",
-            k if k == SyntaxKind::EqualsEqualsEqualsToken as u16 => "===",
-            k if k == SyntaxKind::ExclamationEqualsEqualsToken as u16 => "!==",
-            k if k == SyntaxKind::AmpersandAmpersandToken as u16 => "&&",
-            k if k == SyntaxKind::BarBarToken as u16 => "||",
-            // Bitwise operators - for now, return number directly
-            k if k == SyntaxKind::AmpersandToken as u16
-                || k == SyntaxKind::BarToken as u16
-                || k == SyntaxKind::CaretToken as u16
-                || k == SyntaxKind::LessThanLessThanToken as u16
-                || k == SyntaxKind::GreaterThanGreaterThanToken as u16
-                || k == SyntaxKind::GreaterThanGreaterThanGreaterThanToken as u16 => return TypeId::NUMBER,
-            _ => return TypeId::ANY,
-        };
-
-        // Use BinaryOpEvaluator to resolve the operation
         let evaluator = BinaryOpEvaluator::new(self.ctx.types);
-        let result = evaluator.evaluate(left_type, right_type, op_str);
+        let mut stack = vec![(idx, false)];
+        let mut type_stack: Vec<TypeId> = Vec::new();
 
-        match result {
-            BinaryOpResult::Success(result_type) => result_type,
+        while let Some((node_idx, visited)) = stack.pop() {
+            let Some(node) = self.ctx.arena.get(node_idx) else {
+                type_stack.push(TypeId::ANY);
+                continue;
+            };
 
-            BinaryOpResult::TypeError { .. } => {
-                // For now, return any instead of error for binary op mismatches
-                // TypeScript is lenient with many binary operations
-                TypeId::ANY
+            if node.kind != syntax_kind_ext::BINARY_EXPRESSION {
+                type_stack.push(self.get_type_of_node(node_idx));
+                continue;
             }
+
+            let Some(binary) = self.ctx.arena.get_binary_expr(node) else {
+                type_stack.push(TypeId::ANY);
+                continue;
+            };
+
+            let op_kind = binary.operator_token;
+
+            if !visited {
+                stack.push((node_idx, true));
+                if op_kind == SyntaxKind::EqualsToken as u16 {
+                    stack.push((binary.right, false));
+                } else {
+                    stack.push((binary.right, false));
+                    stack.push((binary.left, false));
+                }
+                continue;
+            }
+
+            if op_kind == SyntaxKind::EqualsToken as u16 {
+                let right_type = type_stack.pop().unwrap_or(TypeId::ANY);
+                self.check_readonly_assignment(binary.left, node_idx);
+                type_stack.push(right_type);
+                continue;
+            }
+
+            let right_type = type_stack.pop().unwrap_or(TypeId::ANY);
+            let left_type = type_stack.pop().unwrap_or(TypeId::ANY);
+            let op_str = match op_kind {
+                k if k == SyntaxKind::PlusToken as u16 => "+",
+                k if k == SyntaxKind::MinusToken as u16 => "-",
+                k if k == SyntaxKind::AsteriskToken as u16 => "*",
+                k if k == SyntaxKind::SlashToken as u16 => "/",
+                k if k == SyntaxKind::PercentToken as u16 => "%",
+                k if k == SyntaxKind::LessThanToken as u16 => "<",
+                k if k == SyntaxKind::GreaterThanToken as u16 => ">",
+                k if k == SyntaxKind::LessThanEqualsToken as u16 => "<=",
+                k if k == SyntaxKind::GreaterThanEqualsToken as u16 => ">=",
+                k if k == SyntaxKind::EqualsEqualsToken as u16 => "==",
+                k if k == SyntaxKind::ExclamationEqualsToken as u16 => "!=",
+                k if k == SyntaxKind::EqualsEqualsEqualsToken as u16 => "===",
+                k if k == SyntaxKind::ExclamationEqualsEqualsToken as u16 => "!==",
+                k if k == SyntaxKind::AmpersandAmpersandToken as u16 => "&&",
+                k if k == SyntaxKind::BarBarToken as u16 => "||",
+                k if k == SyntaxKind::AmpersandToken as u16
+                    || k == SyntaxKind::BarToken as u16
+                    || k == SyntaxKind::CaretToken as u16
+                    || k == SyntaxKind::LessThanLessThanToken as u16
+                    || k == SyntaxKind::GreaterThanGreaterThanToken as u16
+                    || k == SyntaxKind::GreaterThanGreaterThanGreaterThanToken as u16 => {
+                    type_stack.push(TypeId::NUMBER);
+                    continue;
+                }
+                _ => {
+                    type_stack.push(TypeId::ANY);
+                    continue;
+                }
+            };
+
+            let result = evaluator.evaluate(left_type, right_type, op_str);
+            let result_type = match result {
+                BinaryOpResult::Success(result_type) => result_type,
+                BinaryOpResult::TypeError { .. } => TypeId::ANY,
+            };
+            type_stack.push(result_type);
         }
+
+        type_stack.pop().unwrap_or(TypeId::ANY)
     }
 
     /// Get type of variable declaration.

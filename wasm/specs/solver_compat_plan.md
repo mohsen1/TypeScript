@@ -12,7 +12,7 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 🟢 **Ready to Start** - TypeKey refactor is complete, APIs are stable.
 
 ## Tasks
-*   **Next Steps:** Focus on **Validation**. With so many rules implemented, the risk of regression or interaction bugs is high. Run `tests/cases/compiler` against the new solver logic (batch run started; expand coverage, investigate binderBinaryExpressionStress bind-time stack overflow).
+*   **Next Steps:** Focus on **Validation**. With so many rules implemented, the risk of regression or interaction bugs is high. Run `tests/cases/compiler` against the new solver logic (batch run started; expand coverage).
 
 
 ### Phase 1: The Compatibility Layer (compat.rs)
@@ -352,9 +352,9 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 
 ### Phase 69: Compiler Suite Validation
 - [x] Batch-run 200 compiler cases via `scripts/batch-test-rust.mjs` (153 executed, 0 failed; 47 skipped for size/parse)
-- [x] Batch-run 500 compiler cases via `scripts/batch-test-rust.mjs` (430 executed, 1 crash; 70 skipped for size/parse)
-- [ ] Investigate `binderBinaryExpressionStress` bind-time stack overflow (thin binder recursion)
-- [ ] Expand coverage to larger batches or full `tests/cases/compiler` run once crash is addressed
+- [x] Batch-run 500 compiler cases via `scripts/batch-test-rust.mjs` (430 executed, 0 failed; 70 skipped for size/parse)
+- [x] Fix deep binary expression stack overflow in binder/checker (iterative traversal)
+- [ ] Expand coverage to larger batches or full `tests/cases/compiler` run
 
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness

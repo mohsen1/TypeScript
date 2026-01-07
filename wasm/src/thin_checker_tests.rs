@@ -3512,3 +3512,30 @@ var x: Alias;
     // This error occurs when the alias is used (var x: Alias), which triggers type resolution
     assert!(codes.contains(&2694), "Expected error 2694 for import alias of non-exported member, got: {:?}", codes);
 }
+
+#[test]
+fn test_deep_binary_expression_type_check() {
+    use crate::thin_parser::ThinParserState;
+
+    const COUNT: usize = 50000;
+    let mut source = String::with_capacity(COUNT * 4);
+    for i in 0..COUNT {
+        if i > 0 {
+            source.push_str(" + ");
+        }
+        source.push('0');
+    }
+    source.push(';');
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source);
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    assert!(checker.ctx.diagnostics.is_empty());
+}
