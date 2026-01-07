@@ -512,6 +512,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     .params
                     .iter()
                     .any(|param| self.type_contains_placeholder(param.type_id, var_map, visited))
+                    || shape.this_type.is_some_and(|this_type| {
+                        self.type_contains_placeholder(this_type, var_map, visited)
+                    })
                     || self.type_contains_placeholder(shape.return_type, var_map, visited)
             }
             TypeKey::Callable(shape) => {
@@ -526,6 +529,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                         .params
                         .iter()
                         .any(|param| self.type_contains_placeholder(param.type_id, var_map, visited))
+                        || sig.this_type.is_some_and(|this_type| {
+                            self.type_contains_placeholder(this_type, var_map, visited)
+                        })
                         || self.type_contains_placeholder(sig.return_type, var_map, visited)
                 });
                 if in_call {
@@ -542,6 +548,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                         .params
                         .iter()
                         .any(|param| self.type_contains_placeholder(param.type_id, var_map, visited))
+                        || sig.this_type.is_some_and(|this_type| {
+                            self.type_contains_placeholder(this_type, var_map, visited)
+                        })
                         || self.type_contains_placeholder(sig.return_type, var_map, visited)
                 });
                 if in_construct {
@@ -669,6 +678,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 for (s_p, t_p) in s_fn.params.iter().zip(t_fn.params.iter()) {
                     self.constrain_types(ctx, var_map, t_p.type_id, s_p.type_id);
                 }
+                if let (Some(s_this), Some(t_this)) = (s_fn.this_type, t_fn.this_type) {
+                    self.constrain_types(ctx, var_map, t_this, s_this);
+                }
                 // Covariant return: source_return <: target_return
                 self.constrain_types(ctx, var_map, s_fn.return_type, t_fn.return_type);
             }
@@ -784,6 +796,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         for (s_p, t_p) in source.params.iter().zip(target.params.iter()) {
             self.constrain_types(ctx, var_map, t_p.type_id, s_p.type_id);
         }
+        if let (Some(s_this), Some(t_this)) = (source.this_type, target.this_type) {
+            self.constrain_types(ctx, var_map, t_this, s_this);
+        }
         self.constrain_types(ctx, var_map, source.return_type, target.return_type);
     }
 
@@ -797,6 +812,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         for (s_p, t_p) in source.params.iter().zip(target.params.iter()) {
             self.constrain_types(ctx, var_map, t_p.type_id, s_p.type_id);
         }
+        if let (Some(s_this), Some(t_this)) = (source.this_type, target.this_type) {
+            self.constrain_types(ctx, var_map, t_this, s_this);
+        }
         self.constrain_types(ctx, var_map, source.return_type, target.return_type);
     }
 
@@ -809,6 +827,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
     ) {
         for (s_p, t_p) in source.params.iter().zip(target.params.iter()) {
             self.constrain_types(ctx, var_map, t_p.type_id, s_p.type_id);
+        }
+        if let (Some(s_this), Some(t_this)) = (source.this_type, target.this_type) {
+            self.constrain_types(ctx, var_map, t_this, s_this);
         }
         self.constrain_types(ctx, var_map, source.return_type, target.return_type);
     }
