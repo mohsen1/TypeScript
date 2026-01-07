@@ -116,6 +116,9 @@ Status: Active
   - Risk: loop exit narrowing remains conservative (no fixed point for assignments).
 - [x] Add flow tests for `for-in`/`for-of` loop bodies
   - Ensure iterator loop headers do not narrow unrelated variables.
+- [x] Keep loop-exit narrowing conservative for while/for/do statements
+  - Avoid applying false-condition narrowing after loop exits that can break early.
+  - Add focused tests for while/for loop exit behavior.
 
 ## Baseline / Validation
 - `./wasm/test.sh`

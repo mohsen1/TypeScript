@@ -1251,6 +1251,28 @@ fn test_project_scope_cache_reuse_across_requests() {
 }
 
 #[test]
+fn test_project_scope_cache_reuse_hover_to_completions() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "const value = 1;\nvalue;\n".to_string());
+    let position = Position::new(1, 0);
+
+    assert!(project.get_hover("a.ts", position).is_some());
+    let items = project
+        .get_completions("a.ts", position)
+        .expect("Expected completions");
+    assert!(items.iter().any(|item| item.label == "value"));
+
+    let timing = project
+        .performance()
+        .timing(ProjectRequestKind::Completions)
+        .expect("Expected timing data for completions");
+
+    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover");
+    assert_eq!(timing.scope_misses, 0, "Expected completions to reuse cached scope");
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 

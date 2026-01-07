@@ -4939,6 +4939,46 @@ impl ThinParserState {
                 // Optional chaining: expr?.prop, expr?.[index], expr?.()
                 SyntaxKind::QuestionDotToken => {
                     self.next_token();
+                    if self.is_token(SyntaxKind::LessThanToken) {
+                        if let Some(type_args) = self.try_parse_type_arguments_for_call() {
+                            if self.is_token(SyntaxKind::OpenParenToken) {
+                                // expr?.<T>()
+                                self.next_token();
+                                let arguments = self.parse_argument_list();
+                                let end_pos = self.token_end();
+                                self.parse_expected(SyntaxKind::CloseParenToken);
+
+                                expr = self.arena.add_call_expr(
+                                    syntax_kind_ext::CALL_EXPRESSION,
+                                    start_pos,
+                                    end_pos,
+                                    CallExprData {
+                                        expression: expr,
+                                        type_arguments: Some(type_args),
+                                        arguments: Some(arguments),
+                                    },
+                                );
+                                continue;
+                            } else if self.is_token(SyntaxKind::NoSubstitutionTemplateLiteral)
+                                || self.is_token(SyntaxKind::TemplateHead)
+                            {
+                                let template = self.parse_template_literal();
+                                let end_pos = self.token_end();
+
+                                expr = self.arena.add_tagged_template(
+                                    syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION,
+                                    start_pos,
+                                    end_pos,
+                                    TaggedTemplateData {
+                                        tag: expr,
+                                        type_arguments: Some(type_args),
+                                        template,
+                                    },
+                                );
+                                continue;
+                            }
+                        }
+                    }
                     if self.is_token(SyntaxKind::OpenBracketToken) {
                         // expr?.[index]
                         self.next_token();
