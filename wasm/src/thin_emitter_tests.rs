@@ -1009,6 +1009,27 @@ fn test_commonjs_import_named() {
 }
 
 #[test]
+fn test_commonjs_import_side_effect() {
+    let source = r#"import "./module";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("require(\"./module\");"),
+        "Expected side-effect require in CommonJS output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_commonjs_import_namespace() {
     let source = r#"import * as ns from "./module";"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
