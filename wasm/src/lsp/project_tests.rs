@@ -282,6 +282,69 @@ fn test_project_update_file_refreshes_file_locals_for_suffix() {
 }
 
 #[test]
+fn test_project_update_file_removes_suffix_symbol_mappings() {
+    let mut project = Project::new();
+    let source = "const alpha = 1;\nconst beta = 2;\n";
+    project.set_file("a.ts".to_string(), source.to_string());
+
+    let (beta_decl_idx, beta_name_idx) = {
+        let file = project.file("a.ts").unwrap();
+        let arena = file.arena();
+        let root = file.root();
+        let source_node = arena.get(root).unwrap();
+        let source_file = arena.get_source_file(source_node).unwrap();
+        let stmt_idx = source_file.statements.nodes[1];
+        let stmt_node = arena.get(stmt_idx).unwrap();
+        let var_stmt = arena.get_variable(stmt_node).unwrap();
+        let decl_list_idx = var_stmt.declarations.nodes[0];
+        let decl_list_node = arena.get(decl_list_idx).unwrap();
+        let decl_list = arena.get_variable(decl_list_node).unwrap();
+        let decl_idx = decl_list.declarations.nodes[0];
+        let decl_node = arena.get(decl_idx).unwrap();
+        let decl = arena.get_variable_declaration(decl_node).unwrap();
+        (decl_idx, decl.name)
+    };
+
+    let edit = {
+        let file = project.file("a.ts").unwrap();
+        let range = range_for_substring(file.source_text(), file.line_map(), "const beta = 2;\n");
+        TextEdit::new(range, "".to_string())
+    };
+    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+
+    let file = project.file("a.ts").unwrap();
+    assert_eq!(file.source_text(), "const alpha = 1;\n");
+    let binder = file.binder();
+    assert!(binder.file_locals.has("alpha"));
+    assert!(!binder.file_locals.has("beta"));
+    assert!(binder.get_node_symbol(beta_decl_idx).is_none());
+    assert!(binder.get_node_symbol(beta_name_idx).is_none());
+}
+
+#[test]
+fn test_project_update_file_inserts_suffix_statement() {
+    let mut project = Project::new();
+    let source = "const alpha = 1;\n";
+    project.set_file("a.ts".to_string(), source.to_string());
+
+    let edit = {
+        let file = project.file("a.ts").unwrap();
+        let source = file.source_text();
+        let end = source.len() as u32;
+        let pos = file.line_map().offset_to_position(end, source);
+        let range = Range::new(pos, pos);
+        TextEdit::new(range, "const beta = 2;\n".to_string())
+    };
+    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+
+    let file = project.file("a.ts").unwrap();
+    assert_eq!(file.source_text(), "const alpha = 1;\nconst beta = 2;\n");
+    let locals = &file.binder().file_locals;
+    assert!(locals.has("alpha"));
+    assert!(locals.has("beta"));
+}
+
+#[test]
 fn test_project_update_file_refreshes_cross_file_references() {
     let mut project = Project::new();
 

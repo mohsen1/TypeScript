@@ -3961,6 +3961,45 @@ const bad = NS.Foo;
 }
 
 #[test]
+fn test_namespace_type_only_nested_member_value_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Outer {
+    export namespace Inner {
+        export interface Foo { value: number; }
+    }
+}
+let ok: Outer.Inner.Foo;
+const bad = Outer.Inner.Foo;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let count = codes.iter().filter(|&&code| code == 2693).count();
+    assert_eq!(
+        count,
+        1,
+        "Expected one 2693 error for nested type-only namespace member used as value, got: {:?}",
+        codes
+    );
+    assert!(
+        !codes.contains(&2339),
+        "Did not expect 2339 for nested type-only namespace member used as value, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_namespace_type_only_alias_value_error() {
     use crate::thin_parser::ThinParserState;
 

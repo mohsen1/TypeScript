@@ -1017,6 +1017,61 @@ fn compile_resolves_node_modules_types_versions_invalid_env_falls_back() {
 }
 
 #[test]
+fn compile_resolves_node_modules_types_versions_invalid_tsconfig_falls_back() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "noEmitOnError": true,
+            "typesVersionsCompilerVersion": "not-a-version"
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { widget } from 'pkg/feature/widget'; export { widget };",
+    );
+    write_file(
+        &base.join("node_modules/pkg/package.json"),
+        r#"{
+          "typesVersions": {
+            ">=7.0": {
+              "feature/*": ["types/v7/feature/*"]
+            },
+            ">=6.0": {
+              "feature/*": ["types/v6/feature/*"]
+            }
+          }
+        }"#,
+    );
+    write_file(
+        &base.join("node_modules/pkg/types/v7/feature/widget.d.ts"),
+        "export const widget = 1;",
+    );
+    write_file(
+        &base.join("node_modules/pkg/types/v6/feature/widget.d.ts"),
+        "export const widget = ;",
+    );
+
+    let args = default_args();
+    let result = with_types_versions_env(None, || {
+        compile(&args, base).expect("compile should succeed")
+    });
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("node_modules/pkg/types/v6/feature/widget.d.ts")));
+    assert!(!base.join("dist/src/index.js").is_file());
+}
+
+#[test]
 fn compile_resolves_node_modules_types_versions_falls_back_to_wildcard() {
     let temp = TempDir::new().expect("temp dir");
     let base = &temp.path;
