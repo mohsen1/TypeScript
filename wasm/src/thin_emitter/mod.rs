@@ -5013,8 +5013,10 @@ impl<'a> ThinPrinter<'a> {
             return;
         };
 
-        // Skip ambient declarations (declare enum)
-        if self.has_declare_modifier(&enum_decl.modifiers) {
+        // Skip ambient and const enums (declare/const enums are erased)
+        if self.has_declare_modifier(&enum_decl.modifiers)
+            || self.has_modifier(&enum_decl.modifiers, SyntaxKind::ConstKeyword as u16)
+        {
             return;
         }
 

@@ -579,6 +579,32 @@ fn test_thin_emit_enum_declaration_es6() {
     assert!(output.contains("Red"), "Expected 'Red' in ES6 output: {}", output);
 }
 
+#[test]
+fn test_thin_emit_const_enum_erased_es6() {
+    let source = "const enum CE { A = 0 }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es6(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.trim().is_empty(), "Const enums should be erased: {}", output);
+}
+
+#[test]
+fn test_thin_emit_declare_enum_erased() {
+    let source = "declare enum E { A }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(output.trim().is_empty(), "Declare enums should be erased: {}", output);
+}
+
 /// Full ThinNode pipeline integration test:
 /// ThinParser → ThinBinder → ThinChecker → ThinEmitter
 #[test]
