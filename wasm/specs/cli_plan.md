@@ -37,8 +37,8 @@ Implement a high-performance, `tsc`-compatible command-line interface. This driv
   - Handle `include`, `exclude`, and `files` globs.
 
 ### Phase 3: The Driver (Orchestration)
-- [ ] **File Discovery**
-  - Implement efficient globbing to find all `.ts` files based on config.
+- [x] **File Discovery**
+  - [x] Implement efficient globbing to find all `.ts` files based on config.
 - [ ] **Pipeline Connection**
   - Wire up `parallel::compile_files` (Parser/Binder) to the discovered files.
   - Wire up `thin_checker::check_source_file` for type checking.
