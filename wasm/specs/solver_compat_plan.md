@@ -354,7 +354,8 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Batch-run 200 compiler cases via `scripts/batch-test-rust.mjs` (153 executed, 0 failed; 47 skipped for size/parse)
 - [x] Batch-run 500 compiler cases via `scripts/batch-test-rust.mjs` (430 executed, 0 failed; 70 skipped for size/parse)
 - [x] Fix deep binary expression stack overflow in binder/checker (iterative traversal)
-- [ ] Expand coverage to larger batches or full `tests/cases/compiler` run
+- [x] Batch-run 1000 compiler cases via `scripts/batch-test-rust.mjs` (876 executed, 0 failed; 124 skipped for size/parse)
+- [ ] Expand coverage to full `tests/cases/compiler` run
 
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
