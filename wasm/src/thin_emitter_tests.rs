@@ -1,7 +1,7 @@
 //! Tests for ThinEmitter
 
 use crate::thin_parser::ThinParserState;
-use crate::thin_emitter::ThinPrinter;
+use crate::thin_emitter::{PrinterOptions, ThinPrinter};
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
 use crate::solver::TypeInterner;
@@ -119,6 +119,25 @@ fn test_thin_emit_function_declaration() {
     assert!(output.contains("function"), "Expected 'function' in output: {}", output);
     assert!(output.contains("add"), "Expected 'add' in output: {}", output);
     assert!(output.contains("return"), "Expected 'return' in output: {}", output);
+}
+
+#[test]
+fn test_thin_emit_string_literal_single_quote() {
+    let source = "const s = \"hi\";";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.single_quote = true;
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("'hi'"),
+        "Expected single-quoted string literal: {}",
+        output
+    );
 }
 
 #[test]
@@ -1184,7 +1203,7 @@ fn test_thin_emit_readonly_index_signature() {
 // CommonJS Module Tests
 // =============================================================================
 
-use crate::thin_emitter::{PrinterOptions, ModuleKind};
+use crate::thin_emitter::ModuleKind;
 
 #[test]
 fn test_commonjs_preamble() {
