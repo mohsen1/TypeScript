@@ -141,6 +141,10 @@ Status: Active
   - Do not narrow `obj[key]` when the key is not a literal string.
 - [x] Narrow element access with literal string keys
   - Apply flow narrowing for `obj["prop"]` in type guard branches.
+- [x] Narrow computed element access with literal key types
+  - Use literal key types (e.g. `key: "prop"`) to narrow `obj[key]`.
+  - Clear narrowing when computed element assignments use literal keys.
+  - Risk: `typeof` operands are now type-checked to populate node types, which can surface missing-name diagnostics.
 
 ## Baseline / Validation
 - `./wasm/test.sh`

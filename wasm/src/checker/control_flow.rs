@@ -1597,7 +1597,7 @@ impl<'a> FlowAnalyzer<'a> {
         self.is_matching_reference(a_base, b_base)
     }
 
-    fn property_reference(&self, idx: NodeIndex) -> Option<(NodeIndex, &str)> {
+    fn property_reference(&self, idx: NodeIndex) -> Option<(NodeIndex, Atom)> {
         let idx = self.skip_parenthesized(idx);
         let node = self.arena.get(idx)?;
 
@@ -1621,7 +1621,8 @@ impl<'a> FlowAnalyzer<'a> {
             }
             let name_node = self.arena.get(access.name_or_argument)?;
             let ident = self.arena.get_identifier(name_node)?;
-            return Some((access.expression, ident.escaped_text.as_str()));
+            let name = self.interner.intern_string(&ident.escaped_text);
+            return Some((access.expression, name));
         }
 
         if node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION {
@@ -1629,11 +1630,27 @@ impl<'a> FlowAnalyzer<'a> {
             if access.question_dot_token {
                 return None;
             }
-            let name = self.literal_string_from_node(access.name_or_argument)?;
+            let name = self.literal_atom_from_node_or_type(access.name_or_argument)?;
             return Some((access.expression, name));
         }
 
         None
+    }
+
+    fn literal_atom_from_node_or_type(&self, idx: NodeIndex) -> Option<Atom> {
+        if let Some(name) = self.literal_string_from_node(idx) {
+            return Some(self.interner.intern_string(name));
+        }
+        self.literal_atom_from_type(idx)
+    }
+
+    fn literal_atom_from_type(&self, idx: NodeIndex) -> Option<Atom> {
+        let node_types = self.node_types?;
+        let type_id = *node_types.get(&idx.0)?;
+        match self.interner.lookup(type_id)? {
+            TypeKey::Literal(LiteralValue::String(atom)) => Some(atom),
+            _ => None,
+        }
     }
 
     fn reference_base(&self, idx: NodeIndex) -> Option<NodeIndex> {

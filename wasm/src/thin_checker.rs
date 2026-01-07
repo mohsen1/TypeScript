@@ -4600,6 +4600,11 @@ impl<'a> ThinCheckerState<'a> {
         match unary.operator {
             // ! returns boolean
             k if k == SyntaxKind::ExclamationToken as u16 => TypeId::BOOLEAN,
+            // typeof returns string but still type-check operand for flow/node types.
+            k if k == SyntaxKind::TypeOfKeyword as u16 => {
+                self.get_type_of_node(unary.operand);
+                TypeId::STRING
+            }
             // Unary + and - return number
             k if k == SyntaxKind::PlusToken as u16 || k == SyntaxKind::MinusToken as u16 => TypeId::NUMBER,
             // ~ returns number
