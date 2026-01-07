@@ -925,6 +925,68 @@ fn test_object_interface_accepts_primitives() {
 }
 
 #[test]
+fn test_tuple_array_assignability_tuple_to_array() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let elem_union = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let array = interner.array(elem_union);
+
+    assert!(checker.is_assignable(tuple, array));
+}
+
+#[test]
+fn test_tuple_array_assignability_tuple_to_array_rejects() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let array = interner.array(TypeId::STRING);
+
+    assert!(!checker.is_assignable(tuple, array));
+}
+
+#[test]
+fn test_tuple_array_assignability_array_to_tuple_rejects() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let array = interner.array(TypeId::STRING);
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    assert!(!checker.is_assignable(array, tuple));
+}
+
+#[test]
+fn test_tuple_array_assignability_empty_array_to_optional_tuple() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let never_array = interner.array(TypeId::NEVER);
+    let optional_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: true, rest: false },
+    ]);
+    let empty_tuple = interner.tuple(Vec::new());
+    let rest_tuple = interner.tuple(vec![
+        TupleElement { type_id: interner.array(TypeId::STRING), name: None, optional: false, rest: true },
+    ]);
+
+    assert!(checker.is_assignable(never_array, empty_tuple));
+    assert!(checker.is_assignable(never_array, optional_tuple));
+    assert!(checker.is_assignable(never_array, rest_tuple));
+}
+
+#[test]
 fn test_apparent_string_members_assignable() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
