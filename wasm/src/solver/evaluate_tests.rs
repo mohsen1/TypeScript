@@ -334,6 +334,62 @@ fn test_index_access_union_object_union_key() {
 }
 
 #[test]
+fn test_correlated_union_index_access_cross_product() {
+    let interner = TypeInterner::new();
+
+    let kind = interner.intern_string("kind");
+    let key_a = interner.intern_string("a");
+    let key_b = interner.intern_string("b");
+
+    let obj_a = interner.object(vec![
+        PropertyInfo {
+            name: kind,
+            type_id: interner.literal_string("a"),
+            write_type: interner.literal_string("a"),
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    let obj_b = interner.object(vec![
+        PropertyInfo {
+            name: kind,
+            type_id: interner.literal_string("b"),
+            write_type: interner.literal_string("b"),
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: key_b,
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union_obj = interner.union(vec![obj_a, obj_b]);
+    let key_union = interner.union(vec![
+        interner.literal_string("a"),
+        interner.literal_string("b"),
+    ]);
+
+    let result = evaluate_index_access(&interner, union_obj, key_union);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::STRING]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_index_access_union_object_union_key_no_unchecked() {
     let interner = TypeInterner::new();
 
