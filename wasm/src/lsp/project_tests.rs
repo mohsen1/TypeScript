@@ -1081,6 +1081,86 @@ fn test_project_performance_scope_cache_hits_hover() {
 }
 
 #[test]
+fn test_project_performance_scope_cache_hits_completions() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "const value = 1;\n".to_string());
+    let position = Position::new(1, 0);
+
+    let first_items = project
+        .get_completions("a.ts", position)
+        .expect("Expected completions on first request");
+    assert!(first_items.iter().any(|item| item.label == "value"));
+
+    let first = project
+        .performance()
+        .timing(ProjectRequestKind::Completions)
+        .expect("Expected timing data for completions");
+
+    let second_items = project
+        .get_completions("a.ts", position)
+        .expect("Expected completions on second request");
+    assert!(second_items.iter().any(|item| item.label == "value"));
+
+    let second = project
+        .performance()
+        .timing(ProjectRequestKind::Completions)
+        .expect("Expected timing data for completions");
+
+    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
+    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+}
+
+#[test]
+fn test_project_performance_scope_cache_hits_signature_help() {
+    let mut project = Project::new();
+
+    project.set_file(
+        "a.ts".to_string(),
+        "function foo(a: number, b: string) {}\nfoo(1, \"x\");\n".to_string(),
+    );
+    let position = Position::new(1, 4);
+
+    assert!(project.get_signature_help("a.ts", position).is_some());
+    let first = project
+        .performance()
+        .timing(ProjectRequestKind::SignatureHelp)
+        .expect("Expected timing data for signature help");
+
+    assert!(project.get_signature_help("a.ts", position).is_some());
+    let second = project
+        .performance()
+        .timing(ProjectRequestKind::SignatureHelp)
+        .expect("Expected timing data for signature help");
+
+    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
+    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+}
+
+#[test]
+fn test_project_performance_scope_cache_hits_references() {
+    let mut project = Project::new();
+
+    project.set_file("a.ts".to_string(), "const value = 1;\nvalue;\n".to_string());
+    let position = Position::new(1, 0);
+
+    assert!(project.find_references("a.ts", position).is_some());
+    let first = project
+        .performance()
+        .timing(ProjectRequestKind::References)
+        .expect("Expected timing data for references");
+
+    assert!(project.find_references("a.ts", position).is_some());
+    let second = project
+        .performance()
+        .timing(ProjectRequestKind::References)
+        .expect("Expected timing data for references");
+
+    assert!(first.scope_misses > 0, "Expected scope cache misses on first request");
+    assert!(second.scope_hits > 0, "Expected scope cache hits on second request");
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 

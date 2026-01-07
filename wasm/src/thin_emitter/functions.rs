@@ -190,21 +190,4 @@ impl<'a> ThinPrinter<'a> {
         }
     }
 
-    pub(super) fn emit_type_parameter(&mut self, node: &ThinNode) {
-        let Some(param) = self.arena.get_type_parameter(node) else {
-            return;
-        };
-
-        self.emit(param.name);
-
-        if !param.constraint.is_none() {
-            self.write(" extends ");
-            self.emit(param.constraint);
-        }
-
-        if !param.default.is_none() {
-            self.write(" = ");
-            self.emit(param.default);
-        }
-    }
 }
