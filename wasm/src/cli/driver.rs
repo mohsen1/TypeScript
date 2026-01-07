@@ -22,7 +22,7 @@ pub struct CompilationResult {
 
 pub fn compile(args: &CliArgs, cwd: &Path) -> Result<CompilationResult> {
     let cwd = canonicalize_or_owned(cwd);
-    let tsconfig_path = find_tsconfig(&cwd);
+    let tsconfig_path = resolve_tsconfig_path(&cwd, args.project.as_deref())?;
     let config = load_config(tsconfig_path.as_deref())?;
 
     let mut resolved = resolve_compiler_options(config.as_ref().and_then(|cfg| cfg.compiler_options.as_ref()))?;
@@ -30,6 +30,7 @@ pub fn compile(args: &CliArgs, cwd: &Path) -> Result<CompilationResult> {
 
     let base_dir = config_base_dir(&cwd, tsconfig_path.as_deref());
     let base_dir = canonicalize_or_owned(&base_dir);
+    let root_dir = normalize_root_dir(&base_dir, resolved.root_dir.clone());
     let out_dir = normalize_output_dir(&base_dir, resolved.out_dir.clone());
     let declaration_dir = normalize_output_dir(&base_dir, resolved.declaration_dir.clone());
 
@@ -60,13 +61,19 @@ pub fn compile(args: &CliArgs, cwd: &Path) -> Result<CompilationResult> {
             .then(left.code.cmp(&right.code))
     });
 
-    let emitted_files = if resolved.no_emit {
+    let has_error = diagnostics
+        .iter()
+        .any(|diag| diag.category == DiagnosticCategory::Error);
+    let should_emit = !(resolved.no_emit || (resolved.no_emit_on_error && has_error));
+
+    let emitted_files = if !should_emit {
         Vec::new()
     } else {
         let outputs = emit_outputs(
             &program,
             &resolved,
             &base_dir,
+            root_dir.as_deref(),
             out_dir.as_deref(),
             declaration_dir.as_deref(),
         )?;
@@ -94,10 +101,36 @@ struct OutputFile {
 pub(crate) fn find_tsconfig(cwd: &Path) -> Option<PathBuf> {
     let candidate = cwd.join("tsconfig.json");
     if candidate.is_file() {
-        Some(candidate)
+        Some(canonicalize_or_owned(&candidate))
     } else {
         None
     }
+}
+
+pub(crate) fn resolve_tsconfig_path(cwd: &Path, project: Option<&Path>) -> Result<Option<PathBuf>> {
+    let Some(project) = project else {
+        return Ok(find_tsconfig(cwd));
+    };
+
+    let mut candidate = if project.is_absolute() {
+        project.to_path_buf()
+    } else {
+        cwd.join(project)
+    };
+
+    if candidate.is_dir() {
+        candidate = candidate.join("tsconfig.json");
+    }
+
+    if !candidate.exists() {
+        bail!("tsconfig not found at {}", candidate.display());
+    }
+
+    if !candidate.is_file() {
+        bail!("project path is not a file: {}", candidate.display());
+    }
+
+    Ok(Some(canonicalize_or_owned(&candidate)))
 }
 
 pub(crate) fn load_config(path: Option<&Path>) -> Result<Option<TsConfig>> {
@@ -220,6 +253,7 @@ fn emit_outputs(
     program: &MergedProgram,
     options: &ResolvedCompilerOptions,
     base_dir: &Path,
+    root_dir: Option<&Path>,
     out_dir: Option<&Path>,
     declaration_dir: Option<&Path>,
 ) -> Result<Vec<OutputFile>> {
@@ -228,7 +262,7 @@ fn emit_outputs(
     for file in &program.files {
         let input_path = PathBuf::from(&file.file_name);
 
-        if let Some(js_path) = js_output_path(base_dir, out_dir, &input_path) {
+        if let Some(js_path) = js_output_path(base_dir, root_dir, out_dir, &input_path) {
             let mut printer = ThinPrinter::with_options(&file.arena, options.printer.clone());
             printer.emit(file.source_file);
             outputs.push(OutputFile {
@@ -239,7 +273,7 @@ fn emit_outputs(
 
         if options.emit_declarations {
             let decl_base = declaration_dir.or(out_dir);
-            if let Some(dts_path) = declaration_output_path(base_dir, decl_base, &input_path) {
+            if let Some(dts_path) = declaration_output_path(base_dir, root_dir, decl_base, &input_path) {
                 let mut emitter = DeclarationEmitter::new(&file.arena);
                 let contents = emitter.emit(file.source_file);
                 outputs.push(OutputFile {
@@ -267,13 +301,18 @@ fn write_outputs(outputs: &[OutputFile]) -> Result<Vec<PathBuf>> {
     Ok(outputs.iter().map(|output| output.path.clone()).collect())
 }
 
-fn js_output_path(base_dir: &Path, out_dir: Option<&Path>, input_path: &Path) -> Option<PathBuf> {
+fn js_output_path(
+    base_dir: &Path,
+    root_dir: Option<&Path>,
+    out_dir: Option<&Path>,
+    input_path: &Path,
+) -> Option<PathBuf> {
     if is_declaration_file(input_path) {
         return None;
     }
 
     let extension = js_extension_for(input_path)?;
-    let relative = input_path.strip_prefix(base_dir).unwrap_or(input_path);
+    let relative = output_relative_path(base_dir, root_dir, input_path);
     let mut output = match out_dir {
         Some(out_dir) => out_dir.join(relative),
         None => input_path.to_path_buf(),
@@ -284,6 +323,7 @@ fn js_output_path(base_dir: &Path, out_dir: Option<&Path>, input_path: &Path) ->
 
 fn declaration_output_path(
     base_dir: &Path,
+    root_dir: Option<&Path>,
     out_dir: Option<&Path>,
     input_path: &Path,
 ) -> Option<PathBuf> {
@@ -291,7 +331,7 @@ fn declaration_output_path(
         return None;
     }
 
-    let relative = input_path.strip_prefix(base_dir).unwrap_or(input_path);
+    let relative = output_relative_path(base_dir, root_dir, input_path);
     let file_name = relative.file_name()?.to_str()?;
     let new_name = declaration_file_name(file_name)?;
 
@@ -301,6 +341,19 @@ fn declaration_output_path(
     };
     output.set_file_name(new_name);
     Some(output)
+}
+
+fn output_relative_path(base_dir: &Path, root_dir: Option<&Path>, input_path: &Path) -> PathBuf {
+    if let Some(root_dir) = root_dir {
+        if let Ok(relative) = input_path.strip_prefix(root_dir) {
+            return relative.to_path_buf();
+        }
+    }
+
+    input_path
+        .strip_prefix(base_dir)
+        .unwrap_or(input_path)
+        .to_path_buf()
 }
 
 fn declaration_file_name(file_name: &str) -> Option<String> {
@@ -350,6 +403,17 @@ pub(crate) fn normalize_output_dir(base_dir: &Path, dir: Option<PathBuf>) -> Opt
         } else {
             base_dir.join(dir)
         }
+    })
+}
+
+pub(crate) fn normalize_root_dir(base_dir: &Path, dir: Option<PathBuf>) -> Option<PathBuf> {
+    dir.map(|dir| {
+        let resolved = if dir.is_absolute() {
+            dir
+        } else {
+            base_dir.join(dir)
+        };
+        canonicalize_or_owned(&resolved)
     })
 }
 
