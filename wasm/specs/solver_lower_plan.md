@@ -179,6 +179,10 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: function return type inference (union returns)
   - [x] Checker: report overload call mismatches with 2769 and related failures
   - [x] Test: overload call mismatch reports 2769
+  - [x] Checker: build class constructor types with instance property shapes
+  - [x] Checker: new expressions use construct signatures for return types
+  - [x] Test: new expressions infer class instance property types
+  - [x] Test: new expressions report overload mismatch (2769)
 - [x] Parser: fix interface member parsing to track progress by token position (avoid skipping consecutive identifiers)
 - [x] Perf: avoid extra String clone when lowering negative bigint literals
 - [x] Perf: avoid extra allocation when normalizing bigint leading zeros
