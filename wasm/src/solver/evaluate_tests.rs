@@ -1677,6 +1677,35 @@ fn test_keyof_union_string_index_overlap_literal() {
 }
 
 #[test]
+fn test_keyof_union_index_signature_intersection() {
+    let interner = TypeInterner::new();
+
+    let string_index = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+    let number_index = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let union = interner.union(vec![string_index, number_index]);
+    let result = evaluate_keyof(&interner, union);
+
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
 fn test_keyof_empty_object() {
     let interner = TypeInterner::new();
 
