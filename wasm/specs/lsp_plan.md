@@ -56,6 +56,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Extract variable: keep comma expressions parenthesized when selected
    - [x] Extract variable: preserve parenthesized selections on replacement
    - [x] Extract variable: fix parenthesized expression end spans
+   - [x] Extract variable: fix call/element access end spans
    - [x] Rename: normalize private identifiers (`#name`)
 
 2. **Extend AST Coverage** (if needed)
