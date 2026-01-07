@@ -423,6 +423,15 @@ const f = new Foo();
     checker.check_source_file(root);
     assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
 
+    eprintln!("=== debug Box ===");
+    if let Some(box_sym) = binder.file_locals.get("Box") {
+        let box_type = checker.get_type_of_symbol(box_sym);
+        eprintln!("Box type id: {:?}", box_type);
+        eprintln!("Box type key: {:?}", types.lookup(box_type));
+    } else {
+        eprintln!("Box symbol missing");
+    }
+
     let f_sym = binder.file_locals.get("f").expect("f should exist");
     let f_type = checker.get_type_of_symbol(f_sym);
     let f_key = types.lookup(f_type).expect("f type should exist");
@@ -3665,4 +3674,93 @@ fn test_deep_binary_expression_type_check() {
     checker.check_source_file(root);
 
     assert!(checker.ctx.diagnostics.is_empty());
+}
+
+#[test]
+fn test_scoped_identifier_resolution_uses_binder_scopes() {
+    use crate::thin_parser::ThinParserState;
+    use crate::parser::syntax_kind_ext;
+
+    let source = r#"
+let x = 1;
+{
+    let x = "hi";
+    x;
+}
+x;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    let block_idx = source_file.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::BLOCK))
+        .expect("block statement");
+    let block = arena.get_block(arena.get(block_idx).expect("block node")).expect("block data");
+    let inner_expr_idx = block.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::EXPRESSION_STATEMENT))
+        .expect("inner expression statement");
+    let inner_expr = arena.get_expression_statement(arena.get(inner_expr_idx).expect("inner expr node"))
+        .expect("inner expression data");
+
+    let outer_expr_idx = source_file.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::EXPRESSION_STATEMENT))
+        .expect("outer expression statement");
+    let outer_expr = arena.get_expression_statement(arena.get(outer_expr_idx).expect("outer expr node"))
+        .expect("outer expression data");
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let inner_type = checker.get_type_of_node(inner_expr.expression);
+    let outer_type = checker.get_type_of_node(outer_expr.expression);
+
+    assert_eq!(inner_type, TypeId::STRING);
+    assert_eq!(outer_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_parameter_identifier_type_from_symbol_cache() {
+    use crate::thin_parser::ThinParserState;
+    use crate::parser::syntax_kind_ext;
+
+    let source = r#"
+function f(x: number) { return x; }
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+    let func_idx = source_file.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::FUNCTION_DECLARATION))
+        .expect("function declaration");
+    let func_node = arena.get(func_idx).expect("function node");
+    let func = arena.get_function(func_node).expect("function data");
+
+    let body_node = arena.get(func.body).expect("function body");
+    let block = arena.get_block(body_node).expect("function block");
+    let return_idx = *block.statements.nodes.first().expect("return statement");
+    let return_node = arena.get(return_idx).expect("return node");
+    let return_data = arena.get_return_statement(return_node).expect("return data");
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let param_type = checker.get_type_of_node(return_data.expression);
+    assert_eq!(param_type, TypeId::NUMBER);
 }

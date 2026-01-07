@@ -1663,7 +1663,9 @@ impl<'a> CodeActionProvider<'a> {
         } else {
             var_name.clone()
         };
-        if expr_node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+        if expr_node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION
+            && !self.needs_parentheses_for_extraction(expr_node)
+        {
             replacement_text = format!("({})", replacement_text);
         }
         edits.push(TextEdit {

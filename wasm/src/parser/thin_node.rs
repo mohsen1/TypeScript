@@ -1675,12 +1675,21 @@ impl ThinNodeArena {
 
     /// Add a loop node (for/while/do)
     pub fn add_loop(&mut self, kind: u16, pos: u32, end: u32, data: LoopData) -> NodeIndex {
+        let initializer = data.initializer;
+        let condition = data.condition;
+        let incrementor = data.incrementor;
+        let statement = data.statement;
         let data_index = self.loops.len() as u32;
         self.loops.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent(initializer, parent);
+        self.set_parent(condition, parent);
+        self.set_parent(incrementor, parent);
+        self.set_parent(statement, parent);
+        parent
     }
 
     /// Add a variable statement/declaration list node
