@@ -38,11 +38,11 @@ The current `ThinNodeArena` makes in-place mutation difficult.
 ## Executive Summary (Manager report)
 Last updated: 2026-01-07
 
-- Overall: Migration is active; Rust/WASM compiler is under construction and not production-ready.
-- Tracks: CLI parser fixes arrow lookahead for return types (everyType conditional) and bench now hits TS2304 at `binder.ts:331` (`node` missing); emitter added member hyphenated attribute parity and expanded the declaration emitter for type-only re-exports plus export assignments; checker added literal element access narrowing and is working on computed literal-key narrowing; LSP added a prefix-symbol preservation test for function-body edits; solver is selecting the next TS_UNSOUNDNESS item after `noUncheckedIndexedAccess` array coverage.
+- Overall: Migration remains active; Rust/WASM compiler is under construction and not production-ready.
+- Tracks: CLI preserved binder scopes for stateless checking and the bench now stops at `binder.ts:432` (`statements` missing); emitter `.d.ts` output now covers type-only re-exports, export assignment, and export default; checker narrows computed element access for literal, numeric, and const-literal keys; LSP preserves cross-file symbols and scope cache after function-body edits; solver expanded TS_UNSOUNDNESS coverage (key remapping, `keyof` variance, tuple-wrapped conditional nondistribution).
 - Baselines (`tests/cases`, first 100): compiler errors 60/77 (77.9%) pass, JS 40/76 (52.6%) pass; conformance errors 18/90 (20.0%) pass, JS 1/88 (1.1%) pass (no new run).
-- Risk: CLI bench blocked by TS2304 in `binder.ts:331`; computed literal-key narrowing is currently failing until control-flow reference matching is fixed; ES module imports still resolve to `any`; source maps remain minimal; parser/arena child enumeration TODOs remain; conformance baseline pass rates are low.
-- Next focus: close remaining parser gaps to run full CLI benches, push assignability/member lookup into solver to end split-brain typing, ship `.d.ts` visibility + re-export handling with ES5 downlevel and full source maps, tighten LSP incremental parse to avoid full rebinds, and retire legacy AST with arena memory-hygiene checks.
+- Risk: CLI bench blocked by TS2304 in `binder.ts:432`; ES module imports still resolve to `any`; source maps remain minimal; parser/arena child enumeration TODOs remain; conformance baseline pass rates are low.
+- Next focus: finish binder scope wiring to clear the bench gap and rerun real repo benchmarks, push assignability/member lookup into solver to end split-brain typing, ship `.d.ts` visibility + re-export handling with ES5 downlevel and fuller source maps, tighten LSP incremental parse to avoid full rebinds, and retire legacy AST with arena memory-hygiene checks.
 
 ## Status
 This project is not ready for general use yet. The interface and distribution are in progress.

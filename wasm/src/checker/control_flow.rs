@@ -1286,8 +1286,8 @@ impl<'a> FlowAnalyzer<'a> {
             if access.question_dot_token || !self.is_matching_reference(access.expression, target) {
                 return None;
             }
-            let name = self.literal_string_from_node(access.name_or_argument)?;
-            return Some(self.interner.intern_string(name));
+            let name = self.literal_atom_from_node_or_type(access.name_or_argument)?;
+            return Some(name);
         }
 
         None
