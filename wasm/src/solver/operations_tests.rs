@@ -1734,6 +1734,52 @@ fn test_infer_generic_property_from_source_index_signature() {
 }
 
 #[test]
+fn test_infer_generic_property_from_number_index_signature_infinity() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("bag")),
+            type_id: interner.object(vec![PropertyInfo {
+                name: interner.intern_string("Infinity"),
+                type_id: t_type,
+                optional: false,
+                readonly: false,
+                is_method: false,
+            }]),
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let indexed_number = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+    });
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[indexed_number]);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
 fn test_infer_generic_union_source() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
