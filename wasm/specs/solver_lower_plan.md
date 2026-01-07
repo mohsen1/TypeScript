@@ -61,6 +61,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Union/intersection normalization
   - [x] Test: Tuple optional/rest/named elements
   - [x] Test: `Array<T>` type reference lowers to array element type
+  - [x] Test: `ReadonlyArray<T>` type reference lowers to readonly array
   - [x] Test: Conditional type with infer (including constraint)
   - [x] Test: Conditional infer binding in true/false branches
 

@@ -1829,13 +1829,18 @@ impl<'a> TypeLowering<'a> {
         if let Some(data) = self.arena.get_type_ref(node) {
             if let Some(name_node) = self.arena.get(data.type_name) {
                 if let Some(ident) = self.arena.get_identifier(name_node) {
-                    if ident.escaped_text == "Array" {
+                    let name = ident.escaped_text.as_str();
+                    if name == "Array" || name == "ReadonlyArray" {
                         let elem_type = data.type_arguments
                             .as_ref()
                             .and_then(|args| args.nodes.first().copied())
                             .map(|idx| self.lower_type(idx))
                             .unwrap_or(TypeId::ANY);
-                        return self.interner.array(elem_type);
+                        let array_type = self.interner.array(elem_type);
+                        if name == "ReadonlyArray" {
+                            return self.interner.intern(TypeKey::ReadonlyType(array_type));
+                        }
+                        return array_type;
                     }
                 }
             }

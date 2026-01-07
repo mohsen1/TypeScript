@@ -445,6 +445,28 @@ fn test_lower_array_type_reference() {
 }
 
 #[test]
+fn test_lower_readonly_array_type_reference() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = ReadonlyArray<string>;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::ReadonlyType(inner) => {
+            let inner_key = interner.lookup(inner).expect("Inner type should exist");
+            match inner_key {
+                TypeKey::Array(element) => {
+                    assert_eq!(element, TypeId::STRING);
+                }
+                _ => panic!("Expected readonly array type, got {:?}", inner_key),
+            }
+        }
+        _ => panic!("Expected readonly type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_conditional_type_with_infer() {
     let (arena, type_idx) =
         parse_type_alias_type_node("type T = string extends infer R ? string : never;");

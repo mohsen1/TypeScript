@@ -393,6 +393,15 @@ impl<'a> ThinCheckerState<'a> {
                             .unwrap_or(TypeId::ANY);
                         return self.ctx.types.array(elem_type);
                     }
+                    "ReadonlyArray" => {
+                        let elem_type = type_ref.type_arguments
+                            .as_ref()
+                            .and_then(|args| args.nodes.first().copied())
+                            .map(|idx| self.get_type_from_type_node(idx))
+                            .unwrap_or(TypeId::ANY);
+                        let array_type = self.ctx.types.array(elem_type);
+                        return self.ctx.types.intern(crate::solver::TypeKey::ReadonlyType(array_type));
+                    }
                     name => {
                         // Look up user-defined types from symbol table
                         // Check local scopes first (includes type parameters)
