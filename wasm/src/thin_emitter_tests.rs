@@ -473,6 +473,28 @@ fn test_thin_emit_object_nested_destructuring_es5() {
 }
 
 #[test]
+fn test_thin_emit_object_spread_es5() {
+    let source = "let o = { ...a, b: 1 };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("Object.assign("),
+        "Expected Object.assign in ES5 output for object spread: {}",
+        output
+    );
+    assert!(
+        !output.contains("...a"),
+        "ES5 output should not contain object spread syntax: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_array_nested_destructuring_es5() {
     let source = "let [[x]] = arr;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

@@ -1724,7 +1724,9 @@ impl<'a> ThinPrinter<'a> {
             }
             // Also check for spread elements which need ES5 transform
             if let Some(node) = self.arena.get(idx) {
-                if node.kind == syntax_kind_ext::SPREAD_ASSIGNMENT {
+                if node.kind == syntax_kind_ext::SPREAD_ASSIGNMENT
+                    || node.kind == syntax_kind_ext::SPREAD_ELEMENT
+                {
                     return true;
                 }
             }
@@ -1767,7 +1769,10 @@ impl<'a> ThinPrinter<'a> {
         // Find the index of the first computed property
         let first_computed_idx = elements.iter()
             .position(|&idx| self.is_computed_property_member(idx) || {
-                self.arena.get(idx).map(|n| n.kind == syntax_kind_ext::SPREAD_ASSIGNMENT).unwrap_or(false)
+                self.arena.get(idx).map(|n| {
+                    n.kind == syntax_kind_ext::SPREAD_ASSIGNMENT
+                        || n.kind == syntax_kind_ext::SPREAD_ELEMENT
+                }).unwrap_or(false)
             })
             .unwrap_or(elements.len());
 
@@ -1882,6 +1887,16 @@ impl<'a> ThinPrinter<'a> {
                     self.write(temp_var);
                     self.write(", ");
                     self.emit(spread.expression);
+                    self.write(")");
+                }
+            }
+            k if k == syntax_kind_ext::SPREAD_ELEMENT => {
+                // Spread: { ...x } → Object.assign(_a, x)
+                if let Some(spread) = self.arena.unary_exprs_ex.get(node.data_index as usize) {
+                    self.write("Object.assign(");
+                    self.write(temp_var);
+                    self.write(", ");
+                    self.emit_expression(spread.expression);
                     self.write(")");
                 }
             }
