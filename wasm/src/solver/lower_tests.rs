@@ -499,6 +499,29 @@ fn test_lower_conditional_infer_binding() {
 }
 
 #[test]
+fn test_lower_conditional_infer_binding_false_branch() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = string extends infer R ? never : R;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Conditional(cond) => {
+            assert_eq!(cond.true_type, TypeId::NEVER);
+            assert_eq!(cond.false_type, cond.extends_type);
+            match interner.lookup(cond.false_type) {
+                Some(TypeKey::Infer(info)) => {
+                    assert_eq!(interner.resolve_atom(info.name), "R");
+                }
+                other => panic!("Expected infer type in false branch, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Conditional type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_deduplicates_identical_types() {
     let (arena_one, type_one) = parse_type_alias_type_node("type A = \"same\";");
     let (arena_two, type_two) = parse_type_alias_type_node("type B = \"same\";");
