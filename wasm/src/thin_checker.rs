@@ -4379,13 +4379,23 @@ impl<'a> ThinCheckerState<'a> {
             return self.ctx.types.tuple(tuple_elements);
         }
 
-        // Create union of element types using TypeInterner
+        // Choose a best common type if any element is a supertype of all others.
         let element_type = if element_types.len() == 1 {
             element_types[0]
         } else if element_types.is_empty() {
             TypeId::NEVER
         } else {
-            self.ctx.types.union(element_types)
+            let mut best = None;
+            'candidates: for &candidate in &element_types {
+                for &elem in &element_types {
+                    if !self.is_assignable_to(elem, candidate) {
+                        continue 'candidates;
+                    }
+                }
+                best = Some(candidate);
+                break;
+            }
+            best.unwrap_or_else(|| self.ctx.types.union(element_types))
         };
 
         self.ctx.types.array(element_type)

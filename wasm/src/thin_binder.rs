@@ -631,6 +631,7 @@ impl ThinBinderState {
             k if k == syntax_kind_ext::WHILE_STATEMENT ||
                  k == syntax_kind_ext::DO_STATEMENT => {
                 if let Some(loop_data) = arena.get_loop(node) {
+                    let pre_loop_flow = self.current_flow;
                     let loop_label = self.create_loop_label();
                     if !self.current_flow.is_none() {
                         self.add_antecedent(loop_label, self.current_flow);
@@ -654,7 +655,10 @@ impl ThinBinderState {
                             pre_condition_flow,
                             loop_data.condition,
                         );
-                        self.current_flow = false_flow;
+                        let merge_label = self.create_branch_label();
+                        self.add_antecedent(merge_label, pre_condition_flow);
+                        self.add_antecedent(merge_label, false_flow);
+                        self.current_flow = merge_label;
                     } else {
                         self.bind_expression(arena, loop_data.condition);
 
@@ -673,7 +677,10 @@ impl ThinBinderState {
                             pre_condition_flow,
                             loop_data.condition,
                         );
-                        self.current_flow = false_flow;
+                        let merge_label = self.create_branch_label();
+                        self.add_antecedent(merge_label, pre_loop_flow);
+                        self.add_antecedent(merge_label, false_flow);
+                        self.current_flow = merge_label;
                     }
                 }
             }
@@ -684,6 +691,7 @@ impl ThinBinderState {
                     self.enter_scope(ContainerKind::Block, idx);
                     self.bind_node(arena, loop_data.initializer);
 
+                    let pre_loop_flow = self.current_flow;
                     let loop_label = self.create_loop_label();
                     if !self.current_flow.is_none() {
                         self.add_antecedent(loop_label, self.current_flow);
@@ -708,7 +716,10 @@ impl ThinBinderState {
                             pre_condition_flow,
                             loop_data.condition,
                         );
-                        self.current_flow = false_flow;
+                        let merge_label = self.create_branch_label();
+                        self.add_antecedent(merge_label, pre_loop_flow);
+                        self.add_antecedent(merge_label, false_flow);
+                        self.current_flow = merge_label;
                     } else {
                         self.bind_node(arena, loop_data.statement);
                         self.bind_expression(arena, loop_data.incrementor);
