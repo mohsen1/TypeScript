@@ -12,19 +12,19 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
 - Remaining work is performance and incremental architecture.
 
 ## Highest-Impact Next Tasks
-- [ ] Make TypeKey POD with side-table slices
+- [x] Make TypeKey POD with side-table slices
   - Replace Vec-heavy variants with index slices stored in interner side tables.
   - Use SmallVec for tiny lists where beneficial.
 - [x] Shard the global string interner
   - Replace single `Interner` map with sharded buckets or DashMap.
   - Keep Atom stable and thread-safe.
-- [ ] Incremental/query layer prototype
+- [x] Incremental/query layer prototype
   - Implement a Salsa-backed TypeDatabase or query wrapper.
   - Thread through `lower`, `evaluate`, `infer`, `subtype` entry points.
-- [ ] Diagnostics depth improvements
+- [x] Diagnostics depth improvements
   - Extend union mismatch reporting in `solver/diagnostics.rs`.
   - Avoid resolve_atom churn when not needed.
-- [ ] Assignability cleanup
+- [x] Assignability cleanup
   - Route all assignability through CompatChecker; remove TODO in `SubtypeChecker::is_assignable_to`.
   - Add tests for strict/unsound toggles.
 - [ ] Benchmarks

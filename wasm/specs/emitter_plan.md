@@ -9,7 +9,7 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 ## Current Status
 - LoweringPass -> TransformDirective -> ThinPrinter pipeline exists.
 - ES5/ESNext transforms largely implemented.
-- Remaining TODOs: push real_world_bench throughput toward 500+ MiB/s (emit-only ~308 MiB/s).
+- Remaining TODOs: push real_world_bench throughput toward 500+ MiB/s (emit-only ~318 MiB/s).
 
 ## Highest-Impact Next Tasks
 - [ ] Performance tuning: reach 500+ MiB/s emitter throughput
@@ -29,8 +29,8 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 - [x] Performance check
   - Run `./wasm/bench.sh real_world_bench` and track throughput deltas.
   - Results (real_world_bench):
-    - checker_ts_full_pipeline thrpt: 60.637–61.017 MiB/s (change within noise).
-    - checker_ts_emit_only thrpt: 303.33–311.35 MiB/s (no significant change).
+    - checker_ts_full_pipeline thrpt: 57.766–58.824 MiB/s (regression ~2.6–5.0%).
+    - checker_ts_emit_only thrpt: 317.28–318.59 MiB/s (improvement ~1.4–4.1%).
 
 ## Success Criteria
 - All transforms triggered via TransformContext (no inline ES5 fallbacks).
@@ -94,6 +94,7 @@ Next Steps: Cleanup. Remove the legacy inline transformation logic from ThinPrin
 48. ES5 emit: move template literal downleveling behind TransformDirective [done]
 49. ES5 emit: move variable destructuring downleveling behind TransformDirective [done]
 50. ES5 emit: move function parameter downleveling behind TransformDirective [done]
+51. LoweringPass: gate export name extraction for non-exported declarations [done]
 
 ## Quick Reference
 
