@@ -193,6 +193,9 @@ impl<'a> FlowAnalyzer<'a> {
             // typeof x === "string"
             k if k == syntax_kind_ext::BINARY_EXPRESSION => {
                 if let Some(bin) = self.arena.get_binary_expr(cond_node) {
+                    if let Some(narrowed) = self.narrow_by_logical_expr(type_id, bin, target, is_true_branch) {
+                        return narrowed;
+                    }
                     return self.narrow_by_binary_expr(type_id, bin, target, is_true_branch, &narrowing);
                 }
             }
@@ -293,6 +296,52 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         type_id
+    }
+
+    fn narrow_by_logical_expr(
+        &self,
+        type_id: TypeId,
+        bin: &crate::parser::thin_node::BinaryExprData,
+        target: NodeIndex,
+        is_true_branch: bool,
+    ) -> Option<TypeId> {
+        let operator = bin.operator_token;
+
+        if operator == SyntaxKind::AmpersandAmpersandToken as u16 {
+            if is_true_branch {
+                let left_true = self.narrow_type_by_condition(type_id, bin.left, target, true);
+                let right_true = self.narrow_type_by_condition(left_true, bin.right, target, true);
+                return Some(right_true);
+            }
+
+            let left_false = self.narrow_type_by_condition(type_id, bin.left, target, false);
+            let left_true = self.narrow_type_by_condition(type_id, bin.left, target, true);
+            let right_false = self.narrow_type_by_condition(left_true, bin.right, target, false);
+            return Some(self.union_types(left_false, right_false));
+        }
+
+        if operator == SyntaxKind::BarBarToken as u16 {
+            if is_true_branch {
+                let left_true = self.narrow_type_by_condition(type_id, bin.left, target, true);
+                let left_false = self.narrow_type_by_condition(type_id, bin.left, target, false);
+                let right_true = self.narrow_type_by_condition(left_false, bin.right, target, true);
+                return Some(self.union_types(left_true, right_true));
+            }
+
+            let left_false = self.narrow_type_by_condition(type_id, bin.left, target, false);
+            let right_false = self.narrow_type_by_condition(left_false, bin.right, target, false);
+            return Some(right_false);
+        }
+
+        None
+    }
+
+    fn union_types(&self, left: TypeId, right: TypeId) -> TypeId {
+        if left == right {
+            left
+        } else {
+            self.interner.union(vec![left, right])
+        }
     }
 
     fn skip_parenthesized(&self, mut idx: NodeIndex) -> NodeIndex {
@@ -870,6 +919,69 @@ if (typeof x === "string") {}
         let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
         let narrowed = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, false);
         assert_eq!(narrowed, TypeId::NUMBER);
+    }
+
+    #[test]
+    fn test_logical_and_applies_right_guard() {
+        let source = r#"
+let x: string | number;
+if (x && typeof x === "string") {}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let arena = parser.get_arena();
+        let types = TypeInterner::new();
+        let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+        let condition_idx = get_if_condition(arena, root, 1);
+        let condition_node = arena.get(condition_idx).expect("condition node");
+        let binary = arena.get_binary_expr(condition_node).expect("binary condition");
+        let target_idx = binary.left;
+
+        let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+        let narrowed = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, true);
+        assert_eq!(narrowed, TypeId::STRING);
+    }
+
+    #[test]
+    fn test_logical_or_narrows_to_union_of_literals() {
+        let source = r#"
+let x: "a" | "b" | "c";
+if (x === "a" || x === "b") {}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let arena = parser.get_arena();
+        let types = TypeInterner::new();
+        let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+        let condition_idx = get_if_condition(arena, root, 1);
+        let condition_node = arena.get(condition_idx).expect("condition node");
+        let binary = arena.get_binary_expr(condition_node).expect("binary condition");
+        let left_node = arena.get(binary.left).expect("left condition");
+        let left_eq = arena.get_binary_expr(left_node).expect("left equality");
+        let target_idx = left_eq.left;
+
+        let lit_a = types.literal_string("a");
+        let lit_b = types.literal_string("b");
+        let lit_c = types.literal_string("c");
+        let union = types.union(vec![lit_a, lit_b, lit_c]);
+
+        let narrowed_true = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, true);
+        let narrowed_false = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, false);
+
+        assert_eq!(narrowed_true, types.union(vec![lit_a, lit_b]));
+        assert_eq!(narrowed_false, lit_c);
     }
 
     #[test]

@@ -43,6 +43,9 @@ Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (in
 - [x] Record flow nodes for identifiers in all contexts
   - Use current flow when binding identifier nodes to enable branch narrowing.
 - [x] Add checker test to verify flow narrowing inside if branches
+- [x] Narrow logical `&&`/`||` conditions in control flow
+  - Apply sequential narrowing for `&&` and union-of-paths narrowing for `||`.
+- [x] Add control-flow tests for logical `&&` and `||` narrowing
 
 ## Baseline / Validation
 - `./wasm/test.sh`
