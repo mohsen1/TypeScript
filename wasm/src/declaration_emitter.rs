@@ -119,6 +119,9 @@ impl<'a> DeclarationEmitter<'a> {
             k if k == syntax_kind_ext::EXPORT_DECLARATION => {
                 self.emit_export_declaration(stmt_idx);
             }
+            k if k == syntax_kind_ext::EXPORT_ASSIGNMENT => {
+                self.emit_export_assignment(stmt_idx);
+            }
             k if k == syntax_kind_ext::IMPORT_DECLARATION => {
                 self.emit_import_declaration(stmt_idx);
             }
@@ -690,6 +693,21 @@ impl<'a> DeclarationEmitter<'a> {
             self.emit_node(export.module_specifier);
         }
         
+        self.write(";");
+        self.write_line();
+    }
+
+    fn emit_export_assignment(&mut self, assign_idx: NodeIndex) {
+        let Some(assign_node) = self.arena.get(assign_idx) else { return };
+        let Some(assign) = self.arena.get_export_assignment(assign_node) else { return };
+
+        self.write_indent();
+        if assign.is_export_equals {
+            self.write("export = ");
+        } else {
+            self.write("export default ");
+        }
+        self.emit_expression(assign.expression);
         self.write(";");
         self.write_line();
     }
