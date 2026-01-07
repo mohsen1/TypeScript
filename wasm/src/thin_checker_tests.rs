@@ -1132,6 +1132,37 @@ class WrongTypePropertyImpl extends WrongTypeProperty {
 }
 
 #[test]
+fn test_property_not_assignable_to_generic_base_2416() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+abstract class Base<T> {
+    abstract value: T;
+}
+class Derived extends Base<string> {
+    value = 123;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2416),
+        "Expected error 2416 for generic base property mismatch, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_non_abstract_class_missing_implementations_2654() {
     // Error 2654: Non-abstract class 'C' is missing implementations for
     // the following members of 'B': 'prop', 'm'.
