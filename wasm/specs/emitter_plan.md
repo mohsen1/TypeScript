@@ -25,6 +25,7 @@ Status: Active
 - [x] Emit default export declarations in declaration emitter.
 - [x] Emit namespace re-exports (`export * as ns`) in declaration emitter.
 - [x] Emit default re-export specifiers (`export { default ... }`) in declaration emitter.
+- [x] Add parser coverage for default re-export specifiers.
 - [x] Shrink `thin_emitter/mod.rs` for maintainability
   - [x] Extract comment utilities + comment/output helpers into modules (keep API stable).
   - [x] Extract module wrapper emission helpers into a submodule (keep API stable).
