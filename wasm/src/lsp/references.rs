@@ -2,12 +2,13 @@
 //!
 //! Given a position in the source, finds all references to the symbol at that position.
 
+use crate::binder::SymbolId;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::{NodeIndex, syntax_kind_ext};
 use crate::thin_binder::ThinBinderState;
 use crate::lsp::position::{Position, Location, LineMap, Range};
 use crate::lsp::utils::find_node_at_offset;
-use crate::lsp::resolver::ScopeWalker;
+use crate::lsp::resolver::{ScopeCache, ScopeCacheStats, ScopeWalker};
 use crate::scanner::SyntaxKind;
 
 /// Find References provider.
@@ -51,6 +52,26 @@ impl<'a> FindReferences<'a> {
     ///
     /// Returns None if no symbol is found at the position.
     pub fn find_references(&self, root: NodeIndex, position: Position) -> Option<Vec<Location>> {
+        self.find_references_internal(root, position, None, None)
+    }
+
+    pub fn find_references_with_scope_cache(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        scope_cache: &mut ScopeCache,
+        scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<Vec<Location>> {
+        self.find_references_internal(root, position, Some(scope_cache), scope_stats)
+    }
+
+    fn find_references_internal(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        scope_cache: Option<&mut ScopeCache>,
+        scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<Vec<Location>> {
         // 1. Convert position to byte offset
         let offset = self.line_map.position_to_offset(position, self.source_text)?;
 
@@ -61,7 +82,7 @@ impl<'a> FindReferences<'a> {
         }
 
         // 3. Resolve the node to a symbol
-        let symbol_id = self.resolve_symbol(root, node_idx)?;
+        let symbol_id = self.resolve_symbol_internal(root, node_idx, scope_cache, scope_stats)?;
 
         // 4. Find all references to this symbol
         let mut walker = ScopeWalker::new(self.arena, self.binder);
@@ -102,12 +123,32 @@ impl<'a> FindReferences<'a> {
     ///
     /// This is useful when you already have the node index from another operation.
     pub fn find_references_for_node(&self, root: NodeIndex, node_idx: NodeIndex) -> Option<Vec<Location>> {
+        self.find_references_for_node_internal(root, node_idx, None, None)
+    }
+
+    pub fn find_references_for_node_with_scope_cache(
+        &self,
+        root: NodeIndex,
+        node_idx: NodeIndex,
+        scope_cache: &mut ScopeCache,
+        scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<Vec<Location>> {
+        self.find_references_for_node_internal(root, node_idx, Some(scope_cache), scope_stats)
+    }
+
+    fn find_references_for_node_internal(
+        &self,
+        root: NodeIndex,
+        node_idx: NodeIndex,
+        scope_cache: Option<&mut ScopeCache>,
+        scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<Vec<Location>> {
         if node_idx.is_none() {
             return None;
         }
 
         // Resolve the node to a symbol
-        let symbol_id = self.resolve_symbol(root, node_idx)?;
+        let symbol_id = self.resolve_symbol_internal(root, node_idx, scope_cache, scope_stats)?;
 
         // Find all references to this symbol
         let mut walker = ScopeWalker::new(self.arena, self.binder);
@@ -146,13 +187,33 @@ impl<'a> FindReferences<'a> {
 
     /// Find only usages (excluding declarations) for the symbol at the given position.
     pub fn find_usages_only(&self, root: NodeIndex, position: Position) -> Option<Vec<Location>> {
+        self.find_usages_only_internal(root, position, None, None)
+    }
+
+    pub fn find_usages_only_with_scope_cache(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        scope_cache: &mut ScopeCache,
+        scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<Vec<Location>> {
+        self.find_usages_only_internal(root, position, Some(scope_cache), scope_stats)
+    }
+
+    fn find_usages_only_internal(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        scope_cache: Option<&mut ScopeCache>,
+        scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<Vec<Location>> {
         let offset = self.line_map.position_to_offset(position, self.source_text)?;
         let node_idx = find_node_at_offset(self.arena, offset);
         if node_idx.is_none() {
             return None;
         }
 
-        let symbol_id = self.resolve_symbol(root, node_idx)?;
+        let symbol_id = self.resolve_symbol_internal(root, node_idx, scope_cache, scope_stats)?;
 
         // Find all references (usages only, not declarations)
         let mut walker = ScopeWalker::new(self.arena, self.binder);
@@ -180,15 +241,41 @@ impl<'a> FindReferences<'a> {
         }
     }
 
-    fn resolve_symbol(&self, root: NodeIndex, node_idx: NodeIndex) -> Option<crate::binder::SymbolId> {
+    pub(crate) fn resolve_symbol_for_node_with_scope_cache(
+        &self,
+        root: NodeIndex,
+        node_idx: NodeIndex,
+        scope_cache: &mut ScopeCache,
+        scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<SymbolId> {
+        self.resolve_symbol_internal(root, node_idx, Some(scope_cache), scope_stats)
+    }
+
+    fn resolve_symbol_internal(
+        &self,
+        root: NodeIndex,
+        node_idx: NodeIndex,
+        mut scope_cache: Option<&mut ScopeCache>,
+        mut scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<SymbolId> {
         let mut walker = ScopeWalker::new(self.arena, self.binder);
-        if let Some(symbol_id) = walker.resolve_node(root, node_idx) {
-            return Some(symbol_id);
+        let symbol_id = if let Some(scope_cache) = scope_cache.as_deref_mut() {
+            walker.resolve_node_cached(root, node_idx, scope_cache, scope_stats.as_deref_mut())
+        } else {
+            walker.resolve_node(root, node_idx)
+        };
+
+        if symbol_id.is_some() {
+            return symbol_id;
         }
 
         let tag_idx = self.tagged_template_tag(node_idx)?;
         let mut walker = ScopeWalker::new(self.arena, self.binder);
-        walker.resolve_node(root, tag_idx)
+        if let Some(scope_cache) = scope_cache.as_deref_mut() {
+            walker.resolve_node_cached(root, tag_idx, scope_cache, scope_stats.as_deref_mut())
+        } else {
+            walker.resolve_node(root, tag_idx)
+        }
     }
 
     fn tagged_template_tag(&self, node_idx: NodeIndex) -> Option<NodeIndex> {

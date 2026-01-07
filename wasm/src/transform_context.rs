@@ -52,12 +52,8 @@ pub enum TransformDirective {
     ES5Class {
         /// Original class node index
         class_node: NodeIndex,
-        /// Extracted class name (for the constructor function)
-        class_name: Option<String>,
         /// Heritage clause (extends)
         heritage: Option<NodeIndex>,
-        /// Members to transform
-        members: Vec<NodeIndex>,
     },
 
     /// ES5 Class Expression: Transform class expression to IIFE expression.
@@ -345,16 +341,14 @@ mod tests {
             class_node,
             TransformDirective::ES5Class {
                 class_node,
-                class_name: Some("MyClass".to_string()),
                 heritage: None,
-                members: vec![],
             },
         );
 
         let directive = ctx.get(class_node).unwrap();
         match directive {
-            TransformDirective::ES5Class { class_name, .. } => {
-                assert_eq!(class_name.as_ref().unwrap(), "MyClass");
+            TransformDirective::ES5Class { class_node, .. } => {
+                assert_eq!(*class_node, NodeIndex(10));
             }
             _ => panic!("Expected ES5Class directive"),
         }
@@ -371,9 +365,7 @@ mod tests {
             is_default: false,
             inner: Box::new(TransformDirective::ES5Class {
                 class_node,
-                class_name: Some("MyClass".to_string()),
                 heritage: None,
-                members: vec![],
             }),
         };
 

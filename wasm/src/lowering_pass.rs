@@ -758,28 +758,27 @@ impl<'a> LoweringPass<'a> {
         // Determine the base transform
         let base_directive = if self.ctx.target_es5 {
             // ES5 class transform
-            TransformDirective::ES5Class {
-                class_node: idx,
-                class_name: class_name.clone(),
-                heritage,
-                members: class.members.nodes.clone(),
-            }
+            TransformDirective::ES5Class { class_node: idx, heritage }
         } else {
             // No transform needed for ES6+ targets
             TransformDirective::Identity
         };
 
         // Wrap with CommonJS export if needed
-        let final_directive = if is_exported && class_name.is_some() {
-            let export_directive = TransformDirective::CommonJSExport {
-                names: vec![class_name.unwrap()],
-                is_default,
-                inner: Box::new(TransformDirective::Identity),
-            };
+        let final_directive = if is_exported {
+            if let Some(export_name) = class_name {
+                let export_directive = TransformDirective::CommonJSExport {
+                    names: vec![export_name],
+                    is_default,
+                    inner: Box::new(TransformDirective::Identity),
+                };
 
-            match base_directive {
-                TransformDirective::Identity => export_directive,
-                other => TransformDirective::Chain(vec![other, export_directive]),
+                match base_directive {
+                    TransformDirective::Identity => export_directive,
+                    other => TransformDirective::Chain(vec![other, export_directive]),
+                }
+            } else {
+                base_directive
             }
         } else {
             base_directive
