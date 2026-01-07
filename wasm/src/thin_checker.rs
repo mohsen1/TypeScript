@@ -2182,12 +2182,10 @@ impl<'a> ThinCheckerState<'a> {
             return false;
         }
 
-        let literal_keys = self.get_literal_key_union_from_type(index_type);
-        let wants_number = index_type == TypeId::NUMBER
-            || literal_index.is_some()
-            || literal_keys.as_ref().is_some_and(|(_, number_keys)| !number_keys.is_empty());
-        let wants_string = index_type == TypeId::STRING
-            || literal_keys.as_ref().is_some_and(|(string_keys, _)| !string_keys.is_empty());
+        let index_key_kind = self.get_index_key_kind(index_type);
+        let wants_number = literal_index.is_some()
+            || index_key_kind.as_ref().is_some_and(|(_, wants_number)| *wants_number);
+        let wants_string = index_key_kind.as_ref().is_some_and(|(wants_string, _)| *wants_string);
         if !wants_number && !wants_string {
             return false;
         }
@@ -2198,6 +2196,28 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         !self.is_element_indexable_key(&object_key, wants_string, wants_number)
+    }
+
+    fn get_index_key_kind(&self, index_type: TypeId) -> Option<(bool, bool)> {
+        use crate::solver::{IntrinsicKind, LiteralValue, TypeKey};
+
+        match self.ctx.types.lookup(index_type)? {
+            TypeKey::Intrinsic(IntrinsicKind::String) => Some((true, false)),
+            TypeKey::Intrinsic(IntrinsicKind::Number) => Some((false, true)),
+            TypeKey::Literal(LiteralValue::String(_)) => Some((true, false)),
+            TypeKey::Literal(LiteralValue::Number(_)) => Some((false, true)),
+            TypeKey::Union(members) => {
+                let mut wants_string = false;
+                let mut wants_number = false;
+                for &member in members.iter() {
+                    let (member_string, member_number) = self.get_index_key_kind(member)?;
+                    wants_string |= member_string;
+                    wants_number |= member_number;
+                }
+                Some((wants_string, wants_number))
+            }
+            _ => None,
+        }
     }
 
     fn is_element_indexable_key(
