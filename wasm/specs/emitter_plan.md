@@ -12,10 +12,13 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 - Remaining TODOs: reduce obvious hot-path overheads without hard throughput targets.
 
 ## Highest-Impact Next Tasks
+- [ ] Shrink `thin_emitter/mod.rs` for maintainability
+  - [ ] Split into focused modules (printer core, ES5 helpers, module emission).
+  - [ ] Keep public API stable and update call sites/tests.
 - [ ] Performance tuning: remove obvious hot-path overheads
   - [x] Pre-allocate output buffer from source size; write numeric indices without allocations.
   - [x] Write numeric values in ES5 transforms without allocating strings.
-  - [ ] Profile emit-only pipeline (LoweringPass + helper detection).
+  - [ ] Profile emit-only pipeline (LoweringPass + helper detection) after parity checks.
   - [x] Reduce allocations and repeated scans in emit hot paths (share directive payloads; drop unused module wrapper body clone).
 - [x] Finish transform-only pipeline
   - [x] Remove or gate `ctx.target_es5` inline paths in `thin_emitter/mod.rs`.
