@@ -118,7 +118,7 @@ impl<'a> CallEvaluator<'a> {
         }
 
         // Check argument count
-        let min_args = func.params.iter().filter(|p| !p.optional).count();
+        let min_args = func.params.iter().filter(|p| !p.optional && !p.rest).count();
         let max_args = if func.params.iter().any(|p| p.rest) {
             None
         } else {

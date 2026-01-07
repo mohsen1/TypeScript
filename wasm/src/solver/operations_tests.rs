@@ -93,6 +93,71 @@ fn test_call_argument_type_mismatch() {
 }
 
 #[test]
+fn test_call_rest_parameter_allows_zero_args() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    // function(...args: number[]): string
+    let rest_array = interner.array(TypeId::NUMBER);
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: rest_array,
+            optional: false,
+            rest: true,
+        }],
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let result = evaluator.resolve_call(func, &[]);
+    match result {
+        CallResult::Success(ret) => assert_eq!(ret, TypeId::STRING),
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_call_rest_parameter_min_args_with_required() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    // function(x: string, ...args: number[]): string
+    let rest_array = interner.array(TypeId::NUMBER);
+    let func = interner.function(FunctionShape {
+        params: vec![
+            ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::STRING,
+                optional: false,
+                rest: false,
+            },
+            ParamInfo {
+                name: Some(interner.intern_string("args")),
+                type_id: rest_array,
+                optional: false,
+                rest: true,
+            },
+        ],
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let result = evaluator.resolve_call(func, &[]);
+    match result {
+        CallResult::ArgumentCountMismatch { expected_min, actual, .. } => {
+            assert_eq!(expected_min, 1);
+            assert_eq!(actual, 0);
+        }
+        _ => panic!("Expected ArgumentCountMismatch, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_call_rest_parameter_type_match() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
