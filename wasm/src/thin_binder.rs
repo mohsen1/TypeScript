@@ -307,6 +307,14 @@ impl ThinBinderState {
                             if let Some(decl) = arena.get_variable_declaration(decl_node) {
                                 if let Some(name) = self.get_identifier_name(arena, decl.name) {
                                     self.hoisted_vars.push((name.to_string(), decl_idx));
+                                } else {
+                                    let mut names = Vec::new();
+                                    self.collect_binding_identifiers(arena, decl.name, &mut names);
+                                    for ident_idx in names {
+                                        if let Some(name) = self.get_identifier_name(arena, ident_idx) {
+                                            self.hoisted_vars.push((name.to_string(), ident_idx));
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -595,6 +603,39 @@ impl ThinBinderState {
         None
     }
 
+    fn collect_binding_identifiers(&self, arena: &ThinNodeArena, idx: NodeIndex, out: &mut Vec<NodeIndex>) {
+        if idx.is_none() {
+            return;
+        }
+
+        let Some(node) = arena.get(idx) else {
+            return;
+        };
+
+        match node.kind {
+            k if k == SyntaxKind::Identifier as u16 => {
+                out.push(idx);
+            }
+            k if k == syntax_kind_ext::BINDING_ELEMENT => {
+                if let Some(binding) = arena.get_binding_element(node) {
+                    self.collect_binding_identifiers(arena, binding.name, out);
+                }
+            }
+            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                || k == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
+                if let Some(pattern) = arena.get_binding_pattern(node) {
+                    for &elem in &pattern.elements.nodes {
+                        if elem.is_none() {
+                            continue;
+                        }
+                        self.collect_binding_identifiers(arena, elem, out);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Check if modifiers list contains the 'abstract' keyword.
     fn has_abstract_modifier(&self, arena: &ThinNodeArena, modifiers: &Option<NodeList>) -> bool {
         use crate::scanner::SyntaxKind;
@@ -879,7 +920,23 @@ impl ThinBinderState {
                 // Check if exported BEFORE allocating symbol
                 let is_exported = self.is_node_exported(arena, idx);
 
-                self.declare_symbol(name, flags, idx, is_exported);
+                let sym_id = self.declare_symbol(name, flags, idx, is_exported);
+                self.node_symbols.insert(decl.name.0, sym_id);
+            } else {
+                let flags = if (node.flags as u32 & (node_flags::LET | node_flags::CONST)) != 0 {
+                    symbol_flags::BLOCK_SCOPED_VARIABLE
+                } else {
+                    symbol_flags::FUNCTION_SCOPED_VARIABLE
+                };
+                let is_exported = self.is_node_exported(arena, idx);
+
+                let mut names = Vec::new();
+                self.collect_binding_identifiers(arena, decl.name, &mut names);
+                for ident_idx in names {
+                    if let Some(name) = self.get_identifier_name(arena, ident_idx) {
+                        self.declare_symbol(name, flags, ident_idx, is_exported);
+                    }
+                }
             }
         }
     }
@@ -914,6 +971,16 @@ impl ThinBinderState {
                     let sym_id = self.symbols.alloc(symbol_flags::FUNCTION_SCOPED_VARIABLE, name.to_string());
                     self.current_scope.set(name.to_string(), sym_id);
                     self.node_symbols.insert(idx.0, sym_id);
+                } else {
+                    let mut names = Vec::new();
+                    self.collect_binding_identifiers(arena, param.name, &mut names);
+                    for ident_idx in names {
+                        if let Some(name) = self.get_identifier_name(arena, ident_idx) {
+                            let sym_id = self.symbols.alloc(symbol_flags::FUNCTION_SCOPED_VARIABLE, name.to_string());
+                            self.current_scope.set(name.to_string(), sym_id);
+                            self.node_symbols.insert(ident_idx.0, sym_id);
+                        }
+                    }
                 }
             }
         }
