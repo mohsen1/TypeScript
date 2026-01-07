@@ -527,6 +527,57 @@ fn test_two_phase_emission_es5_nested_arrow_this_capture() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_arrow_this_in_object_literal_property() {
+    let source = "const fn = () => ({ foo: this.x });";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("function (_this)"),
+        "ES5 arrow output should capture this in object literal property: {}",
+        output
+    );
+    assert!(
+        output.contains("_this.x"),
+        "ES5 arrow output should rewrite this in object literal property: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_arrow_object_literal_method_no_capture() {
+    let source = "const fn = () => ({ method() { return this.x; } });";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        !output.contains("_this"),
+        "ES5 arrow output should not capture this for object literal method bodies: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_async_arrow_function() {
     let source = "const foo = async () => { await bar(); };";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
