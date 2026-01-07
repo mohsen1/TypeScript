@@ -1287,6 +1287,14 @@ const TYPES_VERSIONS_COMPILER_VERSION: SemVer = SemVer {
     patch: 0,
 };
 
+fn types_versions_compiler_version(options: &ResolvedCompilerOptions) -> SemVer {
+    options
+        .types_versions_compiler_version
+        .as_deref()
+        .and_then(parse_semver)
+        .unwrap_or(TYPES_VERSIONS_COMPILER_VERSION)
+}
+
 fn export_conditions(options: &ResolvedCompilerOptions) -> Vec<&'static str> {
     let resolution = options.effective_module_resolution();
     let mut conditions = Vec::new();
@@ -1543,7 +1551,8 @@ fn resolve_types_versions(
     options: &ResolvedCompilerOptions,
     package_type: Option<PackageType>,
 ) -> Option<PathBuf> {
-    let paths = select_types_versions_paths(types_versions)?;
+    let compiler_version = types_versions_compiler_version(options);
+    let paths = select_types_versions_paths(types_versions, compiler_version)?;
     let mut best_pattern: Option<&String> = None;
     let mut best_value: Option<&serde_json::Value> = None;
     let mut best_wildcard = String::new();
@@ -1607,8 +1616,9 @@ fn resolve_types_versions(
 
 fn select_types_versions_paths(
     types_versions: &serde_json::Value,
+    compiler_version: SemVer,
 ) -> Option<&serde_json::Map<String, serde_json::Value>> {
-    select_types_versions_paths_for_version(types_versions, TYPES_VERSIONS_COMPILER_VERSION)
+    select_types_versions_paths_for_version(types_versions, compiler_version)
 }
 
 fn select_types_versions_paths_for_version(
@@ -2844,5 +2854,13 @@ pub(crate) fn apply_cli_overrides(options: &mut ResolvedCompilerOptions, args: &
     }
     if args.no_emit {
         options.no_emit = true;
+    }
+    if let Some(version) = args.types_versions_compiler_version.as_ref() {
+        options.types_versions_compiler_version = Some(version.clone());
+    } else if let Ok(version) = std::env::var("TSZ_TYPES_VERSIONS_COMPILER_VERSION") {
+        let version = version.trim();
+        if !version.is_empty() {
+            options.types_versions_compiler_version = Some(version.to_string());
+        }
     }
 }
