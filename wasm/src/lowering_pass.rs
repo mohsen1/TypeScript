@@ -1077,7 +1077,16 @@ impl<'a> LoweringPass<'a> {
 
     fn needs_es5_object_literal_transform(&self, elements: &[NodeIndex]) -> bool {
         elements.iter().any(|&idx| {
-            self.is_computed_property_member(idx) || self.is_spread_element(idx)
+            if self.is_computed_property_member(idx) || self.is_spread_element(idx) {
+                return true;
+            }
+
+            let Some(node) = self.arena.get(idx) else {
+                return false;
+            };
+
+            node.kind == syntax_kind_ext::METHOD_DECLARATION
+                || node.kind == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT
         })
     }
 
