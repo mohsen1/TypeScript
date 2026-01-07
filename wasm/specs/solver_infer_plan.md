@@ -156,6 +156,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Infer type params from KeyOf wrapper positions
 - [x] Infer type params from IndexAccess wrapper positions
 - [x] Infer type params from template literal wrapper positions
+- [x] Infer type params from mapped types with concrete key sets
 - [x] Infer array element type params from tuple arguments
 - [x] Enforce index signature consistency during bounds validation
 
