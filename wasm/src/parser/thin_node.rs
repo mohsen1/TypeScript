@@ -2518,6 +2518,28 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get labeled statement data.
+    #[inline]
+    pub fn get_labeled_statement(&self, node: &ThinNode) -> Option<&LabeledData> {
+        use super::syntax_kind_ext::LABELED_STATEMENT;
+        if node.has_data() && node.kind == LABELED_STATEMENT {
+            self.labeled_data.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get with statement data (stored in if statement pool).
+    #[inline]
+    pub fn get_with_statement(&self, node: &ThinNode) -> Option<&IfStatementData> {
+        use super::syntax_kind_ext::WITH_STATEMENT;
+        if node.has_data() && node.kind == WITH_STATEMENT {
+            self.if_statements.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Get import declaration data (handles both IMPORT_DECLARATION and IMPORT_EQUALS_DECLARATION).
     #[inline]
     pub fn get_import_decl(&self, node: &ThinNode) -> Option<&ImportDeclData> {
