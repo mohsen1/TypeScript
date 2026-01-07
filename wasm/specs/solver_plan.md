@@ -94,6 +94,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - `keyof number` exposes apparent members; assignability rejects mismatched return types.
 - [x] Add base constraint assignability coverage
   - Type parameters compare via their constraints rather than other param constraints.
+- [x] Add Object/object/{} trifecta coverage
+  - `{}` accepts primitives, `object` rejects them, `Object` interface accepts them.
 - [x] Add mapped type key remapping coverage (`as never`)
   - Remapped keys returning `never` are filtered from mapped outputs.
 - [x] Add mapped type key remapping coverage in evaluate/subtype

@@ -1895,6 +1895,40 @@ fn test_keyof_object_keyword() {
 }
 
 #[test]
+fn test_object_trifecta_keyof_object_interface() {
+    use crate::solver::{TypeEnvironment, SymbolRef};
+
+    let interner = TypeInterner::new();
+    let mut env = TypeEnvironment::new();
+
+    let object_interface = interner.object(vec![
+        PropertyInfo { name: interner.intern_string("toString"), type_id: TypeId::STRING,
+ write_type: TypeId::STRING, optional: false, readonly: false, is_method: false },
+        PropertyInfo { name: interner.intern_string("valueOf"), type_id: TypeId::NUMBER,
+ write_type: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+    ]);
+
+    let sym = SymbolRef(1);
+    env.insert(sym, object_interface);
+
+    let ref_type = interner.reference(sym);
+    let evaluator = TypeEvaluator::with_resolver(&interner, &env);
+    let result = evaluator.evaluate_keyof(ref_type);
+    let key = interner.lookup(result).expect("expected union for keyof Object interface");
+
+    match key {
+        TypeKey::Union(members) => {
+            let members = interner.type_list(members);
+            let to_string = interner.literal_string("toString");
+            let value_of = interner.literal_string("valueOf");
+            assert!(members.contains(&to_string));
+            assert!(members.contains(&value_of));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_keyof_never() {
     let interner = TypeInterner::new();
 
