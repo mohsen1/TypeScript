@@ -4,7 +4,7 @@ use super::args::{CliArgs, Module, Target};
 
 #[test]
 fn parses_defaults() {
-    let args = CliArgs::try_parse_from(["stc"]).expect("default args should parse");
+    let args = CliArgs::try_parse_from(["tsz"]).expect("default args should parse");
 
     assert_eq!(args.target, None);
     assert_eq!(args.module, None);
@@ -18,7 +18,7 @@ fn parses_defaults() {
 #[test]
 fn parses_common_flags() {
     let args = CliArgs::try_parse_from([
-        "stc",
+        "tsz",
         "--target",
         "es2020",
         "--module",

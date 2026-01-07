@@ -1,10 +1,10 @@
-# CLI Track Plan (stc)
+# CLI Track Plan (tsz)
 
 ## Mission
 High-performance, tsc-compatible CLI driving the Rust compiler in native mode.
 
 ## Scope
-Files: `wasm/src/bin/stc.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/src/thin_checker.rs` (integration).
+Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/src/thin_checker.rs` (integration).
 
 ## Current Status
 - Args/tsconfig parsing, globbing, compile + emit work.
@@ -23,13 +23,13 @@ Files: `wasm/src/bin/stc.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
   - Support Node16/NodeNext resolution and `.d.ts` lookup.
   - Improve path mapping + extension inference.
 - [ ] Benchmark harness
-  - Script for `stc` vs `tsc` on large repos with timing + memory stats.
+  - Script for `tsz` vs `tsc` on large repos with timing + memory stats.
 
 ## Task Ledger (legacy checklist)
 
 ### Phase 1: Foundation & Arguments
 - [x] **Scaffold Binary**
-  - Add `[[bin]]` entry in `Cargo.toml` for `stc` (Speedy TypeScript Compiler).
+  - Add `[[bin]]` entry in `Cargo.toml` for `tsz` (Codename Zang CLI).
   - Add dependencies: `clap` (derive), `anyhow`, `serde`, `serde_json` (with preserve_order).
 - [x] **Implement Argument Parsing**
   - Replicate common `tsc` flags: `--target`, `--module`, `--outDir`, `--strict`, `--noEmit`.
@@ -77,9 +77,9 @@ Files: `wasm/src/bin/stc.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
   - Auto-generate CLI flag documentation from Clap structs.
   - Write "Migration from tsc" guide.
 - [ ] **Benchmarks vs tsc**
-  - Create a script to run `stc` vs `tsc` on large open source repos (e.g., Three.js, React).
+  - Create a script to run `tsz` vs `tsc` on large open source repos (e.g., Three.js, React).
 
 ## Success Criteria
-- `stc --watch` handles large projects without full reparse.
+- `tsz --watch` handles large projects without full reparse.
 - CLI builds typical `tsconfig.json` projects with correct output.
 - Consistently faster than `tsc` on real-world repos.

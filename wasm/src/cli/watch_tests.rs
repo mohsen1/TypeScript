@@ -42,7 +42,7 @@ fn debouncer_resets_timer_on_new_event() {
 
 #[test]
 fn watch_filter_ignores_outputs_and_excludes() {
-    let base_dir = std::env::temp_dir().join("stc_watch_filter");
+    let base_dir = std::env::temp_dir().join("tsz_watch_filter");
     let out_dir = base_dir.join("dist");
 
     let explicit = base_dir.join("src/index.ts");
@@ -65,7 +65,7 @@ fn watch_filter_ignores_outputs_and_excludes() {
 
 #[test]
 fn watch_filter_respects_emitted_files() {
-    let base_dir = std::env::temp_dir().join("stc_watch_filter_emitted");
+    let base_dir = std::env::temp_dir().join("tsz_watch_filter_emitted");
     let emitted = base_dir.join("types/index.d.ts");
 
     let mut filter = WatchFilter::new(None, Vec::new());

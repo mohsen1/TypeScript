@@ -1,4 +1,4 @@
-//! Native CLI support for the stc binary.
+//! Native CLI support for the tsz binary.
 
 pub mod args;
 pub mod config;
