@@ -1159,7 +1159,7 @@ impl<'a> TypeLowering<'a> {
         if trimmed.len() == text.len() {
             Some(std::borrow::Cow::Borrowed(text))
         } else {
-            Some(std::borrow::Cow::Owned(trimmed.to_string()))
+            Some(std::borrow::Cow::Borrowed(trimmed))
         }
     }
 
