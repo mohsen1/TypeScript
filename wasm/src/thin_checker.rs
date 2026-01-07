@@ -726,82 +726,18 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type from a function type node (e.g., () => number, (x: string) => void).
     fn get_type_from_function_type(&mut self, idx: NodeIndex) -> TypeId {
-        use crate::solver::{FunctionShape, ParamInfo};
-        use std::sync::Arc;
+        use crate::solver::TypeLowering;
 
-        let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
-        };
+        let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
+        let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
+        let lowering = TypeLowering::with_resolvers(
+            self.ctx.arena,
+            self.ctx.types,
+            &type_resolver,
+            &value_resolver,
+        );
 
-        let Some(func_type) = self.ctx.arena.get_function_type(node) else {
-            return TypeId::ANY;
-        };
-
-        // Build parameter info
-        let mut params = Vec::new();
-        let mut this_type = None;
-        let this_atom = self.ctx.types.intern_string("this");
-        for &param_idx in &func_type.parameters.nodes {
-            if let Some(param_node) = self.ctx.arena.get(param_idx) {
-                if let Some(param) = self.ctx.arena.get_parameter(param_node) {
-                    // Get parameter name
-                    let name = if let Some(name_node) = self.ctx.arena.get(param.name) {
-                        if let Some(name_data) = self.ctx.arena.get_identifier(name_node) {
-                            Some(self.ctx.types.intern_string(&name_data.escaped_text))
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    };
-
-                    // Get parameter type
-                    let type_id = if !param.type_annotation.is_none() {
-                        self.get_type_of_node(param.type_annotation)
-                    } else {
-                        TypeId::ANY
-                    };
-
-                    if let Some(name_atom) = name {
-                        if name_atom == this_atom {
-                            if this_type.is_none() {
-                                this_type = Some(type_id);
-                            }
-                            continue;
-                        }
-                    }
-
-                    let optional = param.question_token || !param.initializer.is_none();
-                    let rest = param.dot_dot_dot_token;
-
-                    params.push(ParamInfo {
-                        name,
-                        type_id,
-                        optional,
-                        rest,
-                    });
-                }
-            }
-        }
-
-        // Get return type
-        let return_type = if !func_type.type_annotation.is_none() {
-            self.get_type_of_node(func_type.type_annotation)
-        } else {
-            TypeId::ANY
-        };
-
-        // Create function type
-        let shape = FunctionShape {
-            type_params: Vec::new(), // TODO: Handle type parameters
-            params,
-            this_type,
-            return_type,
-            type_predicate: None,
-            is_constructor: false,
-        };
-
-        self.ctx.types.function(shape)
+        lowering.lower_type(idx)
     }
 
     /// Get type of an interface declaration.
