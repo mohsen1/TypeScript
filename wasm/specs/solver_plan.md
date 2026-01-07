@@ -92,12 +92,16 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Remapped keys returning `never` are filtered from mapped outputs.
 - [x] Add keyof contravariance coverage for intersections
   - `keyof (A & B)` unions keys and stays assignable from `keyof A`.
+- [x] Add keyof contravariance coverage for unions with index signatures
+  - `keyof (A | B)` retains only shared keys (string index overlaps still yield `number`).
 - [x] Add error poisoning coverage
   - `error` is compatible with all types and poisons unions/conditionals.
 - [x] Add correlated union index access coverage
   - Index access over union objects/keys uses cross-product (no correlation).
 - [x] Add unchecked indexed access coverage for arrays
   - Array index access includes `undefined` only when `noUncheckedIndexedAccess` is enabled.
+- [x] Disable conditional distributivity for tuple-wrapped type params
+  - `[T] extends [U]` remains non-distributive after instantiation.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.

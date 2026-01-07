@@ -1,5 +1,5 @@
 use super::*;
-use std::sync::Arc;
+use crate::solver::{instantiate_type, TypeSubstitution};
 
 #[test]
 fn test_conditional_true_branch() {
@@ -104,6 +104,75 @@ fn test_conditional_non_distributive_union() {
     };
 
     let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, lit_false);
+}
+
+#[test]
+fn test_conditional_instantiated_param_distributes() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    // T extends string ? true : false, with T = string | number (distributive).
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: TypeId::STRING,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, string_or_number);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+    let expected = interner.union(vec![lit_true, lit_false]);
+
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_instantiated_param_tuple_wrapper_no_distribution() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    // [T] extends [string] ? true : false, with T = string | number (no distribution).
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: TypeId::STRING,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, string_or_number);
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
     assert_eq!(result, lit_false);
 }
 
@@ -1605,6 +1674,35 @@ fn test_keyof_union_string_index_overlap_literal() {
     let result = evaluate_keyof(&interner, union);
     let expected = interner.literal_string("a");
     assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_union_index_signature_intersection() {
+    let interner = TypeInterner::new();
+
+    let string_index = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+    let number_index = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let union = interner.union(vec![string_index, number_index]);
+    let result = evaluate_keyof(&interner, union);
+
+    assert_eq!(result, TypeId::NUMBER);
 }
 
 #[test]
