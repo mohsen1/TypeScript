@@ -134,6 +134,9 @@ Status: Active
 - [x] Clear flow narrowing when property/element access targets are reassigned
   - Clear narrowings after `obj.prop = ...` and `obj["prop"] = ...`.
   - Risk: computed access with non-literal keys remains conservative.
+- [x] Keep property and element access references aligned in flow narrowing
+  - Narrow across `obj.prop` and `obj["prop"]` forms.
+  - Clear narrowings when assignments use the opposite access form.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
