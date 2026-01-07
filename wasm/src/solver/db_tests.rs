@@ -13,6 +13,7 @@ fn type_database_interns_and_looks_up() {
     match key {
         TypeKey::Literal(LiteralValue::String(atom)) => {
             assert_eq!(db.resolve_atom(atom), "hello");
+            assert_eq!(db.resolve_atom_ref(atom).as_ref(), "hello");
         }
         _ => panic!("expected string literal type"),
     }

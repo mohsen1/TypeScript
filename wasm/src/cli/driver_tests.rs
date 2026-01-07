@@ -74,6 +74,65 @@ fn compile_with_tsconfig_emits_outputs() {
 }
 
 #[test]
+fn compile_with_source_map_emits_map_outputs() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "sourceMap": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/index.ts"), "export const value = 1;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+    let js_path = base.join("dist/src/index.js");
+    let map_path = base.join("dist/src/index.js.map");
+    assert!(js_path.is_file());
+    assert!(map_path.is_file());
+    let js_contents = std::fs::read_to_string(&js_path).expect("read js output");
+    assert!(js_contents.contains("sourceMappingURL=index.js.map"));
+}
+
+#[test]
+fn compile_with_declaration_map_emits_map_outputs() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "declaration": true,
+            "declarationMap": true
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+    write_file(&base.join("src/index.ts"), "export const value = 1;");
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty());
+    let dts_path = base.join("dist/src/index.d.ts");
+    let map_path = base.join("dist/src/index.d.ts.map");
+    assert!(dts_path.is_file());
+    assert!(map_path.is_file());
+    let dts_contents = std::fs::read_to_string(&dts_path).expect("read d.ts output");
+    assert!(dts_contents.contains("sourceMappingURL=index.d.ts.map"));
+}
+
+#[test]
 fn compile_with_explicit_files_without_tsconfig() {
     let temp = TempDir::new().expect("temp dir");
     let base = &temp.path;

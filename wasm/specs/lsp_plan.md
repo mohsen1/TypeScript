@@ -9,9 +9,14 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
 ## Current Status
 - Major features implemented (definitions, references, rename, organize imports, extract variable, signature help).
 - Incremental updates reuse arena/binder; type/scope caches are per-file and reset on edit.
-- Remaining TODOs: JSDoc extraction for signature help/hover.
+- JSDoc extraction is complete for hover/signature help, including overload matching.
 
 ## Highest-Impact Next Tasks
+- [ ] JSDoc coverage expansion
+  - [ ] Add overload JSDoc tests for methods/constructors, including `this` and rest params.
+  - [ ] Add JSDoc proximity tests to guard against unrelated comment chaining.
+- [ ] Error-recovery robustness
+  - [ ] Ensure hover/signature help tolerate missing nodes in incomplete calls/expressions.
 - [x] Incremental file updates
   - [x] Add `Project::update_file` that applies LSP edits and re-parses.
   - [x] Reuse parsed arena + binder where possible.

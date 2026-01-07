@@ -23,6 +23,7 @@ pub trait TypeDatabase {
     fn lookup(&self, id: TypeId) -> Option<TypeKey>;
     fn intern_string(&self, s: &str) -> Atom;
     fn resolve_atom(&self, atom: Atom) -> String;
+    fn resolve_atom_ref(&self, atom: Atom) -> Arc<str>;
     fn type_list(&self, id: TypeListId) -> Arc<[TypeId]>;
     fn tuple_list(&self, id: TupleListId) -> Arc<[TupleElement]>;
     fn template_list(&self, id: TemplateLiteralId) -> Arc<[TemplateSpan]>;
@@ -69,6 +70,10 @@ impl TypeDatabase for TypeInterner {
 
     fn resolve_atom(&self, atom: Atom) -> String {
         TypeInterner::resolve_atom(self, atom)
+    }
+
+    fn resolve_atom_ref(&self, atom: Atom) -> Arc<str> {
+        TypeInterner::resolve_atom_ref(self, atom)
     }
 
     fn type_list(&self, id: TypeListId) -> Arc<[TypeId]> {
@@ -279,6 +284,10 @@ impl TypeDatabase for QueryCache<'_> {
 
     fn resolve_atom(&self, atom: Atom) -> String {
         self.interner.resolve_atom(atom)
+    }
+
+    fn resolve_atom_ref(&self, atom: Atom) -> Arc<str> {
+        self.interner.resolve_atom_ref(atom)
     }
 
     fn type_list(&self, id: TypeListId) -> Arc<[TypeId]> {

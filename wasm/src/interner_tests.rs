@@ -56,8 +56,8 @@ fn test_sharded_interner_basic() {
 
     assert_eq!(a1, a2, "Same string should return same atom");
     assert_ne!(a1, a3, "Different strings should return different atoms");
-    assert_eq!(interner.resolve(a1), "hello");
-    assert_eq!(interner.resolve(a3), "world");
+    assert_eq!(interner.resolve(a1).as_ref(), "hello");
+    assert_eq!(interner.resolve(a3).as_ref(), "world");
 }
 
 #[test]
@@ -66,8 +66,8 @@ fn test_sharded_interner_empty_string() {
     let empty = interner.intern("");
     assert_eq!(empty, Atom::NONE);
     assert!(empty.is_none());
-    assert_eq!(interner.resolve(empty), "");
-    assert_eq!(interner.try_resolve(empty), Some(String::new()));
+    assert_eq!(interner.resolve(empty).as_ref(), "");
+    assert_eq!(interner.try_resolve(empty).as_deref(), Some(""));
 }
 
 #[test]
@@ -90,7 +90,7 @@ fn test_sharded_interner_concurrent() {
 
     assert!(!atoms.is_empty());
     assert!(atoms.iter().all(|&atom| atom == atoms[0]));
-    assert_eq!(interner.resolve(atoms[0]), "parallel");
+    assert_eq!(interner.resolve(atoms[0]).as_ref(), "parallel");
 }
 
 #[test]

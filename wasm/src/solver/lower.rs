@@ -1046,8 +1046,8 @@ impl<'a> TypeLowering<'a> {
 
             if let Some(number_idx) = number_index {
                 if !skip_number {
-                    let prop_name = self.interner.resolve_atom(prop.name);
-                    let is_numeric = prop_name.parse::<f64>().is_ok();
+                    let prop_name = self.interner.resolve_atom_ref(prop.name);
+                    let is_numeric = prop_name.as_ref().parse::<f64>().is_ok();
                     if is_numeric && !checker.is_subtype_of(prop_type, number_idx.value_type) {
                         return false;
                     }

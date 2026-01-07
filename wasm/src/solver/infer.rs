@@ -1022,8 +1022,8 @@ impl<'a> InferenceContext<'a> {
     }
 
     fn is_numeric_property_name(&self, name: Atom) -> bool {
-        let prop_name = self.interner.resolve_atom(name);
-        Self::is_numeric_literal_name(&prop_name)
+        let prop_name = self.interner.resolve_atom_ref(name);
+        Self::is_numeric_literal_name(prop_name.as_ref())
     }
 
     pub(crate) fn is_numeric_literal_name(name: &str) -> bool {

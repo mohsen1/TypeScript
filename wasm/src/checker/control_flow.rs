@@ -20,7 +20,7 @@
 
 use crate::binder::{FlowNode, FlowNodeId, flow_flags};
 use crate::interner::Atom;
-use crate::parser::thin_node::ThinNodeArena;
+use crate::parser::thin_node::{BinaryExprData, ThinNodeArena};
 use crate::parser::{NodeIndex, syntax_kind_ext};
 use crate::scanner::SyntaxKind;
 use crate::solver::{LiteralValue, TypeId, TypeInterner, TypeKey, NarrowingContext};
@@ -93,6 +93,10 @@ impl<'a> FlowAnalyzer<'a> {
 
         if flow.has_any_flags(flow_flags::CONDITION) {
             return self.handle_condition(reference, type_id, flow, visited);
+        }
+
+        if flow.has_any_flags(flow_flags::SWITCH_CLAUSE) {
+            return self.handle_switch_clause(reference, type_id, flow, visited);
         }
 
         if flow.has_any_flags(flow_flags::START) {
@@ -174,6 +178,129 @@ impl<'a> FlowAnalyzer<'a> {
         self.narrow_type_by_condition(pre_type, flow.node, reference, is_true_branch)
     }
 
+    /// Handle switch clause flow nodes, including fallthrough and default narrowing.
+    fn handle_switch_clause(
+        &self,
+        reference: NodeIndex,
+        type_id: TypeId,
+        flow: &FlowNode,
+        visited: &mut Vec<FlowNodeId>,
+    ) -> TypeId {
+        let clause_idx = flow.node;
+        let Some(switch_idx) = self.binder.get_switch_for_clause(clause_idx) else {
+            return type_id;
+        };
+        let Some(switch_node) = self.arena.get(switch_idx) else {
+            return type_id;
+        };
+        let Some(switch_data) = self.arena.get_switch(switch_node) else {
+            return type_id;
+        };
+        let Some(clause_node) = self.arena.get(clause_idx) else {
+            return type_id;
+        };
+        let Some(clause) = self.arena.get_case_clause(clause_node) else {
+            return type_id;
+        };
+
+        let pre_switch_type = if let Some(&ant) = flow.antecedent.first() {
+            self.check_flow(reference, type_id, ant, visited)
+        } else {
+            type_id
+        };
+
+        let narrowing = NarrowingContext::new(self.interner);
+        let mut clause_type = if clause.expression.is_none() {
+            self.narrow_by_default_switch_clause(
+                pre_switch_type,
+                switch_data.expression,
+                switch_data.case_block,
+                reference,
+                &narrowing,
+            )
+        } else {
+            self.narrow_by_switch_clause(
+                pre_switch_type,
+                switch_data.expression,
+                clause.expression,
+                reference,
+                &narrowing,
+            )
+        };
+
+        if flow.antecedent.len() > 1 {
+            let mut fallthrough_types = Vec::new();
+            for &ant in flow.antecedent.iter().skip(1) {
+                fallthrough_types.push(self.check_flow(reference, type_id, ant, &mut visited.clone()));
+            }
+
+            let fallthrough_type = if fallthrough_types.len() == 1 {
+                fallthrough_types[0]
+            } else {
+                self.interner.union(fallthrough_types)
+            };
+
+            clause_type = self.union_types(clause_type, fallthrough_type);
+        }
+
+        clause_type
+    }
+
+    fn narrow_by_switch_clause(
+        &self,
+        type_id: TypeId,
+        switch_expr: NodeIndex,
+        case_expr: NodeIndex,
+        target: NodeIndex,
+        narrowing: &NarrowingContext,
+    ) -> TypeId {
+        let binary = BinaryExprData {
+            left: switch_expr,
+            operator_token: SyntaxKind::EqualsEqualsEqualsToken as u16,
+            right: case_expr,
+        };
+
+        self.narrow_by_binary_expr(type_id, &binary, target, true, narrowing)
+    }
+
+    fn narrow_by_default_switch_clause(
+        &self,
+        type_id: TypeId,
+        switch_expr: NodeIndex,
+        case_block: NodeIndex,
+        target: NodeIndex,
+        narrowing: &NarrowingContext,
+    ) -> TypeId {
+        let Some(case_block_node) = self.arena.get(case_block) else {
+            return type_id;
+        };
+        let Some(case_block) = self.arena.get_block(case_block_node) else {
+            return type_id;
+        };
+
+        let mut narrowed = type_id;
+        for &clause_idx in &case_block.statements.nodes {
+            let Some(clause_node) = self.arena.get(clause_idx) else {
+                continue;
+            };
+            let Some(clause) = self.arena.get_case_clause(clause_node) else {
+                continue;
+            };
+            if clause.expression.is_none() {
+                continue;
+            }
+
+            let binary = BinaryExprData {
+                left: switch_expr,
+                operator_token: SyntaxKind::EqualsEqualsEqualsToken as u16,
+                right: clause.expression,
+            };
+            narrowed = self.narrow_by_binary_expr(narrowed, &binary, target, false, narrowing);
+        }
+
+        narrowed
+    }
+
     /// Apply type narrowing based on a condition expression.
     fn narrow_type_by_condition(
         &self,
@@ -193,6 +320,9 @@ impl<'a> FlowAnalyzer<'a> {
             // typeof x === "string"
             k if k == syntax_kind_ext::BINARY_EXPRESSION => {
                 if let Some(bin) = self.arena.get_binary_expr(cond_node) {
+                    if let Some(narrowed) = self.narrow_by_logical_expr(type_id, bin, target, is_true_branch) {
+                        return narrowed;
+                    }
                     return self.narrow_by_binary_expr(type_id, bin, target, is_true_branch, &narrowing);
                 }
             }
@@ -293,6 +423,52 @@ impl<'a> FlowAnalyzer<'a> {
         }
 
         type_id
+    }
+
+    fn narrow_by_logical_expr(
+        &self,
+        type_id: TypeId,
+        bin: &crate::parser::thin_node::BinaryExprData,
+        target: NodeIndex,
+        is_true_branch: bool,
+    ) -> Option<TypeId> {
+        let operator = bin.operator_token;
+
+        if operator == SyntaxKind::AmpersandAmpersandToken as u16 {
+            if is_true_branch {
+                let left_true = self.narrow_type_by_condition(type_id, bin.left, target, true);
+                let right_true = self.narrow_type_by_condition(left_true, bin.right, target, true);
+                return Some(right_true);
+            }
+
+            let left_false = self.narrow_type_by_condition(type_id, bin.left, target, false);
+            let left_true = self.narrow_type_by_condition(type_id, bin.left, target, true);
+            let right_false = self.narrow_type_by_condition(left_true, bin.right, target, false);
+            return Some(self.union_types(left_false, right_false));
+        }
+
+        if operator == SyntaxKind::BarBarToken as u16 {
+            if is_true_branch {
+                let left_true = self.narrow_type_by_condition(type_id, bin.left, target, true);
+                let left_false = self.narrow_type_by_condition(type_id, bin.left, target, false);
+                let right_true = self.narrow_type_by_condition(left_false, bin.right, target, true);
+                return Some(self.union_types(left_true, right_true));
+            }
+
+            let left_false = self.narrow_type_by_condition(type_id, bin.left, target, false);
+            let right_false = self.narrow_type_by_condition(left_false, bin.right, target, false);
+            return Some(right_false);
+        }
+
+        None
+    }
+
+    fn union_types(&self, left: TypeId, right: TypeId) -> TypeId {
+        if left == right {
+            left
+        } else {
+            self.interner.union(vec![left, right])
+        }
     }
 
     fn skip_parenthesized(&self, mut idx: NodeIndex) -> NodeIndex {
@@ -870,6 +1046,69 @@ if (typeof x === "string") {}
         let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
         let narrowed = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, false);
         assert_eq!(narrowed, TypeId::NUMBER);
+    }
+
+    #[test]
+    fn test_logical_and_applies_right_guard() {
+        let source = r#"
+let x: string | number;
+if (x && typeof x === "string") {}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let arena = parser.get_arena();
+        let types = TypeInterner::new();
+        let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+        let condition_idx = get_if_condition(arena, root, 1);
+        let condition_node = arena.get(condition_idx).expect("condition node");
+        let binary = arena.get_binary_expr(condition_node).expect("binary condition");
+        let target_idx = binary.left;
+
+        let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+        let narrowed = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, true);
+        assert_eq!(narrowed, TypeId::STRING);
+    }
+
+    #[test]
+    fn test_logical_or_narrows_to_union_of_literals() {
+        let source = r#"
+let x: "a" | "b" | "c";
+if (x === "a" || x === "b") {}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let arena = parser.get_arena();
+        let types = TypeInterner::new();
+        let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+        let condition_idx = get_if_condition(arena, root, 1);
+        let condition_node = arena.get(condition_idx).expect("condition node");
+        let binary = arena.get_binary_expr(condition_node).expect("binary condition");
+        let left_node = arena.get(binary.left).expect("left condition");
+        let left_eq = arena.get_binary_expr(left_node).expect("left equality");
+        let target_idx = left_eq.left;
+
+        let lit_a = types.literal_string("a");
+        let lit_b = types.literal_string("b");
+        let lit_c = types.literal_string("c");
+        let union = types.union(vec![lit_a, lit_b, lit_c]);
+
+        let narrowed_true = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, true);
+        let narrowed_false = analyzer.narrow_type_by_condition(union, condition_idx, target_idx, false);
+
+        assert_eq!(narrowed_true, types.union(vec![lit_a, lit_b]));
+        assert_eq!(narrowed_false, lit_c);
     }
 
     #[test]

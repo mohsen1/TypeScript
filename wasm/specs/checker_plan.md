@@ -8,10 +8,11 @@ Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (in
 
 ## Current Status
 - Solver TypeDatabase + lowering/inference/compat layers are integrated.
-- Control flow narrowing includes false-branch logic for typeof/truthiness.
+- Control flow narrowing covers typeof/truthiness, discriminant/literal equality, logical `&&`/`||`, and loose nullish checks.
 - Namespace member resolution covers nested namespaces and import-equals aliases.
 - Namespace value member access resolves exported members in property access chains.
 - Checker uses binder persistent scopes with SymbolId type caching; local scope stack removed.
+- Flow positions are recorded for identifier nodes to enable branch narrowing.
 - Solver inference skips constraining defaulted placeholders in union targets to preserve defaults.
 - Type literal lowering uses checker paths for type params while preserving ref semantics for named members.
 - Solver diagnostics rendering preserves related messages without spans via fallback span.
@@ -40,6 +41,24 @@ Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (in
   - Handle property/element access discriminants and direct literal checks.
   - Support loose nullish equality (`==` / `!=`) narrowing.
 - [x] Add control-flow tests for discriminant, literal equality, and loose nullish checks
+- [x] Record flow nodes for identifiers in all contexts
+  - Use current flow when binding identifier nodes to enable branch narrowing.
+- [x] Add checker test to verify flow narrowing inside if branches
+- [x] Narrow logical `&&`/`||` conditions in control flow
+  - Apply sequential narrowing for `&&` and union-of-paths narrowing for `||`.
+- [x] Add control-flow tests for logical `&&` and `||` narrowing
+- [x] Add switch/case narrowing using `SWITCH_CLAUSE` flow nodes
+  - Narrow discriminants per case and handle fallthrough/default.
+  - Add tests covering switch unions and default behavior.
+- [ ] Implement `instanceof` and `in` operator narrowing
+  - Respect structural/object checks and report safe narrowings only.
+  - Add tests for primitive/object and union cases.
+- [ ] Use user-defined type predicate signatures in flow narrowing
+  - Narrow based on call expressions returning `x is T` or `asserts x is T`.
+  - Add tests for predicate functions and alias references.
+- [ ] Track assignment/mutation flow to widen/clear stale narrowings
+  - Emit assignment/array-mutation flow nodes and update flow analyzer.
+  - Add tests for reassignment inside branches.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
