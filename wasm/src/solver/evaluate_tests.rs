@@ -1908,6 +1908,25 @@ fn test_keyof_string_apparent_members() {
 }
 
 #[test]
+fn test_apparent_number_keyof_members() {
+    let interner = TypeInterner::new();
+
+    let result = evaluate_keyof(&interner, TypeId::NUMBER);
+    let key = interner.lookup(result).expect("expected union for keyof number");
+
+    match key {
+        TypeKey::Union(members) => {
+            let members = interner.type_list(members);
+            let to_fixed = interner.literal_string("toFixed");
+            let value_of = interner.literal_string("valueOf");
+            assert!(members.contains(&to_fixed));
+            assert!(members.contains(&value_of));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_keyof_template_literal_matches_string() {
     let interner = TypeInterner::new();
 

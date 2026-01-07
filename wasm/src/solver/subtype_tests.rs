@@ -55,6 +55,51 @@ fn test_literal_subtyping() {
 }
 
 #[test]
+fn test_apparent_number_member_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let rest_any = interner.array(TypeId::ANY);
+    let method = |return_type| {
+        interner.function(FunctionShape {
+            params: vec![ParamInfo {
+                name: None,
+                type_id: rest_any,
+                optional: false,
+                rest: true,
+            }],
+            this_type: None,
+            return_type,
+            type_params: Vec::new(),
+            type_predicate: None,
+            is_constructor: false,
+        })
+    };
+
+    let to_fixed = interner.intern_string("toFixed");
+    let target = interner.object(vec![PropertyInfo {
+        name: to_fixed,
+        type_id: method(TypeId::STRING),
+        write_type: method(TypeId::STRING),
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let mismatch = interner.object(vec![PropertyInfo {
+        name: to_fixed,
+        type_id: method(TypeId::NUMBER),
+        write_type: method(TypeId::NUMBER),
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(checker.is_subtype_of(TypeId::NUMBER, target));
+    assert!(!checker.is_subtype_of(TypeId::NUMBER, mismatch));
+}
+
+#[test]
 fn test_unique_symbol_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);

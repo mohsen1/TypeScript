@@ -1528,6 +1528,41 @@ fn test_apparent_number_method_assignable() {
 }
 
 #[test]
+fn test_apparent_number_member_rejects_mismatch() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let rest_any = interner.array(TypeId::ANY);
+    let method = |return_type| {
+        interner.function(FunctionShape {
+            params: vec![ParamInfo {
+                name: None,
+                type_id: rest_any,
+                optional: false,
+                rest: true,
+            }],
+            this_type: None,
+            return_type,
+            type_params: Vec::new(),
+            type_predicate: None,
+            is_constructor: false,
+        })
+    };
+
+    let to_fixed = interner.intern_string("toFixed");
+    let mismatch = interner.object(vec![PropertyInfo {
+        name: to_fixed,
+        type_id: method(TypeId::NUMBER),
+        write_type: method(TypeId::NUMBER),
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(!checker.is_assignable(TypeId::NUMBER, mismatch));
+}
+
+#[test]
 fn test_number_interface_boxing_assignability() {
     let interner = TypeInterner::new();
     let symbol = SymbolRef(1);

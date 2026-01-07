@@ -90,6 +90,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Unique symbols are nominal and only subtype themselves plus `symbol`.
 - [x] Add coverage for global Function type assignability
   - Callables assignable to Function; Function not assignable to specific signatures.
+- [x] Add apparent primitive member coverage for numbers
+  - `keyof number` exposes apparent members; assignability rejects mismatched return types.
 - [x] Add mapped type key remapping coverage (`as never`)
   - Remapped keys returning `never` are filtered from mapped outputs.
 - [x] Add mapped type key remapping coverage in evaluate/subtype
