@@ -1409,6 +1409,61 @@ fn compile_resolves_package_imports_prefers_types_condition() {
 }
 
 #[test]
+fn compile_resolves_package_imports_prefers_require_condition_for_commonjs() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "module": "commonjs",
+            "noEmitOnError": true
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { feature } from '#feature'; export { feature };",
+    );
+    write_file(
+        &base.join("package.json"),
+        r##"{
+          "imports": {
+            "#feature": {
+              "require": "./types/require.d.ts",
+              "import": "./types/import.d.ts"
+            }
+          }
+        }"##,
+    );
+    write_file(
+        &base.join("types/require.d.ts"),
+        "export const feature = ;",
+    );
+    write_file(
+        &base.join("types/import.d.ts"),
+        "export const feature = 1;",
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("types/require.d.ts")));
+    assert!(!result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("types/import.d.ts")));
+    assert!(!base.join("dist/src/index.js").is_file());
+}
+
+#[test]
 fn compile_prefers_browser_exports_for_bundler() {
     let temp = TempDir::new().expect("temp dir");
     let base = &temp.path;
