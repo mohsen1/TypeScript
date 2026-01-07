@@ -38,6 +38,7 @@ Status: Active
   - [x] Add JSX fragment/spread emission coverage in thin emitter tests.
   - [x] Add JSX namespaced/member tag emission coverage in thin emitter tests.
   - [x] Add JSX namespaced attribute emission coverage in thin emitter tests.
+  - [x] Extract template literal emission helpers into a module.
 - [ ] Performance tuning (deferred until correctness parity)
   - [x] Pre-allocate output buffer from source size; write numeric indices without allocations.
   - [x] Write numeric values in ES5 transforms without allocating strings.
