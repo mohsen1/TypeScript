@@ -105,6 +105,32 @@ fn test_no_unchecked_indexed_access_array_subtyping() {
 }
 
 #[test]
+fn test_no_unchecked_object_index_signature_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let indexed = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let index_access = interner.intern(TypeKey::IndexAccess(indexed, TypeId::NUMBER));
+
+    assert!(checker.is_subtype_of(index_access, TypeId::NUMBER));
+
+    checker.no_unchecked_indexed_access = true;
+
+    assert!(!checker.is_subtype_of(index_access, TypeId::NUMBER));
+    let number_or_undefined = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert!(checker.is_subtype_of(index_access, number_or_undefined));
+}
+
+#[test]
 fn test_correlated_union_index_access_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);

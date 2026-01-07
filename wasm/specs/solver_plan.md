@@ -104,6 +104,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Index access over union objects/keys uses cross-product (no correlation).
 - [x] Add unchecked indexed access coverage for arrays
   - Array index access includes `undefined` only when `noUncheckedIndexedAccess` is enabled.
+- [x] Add unchecked indexed access coverage for object index signatures
+  - Number index access on string index signatures includes `undefined` when enabled.
 - [x] Disable conditional distributivity for tuple-wrapped type params
   - `[T] extends [U]` remains non-distributive after instantiation.
 - [x] Add tuple-wrapped conditional nondistribution coverage in subtype/compat
