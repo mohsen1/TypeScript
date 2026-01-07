@@ -44,6 +44,7 @@ pub(crate) struct CompilationCache {
     diagnostics: HashMap<PathBuf, Vec<Diagnostic>>,
     export_hashes: HashMap<PathBuf, u64>,
     import_symbol_ids: HashMap<PathBuf, HashMap<PathBuf, Vec<SymbolId>>>,
+    star_export_dependencies: HashMap<PathBuf, HashSet<PathBuf>>,
 }
 
 struct BindCacheEntry {
@@ -64,6 +65,7 @@ impl CompilationCache {
             self.diagnostics.remove(&path);
             self.export_hashes.remove(&path);
             self.import_symbol_ids.remove(&path);
+            self.star_export_dependencies.remove(&path);
         }
     }
 
@@ -80,6 +82,7 @@ impl CompilationCache {
                 self.diagnostics.remove(&path);
                 self.export_hashes.remove(&path);
                 self.import_symbol_ids.remove(&path);
+                self.star_export_dependencies.remove(&path);
                 continue;
             }
 
@@ -96,7 +99,20 @@ impl CompilationCache {
             }
 
             if roots.is_empty() {
-                self.type_caches.remove(&path);
+                let has_star_export = self
+                    .star_export_dependencies
+                    .get(&path)
+                    .map(|deps| changed.iter().any(|changed_path| deps.contains(changed_path)))
+                    .unwrap_or(false);
+                if has_star_export {
+                    if let Some(cache) = self.type_caches.get_mut(&path) {
+                        cache.node_types.clear();
+                        cache.relation_cache.clear();
+                        cache.type_parameter_names.clear();
+                    }
+                } else {
+                    self.type_caches.remove(&path);
+                }
                 continue;
             }
 
@@ -116,6 +132,7 @@ impl CompilationCache {
             self.diagnostics.remove(&path);
             self.export_hashes.remove(&path);
             self.import_symbol_ids.remove(&path);
+            self.star_export_dependencies.remove(&path);
         }
     }
 
@@ -127,6 +144,7 @@ impl CompilationCache {
         self.diagnostics.clear();
         self.export_hashes.clear();
         self.import_symbol_ids.clear();
+        self.star_export_dependencies.clear();
     }
 
     #[cfg(test)]
@@ -491,10 +509,12 @@ fn update_import_symbol_ids(
 ) {
     let mut resolution_cache = ModuleResolutionCache::default();
     let mut import_symbol_ids: HashMap<PathBuf, HashMap<PathBuf, Vec<SymbolId>>> = HashMap::new();
+    let mut star_export_dependencies: HashMap<PathBuf, HashSet<PathBuf>> = HashMap::new();
 
     for (file_idx, file) in program.files.iter().enumerate() {
         let file_path = PathBuf::from(&file.file_name);
         let mut by_dep: HashMap<PathBuf, Vec<SymbolId>> = HashMap::new();
+        let mut star_exports: HashSet<PathBuf> = HashSet::new();
         for (specifier, local_names) in collect_import_bindings(&file.arena, file.source_file) {
             let resolved = resolve_module_specifier(
                 Path::new(&file.file_name),
@@ -535,14 +555,32 @@ fn update_import_symbol_ids(
                 }
             }
         }
+        for specifier in collect_star_export_specifiers(&file.arena, file.source_file) {
+            let resolved = resolve_module_specifier(
+                Path::new(&file.file_name),
+                &specifier,
+                options,
+                base_dir,
+                &mut resolution_cache,
+            );
+            let Some(resolved) = resolved else {
+                continue;
+            };
+            let canonical = canonicalize_or_owned(&resolved);
+            star_exports.insert(canonical);
+        }
         for symbols in by_dep.values_mut() {
             symbols.sort_by_key(|sym| sym.0);
             symbols.dedup();
+        }
+        if !star_exports.is_empty() {
+            star_export_dependencies.insert(file_path.clone(), star_exports);
         }
         import_symbol_ids.insert(file_path, by_dep);
     }
 
     cache.import_symbol_ids = import_symbol_ids;
+    cache.star_export_dependencies = star_export_dependencies;
 }
 
 fn hash_text(text: &str) -> u64 {
@@ -915,6 +953,39 @@ fn collect_export_binding_nodes(
     }
 
     bindings
+}
+
+fn collect_star_export_specifiers(
+    arena: &ThinNodeArena,
+    source_file: NodeIndex,
+) -> Vec<String> {
+    let mut specifiers = Vec::new();
+    let Some(node) = arena.get(source_file) else {
+        return specifiers;
+    };
+    let Some(source) = arena.get_source_file(node) else {
+        return specifiers;
+    };
+
+    for &stmt_idx in &source.statements.nodes {
+        if stmt_idx.is_none() {
+            continue;
+        }
+        let Some(stmt) = arena.get(stmt_idx) else {
+            continue;
+        };
+        let Some(export_decl) = arena.get_export_decl(stmt) else {
+            continue;
+        };
+        if !export_decl.export_clause.is_none() {
+            continue;
+        }
+        if let Some(text) = arena.get_literal_text(export_decl.module_specifier) {
+            specifiers.push(text.to_string());
+        }
+    }
+
+    specifiers
 }
 
 fn collect_import_local_names(arena: &ThinNodeArena, import_decl: &crate::parser::thin_node::ImportDeclData) -> Vec<String> {
