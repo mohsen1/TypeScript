@@ -58,6 +58,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Tuple keyof now includes indices from rest tuple expansions.
 - [x] Reject non-integer/negative tuple indices
   - Tuple index access now yields undefined for negative or fractional indices.
+- [x] Add mapped type coverage for primitive keyof (number)
+  - Validate mapped types over `keyof number` produce expected boolean properties.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.
