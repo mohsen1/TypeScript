@@ -18,7 +18,7 @@
 
 use crate::binder::ScopeId;
 use crate::parser::NodeIndex;
-use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
+use crate::parser::thin_node::{NodeAccess, ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::comments::get_leading_comments_from_cache;
 use crate::thin_binder::ThinBinderState;
@@ -1498,6 +1498,7 @@ impl<'a> CodeActionProvider<'a> {
         let node_start = expr_node.pos;
         let node_end = expr_node.end;
         let selected_text = self.source.get(node_start as usize..node_end as usize)?;
+        let initializer_text = self.format_extracted_initializer(expr_node, selected_text);
         let replacement_range = Range::new(
             self.line_map.offset_to_position(node_start, self.source),
             self.line_map.offset_to_position(node_end, self.source),
@@ -1514,7 +1515,7 @@ impl<'a> CodeActionProvider<'a> {
         // Calculate indentation by looking at the statement's line
         let indent = self.get_indentation_at_position(&stmt_pos);
 
-        let declaration = format!("{}const {} = {};\n", indent, var_name, selected_text);
+        let declaration = format!("{}const {} = {};\n", indent, var_name, initializer_text);
 
         let mut edits = Vec::new();
 
@@ -1564,6 +1565,23 @@ impl<'a> CodeActionProvider<'a> {
             }
             suffix += 1;
         }
+    }
+
+    fn format_extracted_initializer(&self, expr_node: &ThinNode, selected_text: &str) -> String {
+        if self.needs_parentheses_for_extraction(expr_node) {
+            return format!("({})", selected_text);
+        }
+        selected_text.to_string()
+    }
+
+    fn needs_parentheses_for_extraction(&self, expr_node: &ThinNode) -> bool {
+        if expr_node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            if let Some(binary) = self.arena.get_binary_expr(expr_node) {
+                return binary.operator_token == SyntaxKind::CommaToken as u16;
+            }
+        }
+
+        false
     }
 
     fn expression_and_statement_share_scope(&self, expr_idx: NodeIndex, stmt_idx: NodeIndex) -> bool {
