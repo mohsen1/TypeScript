@@ -135,6 +135,22 @@ pub enum TransformDirective {
         for_of_node: NodeIndex,
     },
 
+    /// ES5 Object Literal: Transform computed properties and spread to assignments
+    ///
+    /// ```typescript
+    /// const obj = { a: 1, [k]: 2, ...rest };
+    /// ```
+    ///
+    /// Becomes:
+    ///
+    /// ```javascript
+    /// var obj = (_a = { a: 1 }, _a[k] = 2, Object.assign(_a, rest), _a);
+    /// ```
+    ES5ObjectLiteral {
+        /// Original object literal node
+        object_literal: NodeIndex,
+    },
+
     /// Module Wrapper: Wrap entire file for AMD/System/UMD
     ModuleWrapper {
         /// Module format (AMD, System, UMD)
