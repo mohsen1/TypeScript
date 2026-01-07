@@ -28,26 +28,54 @@ use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::{NodeIndex, NodeList};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
+use crate::source_writer::{SourcePosition, SourceWriter, source_position_from_offset};
 
 /// Declaration emitter for .d.ts files
 pub struct DeclarationEmitter<'a> {
     arena: &'a ThinNodeArena,
-    output: String,
+    writer: SourceWriter,
     indent_level: u32,
+    source_map_text: Option<&'a str>,
+    source_map_state: Option<SourceMapState>,
+    pending_source_pos: Option<SourcePosition>,
+}
+
+struct SourceMapState {
+    output_name: String,
+    source_name: String,
 }
 
 impl<'a> DeclarationEmitter<'a> {
     pub fn new(arena: &'a ThinNodeArena) -> Self {
         DeclarationEmitter {
             arena,
-            output: String::with_capacity(4096),
+            writer: SourceWriter::with_capacity(4096),
             indent_level: 0,
+            source_map_text: None,
+            source_map_state: None,
+            pending_source_pos: None,
         }
+    }
+
+    pub fn set_source_map_text(&mut self, text: &'a str) {
+        self.source_map_text = Some(text);
+    }
+
+    pub fn enable_source_map(&mut self, output_name: &str, source_name: &str) {
+        self.source_map_state = Some(SourceMapState {
+            output_name: output_name.to_string(),
+            source_name: source_name.to_string(),
+        });
+    }
+
+    pub fn generate_source_map_json(&mut self) -> Option<String> {
+        self.writer.generate_source_map_json()
     }
     
     /// Emit declaration for a source file
     pub fn emit(&mut self, root_idx: NodeIndex) -> String {
-        self.output.clear();
+        self.reset_writer();
+        self.indent_level = 0;
         
         let Some(root_node) = self.arena.get(root_idx) else {
             return String::new();
@@ -61,12 +89,14 @@ impl<'a> DeclarationEmitter<'a> {
             self.emit_statement(stmt_idx);
         }
         
-        std::mem::take(&mut self.output)
+        self.writer.get_output().to_string()
     }
     
     fn emit_statement(&mut self, stmt_idx: NodeIndex) {
         let Some(stmt_node) = self.arena.get(stmt_idx) else { return };
-        
+        let before_len = self.writer.len();
+        self.queue_source_mapping(stmt_node);
+
         match stmt_node.kind {
             k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
                 self.emit_function_declaration(stmt_idx);
@@ -96,6 +126,10 @@ impl<'a> DeclarationEmitter<'a> {
                 self.emit_module_declaration(stmt_idx);
             }
             _ => {}
+        }
+
+        if self.writer.len() == before_len {
+            self.pending_source_pos = None;
         }
     }
     
@@ -1218,6 +1252,8 @@ impl<'a> DeclarationEmitter<'a> {
     
     fn emit_expression(&mut self, expr_idx: NodeIndex) {
         let Some(expr_node) = self.arena.get(expr_idx) else { return };
+        let before_len = self.writer.len();
+        self.queue_source_mapping(expr_node);
         
         match expr_node.kind {
             k if k == SyntaxKind::NumericLiteral as u16 => {
@@ -1234,10 +1270,16 @@ impl<'a> DeclarationEmitter<'a> {
             }
             _ => self.emit_node(expr_idx),
         }
+
+        if self.writer.len() == before_len {
+            self.pending_source_pos = None;
+        }
     }
     
     fn emit_node(&mut self, node_idx: NodeIndex) {
         let Some(node) = self.arena.get(node_idx) else { return };
+        let before_len = self.writer.len();
+        self.queue_source_mapping(node);
 
         match node.kind {
             k if k == SyntaxKind::Identifier as u16 => {
@@ -1265,6 +1307,10 @@ impl<'a> DeclarationEmitter<'a> {
             }
             _ => {}
         }
+
+        if self.writer.len() == before_len {
+            self.pending_source_pos = None;
+        }
     }
     
     fn has_export_modifier(&self, modifiers: &Option<NodeList>) -> bool {
@@ -1283,18 +1329,54 @@ impl<'a> DeclarationEmitter<'a> {
         }
         false
     }
+
+    fn reset_writer(&mut self) {
+        self.writer = SourceWriter::with_capacity(4096);
+        self.pending_source_pos = None;
+        if let Some(state) = &self.source_map_state {
+            self.writer.enable_source_map(state.output_name.clone());
+            let content = self.source_map_text.map(|text| text.to_string());
+            self.writer.add_source(state.source_name.clone(), content);
+        }
+    }
+
+    fn queue_source_mapping(&mut self, node: &ThinNode) {
+        if !self.writer.has_source_map() {
+            self.pending_source_pos = None;
+            return;
+        }
+
+        let Some(text) = self.source_map_text else {
+            self.pending_source_pos = None;
+            return;
+        };
+
+        self.pending_source_pos = Some(source_position_from_offset(text, node.pos));
+    }
+
+    fn take_pending_source_pos(&mut self) -> Option<SourcePosition> {
+        self.pending_source_pos.take()
+    }
+
+    fn write_raw(&mut self, s: &str) {
+        self.writer.write(s);
+    }
     
     fn write(&mut self, s: &str) {
-        self.output.push_str(s);
+        if let Some(source_pos) = self.take_pending_source_pos() {
+            self.writer.write_node(s, source_pos);
+        } else {
+            self.writer.write(s);
+        }
     }
     
     fn write_line(&mut self) {
-        self.output.push('\n');
+        self.writer.write_line();
     }
     
     fn write_indent(&mut self) {
         for _ in 0..self.indent_level {
-            self.output.push_str("    ");
+            self.write_raw("    ");
         }
     }
     

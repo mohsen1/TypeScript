@@ -839,6 +839,50 @@ fn test_index_access_tuple_optional_literal() {
 }
 
 #[test]
+fn test_index_access_tuple_negative_literal() {
+    let interner = TypeInterner::new();
+
+    let number_array = interner.array(TypeId::NUMBER);
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+    ]);
+    let negative = interner.literal_number(-1.0);
+
+    let result = evaluate_index_access(&interner, tuple, negative);
+    assert_eq!(result, TypeId::UNDEFINED);
+}
+
+#[test]
+fn test_index_access_tuple_fractional_literal() {
+    let interner = TypeInterner::new();
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+    ]);
+    let fractional = interner.literal_number(1.5);
+
+    let result = evaluate_index_access(&interner, tuple, fractional);
+    assert_eq!(result, TypeId::UNDEFINED);
+}
+
+#[test]
+fn test_index_access_tuple_negative_string_literal() {
+    let interner = TypeInterner::new();
+
+    let number_array = interner.array(TypeId::NUMBER);
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: number_array, name: None, optional: false, rest: true },
+    ]);
+    let negative = interner.literal_string("-1");
+
+    let result = evaluate_index_access(&interner, tuple, negative);
+    assert_eq!(result, TypeId::UNDEFINED);
+}
+
+#[test]
 fn test_index_access_tuple_string_index() {
     let interner = TypeInterner::new();
 
@@ -1652,6 +1696,59 @@ fn test_mapped_type_over_string_keys() {
             let number_index = shape.number_index.as_ref().expect("expected number index signature");
             assert_eq!(number_index.key_type, TypeId::NUMBER);
             assert_eq!(number_index.value_type, TypeId::BOOLEAN);
+        }
+        other => panic!("Expected object type, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_mapped_type_over_number_keys() {
+    let interner = TypeInterner::new();
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::NUMBER));
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    let key = interner.lookup(result).expect("Expected object type");
+
+    match key {
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
+            let to_fixed = interner.intern_string("toFixed");
+            let value_of = interner.intern_string("valueOf");
+            let has_own = interner.intern_string("hasOwnProperty");
+            let mut saw_to_fixed = false;
+            let mut saw_value_of = false;
+            let mut saw_has_own = false;
+
+            for prop in &shape.properties {
+                if prop.name == to_fixed {
+                    assert_eq!(prop.type_id, TypeId::BOOLEAN);
+                    saw_to_fixed = true;
+                }
+                if prop.name == value_of {
+                    assert_eq!(prop.type_id, TypeId::BOOLEAN);
+                    saw_value_of = true;
+                }
+                if prop.name == has_own {
+                    assert_eq!(prop.type_id, TypeId::BOOLEAN);
+                    saw_has_own = true;
+                }
+            }
+
+            assert!(saw_to_fixed, "missing toFixed property");
+            assert!(saw_value_of, "missing valueOf property");
+            assert!(saw_has_own, "missing hasOwnProperty property");
         }
         other => panic!("Expected object type, got {:?}", other),
     }

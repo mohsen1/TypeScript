@@ -2,6 +2,7 @@
 
 use crate::declaration_emitter::*;
 use crate::thin_parser::ThinParserState;
+use serde_json::Value;
 
 fn emit_declaration(source: &str) -> String {
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -111,4 +112,27 @@ fn test_namespace_export() {
 fn test_named_exports() {
     let output = emit_declaration("export { foo, bar } from './module';");
     assert!(output.contains("export"), "Should contain export: {}", output);
+}
+
+#[test]
+fn test_declaration_source_map_basic() {
+    let source = "export interface Foo { x: number; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut emitter = DeclarationEmitter::new(&parser.arena);
+    emitter.set_source_map_text(parser.get_source_text());
+    emitter.enable_source_map("test.d.ts", "test.ts");
+    let _output = emitter.emit(root);
+
+    let map_json = emitter.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    assert!(
+        mappings.contains(',') || mappings.contains(';'),
+        "expected non-trivial mappings, got: {mappings}"
+    );
 }

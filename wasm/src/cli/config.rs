@@ -30,6 +30,8 @@ pub struct CompilerOptions {
     #[serde(default)]
     pub module_resolution: Option<String>,
     #[serde(default)]
+    pub types_versions_compiler_version: Option<String>,
+    #[serde(default)]
     pub jsx: Option<String>,
     #[serde(default)]
     pub lib: Option<Vec<String>>,
@@ -69,6 +71,7 @@ pub struct ResolvedCompilerOptions {
     pub jsx: Option<JsxEmit>,
     pub lib_files: Vec<PathBuf>,
     pub module_resolution: Option<ModuleResolutionKind>,
+    pub types_versions_compiler_version: Option<String>,
     pub base_url: Option<PathBuf>,
     pub paths: Option<Vec<PathMapping>>,
     pub root_dir: Option<PathBuf>,
@@ -153,6 +156,7 @@ impl Default for ResolvedCompilerOptions {
             jsx: None,
             lib_files: Vec::new(),
             module_resolution: None,
+            types_versions_compiler_version: None,
             base_url: None,
             paths: None,
             root_dir: None,
@@ -185,6 +189,15 @@ pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<Res
         let value = module_resolution.trim();
         if !value.is_empty() {
             resolved.module_resolution = Some(parse_module_resolution(value)?);
+        }
+    }
+
+    if let Some(types_versions_compiler_version) =
+        options.types_versions_compiler_version.as_deref()
+    {
+        let value = types_versions_compiler_version.trim();
+        if !value.is_empty() {
+            resolved.types_versions_compiler_version = Some(value.to_string());
         }
     }
 
@@ -334,6 +347,9 @@ fn merge_compiler_options(base: CompilerOptions, child: CompilerOptions) -> Comp
         target: child.target.or(base.target),
         module: child.module.or(base.module),
         module_resolution: child.module_resolution.or(base.module_resolution),
+        types_versions_compiler_version: child
+            .types_versions_compiler_version
+            .or(base.types_versions_compiler_version),
         jsx: child.jsx.or(base.jsx),
         lib: child.lib.or(base.lib),
         base_url: child.base_url.or(base.base_url),

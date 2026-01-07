@@ -6,6 +6,7 @@ use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
 use crate::solver::TypeInterner;
 use crate::parser::syntax_kind_ext;
+use serde_json::Value;
 
 #[test]
 fn test_thin_printer_creation() {
@@ -13,6 +14,52 @@ fn test_thin_printer_creation() {
     let arena = ThinNodeArena::new();
     let printer = ThinPrinter::new(&arena);
     assert!(printer.get_output().is_empty());
+}
+
+#[test]
+fn test_thin_emitter_source_map_basic() {
+    let source = "let x = 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    assert!(
+        mappings.contains(',') || mappings.contains(';'),
+        "expected non-trivial mappings, got: {mappings}"
+    );
+}
+
+#[test]
+fn test_thin_emitter_source_map_transform_class() {
+    let source = "class Foo { constructor() {} }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+    assert!(
+        !mappings.is_empty(),
+        "expected mappings for transformed output, got empty"
+    );
 }
 
 // Note: write() is private, so we can't test it directly.

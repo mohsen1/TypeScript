@@ -3746,8 +3746,6 @@ var x: string;
         "Expected no error 2403 for top-level variable redeclaration with same type, got: {:?}", codes);
 }
 
-// TODO: Re-enable once namespace member checking is fully working
-// #[test]
 #[test]
 fn test_namespace_member_not_found() {
     use crate::thin_parser::ThinParserState;
@@ -3774,6 +3772,39 @@ var p: foo.NotExist;
 
     // Should produce error 2694: Namespace 'foo' has no exported member 'NotExist'
     assert!(codes.contains(&2694), "Expected error 2694 for namespace member not found, got: {:?}", codes);
+}
+
+#[test]
+fn test_namespace_value_member_missing_errors() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace NS {
+    export const ok = 1;
+}
+import Alias = NS;
+const bad = NS.missing;
+const badAlias = Alias.missing;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let missing_count = codes.iter().filter(|&&code| code == 2339).count();
+    assert_eq!(
+        missing_count,
+        2,
+        "Expected two 2339 errors for missing namespace value members, got: {:?}",
+        codes
+    );
 }
 
 #[test]
@@ -3900,6 +3931,36 @@ let missing: Alias.Missing;
 }
 
 #[test]
+fn test_namespace_type_only_member_value_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace NS {
+    export interface Foo { value: number; }
+}
+let ok: NS.Foo;
+const bad = NS.Foo;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2693),
+        "Expected error 2693 for type-only namespace member used as value, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_namespace_value_member_access() {
     use crate::thin_parser::ThinParserState;
 
@@ -3934,6 +3995,117 @@ const viaAlias = Alias.value;
     assert_eq!(checker.get_type_of_symbol(direct_sym), TypeId::NUMBER);
     assert_eq!(checker.get_type_of_symbol(top_sym), TypeId::NUMBER);
     assert_eq!(checker.get_type_of_symbol(alias_sym), TypeId::NUMBER);
+}
+
+#[test]
+fn test_namespace_value_member_alias_missing_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Outer {
+    export namespace Inner {
+        export const value = 1;
+    }
+}
+import Alias = Outer.Inner;
+const ok = Alias.value;
+const bad = Alias.missing;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let missing_count = codes.iter().filter(|&&code| code == 2339).count();
+    assert_eq!(
+        missing_count,
+        1,
+        "Expected one 2339 error for missing namespace alias member, got: {:?}",
+        codes
+    );
+
+    let ok_sym = binder.file_locals.get("ok").expect("ok should exist");
+    assert_eq!(checker.get_type_of_symbol(ok_sym), TypeId::NUMBER);
+}
+
+#[test]
+fn test_nested_namespace_value_member_missing_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Outer {
+    export namespace Inner {
+        export const ok = 1;
+    }
+}
+const okValue = Outer.Inner.ok;
+const badValue = Outer.Inner.missing;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let missing_count = codes.iter().filter(|&&code| code == 2339).count();
+    assert_eq!(
+        missing_count,
+        1,
+        "Expected one 2339 error for missing nested namespace value member, got: {:?}",
+        codes
+    );
+
+    let ok_sym = binder.file_locals.get("okValue").expect("okValue should exist");
+    assert_eq!(checker.get_type_of_symbol(ok_sym), TypeId::NUMBER);
+}
+
+#[test]
+fn test_namespace_value_member_not_exported_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace NS {
+    export const ok = 1;
+    const hidden = 2;
+}
+const ok = NS.ok;
+const bad = NS.hidden;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let missing_count = codes.iter().filter(|&&code| code == 2339).count();
+    assert_eq!(
+        missing_count,
+        1,
+        "Expected one 2339 error for non-exported namespace value member, got: {:?}",
+        codes
+    );
+
+    let ok_sym = binder.file_locals.get("ok").expect("ok should exist");
+    assert_eq!(checker.get_type_of_symbol(ok_sym), TypeId::NUMBER);
 }
 
 #[test]

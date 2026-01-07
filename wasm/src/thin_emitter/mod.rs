@@ -25,7 +25,7 @@ use crate::parser::{NodeIndex, NodeList};
 use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
-use crate::source_writer::SourceWriter;
+use crate::source_writer::{SourcePosition, SourceWriter, source_position_from_offset};
 use crate::lowering_pass::LoweringPass;
 use crate::transform_context::{IdentifierId, TransformContext, TransformDirective};
 use crate::transforms::class_es5::ClassES5Emitter;
@@ -211,8 +211,14 @@ pub struct ThinPrinter<'a> {
     /// Source text for detecting single-line constructs
     pub(super) source_text: Option<&'a str>,
 
+    /// Source text for source map generation (kept separate from comment emission).
+    pub(super) source_map_text: Option<&'a str>,
+
     /// Last processed position in source text for comment gap detection
     pub(super) last_processed_pos: u32,
+
+    /// Pending source position for mapping the next write.
+    pub(super) pending_source_pos: Option<SourcePosition>,
 }
 
 impl<'a> ThinPrinter<'a> {
@@ -248,7 +254,9 @@ impl<'a> ThinPrinter<'a> {
             transforms: TransformContext::new(), // Empty by default, can be set later
             auto_lower: true,
             source_text: None,
+            source_map_text: None,
             last_processed_pos: 0,
+            pending_source_pos: None,
         }
     }
 
@@ -309,6 +317,41 @@ impl<'a> ThinPrinter<'a> {
         self.source_text = Some(text);
         let estimated = text.len().saturating_mul(3) / 2;
         self.writer.ensure_output_capacity(estimated);
+    }
+
+    /// Set source text for source map generation without enabling comment emission.
+    pub fn set_source_map_text(&mut self, text: &'a str) {
+        self.source_map_text = Some(text);
+    }
+
+    /// Enable source map generation and register the current source file.
+    pub fn enable_source_map(&mut self, output_name: &str, source_name: &str) {
+        self.writer.enable_source_map(output_name.to_string());
+        let content = self.source_text_for_map().map(|text| text.to_string());
+        self.writer.add_source(source_name.to_string(), content);
+    }
+
+    /// Generate source map JSON (if enabled).
+    pub fn generate_source_map_json(&mut self) -> Option<String> {
+        self.writer.generate_source_map_json()
+    }
+
+    fn source_text_for_map(&self) -> Option<&'a str> {
+        self.source_map_text.or(self.source_text)
+    }
+
+    fn queue_source_mapping(&mut self, node: &ThinNode) {
+        if !self.writer.has_source_map() {
+            self.pending_source_pos = None;
+            return;
+        }
+
+        let Some(text) = self.source_text_for_map() else {
+            self.pending_source_pos = None;
+            return;
+        };
+
+        self.pending_source_pos = Some(source_position_from_offset(text, node.pos));
     }
 
     /// Check if a node spans a single line in the source.
@@ -945,17 +988,20 @@ impl<'a> ThinPrinter<'a> {
     /// Emit a node.
     fn emit_node(&mut self, node: &ThinNode, idx: NodeIndex) {
         // Phase 2 Architecture: Check transform directives first
-        if !self.transforms.is_empty()
+        let has_transform = !self.transforms.is_empty()
             && Self::kind_may_have_transform(node.kind)
-            && self.transforms.has_transform(idx)
-        {
+            && self.transforms.has_transform(idx);
+        let previous_pending = self.pending_source_pos;
+
+        self.queue_source_mapping(node);
+        if has_transform {
             self.apply_transform(node, idx);
-            return;
+        } else {
+            let kind = node.kind;
+            self.emit_node_by_kind(node, idx, kind);
         }
 
-        // No transform, emit using default logic
-        let kind = node.kind;
-        self.emit_node_by_kind(node, idx, kind);
+        self.pending_source_pos = previous_pending;
     }
 
     fn kind_may_have_transform(kind: u16) -> bool {

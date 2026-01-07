@@ -66,6 +66,21 @@ Status: Active
   - Inspect assignment patterns (array/object) to detect bound references.
   - Add focused tests for destructuring and compound assignment narrowing clears.
   - Risk: still conservative for nested aliasing and property writes beyond the base identifier.
+- [x] Clear narrowing for destructuring default initializers and aliases
+  - Handle assignment patterns like `[x = 1] = ...` and `{ y: x = 1 } = ...`.
+  - Add focused tests for default initializer and alias patterns (including alias-only assignment).
+  - Risk: still conservative for nested initializer side effects.
+- [x] Re-enable namespace member tests
+  - Remove stale TODO suppression.
+  - Add focused tests for missing namespace value members.
+- [x] Expand namespace member tests for alias resolution
+  - Add coverage for missing members through nested namespace aliases.
+- [x] Expand namespace member error coverage for non-exported values
+  - Ensure namespace value access reports TS2339 for non-exported members.
+- [x] Expand namespace member error coverage for nested values
+  - Add coverage for missing nested namespace value members.
+- [x] Enforce type-only namespace members in value position
+  - Report TS2693 when accessing interface/type alias exports as values.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
