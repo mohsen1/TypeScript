@@ -45,7 +45,7 @@ Useful commands:
    - `rg -n "TODO|FIXME|HACK|XXX" wasm/src`
    - Spot-check high-risk areas: `interner.rs`, `solver/intern.rs`, `thin_emitter/mod.rs`,
      `lsp/*`, `cli/*`.
-4. Compare changes to track plans and architecture.
+4. Compare changes to track plans and architecture. If needed dig deep to understand the code.
 5. If a track drifts, update its plan and notify the track.
 6. Produce a concise report (what changed, risks, next checks).
 
@@ -74,9 +74,6 @@ Manager actions:
 - To stop a track, add `Status: Complete` to its plan file.
 - To delete a worktree, run `git worktree remove <path>` after it is complete.
 
-## Monitoring mode (when asked)
-- Sleep 15 minutes, pull latest, report, repeat.
-- Do not make code changes unless explicitly requested.
 
 ## Communication via tmux
 - Send message to a track:
