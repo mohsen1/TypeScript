@@ -1080,6 +1080,10 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 }
             }
 
+            TypeKey::ReadonlyType(inner) => {
+                self.resolve_property_access_inner(inner, prop_name, prop_atom)
+            }
+
             // TS apparent members: literals inherit primitive wrapper methods.
             TypeKey::Literal(ref literal) => {
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
@@ -1113,6 +1117,11 @@ impl<'a> PropertyAccessEvaluator<'a> {
             }
 
             TypeKey::Array(_) => {
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                self.resolve_array_property(obj_type, prop_name, prop_atom)
+            }
+
+            TypeKey::Tuple(_) => {
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
                 self.resolve_array_property(obj_type, prop_name, prop_atom)
             }

@@ -195,6 +195,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Reject readonly arrays/tuples when target expects mutable
 - [x] Tests for readonly array/tuple assignability
 
+### Phase 32: Readonly/Tuple Property Access
+- [x] Resolve property access through readonly type operator wrappers
+- [x] Treat tuple property access as array property access
+- [x] Tests for readonly array and tuple property access
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
