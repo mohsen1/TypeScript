@@ -40,6 +40,9 @@ Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (in
   - Handle property/element access discriminants and direct literal checks.
   - Support loose nullish equality (`==` / `!=`) narrowing.
 - [x] Add control-flow tests for discriminant, literal equality, and loose nullish checks
+- [x] Record flow nodes for identifiers in all contexts
+  - Use current flow when binding identifier nodes to enable branch narrowing.
+- [x] Add checker test to verify flow narrowing inside if branches
 
 ## Baseline / Validation
 - `./wasm/test.sh`
