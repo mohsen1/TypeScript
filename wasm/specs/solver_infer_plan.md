@@ -78,6 +78,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Constrain tuple elements
 - [x] Constrain union members to target
 - [x] Constrain optional union targets
+- [x] Infer type params from union targets with a single placeholder member
 - [x] Use Atom for discriminant property names in narrowing
 - [x] Compare property access names via Atom to avoid resolve_atom churn
 - [x] Store subtype failure property names as Atom for diagnostics

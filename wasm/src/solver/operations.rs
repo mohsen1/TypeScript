@@ -734,6 +734,24 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 }
                 if count == 1 {
                     self.constrain_types(ctx, var_map, source, non_nullable.unwrap());
+                    return;
+                }
+
+                let mut placeholder_member = None;
+                let mut placeholder_count = 0;
+                for &member in t_members {
+                    let mut visited = FxHashSet::default();
+                    if self.type_contains_placeholder(member, var_map, &mut visited) {
+                        placeholder_count += 1;
+                        if placeholder_count == 1 {
+                            placeholder_member = Some(member);
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                if placeholder_count == 1 {
+                    self.constrain_types(ctx, var_map, source, placeholder_member.unwrap());
                 }
             }
             (Some(TypeKey::Array(s_elem)), Some(TypeKey::Array(t_elem))) => {
