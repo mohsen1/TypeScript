@@ -27,6 +27,7 @@ mod contextual;
 mod narrowing;
 mod diagnostics;
 mod operations;
+mod apparent;
 
 pub use db::*;
 pub use types::*;
@@ -41,3 +42,4 @@ pub use contextual::*;
 pub use narrowing::*;
 pub use diagnostics::*;
 pub use operations::*;
+pub(crate) use apparent::*;

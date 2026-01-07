@@ -108,6 +108,7 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Apply apparent primitive members during object assignability checks
 - [x] Tests for primitive method property access and literal string properties
 - [x] Tests for primitive-to-object assignability and index signature cases
+- [x] Deduplicate primitive member lists across property access and subtyping
 
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness

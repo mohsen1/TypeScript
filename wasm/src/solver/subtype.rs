@@ -12,7 +12,7 @@
 use std::collections::HashSet;
 use crate::interner::Atom;
 use crate::solver::types::*;
-use crate::solver::TypeDatabase;
+use crate::solver::{apparent_primitive_members, ApparentMemberKind, TypeDatabase};
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -681,56 +681,27 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     }
 
     fn apparent_primitive_shape(&mut self, kind: IntrinsicKind) -> ObjectShape {
-        let mut properties = Vec::new();
+        let members = apparent_primitive_members(self.interner, kind);
+        let mut properties = Vec::with_capacity(members.len());
 
-        match kind {
-            IntrinsicKind::String => {
-                properties.push(self.apparent_value_prop("length", TypeId::NUMBER));
-                for name in [
-                    "at", "charAt", "concat", "padEnd", "padStart", "repeat", "slice",
-                    "substring", "toLocaleLowerCase", "toLocaleUpperCase", "toLowerCase",
-                    "toString", "toUpperCase", "trim", "trimEnd", "trimStart", "valueOf",
-                    "replace", "replaceAll",
-                ] {
-                    properties.push(self.apparent_method_prop(name, TypeId::STRING));
-                }
-                for name in ["charCodeAt", "codePointAt", "indexOf", "lastIndexOf", "search"] {
-                    properties.push(self.apparent_method_prop(name, TypeId::NUMBER));
-                }
-                for name in ["endsWith", "includes", "startsWith"] {
-                    properties.push(self.apparent_method_prop(name, TypeId::BOOLEAN));
-                }
-                for name in ["match", "matchAll"] {
-                    properties.push(self.apparent_method_prop(name, TypeId::ANY));
-                }
-                let string_array = self.interner.array(TypeId::STRING);
-                properties.push(self.apparent_method_prop("split", string_array));
+        for member in members {
+            let name = self.interner.intern_string(member.name);
+            match member.kind {
+                ApparentMemberKind::Value(type_id) => properties.push(PropertyInfo {
+                    name,
+                    type_id,
+                    optional: false,
+                    readonly: false,
+                    is_method: false,
+                }),
+                ApparentMemberKind::Method(return_type) => properties.push(PropertyInfo {
+                    name,
+                    type_id: self.apparent_method_type(return_type),
+                    optional: false,
+                    readonly: false,
+                    is_method: true,
+                }),
             }
-            IntrinsicKind::Number => {
-                for name in ["toExponential", "toFixed", "toLocaleString", "toPrecision", "toString"] {
-                    properties.push(self.apparent_method_prop(name, TypeId::STRING));
-                }
-                properties.push(self.apparent_method_prop("valueOf", TypeId::NUMBER));
-            }
-            IntrinsicKind::Boolean => {
-                for name in ["toLocaleString", "toString"] {
-                    properties.push(self.apparent_method_prop(name, TypeId::STRING));
-                }
-                properties.push(self.apparent_method_prop("valueOf", TypeId::BOOLEAN));
-            }
-            IntrinsicKind::Bigint => {
-                for name in ["toLocaleString", "toString"] {
-                    properties.push(self.apparent_method_prop(name, TypeId::STRING));
-                }
-                properties.push(self.apparent_method_prop("valueOf", TypeId::BIGINT));
-            }
-            IntrinsicKind::Symbol => {
-                let description_type = self.interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
-                properties.push(self.apparent_value_prop("description", description_type));
-                properties.push(self.apparent_method_prop("toString", TypeId::STRING));
-                properties.push(self.apparent_method_prop("valueOf", TypeId::SYMBOL));
-            }
-            _ => {}
         }
 
         let number_index = if kind == IntrinsicKind::String {
@@ -747,26 +718,6 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             properties,
             string_index: None,
             number_index,
-        }
-    }
-
-    fn apparent_method_prop(&mut self, name: &str, return_type: TypeId) -> PropertyInfo {
-        PropertyInfo {
-            name: self.interner.intern_string(name),
-            type_id: self.apparent_method_type(return_type),
-            optional: false,
-            readonly: false,
-            is_method: true,
-        }
-    }
-
-    fn apparent_value_prop(&mut self, name: &str, type_id: TypeId) -> PropertyInfo {
-        PropertyInfo {
-            name: self.interner.intern_string(name),
-            type_id,
-            optional: false,
-            readonly: false,
-            is_method: false,
         }
     }
 

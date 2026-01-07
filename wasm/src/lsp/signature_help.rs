@@ -191,13 +191,13 @@ impl<'a> SignatureHelpProvider<'a> {
             };
 
             // If cursor is before this argument's start, we're between args
-            // Return the index of the previous argument (or 0 for the first gap)
+            // Treat it as the next argument.
             if cursor_offset < arg_node.pos {
-                return index.max(1) as u32 - 1;
+                return index as u32;
             }
 
             // If cursor is within this argument's range, return this index
-            if cursor_offset >= arg_node.pos && cursor_offset <= arg_node.end {
+            if cursor_offset >= arg_node.pos && cursor_offset < arg_node.end {
                 return index as u32;
             }
         }
@@ -311,7 +311,6 @@ mod signature_help_tests {
     use crate::lsp::position::LineMap;
 
     #[test]
-    #[ignore] // TODO: Debug cursor position detection with multiple arguments
     fn test_signature_help_simple() {
         // function add(x: number, y: number): number { return x + y; }
         // add(1, 2|);
@@ -450,6 +449,13 @@ mod signature_help_tests {
         let pos2 = Position::new(1, 11); // At "2"
         let help2 = provider.get_signature_help(root, pos2, &mut cache);
         if let Some(h) = help2 {
+            assert_eq!(h.active_parameter, 1, "Should be on second parameter");
+        }
+
+        // Test cursor between comma and second argument
+        let pos_between = Position::new(1, 10); // Between "," and "2"
+        let help_between = provider.get_signature_help(root, pos_between, &mut cache);
+        if let Some(h) = help_between {
             assert_eq!(h.active_parameter, 1, "Should be on second parameter");
         }
 
