@@ -92,6 +92,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Remapped keys returning `never` are filtered from mapped outputs.
 - [x] Add keyof contravariance coverage for intersections
   - `keyof (A & B)` unions keys and stays assignable from `keyof A`.
+- [x] Add keyof contravariance coverage for unions with index signatures
+  - `keyof (A | B)` retains only shared keys (string index overlaps still yield `number`).
 - [x] Add error poisoning coverage
   - `error` is compatible with all types and poisons unions/conditionals.
 - [x] Add correlated union index access coverage

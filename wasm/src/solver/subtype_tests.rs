@@ -1707,6 +1707,37 @@ fn test_keyof_intersection_contravariant() {
 }
 
 #[test]
+fn test_keyof_union_index_signature_contravariant() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let string_index = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+    let number_index = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: None,
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let union = interner.union(vec![string_index, number_index]);
+    let keyof_union = interner.intern(TypeKey::KeyOf(union));
+
+    assert!(checker.is_subtype_of(keyof_union, TypeId::NUMBER));
+    assert!(!checker.is_subtype_of(keyof_union, TypeId::STRING));
+}
+
+#[test]
 fn test_keyof_deferred_not_subtype_of_string() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
