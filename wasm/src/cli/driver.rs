@@ -37,6 +37,7 @@ pub(crate) struct CompilationCache {
     bind_cache: HashMap<PathBuf, BindCacheEntry>,
     dependencies: HashMap<PathBuf, HashSet<PathBuf>>,
     reverse_dependencies: HashMap<PathBuf, HashSet<PathBuf>>,
+    diagnostics: HashMap<PathBuf, Vec<Diagnostic>>,
 }
 
 struct BindCacheEntry {
@@ -53,6 +54,7 @@ impl CompilationCache {
         for path in affected {
             self.type_caches.remove(&path);
             self.bind_cache.remove(&path);
+            self.diagnostics.remove(&path);
         }
     }
 
@@ -61,6 +63,7 @@ impl CompilationCache {
         self.bind_cache.clear();
         self.dependencies.clear();
         self.reverse_dependencies.clear();
+        self.diagnostics.clear();
     }
 
     #[cfg(test)]
@@ -71,6 +74,11 @@ impl CompilationCache {
     #[cfg(test)]
     pub(crate) fn bind_len(&self) -> usize {
         self.bind_cache.len()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn diagnostics_len(&self) -> usize {
+        self.diagnostics.len()
     }
 
     pub(crate) fn update_dependencies(&mut self, dependencies: HashMap<PathBuf, HashSet<PathBuf>>) {
@@ -1127,8 +1135,12 @@ fn collect_diagnostics(
     for (file_idx, file) in program.files.iter().enumerate() {
         let file_path = PathBuf::from(&file.file_name);
         used_paths.insert(file_path.clone());
-        for parse_diagnostic in &file.parse_diagnostics {
-            diagnostics.push(parse_diagnostic_to_checker(&file.file_name, parse_diagnostic));
+        if let Some(cached) = cache
+            .as_deref()
+            .and_then(|cache| cache.diagnostics.get(&file_path))
+        {
+            diagnostics.extend(cached.clone());
+            continue;
         }
 
         let binder = create_binder_from_bound_file(file, program, file_idx);
@@ -1151,16 +1163,28 @@ fn collect_diagnostics(
                 file.file_name.clone(),
             )
         };
+        let mut file_diagnostics = Vec::new();
+        for parse_diagnostic in &file.parse_diagnostics {
+            file_diagnostics.push(parse_diagnostic_to_checker(
+                &file.file_name,
+                parse_diagnostic,
+            ));
+        }
         checker.check_source_file(file.source_file);
-        diagnostics.extend(std::mem::take(&mut checker.ctx.diagnostics));
+        file_diagnostics.extend(std::mem::take(&mut checker.ctx.diagnostics));
+        diagnostics.extend(file_diagnostics.clone());
 
         if let Some(cache) = cache.as_deref_mut() {
-            cache.type_caches.insert(file_path, checker.extract_cache());
+            cache
+                .type_caches
+                .insert(file_path.clone(), checker.extract_cache());
+            cache.diagnostics.insert(file_path, file_diagnostics);
         }
     }
 
     if let Some(cache) = cache {
         cache.type_caches.retain(|path, _| used_paths.contains(path));
+        cache.diagnostics.retain(|path, _| used_paths.contains(path));
     }
 
     diagnostics
