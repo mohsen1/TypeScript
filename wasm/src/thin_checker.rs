@@ -3786,21 +3786,27 @@ impl<'a> ThinCheckerState<'a> {
             other => other,
         };
 
+        let literal_index_type = literal_index
+            .map(|index| self.ctx.types.literal_number(index as f64))
+            .or_else(|| {
+                match self.ctx.types.lookup(index_type) {
+                    Some(TypeKey::Literal(LiteralValue::Number(num))) => {
+                        Some(self.ctx.types.literal_number(num.0))
+                    }
+                    _ => None,
+                }
+            });
+
         match object_key {
-            Some(TypeKey::Array(element)) => element,
+            Some(TypeKey::Array(element)) => {
+                if let Some(literal_index_type) = literal_index_type {
+                    let result = self.ctx.types.evaluate_index_access(object_type, literal_index_type);
+                    return if result == TypeId::UNDEFINED { element } else { result };
+                }
+                element
+            }
             Some(TypeKey::Tuple(elements)) => {
                 let elements = self.ctx.types.tuple_list(elements);
-                let literal_index_type = literal_index
-                    .map(|index| self.ctx.types.literal_number(index as f64))
-                    .or_else(|| {
-                        match self.ctx.types.lookup(index_type) {
-                            Some(TypeKey::Literal(LiteralValue::Number(num))) => {
-                                Some(self.ctx.types.literal_number(num.0))
-                            }
-                            _ => None,
-                        }
-                    });
-
                 if let Some(literal_index_type) = literal_index_type {
                     let result = self.ctx.types.evaluate_index_access(object_type, literal_index_type);
                     return if result == TypeId::UNDEFINED { TypeId::ANY } else { result };
