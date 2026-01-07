@@ -21,10 +21,10 @@ Implement a high-performance, `tsc`-compatible command-line interface. This driv
 ## Tasks
 
 ### Phase 1: Foundation & Arguments
-- [ ] **Scaffold Binary**
+- [x] **Scaffold Binary**
   - Add `[[bin]]` entry in `Cargo.toml` for `stc` (Speedy TypeScript Compiler).
   - Add dependencies: `clap` (derive), `anyhow`, `serde`, `serde_json` (with preserve_order).
-- [ ] **Implement Argument Parsing**
+- [x] **Implement Argument Parsing**
   - Replicate common `tsc` flags: `--target`, `--module`, `--outDir`, `--strict`, `--noEmit`.
   - Implement `--help` and `--version`.
 
