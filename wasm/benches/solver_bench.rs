@@ -1,6 +1,7 @@
 //! Solver microbenchmarks (subtype, evaluate, infer).
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use wasm::interner::Atom;
 use wasm::solver::{
     evaluate_type,
     infer_generic_function,
@@ -8,6 +9,7 @@ use wasm::solver::{
     CompatChecker,
     ConditionalType,
     FunctionShape,
+    ObjectShapeId,
     ParamInfo,
     PropertyInfo,
     TypeId,
@@ -131,6 +133,51 @@ fn build_infer_fixture(interner: &TypeInterner) -> (FunctionShape, [TypeId; 1]) 
     (func, [arg])
 }
 
+fn build_property_lookup_fixture(interner: &TypeInterner) -> (ObjectShapeId, Atom, Atom) {
+    let mut props = Vec::with_capacity(64);
+    for i in 0..64 {
+        let name = interner.intern_string(&format!("prop{}", i));
+        props.push(PropertyInfo {
+            name,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        });
+    }
+
+    let obj = interner.object(props);
+    let shape_id = match interner.lookup(obj) {
+        Some(TypeKey::Object(shape_id)) => shape_id,
+        other => panic!("expected object shape, got {:?}", other),
+    };
+
+    let hit = interner.intern_string("prop32");
+    let miss = interner.intern_string("missing");
+    (shape_id, hit, miss)
+}
+
+fn build_normalization_fixture(interner: &TypeInterner) -> (Vec<TypeId>, Vec<TypeId>) {
+    let mut members = Vec::with_capacity(64);
+    for i in 0..64 {
+        members.push(interner.literal_number(i as f64));
+    }
+
+    let inner_union = interner.union(members[..32].to_vec());
+    let mut union_members = Vec::with_capacity(68);
+    union_members.push(inner_union);
+    union_members.extend_from_slice(&members[32..]);
+    union_members.extend_from_slice(&members[..4]);
+
+    let inner_intersection = interner.intersection(members[..32].to_vec());
+    let mut intersection_members = Vec::with_capacity(68);
+    intersection_members.push(inner_intersection);
+    intersection_members.extend_from_slice(&members[32..]);
+    intersection_members.extend_from_slice(&members[..4]);
+
+    (union_members, intersection_members)
+}
+
 fn bench_subtype(c: &mut Criterion) {
     let interner = TypeInterner::new();
     let (source, union_match, union_miss) = build_subtype_fixtures(&interner);
@@ -166,5 +213,47 @@ fn bench_infer(c: &mut Criterion) {
     });
 }
 
-criterion_group!(solver_benches, bench_subtype, bench_evaluate, bench_infer);
+fn bench_property_lookup(c: &mut Criterion) {
+    let interner = TypeInterner::new();
+    let (shape_id, hit, miss) = build_property_lookup_fixture(&interner);
+
+    let _ = interner.object_property_index(shape_id, hit);
+    let _ = interner.object_property_index(shape_id, miss);
+
+    c.bench_function("property_lookup_cached_hit", |b| {
+        b.iter(|| black_box(interner.object_property_index(shape_id, hit)))
+    });
+
+    c.bench_function("property_lookup_cached_miss", |b| {
+        b.iter(|| black_box(interner.object_property_index(shape_id, miss)))
+    });
+}
+
+fn bench_normalization(c: &mut Criterion) {
+    let interner = TypeInterner::new();
+    let (union_members, intersection_members) = build_normalization_fixture(&interner);
+
+    c.bench_function("union_normalize_nested", |b| {
+        b.iter(|| {
+            let members = union_members.clone();
+            black_box(interner.union(members))
+        })
+    });
+
+    c.bench_function("intersection_normalize_nested", |b| {
+        b.iter(|| {
+            let members = intersection_members.clone();
+            black_box(interner.intersection(members))
+        })
+    });
+}
+
+criterion_group!(
+    solver_benches,
+    bench_subtype,
+    bench_evaluate,
+    bench_infer,
+    bench_property_lookup,
+    bench_normalization
+);
 criterion_main!(solver_benches);
