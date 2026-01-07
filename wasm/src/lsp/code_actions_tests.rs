@@ -47,7 +47,7 @@ fn apply_text_edits(source: &str, line_map: &LineMap, edits: &[TextEdit]) -> Str
 #[test]
 fn test_extract_variable_property_access() {
     let source = "const x = foo.bar.baz + 1;";
-    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
     let root = parser.parse_source_file();
     let arena = parser.get_arena();
 
@@ -59,7 +59,7 @@ fn test_extract_variable_property_access() {
         arena,
         &binder,
         &line_map,
-        "test.ts".to_string(),
+        "test.tsx".to_string(),
         source,
     );
 
@@ -84,7 +84,7 @@ fn test_extract_variable_property_access() {
     assert!(actions[0].is_preferred);
 
     let edit = actions[0].edit.as_ref().unwrap();
-    let edits = edit.changes.get("test.ts").unwrap();
+    let edits = edit.changes.get("test.tsx").unwrap();
     assert_eq!(edits.len(), 2);
 
     assert!(edits[0].new_text.contains("const extracted = foo.bar.baz;"));
@@ -172,6 +172,47 @@ fn test_extract_variable_parenthesizes_comma_expression() {
         .new_text
         .contains("const extracted = (foo(), bar());"));
     assert_eq!(edits[1].new_text, "extracted");
+}
+
+#[test]
+fn test_extract_variable_jsx_child_wraps_expression() {
+    let source = "const view = <div><Foo /></div>;\n";
+    let mut parser = ThinParserState::new("test.tsx".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.tsx".to_string(),
+        source,
+    );
+
+    let range = range_for_substring(source, &line_map, "<Foo />");
+    let actions = provider.provide_code_actions(
+        root,
+        range,
+        CodeActionContext {
+            diagnostics: Vec::new(),
+            only: None,
+            import_candidates: Vec::new(),
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.tsx").unwrap();
+    let updated = apply_text_edits(source, &line_map, edits);
+    assert_eq!(
+        updated,
+        "const extracted = <Foo />;\nconst view = <div>{extracted}</div>;\n"
+    );
 }
 
 #[test]

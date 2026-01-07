@@ -734,6 +734,24 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 }
                 if count == 1 {
                     self.constrain_types(ctx, var_map, source, non_nullable.unwrap());
+                    return;
+                }
+
+                let mut placeholder_member = None;
+                let mut placeholder_count = 0;
+                for &member in t_members {
+                    let mut visited = FxHashSet::default();
+                    if self.type_contains_placeholder(member, var_map, &mut visited) {
+                        placeholder_count += 1;
+                        if placeholder_count == 1 {
+                            placeholder_member = Some(member);
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                if placeholder_count == 1 {
+                    self.constrain_types(ctx, var_map, source, placeholder_member.unwrap());
                 }
             }
             (Some(TypeKey::Array(s_elem)), Some(TypeKey::Array(t_elem))) => {
@@ -1356,7 +1374,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 for prop in props {
                     if prop.name == prop_atom {
                         return PropertyAccessResult::Success {
-                            type_id: prop.type_id,
+                            type_id: self.optional_property_type(prop),
                             from_index_signature: false,
                         };
                     }
@@ -1373,7 +1391,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 for prop in &shape.properties {
                     if prop.name == prop_atom {
                         return PropertyAccessResult::Success {
-                            type_id: prop.type_id,
+                            type_id: self.optional_property_type(prop),
                             from_index_signature: false,
                         };
                     }
@@ -1578,6 +1596,14 @@ impl<'a> PropertyAccessEvaluator<'a> {
             return type_id;
         }
         self.interner.union(vec![type_id, TypeId::UNDEFINED])
+    }
+
+    fn optional_property_type(&self, prop: &PropertyInfo) -> TypeId {
+        if prop.optional {
+            self.interner.union(vec![prop.type_id, TypeId::UNDEFINED])
+        } else {
+            prop.type_id
+        }
     }
 
     fn resolve_apparent_property(

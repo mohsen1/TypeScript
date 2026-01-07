@@ -472,6 +472,20 @@ fn test_index_access_type_param_no_constraint_deferred() {
 }
 
 #[test]
+fn test_index_access_optional_property() {
+    let interner = TypeInterner::new();
+
+    let obj = interner.object(vec![
+        PropertyInfo { name: interner.intern_string("x"), type_id: TypeId::NUMBER, optional: true, readonly: false, is_method: false },
+    ]);
+
+    let key_x = interner.literal_string("x");
+    let result = evaluate_index_access(&interner, obj, key_x);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_index_access_with_no_unchecked_indexed_access() {
     let interner = TypeInterner::new();
 
