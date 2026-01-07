@@ -119,6 +119,9 @@ impl<'a> DeclarationEmitter<'a> {
             k if k == syntax_kind_ext::EXPORT_DECLARATION => {
                 self.emit_export_declaration(stmt_idx);
             }
+            k if k == syntax_kind_ext::EXPORT_ASSIGNMENT => {
+                self.emit_export_assignment(stmt_idx);
+            }
             k if k == syntax_kind_ext::IMPORT_DECLARATION => {
                 self.emit_import_declaration(stmt_idx);
             }
@@ -665,9 +668,22 @@ impl<'a> DeclarationEmitter<'a> {
         // or star exports: export * from "mod"
         self.write_indent();
         self.write("export ");
+
+        if export.is_type_only {
+            self.write("type ");
+        }
         
         if !export.export_clause.is_none() {
-            self.emit_node(export.export_clause);
+            if let Some(clause_node) = self.arena.get(export.export_clause) {
+                if clause_node.kind == syntax_kind_ext::NAMED_EXPORTS {
+                    self.emit_named_exports(export.export_clause, !export.is_type_only);
+                } else if clause_node.kind == SyntaxKind::Identifier as u16 {
+                    self.write("* as ");
+                    self.emit_node(export.export_clause);
+                } else {
+                    self.emit_node(export.export_clause);
+                }
+            }
         } else {
             self.write("*");
         }
@@ -679,6 +695,58 @@ impl<'a> DeclarationEmitter<'a> {
         
         self.write(";");
         self.write_line();
+    }
+
+    fn emit_export_assignment(&mut self, assign_idx: NodeIndex) {
+        let Some(assign_node) = self.arena.get(assign_idx) else { return };
+        let Some(assign) = self.arena.get_export_assignment(assign_node) else { return };
+
+        self.write_indent();
+        if assign.is_export_equals {
+            self.write("export = ");
+        } else {
+            self.write("export default ");
+        }
+        self.emit_expression(assign.expression);
+        self.write(";");
+        self.write_line();
+    }
+
+    fn emit_named_exports(&mut self, exports_idx: NodeIndex, allow_type_prefix: bool) {
+        let Some(exports_node) = self.arena.get(exports_idx) else { return };
+        let Some(exports) = self.arena.get_named_imports(exports_node) else { return };
+
+        if !exports.name.is_none() && exports.elements.nodes.is_empty() {
+            self.write("* as ");
+            self.emit_node(exports.name);
+            return;
+        }
+
+        self.write("{ ");
+        let mut first = true;
+        for &spec_idx in &exports.elements.nodes {
+            if !first {
+                self.write(", ");
+            }
+            first = false;
+            self.emit_export_specifier(spec_idx, allow_type_prefix);
+        }
+        self.write(" }");
+    }
+
+    fn emit_export_specifier(&mut self, spec_idx: NodeIndex, allow_type_prefix: bool) {
+        let Some(spec_node) = self.arena.get(spec_idx) else { return };
+        let Some(spec) = self.arena.get_specifier(spec_node) else { return };
+
+        if allow_type_prefix && spec.is_type_only {
+            self.write("type ");
+        }
+
+        if !spec.property_name.is_none() {
+            self.emit_node(spec.property_name);
+            self.write(" as ");
+        }
+        self.emit_node(spec.name);
     }
     
     // Helper to emit exported interface with "export" prefix
@@ -880,6 +948,10 @@ impl<'a> DeclarationEmitter<'a> {
         if !import.import_clause.is_none() {
             if let Some(clause_node) = self.arena.get(import.import_clause) {
                 if let Some(clause) = self.arena.get_import_clause(clause_node) {
+                    if clause.is_type_only {
+                        self.write("type ");
+                    }
+
                     let mut has_default = false;
                     
                     // Default import
@@ -893,7 +965,7 @@ impl<'a> DeclarationEmitter<'a> {
                         if has_default {
                             self.write(", ");
                         }
-                        self.emit_node(clause.named_bindings);
+                        self.emit_named_imports(clause.named_bindings, !clause.is_type_only);
                     }
                     
                     self.write(" from ");
@@ -904,6 +976,43 @@ impl<'a> DeclarationEmitter<'a> {
         self.emit_node(import.module_specifier);
         self.write(";");
         self.write_line();
+    }
+
+    fn emit_named_imports(&mut self, imports_idx: NodeIndex, allow_type_prefix: bool) {
+        let Some(imports_node) = self.arena.get(imports_idx) else { return };
+        let Some(imports) = self.arena.get_named_imports(imports_node) else { return };
+
+        if !imports.name.is_none() && imports.elements.nodes.is_empty() {
+            self.write("* as ");
+            self.emit_node(imports.name);
+            return;
+        }
+
+        self.write("{ ");
+        let mut first = true;
+        for &spec_idx in &imports.elements.nodes {
+            if !first {
+                self.write(", ");
+            }
+            first = false;
+            self.emit_import_specifier(spec_idx, allow_type_prefix);
+        }
+        self.write(" }");
+    }
+
+    fn emit_import_specifier(&mut self, spec_idx: NodeIndex, allow_type_prefix: bool) {
+        let Some(spec_node) = self.arena.get(spec_idx) else { return };
+        let Some(spec) = self.arena.get_specifier(spec_node) else { return };
+
+        if allow_type_prefix && spec.is_type_only {
+            self.write("type ");
+        }
+
+        if !spec.property_name.is_none() {
+            self.emit_node(spec.property_name);
+            self.write(" as ");
+        }
+        self.emit_node(spec.name);
     }
     
     fn emit_module_declaration(&mut self, module_idx: NodeIndex) {

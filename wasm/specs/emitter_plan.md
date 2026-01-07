@@ -20,6 +20,8 @@ Status: Active
 - [x] Add minimal source map anchors for transform emission paths.
 - [x] Replace declaration map stub with minimal source map output.
 - [x] Add identifier name entries to source maps for transform-path metadata.
+- [x] Emit type-only re-exports in declaration emitter (export type / export { type ... }).
+- [x] Emit export assignment (`export =`) in declaration emitter.
 - [x] Shrink `thin_emitter/mod.rs` for maintainability
   - [x] Extract comment utilities + comment/output helpers into modules (keep API stable).
   - [x] Extract module wrapper emission helpers into a submodule (keep API stable).
@@ -44,8 +46,10 @@ Status: Active
   - [x] Add JSX hyphenated element name emission coverage in thin emitter tests.
   - [x] Add JSX hyphenated element + attribute coverage in thin emitter tests.
   - [x] Add JSX member element attribute coverage in thin emitter tests.
+  - [x] Add JSX member element hyphenated attribute coverage in thin emitter tests.
   - [x] Add JSX namespaced attribute string literal coverage in thin emitter tests.
   - [x] Add JSX member element namespaced attribute coverage in thin emitter tests.
+  - [x] Add JSX member element namespaced attribute expression coverage in thin emitter tests.
   - [x] Add JSX boolean attribute coverage in thin emitter tests.
   - [x] Add JSX member element boolean attribute coverage in thin emitter tests.
   - [x] Add JSX spread + boolean attribute coverage in thin emitter tests.

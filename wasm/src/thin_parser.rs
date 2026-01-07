@@ -4449,18 +4449,21 @@ impl ThinParserState {
         // Empty params: () => or (): type =>
         if self.is_token(SyntaxKind::CloseParenToken) {
             self.next_token();
-            // Check for optional return type: (): type =>
-            if self.is_token(SyntaxKind::ColonToken) {
+            let is_arrow = if self.is_token(SyntaxKind::ColonToken) {
+                let saved_arena_len = self.arena.nodes.len();
+                let saved_diagnostics_len = self.parse_diagnostics.len();
+
                 self.next_token();
-                // Skip the type until =>
-                while !self.is_token(SyntaxKind::EqualsGreaterThanToken)
-                    && !self.is_token(SyntaxKind::EndOfFileToken)
-                    && !self.is_token(SyntaxKind::SemicolonToken)
-                    && !self.is_token(SyntaxKind::CloseBraceToken) {
-                    self.next_token();
-                }
-            }
-            let is_arrow = self.is_token(SyntaxKind::EqualsGreaterThanToken);
+                let _ = self.parse_return_type();
+                let result = self.is_token(SyntaxKind::EqualsGreaterThanToken);
+
+                self.arena.nodes.truncate(saved_arena_len);
+                self.parse_diagnostics.truncate(saved_diagnostics_len);
+
+                result
+            } else {
+                self.is_token(SyntaxKind::EqualsGreaterThanToken)
+            };
             self.scanner.restore_state(snapshot);
             self.current_token = current;
             return is_arrow;
@@ -4478,18 +4481,21 @@ impl ThinParserState {
         }
 
         // Check for optional return type annotation
-        if self.is_token(SyntaxKind::ColonToken) {
-            self.next_token();
-            // Skip the type (simplified - just skip until =>)
-            while !self.is_token(SyntaxKind::EqualsGreaterThanToken)
-                && !self.is_token(SyntaxKind::EndOfFileToken)
-                && !self.is_token(SyntaxKind::SemicolonToken)
-                && !self.is_token(SyntaxKind::CloseBraceToken) {
-                self.next_token();
-            }
-        }
+        let is_arrow = if self.is_token(SyntaxKind::ColonToken) {
+            let saved_arena_len = self.arena.nodes.len();
+            let saved_diagnostics_len = self.parse_diagnostics.len();
 
-        let is_arrow = self.is_token(SyntaxKind::EqualsGreaterThanToken);
+            self.next_token();
+            let _ = self.parse_return_type();
+            let result = self.is_token(SyntaxKind::EqualsGreaterThanToken);
+
+            self.arena.nodes.truncate(saved_arena_len);
+            self.parse_diagnostics.truncate(saved_diagnostics_len);
+
+            result
+        } else {
+            self.is_token(SyntaxKind::EqualsGreaterThanToken)
+        };
         self.scanner.restore_state(snapshot);
         self.current_token = current;
         is_arrow

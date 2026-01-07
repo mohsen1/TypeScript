@@ -39,9 +39,9 @@ The current `ThinNodeArena` makes in-place mutation difficult.
 Last updated: 2026-01-07
 
 - Overall: Migration is active; Rust/WASM compiler is under construction and not production-ready.
-- Tracks: CLI parser still blocks on TS1005 `=>` expected at `checker.ts:15885` (everyType arrow with optional chaining); emitter expanded JSX boolean attribute parity to include spread+boolean, namespaced+boolean, and member-element variants; checker added cross-form property/element narrowing and clearing tests; LSP added cache reuse coverage for hover→signature help after edit across files; solver added TS_UNSOUNDNESS coverage for `noUncheckedIndexedAccess` array index behavior.
+- Tracks: CLI parser fixes arrow lookahead for return types (everyType conditional) and bench now hits TS2304 at `binder.ts:331` (`node` missing); emitter added member hyphenated attribute parity and expanded the declaration emitter for type-only re-exports plus export assignments; checker added literal element access narrowing and is working on computed literal-key narrowing; LSP added a prefix-symbol preservation test for function-body edits; solver is selecting the next TS_UNSOUNDNESS item after `noUncheckedIndexedAccess` array coverage.
 - Baselines (`tests/cases`, first 100): compiler errors 60/77 (77.9%) pass, JS 40/76 (52.6%) pass; conformance errors 18/90 (20.0%) pass, JS 1/88 (1.1%) pass (no new run).
-- Risk: CLI bench blocked by the remaining parser gap at `checker.ts:15885`; ES module imports still resolve to `any`; source maps remain minimal; parser/arena child enumeration TODOs remain; conformance baseline pass rates are low.
+- Risk: CLI bench blocked by TS2304 in `binder.ts:331`; computed literal-key narrowing is currently failing until control-flow reference matching is fixed; ES module imports still resolve to `any`; source maps remain minimal; parser/arena child enumeration TODOs remain; conformance baseline pass rates are low.
 - Next focus: close remaining parser gaps to run full CLI benches, push assignability/member lookup into solver to end split-brain typing, ship `.d.ts` visibility + re-export handling with ES5 downlevel and full source maps, tighten LSP incremental parse to avoid full rebinds, and retire legacy AST with arena memory-hygiene checks.
 
 ## Status
