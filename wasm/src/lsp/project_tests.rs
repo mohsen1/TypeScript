@@ -410,6 +410,77 @@ fn test_project_update_file_preserves_prefix_symbol_across_edits() {
 }
 
 #[test]
+fn test_project_update_file_multiple_edits_preserve_prefix_symbol() {
+    let mut project = Project::new();
+    let source = "const alpha = 1;\nconst beta = 2;\nconst gamma = 3;\n";
+    project.set_file("a.ts".to_string(), source.to_string());
+
+    let alpha_symbol_before = {
+        let file = project.file("a.ts").unwrap();
+        let arena = file.arena();
+        let root = file.root();
+        let source_node = arena.get(root).unwrap();
+        let source_file = arena.get_source_file(source_node).unwrap();
+        let stmt_idx = source_file.statements.nodes[0];
+        let stmt_node = arena.get(stmt_idx).unwrap();
+        let var_stmt = arena.get_variable(stmt_node).unwrap();
+        let decl_list_idx = var_stmt.declarations.nodes[0];
+        let decl_list_node = arena.get(decl_list_idx).unwrap();
+        let decl_list = arena.get_variable(decl_list_node).unwrap();
+        let decl_idx = decl_list.declarations.nodes[0];
+        let decl_node = arena.get(decl_idx).unwrap();
+        let decl = arena.get_variable_declaration(decl_node).unwrap();
+        let name_idx = decl.name;
+        file.binder()
+            .get_node_symbol(name_idx)
+            .expect("Expected symbol for alpha")
+    };
+
+    let edits = {
+        let file = project.file("a.ts").unwrap();
+        let rename_beta = range_for_substring(file.source_text(), file.line_map(), "beta");
+        let update_gamma = range_for_substring(file.source_text(), file.line_map(), "3");
+        vec![
+            TextEdit::new(rename_beta, "beta2".to_string()),
+            TextEdit::new(update_gamma, "4".to_string()),
+        ]
+    };
+    project.update_file("a.ts", &edits).expect("Expected update to succeed");
+
+    let alpha_symbol_after = {
+        let file = project.file("a.ts").unwrap();
+        let arena = file.arena();
+        let root = file.root();
+        let source_node = arena.get(root).unwrap();
+        let source_file = arena.get_source_file(source_node).unwrap();
+        let stmt_idx = source_file.statements.nodes[0];
+        let stmt_node = arena.get(stmt_idx).unwrap();
+        let var_stmt = arena.get_variable(stmt_node).unwrap();
+        let decl_list_idx = var_stmt.declarations.nodes[0];
+        let decl_list_node = arena.get(decl_list_idx).unwrap();
+        let decl_list = arena.get_variable(decl_list_node).unwrap();
+        let decl_idx = decl_list.declarations.nodes[0];
+        let decl_node = arena.get(decl_idx).unwrap();
+        let decl = arena.get_variable_declaration(decl_node).unwrap();
+        let name_idx = decl.name;
+        file.binder()
+            .get_node_symbol(name_idx)
+            .expect("Expected symbol for alpha after updates")
+    };
+
+    let file = project.file("a.ts").unwrap();
+    assert_eq!(
+        file.source_text(),
+        "const alpha = 1;\nconst beta2 = 2;\nconst gamma = 4;\n"
+    );
+    assert_eq!(alpha_symbol_before, alpha_symbol_after);
+    let locals = &file.binder().file_locals;
+    assert!(locals.has("alpha"));
+    assert!(locals.has("beta2"));
+    assert!(locals.has("gamma"));
+}
+
+#[test]
 fn test_project_update_file_refreshes_cross_file_references() {
     let mut project = Project::new();
 
