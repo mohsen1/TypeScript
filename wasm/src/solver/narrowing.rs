@@ -221,6 +221,7 @@ impl<'a> NarrowingContext<'a> {
                 "symbol" => TypeId::SYMBOL,
                 "undefined" => TypeId::UNDEFINED,
                 "object" => self.interner.union(vec![TypeId::OBJECT, TypeId::NULL]),
+                "function" => self.function_type(),
                 _ => source_type,
             };
         }
@@ -360,6 +361,23 @@ impl<'a> NarrowingContext<'a> {
 
         if self.is_function_type(source_type) {
             source_type
+        } else if source_type == TypeId::OBJECT {
+            self.function_type()
+        } else if let Some(TypeKey::Object(props)) = self.interner.lookup(source_type) {
+            if props.is_empty() {
+                self.function_type()
+            } else {
+                TypeId::NEVER
+            }
+        } else if let Some(TypeKey::ObjectWithIndex(shape)) = self.interner.lookup(source_type) {
+            if shape.properties.is_empty()
+                && shape.string_index.is_none()
+                && shape.number_index.is_none()
+            {
+                self.function_type()
+            } else {
+                TypeId::NEVER
+            }
         } else {
             TypeId::NEVER
         }
@@ -472,7 +490,8 @@ impl<'a> NarrowingContext<'a> {
 
         let constraint = info.constraint.unwrap_or(TypeId::UNKNOWN);
         if constraint == source || constraint == TypeId::UNKNOWN {
-            return Some(source);
+            let function_type = self.function_type();
+            return Some(self.interner.intersection(vec![source, function_type]));
         }
 
         let narrowed_constraint = self.narrow_to_function(constraint);
@@ -525,6 +544,24 @@ impl<'a> NarrowingContext<'a> {
         }
 
         Some(self.interner.intersection(vec![source, narrowed_constraint]))
+    }
+
+    fn function_type(&self) -> TypeId {
+        let rest_array = self.interner.array(TypeId::ANY);
+        let rest_param = ParamInfo {
+            name: None,
+            type_id: rest_array,
+            optional: false,
+            rest: true,
+        };
+        self.interner.function(FunctionShape {
+            params: vec![rest_param],
+            this_type: None,
+            return_type: TypeId::ANY,
+            type_params: Vec::new(),
+            type_predicate: None,
+            is_constructor: false,
+        })
     }
 
     /// Simple assignability check for narrowing purposes.

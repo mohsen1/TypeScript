@@ -98,6 +98,10 @@ pub mod solver;
 // LSP (Language Server Protocol) support
 pub mod lsp;
 
+// Native CLI (non-wasm targets only)
+#[cfg(not(target_arch = "wasm32"))]
+pub mod cli;
+
 // =============================================================================
 // Scanner Factory Function
 // =============================================================================
