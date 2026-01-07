@@ -956,6 +956,12 @@ impl ScannerState {
                 while self.pos < self.end && is_hex_digit(self.char_code_unchecked(self.pos)) {
                     self.pos += 1;
                 }
+                if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LOWER_N {
+                    self.pos += 1;
+                    self.token_value = self.substring(start, self.pos);
+                    self.token = SyntaxKind::BigIntLiteral;
+                    return;
+                }
                 self.token_value = self.substring(start, self.pos);
                 self.token = SyntaxKind::NumericLiteral;
                 return;
@@ -971,6 +977,12 @@ impl ScannerState {
                     }
                     self.pos += 1;
                 }
+                if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LOWER_N {
+                    self.pos += 1;
+                    self.token_value = self.substring(start, self.pos);
+                    self.token = SyntaxKind::BigIntLiteral;
+                    return;
+                }
                 self.token_value = self.substring(start, self.pos);
                 self.token = SyntaxKind::NumericLiteral;
                 return;
@@ -981,6 +993,12 @@ impl ScannerState {
                 self.token_flags |= TokenFlags::OctalSpecifier as u32;
                 while self.pos < self.end && is_octal_digit(self.char_code_unchecked(self.pos)) {
                     self.pos += 1;
+                }
+                if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LOWER_N {
+                    self.pos += 1;
+                    self.token_value = self.substring(start, self.pos);
+                    self.token = SyntaxKind::BigIntLiteral;
+                    return;
                 }
                 self.token_value = self.substring(start, self.pos);
                 self.token = SyntaxKind::NumericLiteral;
