@@ -552,6 +552,51 @@ fn test_property_access_bigint_method() {
 }
 
 #[test]
+fn test_property_access_object_methods_on_primitives() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let result = evaluator.resolve_property_access(TypeId::STRING, "hasOwnProperty");
+    match result {
+        PropertyAccessResult::Success { type_id, .. } => match interner.lookup(type_id) {
+            Some(TypeKey::Function(func)) => assert_eq!(func.return_type, TypeId::BOOLEAN),
+            other => panic!("Expected function, got {:?}", other),
+        },
+        _ => panic!("Expected success, got {:?}", result),
+    }
+
+    let result = evaluator.resolve_property_access(TypeId::NUMBER, "isPrototypeOf");
+    match result {
+        PropertyAccessResult::Success { type_id, .. } => match interner.lookup(type_id) {
+            Some(TypeKey::Function(func)) => assert_eq!(func.return_type, TypeId::BOOLEAN),
+            other => panic!("Expected function, got {:?}", other),
+        },
+        _ => panic!("Expected success, got {:?}", result),
+    }
+
+    let result = evaluator.resolve_property_access(TypeId::BOOLEAN, "propertyIsEnumerable");
+    match result {
+        PropertyAccessResult::Success { type_id, .. } => match interner.lookup(type_id) {
+            Some(TypeKey::Function(func)) => assert_eq!(func.return_type, TypeId::BOOLEAN),
+            other => panic!("Expected function, got {:?}", other),
+        },
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_property_access_primitive_constructor_value() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let result = evaluator.resolve_property_access(TypeId::SYMBOL, "constructor");
+    match result {
+        PropertyAccessResult::Success { type_id, .. } => assert_eq!(type_id, TypeId::ANY),
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_property_access_literal_string_length() {
     let interner = TypeInterner::new();
     let evaluator = PropertyAccessEvaluator::new(&interner);
