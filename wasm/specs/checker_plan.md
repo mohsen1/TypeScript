@@ -56,9 +56,11 @@ Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (in
 - [x] Use user-defined type predicate signatures in flow narrowing
   - Narrow based on call expressions returning `x is T` or `asserts x is T`.
   - Add tests for predicate functions and alias references.
-- [ ] Track assignment/mutation flow to widen/clear stale narrowings
+  - Risk: predicate narrowing depends on cached call-expression types and is conservative for overloads/complex `this` predicates.
+- [x] Track assignment/mutation flow to widen/clear stale narrowings
   - Emit assignment/array-mutation flow nodes and update flow analyzer.
   - Add tests for reassignment inside branches.
+  - Risk: assignment clears to declared type (RHS type not tracked) and array mutation detection is method-name based; destructuring/aliasing writes still conservative.
 
 ## Baseline / Validation
 - `./wasm/test.sh`

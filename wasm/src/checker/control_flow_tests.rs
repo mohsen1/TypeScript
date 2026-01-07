@@ -85,6 +85,21 @@ fn extract_expression_from_statement(arena: &ThinNodeArena, stmt_idx: NodeIndex)
     expr_stmt.expression
 }
 
+fn get_block_expression(
+    arena: &ThinNodeArena,
+    block_idx: NodeIndex,
+    stmt_index: usize,
+) -> NodeIndex {
+    let block_node = arena.get(block_idx).expect("block node");
+    let block = arena.get_block(block_node).expect("block");
+    let stmt_idx = *block
+        .statements
+        .nodes
+        .get(stmt_index)
+        .expect("block statement");
+    extract_expression_from_statement(arena, stmt_idx)
+}
+
 #[test]
 fn test_switch_fallthrough_and_default_narrowing() {
     let source = r#"
@@ -466,4 +481,96 @@ if (assertString(x)) {
 
     let narrowed_else = analyzer.get_flow_type(ident_else, union, flow_else);
     assert_eq!(narrowed_else, union);
+}
+
+#[test]
+fn test_assignment_clears_narrowing_in_branch() {
+    let source = r#"
+let x: string | number;
+if (typeof x === "string") {
+  x;
+  x = 1;
+  x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let analyzer = FlowAnalyzer::new(arena, &binder, &types);
+
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+    let if_idx = *source_file.statements.nodes.get(1).expect("if statement");
+    let if_node = arena.get(if_idx).expect("if node");
+    let if_data = arena.get_if_statement(if_node).expect("if data");
+    let then_block = if_data.then_statement;
+
+    let ident_before = get_block_expression(arena, then_block, 0);
+    let ident_after = get_block_expression(arena, then_block, 2);
+
+    let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    let flow_before = binder.get_node_flow(ident_before).expect("flow before");
+    let narrowed_before = analyzer.get_flow_type(ident_before, union, flow_before);
+    assert_eq!(narrowed_before, TypeId::STRING);
+
+    let flow_after = binder.get_node_flow(ident_after).expect("flow after");
+    let narrowed_after = analyzer.get_flow_type(ident_after, union, flow_after);
+    assert_eq!(narrowed_after, union);
+}
+
+#[test]
+fn test_array_mutation_clears_predicate_narrowing() {
+    let source = r#"
+function isStringArray(x: string[] | number[]): x is string[] {
+  return true;
+}
+let x: string[] | number[];
+if (isStringArray(x)) {
+  x;
+  x.push("a");
+  x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let arena = parser.get_arena();
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let analyzer = FlowAnalyzer::with_node_types(arena, &binder, &types, &checker.ctx.node_types);
+
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+    let if_idx = *source_file.statements.nodes.get(2).expect("if statement");
+    let if_node = arena.get(if_idx).expect("if node");
+    let if_data = arena.get_if_statement(if_node).expect("if data");
+    let then_block = if_data.then_statement;
+
+    let ident_before = get_block_expression(arena, then_block, 0);
+    let ident_after = get_block_expression(arena, then_block, 2);
+
+    let string_array = types.array(TypeId::STRING);
+    let number_array = types.array(TypeId::NUMBER);
+    let union = types.union(vec![string_array, number_array]);
+
+    let flow_before = binder.get_node_flow(ident_before).expect("flow before");
+    let narrowed_before = analyzer.get_flow_type(ident_before, union, flow_before);
+    assert_eq!(narrowed_before, string_array);
+
+    let flow_after = binder.get_node_flow(ident_after).expect("flow after");
+    let narrowed_after = analyzer.get_flow_type(ident_after, union, flow_after);
+    assert_eq!(narrowed_after, union);
 }
