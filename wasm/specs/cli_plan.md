@@ -143,6 +143,13 @@ Tests run in this state:
 - `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (rerun after binder.ts:432 focus; first TS2304 `src/compiler/binder.ts:756:15` via `./wasm/target/release/tsz --project src/compiler/tsconfig.json --noEmit 2>&1 | rg -m1 'TS2304'`).
 - `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (rerun after binder.ts:432 test; still fails first on `src/compiler/binder.ts:575:33` TS2693 `Set`).
 
+## Binder.ts:432 Follow-up Report
+- Repro test already in place: `test_thin_binder_resolves_block_local_from_bound_state_binder_ts_432` in `wasm/src/thin_binder_tests.rs`.
+- Fix already landed: `for`-`in`/`of` nodes now set parent pointers for initializer/expression/statement in `wasm/src/parser/thin_node.rs`, so `find_enclosing_scope` can walk from `statements` usage to the block scope.
+- Scope wiring already present: `parallel.rs` uses `ThinBinderState::from_bound_state_with_scopes` with `scopes` + `node_scope_ids`, and `merge_bind_results_ref` remaps both.
+- Validation: `./wasm/test.sh thin_binder_tests::test_thin_binder_resolves_block_local_from_bound_state_binder_ts_432` passes.
+- Bench status: `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` still exits on TS2693 `Set` at `src/compiler/binder.ts:575:33`; TS2304 `getDeclarationName` at `src/compiler/binder.ts:756:15` is next when filtering for TS2304.
+
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
   - [x] Cache parsed arenas + binder results per file.
