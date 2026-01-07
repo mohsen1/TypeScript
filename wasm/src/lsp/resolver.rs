@@ -137,6 +137,11 @@ impl<'a> ScopeWalker<'a> {
               || k == syntax_kind_ext::ARROW_FUNCTION => {
                 if let Some(func) = self.arena.get_function(node) {
                     if !func.name.is_none() { if let Some(res) = f(self, func.name) { return Some(res); } }
+                    if let Some(ref type_params) = func.type_parameters {
+                        for &param in &type_params.nodes {
+                            if let Some(res) = f(self, param) { return Some(res); }
+                        }
+                    }
                     for &param in &func.parameters.nodes {
                         if let Some(res) = f(self, param) { return Some(res); }
                     }
@@ -147,14 +152,25 @@ impl<'a> ScopeWalker<'a> {
             k if k == syntax_kind_ext::METHOD_DECLARATION => {
                 if let Some(method) = self.arena.get_method_decl(node) {
                     if !method.name.is_none() { if let Some(res) = f(self, method.name) { return Some(res); } }
+                    if let Some(ref type_params) = method.type_parameters {
+                        for &param in &type_params.nodes {
+                            if let Some(res) = f(self, param) { return Some(res); }
+                        }
+                    }
                     for &param in &method.parameters.nodes {
                         if let Some(res) = f(self, param) { return Some(res); }
                     }
+                    if !method.type_annotation.is_none() { if let Some(res) = f(self, method.type_annotation) { return Some(res); } }
                     if !method.body.is_none() { if let Some(res) = f(self, method.body) { return Some(res); } }
                 }
             }
             k if k == syntax_kind_ext::CONSTRUCTOR => {
                 if let Some(ctor) = self.arena.get_constructor(node) {
+                    if let Some(ref type_params) = ctor.type_parameters {
+                        for &param in &type_params.nodes {
+                            if let Some(res) = f(self, param) { return Some(res); }
+                        }
+                    }
                     for &param in &ctor.parameters.nodes {
                         if let Some(res) = f(self, param) { return Some(res); }
                     }
@@ -165,6 +181,16 @@ impl<'a> ScopeWalker<'a> {
             k if k == syntax_kind_ext::CLASS_DECLARATION || k == syntax_kind_ext::CLASS_EXPRESSION => {
                 if let Some(class) = self.arena.get_class(node) {
                     if !class.name.is_none() { if let Some(res) = f(self, class.name) { return Some(res); } }
+                    if let Some(ref type_params) = class.type_parameters {
+                        for &param in &type_params.nodes {
+                            if let Some(res) = f(self, param) { return Some(res); }
+                        }
+                    }
+                    if let Some(ref heritage) = class.heritage_clauses {
+                        for &clause in &heritage.nodes {
+                            if let Some(res) = f(self, clause) { return Some(res); }
+                        }
+                    }
                     for &member in &class.members.nodes {
                         if let Some(res) = f(self, member) { return Some(res); }
                     }
@@ -188,13 +214,53 @@ impl<'a> ScopeWalker<'a> {
             k if k == syntax_kind_ext::VARIABLE_DECLARATION => {
                 if let Some(decl) = self.arena.get_variable_declaration(node) {
                     if let Some(res) = f(self, decl.name) { return Some(res); }
+                    if !decl.type_annotation.is_none() { if let Some(res) = f(self, decl.type_annotation) { return Some(res); } }
                     if !decl.initializer.is_none() { if let Some(res) = f(self, decl.initializer) { return Some(res); } }
+                }
+            }
+            k if k == syntax_kind_ext::PARAMETER => {
+                if let Some(param) = self.arena.get_parameter(node) {
+                    if let Some(res) = f(self, param.name) { return Some(res); }
+                    if !param.type_annotation.is_none() { if let Some(res) = f(self, param.type_annotation) { return Some(res); } }
+                    if !param.initializer.is_none() { if let Some(res) = f(self, param.initializer) { return Some(res); } }
+                }
+            }
+            k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                if let Some(prop) = self.arena.get_property_decl(node) {
+                    if let Some(res) = f(self, prop.name) { return Some(res); }
+                    if !prop.type_annotation.is_none() { if let Some(res) = f(self, prop.type_annotation) { return Some(res); } }
+                    if !prop.initializer.is_none() { if let Some(res) = f(self, prop.initializer) { return Some(res); } }
+                }
+            }
+            k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                if let Some(accessor) = self.arena.get_accessor(node) {
+                    if let Some(res) = f(self, accessor.name) { return Some(res); }
+                    if let Some(ref type_params) = accessor.type_parameters {
+                        for &param in &type_params.nodes {
+                            if let Some(res) = f(self, param) { return Some(res); }
+                        }
+                    }
+                    for &param in &accessor.parameters.nodes {
+                        if let Some(res) = f(self, param) { return Some(res); }
+                    }
+                    if !accessor.type_annotation.is_none() { if let Some(res) = f(self, accessor.type_annotation) { return Some(res); } }
+                    if !accessor.body.is_none() { if let Some(res) = f(self, accessor.body) { return Some(res); } }
                 }
             }
 
             k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
                 if let Some(iface) = self.arena.get_interface(node) {
                     if !iface.name.is_none() { if let Some(res) = f(self, iface.name) { return Some(res); } }
+                    if let Some(ref type_params) = iface.type_parameters {
+                        for &param in &type_params.nodes {
+                            if let Some(res) = f(self, param) { return Some(res); }
+                        }
+                    }
+                    if let Some(ref heritage) = iface.heritage_clauses {
+                        for &clause in &heritage.nodes {
+                            if let Some(res) = f(self, clause) { return Some(res); }
+                        }
+                    }
                     for &member in &iface.members.nodes {
                         if let Some(res) = f(self, member) { return Some(res); }
                     }
@@ -203,6 +269,11 @@ impl<'a> ScopeWalker<'a> {
             k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
                 if let Some(alias) = self.arena.get_type_alias(node) {
                     if !alias.name.is_none() { if let Some(res) = f(self, alias.name) { return Some(res); } }
+                    if let Some(ref type_params) = alias.type_parameters {
+                        for &param in &type_params.nodes {
+                            if let Some(res) = f(self, param) { return Some(res); }
+                        }
+                    }
                     if !alias.type_node.is_none() { if let Some(res) = f(self, alias.type_node) { return Some(res); } }
                 }
             }
@@ -289,6 +360,19 @@ impl<'a> ScopeWalker<'a> {
                     }
                 }
             }
+            k if k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION => {
+                if node.has_data() {
+                    if let Some(tagged) = self.arena.tagged_templates.get(node.data_index as usize) {
+                        if let Some(res) = f(self, tagged.tag) { return Some(res); }
+                        if let Some(ref type_args) = tagged.type_arguments {
+                            for &arg in &type_args.nodes {
+                                if let Some(res) = f(self, arg) { return Some(res); }
+                            }
+                        }
+                        if let Some(res) = f(self, tagged.template) { return Some(res); }
+                    }
+                }
+            }
             k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
                 if let Some(access) = self.arena.get_access_expr(node) {
                     if let Some(res) = f(self, access.expression) { return Some(res); }
@@ -298,6 +382,18 @@ impl<'a> ScopeWalker<'a> {
             k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
                 if let Some(paren) = self.arena.get_parenthesized(node) {
                     if let Some(res) = f(self, paren.expression) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_ASSERTION
+                || k == syntax_kind_ext::AS_EXPRESSION
+                || k == syntax_kind_ext::SATISFIES_EXPRESSION => {
+                if node.has_data() {
+                    if let Some(assertion) = self.arena.type_assertions.get(node.data_index as usize) {
+                        if let Some(res) = f(self, assertion.expression) { return Some(res); }
+                        if !assertion.type_node.is_none() {
+                            if let Some(res) = f(self, assertion.type_node) { return Some(res); }
+                        }
+                    }
                 }
             }
             k if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION || k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION => {
@@ -311,6 +407,11 @@ impl<'a> ScopeWalker<'a> {
                 if let Some(prop) = self.arena.get_property_assignment(node) {
                     if let Some(res) = f(self, prop.name) { return Some(res); }
                     if let Some(res) = f(self, prop.initializer) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::COMPUTED_PROPERTY_NAME => {
+                if let Some(computed) = self.arena.get_computed_property(node) {
+                    if let Some(res) = f(self, computed.expression) { return Some(res); }
                 }
             }
             k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
@@ -407,6 +508,15 @@ impl<'a> ScopeWalker<'a> {
                     if let Some(res) = f(self, unary.operand) { return Some(res); }
                 }
             }
+            k if k == syntax_kind_ext::AWAIT_EXPRESSION
+                || k == syntax_kind_ext::YIELD_EXPRESSION
+                || k == syntax_kind_ext::NON_NULL_EXPRESSION => {
+                if node.has_data() {
+                    if let Some(unary) = self.arena.unary_exprs_ex.get(node.data_index as usize) {
+                        if let Some(res) = f(self, unary.expression) { return Some(res); }
+                    }
+                }
+            }
             k if k == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT => {
                 if let Some(prop) = self.arena.get_shorthand_property(node) {
                     if let Some(res) = f(self, prop.name) { return Some(res); }
@@ -418,6 +528,208 @@ impl<'a> ScopeWalker<'a> {
             k if k == syntax_kind_ext::SPREAD_ELEMENT || k == syntax_kind_ext::SPREAD_ASSIGNMENT => {
                 if let Some(spread) = self.arena.get_spread(node) {
                     if let Some(res) = f(self, spread.expression) { return Some(res); }
+                }
+            }
+
+            // --- Types ---
+            k if k == syntax_kind_ext::HERITAGE_CLAUSE => {
+                if let Some(heritage) = self.arena.get_heritage_clause(node) {
+                    for &ty in &heritage.types.nodes {
+                        if let Some(res) = f(self, ty) { return Some(res); }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::EXPRESSION_WITH_TYPE_ARGUMENTS => {
+                if let Some(expr) = self.arena.get_expr_type_args(node) {
+                    if let Some(res) = f(self, expr.expression) { return Some(res); }
+                    if let Some(ref type_args) = expr.type_arguments {
+                        for &arg in &type_args.nodes {
+                            if let Some(res) = f(self, arg) { return Some(res); }
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_REFERENCE => {
+                if let Some(type_ref) = self.arena.get_type_ref(node) {
+                    if let Some(res) = f(self, type_ref.type_name) { return Some(res); }
+                    if let Some(ref type_args) = type_ref.type_arguments {
+                        for &arg in &type_args.nodes {
+                            if let Some(res) = f(self, arg) { return Some(res); }
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::QUALIFIED_NAME => {
+                if let Some(qualified) = self.arena.get_qualified_name(node) {
+                    if let Some(res) = f(self, qualified.left) { return Some(res); }
+                    if let Some(res) = f(self, qualified.right) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_QUERY => {
+                if let Some(query) = self.arena.get_type_query(node) {
+                    if let Some(res) = f(self, query.expr_name) { return Some(res); }
+                    if let Some(ref type_args) = query.type_arguments {
+                        for &arg in &type_args.nodes {
+                            if let Some(res) = f(self, arg) { return Some(res); }
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_OPERATOR => {
+                if let Some(op) = self.arena.get_type_operator(node) {
+                    if let Some(res) = f(self, op.type_node) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_PREDICATE => {
+                if let Some(pred) = self.arena.get_type_predicate(node) {
+                    if let Some(res) = f(self, pred.parameter_name) { return Some(res); }
+                    if !pred.type_node.is_none() {
+                        if let Some(res) = f(self, pred.type_node) { return Some(res); }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_PARAMETER => {
+                if let Some(param) = self.arena.get_type_parameter(node) {
+                    if let Some(res) = f(self, param.name) { return Some(res); }
+                    if !param.constraint.is_none() {
+                        if let Some(res) = f(self, param.constraint) { return Some(res); }
+                    }
+                    if !param.default.is_none() {
+                        if let Some(res) = f(self, param.default) { return Some(res); }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::FUNCTION_TYPE || k == syntax_kind_ext::CONSTRUCTOR_TYPE => {
+                if let Some(func_type) = self.arena.get_function_type(node) {
+                    if let Some(ref type_params) = func_type.type_parameters {
+                        for &param in &type_params.nodes {
+                            if let Some(res) = f(self, param) { return Some(res); }
+                        }
+                    }
+                    for &param in &func_type.parameters.nodes {
+                        if let Some(res) = f(self, param) { return Some(res); }
+                    }
+                    if !func_type.type_annotation.is_none() { if let Some(res) = f(self, func_type.type_annotation) { return Some(res); } }
+                }
+            }
+            k if k == syntax_kind_ext::TYPE_LITERAL => {
+                if let Some(literal) = self.arena.get_type_literal(node) {
+                    for &member in &literal.members.nodes {
+                        if let Some(res) = f(self, member) { return Some(res); }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::PROPERTY_SIGNATURE
+                || k == syntax_kind_ext::METHOD_SIGNATURE
+                || k == syntax_kind_ext::CALL_SIGNATURE
+                || k == syntax_kind_ext::CONSTRUCT_SIGNATURE => {
+                if let Some(sig) = self.arena.get_signature(node) {
+                    if !sig.name.is_none() { if let Some(res) = f(self, sig.name) { return Some(res); } }
+                    if let Some(ref type_params) = sig.type_parameters {
+                        for &param in &type_params.nodes {
+                            if let Some(res) = f(self, param) { return Some(res); }
+                        }
+                    }
+                    if let Some(ref params) = sig.parameters {
+                        for &param in &params.nodes {
+                            if let Some(res) = f(self, param) { return Some(res); }
+                        }
+                    }
+                    if !sig.type_annotation.is_none() { if let Some(res) = f(self, sig.type_annotation) { return Some(res); } }
+                }
+            }
+            k if k == syntax_kind_ext::INDEX_SIGNATURE => {
+                if let Some(sig) = self.arena.get_index_signature(node) {
+                    for &param in &sig.parameters.nodes {
+                        if let Some(res) = f(self, param) { return Some(res); }
+                    }
+                    if !sig.type_annotation.is_none() { if let Some(res) = f(self, sig.type_annotation) { return Some(res); } }
+                }
+            }
+            k if k == syntax_kind_ext::ARRAY_TYPE => {
+                if let Some(array) = self.arena.get_array_type(node) {
+                    if let Some(res) = f(self, array.element_type) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::TUPLE_TYPE => {
+                if let Some(tuple) = self.arena.get_tuple_type(node) {
+                    for &elem in &tuple.elements.nodes {
+                        if let Some(res) = f(self, elem) { return Some(res); }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::NAMED_TUPLE_MEMBER => {
+                if let Some(member) = self.arena.get_named_tuple_member(node) {
+                    if let Some(res) = f(self, member.name) { return Some(res); }
+                    if let Some(res) = f(self, member.type_node) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::UNION_TYPE || k == syntax_kind_ext::INTERSECTION_TYPE => {
+                if let Some(comp) = self.arena.get_composite_type(node) {
+                    for &ty in &comp.types.nodes {
+                        if let Some(res) = f(self, ty) { return Some(res); }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::CONDITIONAL_TYPE => {
+                if let Some(cond) = self.arena.get_conditional_type(node) {
+                    if let Some(res) = f(self, cond.check_type) { return Some(res); }
+                    if let Some(res) = f(self, cond.extends_type) { return Some(res); }
+                    if let Some(res) = f(self, cond.true_type) { return Some(res); }
+                    if let Some(res) = f(self, cond.false_type) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::PARENTHESIZED_TYPE
+                || k == syntax_kind_ext::OPTIONAL_TYPE
+                || k == syntax_kind_ext::REST_TYPE => {
+                if let Some(wrapped) = self.arena.get_wrapped_type(node) {
+                    if let Some(res) = f(self, wrapped.type_node) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::INFER_TYPE => {
+                if let Some(infer) = self.arena.get_infer_type(node) {
+                    if let Some(res) = f(self, infer.type_parameter) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::INDEXED_ACCESS_TYPE => {
+                if let Some(indexed) = self.arena.get_indexed_access_type(node) {
+                    if let Some(res) = f(self, indexed.object_type) { return Some(res); }
+                    if let Some(res) = f(self, indexed.index_type) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::MAPPED_TYPE => {
+                if let Some(mapped) = self.arena.get_mapped_type(node) {
+                    if let Some(res) = f(self, mapped.type_parameter) { return Some(res); }
+                    if !mapped.name_type.is_none() {
+                        if let Some(res) = f(self, mapped.name_type) { return Some(res); }
+                    }
+                    if !mapped.type_node.is_none() {
+                        if let Some(res) = f(self, mapped.type_node) { return Some(res); }
+                    }
+                    if let Some(ref members) = mapped.members {
+                        for &member in &members.nodes {
+                            if let Some(res) = f(self, member) { return Some(res); }
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::LITERAL_TYPE => {
+                if let Some(lit) = self.arena.get_literal_type(node) {
+                    if let Some(res) = f(self, lit.literal) { return Some(res); }
+                }
+            }
+            k if k == syntax_kind_ext::TEMPLATE_LITERAL_TYPE => {
+                if let Some(template) = self.arena.get_template_literal_type(node) {
+                    if let Some(res) = f(self, template.head) { return Some(res); }
+                    for &span in &template.template_spans.nodes {
+                        if let Some(res) = f(self, span) { return Some(res); }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TEMPLATE_LITERAL_TYPE_SPAN => {
+                if let Some(span) = self.arena.get_template_span(node) {
+                    if let Some(res) = f(self, span.expression) { return Some(res); }
+                    if let Some(res) = f(self, span.literal) { return Some(res); }
                 }
             }
 

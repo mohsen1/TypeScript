@@ -282,4 +282,73 @@ mod references_tests {
         let refs = references.unwrap();
         assert!(refs.len() >= 2, "Should find declaration and JSX usage");
     }
+
+    #[test]
+    fn test_find_references_await_expression() {
+        let source = "const value = 1;\nasync function run() {\n  await value;\n}";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let line_map = LineMap::build(source);
+
+        // Position at the 'value' inside await (line 2)
+        let position = Position::new(2, 8);
+
+        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let references = find_refs.find_references(root, position);
+
+        assert!(references.is_some(), "Should find references in await expression");
+        let refs = references.unwrap();
+        assert!(refs.len() >= 2, "Should find declaration and await usage");
+    }
+
+    #[test]
+    fn test_find_references_tagged_template_expression() {
+        let source = "const tag = (strings: TemplateStringsArray) => strings[0];\nconst msg = tag`hello`;";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let line_map = LineMap::build(source);
+
+        // Position at the 'tag' inside tagged template (line 1)
+        let position = Position::new(1, 16);
+
+        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let references = find_refs.find_references(root, position);
+
+        assert!(references.is_some(), "Should find references in tagged template");
+        let refs = references.unwrap();
+        assert!(refs.len() >= 2, "Should find declaration and tagged template usage");
+    }
+
+    #[test]
+    fn test_find_references_as_expression() {
+        let source = "const value = 1;\nconst result = value as number;";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let line_map = LineMap::build(source);
+
+        // Position at the 'value' inside the as-expression (line 1)
+        let position = Position::new(1, 15);
+
+        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let references = find_refs.find_references(root, position);
+
+        assert!(references.is_some(), "Should find references in as expression");
+        let refs = references.unwrap();
+        assert!(refs.len() >= 2, "Should find declaration and as-expression usage");
+    }
 }
