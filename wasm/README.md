@@ -10,9 +10,9 @@ engine on top to match TypeScript behavior while preserving correctness where po
 Last updated: 2026-01-07
 
 - Overall: Migration is active; Rust/WASM compiler is under construction and not production-ready.
-- Tracks: Checker, solver, emitter, CLI, and LSP work are in parallel with plan-driven execution.
-- Risk: Parity and performance targets are still in flight; regressions must be guarded by tests.
-- Next focus: Close remaining semantic gaps, grow test coverage, and tighten perf baselines.
+- Tracks: Emitter optimizations landed (fewer name clones) with new tests; solver is stabilizing its POD TypeKey + interner; CLI incremental and tsconfig gaps remain.
+- Risk: LSP signature help still lacks JSDoc extraction; several parser/arena TODOs remain; CLI incremental invalidation and map outputs are incomplete.
+- Next focus: Remove obvious emitter hot-path overheads, finish CLI incremental invalidation and map outputs, and close LSP JSDoc + parser TODOs.
 
 ## Status
 This project is not ready for general use yet. The interface and distribution are in progress.
