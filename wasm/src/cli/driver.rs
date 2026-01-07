@@ -16,6 +16,7 @@ use crate::cli::config::{
 use crate::cli::fs::{discover_ts_files, is_ts_file, FileDiscoveryOptions};
 use crate::declaration_emitter::DeclarationEmitter;
 use crate::parallel::{self, BindResult, BoundFile, MergedProgram};
+use crate::parser::syntax_kind_ext;
 use crate::parser::thin_node::{NodeAccess, ThinNodeArena};
 use crate::parser::NodeIndex;
 use crate::thin_parser::ThinParserState;
@@ -23,7 +24,7 @@ use crate::thin_parser::ParseDiagnostic;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
 use crate::thin_emitter::{ModuleKind, ThinPrinter};
-use crate::solver::TypeFormatter;
+use crate::solver::{TypeFormatter, TypeId};
 use rustc_hash::FxHasher;
 
 #[derive(Debug, Clone)]
@@ -1388,6 +1389,33 @@ fn collect_export_signatures(
             }
 
             if export_decl.module_specifier.is_none() {
+                if !export_decl.export_clause.is_none() {
+                    let clause_node = export_decl.export_clause;
+                    let clause_node_ref = arena.get(clause_node);
+                    if clause_node_ref
+                        .and_then(|node| arena.get_named_imports(node))
+                        .is_some()
+                    {
+                        collect_local_named_export_signatures(
+                            arena,
+                            file.source_file,
+                            clause_node,
+                            checker,
+                            formatter,
+                            export_type_prefix(export_decl.is_type_only),
+                            signatures,
+                        );
+                    } else {
+                        collect_exported_declaration_signatures(
+                            arena,
+                            clause_node,
+                            checker,
+                            formatter,
+                            export_type_prefix(export_decl.is_type_only),
+                            signatures,
+                        );
+                    }
+                }
                 continue;
             }
 
@@ -1450,6 +1478,348 @@ fn collect_export_signatures(
             }
         }
     }
+}
+
+fn collect_local_named_export_signatures(
+    arena: &ThinNodeArena,
+    source_file: NodeIndex,
+    named_idx: NodeIndex,
+    checker: &mut ThinCheckerState,
+    formatter: &mut TypeFormatter,
+    type_prefix: &str,
+    signatures: &mut Vec<String>,
+) {
+    let Some(named_node) = arena.get(named_idx) else {
+        return;
+    };
+    let Some(named) = arena.get_named_imports(named_node) else {
+        return;
+    };
+
+    for &spec_idx in &named.elements.nodes {
+        let Some(spec_node) = arena.get(spec_idx) else {
+            continue;
+        };
+        let Some(spec) = arena.get_specifier(spec_node) else {
+            continue;
+        };
+        let exported_name = if !spec.name.is_none() {
+            arena.get_identifier_text(spec.name).unwrap_or("")
+        } else {
+            arena.get_identifier_text(spec.property_name).unwrap_or("")
+        };
+        if exported_name.is_empty() {
+            continue;
+        }
+        let local_name = if !spec.property_name.is_none() {
+            arena.get_identifier_text(spec.property_name).unwrap_or("")
+        } else {
+            exported_name
+        };
+        let type_id = find_local_declaration(arena, source_file, local_name)
+            .map(|decl_idx| checker.get_type_of_node(decl_idx))
+            .unwrap_or(TypeId::ANY);
+        let type_str = formatter.format(type_id);
+        signatures.push(format!("{type_prefix}{exported_name}:{type_str}"));
+    }
+}
+
+fn collect_exported_declaration_signatures(
+    arena: &ThinNodeArena,
+    decl_idx: NodeIndex,
+    checker: &mut ThinCheckerState,
+    formatter: &mut TypeFormatter,
+    type_prefix: &str,
+    signatures: &mut Vec<String>,
+) {
+    let Some(node) = arena.get(decl_idx) else {
+        return;
+    };
+
+    if node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
+        if let Some(var_stmt) = arena.get_variable(node) {
+            for &list_idx in &var_stmt.declarations.nodes {
+                collect_exported_declaration_signatures(
+                    arena,
+                    list_idx,
+                    checker,
+                    formatter,
+                    type_prefix,
+                    signatures,
+                );
+            }
+        }
+        return;
+    }
+
+    if node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+        if let Some(list) = arena.get_variable(node) {
+            for &decl_idx in &list.declarations.nodes {
+                collect_exported_declaration_signatures(
+                    arena,
+                    decl_idx,
+                    checker,
+                    formatter,
+                    type_prefix,
+                    signatures,
+                );
+            }
+        }
+        return;
+    }
+
+    if let Some(var_decl) = arena.get_variable_declaration(node) {
+        if let Some(name) = arena.get_identifier_text(var_decl.name) {
+            push_exported_signature(
+                name,
+                decl_idx,
+                checker,
+                formatter,
+                type_prefix,
+                signatures,
+            );
+        }
+        return;
+    }
+
+    if let Some(func) = arena.get_function(node) {
+        if let Some(name) = arena.get_identifier_text(func.name) {
+            push_exported_signature(
+                name,
+                decl_idx,
+                checker,
+                formatter,
+                type_prefix,
+                signatures,
+            );
+        }
+        return;
+    }
+
+    if let Some(class) = arena.get_class(node) {
+        if let Some(name) = arena.get_identifier_text(class.name) {
+            push_exported_signature(
+                name,
+                decl_idx,
+                checker,
+                formatter,
+                type_prefix,
+                signatures,
+            );
+        }
+        return;
+    }
+
+    if let Some(interface) = arena.get_interface(node) {
+        if let Some(name) = arena.get_identifier_text(interface.name) {
+            push_exported_signature(
+                name,
+                decl_idx,
+                checker,
+                formatter,
+                type_prefix,
+                signatures,
+            );
+        }
+        return;
+    }
+
+    if let Some(type_alias) = arena.get_type_alias(node) {
+        if let Some(name) = arena.get_identifier_text(type_alias.name) {
+            push_exported_signature(
+                name,
+                decl_idx,
+                checker,
+                formatter,
+                type_prefix,
+                signatures,
+            );
+        }
+        return;
+    }
+
+    if let Some(enum_decl) = arena.get_enum(node) {
+        if let Some(name) = arena.get_identifier_text(enum_decl.name) {
+            push_exported_signature(
+                name,
+                decl_idx,
+                checker,
+                formatter,
+                type_prefix,
+                signatures,
+            );
+        }
+        return;
+    }
+
+    if let Some(module_decl) = arena.get_module(node) {
+        let name = arena
+            .get_identifier_text(module_decl.name)
+            .or_else(|| arena.get_literal_text(module_decl.name));
+        if let Some(name) = name {
+            push_exported_signature(
+                name,
+                decl_idx,
+                checker,
+                formatter,
+                type_prefix,
+                signatures,
+            );
+        }
+    }
+}
+
+fn push_exported_signature(
+    name: &str,
+    decl_idx: NodeIndex,
+    checker: &mut ThinCheckerState,
+    formatter: &mut TypeFormatter,
+    type_prefix: &str,
+    signatures: &mut Vec<String>,
+) {
+    let type_id = checker.get_type_of_node(decl_idx);
+    let type_str = formatter.format(type_id);
+    signatures.push(format!("{type_prefix}{name}:{type_str}"));
+}
+
+fn find_local_declaration(
+    arena: &ThinNodeArena,
+    source_file: NodeIndex,
+    name: &str,
+) -> Option<NodeIndex> {
+    let Some(node) = arena.get(source_file) else {
+        return None;
+    };
+    let Some(source) = arena.get_source_file(node) else {
+        return None;
+    };
+
+    for &stmt_idx in &source.statements.nodes {
+        let Some(stmt) = arena.get(stmt_idx) else {
+            continue;
+        };
+        if let Some(export_decl) = arena.get_export_decl(stmt) {
+            if export_decl.export_clause.is_none() {
+                continue;
+            }
+            let clause_idx = export_decl.export_clause;
+            let Some(clause_node) = arena.get(clause_idx) else {
+                continue;
+            };
+            if arena.get_named_imports(clause_node).is_some() {
+                continue;
+            }
+            if let Some(found) = find_local_declaration_in_node(arena, clause_idx, name) {
+                return Some(found);
+            }
+            continue;
+        }
+
+        if let Some(found) = find_local_declaration_in_node(arena, stmt_idx, name) {
+            return Some(found);
+        }
+    }
+
+    None
+}
+
+fn find_local_declaration_in_node(
+    arena: &ThinNodeArena,
+    node_idx: NodeIndex,
+    name: &str,
+) -> Option<NodeIndex> {
+    let Some(node) = arena.get(node_idx) else {
+        return None;
+    };
+
+    if let Some(var_decl) = arena.get_variable_declaration(node) {
+        if let Some(decl_name) = arena.get_identifier_text(var_decl.name) {
+            if decl_name == name {
+                return Some(node_idx);
+            }
+        }
+        return None;
+    }
+
+    if node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
+        if let Some(var_stmt) = arena.get_variable(node) {
+            for &list_idx in &var_stmt.declarations.nodes {
+                if let Some(found) = find_local_declaration_in_node(arena, list_idx, name) {
+                    return Some(found);
+                }
+            }
+        }
+        return None;
+    }
+
+    if node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+        if let Some(list) = arena.get_variable(node) {
+            for &decl_idx in &list.declarations.nodes {
+                if let Some(found) = find_local_declaration_in_node(arena, decl_idx, name) {
+                    return Some(found);
+                }
+            }
+        }
+        return None;
+    }
+
+    if let Some(func) = arena.get_function(node) {
+        if let Some(decl_name) = arena.get_identifier_text(func.name) {
+            if decl_name == name {
+                return Some(node_idx);
+            }
+        }
+        return None;
+    }
+
+    if let Some(class) = arena.get_class(node) {
+        if let Some(decl_name) = arena.get_identifier_text(class.name) {
+            if decl_name == name {
+                return Some(node_idx);
+            }
+        }
+        return None;
+    }
+
+    if let Some(interface) = arena.get_interface(node) {
+        if let Some(decl_name) = arena.get_identifier_text(interface.name) {
+            if decl_name == name {
+                return Some(node_idx);
+            }
+        }
+        return None;
+    }
+
+    if let Some(type_alias) = arena.get_type_alias(node) {
+        if let Some(decl_name) = arena.get_identifier_text(type_alias.name) {
+            if decl_name == name {
+                return Some(node_idx);
+            }
+        }
+        return None;
+    }
+
+    if let Some(enum_decl) = arena.get_enum(node) {
+        if let Some(decl_name) = arena.get_identifier_text(enum_decl.name) {
+            if decl_name == name {
+                return Some(node_idx);
+            }
+        }
+        return None;
+    }
+
+    if let Some(module_decl) = arena.get_module(node) {
+        let decl_name = arena
+            .get_identifier_text(module_decl.name)
+            .or_else(|| arena.get_literal_text(module_decl.name));
+        if let Some(decl_name) = decl_name {
+            if decl_name == name {
+                return Some(node_idx);
+            }
+        }
+    }
+
+    None
 }
 
 fn export_default_signature(

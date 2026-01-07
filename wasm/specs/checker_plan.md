@@ -36,6 +36,10 @@ Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (in
 - [x] Resolve namespace value member access
   - Allow `Namespace.value` and nested namespace value chains.
   - Add tests for property access via namespaces and import-equals aliases.
+- [x] Add discriminant + literal equality narrowing in control flow
+  - Handle property/element access discriminants and direct literal checks.
+  - Support loose nullish equality (`==` / `!=`) narrowing.
+- [x] Add control-flow tests for discriminant, literal equality, and loose nullish checks
 
 ## Baseline / Validation
 - `./wasm/test.sh`
