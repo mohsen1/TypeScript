@@ -10,6 +10,7 @@ engine on top to match TypeScript behavior while preserving correctness where po
 
 > This is a very high level project direction coming from project's manager's boss.
 
+**I want to see you using all tracks of development aggressively. no track should sit idle**
 
 The system has a "Ferrari engine" (ThinNode AST + Parallel Binder) but needs a finished transmission (Solver integration).
 
