@@ -32,7 +32,8 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
   - [x] Resolve relative + baseUrl/paths imports with TS extension inference.
   - [x] Resolve bare specifiers via node_modules package.json entries + index fallback.
   - [x] Support exports subpath mapping + basic condition selection (types/import/require/default).
-  - [ ] Expand exports conditions (node/browser) + moduleResolution-specific ordering.
+  - [x] Expand exports conditions (node/browser) + moduleResolution-specific ordering.
+  - [ ] Honor package.json `type` + Node16/NodeNext extension rules.
 - [ ] Benchmark harness
   - Script for `tsz` vs `tsc` on large repos with timing + memory stats.
 

@@ -330,3 +330,54 @@ fn compile_resolves_node_modules_exports_subpath() {
         .any(|diag| diag.file.contains("node_modules/pkg/types/feature/widget.d.ts")));
     assert!(!base.join("dist/src/index.js").is_file());
 }
+
+#[test]
+fn compile_prefers_browser_exports_for_bundler() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "moduleResolution": "bundler",
+            "noEmitOnError": true
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { widget } from 'pkg'; export { widget };",
+    );
+    write_file(
+        &base.join("node_modules/pkg/package.json"),
+        r#"{
+          "exports": {
+            ".": {
+              "browser": "./browser.d.ts",
+              "node": "./node.d.ts"
+            }
+          }
+        }"#,
+    );
+    write_file(
+        &base.join("node_modules/pkg/browser.d.ts"),
+        "export const widget = ;",
+    );
+    write_file(
+        &base.join("node_modules/pkg/node.d.ts"),
+        "export const widget = 1;",
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("node_modules/pkg/browser.d.ts")));
+    assert!(!base.join("dist/src/index.js").is_file());
+}
