@@ -235,6 +235,21 @@ fn test_narrow_by_typeof_literal() {
     assert_eq!(narrowed, hello);
 }
 
+#[test]
+fn test_narrow_by_typeof_template_literal() {
+    let interner = TypeInterner::new();
+
+    let template = interner.intern(TypeKey::TemplateLiteral(vec![
+        TemplateSpan::Text(interner.intern_string("prefix")),
+        TemplateSpan::Type(TypeId::STRING),
+        TemplateSpan::Text(interner.intern_string("suffix")),
+    ]));
+    let union = interner.union(vec![template, TypeId::NUMBER]);
+
+    let narrowed = narrow_by_typeof(&interner, union, "string");
+    assert_eq!(narrowed, template);
+}
+
 // =============================================================================
 // General Narrowing Tests
 // =============================================================================

@@ -341,6 +341,12 @@ impl<'a> NarrowingContext<'a> {
             }
         }
 
+        if target == TypeId::STRING {
+            if matches!(self.interner.lookup(source), Some(TypeKey::TemplateLiteral(_))) {
+                return true;
+            }
+        }
+
         // null/undefined to object (for typeof "object" narrowing)
         if source == TypeId::NULL && target == TypeId::OBJECT {
             return true;

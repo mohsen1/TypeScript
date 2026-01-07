@@ -301,7 +301,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 
 ### Phase 57: Template Literal String-Like Behavior
 - [x] Treat template literal types as string-like for property access and apparent members
-- [x] Tests for template literal property access, keyof, and Object-interface assignability
+- [x] Tests for template literal property access, index access, keyof, and Object-interface assignability
+
+### Phase 58: Template Literal Narrowing
+- [x] Treat template literal types as string-like for narrowing
+- [x] Tests for typeof narrowing with template literal types
 
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
