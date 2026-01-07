@@ -218,6 +218,9 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Use type parameter constraints when evaluating keyof
 - [x] Tests for constrained/unconstrained type parameter keyof
 
+### Phase 37: Apparent String Index Assignability
+- [x] Allow apparent string number index to satisfy mutable number index targets
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

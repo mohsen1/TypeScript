@@ -795,7 +795,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             Some(IndexSignature {
                 key_type: TypeId::NUMBER,
                 value_type: TypeId::STRING,
-                readonly: true,
+                // Keep string index signature assignable to mutable targets for TS compat.
+                readonly: false,
             })
         } else {
             None
