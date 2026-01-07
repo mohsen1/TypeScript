@@ -455,32 +455,12 @@ impl<'a> InferenceContext<'a> {
     /// 3. Validate against upper bounds
     /// 4. If no lower bounds, use the constraint (upper bound) or default
     pub fn resolve_with_constraints(&mut self, var: InferenceVar) -> Result<TypeId, InferenceError> {
-        let root = self.table.find(var);
-
         // Check if already resolved
         if let Some(ty) = self.probe(var) {
             return Ok(ty);
         }
 
-        // Get constraints
-        let constraints = self.constraints[root.0 as usize].clone();
-        let upper_bounds = constraints.upper_bounds.clone();
-
-        // Compute result from constraints
-        let result = if !constraints.lower_bounds.is_empty() {
-            // Best common type: union of all lower bounds
-            self.best_common_type(&constraints.lower_bounds)
-        } else if !constraints.upper_bounds.is_empty() {
-            // No lower bounds, use intersection of upper bounds
-            if constraints.upper_bounds.len() == 1 {
-                constraints.upper_bounds[0]
-            } else {
-                self.interner.intersection(constraints.upper_bounds)
-            }
-        } else {
-            // No constraints at all - return unknown
-            TypeId::UNKNOWN
-        };
+        let (root, result, upper_bounds) = self.compute_constraint_result(var);
 
         // Validate against upper bounds
         for &upper in &upper_bounds {
@@ -501,6 +481,65 @@ impl<'a> InferenceContext<'a> {
         self.table.union_value(root, InferenceValue(Some(result)));
 
         Ok(result)
+    }
+
+    /// Resolve an inference variable using its collected constraints and a custom
+    /// assignability check for upper-bound validation.
+    pub fn resolve_with_constraints_by<F>(
+        &mut self,
+        var: InferenceVar,
+        mut is_subtype: F,
+    ) -> Result<TypeId, InferenceError>
+    where
+        F: FnMut(TypeId, TypeId) -> bool,
+    {
+        // Check if already resolved
+        if let Some(ty) = self.probe(var) {
+            return Ok(ty);
+        }
+
+        let (root, result, upper_bounds) = self.compute_constraint_result(var);
+
+        for &upper in &upper_bounds {
+            if !is_subtype(result, upper) {
+                return Err(InferenceError::BoundsViolation {
+                    var,
+                    lower: result,
+                    upper,
+                });
+            }
+        }
+
+        if self.occurs_in(root, result) {
+            return Err(InferenceError::OccursCheck { var: root, ty: result });
+        }
+
+        self.table.union_value(root, InferenceValue(Some(result)));
+
+        Ok(result)
+    }
+
+    fn compute_constraint_result(&mut self, var: InferenceVar) -> (InferenceVar, TypeId, Vec<TypeId>) {
+        let root = self.table.find(var);
+        let constraints = self.constraints[root.0 as usize].clone();
+        let upper_bounds = constraints.upper_bounds.clone();
+
+        let result = if !constraints.lower_bounds.is_empty() {
+            // Best common type: union of all lower bounds
+            self.best_common_type(&constraints.lower_bounds)
+        } else if !constraints.upper_bounds.is_empty() {
+            // No lower bounds, use intersection of upper bounds
+            if constraints.upper_bounds.len() == 1 {
+                constraints.upper_bounds[0]
+            } else {
+                self.interner.intersection(constraints.upper_bounds)
+            }
+        } else {
+            // No constraints at all - return unknown
+            TypeId::UNKNOWN
+        };
+
+        (root, result, upper_bounds)
     }
 
     /// Resolve all type parameters using constraints.

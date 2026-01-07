@@ -227,7 +227,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 .map_or(false, |c| !c.is_empty());
 
             let ty = if has_constraints {
-                match infer_ctx.resolve_with_constraints(var) {
+                match infer_ctx.resolve_with_constraints_by(var, |source, target| {
+                    self.checker.is_assignable_to(source, target)
+                }) {
                     Ok(ty) => ty,
                     Err(_) => return CallResult::Success(TypeId::ANY),
                 }
