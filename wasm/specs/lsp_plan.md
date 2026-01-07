@@ -61,6 +61,7 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Resolve class names within class scopes
    - [x] Bind class expressions in initializers for local resolution
    - [x] Find references for class names in class scopes/expressions
+   - [x] Bind nested function/class expressions inside complex initializers
    - [x] Add import/export handling for cross-file navigation
 
 3. **Multi-File Support**

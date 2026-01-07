@@ -549,6 +549,131 @@ impl ThinBinderState {
                 }
             }
 
+            // Return/throw statements - traverse into the expression
+            k if k == syntax_kind_ext::RETURN_STATEMENT || k == syntax_kind_ext::THROW_STATEMENT => {
+                if let Some(ret) = arena.get_return_statement(node) {
+                    if !ret.expression.is_none() {
+                        self.bind_node(arena, ret.expression);
+                    }
+                }
+            }
+
+            // Binary expressions - traverse into operands
+            k if k == syntax_kind_ext::BINARY_EXPRESSION => {
+                if let Some(bin) = arena.get_binary_expr(node) {
+                    self.bind_node(arena, bin.left);
+                    self.bind_node(arena, bin.right);
+                }
+            }
+
+            // Conditional expressions - traverse into branches
+            k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
+                if let Some(cond) = arena.get_conditional_expr(node) {
+                    self.bind_node(arena, cond.condition);
+                    self.bind_node(arena, cond.when_true);
+                    self.bind_node(arena, cond.when_false);
+                }
+            }
+
+            // Property access / element access
+            k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+                || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
+                if let Some(access) = arena.get_access_expr(node) {
+                    self.bind_node(arena, access.expression);
+                    self.bind_node(arena, access.name_or_argument);
+                }
+            }
+
+            // Prefix/postfix unary expressions
+            k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
+                || k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION => {
+                if let Some(unary) = arena.get_unary_expr(node) {
+                    self.bind_node(arena, unary.operand);
+                }
+            }
+
+            // Await/yield expressions
+            k if k == syntax_kind_ext::AWAIT_EXPRESSION
+                || k == syntax_kind_ext::YIELD_EXPRESSION => {
+                if node.has_data() {
+                    if let Some(unary) = arena.unary_exprs_ex.get(node.data_index as usize) {
+                        self.bind_node(arena, unary.expression);
+                    }
+                }
+            }
+
+            // Type assertions / as / satisfies
+            k if k == syntax_kind_ext::TYPE_ASSERTION
+                || k == syntax_kind_ext::AS_EXPRESSION
+                || k == syntax_kind_ext::SATISFIES_EXPRESSION => {
+                if node.has_data() {
+                    if let Some(assertion) = arena.type_assertions.get(node.data_index as usize) {
+                        self.bind_node(arena, assertion.expression);
+                    }
+                }
+            }
+
+            // Tagged templates
+            k if k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION => {
+                if node.has_data() {
+                    if let Some(tagged) = arena.tagged_templates.get(node.data_index as usize) {
+                        self.bind_node(arena, tagged.tag);
+                        self.bind_node(arena, tagged.template);
+                    }
+                }
+            }
+
+            // Template expressions
+            k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
+                if let Some(template) = arena.get_template_expr(node) {
+                    self.bind_node(arena, template.head);
+                    for &span in &template.template_spans.nodes {
+                        self.bind_node(arena, span);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::TEMPLATE_SPAN => {
+                if let Some(span) = arena.get_template_span(node) {
+                    self.bind_node(arena, span.expression);
+                    self.bind_node(arena, span.literal);
+                }
+            }
+
+            // Object/array literals
+            k if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION
+                || k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION => {
+                if let Some(lit) = arena.get_literal_expr(node) {
+                    for &elem in &lit.elements.nodes {
+                        self.bind_node(arena, elem);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
+                if let Some(prop) = arena.get_property_assignment(node) {
+                    self.bind_node(arena, prop.name);
+                    self.bind_node(arena, prop.initializer);
+                }
+            }
+            k if k == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT => {
+                if let Some(prop) = arena.get_shorthand_property(node) {
+                    self.bind_node(arena, prop.name);
+                    if !prop.object_assignment_initializer.is_none() {
+                        self.bind_node(arena, prop.object_assignment_initializer);
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::SPREAD_ELEMENT
+                || k == syntax_kind_ext::SPREAD_ASSIGNMENT => {
+                if let Some(spread) = arena.get_spread(node) {
+                    self.bind_node(arena, spread.expression);
+                }
+            }
+            k if k == syntax_kind_ext::COMPUTED_PROPERTY_NAME => {
+                if let Some(computed) = arena.get_computed_property(node) {
+                    self.bind_node(arena, computed.expression);
+                }
+            }
+
             // Call expressions - traverse into callee and arguments
             k if k == syntax_kind_ext::CALL_EXPRESSION => {
                 if let Some(call) = arena.get_call_expr(node) {
