@@ -132,6 +132,76 @@ fn test_two_phase_emission_es5_class_try_throw_parenthesized() {
 }
 
 #[test]
+fn test_two_phase_emission_es5_class_template_literal_downlevel() {
+    let source = "class Foo { method(name) { return `hi ${name}`; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let source_text = parser.get_source_text().to_string();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.set_source_text(&source_text);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("\"hi \""),
+        "ES5 class output should emit string literal head: {}",
+        output
+    );
+    assert!(
+        output.contains("+ (name)"),
+        "ES5 class output should concatenate template expression: {}",
+        output
+    );
+    assert!(
+        !output.contains('`'),
+        "ES5 class output should not emit backticks: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_tagged_template_downlevel() {
+    let source = "class Foo { method(name) { return tag`hi ${name}`; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let source_text = parser.get_source_text().to_string();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.set_source_text(&source_text);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("__makeTemplateObject"),
+        "ES5 class output should emit __makeTemplateObject helper: {}",
+        output
+    );
+    assert!(
+        output.contains("tag(__templateObject_"),
+        "ES5 class output should call tag with template object cache: {}",
+        output
+    );
+    assert!(
+        !output.contains('`'),
+        "ES5 class output should not emit backticks: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_class_for_destructuring() {
     let source = "class Foo { method(obj) { for (var { x, y } = obj; ; ) { return x + y; } } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
