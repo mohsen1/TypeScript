@@ -6,13 +6,22 @@ The goal is a correct, fast, drop-in replacement for `tsc`, with both native and
 TypeScript is intentionally unsound. Zang keeps a sound core solver and layers a compatibility
 engine on top to match TypeScript behavior while preserving correctness where possible.
 
+## Project Direction
+
+> This is a very high level project direction coming from project's manager's boss.
+
+- Don't get too bugged down with performance. lets ship something first that works. 
+- I saw emitter/mod.rs is a giant file. smaller files are better
+- I want to see `test/cases` baseline pass rates in manager report
+
+
 ## Executive Summary (Manager report)
 Last updated: 2026-01-07
 
 - Overall: Migration is active; Rust/WASM compiler is under construction and not production-ready.
-- Tracks: Emitter trim-allocations landed; LSP now parses JSDoc for hover/signatures; checker expanded control-flow narrowing; solver interned conditional/mapped types; CLI export hash investigation is WIP and incremental gaps remain.
-- Risk: CLI incremental invalidation and source map outputs are incomplete; parser/arena child enumeration TODOs remain; namespace member checking tests are still disabled.
-- Next focus: Finish CLI incremental invalidation + source maps, re-enable namespace member checking, close parser/arena TODOs, and keep trimming emitter hot paths.
+- Tracks: CLI now has export-hash invalidation with basic source map output; LSP maps JSDoc to overload signatures; checker expanded control-flow narrowing (identifier flows, logical conditions); solver reduced atom-resolve allocations; emitter refactored ES5 emit helpers.
+- Risk: Source maps are stubbed to a single 0,0 mapping; ES module imports still resolve to `any`; parser/arena child enumeration TODOs remain; namespace member checking tests are still disabled.
+- Next focus: Build real source maps, add symbol-level invalidation, type ES imports, re-enable namespace member checking, close parser/arena TODOs, and keep trimming emitter hot paths.
 
 ## Status
 This project is not ready for general use yet. The interface and distribution are in progress.
