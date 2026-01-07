@@ -58,6 +58,7 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Tuple keyof now includes indices from rest tuple expansions.
 - [x] Reject non-integer/negative tuple indices
   - Tuple index access now yields undefined for negative or fractional indices.
+  - String numeric tuple keys validate i64 parsing and reject non-integer values.
 - [x] Add mapped type coverage for primitive keyof (number)
   - Validate mapped types over `keyof number` produce expected boolean properties.
 - [x] Respect type parameter constraints in overlap checks

@@ -99,6 +99,7 @@ Tests run in this state:
 - [x] typesVersions range selection/fallback + fixed version doc.
 - [x] typesVersions compiler version override (flag/env) + fallback tests (Status: Active, env: TSZ_TYPES_VERSIONS_COMPILER_VERSION, manual env override).
 - [x] typesVersions compiler version override via tsconfig + docs (Status: Active, precedence: CLI > env > tsconfig).
+- [ ] Module resolution parity: support package.json `imports` (# specifiers) with conditions (Status: Active).
 - [x] Benchmark harness
   - Script: `wasm/bench_cli.sh` (tsz vs tsc timing + memory stats).
 
