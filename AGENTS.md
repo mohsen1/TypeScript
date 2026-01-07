@@ -13,7 +13,7 @@ We have time. No deadlines. Do it right.
 There are 3 tracks running at the same time. Find out which track you are on based on git branch name. Each track manages its progress in a plan file in `wasm/specs`
 
 - `emitter-track`: `wasm/specs/emitter_plan.md`
-- `checker-track`: `wasm/specs/checker_plan.md`
+- `cli-track`: `wasm/specs/cli_plan.md`
 - `lsp-track`: `wasm/specs/lsp_plan.md`
 
 You must track todo items and progress in the appropriate plan file
