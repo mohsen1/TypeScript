@@ -127,6 +127,24 @@ fn test_conditional_any_produces_union() {
 }
 
 #[test]
+fn test_conditional_any_error_poisoning() {
+    let interner = TypeInterner::new();
+
+    // any extends string ? error : number
+    // any produces union of branches, which should poison to error.
+    let cond = ConditionalType {
+        check_type: TypeId::ANY,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::ERROR,
+        false_type: TypeId::NUMBER,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::ERROR);
+}
+
+#[test]
 fn test_conditional_distributive_never() {
     let interner = TypeInterner::new();
 

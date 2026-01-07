@@ -26,6 +26,15 @@ fn test_intrinsic_subtyping() {
 }
 
 #[test]
+fn test_error_poisoning_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    assert!(checker.is_subtype_of(TypeId::ERROR, TypeId::STRING));
+    assert!(checker.is_subtype_of(TypeId::STRING, TypeId::ERROR));
+}
+
+#[test]
 fn test_literal_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
