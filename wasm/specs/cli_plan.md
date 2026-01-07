@@ -10,7 +10,7 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Args/tsconfig parsing, globbing, compile + emit work.
 - Watch mode implemented with notify + debounce.
 - Incremental compile in place (cache reuse + export-hash dependent invalidation + symbol-level dependent invalidation).
-- Module resolution supports node/bundler + exports/conditions basics + typesVersions mappings (default TS version 6.0.0, override via flag/env/tsconfig `TSZ_TYPES_VERSIONS_COMPILER_VERSION`).
+- Module resolution supports node/bundler + exports/conditions basics + typesVersions mappings (default TS version 6.0.0, override via flag/env/tsconfig; precedence CLI > env > config > default; env var `TSZ_TYPES_VERSIONS_COMPILER_VERSION`).
 - Active: typesVersions compiler version precedence (CLI > env > config > default).
 - Benchmark harness script added for tsz vs tsc comparisons.
 
@@ -69,6 +69,7 @@ Tests run in this state:
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_env_overrides_tsconfig` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_cli_overrides_env_and_tsconfig` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_invalid_tsconfig_falls_back` (pass).
+- `./wasm/test.sh cli::driver_tests::compile_resolves_node_modules_types_versions_empty_env_uses_tsconfig` (pass).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
@@ -100,8 +101,8 @@ Tests run in this state:
   - [x] Honor package.json `type` + Node16/NodeNext extension rules.
   - [x] Apply `typesVersions` mappings for package subpaths.
 - [x] typesVersions range selection/fallback + fixed version doc.
-- [x] typesVersions compiler version override (flag/env) + fallback tests (env: TSZ_TYPES_VERSIONS_COMPILER_VERSION, manual env override).
-- [x] typesVersions compiler version override via tsconfig + docs (precedence: CLI > env > tsconfig > default; invalid config falls back).
+- [x] typesVersions compiler version override (flag/env) + fallback tests.
+- [x] typesVersions compiler version override via tsconfig + docs.
 - [ ] Module resolution parity: support package.json `imports` (# specifiers) with conditions.
 - [x] Benchmark harness
   - Script: `wasm/bench_cli.sh` (tsz vs tsc timing + memory stats).
