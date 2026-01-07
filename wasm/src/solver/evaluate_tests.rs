@@ -12,6 +12,7 @@ fn test_conditional_true_branch() {
         extends_type: TypeId::STRING,
         true_type: TypeId::NUMBER,
         false_type: TypeId::BOOLEAN,
+        is_distributive: false,
     };
 
     let result = evaluate_conditional(&interner, &cond);
@@ -29,6 +30,7 @@ fn test_conditional_false_branch() {
         extends_type: TypeId::STRING,
         true_type: TypeId::NUMBER,
         false_type: TypeId::BOOLEAN,
+        is_distributive: false,
     };
 
     let result = evaluate_conditional(&interner, &cond);
@@ -50,6 +52,7 @@ fn test_conditional_literal_extends_base() {
         extends_type: TypeId::STRING,
         true_type: lit_true,
         false_type: lit_false,
+        is_distributive: false,
     };
 
     let result = evaluate_conditional(&interner, &cond);
@@ -72,6 +75,7 @@ fn test_conditional_distributive() {
         extends_type: TypeId::STRING,
         true_type: lit_true,
         false_type: lit_false,
+        is_distributive: true,
     };
 
     let result = evaluate_conditional(&interner, &cond);
@@ -79,6 +83,28 @@ fn test_conditional_distributive() {
     // Result should be true | false (i.e., boolean union of literals)
     let expected = interner.union(vec![lit_true, lit_false]);
     assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_non_distributive_union() {
+    let interner = TypeInterner::new();
+
+    // (string | number) extends string ? true : false
+    // Non-distributive: union is not a subtype of string, so false
+    let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let lit_true = interner.literal_boolean(true);
+    let lit_false = interner.literal_boolean(false);
+
+    let cond = ConditionalType {
+        check_type: string_or_number,
+        extends_type: TypeId::STRING,
+        true_type: lit_true,
+        false_type: lit_false,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, lit_false);
 }
 
 #[test]
@@ -98,6 +124,7 @@ fn test_conditional_deferred_type_parameter() {
         extends_type: TypeId::STRING,
         true_type: TypeId::NUMBER,
         false_type: TypeId::BOOLEAN,
+        is_distributive: true,
     };
 
     let cond_type = interner.intern(TypeKey::Conditional(Box::new(cond.clone())));
@@ -402,6 +429,7 @@ fn test_nested_conditional() {
         extends_type: TypeId::NUMBER,
         true_type: yes,
         false_type: no,
+        is_distributive: false,
     })));
 
     let cond = ConditionalType {
@@ -409,6 +437,7 @@ fn test_nested_conditional() {
         extends_type: TypeId::STRING,
         true_type: inner_cond,
         false_type: outer_no,
+        is_distributive: false,
     };
 
     let result = evaluate_conditional(&interner, &cond);

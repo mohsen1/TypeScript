@@ -67,6 +67,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
 - [x] Implement function type lowering
   - `(x: string) => number` -> TypeKey::Function
   - Store signature: params (Vec<Param>), return type (TypeId)
+  - [x] Type predicates lower to boolean/void return types
 - [x] Handle optional and rest parameters
   - `(x?: string)` -> Param { optional: true }
   - `(...args: string[])` -> Param { rest: true, type: Array<string> }

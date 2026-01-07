@@ -330,6 +330,7 @@ impl<'a> TypeInstantiator<'a> {
                     extends_type: self.instantiate(cond.extends_type),
                     true_type: self.instantiate(cond.true_type),
                     false_type: self.instantiate(cond.false_type),
+                    is_distributive: cond.is_distributive,
                 };
                 self.interner.intern(TypeKey::Conditional(Box::new(instantiated)))
             }

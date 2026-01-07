@@ -165,6 +165,31 @@ mod definition_tests {
     }
 
     #[test]
+    fn test_goto_definition_type_reference() {
+        let source = "type Foo = { value: string };\nconst x: Foo = { value: \"\" };";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let line_map = LineMap::build(source);
+
+        // Position at the 'Foo' in the type annotation (line 1)
+        let position = Position::new(1, 9);
+
+        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let definitions = goto_def.get_definition(root, position);
+
+        assert!(definitions.is_some(), "Should find definition for type reference");
+        if let Some(defs) = definitions {
+            assert!(!defs.is_empty(), "Should have at least one definition");
+            assert_eq!(defs[0].range.start.line, 0, "Definition should be on line 0");
+        }
+    }
+
+    #[test]
     fn test_goto_definition_not_found() {
         let source = "const x = 1;";
         let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

@@ -394,6 +394,13 @@ impl<'a> TypeLowering<'a> {
             }
 
             // =========================================================================
+            // Type predicate (x is T / asserts x is T)
+            // =========================================================================
+            k if k == syntax_kind_ext::TYPE_PREDICATE => {
+                self.lower_type_predicate(node_idx)
+            }
+
+            // =========================================================================
             // Type operator (keyof, readonly, unique)
             // =========================================================================
             k if k == syntax_kind_ext::TYPE_OPERATOR => {
@@ -1215,6 +1222,7 @@ impl<'a> TypeLowering<'a> {
         };
 
         if let Some(data) = self.arena.get_conditional_type(node) {
+            let is_distributive = self.is_naked_type_param(data.check_type);
             let check_type = self.lower_type(data.check_type);
             let extends_type = self.lower_type(data.extends_type);
 
@@ -1230,10 +1238,45 @@ impl<'a> TypeLowering<'a> {
                 extends_type,
                 true_type,
                 false_type,
+                is_distributive,
             };
             self.interner.intern(TypeKey::Conditional(Box::new(cond)))
         } else {
             TypeId::ERROR
+        }
+    }
+
+    fn is_naked_type_param(&self, node_idx: NodeIndex) -> bool {
+        let mut current = node_idx;
+        loop {
+            let Some(node) = self.arena.get(current) else { return false };
+            match node.kind {
+                k if k == syntax_kind_ext::PARENTHESIZED_TYPE => {
+                    if let Some(data) = self.arena.get_wrapped_type(node) {
+                        current = data.type_node;
+                        continue;
+                    }
+                    return false;
+                }
+                k if k == syntax_kind_ext::TYPE_REFERENCE => {
+                    let Some(data) = self.arena.get_type_ref(node) else { return false };
+                    if let Some(args) = &data.type_arguments {
+                        if !args.nodes.is_empty() {
+                            return false;
+                        }
+                    }
+                    let Some(name_node) = self.arena.get(data.type_name) else { return false };
+                    if let Some(ident) = self.arena.get_identifier(name_node) {
+                        return self.lookup_type_param(&ident.escaped_text).is_some();
+                    }
+                    return false;
+                }
+                k if k == SyntaxKind::Identifier as u16 => {
+                    let Some(ident) = self.arena.get_identifier(node) else { return false };
+                    return self.lookup_type_param(&ident.escaped_text).is_some();
+                }
+                _ => return false,
+            }
         }
     }
 
@@ -1889,6 +1932,23 @@ impl<'a> TypeLowering<'a> {
             }
         } else {
             TypeId::ERROR
+        }
+    }
+
+    fn lower_type_predicate(&self, node_idx: NodeIndex) -> TypeId {
+        let node = match self.arena.get(node_idx) {
+            Some(n) => n,
+            None => return TypeId::ERROR,
+        };
+
+        if let Some(data) = self.arena.get_type_predicate(node) {
+            if data.asserts_modifier {
+                TypeId::VOID
+            } else {
+                TypeId::BOOLEAN
+            }
+        } else {
+            TypeId::BOOLEAN
         }
     }
 

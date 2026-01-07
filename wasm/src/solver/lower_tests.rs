@@ -522,6 +522,42 @@ fn test_lower_conditional_infer_binding_false_branch() {
 }
 
 #[test]
+fn test_lower_conditional_distributive_flag() {
+    let (arena, func_idx) =
+        parse_type_alias("type F = <T>() => T extends string ? number : boolean;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => match interner.lookup(shape.return_type) {
+            Some(TypeKey::Conditional(cond)) => assert!(cond.is_distributive),
+            other => panic!("Expected conditional return type, got {:?}", other),
+        },
+        _ => panic!("Expected function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_conditional_non_distributive_flag() {
+    let (arena, func_idx) =
+        parse_type_alias("type F = <T>() => [T] extends [string] ? number : boolean;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => match interner.lookup(shape.return_type) {
+            Some(TypeKey::Conditional(cond)) => assert!(!cond.is_distributive),
+            other => panic!("Expected conditional return type, got {:?}", other),
+        },
+        _ => panic!("Expected function type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_deduplicates_identical_types() {
     let (arena_one, type_one) = parse_type_alias_type_node("type A = \"same\";");
     let (arena_two, type_two) = parse_type_alias_type_node("type B = \"same\";");
@@ -772,6 +808,38 @@ fn test_lower_function_type_with_type_parameter() {
 }
 
 #[test]
+fn test_lower_function_type_with_type_predicate_return() {
+    let (arena, func_type_idx) = parse_type_alias("type F = (x: any) => x is string;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.return_type, TypeId::BOOLEAN);
+        }
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_function_type_with_asserts_predicate_return() {
+    let (arena, func_type_idx) = parse_type_alias("type F = (x: any) => asserts x is string;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => {
+            assert_eq!(shape.return_type, TypeId::VOID);
+        }
+        _ => panic!("Expected Function type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_function_type_parameter_usage() {
     let (arena, func_type_idx) = parse_type_alias("type F = <T>(x: T) => T;");
     let interner = TypeInterner::new();
@@ -992,13 +1060,7 @@ fn test_lower_intersection_type_normalization() {
     let lowering = TypeLowering::new(&arena, &interner);
 
     let type_id = lowering.lower_type(intersection_idx);
-    let key = interner.lookup(type_id).expect("Type should exist");
-    match key {
-        TypeKey::Intersection(members) => {
-            assert_eq!(members, vec![TypeId::NUMBER, TypeId::STRING]);
-        }
-        _ => panic!("Expected Intersection type, got {:?}", key),
-    }
+    assert_eq!(type_id, TypeId::NEVER);
 }
 
 #[test]
