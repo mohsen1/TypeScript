@@ -6,6 +6,14 @@ The goal is a correct, fast, drop-in replacement for `tsc`, with both native and
 TypeScript is intentionally unsound. Zang keeps a sound core solver and layers a compatibility
 engine on top to match TypeScript behavior while preserving correctness where possible.
 
+## Executive Summary (Manager report)
+Last updated: 2026-01-07
+
+- Overall: Migration is active; Rust/WASM compiler is under construction and not production-ready.
+- Tracks: Checker, solver, emitter, CLI, and LSP work are in parallel with plan-driven execution.
+- Risk: Parity and performance targets are still in flight; regressions must be guarded by tests.
+- Next focus: Close remaining semantic gaps, grow test coverage, and tighten perf baselines.
+
 ## Status
 This project is not ready for general use yet. The interface and distribution are in progress.
 
