@@ -1,6 +1,6 @@
 # Project Zang
 
-Project Zang is a performance-first TypeScript compiler in Rust.[1]
+Project Zang is a performance-first TypeScript compiler in Rust.[^1]
 The goal is a correct, fast, drop-in replacement for `tsc`, with both native and WASM targets.
 
 TypeScript is intentionally unsound. Zang keeps a sound core solver and layers a compatibility
@@ -26,4 +26,4 @@ This project is not ready for general use yet. The interface and distribution ar
 - Keep the architecture clean and enforced. Performance-first is a habit, not a phase.
 
 
-[1] Zang is Persian for rust.
+[^1]: Zang is Persian for rust.
