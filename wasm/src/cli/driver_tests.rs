@@ -1,5 +1,5 @@
 use super::args::CliArgs;
-use super::driver::compile;
+use super::driver::{compile, compile_with_cache, CompilationCache};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -505,4 +505,38 @@ fn compile_node_next_prefers_cts_for_commonjs_package() {
         .iter()
         .any(|diag| diag.file.contains("node_modules/pkg/index.cts")));
     assert!(!base.join("dist/src/index.js").is_file());
+}
+
+#[test]
+fn compile_with_cache_invalidates_paths() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "noEmitOnError": true
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    let index_path = base.join("src/index.ts");
+    write_file(&index_path, "export const value = ;");
+
+    let mut cache = CompilationCache::default();
+    let args = default_args();
+
+    let result = compile_with_cache(&args, base, &mut cache).expect("compile should succeed");
+    assert!(!result.diagnostics.is_empty());
+    assert_eq!(cache.len(), 1);
+
+    let canonical = std::fs::canonicalize(&index_path).unwrap_or(index_path.clone());
+    cache.invalidate_paths(vec![canonical]);
+    assert_eq!(cache.len(), 0);
+
+    let result = compile_with_cache(&args, base, &mut cache).expect("compile should succeed");
+    assert!(!result.diagnostics.is_empty());
+    assert_eq!(cache.len(), 1);
 }

@@ -8,7 +8,7 @@ use std::time::{Duration, Instant};
 
 use crate::cli::args::CliArgs;
 use crate::cli::config::{resolve_compiler_options, ResolvedCompilerOptions};
-use crate::cli::driver;
+use crate::cli::driver::{self, CompilationCache};
 use crate::cli::fs::{is_ts_file, DEFAULT_EXCLUDES};
 use crate::cli::reporter::Reporter;
 
@@ -21,7 +21,7 @@ pub fn run(args: &CliArgs, cwd: &Path) -> Result<()> {
     let mut reporter = Reporter::new(color);
     let mut state = WatchState::new(args, &cwd);
 
-    state.compile_and_report(args, &cwd, &mut reporter)?;
+    state.compile_and_report(args, &cwd, &mut reporter, None)?;
 
     let (tx, rx) = mpsc::channel();
     let mut watcher = RecommendedWatcher::new(tx, Config::default())
@@ -43,8 +43,8 @@ pub fn run(args: &CliArgs, cwd: &Path) -> Result<()> {
             }
         }
 
-        if state.debouncer.flush_ready(Instant::now()).is_some() {
-            state.compile_and_report(args, &cwd, &mut reporter)?;
+        if let Some(changed) = state.debouncer.flush_ready(Instant::now()) {
+            state.compile_and_report(args, &cwd, &mut reporter, Some(changed))?;
         }
     }
 }
@@ -54,6 +54,7 @@ struct WatchState {
     watch_roots: Vec<PathBuf>,
     filter: WatchFilter,
     debouncer: Debouncer,
+    type_cache: CompilationCache,
 }
 
 impl WatchState {
@@ -85,6 +86,7 @@ impl WatchState {
             watch_roots,
             filter: WatchFilter::new(explicit_files, ignore_dirs, project_config),
             debouncer: Debouncer::new(DEFAULT_DEBOUNCE),
+            type_cache: CompilationCache::default(),
         }
     }
 
@@ -95,7 +97,7 @@ impl WatchState {
 
         let now = Instant::now();
         for path in event.paths {
-            let path = normalize_event_path(&self.base_dir, &path);
+            let path = canonicalize_or_owned(&normalize_event_path(&self.base_dir, &path));
             if self.filter.should_record(&path) {
                 self.debouncer.record_at(now, path);
             }
@@ -107,8 +109,11 @@ impl WatchState {
         args: &CliArgs,
         cwd: &Path,
         reporter: &mut Reporter,
+        changed_paths: Option<Vec<PathBuf>>,
     ) -> Result<()> {
-        match driver::compile(args, cwd) {
+        self.invalidate_caches(changed_paths);
+
+        match driver::compile_with_cache(args, cwd, &mut self.type_cache) {
             Ok(result) => {
                 if !result.diagnostics.is_empty() {
                     let output = reporter.render(&result.diagnostics);
@@ -129,6 +134,37 @@ impl WatchState {
         }
 
         Ok(())
+    }
+
+    fn invalidate_caches(&mut self, changed_paths: Option<Vec<PathBuf>>) {
+        let Some(paths) = changed_paths else {
+            return;
+        };
+
+        let mut clear_cache = false;
+        let mut normalized = Vec::with_capacity(paths.len());
+
+        for path in paths {
+            let path = canonicalize_or_owned(&path);
+            if self.is_config_path(&path) {
+                clear_cache = true;
+            }
+            normalized.push(path);
+        }
+
+        if clear_cache {
+            self.type_cache.clear();
+        } else {
+            self.type_cache.invalidate_paths(normalized);
+        }
+    }
+
+    fn is_config_path(&self, path: &Path) -> bool {
+        if let Some(project_config) = &self.filter.project_config {
+            path == project_config
+        } else {
+            is_tsconfig_path(path)
+        }
     }
 
     fn update_emitted(&mut self, emitted_files: Vec<PathBuf>) {

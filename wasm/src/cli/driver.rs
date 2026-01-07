@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::{Path, PathBuf};
 
 use crate::binder::SymbolTable;
+use crate::checker::TypeCache;
 use crate::checker::types::diagnostics::{Diagnostic, DiagnosticCategory};
 use crate::cli::args::CliArgs;
 use crate::cli::config::{
@@ -28,7 +29,48 @@ pub struct CompilationResult {
     pub emitted_files: Vec<PathBuf>,
 }
 
+#[derive(Default)]
+pub(crate) struct CompilationCache {
+    type_caches: HashMap<PathBuf, TypeCache>,
+}
+
+impl CompilationCache {
+    pub(crate) fn invalidate_paths<I>(&mut self, paths: I)
+    where
+        I: IntoIterator<Item = PathBuf>,
+    {
+        for path in paths {
+            self.type_caches.remove(&path);
+        }
+    }
+
+    pub(crate) fn clear(&mut self) {
+        self.type_caches.clear();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.type_caches.len()
+    }
+}
+
 pub fn compile(args: &CliArgs, cwd: &Path) -> Result<CompilationResult> {
+    compile_inner(args, cwd, None)
+}
+
+pub(crate) fn compile_with_cache(
+    args: &CliArgs,
+    cwd: &Path,
+    cache: &mut CompilationCache,
+) -> Result<CompilationResult> {
+    compile_inner(args, cwd, Some(cache))
+}
+
+fn compile_inner(
+    args: &CliArgs,
+    cwd: &Path,
+    cache: Option<&mut CompilationCache>,
+) -> Result<CompilationResult> {
     let cwd = canonicalize_or_owned(cwd);
     let tsconfig_path = resolve_tsconfig_path(&cwd, args.project.as_deref())?;
     let config = load_config(tsconfig_path.as_deref())?;
@@ -69,7 +111,7 @@ pub fn compile(args: &CliArgs, cwd: &Path) -> Result<CompilationResult> {
         .collect();
 
     let program = parallel::compile_files(compile_inputs);
-    let mut diagnostics = collect_diagnostics(&program);
+    let mut diagnostics = collect_diagnostics(&program, cache);
     diagnostics.sort_by(|left, right| {
         left.file
             .cmp(&right.file)
@@ -902,23 +944,51 @@ fn apply_exports_subpath(target: &str, wildcard: &str) -> String {
     }
 }
 
-fn collect_diagnostics(program: &MergedProgram) -> Vec<Diagnostic> {
+fn collect_diagnostics(
+    program: &MergedProgram,
+    cache: Option<&mut CompilationCache>,
+) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
+    let mut used_paths = HashSet::new();
+    let mut cache = cache;
 
     for (file_idx, file) in program.files.iter().enumerate() {
+        let file_path = PathBuf::from(&file.file_name);
+        used_paths.insert(file_path.clone());
         for parse_diagnostic in &file.parse_diagnostics {
             diagnostics.push(parse_diagnostic_to_checker(&file.file_name, parse_diagnostic));
         }
 
         let binder = create_binder_from_bound_file(file, program, file_idx);
-        let mut checker = ThinCheckerState::new(
-            &file.arena,
-            &binder,
-            &program.type_interner,
-            file.file_name.clone(),
-        );
+        let cached = cache
+            .as_deref_mut()
+            .and_then(|cache| cache.type_caches.remove(&file_path));
+        let mut checker = if let Some(cached) = cached {
+            ThinCheckerState::with_cache(
+                &file.arena,
+                &binder,
+                &program.type_interner,
+                file.file_name.clone(),
+                cached,
+            )
+        } else {
+            ThinCheckerState::new(
+                &file.arena,
+                &binder,
+                &program.type_interner,
+                file.file_name.clone(),
+            )
+        };
         checker.check_source_file(file.source_file);
         diagnostics.extend(std::mem::take(&mut checker.ctx.diagnostics));
+
+        if let Some(cache) = cache.as_deref_mut() {
+            cache.type_caches.insert(file_path, checker.extract_cache());
+        }
+    }
+
+    if let Some(cache) = cache {
+        cache.type_caches.retain(|path, _| used_paths.contains(path));
     }
 
     diagnostics
