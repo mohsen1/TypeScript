@@ -97,6 +97,7 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Recheck argument counts after inference for rest tuple defaults/constraints
 - [x] Add defaulted rest tuple call coverage for count and optional behavior
 - [x] Infer rest tuple type params inside tuple parameter types
+- [x] Add tuple rest expansion subtyping coverage
 
 ## Architecture Notes
 - Use `ena` crate for union-find data structure
