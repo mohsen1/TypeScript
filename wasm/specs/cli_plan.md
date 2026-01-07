@@ -93,7 +93,7 @@ Tests run in this state:
   - [x] Honor package.json `type` + Node16/NodeNext extension rules.
   - [x] Apply `typesVersions` mappings for package subpaths.
 - [x] typesVersions range selection/fallback + fixed version doc.
-- [x] typesVersions compiler version override (flag/env) + fallback tests.
+- [x] typesVersions compiler version override (flag/env) + fallback tests (Status: Active).
 - [x] Benchmark harness
   - Script: `wasm/bench_cli.sh` (tsz vs tsc timing + memory stats).
 
