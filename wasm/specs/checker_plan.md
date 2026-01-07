@@ -18,6 +18,7 @@ Status: Active
 - Type literal lowering uses checker paths for type params while preserving ref semantics for named members.
 - Solver diagnostics rendering preserves related messages without spans via fallback span.
 - TS2693 namespace type-only access coverage re-validated.
+- Alias type-only namespace value error test re-validated.
 
 ## Highest-Impact Next Tasks (pick one at a time)
 - [x] Replace local scope stack with binder persistent scopes
