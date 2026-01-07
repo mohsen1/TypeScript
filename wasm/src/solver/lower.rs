@@ -394,6 +394,13 @@ impl<'a> TypeLowering<'a> {
             }
 
             // =========================================================================
+            // Type predicate (x is T / asserts x is T)
+            // =========================================================================
+            k if k == syntax_kind_ext::TYPE_PREDICATE => {
+                self.lower_type_predicate(node_idx)
+            }
+
+            // =========================================================================
             // Type operator (keyof, readonly, unique)
             // =========================================================================
             k if k == syntax_kind_ext::TYPE_OPERATOR => {
@@ -1925,6 +1932,23 @@ impl<'a> TypeLowering<'a> {
             }
         } else {
             TypeId::ERROR
+        }
+    }
+
+    fn lower_type_predicate(&self, node_idx: NodeIndex) -> TypeId {
+        let node = match self.arena.get(node_idx) {
+            Some(n) => n,
+            None => return TypeId::ERROR,
+        };
+
+        if let Some(data) = self.arena.get_type_predicate(node) {
+            if data.asserts_modifier {
+                TypeId::VOID
+            } else {
+                TypeId::BOOLEAN
+            }
+        } else {
+            TypeId::BOOLEAN
         }
     }
 
