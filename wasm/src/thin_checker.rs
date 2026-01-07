@@ -360,10 +360,28 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         let type_name_idx = type_ref.type_name;
+        let has_type_args = type_ref.type_arguments
+            .as_ref()
+            .map_or(false, |args| !args.nodes.is_empty());
 
         // Check if type_name is a qualified name (A.B)
         if let Some(name_node) = self.ctx.arena.get(type_name_idx) {
             if name_node.kind == syntax_kind_ext::QUALIFIED_NAME {
+                if has_type_args {
+                    if self.resolve_qualified_symbol(type_name_idx).is_none() {
+                        let _ = self.resolve_qualified_name(type_name_idx);
+                        return TypeId::ERROR;
+                    }
+                    let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
+                    let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
+                    let lowering = crate::solver::TypeLowering::with_resolvers(
+                        self.ctx.arena,
+                        self.ctx.types,
+                        &type_resolver,
+                        &value_resolver,
+                    );
+                    return lowering.lower_type(idx);
+                }
                 return self.resolve_qualified_name(type_name_idx);
             }
         }
@@ -372,6 +390,26 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(name_node) = self.ctx.arena.get(type_name_idx) {
             if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
                 let name = ident.escaped_text.as_str();
+
+                if has_type_args {
+                    let is_builtin_array = name == "Array" || name == "ReadonlyArray";
+                    if !is_builtin_array
+                        && self.lookup_local(name).is_none()
+                        && !self.has_named_type_symbol(name)
+                    {
+                        self.error_cannot_find_name_at(name, type_name_idx);
+                        return TypeId::ERROR;
+                    }
+                    let type_resolver = |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
+                    let value_resolver = |node_idx: NodeIndex| self.resolve_value_symbol_for_lowering(node_idx);
+                    let lowering = crate::solver::TypeLowering::with_resolvers(
+                        self.ctx.arena,
+                        self.ctx.types,
+                        &type_resolver,
+                        &value_resolver,
+                    );
+                    return lowering.lower_type(idx);
+                }
 
                 if name == "Array" || name == "ReadonlyArray" {
                     if let Some(type_id) = self.resolve_named_type_reference(name) {
@@ -438,6 +476,20 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         None
+    }
+
+    fn has_named_type_symbol(&self, name: &str) -> bool {
+        if self.ctx.binder.file_locals.get(name).is_some() {
+            return true;
+        }
+        if let Some(sym_id) = self.ctx.binder.get_symbols().find_by_name(name) {
+            if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                let is_class_member = (symbol.flags & symbol_flags::PROPERTY) != 0
+                    || (symbol.flags & symbol_flags::METHOD) != 0;
+                return !is_class_member;
+            }
+        }
+        false
     }
 
     /// Resolve a qualified name or identifier to a symbol ID.

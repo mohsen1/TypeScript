@@ -105,6 +105,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Generic function declaration
   - [x] Test: Generic class/interface
   - [x] Test: Constrained type parameters
+  - [x] Test: Generic type reference preserves type arguments in checker
 
 ### Phase 5: Interface Merging & Declaration Spaces
 - [x] Implement interface merging

@@ -1747,6 +1747,44 @@ type AliasB = Outer.B;
 }
 
 #[test]
+fn test_checker_lower_generic_type_reference_applies_args() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::{TypeKey, SymbolRef};
+
+    let source = r#"
+type Box<T> = { value: T };
+type Alias = Box<string>;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let box_sym = binder.file_locals.get("Box").expect("Box should exist");
+    let alias_sym = binder.file_locals.get("Alias").expect("Alias should exist");
+
+    let alias_type = checker.get_type_of_symbol(alias_sym);
+    let alias_key = types.lookup(alias_type).expect("Alias type should exist");
+    match alias_key {
+        TypeKey::Application(app) => {
+            assert_eq!(app.args, vec![TypeId::STRING]);
+            match types.lookup(app.base) {
+                Some(TypeKey::Ref(SymbolRef(sym_id))) => assert_eq!(sym_id, box_sym.0),
+                other => panic!("Expected Ref base type, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Alias to be Application type, got {:?}", alias_key),
+    }
+}
+
+#[test]
 fn test_checker_namespace_merges_with_class_exports() {
     use crate::thin_parser::ThinParserState;
     use crate::solver::TypeKey;
