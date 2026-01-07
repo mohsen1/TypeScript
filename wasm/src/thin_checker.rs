@@ -21,7 +21,11 @@ use crate::scanner::SyntaxKind;
 use crate::binder::{SymbolId, symbol_flags};
 use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeId, TypeInterner, ContextualTypeContext};
-use crate::checker::types::diagnostics::{Diagnostic, DiagnosticCategory};
+use crate::checker::types::diagnostics::{
+    Diagnostic,
+    DiagnosticCategory,
+    DiagnosticRelatedInformation,
+};
 use crate::checker::{CheckerContext, EnclosingClassInfo, FlowAnalyzer};
 use crate::interner::Atom;
 
@@ -1049,6 +1053,78 @@ impl<'a> ThinCheckerState<'a> {
         (params, this_type)
     }
 
+    /// Helper to extract parameters from a parameter list.
+    fn extract_params_from_parameter_list(
+        &mut self,
+        params_list: &crate::parser::NodeList,
+    ) -> (Vec<crate::solver::ParamInfo>, Option<TypeId>) {
+        use crate::solver::ParamInfo;
+
+        let mut params = Vec::new();
+        let mut this_type = None;
+        let this_atom = self.ctx.types.intern_string("this");
+
+        for &param_idx in &params_list.nodes {
+            let Some(param_node) = self.ctx.arena.get(param_idx) else { continue };
+            let Some(param) = self.ctx.arena.get_parameter(param_node) else { continue };
+
+            let name: Option<Atom> = if let Some(name_node) = self.ctx.arena.get(param.name) {
+                if let Some(name_data) = self.ctx.arena.get_identifier(name_node) {
+                    Some(self.ctx.types.intern_string(&name_data.escaped_text))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+            let type_id = if !param.type_annotation.is_none() {
+                self.get_type_from_type_node(param.type_annotation)
+            } else {
+                TypeId::ANY
+            };
+
+            let optional = param.question_token || !param.initializer.is_none();
+            let rest = param.dot_dot_dot_token;
+
+            if let Some(name_atom) = name {
+                if name_atom == this_atom {
+                    if this_type.is_none() {
+                        this_type = Some(type_id);
+                    }
+                    continue;
+                }
+            }
+
+            params.push(ParamInfo { name, type_id, optional, rest });
+        }
+
+        (params, this_type)
+    }
+
+    fn call_signature_from_function(
+        &mut self,
+        func: &crate::parser::thin_node::FunctionData,
+    ) -> crate::solver::CallSignature {
+        let (type_params, type_param_updates) = self.push_type_parameters(&func.type_parameters);
+        let (params, this_type) = self.extract_params_from_parameter_list(&func.parameters);
+        let return_type = if !func.type_annotation.is_none() {
+            self.get_type_from_type_node(func.type_annotation)
+        } else {
+            TypeId::ANY
+        };
+
+        self.pop_type_parameters(type_param_updates);
+
+        crate::solver::CallSignature {
+            type_params,
+            params,
+            this_type,
+            return_type,
+            type_predicate: None,
+        }
+    }
+
     // =========================================================================
     // Type Resolution - Specific Node Types
     // =========================================================================
@@ -1285,11 +1361,44 @@ impl<'a> ThinCheckerState<'a> {
             return self.ctx.types.intern(TypeKey::Ref(SymbolRef(sym_id.0)));
         }
 
-        // Function - build function type from declaration
+        // Function - build function type or callable overload set
         if flags & symbol_flags::FUNCTION != 0 {
+            use crate::solver::CallableShape;
+
+            let mut overloads = Vec::new();
+            let mut implementation_decl = NodeIndex::NONE;
+
+            for &decl_idx in &symbol.declarations {
+                let Some(node) = self.ctx.arena.get(decl_idx) else {
+                    continue;
+                };
+                let Some(func) = self.ctx.arena.get_function(node) else {
+                    continue;
+                };
+
+                if func.body.is_none() {
+                    overloads.push(self.call_signature_from_function(func));
+                } else {
+                    implementation_decl = decl_idx;
+                }
+            }
+
+            if !overloads.is_empty() {
+                let shape = CallableShape {
+                    call_signatures: overloads,
+                    construct_signatures: Vec::new(),
+                    properties: Vec::new(),
+                };
+                return self.ctx.types.callable(shape);
+            }
+
             if !value_decl.is_none() {
                 return self.get_type_of_function(value_decl);
             }
+            if !implementation_decl.is_none() {
+                return self.get_type_of_function(implementation_decl);
+            }
+
             return TypeId::ANY;
         }
 
@@ -1569,10 +1678,8 @@ impl<'a> ThinCheckerState<'a> {
                 TypeId::ERROR
             }
 
-            CallResult::NoOverloadMatch { .. } => {
-                // For now, just report a generic error
-                // TODO: Enhance with specific overload failure details
-                self.error_not_callable_at(callee_type, call.expression);
+            CallResult::NoOverloadMatch { failures, .. } => {
+                self.error_no_overload_matches_at(idx, &failures);
                 TypeId::ERROR
             }
         }
@@ -2448,12 +2555,11 @@ impl<'a> ThinCheckerState<'a> {
         self.check_parameter_properties(&func.parameters.nodes);
 
         // Get return type from annotation or infer
-        let return_type = if !func.type_annotation.is_none() {
+        let mut return_type = if !func.type_annotation.is_none() {
             // Check return type for parameter properties in function types
             self.check_type_for_parameter_properties(func.type_annotation);
             self.get_type_from_type_node(func.type_annotation)
         } else {
-            // TODO: Infer return type from body
             TypeId::ANY
         };
 
@@ -2475,6 +2581,11 @@ impl<'a> ThinCheckerState<'a> {
                         }
                     }
                 }
+            }
+
+            if func.type_annotation.is_none() {
+                let return_context = ctx_helper.as_ref().and_then(|helper| helper.get_return_type());
+                return_type = self.infer_return_type_from_body(func.body, return_context);
             }
 
             self.push_return_type(return_type);
@@ -2931,6 +3042,7 @@ impl<'a> ThinCheckerState<'a> {
             "symbol" => TypeId::SYMBOL,
             "undefined" => TypeId::UNDEFINED,
             "object" => TypeId::OBJECT,
+            "function" => return ctx.narrow_excluding_function(source),
             _ => return source,
         };
 
@@ -3274,6 +3386,56 @@ impl<'a> ThinCheckerState<'a> {
             let diag = builder.argument_count_mismatch(expected, got, loc.start, loc.length());
             self.ctx.diagnostics.push(diag.to_checker_diagnostic(&self.ctx.file_name));
         }
+    }
+
+    /// Report "No overload matches this call" with related overload failures.
+    pub fn error_no_overload_matches_at(
+        &mut self,
+        idx: NodeIndex,
+        failures: &[crate::solver::PendingDiagnostic],
+    ) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+        use crate::solver::{PendingDiagnostic, TypeFormatter};
+
+        let Some(loc) = self.get_source_location(idx) else {
+            return;
+        };
+
+        let mut formatter = TypeFormatter::new(self.ctx.types);
+        let mut related = Vec::new();
+        let span = crate::solver::SourceSpan::new(
+            self.ctx.file_name.as_str(),
+            loc.start,
+            loc.length(),
+        );
+
+        for failure in failures {
+            let pending = PendingDiagnostic {
+                span: Some(span.clone()),
+                ..failure.clone()
+            };
+            let diag = formatter.render(&pending);
+            if let Some(diag_span) = diag.span.as_ref() {
+                related.push(DiagnosticRelatedInformation {
+                    file: diag_span.file.to_string(),
+                    start: diag_span.start,
+                    length: diag_span.length,
+                    message_text: diag.message.clone(),
+                    category: DiagnosticCategory::Message,
+                    code: diag.code,
+                });
+            }
+        }
+
+        self.ctx.diagnostics.push(Diagnostic {
+            code: diagnostic_codes::NO_OVERLOAD_MATCHES_CALL,
+            category: DiagnosticCategory::Error,
+            message_text: diagnostic_messages::NO_OVERLOAD_MATCHES.to_string(),
+            file: self.ctx.file_name.clone(),
+            start: loc.start,
+            length: loc.length(),
+            related_information: related,
+        });
     }
 
     /// Report a "type is not callable" error using solver diagnostics with source tracking.
@@ -6493,6 +6655,188 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         true
+    }
+
+    /// Infer the return type of a function body by collecting return expressions.
+    fn infer_return_type_from_body(
+        &mut self,
+        body_idx: NodeIndex,
+        return_context: Option<TypeId>,
+    ) -> TypeId {
+        if body_idx.is_none() {
+            return TypeId::ANY;
+        }
+
+        let Some(node) = self.ctx.arena.get(body_idx) else {
+            return TypeId::ANY;
+        };
+
+        if node.kind != syntax_kind_ext::BLOCK {
+            return self.return_expression_type(body_idx, return_context);
+        }
+
+        let mut return_types = Vec::new();
+        let mut saw_empty = false;
+
+        if let Some(block) = self.ctx.arena.get_block(node) {
+            for &stmt_idx in &block.statements.nodes {
+                self.collect_return_types_in_statement(
+                    stmt_idx,
+                    &mut return_types,
+                    &mut saw_empty,
+                    return_context,
+                );
+            }
+        }
+
+        if return_types.is_empty() {
+            return TypeId::VOID;
+        }
+
+        if saw_empty {
+            return_types.push(TypeId::VOID);
+        }
+
+        self.ctx.types.union(return_types)
+    }
+
+    fn return_expression_type(&mut self, expr_idx: NodeIndex, return_context: Option<TypeId>) -> TypeId {
+        let prev_context = self.ctx.contextual_type;
+        if let Some(ctx_type) = return_context {
+            self.ctx.contextual_type = Some(ctx_type);
+        }
+        let return_type = self.get_type_of_node(expr_idx);
+        self.ctx.contextual_type = prev_context;
+        return_type
+    }
+
+    fn collect_return_types_in_statement(
+        &mut self,
+        stmt_idx: NodeIndex,
+        return_types: &mut Vec<TypeId>,
+        saw_empty: &mut bool,
+        return_context: Option<TypeId>,
+    ) {
+        let Some(node) = self.ctx.arena.get(stmt_idx) else {
+            return;
+        };
+
+        match node.kind {
+            syntax_kind_ext::RETURN_STATEMENT => {
+                if let Some(return_data) = self.ctx.arena.get_return_statement(node) {
+                    if return_data.expression.is_none() {
+                        *saw_empty = true;
+                    } else {
+                        let return_type =
+                            self.return_expression_type(return_data.expression, return_context);
+                        return_types.push(return_type);
+                    }
+                }
+            }
+            syntax_kind_ext::BLOCK => {
+                if let Some(block) = self.ctx.arena.get_block(node) {
+                    for &stmt in &block.statements.nodes {
+                        self.collect_return_types_in_statement(
+                            stmt,
+                            return_types,
+                            saw_empty,
+                            return_context,
+                        );
+                    }
+                }
+            }
+            syntax_kind_ext::IF_STATEMENT => {
+                if let Some(if_data) = self.ctx.arena.get_if_statement(node) {
+                    self.collect_return_types_in_statement(
+                        if_data.then_statement,
+                        return_types,
+                        saw_empty,
+                        return_context,
+                    );
+                    if !if_data.else_statement.is_none() {
+                        self.collect_return_types_in_statement(
+                            if_data.else_statement,
+                            return_types,
+                            saw_empty,
+                            return_context,
+                        );
+                    }
+                }
+            }
+            syntax_kind_ext::SWITCH_STATEMENT => {
+                if let Some(switch_data) = self.ctx.arena.get_switch(node) {
+                    if let Some(case_block_node) = self.ctx.arena.get(switch_data.case_block) {
+                        if let Some(case_block) = self.ctx.arena.get_block(case_block_node) {
+                            for &clause_idx in &case_block.statements.nodes {
+                                if let Some(clause_node) = self.ctx.arena.get(clause_idx) {
+                                    if let Some(clause) = self.ctx.arena.get_case_clause(clause_node) {
+                                        for &stmt_idx in &clause.statements.nodes {
+                                            self.collect_return_types_in_statement(
+                                                stmt_idx,
+                                                return_types,
+                                                saw_empty,
+                                                return_context,
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            syntax_kind_ext::TRY_STATEMENT => {
+                if let Some(try_data) = self.ctx.arena.get_try(node) {
+                    self.collect_return_types_in_statement(
+                        try_data.try_block,
+                        return_types,
+                        saw_empty,
+                        return_context,
+                    );
+                    if !try_data.catch_clause.is_none() {
+                        self.collect_return_types_in_statement(
+                            try_data.catch_clause,
+                            return_types,
+                            saw_empty,
+                            return_context,
+                        );
+                    }
+                    if !try_data.finally_block.is_none() {
+                        self.collect_return_types_in_statement(
+                            try_data.finally_block,
+                            return_types,
+                            saw_empty,
+                            return_context,
+                        );
+                    }
+                }
+            }
+            syntax_kind_ext::CATCH_CLAUSE => {
+                if let Some(catch_data) = self.ctx.arena.get_catch_clause(node) {
+                    self.collect_return_types_in_statement(
+                        catch_data.block,
+                        return_types,
+                        saw_empty,
+                        return_context,
+                    );
+                }
+            }
+            syntax_kind_ext::WHILE_STATEMENT
+            | syntax_kind_ext::DO_STATEMENT
+            | syntax_kind_ext::FOR_STATEMENT
+            | syntax_kind_ext::FOR_IN_STATEMENT
+            | syntax_kind_ext::FOR_OF_STATEMENT => {
+                if let Some(loop_data) = self.ctx.arena.get_loop(node) {
+                    self.collect_return_types_in_statement(
+                        loop_data.statement,
+                        return_types,
+                        saw_empty,
+                        return_context,
+                    );
+                }
+            }
+            _ => {}
+        }
     }
 
     /// Check if a function body has at least one return statement with a value.

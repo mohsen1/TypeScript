@@ -311,6 +311,27 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Detect disjoint equality comparisons in BinaryOpEvaluator
 - [x] Tests for disjoint/overlapping equality comparisons
 
+### Phase 60: Typeof Narrowing Object/Function
+- [x] Treat object-like types as typeof "object" narrow targets (excluding callables)
+- [x] Include callable types in typeof "function" narrowing
+- [x] Tests for object/function typeof narrowing cases
+
+### Phase 61: Typeof Narrowing Any/Unknown
+- [x] Preserve any and narrow unknown for typeof checks
+- [x] Tests for typeof narrowing with any/unknown
+
+### Phase 62: Typeof Narrowing Intersections
+- [x] Preserve branded primitive/function intersections during typeof narrowing
+- [x] Tests for branded intersection typeof narrowing
+
+### Phase 63: Typeof Narrowing Type Parameters
+- [x] Narrow generic parameters using constraints during typeof checks
+- [x] Tests for constrained/unconstrained type param typeof narrowing
+
+### Phase 64: Typeof Narrowing Negation
+- [x] Exclude function-like types for typeof !== "function"
+- [x] Tests for typeof negation of function types
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

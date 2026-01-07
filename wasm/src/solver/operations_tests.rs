@@ -1632,6 +1632,46 @@ fn test_infer_generic_index_access_param_from_index_access_arg() {
 }
 
 #[test]
+fn test_infer_generic_index_access_param_from_object_property_arg() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let key_x = interner.literal_string("x");
+    let obj = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let index_access_param = interner.intern(TypeKey::IndexAccess(obj, key_x));
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: index_access_param,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::NUMBER]);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
 fn test_infer_generic_template_literal_param() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
@@ -1671,6 +1711,45 @@ fn test_infer_generic_template_literal_param() {
 
     let result = infer_generic_function(&interner, &mut subtype, &func, &[arg_template]);
     assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_infer_generic_conditional_param_from_arg() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let conditional = ConditionalType {
+        check_type: TypeId::STRING,
+        extends_type: TypeId::STRING,
+        true_type: t_type,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+    let conditional_type = interner.intern(TypeKey::Conditional(Box::new(conditional)));
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: conditional_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::NUMBER]);
+    assert_eq!(result, TypeId::NUMBER);
 }
 
 #[test]
@@ -3795,6 +3874,68 @@ fn test_infer_generic_union_source() {
     let result = infer_generic_function(&interner, &mut subtype, &func, &[union_arg]);
     let expected = interner.union(vec![TypeId::NUMBER, TypeId::STRING]);
     assert_eq!(result, expected);
+}
+
+#[test]
+fn test_infer_generic_union_target_with_placeholder_member() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let union_target = interner.union(vec![t_type, TypeId::STRING]);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: union_target,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::NUMBER]);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_infer_generic_union_target_with_placeholder_and_optional_member() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let union_target = interner.union(vec![t_type, TypeId::STRING, TypeId::UNDEFINED]);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: union_target,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[TypeId::NUMBER]);
+    assert_eq!(result, TypeId::NUMBER);
 }
 
 #[test]

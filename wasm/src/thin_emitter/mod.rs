@@ -1424,6 +1424,15 @@ impl<'a> ThinPrinter<'a> {
             k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
                 self.emit_parenthesized(node);
             }
+            k if k == syntax_kind_ext::TYPE_ASSERTION
+                || k == syntax_kind_ext::AS_EXPRESSION
+                || k == syntax_kind_ext::SATISFIES_EXPRESSION =>
+            {
+                self.emit_type_assertion_expression(node);
+            }
+            k if k == syntax_kind_ext::NON_NULL_EXPRESSION => {
+                self.emit_non_null_expression(node);
+            }
 
             // Conditional expression
             k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
@@ -1750,6 +1759,9 @@ impl<'a> ThinPrinter<'a> {
             }
 
             // Template literals
+            k if k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION => {
+                self.emit_tagged_template_expression(node);
+            }
             k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
                 self.emit_template_expression(node);
             }
@@ -1944,6 +1956,24 @@ impl<'a> ThinPrinter<'a> {
         self.write("(");
         self.emit(paren.expression);
         self.write(")");
+    }
+
+    fn emit_type_assertion_expression(&mut self, node: &ThinNode) {
+        let Some(assertion) = self.arena.get_type_assertion(node) else {
+            self.write("void 0");
+            return;
+        };
+
+        self.emit_expression(assertion.expression);
+    }
+
+    fn emit_non_null_expression(&mut self, node: &ThinNode) {
+        let Some(unary) = self.arena.get_unary_expr_ex(node) else {
+            self.write("void 0");
+            return;
+        };
+
+        self.emit_expression(unary.expression);
     }
 
     fn emit_conditional(&mut self, node: &ThinNode) {
@@ -5371,6 +5401,15 @@ impl<'a> ThinPrinter<'a> {
     // =========================================================================
     // Template Literals
     // =========================================================================
+
+    fn emit_tagged_template_expression(&mut self, node: &ThinNode) {
+        let Some(tagged) = self.arena.get_tagged_template(node) else {
+            return;
+        };
+
+        self.emit_expression(tagged.tag);
+        self.emit(tagged.template);
+    }
 
     fn emit_template_expression(&mut self, node: &ThinNode) {
         let Some(tpl) = self.arena.get_template_expr(node) else {

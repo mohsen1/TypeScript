@@ -329,6 +329,36 @@ function bar() {}
 }
 
 #[test]
+fn test_overload_call_reports_no_overload_matches() {
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function f(x: string): void;
+function f(x: number, y: number): void;
+function f(x: any, y?: any) {}
+f(true);
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&diagnostic_codes::NO_OVERLOAD_MATCHES_CALL),
+        "Expected error 2769 for overload call mismatch, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_parameter_property_in_function_2369() {
     use crate::thin_parser::ThinParserState;
     // Parameter properties (public/private/protected/readonly on params)
@@ -2134,6 +2164,80 @@ function id<T>(value: T): T {
             }
         }
         _ => panic!("Expected id to be Function type, got {:?}", id_key),
+    }
+}
+
+#[test]
+fn test_function_return_type_inferred_from_body() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::{TypeId, TypeKey};
+
+    let source = r#"
+function id(x: string) {
+    return x;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let id_sym = binder.file_locals.get("id").expect("id should exist");
+    let id_type = checker.get_type_of_symbol(id_sym);
+    let id_key = types.lookup(id_type).expect("id type should exist");
+    match id_key {
+        TypeKey::Function(shape) => assert_eq!(shape.return_type, TypeId::STRING),
+        _ => panic!("Expected id to be Function type, got {:?}", id_key),
+    }
+}
+
+#[test]
+fn test_arrow_function_return_type_inferred_union() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::{TypeId, TypeKey};
+
+    let source = r#"
+const f = (flag: boolean) => {
+    if (flag) {
+        return 1;
+    }
+    return "a";
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let f_sym = binder.file_locals.get("f").expect("f should exist");
+    let f_type = checker.get_type_of_symbol(f_sym);
+    let f_key = types.lookup(f_type).expect("f type should exist");
+    match f_key {
+        TypeKey::Function(shape) => {
+            let return_key = types.lookup(shape.return_type).expect("return type should exist");
+            match return_key {
+                TypeKey::Union(members) => {
+                    assert!(members.contains(&TypeId::NUMBER));
+                    assert!(members.contains(&TypeId::STRING));
+                }
+                _ => panic!("Expected union return type, got {:?}", return_key),
+            }
+        }
+        _ => panic!("Expected f to be Function type, got {:?}", f_key),
     }
 }
 

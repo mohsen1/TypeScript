@@ -78,6 +78,8 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Constrain tuple elements
 - [x] Constrain union members to target
 - [x] Constrain optional union targets
+- [x] Infer type params from union targets with a single placeholder member
+- [x] Add inference coverage for union targets with placeholder and nullish members
 - [x] Use Atom for discriminant property names in narrowing
 - [x] Compare property access names via Atom to avoid resolve_atom churn
 - [x] Store subtype failure property names as Atom for diagnostics
@@ -155,7 +157,9 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Infer type params from constructor call signatures
 - [x] Infer type params from KeyOf wrapper positions
 - [x] Infer type params from IndexAccess wrapper positions
+- [x] Infer type params from index access on concrete object properties
 - [x] Infer type params from template literal wrapper positions
+- [x] Infer type params from conditional types with concrete check types
 - [x] Infer type params from mapped types with concrete key sets
 - [x] Infer array element type params from tuple arguments
 - [x] Enforce index signature consistency during bounds validation

@@ -174,6 +174,11 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: interface extension detects generic argument mismatch (2430)
   - [x] Test: interface extension accepts matching generic type arguments
   - [x] Test: interface extension detects namespace-qualified base mismatch (2430)
+  - [x] Checker: infer function return types from unannotated bodies
+  - [x] Test: function return type inference (simple return)
+  - [x] Test: function return type inference (union returns)
+  - [x] Checker: report overload call mismatches with 2769 and related failures
+  - [x] Test: overload call mismatch reports 2769
 - [x] Parser: fix interface member parsing to track progress by token position (avoid skipping consecutive identifiers)
 - [x] Perf: avoid extra String clone when lowering negative bigint literals
 - [x] Perf: avoid extra allocation when normalizing bigint leading zeros

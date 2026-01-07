@@ -309,6 +309,12 @@ impl<'a> LoweringPass<'a> {
                     self.visit(decorator.expression);
                 }
             }
+            k if k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION => {
+                if let Some(tagged) = self.arena.get_tagged_template(node) {
+                    self.visit(tagged.tag);
+                    self.visit(tagged.template);
+                }
+            }
             k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
                 if let Some(template) = self.arena.get_template_expr(node) {
                     self.visit(template.head);

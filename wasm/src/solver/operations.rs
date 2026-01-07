@@ -20,7 +20,14 @@
 
 use crate::interner::Atom;
 use crate::solver::types::*;
-use crate::solver::{apparent_primitive_member_kind, evaluate_mapped, ApparentMemberKind, TypeDatabase};
+use crate::solver::{
+    apparent_primitive_member_kind,
+    evaluate_conditional,
+    evaluate_index_access,
+    evaluate_mapped,
+    ApparentMemberKind,
+    TypeDatabase,
+};
 use crate::solver::diagnostics::PendingDiagnostic;
 use crate::solver::infer::InferenceContext;
 use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
@@ -666,6 +673,30 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     }
                 }
             }
+            (Some(TypeKey::IndexAccess(s_obj, s_idx)), _) => {
+                let evaluated = evaluate_index_access(self.interner, s_obj, s_idx);
+                if evaluated != source {
+                    self.constrain_types(ctx, var_map, evaluated, target);
+                }
+            }
+            (_, Some(TypeKey::IndexAccess(t_obj, t_idx))) => {
+                let evaluated = evaluate_index_access(self.interner, t_obj, t_idx);
+                if evaluated != target {
+                    self.constrain_types(ctx, var_map, source, evaluated);
+                }
+            }
+            (Some(TypeKey::Conditional(ref cond)), _) => {
+                let evaluated = evaluate_conditional(self.interner, cond);
+                if evaluated != source {
+                    self.constrain_types(ctx, var_map, evaluated, target);
+                }
+            }
+            (_, Some(TypeKey::Conditional(ref cond))) => {
+                let evaluated = evaluate_conditional(self.interner, cond);
+                if evaluated != target {
+                    self.constrain_types(ctx, var_map, source, evaluated);
+                }
+            }
             (Some(TypeKey::Mapped(ref mapped)), _) => {
                 let evaluated = evaluate_mapped(self.interner, mapped);
                 if evaluated != source {
@@ -703,6 +734,24 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 }
                 if count == 1 {
                     self.constrain_types(ctx, var_map, source, non_nullable.unwrap());
+                    return;
+                }
+
+                let mut placeholder_member = None;
+                let mut placeholder_count = 0;
+                for &member in t_members {
+                    let mut visited = FxHashSet::default();
+                    if self.type_contains_placeholder(member, var_map, &mut visited) {
+                        placeholder_count += 1;
+                        if placeholder_count == 1 {
+                            placeholder_member = Some(member);
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                if placeholder_count == 1 {
+                    self.constrain_types(ctx, var_map, source, placeholder_member.unwrap());
                 }
             }
             (Some(TypeKey::Array(s_elem)), Some(TypeKey::Array(t_elem))) => {
