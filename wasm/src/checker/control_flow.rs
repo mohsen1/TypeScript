@@ -1605,6 +1605,15 @@ impl<'a> FlowAnalyzer<'a> {
             return self.resolve_namespace_member(access.expression, access.name_or_argument, visited);
         }
 
+        if node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION {
+            let access = self.arena.get_access_expr(node)?;
+            if access.question_dot_token {
+                return None;
+            }
+            let name = self.literal_string_from_node(access.name_or_argument)?;
+            return self.resolve_namespace_member_by_name(access.expression, name, visited);
+        }
+
         None
     }
 
@@ -1614,11 +1623,20 @@ impl<'a> FlowAnalyzer<'a> {
         right: NodeIndex,
         visited: &mut Vec<SymbolId>,
     ) -> Option<SymbolId> {
-        let left_sym = self.reference_symbol_inner(left, visited)?;
-        let left_sym = self.resolve_alias_symbol(left_sym, visited)?;
         let right_name = self.arena.get(right)
             .and_then(|node| self.arena.get_identifier(node))
             .map(|ident| ident.escaped_text.as_str())?;
+        self.resolve_namespace_member_by_name(left, right_name, visited)
+    }
+
+    fn resolve_namespace_member_by_name(
+        &self,
+        left: NodeIndex,
+        right_name: &str,
+        visited: &mut Vec<SymbolId>,
+    ) -> Option<SymbolId> {
+        let left_sym = self.reference_symbol_inner(left, visited)?;
+        let left_sym = self.resolve_alias_symbol(left_sym, visited)?;
         let left_symbol = self.binder.get_symbol(left_sym)?;
         let exports = left_symbol.exports.as_ref()?;
         let member_sym = exports.get(right_name)?;

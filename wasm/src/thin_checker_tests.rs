@@ -4006,6 +4006,35 @@ const bad = NS.Foo;
 }
 
 #[test]
+fn test_namespace_type_only_member_element_access_value_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace NS {
+    export interface Foo { value: number; }
+}
+const bad = NS["Foo"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2693),
+        "Expected error 2693 for type-only namespace member element access used as value, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_namespace_type_only_nested_member_value_error() {
     use crate::thin_parser::ThinParserState;
 
@@ -4560,6 +4589,37 @@ const viaAlias = Alias.value;
 
     assert_eq!(checker.get_type_of_symbol(direct_sym), TypeId::NUMBER);
     assert_eq!(checker.get_type_of_symbol(top_sym), TypeId::NUMBER);
+    assert_eq!(checker.get_type_of_symbol(alias_sym), TypeId::NUMBER);
+}
+
+#[test]
+fn test_namespace_value_member_element_access() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace Ns {
+    export const value = 1;
+}
+import Alias = Ns;
+const direct = Ns["value"];
+const viaAlias = Alias["value"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let direct_sym = binder.file_locals.get("direct").expect("direct should exist");
+    let alias_sym = binder.file_locals.get("viaAlias").expect("viaAlias should exist");
+
+    assert_eq!(checker.get_type_of_symbol(direct_sym), TypeId::NUMBER);
     assert_eq!(checker.get_type_of_symbol(alias_sym), TypeId::NUMBER);
 }
 
@@ -5133,6 +5193,52 @@ namespace Ns {
 import Alias = Ns;
 if (typeof Alias.value === "string") {
     Alias.value;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let root_node = arena.get(root).expect("root node");
+    let source_file = arena.get_source_file(root_node).expect("source file");
+
+    let if_idx = source_file.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::IF_STATEMENT))
+        .expect("if statement");
+    let if_node = arena.get(if_idx).expect("if node");
+    let if_data = arena.get_if_statement(if_node).expect("if data");
+
+    let then_node = arena.get(if_data.then_statement).expect("then node");
+    let block = arena.get_block(then_node).expect("then block");
+    let expr_stmt_idx = block.statements.nodes.iter().copied()
+        .find(|&idx| arena.get(idx).map_or(false, |node| node.kind == syntax_kind_ext::EXPRESSION_STATEMENT))
+        .expect("expression statement");
+    let expr_stmt = arena.get_expression_statement(arena.get(expr_stmt_idx).expect("expr node"))
+        .expect("expression data");
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let narrowed = checker.get_type_of_node(expr_stmt.expression);
+    assert_eq!(narrowed, TypeId::STRING);
+}
+
+#[test]
+fn test_flow_narrowing_applies_for_namespace_element_access() {
+    use crate::thin_parser::ThinParserState;
+    use crate::parser::syntax_kind_ext;
+
+    let source = r#"
+namespace Ns {
+    export let value: string | number;
+}
+if (typeof Ns["value"] === "string") {
+    Ns["value"];
 }
 "#;
 

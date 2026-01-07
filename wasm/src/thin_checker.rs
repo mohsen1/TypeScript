@@ -3597,8 +3597,11 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         let index_type = self.get_type_of_node(access.name_or_argument);
-        let literal_string_is_none = self.get_literal_string_from_node(access.name_or_argument).is_none();
-        let numeric_string_index = self.get_literal_string_from_node(access.name_or_argument)
+        let literal_string = self.get_literal_string_from_node(access.name_or_argument)
+            .map(|name| name.to_string());
+        let literal_string_is_none = literal_string.is_none();
+        let numeric_string_index = literal_string
+            .as_deref()
             .and_then(|name| self.get_numeric_index_from_string(name));
         let literal_index = self.get_literal_index_from_node(access.name_or_argument)
             .or(numeric_string_index);
@@ -3607,7 +3610,17 @@ impl<'a> ThinCheckerState<'a> {
         let mut report_no_index = false;
         let mut use_index_signature_check = true;
 
-        if literal_index.is_none() {
+        if let Some(name) = literal_string.as_deref() {
+            if let Some(member_type) = self.resolve_namespace_value_member(object_type_for_access, name) {
+                result_type = Some(member_type);
+                use_index_signature_check = false;
+            } else if self.namespace_has_type_only_member(object_type_for_access, name) {
+                self.error_type_only_value_at(name, access.name_or_argument);
+                return TypeId::ERROR;
+            }
+        }
+
+        if result_type.is_none() && literal_index.is_none() {
             if let Some((string_keys, number_keys)) = self.get_literal_key_union_from_type(index_type) {
                 let total_keys = string_keys.len() + number_keys.len();
                 if total_keys > 1 || literal_string_is_none {
@@ -3686,7 +3699,7 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        result_type
+        self.apply_flow_narrowing(idx, result_type)
     }
 
     fn get_element_access_type(

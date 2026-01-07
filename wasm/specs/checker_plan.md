@@ -123,6 +123,10 @@ Status: Active
 - [x] Resolve namespace alias members in flow narrowing/clearing
   - Allow `typeof Alias.value` to narrow namespace members in true branches.
   - Clear narrowings when namespace members are reassigned via aliases.
+- [x] Support namespace member element access in value + flow contexts
+  - Resolve `Ns["value"]` to exported value members (including alias access).
+  - Apply flow narrowing for string-literal element access and report TS2693 for type-only members.
+  - Risk: computed element access (non-literal) still falls back to index signature rules.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
