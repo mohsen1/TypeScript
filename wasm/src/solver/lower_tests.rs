@@ -734,6 +734,41 @@ fn test_lower_type_reference_with_arguments() {
 }
 
 #[test]
+fn test_lower_type_query_uses_value_resolver() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = Foo | typeof Foo;");
+    let interner = TypeInterner::new();
+
+    let type_resolver = |_node_idx: NodeIndex| Some(1);
+    let value_resolver = |_node_idx: NodeIndex| Some(2);
+    let lowering = TypeLowering::with_resolvers(&arena, &interner, &type_resolver, &value_resolver);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Union(members) => {
+            let mut saw_ref = false;
+            let mut saw_query = false;
+            for member in members {
+                match interner.lookup(member) {
+                    Some(TypeKey::Ref(SymbolRef(sym_id))) => {
+                        assert_eq!(sym_id, 1);
+                        saw_ref = true;
+                    }
+                    Some(TypeKey::TypeQuery(SymbolRef(sym_id))) => {
+                        assert_eq!(sym_id, 2);
+                        saw_query = true;
+                    }
+                    other => panic!("Unexpected union member {:?}", other),
+                }
+            }
+            assert!(saw_ref, "Expected union to include type reference");
+            assert!(saw_query, "Expected union to include typeof query");
+        }
+        _ => panic!("Expected Union type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_template_literal_type_spans() {
     let (arena, template_idx) = parse_template_literal_type("type T = `hello${string}world`;");
 
