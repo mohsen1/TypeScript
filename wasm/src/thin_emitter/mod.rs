@@ -22,7 +22,7 @@
 
 use crate::emit_context::EmitContext;
 use crate::parser::{NodeIndex, NodeList};
-use crate::parser::thin_node::{ThinNode, ThinNodeArena};
+use crate::parser::thin_node::{ThinNode, ThinNodeArena, TemplateExprData};
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
 use crate::source_writer::SourceWriter;
@@ -367,6 +367,12 @@ struct RestParamTransform {
     name: String,
     pattern: Option<NodeIndex>,
     index: usize,
+}
+
+struct TemplateParts {
+    cooked: Vec<String>,
+    raw: Vec<String>,
+    expressions: Vec<NodeIndex>,
 }
 
 // =============================================================================
@@ -1760,7 +1766,7 @@ impl<'a> ThinPrinter<'a> {
 
             // Template literals
             k if k == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION => {
-                self.emit_tagged_template_expression(node);
+                self.emit_tagged_template_expression(node, idx);
             }
             k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
                 self.emit_template_expression(node);
@@ -1848,6 +1854,13 @@ impl<'a> ThinPrinter<'a> {
             self.emit_escaped_string(&lit.text, quote);
             self.write_char(quote);
         }
+    }
+
+    fn emit_string_literal_text(&mut self, text: &str) {
+        let quote = if self.ctx.options.single_quote { '\'' } else { '"' };
+        self.write_char(quote);
+        self.emit_escaped_string(text, quote);
+        self.write_char(quote);
     }
 
     fn emit_escaped_string(&mut self, s: &str, quote_char: char) {
@@ -5402,13 +5415,40 @@ impl<'a> ThinPrinter<'a> {
     // Template Literals
     // =========================================================================
 
-    fn emit_tagged_template_expression(&mut self, node: &ThinNode) {
+    fn emit_tagged_template_expression(&mut self, node: &ThinNode, idx: NodeIndex) {
         let Some(tagged) = self.arena.get_tagged_template(node) else {
             return;
         };
 
+        if !self.ctx.target_es5 {
+            self.emit_expression(tagged.tag);
+            self.emit(tagged.template);
+            return;
+        }
+
+        let Some(parts) = self.collect_template_parts(tagged.template) else {
+            self.emit_expression(tagged.tag);
+            self.emit(tagged.template);
+            return;
+        };
+
+        let temp_var = self.tagged_template_var_name(idx);
+
         self.emit_expression(tagged.tag);
-        self.emit(tagged.template);
+        self.write("(");
+        self.write(&temp_var);
+        self.write(" || (");
+        self.write(&temp_var);
+        self.write(" = __makeTemplateObject(");
+        self.emit_string_array_literal(&parts.cooked);
+        self.write(", ");
+        self.emit_string_array_literal(&parts.raw);
+        self.write("))");
+        for expr in parts.expressions {
+            self.write(", ");
+            self.emit_expression(expr);
+        }
+        self.write(")");
     }
 
     fn emit_template_expression(&mut self, node: &ThinNode) {
@@ -5416,6 +5456,11 @@ impl<'a> ThinPrinter<'a> {
             self.write("``");
             return;
         };
+
+        if self.ctx.target_es5 {
+            self.emit_template_expression_es5(tpl);
+            return;
+        }
 
         // Emit the template head (opening backtick and initial text)
         self.emit(tpl.head);
@@ -5428,6 +5473,11 @@ impl<'a> ThinPrinter<'a> {
 
     fn emit_no_substitution_template(&mut self, node: &ThinNode) {
         if let Some(lit) = self.arena.get_literal(node) {
+            if self.ctx.target_es5 {
+                self.emit_string_literal_text(&lit.text);
+                return;
+            }
+
             self.write("`");
             self.write(&lit.text);
             self.write("`");
@@ -5468,6 +5518,159 @@ impl<'a> ThinPrinter<'a> {
             self.write(&lit.text);
             self.write("`");
         }
+    }
+
+    fn emit_template_expression_es5(&mut self, tpl: &TemplateExprData) {
+        let head_text = self
+            .arena
+            .get(tpl.head)
+            .and_then(|node| self.arena.get_literal(node))
+            .map(|lit| lit.text.as_str())
+            .unwrap_or("");
+
+        self.write("(");
+        self.emit_string_literal_text(head_text);
+
+        for &span_idx in &tpl.template_spans.nodes {
+            let Some(span_node) = self.arena.get(span_idx) else {
+                continue;
+            };
+            let Some(span) = self.arena.get_template_span(span_node) else {
+                continue;
+            };
+
+            self.write(" + ");
+            self.write("(");
+            self.emit_expression(span.expression);
+            self.write(")");
+
+            let literal_text = self
+                .arena
+                .get(span.literal)
+                .and_then(|node| self.arena.get_literal(node))
+                .map(|lit| lit.text.as_str())
+                .unwrap_or("");
+            self.write(" + ");
+            self.emit_string_literal_text(literal_text);
+        }
+
+        self.write(")");
+    }
+
+    fn emit_string_array_literal(&mut self, parts: &[String]) {
+        let quote = if self.ctx.options.single_quote { '\'' } else { '"' };
+        self.write("[");
+        for (i, part) in parts.iter().enumerate() {
+            if i > 0 {
+                self.write(", ");
+            }
+            self.write_char(quote);
+            self.emit_escaped_string(part, quote);
+            self.write_char(quote);
+        }
+        self.write("]");
+    }
+
+    fn collect_template_parts(&self, template_idx: NodeIndex) -> Option<TemplateParts> {
+        let node = self.arena.get(template_idx)?;
+        match node.kind {
+            k if k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 => {
+                let cooked = self
+                    .arena
+                    .get_literal(node)
+                    .map(|lit| lit.text.clone())
+                    .unwrap_or_default();
+                let raw = self.template_raw_text(node, &cooked);
+                Some(TemplateParts {
+                    cooked: vec![cooked],
+                    raw: vec![raw],
+                    expressions: Vec::new(),
+                })
+            }
+            k if k == syntax_kind_ext::TEMPLATE_EXPRESSION => {
+                let tpl = self.arena.get_template_expr(node)?;
+                let mut cooked = Vec::with_capacity(tpl.template_spans.nodes.len() + 1);
+                let mut raw = Vec::with_capacity(tpl.template_spans.nodes.len() + 1);
+                let mut expressions = Vec::with_capacity(tpl.template_spans.nodes.len());
+
+                let head_node = self.arena.get(tpl.head)?;
+                let head_text = self
+                    .arena
+                    .get_literal(head_node)
+                    .map(|lit| lit.text.clone())
+                    .unwrap_or_default();
+                let head_raw = self.template_raw_text(head_node, &head_text);
+                cooked.push(head_text);
+                raw.push(head_raw);
+
+                for &span_idx in &tpl.template_spans.nodes {
+                    let span_node = self.arena.get(span_idx)?;
+                    let span = self.arena.get_template_span(span_node)?;
+                    expressions.push(span.expression);
+
+                    let literal_node = self.arena.get(span.literal)?;
+                    let literal_text = self
+                        .arena
+                        .get_literal(literal_node)
+                        .map(|lit| lit.text.clone())
+                        .unwrap_or_default();
+                    let literal_raw = self.template_raw_text(literal_node, &literal_text);
+                    cooked.push(literal_text);
+                    raw.push(literal_raw);
+                }
+
+                Some(TemplateParts {
+                    cooked,
+                    raw,
+                    expressions,
+                })
+            }
+            _ => None,
+        }
+    }
+
+    fn template_raw_text(&self, node: &ThinNode, cooked_fallback: &str) -> String {
+        let Some(text) = self.source_text else {
+            return cooked_fallback.to_string();
+        };
+
+        let (skip_leading, allow_dollar_brace, allow_backtick) = match node.kind {
+            k if k == SyntaxKind::NoSubstitutionTemplateLiteral as u16 => (1_usize, false, true),
+            k if k == SyntaxKind::TemplateHead as u16 => (1_usize, true, true),
+            k if k == SyntaxKind::TemplateMiddle as u16 => (1_usize, true, true),
+            k if k == SyntaxKind::TemplateTail as u16 => (1_usize, false, true),
+            _ => return cooked_fallback.to_string(),
+        };
+
+        let start = node.pos as usize;
+        if start >= text.len() {
+            return cooked_fallback.to_string();
+        }
+
+        let bytes = text.as_bytes();
+        let mut i = start + skip_leading;
+        while i < bytes.len() {
+            let ch = bytes[i];
+            if ch == b'\\' {
+                i += 1;
+                if i < bytes.len() {
+                    i += 1;
+                }
+                continue;
+            }
+
+            if allow_backtick && ch == b'`' {
+                return text[start + skip_leading..i].to_string();
+            }
+
+            if allow_dollar_brace && ch == b'$' && i + 1 < bytes.len() && bytes[i + 1] == b'{' {
+                return text[start + skip_leading..i].to_string();
+            }
+
+            i += 1;
+        }
+
+        cooked_fallback.to_string()
     }
 
     // =========================================================================
@@ -5928,12 +6131,25 @@ impl<'a> ThinPrinter<'a> {
         if self.ctx.target_es5 && self.needs_rest_helper() {
             helpers.rest = true;
         }
+        if self.ctx.target_es5 && self.needs_make_template_object_helper() {
+            helpers.make_template_object = true;
+        }
 
         // Emit all needed helpers
         let helpers_code = crate::transforms::helpers::emit_helpers(&helpers);
         if !helpers_code.is_empty() {
             self.write(&helpers_code);
             // emit_helpers() already adds newlines, no need to add more
+        }
+
+        if self.ctx.target_es5 {
+            let template_vars = self.collect_tagged_template_vars();
+            if !template_vars.is_empty() {
+                self.write("var ");
+                self.write(&template_vars.join(", "));
+                self.write(";");
+                self.write_line();
+            }
         }
 
         // CommonJS: Emit __esModule and exports initialization (AFTER helpers)
@@ -6432,6 +6648,26 @@ impl<'a> ThinPrinter<'a> {
 
             false
         })
+    }
+
+    fn needs_make_template_object_helper(&self) -> bool {
+        self.arena.nodes.iter().any(|node| {
+            node.kind == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION
+        })
+    }
+
+    fn tagged_template_var_name(&self, idx: NodeIndex) -> String {
+        format!("__templateObject_{}", idx.0)
+    }
+
+    fn collect_tagged_template_vars(&self) -> Vec<String> {
+        let mut vars = Vec::new();
+        for (idx, node) in self.arena.nodes.iter().enumerate() {
+            if node.kind == syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION {
+                vars.push(self.tagged_template_var_name(NodeIndex(idx as u32)));
+            }
+        }
+        vars
     }
 
     /// Check if a statement contains a class that extends another (recursive)
