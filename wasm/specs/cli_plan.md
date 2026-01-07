@@ -30,7 +30,7 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Focused parser coverage for checker.ts:15885 (`everyType` arrow with optional chaining + ternary/comma) via `test_thin_parser_checker_every_type_arrow_optional_chain` and `test_thin_parser_checker_every_type_arrow_optional_chain_line`.
 - Bound file merge now preserves persistent scopes for stateless checking; CLI binder reconstruction uses them to resolve locals.
 - Focused checker regression: `test_thin_checker_resolves_function_parameter_from_bound_state`.
-- Focused binder regression: `test_thin_binder_resolves_parameter_from_bound_state` (binder.ts:331:9 `node` param resolves to parameter symbol).
+- Focused binder regressions: `test_thin_binder_resolves_parameter_from_bound_state` (simple bound-state param) and `test_thin_binder_resolves_parameter_from_bound_state_module_instance_state` (binder.ts:331:9 `node` param).
 - Latest bench gap from rerun: `src/compiler/binder.ts:432:37` (TS2304: cannot find name `statements`).
 - Latest attempt: `npm install --no-save --no-package-lock typescript @types/node`, `cargo build --release --bin tsz`, `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 3 --warmup 1` → tsz failed before timing; tsc not run.
 - Bench harness update: fixed BSD `/usr/bin/time -l` parsing in `wasm/bench_cli.sh` so elapsed time is read from the `real` token.
@@ -130,7 +130,8 @@ Tests run in this state:
 - `./wasm/test.sh thin_parser_tests::test_thin_parser_checker_every_type_arrow_optional_chain_line` (pass).
 - `./wasm/test.sh thin_checker_tests::test_thin_checker_resolves_function_parameter_from_bound_state` (pass).
 - `./wasm/test.sh thin_binder_tests::test_thin_binder_resolves_parameter_from_bound_state` (pass).
-- `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (failed: tsz diagnostics; first error remains `src/compiler/binder.ts:432:37` (TS2304 `Cannot find name 'statements'`), captured via `./wasm/target/release/tsz --project src/compiler/tsconfig.json --noEmit 2>&1 | rg -m1 'TS[0-9]+'`).
+- `./wasm/test.sh thin_binder_tests::test_thin_binder_resolves_parameter_from_bound_state_module_instance_state` (pass).
+- `./wasm/bench_cli.sh --repo . --tsconfig src/compiler/tsconfig.json --runs 1 --warmup 1` (rerun after binder.ts:331 regression; first error remains `src/compiler/binder.ts:432:37` (TS2304 `Cannot find name 'statements'`), captured via `./wasm/target/release/tsz --project src/compiler/tsconfig.json --noEmit 2>&1 | rg -m1 'TS[0-9]+'`).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches
