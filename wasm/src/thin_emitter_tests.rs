@@ -408,6 +408,28 @@ fn test_thin_emit_array_rest_destructuring_es5() {
 }
 
 #[test]
+fn test_thin_emit_object_literal_computed_shorthand_es5() {
+    let source = "const key = 1; const a = 2; const obj = { [key]: a, a };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("[key] = a"),
+        "Expected computed property assignment in ES5 output: {}",
+        output
+    );
+    assert!(
+        output.contains(".a = a"),
+        "Expected shorthand property assignment in ES5 output: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_object_destructuring_default_es5() {
     let source = "let { x = 1 } = obj;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
