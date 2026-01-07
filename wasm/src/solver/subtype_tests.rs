@@ -1035,6 +1035,136 @@ fn test_object_with_index_property_mismatch_number_index() {
 }
 
 #[test]
+fn test_object_with_index_satisfies_named_property_string_index() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let source = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        number_index: None,
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let target = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_object_with_index_named_property_mismatch_string_index() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let source = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        number_index: None,
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let target = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(!checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_object_with_index_satisfies_numeric_property_number_index() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let source = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        string_index: None,
+    });
+
+    let target = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("0"),
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_object_with_index_noncanonical_numeric_property_fails() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let source = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        number_index: Some(IndexSignature {
+            key_type: TypeId::NUMBER,
+            value_type: TypeId::STRING,
+            readonly: false,
+        }),
+        string_index: None,
+    });
+
+    let target = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("01"),
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(!checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_object_with_index_readonly_index_to_mutable_property_fails() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let source = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        number_index: None,
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: true,
+        }),
+    });
+
+    let target = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(!checker.is_subtype_of(source, target));
+}
+
+#[test]
 fn test_type_parameter_constraint_assignability() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
