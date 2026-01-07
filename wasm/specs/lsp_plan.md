@@ -12,9 +12,9 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
 - JSDoc extraction is complete for hover/signature help, including overload matching.
 
 ## Highest-Impact Next Tasks
-- [ ] JSDoc coverage expansion
-  - [ ] Add overload JSDoc tests for methods/constructors, including `this` and rest params.
-  - [ ] Add JSDoc proximity tests to guard against unrelated comment chaining.
+- [x] JSDoc coverage expansion
+  - [x] Add overload JSDoc tests for methods/constructors, including `this` and rest params.
+  - [x] Add JSDoc proximity tests to guard against unrelated comment chaining.
 - [ ] Error-recovery robustness
   - [ ] Ensure hover/signature help tolerate missing nodes in incomplete calls/expressions.
 - [x] Incremental file updates
