@@ -4,6 +4,7 @@
 
 use crate::checker::types::diagnostics::diagnostic_codes;
 use crate::parser::syntax_kind_ext;
+use crate::scanner::SyntaxKind;
 use crate::thin_parser::ThinParserState;
 use std::mem::size_of;
 
@@ -187,6 +188,76 @@ fn test_thin_parser_object_binding_pattern_span() {
         &source[binding.pos as usize..binding.end as usize],
         binding.pos,
         binding.end
+    );
+}
+
+#[test]
+fn test_thin_parser_no_substitution_template_literal_span() {
+    let source = "const message = `hello`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let literal = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16)
+        .expect("template literal not found");
+    let expected_end = source.rfind('`').expect("` not found") as u32 + 1;
+    assert!(
+        literal.end == expected_end,
+        "span: '{}' ({}..{})",
+        &source[literal.pos as usize..literal.end as usize],
+        literal.pos,
+        literal.end
+    );
+}
+
+#[test]
+fn test_thin_parser_template_expression_spans() {
+    let source = "const message = `hello ${name}!`;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let expr = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == syntax_kind_ext::TEMPLATE_EXPRESSION)
+        .expect("template expression not found");
+    let head = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == SyntaxKind::TemplateHead as u16)
+        .expect("template head not found");
+    let tail = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == SyntaxKind::TemplateTail as u16)
+        .expect("template tail not found");
+
+    let expected_head_end = source.find("${").expect("${ not found") as u32 + 2;
+    let expected_tail_end = source.rfind('`').expect("` not found") as u32 + 1;
+    assert!(
+        head.end == expected_head_end,
+        "span: '{}' ({}..{})",
+        &source[head.pos as usize..head.end as usize],
+        head.pos,
+        head.end
+    );
+    assert!(
+        tail.end == expected_tail_end,
+        "span: '{}' ({}..{})",
+        &source[tail.pos as usize..tail.end as usize],
+        tail.pos,
+        tail.end
+    );
+    assert!(
+        expr.end == expected_tail_end,
+        "span: '{}' ({}..{})",
+        &source[expr.pos as usize..expr.end as usize],
+        expr.pos,
+        expr.end
     );
 }
 

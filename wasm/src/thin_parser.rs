@@ -5521,8 +5521,8 @@ impl ThinParserState {
     fn parse_no_substitution_template_literal(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
         let text = self.scanner.get_token_value_ref().to_string();
-        self.parse_expected(SyntaxKind::NoSubstitutionTemplateLiteral);
         let end_pos = self.token_end();
+        self.parse_expected(SyntaxKind::NoSubstitutionTemplateLiteral);
 
         self.arena.add_literal(
             SyntaxKind::NoSubstitutionTemplateLiteral as u16,
@@ -5539,8 +5539,8 @@ impl ThinParserState {
         // Parse template head: `hello ${
         let head_text = self.scanner.get_token_value_ref().to_string();
         let head_start = self.token_pos();
-        self.parse_expected(SyntaxKind::TemplateHead);
         let head_end = self.token_end();
+        self.parse_expected(SyntaxKind::TemplateHead);
 
         let head = self.arena.add_literal(
             SyntaxKind::TemplateHead as u16,
@@ -5551,7 +5551,7 @@ impl ThinParserState {
 
         // Parse template spans
         let mut spans = Vec::new();
-        loop {
+        let end_pos = loop {
             // Parse expression in ${ }
             let expression = self.parse_expression();
 
@@ -5570,8 +5570,8 @@ impl ThinParserState {
                 SyntaxKind::TemplateMiddle
             };
 
-            self.next_token();
             let literal_end = self.token_end();
+            self.next_token();
 
             let literal = self.arena.add_literal(
                 literal_kind as u16,
@@ -5590,11 +5590,9 @@ impl ThinParserState {
             spans.push(span);
 
             if is_tail {
-                break;
+                break literal_end;
             }
-        }
-
-        let end_pos = self.token_end();
+        };
 
         self.arena.add_template_expr(
             syntax_kind_ext::TEMPLATE_EXPRESSION,
