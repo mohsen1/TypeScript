@@ -111,9 +111,16 @@ impl WatchState {
         reporter: &mut Reporter,
         changed_paths: Option<Vec<PathBuf>>,
     ) -> Result<()> {
-        self.invalidate_caches(changed_paths);
+        let changed_paths_ref = changed_paths.as_deref();
+        self.invalidate_caches(changed_paths_ref);
 
-        match driver::compile_with_cache(args, cwd, &mut self.type_cache) {
+        let result = if let Some(changed_paths) = changed_paths_ref {
+            driver::compile_with_cache_and_changes(args, cwd, &mut self.type_cache, changed_paths)
+        } else {
+            driver::compile_with_cache(args, cwd, &mut self.type_cache)
+        };
+
+        match result {
             Ok(result) => {
                 if !result.diagnostics.is_empty() {
                     let output = reporter.render(&result.diagnostics);
@@ -136,7 +143,7 @@ impl WatchState {
         Ok(())
     }
 
-    fn invalidate_caches(&mut self, changed_paths: Option<Vec<PathBuf>>) {
+    fn invalidate_caches(&mut self, changed_paths: Option<&[PathBuf]>) {
         let Some(paths) = changed_paths else {
             return;
         };
@@ -145,7 +152,7 @@ impl WatchState {
         let mut normalized = Vec::with_capacity(paths.len());
 
         for path in paths {
-            let path = canonicalize_or_owned(&path);
+            let path = canonicalize_or_owned(path);
             if self.is_config_path(&path) {
                 clear_cache = true;
             }
@@ -155,7 +162,7 @@ impl WatchState {
         if clear_cache {
             self.type_cache.clear();
         } else {
-            self.type_cache.invalidate_paths(normalized);
+            self.type_cache.invalidate_paths_with_dependents(normalized);
         }
     }
 

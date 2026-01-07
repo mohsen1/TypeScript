@@ -1,5 +1,7 @@
 use super::args::CliArgs;
-use super::driver::{compile, compile_with_cache, CompilationCache};
+use super::driver::{
+    compile, compile_with_cache, compile_with_cache_and_changes, CompilationCache,
+};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -508,6 +510,105 @@ fn compile_node_next_prefers_cts_for_commonjs_package() {
 }
 
 #[test]
+fn compile_with_cache_emits_only_dirty_files() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "files": ["src/alpha.ts", "src/beta.ts"]
+        }"#,
+    );
+
+    let alpha_path = base.join("src/alpha.ts");
+    let beta_path = base.join("src/beta.ts");
+    write_file(&alpha_path, "export const alpha = 1;");
+    write_file(&beta_path, "export const beta = 2;");
+
+    let mut cache = CompilationCache::default();
+    let args = default_args();
+
+    let result = compile_with_cache(&args, base, &mut cache).expect("compile should succeed");
+    assert!(result.diagnostics.is_empty());
+
+    let alpha_output = std::fs::canonicalize(base.join("dist/src/alpha.js"))
+        .unwrap_or_else(|_| base.join("dist/src/alpha.js"));
+    let beta_output = std::fs::canonicalize(base.join("dist/src/beta.js"))
+        .unwrap_or_else(|_| base.join("dist/src/beta.js"));
+    assert_eq!(result.emitted_files.len(), 2);
+    assert!(result.emitted_files.contains(&alpha_output));
+    assert!(result.emitted_files.contains(&beta_output));
+
+    write_file(&alpha_path, "export const alpha = 2;");
+    let canonical = std::fs::canonicalize(&alpha_path).unwrap_or(alpha_path.clone());
+    cache.invalidate_paths_with_dependents(vec![canonical]);
+
+    let result = compile_with_cache(&args, base, &mut cache).expect("compile should succeed");
+    assert!(result.diagnostics.is_empty());
+    assert_eq!(result.emitted_files.len(), 1);
+    assert!(result.emitted_files.contains(&alpha_output));
+    assert!(!result.emitted_files.contains(&beta_output));
+}
+
+#[test]
+fn compile_with_cache_updates_dependencies_for_changed_files() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+
+    let index_path = base.join("src/index.ts");
+    let util_path = base.join("src/util.ts");
+    let extra_path = base.join("src/extra.ts");
+    write_file(
+        &index_path,
+        "import { value } from './util'; export { value };",
+    );
+    write_file(&util_path, "export const value = ;");
+
+    let mut cache = CompilationCache::default();
+    let args = default_args();
+
+    let result = compile_with_cache(&args, base, &mut cache).expect("compile should succeed");
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("util.ts")));
+
+    write_file(
+        &index_path,
+        "import { value } from './extra'; export { value };",
+    );
+    write_file(&extra_path, "export const value = ;");
+
+    let canonical = std::fs::canonicalize(&index_path).unwrap_or(index_path.clone());
+    cache.invalidate_paths_with_dependents(vec![canonical.clone()]);
+
+    let result = compile_with_cache_and_changes(&args, base, &mut cache, &[canonical])
+        .expect("compile should succeed");
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("extra.ts")));
+    assert!(!result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("util.ts")));
+}
+
+#[test]
 fn compile_with_cache_invalidates_paths() {
     let temp = TempDir::new().expect("temp dir");
     let base = &temp.path;
@@ -532,14 +633,62 @@ fn compile_with_cache_invalidates_paths() {
     assert!(!result.diagnostics.is_empty());
     assert_eq!(cache.len(), 1);
     assert_eq!(cache.bind_len(), 1);
+    assert_eq!(cache.diagnostics_len(), 1);
 
     let canonical = std::fs::canonicalize(&index_path).unwrap_or(index_path.clone());
-    cache.invalidate_paths(vec![canonical]);
+    cache.invalidate_paths_with_dependents(vec![canonical]);
     assert_eq!(cache.len(), 0);
     assert_eq!(cache.bind_len(), 0);
+    assert_eq!(cache.diagnostics_len(), 0);
 
     let result = compile_with_cache(&args, base, &mut cache).expect("compile should succeed");
     assert!(!result.diagnostics.is_empty());
     assert_eq!(cache.len(), 1);
     assert_eq!(cache.bind_len(), 1);
+    assert_eq!(cache.diagnostics_len(), 1);
+}
+
+#[test]
+fn compile_with_cache_invalidates_dependents() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "noEmitOnError": true
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    let index_path = base.join("src/index.ts");
+    let util_path = base.join("src/util.ts");
+    write_file(
+        &index_path,
+        "import { value } from './util'; export { value };",
+    );
+    write_file(&util_path, "export const value = ;");
+
+    let mut cache = CompilationCache::default();
+    let args = default_args();
+
+    let result = compile_with_cache(&args, base, &mut cache).expect("compile should succeed");
+    assert!(!result.diagnostics.is_empty());
+    assert_eq!(cache.len(), 2);
+    assert_eq!(cache.bind_len(), 2);
+    assert_eq!(cache.diagnostics_len(), 2);
+
+    let canonical = std::fs::canonicalize(&util_path).unwrap_or(util_path.clone());
+    cache.invalidate_paths_with_dependents(vec![canonical]);
+    assert_eq!(cache.len(), 0);
+    assert_eq!(cache.bind_len(), 0);
+    assert_eq!(cache.diagnostics_len(), 0);
+
+    let result = compile_with_cache(&args, base, &mut cache).expect("compile should succeed");
+    assert!(!result.diagnostics.is_empty());
+    assert_eq!(cache.len(), 2);
+    assert_eq!(cache.bind_len(), 2);
+    assert_eq!(cache.diagnostics_len(), 2);
 }

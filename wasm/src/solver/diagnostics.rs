@@ -348,19 +348,19 @@ impl<'a> TypeFormatter<'a> {
             related: Vec::new(),
         };
 
-        // Render related diagnostics, falling back to the primary span when needed.
+        // Render related diagnostics, falling back to the primary span.
+        let fallback_span = pending.span.clone()
+            .unwrap_or_else(|| SourceSpan::new("<unknown>", 0, 0));
         for related in &pending.related {
-            let span = related.span.as_ref().or(pending.span.as_ref());
-            if let Some(span) = span {
-                let related_msg = self.render_template(
-                    get_message_template(related.code),
-                    &related.args
-                );
-                diag.related.push(RelatedInformation {
-                    span: span.clone(),
-                    message: related_msg,
-                });
-            }
+            let related_msg = self.render_template(
+                get_message_template(related.code),
+                &related.args
+            );
+            let span = related.span.clone().unwrap_or_else(|| fallback_span.clone());
+            diag.related.push(RelatedInformation {
+                span,
+                message: related_msg,
+            });
         }
 
         diag
@@ -467,12 +467,12 @@ impl<'a> TypeFormatter<'a> {
                 let elements = self.interner.tuple_list(*elements);
                 self.format_tuple(elements.as_ref())
             }
-            TypeKey::Function(shape) => {
-                let shape = self.interner.function_shape(*shape);
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(*shape_id);
                 self.format_function(shape.as_ref())
             }
-            TypeKey::Callable(shape) => {
-                let shape = self.interner.callable_shape(*shape);
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(*shape_id);
                 self.format_callable(shape.as_ref())
             }
             TypeKey::TypeParameter(info) => self.atom(info.name).to_string(),

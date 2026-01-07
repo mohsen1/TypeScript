@@ -50,6 +50,7 @@ enum PropertyMerge {
 struct MethodOverloads {
     signatures: Vec<CallSignature>,
     optional: bool,
+    readonly: bool,
 }
 
 struct IndexSignatureResolver;
@@ -113,7 +114,7 @@ impl InterfaceParts {
         }
     }
 
-    fn merge_method(&mut self, name: Atom, signature: CallSignature, optional: bool) {
+    fn merge_method(&mut self, name: Atom, signature: CallSignature, optional: bool, readonly: bool) {
         use std::collections::hash_map::Entry;
 
         match self.properties.entry(name) {
@@ -121,6 +122,7 @@ impl InterfaceParts {
                 entry.insert(PropertyMerge::Method(MethodOverloads {
                     signatures: vec![signature],
                     optional,
+                    readonly,
                 }));
             }
             Entry::Occupied(mut entry) => {
@@ -128,6 +130,7 @@ impl InterfaceParts {
                     PropertyMerge::Method(methods) => {
                         methods.signatures.push(signature);
                         methods.optional |= optional;
+                        methods.readonly &= readonly;
                     }
                     PropertyMerge::Property(prop) => {
                         let conflict = PropertyInfo {
@@ -874,7 +877,8 @@ impl<'a> TypeLowering<'a> {
                     k if k == syntax_kind_ext::METHOD_SIGNATURE => {
                         if let Some(name) = self.lower_signature_name(sig.name) {
                             let signature = self.lower_call_signature(sig);
-                            parts.merge_method(name, signature, sig.question_token);
+                            let readonly = self.has_readonly_modifier(&sig.modifiers);
+                            parts.merge_method(name, signature, sig.question_token, readonly);
                         }
                     }
                     _ => {
@@ -909,7 +913,7 @@ impl<'a> TypeLowering<'a> {
                         name,
                         type_id,
                         optional: methods.optional,
-                        readonly: false,
+                        readonly: methods.readonly,
                         is_method: true,
                     });
                 }

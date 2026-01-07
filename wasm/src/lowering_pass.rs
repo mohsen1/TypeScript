@@ -42,7 +42,7 @@ use crate::parser::syntax_kind_ext;
 use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::{NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
-use crate::transform_context::{ModuleFormat, TransformContext, TransformDirective};
+use crate::transform_context::{IdentifierId, ModuleFormat, TransformContext, TransformDirective};
 use crate::thin_emitter::ModuleKind;
 use crate::transforms::arrow_es5::contains_this_reference;
 use crate::transforms::private_fields_es5::is_private_identifier;
@@ -579,9 +579,11 @@ impl<'a> LoweringPass<'a> {
             if let Some(export_node) = self.arena.get(export_decl.export_clause) {
                 if export_node.kind == syntax_kind_ext::FUNCTION_DECLARATION {
                     if let Some(func) = self.arena.get_function(export_node) {
-                        let func_name = self.get_identifier_text(func.name);
-                        let is_anonymous = func_name == "function"
-                            || !Self::is_valid_identifier_name(&func_name);
+                        let is_anonymous = {
+                            let func_name = self.get_identifier_text_ref(func.name).unwrap_or("");
+                            func_name == "function"
+                                || !Self::is_valid_identifier_name(func_name)
+                        };
                         if is_anonymous {
                             let directive = self.commonjs_default_export_function_directive(
                                 export_decl.export_clause,
@@ -610,8 +612,11 @@ impl<'a> LoweringPass<'a> {
 
                 if export_node.kind == syntax_kind_ext::CLASS_DECLARATION {
                     if let Some(class) = self.arena.get_class(export_node) {
-                        let class_name = self.get_identifier_text(class.name);
-                        if !Self::is_valid_identifier_name(&class_name) {
+                        let is_anonymous = {
+                            let class_name = self.get_identifier_text_ref(class.name).unwrap_or("");
+                            !Self::is_valid_identifier_name(class_name)
+                        };
+                        if is_anonymous {
                             let directive = if self.ctx.target_es5 {
                                 let heritage =
                                     self.get_extends_heritage(&class.heritage_clauses);
@@ -745,7 +750,7 @@ impl<'a> LoweringPass<'a> {
 
         // Get class name only if we might need it for exports.
         let class_name = if is_exported && !class.name.is_none() {
-            Some(self.get_identifier_text(class.name))
+            self.get_identifier_id(class.name)
         } else {
             None
         };
@@ -826,7 +831,7 @@ impl<'a> LoweringPass<'a> {
         };
 
         let func_name = if is_exported && !func.name.is_none() {
-            Some(self.get_identifier_text(func.name))
+            self.get_identifier_id(func.name)
         } else {
             None
         };
@@ -898,7 +903,7 @@ impl<'a> LoweringPass<'a> {
         }
 
         let enum_name = if is_exported && !enum_decl.name.is_none() {
-            Some(self.get_identifier_text(enum_decl.name))
+            self.get_identifier_id(enum_decl.name)
         } else {
             None
         };
@@ -1362,25 +1367,31 @@ impl<'a> LoweringPass<'a> {
             || node.kind == syntax_kind_ext::SPREAD_ELEMENT
     }
 
-    /// Get identifier text from a node index
-    fn get_identifier_text(&self, idx: NodeIndex) -> String {
+    fn get_identifier_id(&self, idx: NodeIndex) -> Option<IdentifierId> {
         if idx.is_none() {
-            return String::new();
+            return None;
         }
 
-        let Some(node) = self.arena.get(idx) else {
-            return String::new();
-        };
-
+        let node = self.arena.get(idx)?;
         if node.kind != SyntaxKind::Identifier as u16 {
-            return String::new();
+            return None;
         }
 
-        let Some(ident) = self.arena.get_identifier(node) else {
-            return String::new();
-        };
+        Some(node.data_index)
+    }
 
-        ident.escaped_text.clone()
+    fn get_identifier_text_ref(&self, idx: NodeIndex) -> Option<&str> {
+        if idx.is_none() {
+            return None;
+        }
+
+        let node = self.arena.get(idx)?;
+        if node.kind != SyntaxKind::Identifier as u16 {
+            return None;
+        }
+
+        let ident = self.arena.get_identifier(node)?;
+        Some(&ident.escaped_text)
     }
 
     fn is_valid_identifier_name(name: &str) -> bool {
@@ -1394,14 +1405,14 @@ impl<'a> LoweringPass<'a> {
         chars.all(|ch| ch == '_' || ch == '$' || ch.is_alphanumeric())
     }
 
-    fn get_module_root_name(&self, name_idx: NodeIndex) -> Option<String> {
+    fn get_module_root_name(&self, name_idx: NodeIndex) -> Option<IdentifierId> {
         if name_idx.is_none() {
             return None;
         }
 
         let node = self.arena.get(name_idx)?;
         if node.kind == SyntaxKind::Identifier as u16 {
-            return self.arena.get_identifier(node).map(|id| id.escaped_text.clone());
+            return Some(node.data_index);
         }
 
         if node.kind == syntax_kind_ext::QUALIFIED_NAME {
@@ -1421,7 +1432,7 @@ impl<'a> LoweringPass<'a> {
         }
     }
 
-    fn collect_variable_names(&self, declarations: &NodeList) -> Vec<String> {
+    fn collect_variable_names(&self, declarations: &NodeList) -> Vec<IdentifierId> {
         let mut names = Vec::new();
         for &decl_list_idx in &declarations.nodes {
             let Some(decl_list_node) = self.arena.get(decl_list_idx) else {
@@ -1444,7 +1455,7 @@ impl<'a> LoweringPass<'a> {
         names
     }
 
-    fn collect_binding_names(&self, name_idx: NodeIndex, names: &mut Vec<String>) {
+    fn collect_binding_names(&self, name_idx: NodeIndex, names: &mut Vec<IdentifierId>) {
         if name_idx.is_none() {
             return;
         }
@@ -1454,9 +1465,7 @@ impl<'a> LoweringPass<'a> {
         };
 
         if node.kind == SyntaxKind::Identifier as u16 {
-            if let Some(id) = self.arena.get_identifier(node) {
-                names.push(id.escaped_text.clone());
-            }
+            names.push(node.data_index);
             return;
         }
 
@@ -1479,7 +1488,7 @@ impl<'a> LoweringPass<'a> {
         }
     }
 
-    fn collect_binding_names_from_element(&self, elem_idx: NodeIndex, names: &mut Vec<String>) {
+    fn collect_binding_names_from_element(&self, elem_idx: NodeIndex, names: &mut Vec<IdentifierId>) {
         if elem_idx.is_none() {
             return;
         }
@@ -1937,6 +1946,51 @@ mod tests {
             !transforms.is_empty(),
             "Expected CommonJS export transform for variables"
         );
+    }
+
+    #[test]
+    fn test_lowering_pass_commonjs_export_name_indices() {
+        let (arena, root) = parse("export const x = 1;");
+        let mut ctx = EmitContext::default();
+        ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+        let lowering = LoweringPass::new(&arena, &ctx);
+        let transforms = lowering.run(root);
+
+        let root_node = arena.get(root).expect("expected source file node");
+        let source = arena
+            .get_source_file(root_node)
+            .expect("expected source file data");
+        let stmt_idx = *source
+            .statements
+            .nodes
+            .first()
+            .expect("expected statement");
+        let stmt_node = arena.get(stmt_idx).expect("expected statement node");
+        let var_stmt_idx = if stmt_node.kind == syntax_kind_ext::EXPORT_DECLARATION {
+            let export_decl = arena
+                .get_export_decl(stmt_node)
+                .expect("expected export declaration");
+            export_decl.export_clause
+        } else {
+            stmt_idx
+        };
+        assert!(!var_stmt_idx.is_none(), "expected variable statement node");
+
+        let directive = transforms
+            .get(var_stmt_idx)
+            .expect("expected CommonJS export directive");
+        match directive {
+            TransformDirective::CommonJSExport { names, .. } => {
+                assert_eq!(names.len(), 1, "Expected single exported name");
+                let ident = arena
+                    .identifiers
+                    .get(names[0] as usize)
+                    .expect("expected exported identifier");
+                assert_eq!(ident.escaped_text, "x");
+            }
+            _ => panic!("Expected CommonJSExport directive"),
+        }
     }
 
     #[test]

@@ -28,6 +28,8 @@ use crate::parser::NodeIndex;
 use crate::transforms::helpers::HelpersNeeded;
 use rustc_hash::FxHashMap;
 
+pub type IdentifierId = u32;
+
 /// Transform directives tell the printer how to emit a node differently
 /// than its literal AST representation.
 #[derive(Debug, Clone)]
@@ -88,8 +90,8 @@ pub enum TransformDirective {
     /// exports.Foo = Foo;
     /// ```
     CommonJSExport {
-        /// Names to export
-        names: Vec<String>,
+        /// Identifier ids to export
+        names: Vec<IdentifierId>,
         /// Whether this is a default export
         is_default: bool,
         /// The inner directive to apply first
@@ -358,10 +360,11 @@ mod tests {
     fn test_commonjs_export_chain() {
         let mut ctx = TransformContext::new();
         let class_node = NodeIndex(10);
+        let name_id: IdentifierId = 11;
 
         // Chain ES5 class transform with CommonJS export
         let directive = TransformDirective::CommonJSExport {
-            names: vec!["MyClass".to_string()],
+            names: vec![name_id],
             is_default: false,
             inner: Box::new(TransformDirective::ES5Class {
                 class_node,
@@ -374,7 +377,7 @@ mod tests {
         let retrieved = ctx.get(class_node).unwrap();
         match retrieved {
             TransformDirective::CommonJSExport { names, inner, .. } => {
-                assert_eq!(names, &["MyClass".to_string()]);
+                assert_eq!(names, &[name_id]);
                 assert!(matches!(**inner, TransformDirective::ES5Class { .. }));
             }
             _ => panic!("Expected CommonJSExport directive"),
