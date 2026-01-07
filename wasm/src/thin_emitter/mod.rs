@@ -993,11 +993,10 @@ impl<'a> ThinPrinter<'a> {
             && self.transforms.has_transform(idx);
         let previous_pending = self.pending_source_pos;
 
+        self.queue_source_mapping(node);
         if has_transform {
-            self.pending_source_pos = None;
             self.apply_transform(node, idx);
         } else {
-            self.queue_source_mapping(node);
             let kind = node.kind;
             self.emit_node_by_kind(node, idx, kind);
         }
