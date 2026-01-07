@@ -275,6 +275,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Treat `keyof object` as `never`
 - [x] Treat `keyof null`/`undefined`/`void`/`never` as `never`
 
+### Phase 51: Keyof Union Key Intersection
+- [x] Intersect union `keyof` key sets using literal/primitive overlap
+- [x] Tests for union `keyof` key intersections
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

@@ -17,6 +17,7 @@ use crate::solver::{apparent_primitive_members, ApparentMemberKind, TypeDatabase
 use crate::solver::infer::InferenceContext;
 use crate::solver::subtype::{SubtypeChecker, TypeResolver, NoopResolver};
 use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
+use rustc_hash::FxHashSet;
 
 #[cfg(test)]
 use crate::solver::TypeInterner;
@@ -42,6 +43,57 @@ struct MappedKeys {
     string_literals: Vec<Atom>,
     has_string: bool,
     has_number: bool,
+}
+
+struct KeyofKeySet {
+    string_literals: FxHashSet<Atom>,
+    has_string: bool,
+    has_number: bool,
+    has_symbol: bool,
+}
+
+impl KeyofKeySet {
+    fn new() -> Self {
+        KeyofKeySet {
+            string_literals: FxHashSet::default(),
+            has_string: false,
+            has_number: false,
+            has_symbol: false,
+        }
+    }
+
+    fn insert_type(&mut self, interner: &dyn TypeDatabase, type_id: TypeId) -> bool {
+        let Some(key) = interner.lookup(type_id) else {
+            return false;
+        };
+
+        match key {
+            TypeKey::Union(members) => members
+                .iter()
+                .all(|&member| self.insert_type(interner, member)),
+            TypeKey::Intrinsic(kind) => match kind {
+                IntrinsicKind::String => {
+                    self.has_string = true;
+                    true
+                }
+                IntrinsicKind::Number => {
+                    self.has_number = true;
+                    true
+                }
+                IntrinsicKind::Symbol => {
+                    self.has_symbol = true;
+                    true
+                }
+                IntrinsicKind::Never => true,
+                _ => false,
+            },
+            TypeKey::Literal(LiteralValue::String(atom)) => {
+                self.string_literals.insert(atom);
+                true
+            }
+            _ => false,
+        }
+    }
 }
 
 const ARRAY_METHODS_RETURN_ANY: &[&str] = &[
@@ -438,6 +490,74 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         keys
     }
 
+    fn intersect_keyof_sets(&self, key_sets: &[TypeId]) -> Option<TypeId> {
+        let mut parsed_sets = Vec::with_capacity(key_sets.len());
+        for &key_set in key_sets {
+            let mut parsed = KeyofKeySet::new();
+            if !parsed.insert_type(self.interner, key_set) {
+                return None;
+            }
+            parsed_sets.push(parsed);
+        }
+
+        let mut all_string = true;
+        let mut string_possible = true;
+        let mut common_literals: Option<FxHashSet<Atom>> = None;
+        let mut all_number = true;
+        let mut all_symbol = true;
+
+        for set in &parsed_sets {
+            if set.has_string {
+                // string index signatures don't restrict literal key overlap
+            } else {
+                all_string = false;
+                if set.string_literals.is_empty() {
+                    string_possible = false;
+                } else {
+                    common_literals = Some(match common_literals {
+                        Some(mut existing) => {
+                            existing.retain(|atom| set.string_literals.contains(atom));
+                            existing
+                        }
+                        None => set.string_literals.clone(),
+                    });
+                }
+            }
+
+            if !set.has_number {
+                all_number = false;
+            }
+            if !set.has_symbol {
+                all_symbol = false;
+            }
+        }
+
+        let mut result_keys = Vec::new();
+        if string_possible {
+            if all_string {
+                result_keys.push(TypeId::STRING);
+            } else if let Some(common) = common_literals {
+                for atom in common {
+                    result_keys.push(self.interner.intern(TypeKey::Literal(LiteralValue::String(atom))));
+                }
+            }
+        }
+        if all_number {
+            result_keys.push(TypeId::NUMBER);
+        }
+        if all_symbol {
+            result_keys.push(TypeId::SYMBOL);
+        }
+
+        if result_keys.is_empty() {
+            Some(TypeId::NEVER)
+        } else if result_keys.len() == 1 {
+            Some(result_keys[0])
+        } else {
+            Some(self.interner.union(result_keys))
+        }
+    }
+
     fn array_member_types(&self) -> Vec<TypeId> {
         vec![
             TypeId::NUMBER,
@@ -831,8 +951,12 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 let key_sets: Vec<TypeId> = members.iter()
                     .map(|&m| self.evaluate_keyof(m))
                     .collect();
-                // Intersection of all key sets
-                self.interner.intersection(key_sets)
+                // Prefer explicit key-set intersection to avoid opaque literal intersections.
+                if let Some(intersection) = self.intersect_keyof_sets(&key_sets) {
+                    intersection
+                } else {
+                    self.interner.intersection(key_sets)
+                }
             }
             TypeKey::Intersection(members) => {
                 // keyof (A & B) = keyof A | keyof B

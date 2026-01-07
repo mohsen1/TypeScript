@@ -1056,6 +1056,100 @@ fn test_keyof_object_with_number_index_signature() {
 }
 
 #[test]
+fn test_keyof_union_disjoint_objects() {
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let obj_b = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![obj_a, obj_b]);
+    let result = evaluate_keyof(&interner, union);
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
+fn test_keyof_union_overlap_objects() {
+    let interner = TypeInterner::new();
+
+    let obj_a = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+    let obj_b = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::BOOLEAN,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("c"),
+            type_id: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union = interner.union(vec![obj_a, obj_b]);
+    let result = evaluate_keyof(&interner, union);
+    let expected = interner.literal_string("b");
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_keyof_union_string_index_overlap_literal() {
+    let interner = TypeInterner::new();
+
+    let obj_index = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+    let obj_literal = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let union = interner.union(vec![obj_index, obj_literal]);
+    let result = evaluate_keyof(&interner, union);
+    let expected = interner.literal_string("a");
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_keyof_empty_object() {
     let interner = TypeInterner::new();
 
