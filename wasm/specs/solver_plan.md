@@ -98,6 +98,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Index access over union objects/keys uses cross-product (no correlation).
 - [x] Add unchecked indexed access coverage for arrays
   - Array index access includes `undefined` only when `noUncheckedIndexedAccess` is enabled.
+- [x] Disable conditional distributivity for tuple-wrapped type params
+  - `[T] extends [U]` remains non-distributive after instantiation.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.
