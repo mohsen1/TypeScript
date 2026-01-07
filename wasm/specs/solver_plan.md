@@ -60,6 +60,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Tuple index access now yields undefined for negative or fractional indices.
 - [x] Add mapped type coverage for primitive keyof (number)
   - Validate mapped types over `keyof number` produce expected boolean properties.
+- [x] Respect type parameter constraints in overlap checks
+  - Binary comparison overlap now considers generic constraints for disjoint primitives.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.

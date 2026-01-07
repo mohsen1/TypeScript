@@ -334,6 +334,39 @@ fn test_binary_overlap_union_literals() {
 }
 
 #[test]
+fn test_binary_overlap_generic_constraint_disjoint() {
+    let interner = TypeInterner::new();
+    let evaluator = BinaryOpEvaluator::new(&interner);
+
+    let type_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    let result = evaluator.evaluate(type_param, TypeId::NUMBER, "===");
+    assert!(matches!(result, BinaryOpResult::TypeError { .. }));
+}
+
+#[test]
+fn test_binary_overlap_generic_constraint_overlap() {
+    let interner = TypeInterner::new();
+    let evaluator = BinaryOpEvaluator::new(&interner);
+
+    let type_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    let result = evaluator.evaluate(type_param, TypeId::STRING, "===");
+    match result {
+        BinaryOpResult::Success(result_type) => assert_eq!(result_type, TypeId::BOOLEAN),
+        _ => panic!("Expected boolean result, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_call_rest_parameter_type_match() {
     let interner = TypeInterner::new();
     let mut subtype = CompatChecker::new(&interner);
