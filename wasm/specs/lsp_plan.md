@@ -70,6 +70,7 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
   - [x] Verify scope cache reuse from hover to signature help after edit across files.
   - [x] Verify scope cache reuse from hover to completions after edit across files.
   - [x] Preserve scope cache for untouched files after other file edits.
+  - [x] Preserve scope cache for suffix export after nested edit across files.
   - [x] Preserve prefix symbols and scope cache after nested function body edits.
   - [x] Warm scope cache assertions for nested edit timing to avoid cold-start flake.
   - [x] Verify scope cache reuse from hover to completions after edit.

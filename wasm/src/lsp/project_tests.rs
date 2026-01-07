@@ -1767,6 +1767,49 @@ fn test_project_scope_cache_reuse_after_other_file_edit() {
 }
 
 #[test]
+fn test_project_scope_cache_reuse_after_nested_edit_suffix_export_across_files() {
+    let mut project = Project::new();
+
+    project.set_file(
+        "a.ts".to_string(),
+        "function outer() {\n  function inner() {\n    return 1;\n  }\n  return inner();\n}\nexport const beta = 1;\n".to_string(),
+    );
+    project.set_file(
+        "b.ts".to_string(),
+        "import { beta } from \"./a\";\nbeta;\n".to_string(),
+    );
+    let position = Position::new(1, 0);
+
+    assert!(project.get_hover("b.ts", position).is_some());
+
+    let edit = {
+        let file = project.file("a.ts").unwrap();
+        let range = range_for_substring(file.source_text(), file.line_map(), "return 1");
+        TextEdit::new(range, "return 2".to_string())
+    };
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
+
+    assert!(project.get_definition("b.ts", position).is_some());
+
+    let timing = project
+        .performance()
+        .timing(ProjectRequestKind::Definition)
+        .expect("Expected timing data for definition");
+
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit after nested edit in other file"
+    );
+    assert_eq!(
+        timing.scope_misses,
+        0,
+        "Expected definition to reuse cached scope after nested edit in other file"
+    );
+}
+
+#[test]
 fn test_project_nested_function_body_edit_preserves_prefix_symbol_and_scope_cache() {
     let mut project = Project::new();
 
