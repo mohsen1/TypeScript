@@ -199,7 +199,7 @@ run_once() {
     elapsed="$(parse_elapsed_seconds "$raw")"
     rss_kb="$(awk -F': ' '/Maximum resident set size/ {print $2}' "$time_file")"
   elif [[ "$TIME_STYLE" = "bsd" ]]; then
-    elapsed="$(awk '/^real/ {print $2}' "$time_file")"
+    elapsed="$(awk '$1=="real" {print $2; exit} $2=="real" {print $1; exit}' "$time_file")"
     rss_kb="$(awk '/maximum resident set size/ {print int($1/1024)}' "$time_file")"
   else
     elapsed="$(awk -F'=' '/wall_seconds/ {print $2}' "$time_file")"
