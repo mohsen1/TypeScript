@@ -1342,3 +1342,60 @@ fn test_legacy_system_wrapper() {
         output
     );
 }
+
+#[test]
+fn test_legacy_amd_wrapper_skips_type_only_imports() {
+    let source = "import { type Foo } from \"./types\"; export const x = 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::AMD,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("define([\"require\", \"exports\"]"),
+        "Expected AMD wrapper without type-only dependencies: {}",
+        output
+    );
+    assert!(
+        output.contains("function (require, exports)"),
+        "Expected AMD factory signature without extra params: {}",
+        output
+    );
+    assert!(
+        !output.contains("\"./types\""),
+        "Type-only import should not add AMD dependency: {}",
+        output
+    );
+}
+
+#[test]
+fn test_legacy_system_wrapper_skips_type_only_exports() {
+    let source = "export { type Foo } from \"./types\"; export const x = 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::System,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("System.register([]"),
+        "Expected System.register without type-only dependencies: {}",
+        output
+    );
+    assert!(
+        !output.contains("\"./types\""),
+        "Type-only export should not add System dependency: {}",
+        output
+    );
+}
