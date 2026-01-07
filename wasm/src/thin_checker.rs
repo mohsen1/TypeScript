@@ -1177,34 +1177,26 @@ impl<'a> ThinCheckerState<'a> {
                     CALL_SIGNATURE => {
                         let (type_params, type_param_updates) = self.push_type_parameters(&sig.type_parameters);
                         let (params, this_type) = self.extract_params_from_signature_in_type_literal(sig);
-                        let return_type = if !sig.type_annotation.is_none() {
-                            self.get_type_from_type_node_in_type_literal(sig.type_annotation)
-                        } else {
-                            TypeId::ANY
-                        };
+                        let (return_type, type_predicate) = self.return_type_and_predicate_in_type_literal(sig.type_annotation);
                         call_signatures.push(CallSignature {
                             type_params,
                             params,
                             this_type,
                             return_type,
-                            type_predicate: None,
+                            type_predicate,
                         });
                         self.pop_type_parameters(type_param_updates);
                     }
                     CONSTRUCT_SIGNATURE => {
                         let (type_params, type_param_updates) = self.push_type_parameters(&sig.type_parameters);
                         let (params, this_type) = self.extract_params_from_signature_in_type_literal(sig);
-                        let return_type = if !sig.type_annotation.is_none() {
-                            self.get_type_from_type_node_in_type_literal(sig.type_annotation)
-                        } else {
-                            TypeId::ANY
-                        };
+                        let (return_type, type_predicate) = self.return_type_and_predicate_in_type_literal(sig.type_annotation);
                         construct_signatures.push(CallSignature {
                             type_params,
                             params,
                             this_type,
                             return_type,
-                            type_predicate: None,
+                            type_predicate,
                         });
                         self.pop_type_parameters(type_param_updates);
                     }
@@ -1217,17 +1209,13 @@ impl<'a> ThinCheckerState<'a> {
                         if member.kind == METHOD_SIGNATURE {
                             let (type_params, type_param_updates) = self.push_type_parameters(&sig.type_parameters);
                             let (params, this_type) = self.extract_params_from_signature_in_type_literal(sig);
-                            let return_type = if !sig.type_annotation.is_none() {
-                                self.get_type_from_type_node_in_type_literal(sig.type_annotation)
-                            } else {
-                                TypeId::ANY
-                            };
+                            let (return_type, type_predicate) = self.return_type_and_predicate_in_type_literal(sig.type_annotation);
                             let shape = FunctionShape {
                                 type_params,
                                 params,
                                 this_type,
                                 return_type,
-                                type_predicate: None,
+                                type_predicate,
                                 is_constructor: false,
                             };
                             self.pop_type_parameters(type_param_updates);
@@ -1436,10 +1424,17 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(sig) = self.ctx.arena.get_signature(member_node) {
                     let (type_params, type_param_updates) = self.push_type_parameters(&sig.type_parameters);
                     let (params, this_type) = self.extract_params_from_signature(sig);
-                    let return_type = if !sig.type_annotation.is_none() {
-                        self.get_type_of_node(sig.type_annotation)
+                    let (return_type, type_predicate) = if !sig.type_annotation.is_none() {
+                        let is_predicate = self.ctx.arena.get(sig.type_annotation)
+                            .map(|node| node.kind == syntax_kind_ext::TYPE_PREDICATE)
+                            .unwrap_or(false);
+                        if is_predicate {
+                            self.return_type_and_predicate(sig.type_annotation)
+                        } else {
+                            (self.get_type_of_node(sig.type_annotation), None)
+                        }
                     } else {
-                        TypeId::ANY
+                        (TypeId::ANY, None)
                     };
 
                     call_signatures.push(SolverCallSignature {
@@ -1447,7 +1442,7 @@ impl<'a> ThinCheckerState<'a> {
                         params,
                         this_type,
                         return_type,
-                        type_predicate: None,
+                        type_predicate,
                     });
                     self.pop_type_parameters(type_param_updates);
                 }
@@ -1456,10 +1451,17 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(sig) = self.ctx.arena.get_signature(member_node) {
                     let (type_params, type_param_updates) = self.push_type_parameters(&sig.type_parameters);
                     let (params, this_type) = self.extract_params_from_signature(sig);
-                    let return_type = if !sig.type_annotation.is_none() {
-                        self.get_type_of_node(sig.type_annotation)
+                    let (return_type, type_predicate) = if !sig.type_annotation.is_none() {
+                        let is_predicate = self.ctx.arena.get(sig.type_annotation)
+                            .map(|node| node.kind == syntax_kind_ext::TYPE_PREDICATE)
+                            .unwrap_or(false);
+                        if is_predicate {
+                            self.return_type_and_predicate(sig.type_annotation)
+                        } else {
+                            (self.get_type_of_node(sig.type_annotation), None)
+                        }
                     } else {
-                        TypeId::ANY
+                        (TypeId::ANY, None)
                     };
 
                     construct_signatures.push(SolverCallSignature {
@@ -1467,7 +1469,7 @@ impl<'a> ThinCheckerState<'a> {
                         params,
                         this_type,
                         return_type,
-                        type_predicate: None,
+                        type_predicate,
                     });
                     self.pop_type_parameters(type_param_updates);
                 }
@@ -1904,17 +1906,120 @@ impl<'a> ThinCheckerState<'a> {
         (params, this_type)
     }
 
+    fn type_predicate_target(&self, param_name: NodeIndex) -> Option<crate::solver::TypePredicateTarget> {
+        use crate::solver::TypePredicateTarget;
+
+        let node = self.ctx.arena.get(param_name)?;
+        if node.kind == SyntaxKind::ThisKeyword as u16 || node.kind == syntax_kind_ext::THIS_TYPE {
+            return Some(TypePredicateTarget::This);
+        }
+
+        self.ctx
+            .arena
+            .get_identifier(node)
+            .map(|ident| TypePredicateTarget::Identifier(self.ctx.types.intern_string(&ident.escaped_text)))
+    }
+
+    fn return_type_and_predicate(&mut self, type_annotation: NodeIndex) -> (TypeId, Option<crate::solver::TypePredicate>) {
+        use crate::solver::TypePredicate;
+
+        if type_annotation.is_none() {
+            return (TypeId::ANY, None);
+        }
+
+        let Some(node) = self.ctx.arena.get(type_annotation) else {
+            return (TypeId::ANY, None);
+        };
+
+        if node.kind != syntax_kind_ext::TYPE_PREDICATE {
+            return (self.get_type_from_type_node(type_annotation), None);
+        }
+
+        let Some(data) = self.ctx.arena.get_type_predicate(node) else {
+            return (TypeId::BOOLEAN, None);
+        };
+
+        let return_type = if data.asserts_modifier {
+            TypeId::VOID
+        } else {
+            TypeId::BOOLEAN
+        };
+
+        let target = match self.type_predicate_target(data.parameter_name) {
+            Some(target) => target,
+            None => return (return_type, None),
+        };
+
+        let type_id = if data.type_node.is_none() {
+            None
+        } else {
+            Some(self.get_type_from_type_node(data.type_node))
+        };
+
+        let predicate = TypePredicate {
+            asserts: data.asserts_modifier,
+            target,
+            type_id,
+        };
+
+        (return_type, Some(predicate))
+    }
+
+    fn return_type_and_predicate_in_type_literal(
+        &mut self,
+        type_annotation: NodeIndex,
+    ) -> (TypeId, Option<crate::solver::TypePredicate>) {
+        use crate::solver::TypePredicate;
+
+        if type_annotation.is_none() {
+            return (TypeId::ANY, None);
+        }
+
+        let Some(node) = self.ctx.arena.get(type_annotation) else {
+            return (TypeId::ANY, None);
+        };
+
+        if node.kind != syntax_kind_ext::TYPE_PREDICATE {
+            return (self.get_type_from_type_node_in_type_literal(type_annotation), None);
+        }
+
+        let Some(data) = self.ctx.arena.get_type_predicate(node) else {
+            return (TypeId::BOOLEAN, None);
+        };
+
+        let return_type = if data.asserts_modifier {
+            TypeId::VOID
+        } else {
+            TypeId::BOOLEAN
+        };
+
+        let target = match self.type_predicate_target(data.parameter_name) {
+            Some(target) => target,
+            None => return (return_type, None),
+        };
+
+        let type_id = if data.type_node.is_none() {
+            None
+        } else {
+            Some(self.get_type_from_type_node_in_type_literal(data.type_node))
+        };
+
+        let predicate = TypePredicate {
+            asserts: data.asserts_modifier,
+            target,
+            type_id,
+        };
+
+        (return_type, Some(predicate))
+    }
+
     fn call_signature_from_function(
         &mut self,
         func: &crate::parser::thin_node::FunctionData,
     ) -> crate::solver::CallSignature {
         let (type_params, type_param_updates) = self.push_type_parameters(&func.type_parameters);
         let (params, this_type) = self.extract_params_from_parameter_list(&func.parameters);
-        let return_type = if !func.type_annotation.is_none() {
-            self.get_type_from_type_node(func.type_annotation)
-        } else {
-            TypeId::ANY
-        };
+        let (return_type, type_predicate) = self.return_type_and_predicate(func.type_annotation);
 
         self.pop_type_parameters(type_param_updates);
 
@@ -1923,7 +2028,7 @@ impl<'a> ThinCheckerState<'a> {
             params,
             this_type,
             return_type,
-            type_predicate: None,
+            type_predicate,
         }
     }
 
@@ -1933,11 +2038,7 @@ impl<'a> ThinCheckerState<'a> {
     ) -> crate::solver::CallSignature {
         let (type_params, type_param_updates) = self.push_type_parameters(&method.type_parameters);
         let (params, this_type) = self.extract_params_from_parameter_list(&method.parameters);
-        let return_type = if !method.type_annotation.is_none() {
-            self.get_type_from_type_node(method.type_annotation)
-        } else {
-            TypeId::ANY
-        };
+        let (return_type, type_predicate) = self.return_type_and_predicate(method.type_annotation);
 
         self.pop_type_parameters(type_param_updates);
 
@@ -1946,7 +2047,7 @@ impl<'a> ThinCheckerState<'a> {
             params,
             this_type,
             return_type,
-            type_predicate: None,
+            type_predicate,
         }
     }
 
@@ -2488,10 +2589,11 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Create a flow analyzer and apply narrowing
-        let analyzer = FlowAnalyzer::new(
+        let analyzer = FlowAnalyzer::with_node_types(
             self.ctx.arena,
             self.ctx.binder,
             self.ctx.types,
+            &self.ctx.node_types,
         );
 
         analyzer.get_flow_type(idx, declared_type, flow_node)
@@ -3903,12 +4005,12 @@ impl<'a> ThinCheckerState<'a> {
         self.check_parameter_properties(&func.parameters.nodes);
 
         // Get return type from annotation or infer
-        let mut return_type = if !func.type_annotation.is_none() {
+        let (mut return_type, type_predicate) = if !func.type_annotation.is_none() {
             // Check return type for parameter properties in function types
             self.check_type_for_parameter_properties(func.type_annotation);
-            self.get_type_from_type_node(func.type_annotation)
+            self.return_type_and_predicate(func.type_annotation)
         } else {
-            TypeId::ANY
+            (TypeId::ANY, None)
         };
 
         // Check the function body (for type errors within the body)
@@ -3931,7 +4033,7 @@ impl<'a> ThinCheckerState<'a> {
             params,
             this_type,
             return_type,
-            type_predicate: None,
+            type_predicate,
             is_constructor: false,
         };
 
@@ -6908,18 +7010,14 @@ impl<'a> ThinCheckerState<'a> {
             if member_node.kind == METHOD_SIGNATURE {
                 let (type_params, type_param_updates) = self.push_type_parameters(&sig.type_parameters);
                 let (params, this_type) = self.extract_params_from_signature(sig);
-                let return_type = if !sig.type_annotation.is_none() {
-                    self.get_type_from_type_node(sig.type_annotation)
-                } else {
-                    TypeId::ANY
-                };
+                let (return_type, type_predicate) = self.return_type_and_predicate(sig.type_annotation);
 
                 let shape = FunctionShape {
                     type_params,
                     params,
                     this_type,
                     return_type,
-                    type_predicate: None,
+                    type_predicate,
                     is_constructor: false,
                 };
                 self.pop_type_parameters(type_param_updates);
