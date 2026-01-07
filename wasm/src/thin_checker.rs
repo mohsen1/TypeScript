@@ -4949,6 +4949,7 @@ impl<'a> ThinCheckerState<'a> {
 
         // Push a scope for type parameters
         self.push_local_scope();
+        let (_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
 
         // Add type parameters to scope
         if let Some(ref type_params) = class.type_parameters {
@@ -5021,6 +5022,7 @@ impl<'a> ThinCheckerState<'a> {
         // Restore previous enclosing class
         self.ctx.enclosing_class = prev_enclosing_class;
 
+        self.pop_type_parameters(type_param_updates);
         self.pop_local_scope();
     }
 
@@ -5627,6 +5629,7 @@ impl<'a> ThinCheckerState<'a> {
         class_data: &crate::parser::thin_node::ClassData,
     ) {
         use crate::checker::types::diagnostics::diagnostic_codes;
+        use crate::solver::{instantiate_type, TypeSubstitution};
         use crate::scanner::SyntaxKind;
 
         // Find base class from heritage clauses (extends, not implements)
@@ -5636,6 +5639,7 @@ impl<'a> ThinCheckerState<'a> {
 
         let mut base_class_idx: Option<NodeIndex> = None;
         let mut base_class_name = String::new();
+        let mut base_type_argument_nodes: Option<Vec<NodeIndex>> = None;
 
         for &clause_idx in &heritage_clauses.nodes {
             let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
@@ -5657,12 +5661,15 @@ impl<'a> ThinCheckerState<'a> {
                     // Handle both cases:
                     // 1. ExpressionWithTypeArguments (e.g., Base<T>)
                     // 2. Simple Identifier (e.g., Base)
-                    let expr_idx = if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
-                        expr_type_args.expression
+                    let (expr_idx, type_arguments) = if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
+                        (expr_type_args.expression, expr_type_args.type_arguments.as_ref())
                     } else {
                         // For simple identifiers without type arguments, the type_node itself is the identifier
-                        type_idx
+                        (type_idx, None)
                     };
+                    if let Some(args) = type_arguments {
+                        base_type_argument_nodes = Some(args.nodes.clone());
+                    }
 
                     // Get the class name from the expression (identifier)
                     if let Some(expr_node) = self.ctx.arena.get(expr_idx) {
@@ -5700,6 +5707,26 @@ impl<'a> ThinCheckerState<'a> {
         let Some(base_class) = self.ctx.arena.get_class(base_node) else {
             return;
         };
+
+        let mut type_args = Vec::new();
+        if let Some(nodes) = base_type_argument_nodes {
+            for arg_idx in nodes {
+                type_args.push(self.get_type_from_type_node(arg_idx));
+            }
+        }
+
+        let (base_type_params, base_type_param_updates) =
+            self.push_type_parameters(&base_class.type_parameters);
+        if type_args.len() < base_type_params.len() {
+            for param in base_type_params.iter().skip(type_args.len()) {
+                let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                type_args.push(fallback);
+            }
+        }
+        if type_args.len() > base_type_params.len() {
+            type_args.truncate(base_type_params.len());
+        }
+        let substitution = TypeSubstitution::from_args(&base_type_params, &type_args);
 
         // Get the derived class name for the error message
         let derived_class_name = if !class_data.name.is_none() {
@@ -5832,6 +5859,8 @@ impl<'a> ThinCheckerState<'a> {
                     _ => continue,
                 };
 
+                let base_type = instantiate_type(self.ctx.types, base_type, &substitution);
+
                 // Skip if base type is ANY
                 if base_type == TypeId::ANY {
                     continue;
@@ -5872,6 +5901,8 @@ impl<'a> ThinCheckerState<'a> {
                 break; // Found matching base member, no need to continue
             }
         }
+
+        self.pop_type_parameters(base_type_param_updates);
     }
 
     /// Check that interface correctly extends its base interfaces (error 2430).
