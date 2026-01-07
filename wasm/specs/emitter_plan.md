@@ -21,6 +21,8 @@ Note:
 
 Pick the most doable and impactful
 
+Next Steps: Cleanup. Remove the legacy inline transformation logic from ThinPrinter to rely strictly on TransformDirective.
+
 1. Integrate LoweringPass into public API (lib.rs exports) [done]
 2. Implement remaining directive handlers (arrow, async, modules) [partial: arrow this-capture (incl. nested) + async arrow downlevel handled; AMD/UMD/System wrappers auto-lower in legacy ThinPrinter]
 3. Deprecate old API, make transforms required [partial: emit/emitModern now use two-phase pipeline; ThinPrinter auto-runs LoweringPass for source files]

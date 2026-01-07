@@ -12,6 +12,8 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 🟢 **Ready to Start** - TypeKey refactor is complete, APIs are stable.
 
 ## Tasks
+*   **Next Steps:** Focus on **Validation**. With so many rules implemented, the risk of regression or interaction bugs is high. Run `tests/cases/compiler` against the new solver logic.
+
 
 ### Phase 1: The Compatibility Layer (compat.rs)
 - [x] Create `CompatChecker` struct
@@ -319,6 +321,22 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 ### Phase 61: Typeof Narrowing Any/Unknown
 - [x] Preserve any and narrow unknown for typeof checks
 - [x] Tests for typeof narrowing with any/unknown
+
+### Phase 62: Typeof Narrowing Intersections
+- [x] Preserve branded primitive/function intersections during typeof narrowing
+- [x] Tests for branded intersection typeof narrowing
+
+### Phase 63: Typeof Narrowing Type Parameters
+- [x] Narrow generic parameters using constraints during typeof checks
+- [x] Tests for constrained/unconstrained type param typeof narrowing
+
+### Phase 64: Typeof Narrowing Negation
+- [x] Exclude function-like types for typeof !== "function"
+- [x] Tests for typeof negation of function types
+
+### Phase 65: Type Parameter Negation Narrowing
+- [x] Narrow type parameters by excluding targets using constraints
+- [x] Tests for type parameter negative narrowing
 
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness

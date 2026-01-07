@@ -249,9 +249,17 @@ impl<'a> NarrowingContext<'a> {
 
         // If source is a union, filter members
         if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
-            let matching: Vec<TypeId> = members.iter()
-                .filter(|&&m| self.is_assignable_to(m, target_type))
-                .copied()
+            let matching: Vec<TypeId> = members
+                .iter()
+                .filter_map(|&member| {
+                    if let Some(narrowed) = self.narrow_type_param(member, target_type) {
+                        return Some(narrowed);
+                    }
+                    if self.is_assignable_to(member, target_type) {
+                        return Some(member);
+                    }
+                    None
+                })
                 .collect();
 
             if matching.is_empty() {
@@ -261,6 +269,10 @@ impl<'a> NarrowingContext<'a> {
             } else {
                 return self.interner.union(matching);
             }
+        }
+
+        if let Some(narrowed) = self.narrow_type_param(source_type, target_type) {
+            return narrowed;
         }
 
         // Check if source is assignable to target
@@ -275,9 +287,21 @@ impl<'a> NarrowingContext<'a> {
     pub fn narrow_excluding_type(&self, source_type: TypeId, excluded_type: TypeId) -> TypeId {
         // If source is a union, filter out matching members
         if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
-            let remaining: Vec<TypeId> = members.iter()
-                .filter(|&&m| !self.is_assignable_to(m, excluded_type))
-                .copied()
+            let remaining: Vec<TypeId> = members
+                .iter()
+                .filter_map(|&member| {
+                    if let Some(narrowed) = self.narrow_type_param_excluding(member, excluded_type) {
+                        if narrowed == TypeId::NEVER {
+                            return None;
+                        }
+                        return Some(narrowed);
+                    }
+                    if self.is_assignable_to(member, excluded_type) {
+                        None
+                    } else {
+                        Some(member)
+                    }
+                })
                 .collect();
 
             if remaining.is_empty() {
@@ -287,6 +311,10 @@ impl<'a> NarrowingContext<'a> {
             } else {
                 return self.interner.union(remaining);
             }
+        }
+
+        if let Some(narrowed) = self.narrow_type_param_excluding(source_type, excluded_type) {
+            return narrowed;
         }
 
         // If source is assignable to excluded, return never
@@ -328,10 +356,38 @@ impl<'a> NarrowingContext<'a> {
 
     /// Check if a type is a function type.
     fn is_function_type(&self, type_id: TypeId) -> bool {
-        matches!(
-            self.interner.lookup(type_id),
-            Some(TypeKey::Function(_) | TypeKey::Callable(_))
-        )
+        match self.interner.lookup(type_id) {
+            Some(TypeKey::Function(_) | TypeKey::Callable(_)) => true,
+            Some(TypeKey::Intersection(members)) => members
+                .iter()
+                .any(|member| self.is_function_type(*member)),
+            _ => false,
+        }
+    }
+
+    /// Narrow a type to exclude function-like members (typeof !== "function").
+    pub fn narrow_excluding_function(&self, source_type: TypeId) -> TypeId {
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(source_type) {
+            let remaining: Vec<TypeId> = members
+                .iter()
+                .filter(|&&member| !self.is_function_type(member))
+                .copied()
+                .collect();
+
+            if remaining.is_empty() {
+                return TypeId::NEVER;
+            } else if remaining.len() == 1 {
+                return remaining[0];
+            } else {
+                return self.interner.union(remaining);
+            }
+        }
+
+        if self.is_function_type(source_type) {
+            TypeId::NEVER
+        } else {
+            source_type
+        }
     }
 
     fn is_object_typeof(&self, type_id: TypeId) -> bool {
@@ -342,12 +398,61 @@ impl<'a> NarrowingContext<'a> {
             | Some(TypeKey::Tuple(_))
             | Some(TypeKey::Mapped(_)) => true,
             Some(TypeKey::ReadonlyType(inner)) => self.is_object_typeof(inner),
+            Some(TypeKey::Intersection(members)) => members
+                .iter()
+                .all(|member| self.is_object_typeof(*member)),
             Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info
                 .constraint
                 .map(|constraint| self.is_object_typeof(constraint))
                 .unwrap_or(false),
             _ => false,
         }
+    }
+
+    fn narrow_type_param(&self, source: TypeId, target: TypeId) -> Option<TypeId> {
+        let info = match self.interner.lookup(source) {
+            Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info,
+            _ => return None,
+        };
+
+        let constraint = info.constraint.unwrap_or(TypeId::UNKNOWN);
+        if constraint == source {
+            return None;
+        }
+
+        let narrowed_constraint = if constraint == TypeId::UNKNOWN {
+            target
+        } else {
+            self.narrow_to_type(constraint, target)
+        };
+
+        if narrowed_constraint == TypeId::NEVER {
+            return None;
+        }
+
+        Some(self.interner.intersection(vec![source, narrowed_constraint]))
+    }
+
+    fn narrow_type_param_excluding(&self, source: TypeId, excluded: TypeId) -> Option<TypeId> {
+        let info = match self.interner.lookup(source) {
+            Some(TypeKey::TypeParameter(info)) | Some(TypeKey::Infer(info)) => info,
+            _ => return None,
+        };
+
+        let constraint = info.constraint?;
+        if constraint == source || constraint == TypeId::UNKNOWN {
+            return None;
+        }
+
+        let narrowed_constraint = self.narrow_excluding_type(constraint, excluded);
+        if narrowed_constraint == constraint {
+            return None;
+        }
+        if narrowed_constraint == TypeId::NEVER {
+            return Some(TypeId::NEVER);
+        }
+
+        Some(self.interner.intersection(vec![source, narrowed_constraint]))
     }
 
     /// Simple assignability check for narrowing purposes.
@@ -377,18 +482,28 @@ impl<'a> NarrowingContext<'a> {
             }
         }
 
-        if target == TypeId::STRING {
-            if matches!(self.interner.lookup(source), Some(TypeKey::TemplateLiteral(_))) {
-                return true;
-            }
-        }
-
-        // null/undefined to object (for typeof "object" narrowing)
+        // object/null for typeof "object"
         if target == TypeId::OBJECT {
             if source == TypeId::NULL {
                 return true;
             }
             if self.is_object_typeof(source) {
+                return true;
+            }
+            return false;
+        }
+
+        if let Some(TypeKey::Intersection(members)) = self.interner.lookup(source) {
+            if members
+                .iter()
+                .any(|member| self.is_assignable_to(*member, target))
+            {
+                return true;
+            }
+        }
+
+        if target == TypeId::STRING {
+            if matches!(self.interner.lookup(source), Some(TypeKey::TemplateLiteral(_))) {
                 return true;
             }
         }

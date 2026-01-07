@@ -7820,8 +7820,8 @@ impl ThinParserState {
 
         // Check for fragment: <>
         if self.is_token(SyntaxKind::GreaterThanToken) {
-            self.next_token(); // consume >
             let end_pos = self.token_end();
+            self.next_token(); // consume >
             return self.arena.add_token(syntax_kind_ext::JSX_OPENING_FRAGMENT, start_pos, end_pos);
         }
 
@@ -7841,8 +7841,8 @@ impl ThinParserState {
         // Check for self-closing: />
         if self.is_token(SyntaxKind::SlashToken) {
             self.next_token(); // consume /
-            self.parse_expected(SyntaxKind::GreaterThanToken);
             let end_pos = self.token_end();
+            self.parse_expected(SyntaxKind::GreaterThanToken);
             return self.arena.add_jsx_opening(
                 syntax_kind_ext::JSX_SELF_CLOSING_ELEMENT,
                 start_pos,
@@ -7856,8 +7856,8 @@ impl ThinParserState {
         }
 
         // Opening element: consume > and continue parsing children
-        self.parse_expected(SyntaxKind::GreaterThanToken);
         let end_pos = self.token_end();
+        self.parse_expected(SyntaxKind::GreaterThanToken);
         self.arena.add_jsx_opening(
             syntax_kind_ext::JSX_OPENING_ELEMENT,
             start_pos,
@@ -8144,8 +8144,8 @@ impl ThinParserState {
     fn parse_jsx_text(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
         let text = self.scanner.get_token_value_ref().to_string();
-        self.next_token();
         let end_pos = self.token_end();
+        self.next_token();
 
         self.arena.add_jsx_text(
             SyntaxKind::JsxText as u16,
@@ -8164,9 +8164,8 @@ impl ThinParserState {
         // In JSX mode, </ is scanned as a single LessThanSlashToken
         self.parse_expected(SyntaxKind::LessThanSlashToken);
         let tag_name = self.parse_jsx_element_name();
-        self.parse_expected(SyntaxKind::GreaterThanToken);
-
         let end_pos = self.token_end();
+        self.parse_expected(SyntaxKind::GreaterThanToken);
         self.arena.add_jsx_closing(
             syntax_kind_ext::JSX_CLOSING_ELEMENT,
             start_pos,
@@ -8182,9 +8181,8 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         // In JSX mode, </ is scanned as a single LessThanSlashToken
         self.parse_expected(SyntaxKind::LessThanSlashToken);
-        self.parse_expected(SyntaxKind::GreaterThanToken);
-
         let end_pos = self.token_end();
+        self.parse_expected(SyntaxKind::GreaterThanToken);
         self.arena.add_token(syntax_kind_ext::JSX_CLOSING_FRAGMENT, start_pos, end_pos)
     }
 
