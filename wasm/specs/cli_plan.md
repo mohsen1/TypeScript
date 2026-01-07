@@ -46,12 +46,13 @@ Resolved behavior:
 Remaining limitation:
 - ES module imports still resolve to `any`, so cross-file type diagnostics are not yet reliable.
 - Source maps are stubbed with a single 0,0 mapping; full node-level mappings still TODO.
-- Symbol-level invalidation mapping does not yet cover `import = require(...)` or re-exports (`export * from`, `export { ... } from`).
+- Symbol-level invalidation mapping still falls back to full invalidation for star re-exports (`export * from`, `export * as ns from`).
 
 Tests run in this state:
 - `./wasm/test.sh cli::driver_tests::compile_with_cache_rechecks_dependents_on_export_change` (pass).
 - `./wasm/test.sh cli::driver_tests::compile_with_cache_skips_dependents_when_exports_unchanged` (pass).
 - `./wasm/test.sh cli::driver_tests::invalidate_paths_with_dependents_symbols_keeps_unrelated_cache` (pass).
+- `./wasm/test.sh cli::driver_tests::invalidate_paths_with_dependents_symbols_handles_reexports` (pass).
 
 ## Highest-Impact Next Tasks
 - [ ] Incremental compilation caches

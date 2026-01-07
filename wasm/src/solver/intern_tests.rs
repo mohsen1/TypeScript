@@ -64,6 +64,17 @@ fn test_interner_union_normalization() {
 }
 
 #[test]
+fn test_interner_union_unknown_dominates() {
+    let interner = TypeInterner::new();
+
+    let with_unknown = interner.union(vec![TypeId::STRING, TypeId::UNKNOWN]);
+    assert_eq!(with_unknown, TypeId::UNKNOWN);
+
+    let only_unknown = interner.union(vec![TypeId::UNKNOWN]);
+    assert_eq!(only_unknown, TypeId::UNKNOWN);
+}
+
+#[test]
 fn test_interner_intersection_normalization() {
     let interner = TypeInterner::new();
 
@@ -86,6 +97,17 @@ fn test_interner_intersection_normalization() {
     // Intersection with `error` should be `error`
     let with_error = interner.intersection(vec![TypeId::STRING, TypeId::ERROR]);
     assert_eq!(with_error, TypeId::ERROR);
+}
+
+#[test]
+fn test_interner_intersection_unknown_identity() {
+    let interner = TypeInterner::new();
+
+    let with_unknown = interner.intersection(vec![TypeId::STRING, TypeId::UNKNOWN]);
+    assert_eq!(with_unknown, TypeId::STRING);
+
+    let only_unknown = interner.intersection(vec![TypeId::UNKNOWN]);
+    assert_eq!(only_unknown, TypeId::UNKNOWN);
 }
 
 #[test]

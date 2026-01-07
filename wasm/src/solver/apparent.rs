@@ -173,7 +173,7 @@ pub fn apparent_primitive_member_kind(
         }
         IntrinsicKind::Symbol => {
             if name == "description" {
-                let description = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+                let description = interner.union2(TypeId::STRING, TypeId::UNDEFINED);
                 return Some(ApparentMemberKind::Value(description));
             }
             if name == "toString" {
@@ -273,7 +273,7 @@ pub fn apparent_primitive_members(
             push_object_members(&mut members, false);
         }
         IntrinsicKind::Symbol => {
-            let description = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+            let description = interner.union2(TypeId::STRING, TypeId::UNDEFINED);
             members.push(ApparentMember {
                 name: "description",
                 kind: ApparentMemberKind::Value(description),

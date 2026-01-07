@@ -165,6 +165,72 @@ fn test_signature_help_between_arguments() {
 }
 
 #[test]
+fn test_signature_help_trailing_comma() {
+    // function foo(a: number, b: string): void {}
+    // foo(1, |);
+    let source = "function foo(a: number, b: string): void {}\nfoo(1, );";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let interner = TypeInterner::new();
+    let line_map = LineMap::build(source);
+
+    let provider = SignatureHelpProvider::new(
+        parser.get_arena(),
+        &binder,
+        &line_map,
+        &interner,
+        source,
+        "test.ts".to_string(),
+    );
+
+    let pos = Position::new(1, 6); // After the comma.
+    let mut cache = None;
+    let help = provider.get_signature_help(root, pos, &mut cache);
+    assert!(help.is_some(), "Should find signature help");
+
+    if let Some(h) = help {
+        assert_eq!(h.active_parameter, 1, "Should be on second parameter after trailing comma");
+    }
+}
+
+#[test]
+fn test_signature_help_comment_comma_ignored() {
+    // function foo(a: number, b: string): void {}
+    // foo(1 /*,*/ |);
+    let source = "function foo(a: number, b: string): void {}\nfoo(1 /*,*/ );";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let interner = TypeInterner::new();
+    let line_map = LineMap::build(source);
+
+    let provider = SignatureHelpProvider::new(
+        parser.get_arena(),
+        &binder,
+        &line_map,
+        &interner,
+        source,
+        "test.ts".to_string(),
+    );
+
+    let pos = Position::new(1, 11); // After the comment, before the close paren.
+    let mut cache = None;
+    let help = provider.get_signature_help(root, pos, &mut cache);
+    assert!(help.is_some(), "Should find signature help");
+
+    if let Some(h) = help {
+        assert_eq!(h.active_parameter, 0, "Should stay on first parameter when comma is only in comment");
+    }
+}
+
+#[test]
 fn test_signature_help_overload_selection() {
     let source = "interface Fn {\n  (a: number): void;\n  (a: number, b: string): void;\n}\ndeclare const fn: Fn;\nfn(1);\nfn(1, \"x\");";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

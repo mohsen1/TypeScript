@@ -15,8 +15,10 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
 - [x] JSDoc coverage expansion
   - [x] Add overload JSDoc tests for methods/constructors, including `this` and rest params.
   - [x] Add JSDoc proximity tests to guard against unrelated comment chaining.
+  - [x] Attach hover JSDoc to single-decl variable statements (use statement start).
 - [ ] Error-recovery robustness
   - [ ] Ensure hover/signature help tolerate missing nodes in incomplete calls/expressions.
+  - [x] Advance active parameter on trailing commas without counting comment commas.
 - [x] Incremental file updates
   - [x] Add `Project::update_file` that applies LSP edits and re-parses.
   - [x] Reuse parsed arena + binder where possible.

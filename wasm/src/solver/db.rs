@@ -42,7 +42,10 @@ pub trait TypeDatabase {
     fn literal_bigint_with_sign(&self, negative: bool, digits: &str) -> TypeId;
 
     fn union(&self, members: Vec<TypeId>) -> TypeId;
+    fn union2(&self, left: TypeId, right: TypeId) -> TypeId;
+    fn union3(&self, first: TypeId, second: TypeId, third: TypeId) -> TypeId;
     fn intersection(&self, members: Vec<TypeId>) -> TypeId;
+    fn intersection2(&self, left: TypeId, right: TypeId) -> TypeId;
     fn array(&self, element: TypeId) -> TypeId;
     fn tuple(&self, elements: Vec<TupleElement>) -> TypeId;
     fn object(&self, properties: Vec<PropertyInfo>) -> TypeId;
@@ -141,8 +144,20 @@ impl TypeDatabase for TypeInterner {
         TypeInterner::union(self, members)
     }
 
+    fn union2(&self, left: TypeId, right: TypeId) -> TypeId {
+        TypeInterner::union2(self, left, right)
+    }
+
+    fn union3(&self, first: TypeId, second: TypeId, third: TypeId) -> TypeId {
+        TypeInterner::union3(self, first, second, third)
+    }
+
     fn intersection(&self, members: Vec<TypeId>) -> TypeId {
         TypeInterner::intersection(self, members)
+    }
+
+    fn intersection2(&self, left: TypeId, right: TypeId) -> TypeId {
+        TypeInterner::intersection2(self, left, right)
     }
 
     fn array(&self, element: TypeId) -> TypeId {
@@ -359,8 +374,20 @@ impl TypeDatabase for QueryCache<'_> {
         self.interner.union(members)
     }
 
+    fn union2(&self, left: TypeId, right: TypeId) -> TypeId {
+        self.interner.union2(left, right)
+    }
+
+    fn union3(&self, first: TypeId, second: TypeId, third: TypeId) -> TypeId {
+        self.interner.union3(first, second, third)
+    }
+
     fn intersection(&self, members: Vec<TypeId>) -> TypeId {
         self.interner.intersection(members)
+    }
+
+    fn intersection2(&self, left: TypeId, right: TypeId) -> TypeId {
+        self.interner.intersection2(left, right)
     }
 
     fn array(&self, element: TypeId) -> TypeId {
