@@ -25,7 +25,7 @@ use crate::solver::subtype::SubtypeChecker;
 use crate::solver::diagnostics::PendingDiagnostic;
 use crate::solver::infer::InferenceContext;
 use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 // =============================================================================
 // Function Call Resolution
@@ -112,11 +112,6 @@ impl<'a> CallEvaluator<'a> {
 
     /// Resolve a call to a simple function type.
     fn resolve_function_call(&mut self, func: &FunctionShape, arg_types: &[TypeId]) -> CallResult {
-        // Handle generic functions
-        if !func.type_params.is_empty() {
-            return self.resolve_generic_call(func, arg_types);
-        }
-
         // Check argument count
         let min_args = func.params.iter().filter(|p| !p.optional && !p.rest).count();
         let max_args = if func.params.iter().any(|p| p.rest) {
@@ -141,6 +136,11 @@ impl<'a> CallEvaluator<'a> {
                     actual: arg_types.len(),
                 };
             }
+        }
+
+        // Handle generic functions
+        if !func.type_params.is_empty() {
+            return self.resolve_generic_call(func, arg_types);
         }
 
         // Check argument types
@@ -230,6 +230,17 @@ impl<'a> CallEvaluator<'a> {
                 param.type_id
             };
 
+            let mut visited = FxHashSet::default();
+            if !self.type_contains_placeholder(target_type, &var_map, &mut visited)
+                && !self.subtype.is_assignable_to(arg_type, target_type)
+            {
+                return CallResult::ArgumentTypeMismatch {
+                    index: i,
+                    expected: target_type,
+                    actual: arg_type,
+                };
+            }
+
             // arg_type <: target_type
             self.constrain_types(&mut infer_ctx, &var_map, arg_type, target_type);
         }
@@ -266,6 +277,144 @@ impl<'a> CallEvaluator<'a> {
 
         let return_type = instantiate_type(self.interner, func.return_type, &final_subst);
         CallResult::Success(return_type)
+    }
+
+    fn type_contains_placeholder(
+        &self,
+        ty: TypeId,
+        var_map: &FxHashMap<TypeId, crate::solver::infer::InferenceVar>,
+        visited: &mut FxHashSet<TypeId>,
+    ) -> bool {
+        if var_map.contains_key(&ty) {
+            return true;
+        }
+        if !visited.insert(ty) {
+            return false;
+        }
+
+        let key = match self.interner.lookup(ty) {
+            Some(key) => key,
+            None => return false,
+        };
+
+        match key {
+            TypeKey::Array(elem) => self.type_contains_placeholder(elem, var_map, visited),
+            TypeKey::Tuple(elements) => elements
+                .iter()
+                .any(|elem| self.type_contains_placeholder(elem.type_id, var_map, visited)),
+            TypeKey::Union(members) | TypeKey::Intersection(members) => members
+                .iter()
+                .any(|&member| self.type_contains_placeholder(member, var_map, visited)),
+            TypeKey::Object(props) => props
+                .iter()
+                .any(|prop| self.type_contains_placeholder(prop.type_id, var_map, visited)),
+            TypeKey::ObjectWithIndex(shape) => {
+                shape
+                    .properties
+                    .iter()
+                    .any(|prop| self.type_contains_placeholder(prop.type_id, var_map, visited))
+                    || shape.string_index.as_ref().is_some_and(|idx| {
+                        self.type_contains_placeholder(idx.key_type, var_map, visited)
+                            || self.type_contains_placeholder(idx.value_type, var_map, visited)
+                    })
+                    || shape.number_index.as_ref().is_some_and(|idx| {
+                        self.type_contains_placeholder(idx.key_type, var_map, visited)
+                            || self.type_contains_placeholder(idx.value_type, var_map, visited)
+                    })
+            }
+            TypeKey::Application(app) => {
+                self.type_contains_placeholder(app.base, var_map, visited)
+                    || app.args.iter().any(|&arg| self.type_contains_placeholder(arg, var_map, visited))
+            }
+            TypeKey::Function(shape) => {
+                shape.type_params.iter().any(|tp| {
+                    tp.constraint
+                        .is_some_and(|constraint| self.type_contains_placeholder(constraint, var_map, visited))
+                        || tp.default
+                            .is_some_and(|default| self.type_contains_placeholder(default, var_map, visited))
+                }) || shape
+                    .params
+                    .iter()
+                    .any(|param| self.type_contains_placeholder(param.type_id, var_map, visited))
+                    || self.type_contains_placeholder(shape.return_type, var_map, visited)
+            }
+            TypeKey::Callable(shape) => {
+                let in_call = shape.call_signatures.iter().any(|sig| {
+                    sig.type_params.iter().any(|tp| {
+                        tp.constraint.is_some_and(|constraint| {
+                            self.type_contains_placeholder(constraint, var_map, visited)
+                        }) || tp.default.is_some_and(|default| {
+                            self.type_contains_placeholder(default, var_map, visited)
+                        })
+                    }) || sig
+                        .params
+                        .iter()
+                        .any(|param| self.type_contains_placeholder(param.type_id, var_map, visited))
+                        || self.type_contains_placeholder(sig.return_type, var_map, visited)
+                });
+                if in_call {
+                    return true;
+                }
+                let in_construct = shape.construct_signatures.iter().any(|sig| {
+                    sig.type_params.iter().any(|tp| {
+                        tp.constraint.is_some_and(|constraint| {
+                            self.type_contains_placeholder(constraint, var_map, visited)
+                        }) || tp.default.is_some_and(|default| {
+                            self.type_contains_placeholder(default, var_map, visited)
+                        })
+                    }) || sig
+                        .params
+                        .iter()
+                        .any(|param| self.type_contains_placeholder(param.type_id, var_map, visited))
+                        || self.type_contains_placeholder(sig.return_type, var_map, visited)
+                });
+                if in_construct {
+                    return true;
+                }
+                shape
+                    .properties
+                    .iter()
+                    .any(|prop| self.type_contains_placeholder(prop.type_id, var_map, visited))
+            }
+            TypeKey::Conditional(cond) => {
+                self.type_contains_placeholder(cond.check_type, var_map, visited)
+                    || self.type_contains_placeholder(cond.extends_type, var_map, visited)
+                    || self.type_contains_placeholder(cond.true_type, var_map, visited)
+                    || self.type_contains_placeholder(cond.false_type, var_map, visited)
+            }
+            TypeKey::Mapped(mapped) => {
+                mapped
+                    .type_param
+                    .constraint
+                    .is_some_and(|constraint| self.type_contains_placeholder(constraint, var_map, visited))
+                    || mapped
+                        .type_param
+                        .default
+                        .is_some_and(|default| self.type_contains_placeholder(default, var_map, visited))
+                    || self.type_contains_placeholder(mapped.constraint, var_map, visited)
+                    || self.type_contains_placeholder(mapped.template, var_map, visited)
+            }
+            TypeKey::IndexAccess(obj, idx) => {
+                self.type_contains_placeholder(obj, var_map, visited)
+                    || self.type_contains_placeholder(idx, var_map, visited)
+            }
+            TypeKey::KeyOf(operand) | TypeKey::ReadonlyType(operand) => {
+                self.type_contains_placeholder(operand, var_map, visited)
+            }
+            TypeKey::TemplateLiteral(spans) => spans.iter().any(|span| match span {
+                TemplateSpan::Text(_) => false,
+                TemplateSpan::Type(inner) => self.type_contains_placeholder(*inner, var_map, visited),
+            }),
+            TypeKey::TypeParameter(_)
+            | TypeKey::Infer(_)
+            | TypeKey::Intrinsic(_)
+            | TypeKey::Literal(_)
+            | TypeKey::Ref(_)
+            | TypeKey::TypeQuery(_)
+            | TypeKey::UniqueSymbol(_)
+            | TypeKey::ThisType
+            | TypeKey::Error => false,
+        }
     }
 
     /// Structural walker to collect constraints: source <: target
