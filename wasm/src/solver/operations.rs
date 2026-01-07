@@ -81,11 +81,16 @@ struct TupleRestExpansion {
 pub struct CallEvaluator<'a, C: AssignabilityChecker> {
     interner: &'a dyn TypeDatabase,
     checker: &'a mut C,
+    defaulted_placeholders: FxHashSet<TypeId>,
 }
 
 impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
     pub fn new(interner: &'a dyn TypeDatabase, checker: &'a mut C) -> Self {
-        CallEvaluator { interner, checker }
+        CallEvaluator {
+            interner,
+            checker,
+            defaulted_placeholders: FxHashSet::default(),
+        }
     }
 
     pub fn infer_call_signature(&mut self, sig: &CallSignature, arg_types: &[TypeId]) -> TypeId {
@@ -164,6 +169,13 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 
     /// Resolve a call to a generic function by inferring type arguments.
     fn resolve_generic_call(&mut self, func: &FunctionShape, arg_types: &[TypeId]) -> CallResult {
+        let previous_defaulted = std::mem::take(&mut self.defaulted_placeholders);
+        let result = self.resolve_generic_call_inner(func, arg_types);
+        self.defaulted_placeholders = previous_defaulted;
+        result
+    }
+
+    fn resolve_generic_call_inner(&mut self, func: &FunctionShape, arg_types: &[TypeId]) -> CallResult {
         let mut infer_ctx = InferenceContext::new(self.interner);
         let mut substitution = TypeSubstitution::new();
         let mut var_map: FxHashMap<TypeId, crate::solver::infer::InferenceVar> = FxHashMap::default();
@@ -186,6 +198,10 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
 
             substitution.insert(tp.name, placeholder_id);
             var_map.insert(placeholder_id, var);
+
+            if tp.default.is_some() {
+                self.defaulted_placeholders.insert(placeholder_id);
+            }
         }
 
         // 2. Instantiate parameters with placeholders
@@ -751,7 +767,10 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     }
                 }
                 if placeholder_count == 1 {
-                    self.constrain_types(ctx, var_map, source, placeholder_member.unwrap());
+                    let member = placeholder_member.unwrap();
+                    if !self.defaulted_placeholders.contains(&member) {
+                        self.constrain_types(ctx, var_map, source, member);
+                    }
                 }
             }
             (Some(TypeKey::Array(s_elem)), Some(TypeKey::Array(t_elem))) => {

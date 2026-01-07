@@ -72,11 +72,9 @@ impl<'a, 'ctx> StatementChecker<'a, 'ctx> {
         };
 
         if let Some(block) = self.ctx.arena.get_block(node) {
-            self.ctx.push_local_scope();
             for &stmt_idx in &block.statements.nodes {
                 self.check(stmt_idx);
             }
-            self.ctx.pop_local_scope();
         }
     }
 
@@ -122,15 +120,11 @@ impl<'a, 'ctx> StatementChecker<'a, 'ctx> {
         };
 
         if let Some(loop_stmt) = self.ctx.arena.get_loop(node) {
-            self.ctx.push_local_scope();
-
             // Check initializer (variable declaration or expression)
             // Check condition
             // Check incrementor
             // Check body
             self.check(loop_stmt.statement);
-
-            self.ctx.pop_local_scope();
         }
     }
 
