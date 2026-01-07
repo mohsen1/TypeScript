@@ -89,6 +89,7 @@ impl<'a> LoweringPass<'a> {
             k if k == syntax_kind_ext::FUNCTION_EXPRESSION => self.visit_function_expression(node, idx),
             k if k == syntax_kind_ext::ARROW_FUNCTION => self.visit_arrow_function(node, idx),
             k if k == syntax_kind_ext::VARIABLE_STATEMENT => self.visit_variable_statement(node, idx),
+            k if k == syntax_kind_ext::ENUM_DECLARATION => self.visit_enum_declaration(node, idx),
             k if k == syntax_kind_ext::EXPORT_DECLARATION => self.visit_export_declaration(node, idx),
             k if k == syntax_kind_ext::FOR_IN_STATEMENT => self.visit_for_in_statement(node),
             k if k == syntax_kind_ext::FOR_OF_STATEMENT => self.visit_for_of_statement(node, idx),
@@ -459,6 +460,10 @@ impl<'a> LoweringPass<'a> {
         self.lower_class_declaration(node, idx, false, false);
     }
 
+    fn visit_enum_declaration(&mut self, node: &ThinNode, idx: NodeIndex) {
+        self.lower_enum_declaration(node, idx, false);
+    }
+
     fn visit_export_declaration(&mut self, node: &ThinNode, _idx: NodeIndex) {
         let Some(export_decl) = self.arena.get_export_decl(node) else {
             return;
@@ -491,6 +496,11 @@ impl<'a> LoweringPass<'a> {
 
             if export_node.kind == syntax_kind_ext::VARIABLE_STATEMENT {
                 self.lower_variable_statement(export_node, export_decl.export_clause, true);
+                return;
+            }
+
+            if export_node.kind == syntax_kind_ext::ENUM_DECLARATION {
+                self.lower_enum_declaration(export_node, export_decl.export_clause, true);
                 return;
             }
         }
@@ -650,6 +660,71 @@ impl<'a> LoweringPass<'a> {
 
         if !func.body.is_none() {
             self.visit(func.body);
+        }
+    }
+
+    fn lower_enum_declaration(
+        &mut self,
+        node: &ThinNode,
+        idx: NodeIndex,
+        force_export: bool,
+    ) {
+        let Some(enum_decl) = self.arena.get_enum(node) else {
+            return;
+        };
+
+        // Skip ambient declarations (declare enum)
+        if self.has_declare_modifier(&enum_decl.modifiers) {
+            return;
+        }
+
+        let mut is_exported = self.is_commonjs()
+            && !self.has_export_assignment
+            && (force_export || self.has_export_modifier(&enum_decl.modifiers));
+        if force_export && self.is_commonjs() && !self.has_export_assignment {
+            is_exported = true;
+        }
+
+        let enum_name = if !enum_decl.name.is_none() {
+            Some(self.get_identifier_text(enum_decl.name))
+        } else {
+            None
+        };
+
+        let base_directive = if self.ctx.target_es5 {
+            TransformDirective::ES5Enum { enum_node: idx }
+        } else {
+            TransformDirective::Identity
+        };
+
+        let final_directive = if is_exported && enum_name.is_some() {
+            let export_directive = TransformDirective::CommonJSExport {
+                names: vec![enum_name.unwrap()],
+                is_default: false,
+                inner: Box::new(TransformDirective::Identity),
+            };
+
+            match base_directive {
+                TransformDirective::Identity => export_directive,
+                other => TransformDirective::Chain(vec![other, export_directive]),
+            }
+        } else {
+            base_directive
+        };
+
+        if !matches!(final_directive, TransformDirective::Identity) {
+            self.transforms.insert(idx, final_directive);
+        }
+
+        for &member_idx in &enum_decl.members.nodes {
+            if let Some(member_node) = self.arena.get(member_idx) {
+                if let Some(member) = self.arena.get_enum_member(member_node) {
+                    self.visit(member.name);
+                    if !member.initializer.is_none() {
+                        self.visit(member.initializer);
+                    }
+                }
+            }
         }
     }
 

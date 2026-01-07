@@ -59,6 +59,12 @@ pub enum TransformDirective {
         members: Vec<NodeIndex>,
     },
 
+    /// ES5 Enum: Transform enum to IIFE pattern
+    ES5Enum {
+        /// Original enum node index
+        enum_node: NodeIndex,
+    },
+
     /// CommonJS Export: Wrap declaration with exports assignment
     ///
     /// ```typescript

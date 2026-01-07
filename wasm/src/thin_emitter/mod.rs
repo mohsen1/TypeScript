@@ -29,6 +29,7 @@ use crate::source_writer::SourceWriter;
 use crate::transform_context::TransformDirective;
 use crate::transform_context::TransformContext;
 use crate::transforms::class_es5::ClassES5Emitter;
+use crate::transforms::enum_es5::EnumES5Emitter;
 use crate::transforms::arrow_es5::contains_this_reference;
 
 // =============================================================================
@@ -726,6 +727,13 @@ impl<'a> ThinPrinter<'a> {
                 self.write(&es5_output);
             }
 
+            TransformDirective::ES5Enum { enum_node } => {
+                let mut enum_emitter = EnumES5Emitter::new(self.arena);
+                enum_emitter.set_indent_level(self.writer.indent_level());
+                let output = enum_emitter.emit_enum(enum_node);
+                self.write(&output);
+            }
+
             TransformDirective::CommonJSExport {
                 names,
                 is_default,
@@ -854,6 +862,12 @@ impl<'a> ThinPrinter<'a> {
                 let es5_output = es5_emitter.emit_class(*class_node);
                 self.write(&es5_output);
             }
+            TransformDirective::ES5Enum { enum_node } => {
+                let mut enum_emitter = EnumES5Emitter::new(self.arena);
+                enum_emitter.set_indent_level(self.writer.indent_level());
+                let output = enum_emitter.emit_enum(*enum_node);
+                self.write(&output);
+            }
             TransformDirective::ES5AsyncFunction { function_node } => {
                 if let Some(func_node) = self.arena.get(*function_node) {
                     if let Some(func) = self.arena.get_function(func_node) {
@@ -928,6 +942,12 @@ impl<'a> ThinPrinter<'a> {
                 }
                 let es5_output = es5_emitter.emit_class(*class_node);
                 self.write(&es5_output);
+            }
+            TransformDirective::ES5Enum { enum_node } => {
+                let mut enum_emitter = EnumES5Emitter::new(self.arena);
+                enum_emitter.set_indent_level(self.writer.indent_level());
+                let output = enum_emitter.emit_enum(*enum_node);
+                self.write(&output);
             }
             TransformDirective::CommonJSExport {
                 names,
@@ -4393,7 +4413,8 @@ impl<'a> ThinPrinter<'a> {
             let clause_kind = clause_node.kind;
             let is_decl = clause_kind == syntax_kind_ext::VARIABLE_STATEMENT
                 || clause_kind == syntax_kind_ext::FUNCTION_DECLARATION
-                || clause_kind == syntax_kind_ext::CLASS_DECLARATION;
+                || clause_kind == syntax_kind_ext::CLASS_DECLARATION
+                || clause_kind == syntax_kind_ext::ENUM_DECLARATION;
 
             if is_decl && !is_anonymous_default && self.transforms.has_transform(export.export_clause) {
                 self.emit(export.export_clause);
@@ -4497,6 +4518,28 @@ impl<'a> ThinPrinter<'a> {
                     if !self.ctx.module_state.has_export_assignment {
                         if let Some(class) = self.arena.get_class(clause_node) {
                             if let Some(name) = self.get_identifier_text_opt(class.name) {
+                                if export.is_default_export {
+                                    self.write("exports.default = ");
+                                } else {
+                                    self.write("exports.");
+                                    self.write(&name);
+                                    self.write(" = ");
+                                }
+                                self.write(&name);
+                                self.write(";");
+                                self.write_line();
+                            }
+                        }
+                    }
+                }
+                // export enum E {}
+                k if k == syntax_kind_ext::ENUM_DECLARATION => {
+                    self.emit_enum_declaration(clause_node, export.export_clause);
+                    self.write_line();
+
+                    if !self.ctx.module_state.has_export_assignment {
+                        if let Some(enum_decl) = self.arena.get_enum(clause_node) {
+                            if let Some(name) = self.get_identifier_text_opt(enum_decl.name) {
                                 if export.is_default_export {
                                     self.write("exports.default = ");
                                 } else {

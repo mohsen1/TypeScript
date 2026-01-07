@@ -672,6 +672,47 @@ fn test_two_phase_emission_commonjs_default_anonymous_class_export() {
 }
 
 #[test]
+fn test_two_phase_emission_commonjs_export_enum() {
+    let source = "export enum E { A, B = 2 }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::es5();
+    ctx.options.module = crate::thin_emitter::ModuleKind::CommonJS;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    assert!(
+        !transforms.is_empty(),
+        "LoweringPass should generate enum/CommonJS transforms"
+    );
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_module_kind(crate::thin_emitter::ModuleKind::CommonJS);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var E"),
+        "CommonJS output should declare enum variable: {}",
+        output
+    );
+    assert!(
+        output.contains("(function (E)"),
+        "CommonJS output should emit enum IIFE: {}",
+        output
+    );
+    assert!(
+        output.contains("exports.E = E;"),
+        "CommonJS output should export enum: {}",
+        output
+    );
+}
+
+#[test]
 fn test_two_phase_emission_commonjs_auto_detect_exports() {
     let source = "export const x = 1;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
