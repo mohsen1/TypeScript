@@ -1299,6 +1299,42 @@ fn test_project_scope_cache_reuse_hover_to_completions_after_edit() {
 }
 
 #[test]
+fn test_project_scope_cache_reuse_hover_to_signature_help_after_edit() {
+    let mut project = Project::new();
+
+    project.set_file(
+        "a.ts".to_string(),
+        "function foo(a: number, b: string) {}\nfoo(1, \"x\");\n".to_string(),
+    );
+    let hover_position = Position::new(1, 0);
+    let signature_position = Position::new(1, 0);
+
+    let edit = {
+        let file = project.file("a.ts").unwrap();
+        let range = range_for_substring(file.source_text(), file.line_map(), "\"x\"");
+        TextEdit::new(range, "\"y\"".to_string())
+    };
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
+
+    assert!(project.get_hover("a.ts", hover_position).is_some());
+    assert!(project.get_signature_help("a.ts", signature_position).is_some());
+
+    let timing = project
+        .performance()
+        .timing(ProjectRequestKind::SignatureHelp)
+        .expect("Expected timing data for signature help");
+
+    assert!(timing.scope_hits > 0, "Expected scope cache hit from prior hover after edit");
+    assert_eq!(
+        timing.scope_misses,
+        0,
+        "Expected signature help to reuse cached scope after edit"
+    );
+}
+
+#[test]
 fn test_project_scope_cache_reuse_across_requests() {
     let mut project = Project::new();
 
