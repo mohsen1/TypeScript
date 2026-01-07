@@ -38,6 +38,12 @@ pub struct TypeEvaluator<'a, R: TypeResolver = NoopResolver> {
     no_unchecked_indexed_access: bool,
 }
 
+struct MappedKeys {
+    string_literals: Vec<Atom>,
+    has_string: bool,
+    has_number: bool,
+}
+
 impl<'a> TypeEvaluator<'a, NoopResolver> {
     /// Create a new evaluator without a resolver.
     pub fn new(interner: &'a dyn TypeDatabase) -> TypeEvaluator<'a, NoopResolver> {
@@ -439,18 +445,27 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         let keys = self.evaluate_keyof_or_constraint(constraint);
 
         // If we can't determine concrete keys, keep it as a mapped type (deferred)
-        let key_literals = match self.extract_string_literals(keys) {
-            Some(literals) => literals,
-            None => {
-                // Can't evaluate - return deferred mapped type
-                return self.interner.intern(TypeKey::Mapped(Box::new(mapped.clone())));
-            }
+        let key_set = match self.extract_mapped_keys(keys) {
+            Some(keys) => keys,
+            None => return self.interner.intern(TypeKey::Mapped(Box::new(mapped.clone()))),
+        };
+
+        let optional = match mapped.optional_modifier {
+            Some(MappedModifier::Add) => true,
+            Some(MappedModifier::Remove) => false,
+            None => false, // Default: preserve original (but we don't have original info here)
+        };
+
+        let readonly = match mapped.readonly_modifier {
+            Some(MappedModifier::Add) => true,
+            Some(MappedModifier::Remove) => false,
+            None => false,
         };
 
         // Build the resulting object properties
         let mut properties = Vec::new();
 
-        for key_name in key_literals {
+        for key_name in key_set.string_literals {
             // Create substitution: type_param.name -> literal key type
             // First intern the Atom as a literal string type
             let key_literal = self.interner.intern(TypeKey::Literal(LiteralValue::String(key_name)));
@@ -461,19 +476,6 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             // Substitute into the template
             let property_type = instantiate_type(self.interner, mapped.template, &subst);
 
-            // Apply modifiers
-            let optional = match mapped.optional_modifier {
-                Some(MappedModifier::Add) => true,
-                Some(MappedModifier::Remove) => false,
-                None => false, // Default: preserve original (but we don't have original info here)
-            };
-
-            let readonly = match mapped.readonly_modifier {
-                Some(MappedModifier::Add) => true,
-                Some(MappedModifier::Remove) => false,
-                None => false,
-            };
-
             properties.push(PropertyInfo {
                 name: key_name,
                 type_id: property_type,
@@ -483,7 +485,49 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             });
         }
 
-        self.interner.object(properties)
+        let string_index = if key_set.has_string {
+            let key_type = TypeId::STRING;
+            let mut subst = TypeSubstitution::new();
+            subst.insert(mapped.type_param.name, key_type);
+            let mut value_type = instantiate_type(self.interner, mapped.template, &subst);
+            if optional {
+                value_type = self.interner.union(vec![value_type, TypeId::UNDEFINED]);
+            }
+            Some(IndexSignature {
+                key_type,
+                value_type,
+                readonly,
+            })
+        } else {
+            None
+        };
+
+        let number_index = if key_set.has_number {
+            let key_type = TypeId::NUMBER;
+            let mut subst = TypeSubstitution::new();
+            subst.insert(mapped.type_param.name, key_type);
+            let mut value_type = instantiate_type(self.interner, mapped.template, &subst);
+            if optional {
+                value_type = self.interner.union(vec![value_type, TypeId::UNDEFINED]);
+            }
+            Some(IndexSignature {
+                key_type,
+                value_type,
+                readonly,
+            })
+        } else {
+            None
+        };
+
+        if string_index.is_some() || number_index.is_some() {
+            self.interner.object_with_index(ObjectShape {
+                properties,
+                string_index,
+                number_index,
+            })
+        } else {
+            self.interner.object(properties)
+        }
     }
 
     /// Evaluate keyof T - extract the keys of an object type
@@ -631,25 +675,47 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         constraint
     }
 
-    /// Extract string literals from a type (for mapped type iteration)
-    fn extract_string_literals(&self, type_id: TypeId) -> Option<Vec<crate::interner::Atom>> {
+    /// Extract mapped keys from a type (for mapped type iteration)
+    fn extract_mapped_keys(&self, type_id: TypeId) -> Option<MappedKeys> {
         let key = self.interner.lookup(type_id)?;
+
+        let mut keys = MappedKeys {
+            string_literals: Vec::new(),
+            has_string: false,
+            has_number: false,
+        };
 
         match key {
             TypeKey::Literal(LiteralValue::String(s)) => {
-                Some(vec![s])
+                keys.string_literals.push(s);
+                Some(keys)
             }
             TypeKey::Union(members) => {
-                let mut result = Vec::new();
                 for &member in &members {
+                    if member == TypeId::STRING {
+                        keys.has_string = true;
+                        continue;
+                    }
+                    if member == TypeId::NUMBER {
+                        keys.has_number = true;
+                        continue;
+                    }
                     if let Some(TypeKey::Literal(LiteralValue::String(s))) = self.interner.lookup(member) {
-                        result.push(s);
+                        keys.string_literals.push(s);
                     } else {
                         // Non-literal in union - can't fully evaluate
                         return None;
                     }
                 }
-                Some(result)
+                Some(keys)
+            }
+            TypeKey::Intrinsic(IntrinsicKind::String) => {
+                keys.has_string = true;
+                Some(keys)
+            }
+            TypeKey::Intrinsic(IntrinsicKind::Number) => {
+                keys.has_number = true;
+                Some(keys)
             }
             // Can't extract literals from other types
             _ => None,
@@ -754,6 +820,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         let mut key_types = Vec::with_capacity(members.len());
         for member in members {
             key_types.push(self.interner.literal_string(member.name));
+        }
+        if kind == IntrinsicKind::String {
+            key_types.push(TypeId::NUMBER);
         }
         if key_types.is_empty() {
             TypeId::NEVER

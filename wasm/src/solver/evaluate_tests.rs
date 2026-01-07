@@ -890,6 +890,7 @@ fn test_keyof_string_apparent_members() {
             let to_string = interner.literal_string("toString");
             assert!(members.contains(&length));
             assert!(members.contains(&to_string));
+            assert!(members.contains(&TypeId::NUMBER));
         }
         other => panic!("Expected union, got {:?}", other),
     }
@@ -952,13 +953,13 @@ fn test_mapped_type_over_string_keys() {
     let key = interner.lookup(result).expect("Expected object type");
 
     match key {
-        TypeKey::Object(props) => {
+        TypeKey::ObjectWithIndex(shape) => {
             let length = interner.intern_string("length");
             let to_string = interner.intern_string("toString");
             let mut saw_length = false;
             let mut saw_to_string = false;
 
-            for prop in props {
+            for prop in &shape.properties {
                 if prop.name == length {
                     assert_eq!(prop.type_id, TypeId::BOOLEAN);
                     saw_length = true;
@@ -971,6 +972,9 @@ fn test_mapped_type_over_string_keys() {
 
             assert!(saw_length, "missing length property");
             assert!(saw_to_string, "missing toString property");
+            let number_index = shape.number_index.as_ref().expect("expected number index signature");
+            assert_eq!(number_index.key_type, TypeId::NUMBER);
+            assert_eq!(number_index.value_type, TypeId::BOOLEAN);
         }
         other => panic!("Expected object type, got {:?}", other),
     }

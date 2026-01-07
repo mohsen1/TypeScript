@@ -243,6 +243,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Align primitive index-access method types with any-args callable shape
 - [x] Tests for primitive method index access parameter shape
 
+### Phase 43: Keyof String Index Keys
+- [x] Include numeric index keys in `keyof string`
+- [x] Preserve number index signatures when mapping over `keyof string`
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
