@@ -1794,7 +1794,7 @@ impl Project {
                 provider.normalize_rename_at_position(position, &new_name)?
             };
 
-            let (local_name, import_targets, export_names, source_file_name) = {
+            let (symbol_id, local_name, import_targets, export_names, source_file_name) = {
                 let file = self
                     .files
                     .get_mut(file_name)
@@ -1832,7 +1832,13 @@ impl Project {
                 let import_targets = file.import_targets_for_local(&local_name);
                 let export_names = file.exported_names_for_symbol(symbol_id);
 
-                (local_name, import_targets, export_names, file.file_name().to_string())
+                (
+                    symbol_id,
+                    local_name,
+                    import_targets,
+                    export_names,
+                    file.file_name().to_string(),
+                )
             };
 
             let mut workspace_edit = {
@@ -1847,12 +1853,10 @@ impl Project {
                     file.file_name.clone(),
                     file.parser.get_source_text(),
                 );
-                provider.provide_rename_edits_with_scope_cache(
+                provider.provide_rename_edits_for_symbol(
                     file.root(),
-                    position,
+                    symbol_id,
                     normalized_name.clone(),
-                    &mut file.scope_cache,
-                    Some(&mut scope_stats),
                 )?
             };
 

@@ -58,6 +58,7 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
 - [x] Cross-file rename
   - [x] Project-level rename builds workspace edits from multi-file references.
   - [x] Preserve local alias names when renaming exported symbols.
+  - [x] Reuse resolved symbol id to avoid duplicate rename resolution.
 - [x] Diff-based incremental parsing
   - [x] Reparse from the first affected statement and reuse prefix nodes.
 

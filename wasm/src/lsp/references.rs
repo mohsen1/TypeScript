@@ -127,6 +127,33 @@ impl<'a> FindReferences<'a> {
         self.find_references_for_node_internal(root, node_idx, Some(scope_cache), scope_stats)
     }
 
+    pub fn find_references_for_symbol(&self, root: NodeIndex, symbol_id: SymbolId) -> Option<Vec<Location>> {
+        if symbol_id.is_none() {
+            return None;
+        }
+
+        let mut walker = ScopeWalker::new(self.arena, self.binder);
+        let ref_nodes = walker.find_references(root, symbol_id);
+
+        let symbol = self.binder.symbols.get(symbol_id)?;
+        let mut all_nodes = ref_nodes;
+        all_nodes.extend(symbol.declarations.iter().copied());
+
+        all_nodes.sort_by_key(|n| n.0);
+        all_nodes.dedup();
+
+        let locations: Vec<Location> = all_nodes
+            .iter()
+            .filter_map(|&idx| self.location_for_node(idx))
+            .collect();
+
+        if locations.is_empty() {
+            None
+        } else {
+            Some(locations)
+        }
+    }
+
     fn find_references_for_node_internal(
         &self,
         root: NodeIndex,
@@ -423,6 +450,31 @@ mod references_tests {
 
         if let Some(refs) = references {
             // Should find at least the declaration and two usages
+            assert!(refs.len() >= 2, "Should find at least 2 references (declaration + usages)");
+        }
+    }
+
+    #[test]
+    fn test_find_references_for_symbol() {
+        let source = "const x = 1;\nx + x;";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let symbol_id = binder
+            .file_locals
+            .get("x")
+            .expect("Expected symbol for x");
+
+        let line_map = LineMap::build(source);
+        let find_refs = FindReferences::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let references = find_refs.find_references_for_symbol(root, symbol_id);
+
+        assert!(references.is_some(), "Should find references for x");
+        if let Some(refs) = references {
             assert!(refs.len() >= 2, "Should find at least 2 references (declaration + usages)");
         }
     }

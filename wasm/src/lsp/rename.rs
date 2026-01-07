@@ -4,6 +4,7 @@
 //! and workspace edit generation.
 
 use std::collections::HashMap;
+use crate::binder::SymbolId;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::parser::NodeIndex;
 use crate::thin_binder::ThinBinderState;
@@ -132,6 +133,39 @@ impl<'a> RenameProvider<'a> {
         scope_stats: Option<&mut ScopeCacheStats>,
     ) -> Result<WorkspaceEdit, String> {
         self.provide_rename_edits_internal(root, position, new_name, Some(scope_cache), scope_stats)
+    }
+
+    /// Provide rename edits when the symbol has already been resolved.
+    pub fn provide_rename_edits_for_symbol(
+        &self,
+        root: NodeIndex,
+        symbol_id: SymbolId,
+        new_name: String,
+    ) -> Result<WorkspaceEdit, String> {
+        if symbol_id.is_none() {
+            return Err("Could not find symbol to rename".to_string());
+        }
+
+        let finder = FindReferences::new(
+            self.arena,
+            self.binder,
+            self.line_map,
+            self.file_name.clone(),
+            self.source_text,
+        );
+        let locations = finder
+            .find_references_for_symbol(root, symbol_id)
+            .ok_or_else(|| "Could not find symbol to rename".to_string())?;
+
+        let mut workspace_edit = WorkspaceEdit::new();
+        for loc in locations {
+            workspace_edit.add_edit(
+                loc.file_path,
+                TextEdit::new(loc.range, new_name.clone()),
+            );
+        }
+
+        Ok(workspace_edit)
     }
 
     fn provide_rename_edits_internal(
