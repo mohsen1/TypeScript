@@ -1658,9 +1658,14 @@ impl<'a> CodeActionProvider<'a> {
         });
 
         // Replace the expression with the variable name
+        let replacement_text = if self.needs_jsx_expression_wrapper(expr_idx) {
+            format!("{{{}}}", var_name)
+        } else {
+            var_name.clone()
+        };
         edits.push(TextEdit {
             range: replacement_range,
-            new_text: var_name.clone(),
+            new_text: replacement_text,
         });
 
         // Create the workspace edit
@@ -1764,6 +1769,36 @@ impl<'a> CodeActionProvider<'a> {
         }
 
         false
+    }
+
+    fn needs_jsx_expression_wrapper(&self, expr_idx: NodeIndex) -> bool {
+        let node = match self.arena.get(expr_idx) {
+            Some(node) => node,
+            None => return false,
+        };
+
+        if node.kind != syntax_kind_ext::JSX_ELEMENT
+            && node.kind != syntax_kind_ext::JSX_SELF_CLOSING_ELEMENT
+            && node.kind != syntax_kind_ext::JSX_FRAGMENT
+        {
+            return false;
+        }
+
+        let parent = match self.arena.get_extended(expr_idx) {
+            Some(ext) => ext.parent,
+            None => return false,
+        };
+        if parent.is_none() {
+            return false;
+        }
+
+        let parent_node = match self.arena.get(parent) {
+            Some(node) => node,
+            None => return false,
+        };
+
+        parent_node.kind == syntax_kind_ext::JSX_ELEMENT
+            || parent_node.kind == syntax_kind_ext::JSX_FRAGMENT
     }
 
     fn expression_and_statement_share_scope(&self, expr_idx: NodeIndex, stmt_idx: NodeIndex) -> bool {
