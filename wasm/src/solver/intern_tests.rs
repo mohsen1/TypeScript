@@ -89,6 +89,18 @@ fn test_interner_intersection_normalization() {
 }
 
 #[test]
+fn test_interner_intersection_disjoint_primitives() {
+    let interner = TypeInterner::new();
+
+    let disjoint = interner.intersection(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(disjoint, TypeId::NEVER);
+
+    let literal = interner.literal_string("a");
+    let disjoint_literal = interner.intersection(vec![literal, TypeId::BOOLEAN]);
+    assert_eq!(disjoint_literal, TypeId::NEVER);
+}
+
+#[test]
 fn test_interner_object_sorting() {
     let interner = TypeInterner::new();
     use std::sync::Arc;

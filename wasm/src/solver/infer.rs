@@ -127,6 +127,11 @@ impl ConstraintSet {
     }
 }
 
+struct TupleRestExpansion {
+    fixed: Vec<TupleElement>,
+    variadic: Option<TypeId>,
+}
+
 /// Type inference context for a single function call or expression.
 pub struct InferenceContext<'a> {
     interner: &'a dyn TypeDatabase,
@@ -571,8 +576,11 @@ impl<'a> InferenceContext<'a> {
             return true;
         }
 
+        let source_key = self.interner.lookup(source);
+        let target_key = self.interner.lookup(target);
+
         // Check if source is literal of target intrinsic
-        if let Some(TypeKey::Literal(lit)) = self.interner.lookup(source) {
+        if let Some(TypeKey::Literal(lit)) = source_key.as_ref() {
             match (lit, target) {
                 (LiteralValue::String(_), t) if t == TypeId::STRING => return true,
                 (LiteralValue::Number(_), t) if t == TypeId::NUMBER => return true,
@@ -582,27 +590,172 @@ impl<'a> InferenceContext<'a> {
             }
         }
 
+        // Array and tuple structural checks
+        if let (Some(TypeKey::Array(s_elem)), Some(TypeKey::Array(t_elem))) =
+            (source_key.as_ref(), target_key.as_ref())
+        {
+            return self.is_subtype(*s_elem, *t_elem);
+        }
+
+        if let (Some(TypeKey::Tuple(s_elems)), Some(TypeKey::Tuple(t_elems))) =
+            (source_key.as_ref(), target_key.as_ref())
+        {
+            return self.tuple_subtype_of(s_elems, t_elems);
+        }
+
+        if let (Some(TypeKey::Tuple(s_elems)), Some(TypeKey::Array(t_elem))) =
+            (source_key.as_ref(), target_key.as_ref())
+        {
+            return self.tuple_subtype_array(s_elems, *t_elem);
+        }
+
         // Intersection: A & B <: T if either member is a subtype of T
-        if let Some(TypeKey::Intersection(members)) = self.interner.lookup(source) {
+        if let Some(TypeKey::Intersection(members)) = source_key.as_ref() {
             return members.iter().any(|&member| self.is_subtype(member, target));
         }
 
         // Union: A | B <: T if both A <: T and B <: T
-        if let Some(TypeKey::Union(members)) = self.interner.lookup(source) {
+        if let Some(TypeKey::Union(members)) = source_key.as_ref() {
             return members.iter().all(|&member| self.is_subtype(member, target));
         }
 
         // Target intersection: S <: (A & B) if S <: A and S <: B
-        if let Some(TypeKey::Intersection(members)) = self.interner.lookup(target) {
+        if let Some(TypeKey::Intersection(members)) = target_key.as_ref() {
             return members.iter().all(|&member| self.is_subtype(source, member));
         }
 
-        // Check union membership
-        if let Some(TypeKey::Union(members)) = self.interner.lookup(target) {
-            return members.contains(&source);
+        // Target union: S <: (A | B) if S <: A or S <: B
+        if let Some(TypeKey::Union(members)) = target_key.as_ref() {
+            return members.iter().any(|&member| self.is_subtype(source, member));
         }
 
         false
+    }
+
+    fn tuple_subtype_array(&self, source: &[TupleElement], target_elem: TypeId) -> bool {
+        for elem in source {
+            if elem.rest {
+                let expansion = self.expand_tuple_rest(elem.type_id);
+                for fixed in expansion.fixed {
+                    if !self.is_subtype(fixed.type_id, target_elem) {
+                        return false;
+                    }
+                }
+                if let Some(variadic) = expansion.variadic {
+                    if !self.is_subtype(variadic, target_elem) {
+                        return false;
+                    }
+                }
+            } else if !self.is_subtype(elem.type_id, target_elem) {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn tuple_subtype_of(&self, source: &[TupleElement], target: &[TupleElement]) -> bool {
+        let source_required = source.iter().filter(|e| !e.optional && !e.rest).count();
+        let target_required = target.iter().filter(|e| !e.optional && !e.rest).count();
+
+        if source_required < target_required {
+            return false;
+        }
+
+        for (i, t_elem) in target.iter().enumerate() {
+            if t_elem.rest {
+                let expansion = self.expand_tuple_rest(t_elem.type_id);
+                let mut source_iter = source.iter().skip(i);
+
+                for t_fixed in &expansion.fixed {
+                    match source_iter.next() {
+                        Some(s_elem) => {
+                            if s_elem.rest {
+                                return false;
+                            }
+                            if !self.is_subtype(s_elem.type_id, t_fixed.type_id) {
+                                return false;
+                            }
+                        }
+                        None => {
+                            if !t_fixed.optional {
+                                return false;
+                            }
+                        }
+                    }
+                }
+
+                if let Some(variadic) = expansion.variadic {
+                    let variadic_array = self.interner.array(variadic);
+                    for s_elem in source_iter {
+                        if s_elem.rest {
+                            if !self.is_subtype(s_elem.type_id, variadic_array) {
+                                return false;
+                            }
+                        } else if !self.is_subtype(s_elem.type_id, variadic) {
+                            return false;
+                        }
+                    }
+                    return true;
+                }
+
+                if source_iter.next().is_some() {
+                    return false;
+                }
+                return true;
+            }
+
+            if let Some(s_elem) = source.get(i) {
+                if s_elem.rest {
+                    return false;
+                }
+                if !self.is_subtype(s_elem.type_id, t_elem.type_id) {
+                    return false;
+                }
+            } else if !t_elem.optional {
+                return false;
+            }
+        }
+
+        if source.len() > target.len() {
+            return false;
+        }
+
+        if source.iter().any(|elem| elem.rest) {
+            return false;
+        }
+
+        true
+    }
+
+    fn expand_tuple_rest(&self, type_id: TypeId) -> TupleRestExpansion {
+        match self.interner.lookup(type_id) {
+            Some(TypeKey::Array(elem)) => TupleRestExpansion {
+                fixed: Vec::new(),
+                variadic: Some(elem),
+            },
+            Some(TypeKey::Tuple(elements)) => {
+                let mut fixed = Vec::new();
+                for elem in elements {
+                    if elem.rest {
+                        let inner = self.expand_tuple_rest(elem.type_id);
+                        fixed.extend(inner.fixed);
+                        return TupleRestExpansion {
+                            fixed,
+                            variadic: inner.variadic,
+                        };
+                    }
+                    fixed.push(elem.clone());
+                }
+                TupleRestExpansion {
+                    fixed,
+                    variadic: None,
+                }
+            }
+            _ => TupleRestExpansion {
+                fixed: Vec::new(),
+                variadic: Some(type_id),
+            },
+        }
     }
 }
 

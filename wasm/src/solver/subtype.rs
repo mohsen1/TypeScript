@@ -366,6 +366,21 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 SubtypeResult::True
             }
 
+            (TypeKey::TypeParameter(s_info), target_key)
+            | (TypeKey::Infer(s_info), target_key) => {
+                if let TypeKey::TypeParameter(t_info) | TypeKey::Infer(t_info) = target_key {
+                    if s_info.name == t_info.name {
+                        return SubtypeResult::True;
+                    }
+                }
+
+                if let Some(constraint) = s_info.constraint {
+                    return self.check_subtype(constraint, target);
+                }
+
+                SubtypeResult::False
+            }
+
             // object keyword accepts any non-primitive type
             (_, TypeKey::Intrinsic(IntrinsicKind::Object)) => {
                 if self.is_object_keyword_type(source) {
@@ -587,15 +602,6 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             // Unique symbol is a subtype of symbol
             (TypeKey::UniqueSymbol(_), TypeKey::Intrinsic(IntrinsicKind::Symbol)) => {
                 SubtypeResult::True
-            }
-
-            // Infer types - identity only
-            (TypeKey::Infer(s_info), TypeKey::Infer(t_info)) => {
-                if s_info.name == t_info.name {
-                    SubtypeResult::True
-                } else {
-                    SubtypeResult::False
-                }
             }
 
             // This type - identity only

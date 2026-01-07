@@ -100,6 +100,8 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Infer tuple rest placeholders from rest tuple arguments
 - [x] Add tuple rest expansion subtyping coverage
 - [x] Handle tuple rest expansion for tuple-to-array subtyping
+- [x] Validate tuple-to-array bounds during inference resolution
+- [x] Allow union upper bounds during inference resolution
 
 ## Architecture Notes
 - Use `ena` crate for union-find data structure

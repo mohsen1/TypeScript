@@ -18,6 +18,17 @@ const SHARD_BITS: u32 = 6;
 const SHARD_COUNT: usize = 1 << SHARD_BITS; // 64 shards
 const SHARD_MASK: u32 = (SHARD_COUNT as u32) - 1;
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum PrimitiveClass {
+    String,
+    Number,
+    Boolean,
+    Bigint,
+    Symbol,
+    Null,
+    Undefined,
+}
+
 struct TypeShard {
     key_to_index: RwLock<FxHashMap<TypeKey, u32>>,
     index_to_key: RwLock<Vec<TypeKey>>,
@@ -294,6 +305,9 @@ impl TypeInterner {
         }
         // Remove `unknown` from intersections (identity element)
         flat.retain(|&id| id != TypeId::UNKNOWN);
+        if self.intersection_has_disjoint_primitives(&flat) {
+            return TypeId::NEVER;
+        }
         if flat.is_empty() {
             return TypeId::UNKNOWN;
         }
@@ -302,6 +316,62 @@ impl TypeInterner {
         }
 
         self.intern(TypeKey::Intersection(flat))
+    }
+
+    fn intersection_has_disjoint_primitives(&self, members: &[TypeId]) -> bool {
+        let mut class: Option<PrimitiveClass> = None;
+
+        for &member in members {
+            let Some(member_class) = self.primitive_class_for(member) else {
+                continue;
+            };
+            if let Some(existing) = class {
+                if existing != member_class {
+                    return true;
+                }
+            } else {
+                class = Some(member_class);
+            }
+        }
+
+        false
+    }
+
+    fn primitive_class_for(&self, type_id: TypeId) -> Option<PrimitiveClass> {
+        match type_id {
+            TypeId::STRING => return Some(PrimitiveClass::String),
+            TypeId::NUMBER => return Some(PrimitiveClass::Number),
+            TypeId::BOOLEAN => return Some(PrimitiveClass::Boolean),
+            TypeId::BIGINT => return Some(PrimitiveClass::Bigint),
+            TypeId::SYMBOL => return Some(PrimitiveClass::Symbol),
+            TypeId::NULL => return Some(PrimitiveClass::Null),
+            TypeId::UNDEFINED | TypeId::VOID => return Some(PrimitiveClass::Undefined),
+            _ => {}
+        }
+
+        let key = self.lookup(type_id)?;
+
+        match key {
+            TypeKey::Intrinsic(kind) => match kind {
+                IntrinsicKind::String => Some(PrimitiveClass::String),
+                IntrinsicKind::Number => Some(PrimitiveClass::Number),
+                IntrinsicKind::Boolean => Some(PrimitiveClass::Boolean),
+                IntrinsicKind::Bigint => Some(PrimitiveClass::Bigint),
+                IntrinsicKind::Symbol => Some(PrimitiveClass::Symbol),
+                IntrinsicKind::Null => Some(PrimitiveClass::Null),
+                IntrinsicKind::Undefined | IntrinsicKind::Void => Some(PrimitiveClass::Undefined),
+                _ => None,
+            },
+            TypeKey::Literal(literal) => match literal {
+                LiteralValue::String(_) => Some(PrimitiveClass::String),
+                LiteralValue::Number(_) => Some(PrimitiveClass::Number),
+                LiteralValue::Boolean(_) => Some(PrimitiveClass::Boolean),
+                LiteralValue::BigInt(_) => Some(PrimitiveClass::Bigint),
+            },
+            TypeKey::UniqueSymbol(_) => Some(PrimitiveClass::Symbol),
+            TypeKey::TemplateLiteral(_) => Some(PrimitiveClass::String),
+            _ => None,
+        }
     }
 
     /// Intern an array type

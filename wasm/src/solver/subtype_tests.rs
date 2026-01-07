@@ -911,6 +911,47 @@ fn test_object_with_index_property_mismatch_number_index() {
 }
 
 #[test]
+fn test_type_parameter_constraint_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    assert!(checker.is_subtype_of(t_param, TypeId::STRING));
+    assert!(!checker.is_subtype_of(t_param, TypeId::NUMBER));
+
+    let unconstrained = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    }));
+    assert!(!checker.is_subtype_of(unconstrained, TypeId::STRING));
+}
+
+#[test]
+fn test_type_parameter_identity_only() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+    let u_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    assert!(!checker.is_subtype_of(t_param, u_param));
+}
+
+#[test]
 fn test_strict_function_variance() {
     use std::sync::Arc;
     let interner = TypeInterner::new();
