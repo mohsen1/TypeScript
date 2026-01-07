@@ -1405,7 +1405,7 @@ impl<'a> ThinCheckerState<'a> {
                                 name: self.ctx.types.intern_string(&id_data.escaped_text),
                                 type_id,
                                 optional: sig.question_token,
-                                readonly: false, // TODO: Check for readonly modifier,
+                                readonly: self.has_readonly_modifier(&sig.modifiers),
                                 is_method: member_node.kind == METHOD_SIGNATURE,
                             });
                         }
@@ -6734,7 +6734,7 @@ impl<'a> ThinCheckerState<'a> {
                     name: name_atom,
                     type_id: self.ctx.types.function(shape),
                     optional: sig.question_token,
-                    readonly: false,
+                    readonly: self.has_readonly_modifier(&sig.modifiers),
                     is_method: true,
                 };
                 return self.ctx.types.object(vec![prop]);
