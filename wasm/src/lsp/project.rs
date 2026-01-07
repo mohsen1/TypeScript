@@ -55,6 +55,11 @@ struct ExportMatch {
     is_type_only: bool,
 }
 
+struct ImportSpecifierTarget {
+    local_ident: NodeIndex,
+    property_name: Option<NodeIndex>,
+}
+
 struct IncrementalUpdatePlan {
     reparse_start: u32,
     prefix_nodes: Vec<NodeIndex>,
@@ -1099,6 +1104,37 @@ impl Project {
         }
     }
 
+    fn collect_file_rename_edits(
+        file: &mut ProjectFile,
+        node_idx: NodeIndex,
+        new_name: &str,
+        output: &mut WorkspaceEdit,
+    ) {
+        let mut locations = Vec::new();
+        Self::collect_file_references(file, node_idx, None, &mut locations);
+        for location in locations {
+            output.add_edit(
+                location.file_path,
+                TextEdit::new(location.range, new_name.to_string()),
+            );
+        }
+    }
+
+    fn dedup_workspace_edit(workspace_edit: &mut WorkspaceEdit) {
+        for edits in workspace_edit.changes.values_mut() {
+            let mut seen = FxHashSet::default();
+            edits.retain(|edit| {
+                let key = (
+                    edit.range.start.line,
+                    edit.range.start.character,
+                    edit.range.end.line,
+                    edit.range.end.character,
+                );
+                seen.insert(key)
+            });
+        }
+    }
+
     fn import_binding_nodes(&self, file: &ProjectFile, target_file: &str, export_name: &str) -> Vec<NodeIndex> {
         let mut bindings = Vec::new();
         let arena = file.arena();
@@ -1157,6 +1193,85 @@ impl Project {
         }
 
         bindings
+    }
+
+    fn import_specifier_targets_for_export(
+        &self,
+        file: &ProjectFile,
+        target_file: &str,
+        export_name: &str,
+    ) -> Vec<ImportSpecifierTarget> {
+        let mut targets = Vec::new();
+        let arena = file.arena();
+
+        let Some(root_node) = arena.get(file.root()) else { return targets; };
+        let Some(source_file) = arena.get_source_file(root_node) else { return targets; };
+
+        for &stmt_idx in &source_file.statements.nodes {
+            let Some(stmt_node) = arena.get(stmt_idx) else { continue; };
+            if stmt_node.kind != syntax_kind_ext::IMPORT_DECLARATION
+                && stmt_node.kind != syntax_kind_ext::IMPORT_EQUALS_DECLARATION {
+                continue;
+            }
+
+            let Some(import) = arena.get_import_decl(stmt_node) else { continue; };
+            let Some(module_specifier) = arena.get_literal_text(import.module_specifier) else { continue; };
+            let Some(resolved) = self.resolve_module_specifier(file.file_name(), module_specifier) else { continue; };
+            if resolved != target_file {
+                continue;
+            }
+
+            if import.import_clause.is_none() {
+                continue;
+            }
+
+            let Some(clause_node) = arena.get(import.import_clause) else { continue; };
+            let Some(clause) = arena.get_import_clause(clause_node) else { continue; };
+
+            if clause.named_bindings.is_none() {
+                continue;
+            }
+
+            let Some(bindings_node) = arena.get(clause.named_bindings) else { continue; };
+            if bindings_node.kind == SyntaxKind::Identifier as u16 {
+                continue;
+            }
+
+            let Some(named) = arena.get_named_imports(bindings_node) else { continue; };
+
+            for &spec_idx in &named.elements.nodes {
+                let Some(spec_node) = arena.get(spec_idx) else { continue; };
+                let Some(spec) = arena.get_specifier(spec_node) else { continue; };
+
+                let export_ident = if !spec.property_name.is_none() {
+                    spec.property_name
+                } else {
+                    spec.name
+                };
+                let Some(export_text) = arena.get_identifier_text(export_ident) else { continue; };
+                if export_text != export_name {
+                    continue;
+                }
+
+                let local_ident = if !spec.name.is_none() {
+                    spec.name
+                } else {
+                    spec.property_name
+                };
+                let property_name = if !spec.property_name.is_none() {
+                    Some(spec.property_name)
+                } else {
+                    None
+                };
+
+                targets.push(ImportSpecifierTarget {
+                    local_ident,
+                    property_name,
+                });
+            }
+        }
+
+        targets
     }
 
     fn named_import_local_names(&self, file: &ProjectFile, target_file: &str, export_name: &str) -> Vec<String> {
@@ -1652,17 +1767,259 @@ impl Project {
             provider.normalize_rename_at_position(position, &new_name)?
         };
 
-        let locations = self
-            .find_references(file_name, position)
-            .ok_or_else(|| "Could not find symbol to rename".to_string())?;
-        let mut workspace_edit = WorkspaceEdit::new();
-        for location in locations {
-            workspace_edit.add_edit(
-                location.file_path,
-                TextEdit::new(location.range, normalized_name.clone()),
+        let (local_name, import_targets, export_names, source_file_name) = {
+            let file = self
+                .files
+                .get_mut(file_name)
+                .ok_or_else(|| "You cannot rename this element.".to_string())?;
+            let offset = file
+                .line_map
+                .position_to_offset(position, file.source_text())
+                .ok_or_else(|| "Could not find symbol to rename".to_string())?;
+            let node_idx = find_node_at_offset(file.arena(), offset);
+            if node_idx.is_none() {
+                return Err("Could not find symbol to rename".to_string());
+            }
+
+            let finder = FindReferences::new(
+                file.parser.get_arena(),
+                &file.binder,
+                &file.line_map,
+                file.file_name.clone(),
+                file.parser.get_source_text(),
             );
+            let symbol_id = finder
+                .resolve_symbol_for_node_with_scope_cache(file.root(), node_idx, &mut file.scope_cache, None)
+                .ok_or_else(|| "Could not find symbol to rename".to_string())?;
+            let symbol = file
+                .binder()
+                .symbols
+                .get(symbol_id)
+                .ok_or_else(|| "Could not find symbol to rename".to_string())?;
+            let local_name = symbol.escaped_name.clone();
+            let import_targets = file.import_targets_for_local(&local_name);
+            let export_names = file.exported_names_for_symbol(symbol_id);
+
+            (local_name, import_targets, export_names, file.file_name().to_string())
+        };
+
+        let mut workspace_edit = {
+            let file = self
+                .files
+                .get_mut(file_name)
+                .ok_or_else(|| "You cannot rename this element.".to_string())?;
+            let provider = RenameProvider::new(
+                file.parser.get_arena(),
+                &file.binder,
+                &file.line_map,
+                file.file_name.clone(),
+                file.parser.get_source_text(),
+            );
+            provider.provide_rename_edits_with_scope_cache(
+                file.root(),
+                position,
+                normalized_name.clone(),
+                &mut file.scope_cache,
+            )?
+        };
+
+        let mut cross_targets = Vec::new();
+
+        if !import_targets.is_empty() {
+            for target in import_targets {
+                let Some(resolved) = self.resolve_module_specifier(&source_file_name, &target.module_specifier) else {
+                    continue;
+                };
+
+                match target.kind {
+                    ImportKind::Named(name) => {
+                        if name == local_name {
+                            cross_targets.push((resolved, name));
+                        }
+                    }
+                    ImportKind::Default => {
+                        cross_targets.push((resolved, "default".to_string()));
+                    }
+                    ImportKind::Namespace => {}
+                }
+            }
         }
 
+        let mut export_names: Vec<String> = export_names
+            .into_iter()
+            .filter(|name| name == &local_name)
+            .collect();
+        export_names.sort();
+        export_names.dedup();
+
+        for export_name in export_names {
+            cross_targets.push((source_file_name.clone(), export_name));
+        }
+
+        if cross_targets.is_empty() {
+            Self::dedup_workspace_edit(&mut workspace_edit);
+            return Ok(workspace_edit);
+        }
+
+        let file_names: Vec<String> = self.files.keys().cloned().collect();
+        let mut pending = cross_targets;
+        let mut seen_targets: FxHashSet<(String, String)> = FxHashSet::default();
+        let mut namespace_targets = Vec::new();
+
+        while let Some((def_file, export_name)) = pending.pop() {
+            if !seen_targets.insert((def_file.clone(), export_name.clone())) {
+                continue;
+            }
+
+            if def_file != file_name {
+                let export_nodes = {
+                    let target_file = self.files.get(&def_file);
+                    target_file
+                        .map(|file| file.export_nodes(&export_name))
+                        .unwrap_or_default()
+                };
+                if !export_nodes.is_empty() {
+                    if let Some(target_file) = self.files.get_mut(&def_file) {
+                        for node in export_nodes {
+                            Self::collect_file_rename_edits(
+                                target_file,
+                                node,
+                                &normalized_name,
+                                &mut workspace_edit,
+                            );
+                        }
+                    }
+                }
+            }
+
+            let mut reexport_refs = Vec::new();
+            let (reexports, reexport_namespaces) =
+                self.reexport_targets_for(&def_file, &export_name, &mut reexport_refs);
+            for location in reexport_refs {
+                workspace_edit.add_edit(
+                    location.file_path,
+                    TextEdit::new(location.range, normalized_name.clone()),
+                );
+            }
+
+            for (reexport_file, reexport_name) in reexports {
+                if reexport_name == export_name {
+                    pending.push((reexport_file, reexport_name));
+                }
+            }
+
+            namespace_targets.extend(reexport_namespaces);
+
+            for other_name in &file_names {
+                if other_name == &def_file {
+                    continue;
+                }
+
+                let import_targets = {
+                    let other_file = self.files.get(other_name);
+                    other_file
+                        .map(|file| self.import_specifier_targets_for_export(file, &def_file, &export_name))
+                        .unwrap_or_default()
+                };
+                if !import_targets.is_empty() {
+                    if let Some(other_file) = self.files.get_mut(other_name) {
+                        for target in import_targets {
+                            if let Some(property_name) = target.property_name {
+                                if let Some(location) = other_file.node_location(property_name) {
+                                    workspace_edit.add_edit(
+                                        location.file_path,
+                                        TextEdit::new(location.range, normalized_name.clone()),
+                                    );
+                                }
+                            } else {
+                                if other_name == file_name {
+                                    continue;
+                                }
+                                Self::collect_file_rename_edits(
+                                    other_file,
+                                    target.local_ident,
+                                    &normalized_name,
+                                    &mut workspace_edit,
+                                );
+                            }
+                        }
+                    }
+                }
+
+                let namespace_names = {
+                    let other_file = self.files.get(other_name);
+                    other_file
+                        .map(|file| self.namespace_import_names(file, &def_file))
+                        .unwrap_or_default()
+                };
+                if !namespace_names.is_empty() {
+                    if let Some(other_file) = self.files.get(other_name) {
+                        let mut locations = Vec::new();
+                        for namespace_name in namespace_names {
+                            self.collect_namespace_member_locations(
+                                other_file,
+                                &namespace_name,
+                                &export_name,
+                                &mut locations,
+                            );
+                        }
+                        for location in locations {
+                            workspace_edit.add_edit(
+                                location.file_path,
+                                TextEdit::new(location.range, normalized_name.clone()),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        let mut seen_namespace_targets: FxHashSet<(String, String, String)> = FxHashSet::default();
+        for target in namespace_targets {
+            if !seen_namespace_targets.insert((
+                target.file.clone(),
+                target.namespace.clone(),
+                target.member.clone(),
+            )) {
+                continue;
+            }
+
+            for other_name in &file_names {
+                if other_name == &target.file {
+                    continue;
+                }
+
+                let local_names = {
+                    let other_file = self.files.get(other_name);
+                    other_file
+                        .map(|file| self.named_import_local_names(file, &target.file, &target.namespace))
+                        .unwrap_or_default()
+                };
+                if local_names.is_empty() {
+                    continue;
+                }
+
+                if let Some(other_file) = self.files.get(other_name) {
+                    let mut locations = Vec::new();
+                    for local_name in local_names {
+                        self.collect_namespace_member_locations(
+                            other_file,
+                            &local_name,
+                            &target.member,
+                            &mut locations,
+                        );
+                    }
+                    for location in locations {
+                        workspace_edit.add_edit(
+                            location.file_path,
+                            TextEdit::new(location.range, normalized_name.clone()),
+                        );
+                    }
+                }
+            }
+        }
+
+        Self::dedup_workspace_edit(&mut workspace_edit);
         Ok(workspace_edit)
     }
 

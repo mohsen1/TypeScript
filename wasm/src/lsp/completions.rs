@@ -371,20 +371,23 @@ impl<'a> Completions<'a> {
         };
 
         match key {
-            TypeKey::Object(properties) => {
-                for prop in properties {
+            TypeKey::Object(shape_id) => {
+                let shape = interner.object_shape(shape_id);
+                for prop in shape.properties.iter() {
                     let name = interner.resolve_atom(prop.name);
                     self.add_property_completion(props, interner, name, prop.type_id, prop.is_method);
                 }
             }
-            TypeKey::ObjectWithIndex(shape) => {
-                for prop in shape.properties {
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = interner.object_shape(shape_id);
+                for prop in shape.properties.iter() {
                     let name = interner.resolve_atom(prop.name);
                     self.add_property_completion(props, interner, name, prop.type_id, prop.is_method);
                 }
             }
             TypeKey::Union(members) | TypeKey::Intersection(members) => {
-                for member in members {
+                let members = interner.type_list(members);
+                for &member in members.iter() {
                     self.collect_properties_for_type(member, interner, checker, visited, props);
                 }
             }
@@ -393,6 +396,7 @@ impl<'a> Completions<'a> {
                 self.collect_properties_for_type(type_id, interner, checker, visited, props);
             }
             TypeKey::Application(app) => {
+                let app = interner.type_application(app);
                 self.collect_properties_for_type(app.base, interner, checker, visited, props);
             }
             TypeKey::Literal(literal) => {

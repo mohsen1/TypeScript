@@ -9,7 +9,7 @@
 //! - Cache-friendly (work with u32 arrays instead of heap objects)
 
 use std::hash::{Hash, Hasher};
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use crate::solver::types::*;
 use crate::interner::{Atom, ShardedInterner};
@@ -75,6 +75,83 @@ impl TypeShard {
     }
 }
 
+struct SliceInterner<T> {
+    items: Vec<Arc<[T]>>,
+    map: FxHashMap<Arc<[T]>, u32>,
+}
+
+impl<T> SliceInterner<T>
+where
+    T: Eq + Hash,
+{
+    fn new() -> Self {
+        let empty: Arc<[T]> = Arc::from(Vec::new());
+        let mut map = FxHashMap::default();
+        map.insert(empty.clone(), 0);
+        SliceInterner {
+            items: vec![empty],
+            map,
+        }
+    }
+
+    fn intern(&mut self, items: Vec<T>) -> u32 {
+        if items.is_empty() {
+            return 0;
+        }
+
+        if let Some(&id) = self.map.get(items.as_slice()) {
+            return id;
+        }
+
+        let arc: Arc<[T]> = items.into();
+        let id = self.items.len() as u32;
+        self.items.push(arc.clone());
+        self.map.insert(arc, id);
+        id
+    }
+
+    fn get(&self, id: u32) -> Option<Arc<[T]>> {
+        self.items.get(id as usize).cloned()
+    }
+
+    fn empty(&self) -> Arc<[T]> {
+        self.items[0].clone()
+    }
+}
+
+struct ValueInterner<T> {
+    items: Vec<Arc<T>>,
+    map: FxHashMap<Arc<T>, u32>,
+}
+
+impl<T> ValueInterner<T>
+where
+    T: Eq + Hash,
+{
+    fn new() -> Self {
+        ValueInterner {
+            items: Vec::new(),
+            map: FxHashMap::default(),
+        }
+    }
+
+    fn intern(&mut self, value: T) -> u32 {
+        if let Some(&id) = self.map.get(&value) {
+            return id;
+        }
+
+        let arc = Arc::new(value);
+        let id = self.items.len() as u32;
+        self.items.push(arc.clone());
+        self.map.insert(arc, id);
+        id
+    }
+
+    fn get(&self, id: u32) -> Option<Arc<T>> {
+        self.items.get(id as usize).cloned()
+    }
+}
+
 /// Type interning table.
 /// Thread-safe via RwLock for concurrent access.
 pub struct TypeInterner {
@@ -83,6 +160,13 @@ pub struct TypeInterner {
     /// String interner for property names and string literals
     /// Thread-safe for concurrent access during type construction
     pub string_interner: ShardedInterner,
+    type_lists: RwLock<SliceInterner<TypeId>>,
+    tuple_lists: RwLock<SliceInterner<TupleElement>>,
+    template_lists: RwLock<SliceInterner<TemplateSpan>>,
+    object_shapes: RwLock<ValueInterner<ObjectShape>>,
+    function_shapes: RwLock<ValueInterner<FunctionShape>>,
+    callable_shapes: RwLock<ValueInterner<CallableShape>>,
+    applications: RwLock<ValueInterner<TypeApplication>>,
 }
 
 impl TypeInterner {
@@ -95,6 +179,13 @@ impl TypeInterner {
                 interner.intern_common();
                 interner
             },
+            type_lists: RwLock::new(SliceInterner::new()),
+            tuple_lists: RwLock::new(SliceInterner::new()),
+            template_lists: RwLock::new(SliceInterner::new()),
+            object_shapes: RwLock::new(ValueInterner::new()),
+            function_shapes: RwLock::new(ValueInterner::new()),
+            callable_shapes: RwLock::new(ValueInterner::new()),
+            applications: RwLock::new(ValueInterner::new()),
         }
     }
 
@@ -108,6 +199,71 @@ impl TypeInterner {
     /// This is used when formatting types for error messages.
     pub fn resolve_atom(&self, atom: Atom) -> String {
         self.string_interner.resolve(atom)
+    }
+
+    pub fn type_list(&self, id: TypeListId) -> Arc<[TypeId]> {
+        let lists = self.type_lists.read().unwrap();
+        lists.get(id.0).unwrap_or_else(|| lists.empty())
+    }
+
+    pub fn tuple_list(&self, id: TupleListId) -> Arc<[TupleElement]> {
+        let lists = self.tuple_lists.read().unwrap();
+        lists.get(id.0).unwrap_or_else(|| lists.empty())
+    }
+
+    pub fn template_list(&self, id: TemplateLiteralId) -> Arc<[TemplateSpan]> {
+        let lists = self.template_lists.read().unwrap();
+        lists.get(id.0).unwrap_or_else(|| lists.empty())
+    }
+
+    pub fn object_shape(&self, id: ObjectShapeId) -> Arc<ObjectShape> {
+        self.object_shapes
+            .read()
+            .unwrap()
+            .get(id.0)
+            .unwrap_or_else(|| Arc::new(ObjectShape {
+                properties: Vec::new(),
+                string_index: None,
+                number_index: None,
+            }))
+    }
+
+    pub fn function_shape(&self, id: FunctionShapeId) -> Arc<FunctionShape> {
+        self.function_shapes
+            .read()
+            .unwrap()
+            .get(id.0)
+            .unwrap_or_else(|| Arc::new(FunctionShape {
+                type_params: Vec::new(),
+                params: Vec::new(),
+                this_type: None,
+                return_type: TypeId::ERROR,
+                type_predicate: None,
+                is_constructor: false,
+            }))
+    }
+
+    pub fn callable_shape(&self, id: CallableShapeId) -> Arc<CallableShape> {
+        self.callable_shapes
+            .read()
+            .unwrap()
+            .get(id.0)
+            .unwrap_or_else(|| Arc::new(CallableShape {
+                call_signatures: Vec::new(),
+                construct_signatures: Vec::new(),
+                properties: Vec::new(),
+            }))
+    }
+
+    pub fn type_application(&self, id: TypeApplicationId) -> Arc<TypeApplication> {
+        self.applications
+            .read()
+            .unwrap()
+            .get(id.0)
+            .unwrap_or_else(|| Arc::new(TypeApplication {
+                base: TypeId::ERROR,
+                args: Vec::new(),
+            }))
     }
 
     /// Intern a type key and return its TypeId.
@@ -161,6 +317,41 @@ impl TypeInterner {
         let shard = self.shards.get(shard_idx)?;
         let storage = shard.index_to_key.read().unwrap();
         storage.get(local_index as usize).cloned()
+    }
+
+    fn intern_type_list(&self, members: Vec<TypeId>) -> TypeListId {
+        let mut lists = self.type_lists.write().unwrap();
+        TypeListId(lists.intern(members))
+    }
+
+    fn intern_tuple_list(&self, elements: Vec<TupleElement>) -> TupleListId {
+        let mut lists = self.tuple_lists.write().unwrap();
+        TupleListId(lists.intern(elements))
+    }
+
+    fn intern_template_list(&self, spans: Vec<TemplateSpan>) -> TemplateLiteralId {
+        let mut lists = self.template_lists.write().unwrap();
+        TemplateLiteralId(lists.intern(spans))
+    }
+
+    fn intern_object_shape(&self, shape: ObjectShape) -> ObjectShapeId {
+        let mut shapes = self.object_shapes.write().unwrap();
+        ObjectShapeId(shapes.intern(shape))
+    }
+
+    fn intern_function_shape(&self, shape: FunctionShape) -> FunctionShapeId {
+        let mut shapes = self.function_shapes.write().unwrap();
+        FunctionShapeId(shapes.intern(shape))
+    }
+
+    fn intern_callable_shape(&self, shape: CallableShape) -> CallableShapeId {
+        let mut shapes = self.callable_shapes.write().unwrap();
+        CallableShapeId(shapes.intern(shape))
+    }
+
+    fn intern_application(&self, application: TypeApplication) -> TypeApplicationId {
+        let mut apps = self.applications.write().unwrap();
+        TypeApplicationId(apps.intern(application))
     }
 
     /// Get the number of interned types
@@ -261,7 +452,8 @@ impl TypeInterner {
         let mut flat: Vec<TypeId> = Vec::new();
         for member in members.drain(..) {
             if let Some(TypeKey::Union(inner)) = self.lookup(member) {
-                flat.extend(inner);
+                let members = self.type_list(inner);
+                flat.extend(members.iter().copied());
             } else {
                 flat.push(member);
             }
@@ -298,7 +490,8 @@ impl TypeInterner {
             return flat[0];
         }
 
-        self.intern(TypeKey::Union(flat))
+        let list_id = self.intern_type_list(flat);
+        self.intern(TypeKey::Union(list_id))
     }
 
     /// Intern an intersection type, normalizing and deduplicating members
@@ -307,7 +500,8 @@ impl TypeInterner {
         let mut flat: Vec<TypeId> = Vec::new();
         for member in members.drain(..) {
             if let Some(TypeKey::Intersection(inner)) = self.lookup(member) {
-                flat.extend(inner);
+                let members = self.type_list(inner);
+                flat.extend(members.iter().copied());
             } else {
                 flat.push(member);
             }
@@ -350,7 +544,8 @@ impl TypeInterner {
             return flat[0];
         }
 
-        self.intern(TypeKey::Intersection(flat))
+        let list_id = self.intern_type_list(flat);
+        self.intern(TypeKey::Intersection(list_id))
     }
 
     fn intersection_has_disjoint_primitives(&self, members: &[TypeId]) -> bool {
@@ -373,15 +568,16 @@ impl TypeInterner {
     }
 
     fn intersection_has_disjoint_object_literals(&self, members: &[TypeId]) -> bool {
-        let mut objects = Vec::new();
+        let mut objects: Vec<Arc<ObjectShape>> = Vec::new();
 
         for &member in members {
             let Some(key) = self.lookup(member) else {
                 continue;
             };
             match key {
-                TypeKey::Object(props) => objects.push(props),
-                TypeKey::ObjectWithIndex(shape) => objects.push(shape.properties),
+                TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                    objects.push(self.object_shape(shape_id));
+                }
                 _ => {}
             }
         }
@@ -392,7 +588,10 @@ impl TypeInterner {
 
         for i in 0..objects.len() {
             for j in (i + 1)..objects.len() {
-                if self.object_literals_disjoint(&objects[i], &objects[j]) {
+                if self.object_literals_disjoint(
+                    objects[i].properties.as_slice(),
+                    objects[j].properties.as_slice(),
+                ) {
                     return true;
                 }
             }
@@ -444,9 +643,10 @@ impl TypeInterner {
         match key {
             TypeKey::Literal(literal) => Some(LiteralSet::from_literal(literal)),
             TypeKey::Union(members) => {
+                let members = self.type_list(members);
                 let mut domain: Option<LiteralDomain> = None;
                 let mut values = FxHashSet::default();
-                for member in members {
+                for &member in members.iter() {
                     let Some(TypeKey::Literal(literal)) = self.lookup(member) else {
                         return None;
                     };
@@ -517,31 +717,46 @@ impl TypeInterner {
 
     /// Intern a tuple type
     pub fn tuple(&self, elements: Vec<TupleElement>) -> TypeId {
-        self.intern(TypeKey::Tuple(elements))
+        let list_id = self.intern_tuple_list(elements);
+        self.intern(TypeKey::Tuple(list_id))
     }
 
     /// Intern an object type with properties
     pub fn object(&self, mut properties: Vec<PropertyInfo>) -> TypeId {
         // Sort by property name for consistent hashing
         properties.sort_by(|a, b| a.name.cmp(&b.name));
-        self.intern(TypeKey::Object(properties))
+        let shape_id = self.intern_object_shape(ObjectShape {
+            properties,
+            string_index: None,
+            number_index: None,
+        });
+        self.intern(TypeKey::Object(shape_id))
     }
 
     /// Intern an object type with index signatures
     pub fn object_with_index(&self, mut shape: ObjectShape) -> TypeId {
         // Sort properties by name for consistent hashing
         shape.properties.sort_by(|a, b| a.name.cmp(&b.name));
-        self.intern(TypeKey::ObjectWithIndex(shape))
+        let shape_id = self.intern_object_shape(shape);
+        self.intern(TypeKey::ObjectWithIndex(shape_id))
     }
 
     /// Intern a function type
     pub fn function(&self, shape: FunctionShape) -> TypeId {
-        self.intern(TypeKey::Function(shape))
+        let shape_id = self.intern_function_shape(shape);
+        self.intern(TypeKey::Function(shape_id))
     }
 
     /// Intern a callable type with overloaded signatures
     pub fn callable(&self, shape: CallableShape) -> TypeId {
-        self.intern(TypeKey::Callable(shape))
+        let shape_id = self.intern_callable_shape(shape);
+        self.intern(TypeKey::Callable(shape_id))
+    }
+
+    /// Intern a template literal type
+    pub fn template_literal(&self, spans: Vec<TemplateSpan>) -> TypeId {
+        let list_id = self.intern_template_list(spans);
+        self.intern(TypeKey::TemplateLiteral(list_id))
     }
 
     /// Intern a type reference
@@ -551,7 +766,8 @@ impl TypeInterner {
 
     /// Intern a generic type application
     pub fn application(&self, base: TypeId, args: Vec<TypeId>) -> TypeId {
-        self.intern(TypeKey::Application(TypeApplication { base, args }))
+        let app_id = self.intern_application(TypeApplication { base, args });
+        self.intern(TypeKey::Application(app_id))
     }
 }
 
