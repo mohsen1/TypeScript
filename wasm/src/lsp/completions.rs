@@ -4,6 +4,7 @@
 //! identifiers that are visible at that position.
 
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::borrow::Cow;
 
 use crate::binder::SymbolId;
 use crate::checker::TypeCache;
@@ -15,7 +16,7 @@ use crate::solver::{
 use crate::thin_binder::ThinBinderState;
 use crate::thin_checker::ThinCheckerState;
 use crate::lsp::position::{Position, LineMap};
-use crate::lsp::resolver::ScopeWalker;
+use crate::lsp::resolver::{ScopeCache, ScopeCacheStats, ScopeWalker};
 use crate::lsp::utils::find_node_at_offset;
 use crate::parser::syntax_kind_ext;
 
@@ -132,7 +133,7 @@ impl<'a> Completions<'a> {
     /// Returns a list of completion items for identifiers visible at the cursor position.
     /// Returns None if no completions are available.
     pub fn get_completions(&self, root: NodeIndex, position: Position) -> Option<Vec<CompletionItem>> {
-        self.get_completions_internal(root, position, None)
+        self.get_completions_internal(root, position, None, None, None)
     }
 
     /// Get completion suggestions at the given position with a persistent type cache.
@@ -142,7 +143,18 @@ impl<'a> Completions<'a> {
         position: Position,
         type_cache: &mut Option<TypeCache>,
     ) -> Option<Vec<CompletionItem>> {
-        self.get_completions_internal(root, position, Some(type_cache))
+        self.get_completions_internal(root, position, Some(type_cache), None, None)
+    }
+
+    pub fn get_completions_with_caches(
+        &self,
+        root: NodeIndex,
+        position: Position,
+        type_cache: &mut Option<TypeCache>,
+        scope_cache: &mut ScopeCache,
+        scope_stats: Option<&mut ScopeCacheStats>,
+    ) -> Option<Vec<CompletionItem>> {
+        self.get_completions_internal(root, position, Some(type_cache), Some(scope_cache), scope_stats)
     }
 
     fn get_completions_internal(
@@ -150,6 +162,8 @@ impl<'a> Completions<'a> {
         root: NodeIndex,
         position: Position,
         type_cache: Option<&mut Option<TypeCache>>,
+        scope_cache: Option<&mut ScopeCache>,
+        scope_stats: Option<&mut ScopeCacheStats>,
     ) -> Option<Vec<CompletionItem>> {
         // 1. Convert position to byte offset
         let offset = self.line_map.position_to_offset(position, self.source_text)?;
@@ -169,7 +183,11 @@ impl<'a> Completions<'a> {
 
         // 3. Get the scope chain at this position
         let mut walker = ScopeWalker::new(self.arena, self.binder);
-        let scope_chain = walker.get_scope_chain(root, node_idx);
+        let scope_chain = if let Some(scope_cache) = scope_cache {
+            Cow::Borrowed(walker.get_scope_chain_cached(root, node_idx, scope_cache, scope_stats))
+        } else {
+            Cow::Owned(walker.get_scope_chain(root, node_idx))
+        };
 
         // 4. Collect all visible identifiers from the scope chain
         let mut completions = Vec::new();

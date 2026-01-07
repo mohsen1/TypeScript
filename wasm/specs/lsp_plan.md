@@ -26,7 +26,7 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
 - [ ] Type-aware completions
   - [x] Add member completions using `ThinCheckerState` + `format_type`.
   - [x] Include auto-import suggestions from project export index.
-- [ ] Performance instrumentation
+- [x] Performance instrumentation
   - Measure per-request timing and memoize scope walkers.
 
 ## Success Criteria

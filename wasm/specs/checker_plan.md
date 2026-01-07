@@ -25,7 +25,7 @@ Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (in
 - [ ] Honor readonly modifiers on property/method signatures
   - Read `readonly` in `thin_checker.rs` when lowering interface members.
   - Enforce readonly assignment rules in `checker/expr.rs` + subtype checks.
-- [ ] Complete control-flow narrowing for false branches
+- [x] Complete control-flow narrowing for false branches
   - `typeof` false branch exclusion; truthiness false branch (null/undefined/false/0/"").
   - Add tests in `checker/control_flow.rs`.
 - [ ] Namespace member resolution parity

@@ -2130,9 +2130,7 @@ fn test_transform_directive_chain_es5_class_commonjs_export() {
         TransformDirective::Chain(vec![
             TransformDirective::ES5Class {
                 class_node: class_idx,
-                class_name: Some("Foo".to_string()),
                 heritage: None,
-                members: Vec::new(),
             },
             TransformDirective::CommonJSExport {
                 names: vec!["Foo".to_string()],
@@ -2186,9 +2184,7 @@ fn test_transform_directive_es5_class_emits_members_from_ast() {
         class_idx,
         TransformDirective::ES5Class {
             class_node: class_idx,
-            class_name: Some("Foo".to_string()),
             heritage: None,
-            members: Vec::new(),
         },
     );
 
@@ -2222,9 +2218,7 @@ fn test_transform_directive_composability() {
         NodeIndex(1),
         TransformDirective::ES5Class {
             class_node: NodeIndex(1),
-            class_name: Some("TestClass".to_string()),
             heritage: None,
-            members: vec![],
         },
     );
 
