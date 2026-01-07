@@ -767,6 +767,25 @@ fn test_index_access_array() {
 }
 
 #[test]
+fn test_no_unchecked_indexed_access_array_union_key() {
+    let interner = TypeInterner::new();
+
+    let string_array = interner.array(TypeId::STRING);
+    let length_key = interner.literal_string("length");
+    let key_union = interner.union(vec![TypeId::NUMBER, length_key]);
+
+    let mut evaluator = TypeEvaluator::new(&interner);
+    let result = evaluator.evaluate_index_access(string_array, key_union);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+
+    evaluator.set_no_unchecked_indexed_access(true);
+    let result = evaluator.evaluate_index_access(string_array, key_union);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_index_access_array_string_index() {
     let interner = TypeInterner::new();
 
