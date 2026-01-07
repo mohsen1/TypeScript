@@ -189,6 +189,8 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: class method overload mismatch reports 2769
   - [x] Checker: merge base class instance properties with type arguments
   - [x] Test: new expressions include generic base class properties
+  - [x] Checker: apply base class type arguments during property inheritance checks
+  - [x] Test: property mismatch against generic base triggers 2416
 - [x] Parser: fix interface member parsing to track progress by token position (avoid skipping consecutive identifiers)
 - [x] Perf: avoid extra String clone when lowering negative bigint literals
 - [x] Perf: avoid extra allocation when normalizing bigint leading zeros

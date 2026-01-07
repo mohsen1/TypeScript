@@ -451,6 +451,83 @@ fn test_property_access_object() {
 }
 
 #[test]
+fn test_property_access_function_members() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let func = interner.function(FunctionShape {
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let result = evaluator.resolve_property_access(func, "call");
+    match result {
+        PropertyAccessResult::Success { type_id, .. } => {
+            let Some(TypeKey::Function(shape)) = interner.lookup(type_id) else {
+                panic!("Expected call to resolve to function type");
+            };
+            let rest_array = interner.array(TypeId::ANY);
+            assert_eq!(shape.return_type, TypeId::ANY);
+            assert_eq!(shape.params.len(), 1);
+            assert!(shape.params[0].rest);
+            assert_eq!(shape.params[0].type_id, rest_array);
+        }
+        _ => panic!("Expected success, got {:?}", result),
+    }
+
+    let result = evaluator.resolve_property_access(func, "length");
+    match result {
+        PropertyAccessResult::Success { type_id: t, .. } => assert_eq!(t, TypeId::NUMBER),
+        _ => panic!("Expected success, got {:?}", result),
+    }
+
+    let result = evaluator.resolve_property_access(func, "toString");
+    match result {
+        PropertyAccessResult::Success { type_id, .. } => {
+            let Some(TypeKey::Function(shape)) = interner.lookup(type_id) else {
+                panic!("Expected toString to resolve to function type");
+            };
+            assert_eq!(shape.return_type, TypeId::STRING);
+        }
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_property_access_callable_members() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let call_sig = CallSignature {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+    };
+    let callable = interner.callable(CallableShape {
+        call_signatures: vec![call_sig],
+        construct_signatures: vec![],
+        properties: vec![],
+    });
+
+    let result = evaluator.resolve_property_access(callable, "bind");
+    match result {
+        PropertyAccessResult::Success { type_id, .. } => {
+            let Some(TypeKey::Function(shape)) = interner.lookup(type_id) else {
+                panic!("Expected bind to resolve to function type");
+            };
+            assert_eq!(shape.return_type, TypeId::ANY);
+        }
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_property_access_optional_property() {
     let interner = TypeInterner::new();
     let evaluator = PropertyAccessEvaluator::new(&interner);

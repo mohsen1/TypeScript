@@ -1747,9 +1747,8 @@ impl ThinParserState {
                             break;
                         }
                     }
-                    self.parse_expected(SyntaxKind::CloseParenToken);
-
                     let end_pos = self.token_end();
+                    self.parse_expected(SyntaxKind::CloseParenToken);
                     expr = self.arena.add_call_expr(
                         syntax_kind_ext::CALL_EXPRESSION,
                         start_pos,
@@ -1787,9 +1786,8 @@ impl ThinParserState {
                         break;
                     }
                 }
-                self.parse_expected(SyntaxKind::CloseParenToken);
-
                 let end_pos = self.token_end();
+                self.parse_expected(SyntaxKind::CloseParenToken);
                 expr = self.arena.add_call_expr(
                     syntax_kind_ext::CALL_EXPRESSION,
                     start_pos,
@@ -4840,8 +4838,8 @@ impl ThinParserState {
                 SyntaxKind::OpenBracketToken => {
                     self.next_token();
                     let argument = self.parse_expression();
-                    self.parse_expected(SyntaxKind::CloseBracketToken);
                     let end_pos = self.token_end();
+                    self.parse_expected(SyntaxKind::CloseBracketToken);
 
                     expr = self.arena.add_access_expr(
                         syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION,
@@ -4857,8 +4855,8 @@ impl ThinParserState {
                 SyntaxKind::OpenParenToken => {
                     self.next_token();
                     let arguments = self.parse_argument_list();
-                    self.parse_expected(SyntaxKind::CloseParenToken);
                     let end_pos = self.token_end();
+                    self.parse_expected(SyntaxKind::CloseParenToken);
 
                     expr = self.arena.add_call_expr(
                         syntax_kind_ext::CALL_EXPRESSION,
@@ -4894,8 +4892,8 @@ impl ThinParserState {
                         // expr?.[index]
                         self.next_token();
                         let argument = self.parse_expression();
-                        self.parse_expected(SyntaxKind::CloseBracketToken);
                         let end_pos = self.token_end();
+                        self.parse_expected(SyntaxKind::CloseBracketToken);
 
                         expr = self.arena.add_access_expr(
                             syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION,
@@ -4911,8 +4909,8 @@ impl ThinParserState {
                         // expr?.()
                         self.next_token();
                         let arguments = self.parse_argument_list();
-                        self.parse_expected(SyntaxKind::CloseParenToken);
                         let end_pos = self.token_end();
+                        self.parse_expected(SyntaxKind::CloseParenToken);
 
                         expr = self.arena.add_call_expr(
                             syntax_kind_ext::CALL_EXPRESSION,
@@ -4973,8 +4971,8 @@ impl ThinParserState {
                         if self.is_token(SyntaxKind::OpenParenToken) {
                             self.next_token();
                             let arguments = self.parse_argument_list();
-                            self.parse_expected(SyntaxKind::CloseParenToken);
                             let end_pos = self.token_end();
+                            self.parse_expected(SyntaxKind::CloseParenToken);
 
                             expr = self.arena.add_call_expr(
                                 syntax_kind_ext::CALL_EXPRESSION,
@@ -5296,8 +5294,8 @@ impl ThinParserState {
             }
         }
 
-        self.parse_expected(SyntaxKind::CloseBracketToken);
         let end_pos = self.token_end();
+        self.parse_expected(SyntaxKind::CloseBracketToken);
 
         self.arena.add_binding_pattern(
             syntax_kind_ext::ARRAY_BINDING_PATTERN,
@@ -5496,8 +5494,8 @@ impl ThinParserState {
             None
         };
 
-        self.parse_expected(SyntaxKind::CloseParenToken);
         let end_pos = self.token_end();
+        self.parse_expected(SyntaxKind::CloseParenToken);
 
         // Create a call expression with import as the callee
         let import_keyword = self.arena.add_token(SyntaxKind::ImportKeyword as u16, start_pos, start_pos + 6);
@@ -5673,8 +5671,8 @@ impl ThinParserState {
             }
         }
 
-        self.parse_expected(SyntaxKind::CloseBracketToken);
         let end_pos = self.token_end();
+        self.parse_expected(SyntaxKind::CloseBracketToken);
 
         self.arena.add_literal_expr(
             syntax_kind_ext::ARRAY_LITERAL_EXPRESSION,
@@ -5702,8 +5700,8 @@ impl ThinParserState {
             }
         }
 
-        self.parse_expected(SyntaxKind::CloseBraceToken);
         let end_pos = self.token_end();
+        self.parse_expected(SyntaxKind::CloseBraceToken);
 
         self.arena.add_literal_expr(
             syntax_kind_ext::OBJECT_LITERAL_EXPRESSION,
@@ -6019,6 +6017,11 @@ impl ThinParserState {
 
         // Parse the callee expression - member access without call (we handle call ourselves)
         let expression = self.parse_member_expression_base();
+        let mut end_pos = self
+            .arena
+            .get(expression)
+            .map(|node| node.end)
+            .unwrap_or(self.token_end());
 
         // Parse type arguments: new Array<string>()
         let type_arguments = if self.is_token(SyntaxKind::LessThanToken) {
@@ -6027,17 +6030,25 @@ impl ThinParserState {
         } else {
             None
         };
+        if let Some(type_args) = type_arguments.as_ref() {
+            if let Some(last) = type_args.nodes.last() {
+                if let Some(node) = self.arena.get(*last) {
+                    end_pos = end_pos.max(node.end);
+                }
+            }
+        }
 
         let arguments = if self.is_token(SyntaxKind::OpenParenToken) {
             self.next_token();
             let args = self.parse_argument_list();
+            let call_end = self.token_end();
             self.parse_expected(SyntaxKind::CloseParenToken);
+            end_pos = call_end;
             Some(args)
         } else {
             None
         };
 
-        let end_pos = self.token_end();
         self.arena.add_call_expr(
             syntax_kind_ext::NEW_EXPRESSION,
             start_pos,
@@ -6080,8 +6091,8 @@ impl ThinParserState {
                 SyntaxKind::OpenBracketToken => {
                     self.next_token();
                     let argument = self.parse_expression();
-                    self.parse_expected(SyntaxKind::CloseBracketToken);
                     let end_pos = self.token_end();
+                    self.parse_expected(SyntaxKind::CloseBracketToken);
 
                     expr = self.arena.add_access_expr(
                         syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION,

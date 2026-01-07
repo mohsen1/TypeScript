@@ -21,19 +21,19 @@ Implement a high-performance, `tsc`-compatible command-line interface. This driv
 ## Tasks
 
 ### Phase 1: Foundation & Arguments
-- [ ] **Scaffold Binary**
+- [x] **Scaffold Binary**
   - Add `[[bin]]` entry in `Cargo.toml` for `stc` (Speedy TypeScript Compiler).
   - Add dependencies: `clap` (derive), `anyhow`, `serde`, `serde_json` (with preserve_order).
-- [ ] **Implement Argument Parsing**
+- [x] **Implement Argument Parsing**
   - Replicate common `tsc` flags: `--target`, `--module`, `--outDir`, `--strict`, `--noEmit`.
   - Implement `--help` and `--version`.
 
 ### Phase 2: Project Configuration (tsconfig)
-- [ ] **JSONC Parsing**
-  - Implement `tsconfig.json` parser that handles comments (JSONC).
-  - Support `extends` inheritance (recursive loading).
+- [x] **JSONC Parsing**
+  - [x] Implement `tsconfig.json` parser that handles comments (JSONC).
+  - [x] Support `extends` inheritance (recursive loading).
 - [ ] **Option Mapping**
-  - Map `tsconfig` "compilerOptions" to internal `PrinterOptions` (Emitter) and `CheckerOptions`.
+  - [x] Map `tsconfig` "compilerOptions" to internal `PrinterOptions` (Emitter) and `CheckerOptions`.
   - Handle `include`, `exclude`, and `files` globs.
 
 ### Phase 3: The Driver (Orchestration)

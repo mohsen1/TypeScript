@@ -1411,6 +1411,24 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 }
             }
 
+            TypeKey::Function(_) => {
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                self.resolve_function_property(obj_type, prop_name, prop_atom)
+            }
+
+            TypeKey::Callable(ref shape) => {
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                for prop in &shape.properties {
+                    if prop.name == prop_atom {
+                        return PropertyAccessResult::Success {
+                            type_id: self.optional_property_type(prop),
+                            from_index_signature: false,
+                        };
+                    }
+                }
+                self.resolve_function_property(obj_type, prop_name, prop_atom)
+            }
+
             TypeKey::Union(ref members) => {
                 // Property access on union: partition into nullable and non-nullable members
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
@@ -1711,6 +1729,28 @@ impl<'a> PropertyAccessEvaluator<'a> {
 
             _ => PropertyAccessResult::PropertyNotFound {
                 type_id: array_type,
+                property_name: prop_atom,
+            },
+        }
+    }
+
+    fn resolve_function_property(
+        &self,
+        func_type: TypeId,
+        prop_name: &str,
+        prop_atom: Atom,
+    ) -> PropertyAccessResult {
+        match prop_name {
+            "apply" | "call" | "bind" => self.method_result(TypeId::ANY),
+            "toString" => self.method_result(TypeId::STRING),
+            "length" => PropertyAccessResult::Success { type_id: TypeId::NUMBER, from_index_signature: false },
+            "prototype" | "arguments" => PropertyAccessResult::Success { type_id: TypeId::ANY, from_index_signature: false },
+            "caller" => PropertyAccessResult::Success {
+                type_id: self.any_args_function(TypeId::ANY),
+                from_index_signature: false,
+            },
+            _ => PropertyAccessResult::PropertyNotFound {
+                type_id: func_type,
                 property_name: prop_atom,
             },
         }

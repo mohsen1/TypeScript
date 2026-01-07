@@ -346,6 +346,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Narrow unknown/object/empty object to function supertype for typeof "function"
 - [x] Tests for function typeof narrowing with top types
 
+### Phase 68: Function Property Access
+- [x] Resolve Function/Callable properties like call/apply/bind/length/toString
+- [x] Tests for function property access results
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)
