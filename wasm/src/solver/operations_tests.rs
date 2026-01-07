@@ -216,6 +216,103 @@ fn test_call_rest_parameter_type_mismatch() {
 }
 
 #[test]
+fn test_call_tuple_rest_argument_count_mismatch() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    let tuple_rest = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: tuple_rest,
+            optional: false,
+            rest: true,
+        }],
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let result = evaluator.resolve_call(func, &[TypeId::NUMBER]);
+    match result {
+        CallResult::ArgumentCountMismatch { expected_min, actual, .. } => {
+            assert_eq!(expected_min, 2);
+            assert_eq!(actual, 1);
+        }
+        _ => panic!("Expected ArgumentCountMismatch, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_call_tuple_rest_argument_type_mismatch() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    let tuple_rest = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: tuple_rest,
+            optional: false,
+            rest: true,
+        }],
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let result = evaluator.resolve_call(func, &[TypeId::NUMBER, TypeId::BOOLEAN]);
+    match result {
+        CallResult::ArgumentTypeMismatch { index, expected, actual } => {
+            assert_eq!(index, 1);
+            assert_eq!(expected, TypeId::STRING);
+            assert_eq!(actual, TypeId::BOOLEAN);
+        }
+        _ => panic!("Expected ArgumentTypeMismatch, got {:?}", result),
+    }
+}
+
+#[test]
+fn test_call_tuple_rest_argument_success() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    let tuple_rest = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    let func = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: tuple_rest,
+            optional: false,
+            rest: true,
+        }],
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        is_constructor: false,
+    });
+
+    let result = evaluator.resolve_call(func, &[TypeId::NUMBER, TypeId::STRING]);
+    match result {
+        CallResult::Success(ret) => assert_eq!(ret, TypeId::STRING),
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_property_access_object() {
     let interner = TypeInterner::new();
     let evaluator = PropertyAccessEvaluator::new(&interner);
@@ -897,6 +994,125 @@ fn test_infer_generic_tuple_element() {
     ]);
     let result = infer_generic_function(&interner, &mut subtype, &func, &[tuple_arg]);
     assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_infer_generic_tuple_rest_elements() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let t_array = interner.array(t_type);
+
+    let tuple_t = interner.tuple(vec![
+        TupleElement { type_id: t_type, name: None, optional: false, rest: false },
+        TupleElement { type_id: t_array, name: None, optional: false, rest: true },
+    ]);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("items")),
+            type_id: tuple_t,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    };
+
+    let tuple_arg = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[tuple_arg]);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::STRING]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_infer_generic_tuple_rest_parameter() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let tuple_t = interner.tuple(vec![
+        TupleElement { type_id: t_type, name: None, optional: false, rest: false },
+        TupleElement { type_id: t_type, name: None, optional: false, rest: false },
+    ]);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("items")),
+            type_id: tuple_t,
+            optional: false,
+            rest: true,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    };
+
+    let result = infer_generic_function(
+        &interner,
+        &mut subtype,
+        &func,
+        &[TypeId::NUMBER, TypeId::STRING],
+    );
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::STRING]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_infer_generic_tuple_rest_from_rest_argument() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let t_array = interner.array(t_type);
+
+    let tuple_t = interner.tuple(vec![
+        TupleElement { type_id: t_type, name: None, optional: false, rest: false },
+        TupleElement { type_id: t_array, name: None, optional: false, rest: true },
+    ]);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("items")),
+            type_id: tuple_t,
+            optional: false,
+            rest: false,
+        }],
+        return_type: t_type,
+        is_constructor: false,
+    };
+
+    let string_array = interner.array(TypeId::STRING);
+    let tuple_arg = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: string_array, name: None, optional: false, rest: true },
+    ]);
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[tuple_arg]);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::STRING]);
+    assert_eq!(result, expected);
 }
 
 #[test]

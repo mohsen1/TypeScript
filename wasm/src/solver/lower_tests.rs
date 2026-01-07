@@ -249,6 +249,58 @@ fn test_lower_literal_boolean_type() {
 }
 
 #[test]
+fn test_lower_unique_symbol_type() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = unique symbol;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::UniqueSymbol(_) => {}
+        _ => panic!("Expected unique symbol type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_keyof_type_operator() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = keyof string;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::KeyOf(inner) => {
+            assert_eq!(inner, TypeId::STRING);
+        }
+        _ => panic!("Expected keyof type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_readonly_type_operator() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = readonly string[];");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::ReadonlyType(inner) => {
+            let inner_key = interner.lookup(inner).expect("Inner type should exist");
+            match inner_key {
+                TypeKey::Array(element) => {
+                    assert_eq!(element, TypeId::STRING);
+                }
+                _ => panic!("Expected readonly array type, got {:?}", inner_key),
+            }
+        }
+        _ => panic!("Expected readonly type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_deduplicates_identical_types() {
     let (arena_one, type_one) = parse_type_alias_type_node("type A = \"same\";");
     let (arena_two, type_two) = parse_type_alias_type_node("type B = \"same\";");

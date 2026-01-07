@@ -628,6 +628,27 @@ fn test_empty_object_rejects_nullish_and_unknown() {
 }
 
 #[test]
+fn test_strict_null_checks_toggle() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let empty_object = interner.object(Vec::new());
+    let nullable_string = interner.union(vec![TypeId::STRING, TypeId::NULL]);
+
+    assert!(!checker.is_assignable(TypeId::NULL, TypeId::STRING));
+    assert!(!checker.is_assignable(nullable_string, TypeId::STRING));
+    assert!(!checker.is_assignable(nullable_string, empty_object));
+
+    checker.set_strict_null_checks(false);
+
+    assert!(checker.is_assignable(TypeId::NULL, TypeId::STRING));
+    assert!(checker.is_assignable(TypeId::UNDEFINED, TypeId::NUMBER));
+    assert!(checker.is_assignable(nullable_string, TypeId::STRING));
+    assert!(checker.is_assignable(TypeId::UNDEFINED, empty_object));
+    assert!(checker.is_assignable(nullable_string, empty_object));
+}
+
+#[test]
 fn test_object_keyword_accepts_non_primitives() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);

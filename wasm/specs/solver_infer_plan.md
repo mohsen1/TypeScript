@@ -90,6 +90,9 @@ Implement the mathematical engine for type inference and generic instantiation. 
 - [x] Validate generic call argument count and non-generic params
 - [x] Validate generic calls after inference for defaulted params
 - [x] Use FxHashSet in inference visited/dedup
+- [x] Handle tuple rest parameters in call resolution
+- [x] Constrain tuple rest elements during inference
+- [x] Add tuple rest inference coverage for rest params and rest arguments
 
 ## Architecture Notes
 - Use `ena` crate for union-find data structure

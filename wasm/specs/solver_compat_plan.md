@@ -115,6 +115,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Mapped types can expand over primitive apparent keys
 - [x] Tests for primitive `keyof` and mapped types
 
+### Phase 15: Legacy Null/Undefined Assignability
+- [x] Add strict null checks flag to compat/subtype
+- [x] Allow null/undefined to assign when strictNullChecks is off
+- [x] Tests for strict null checks toggle
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

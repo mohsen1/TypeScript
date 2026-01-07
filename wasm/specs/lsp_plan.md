@@ -39,6 +39,9 @@ Our focus is to make wasm Language Service Protocol (LSP) complete
    - [x] Missing import: use import type in type positions (and skip type-only for values)
    - [x] Signature help: fix active parameter detection (between arguments)
    - [x] Signature help: pick overload by argument count
+   - [x] Signature help: select constructor overloads for `new`
+   - [x] Signature help: surface JSDoc documentation
+   - [x] Signature help: attach @param docs to parameters
 
 2. **Extend AST Coverage** (if needed)
    - [x] Traverse template expressions in LSP resolver for references/completions

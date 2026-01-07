@@ -24,6 +24,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - Hex/binary/octal numeric literals map to numeric literal types
   - BigInt literals normalize base prefixes to decimal
   - BigInt literals with base prefixes are tokenized in the scanner
+- [x] Parse and lower `unique symbol` type operator
 - [x] Tests for basic lowering
   - Test: `number` annotation -> Intrinsic(Number)
   - Test: `"hello"` -> Literal with correct Atom
@@ -32,6 +33,9 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: Negative numeric and bigint literal types
   - [x] Test: Hex/binary/octal numeric literal types
   - [x] Test: Hex/binary/octal bigint literal types (normalized)
+  - [x] Test: `unique symbol` type operator lowering
+  - [x] Test: `keyof` type operator lowering
+  - [x] Test: `readonly` type operator lowering
 
 ### Phase 2: Complex Type Structures
 - [x] Implement object type lowering
