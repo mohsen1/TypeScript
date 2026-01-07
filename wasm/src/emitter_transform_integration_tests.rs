@@ -6,7 +6,7 @@
 
 use crate::emit_context::EmitContext;
 use crate::lowering_pass::LoweringPass;
-use crate::parser::NodeIndex;
+use crate::parser::{NodeIndex, syntax_kind_ext};
 use crate::scanner::SyntaxKind;
 use crate::thin_emitter::ThinPrinter;
 use crate::thin_parser::ThinParserState;
@@ -52,6 +52,112 @@ fn test_two_phase_emission_es5_class() {
     assert!(
         output.contains("return Point"),
         "ES5 output should return constructor"
+    );
+}
+
+#[test]
+fn test_lowering_pass_es5_class_heritage_clause() {
+    let source = "class Base {} class Derived extends Base {}";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let mut ctx = EmitContext::default();
+    ctx.target_es5 = true;
+
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+
+    let mut derived_idx = None;
+    for &stmt_idx in &source_file.statements.nodes {
+        let Some(stmt_node) = arena.get(stmt_idx) else { continue };
+        if stmt_node.kind != syntax_kind_ext::CLASS_DECLARATION {
+            continue;
+        }
+        let Some(class_data) = arena.get_class(stmt_node) else { continue };
+        if let Some(clauses) = &class_data.heritage_clauses {
+            if !clauses.nodes.is_empty() {
+                derived_idx = Some(stmt_idx);
+                break;
+            }
+        }
+    }
+
+    let derived_idx = derived_idx.expect("expected derived class declaration");
+    let directive = transforms
+        .get(derived_idx)
+        .expect("expected transform directive for derived class");
+
+    match directive {
+        TransformDirective::ES5Class { heritage, .. } => {
+            let heritage_idx = heritage.expect("expected extends heritage clause");
+            let heritage_node = arena.get(heritage_idx).expect("expected heritage node");
+            let heritage_data = arena
+                .get_heritage(heritage_node)
+                .expect("expected heritage data");
+            assert_eq!(
+                heritage_data.token,
+                SyntaxKind::ExtendsKeyword as u16,
+                "Expected extends heritage clause"
+            );
+        }
+        _ => panic!("Expected ES5Class directive"),
+    }
+}
+
+#[test]
+fn test_two_phase_emission_es5_class_extends_private_fields_helpers() {
+    let source = r#"
+class Base {}
+class Derived extends Base {
+    #count = 0;
+    getCount() { return this.#count; }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("var __extends"),
+        "ES5 output should include __extends helper: {}",
+        output
+    );
+    assert!(
+        output.contains("var __classPrivateFieldGet"),
+        "ES5 output should include __classPrivateFieldGet helper: {}",
+        output
+    );
+    assert!(
+        output.contains("var __classPrivateFieldSet"),
+        "ES5 output should include __classPrivateFieldSet helper: {}",
+        output
+    );
+    assert!(
+        output.contains("__extends(Derived, _super)"),
+        "ES5 output should call __extends for Derived: {}",
+        output
+    );
+    assert!(
+        output.contains("__classPrivateFieldSet(")
+            && output.contains("_Derived_count")
+            && output.contains("0, \"f\""),
+        "ES5 output should emit private field initializer: {}",
+        output
     );
 }
 

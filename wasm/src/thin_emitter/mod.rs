@@ -6448,6 +6448,10 @@ impl<'a> ThinPrinter<'a> {
             if self.needs_make_template_object_helper() {
                 helpers.make_template_object = true;
             }
+            if self.needs_class_private_field_helpers() {
+                helpers.class_private_field_get = true;
+                helpers.class_private_field_set = true;
+            }
         }
 
         // Emit all needed helpers
@@ -6921,11 +6925,158 @@ impl<'a> ThinPrinter<'a> {
 
     /// Check if any class in the statements (recursively) extends another class
     fn needs_extends_helper(&self, statements: &NodeList) -> bool {
+        if let Some(needed) = self.needs_extends_helper_from_transforms() {
+            return needed;
+        }
+
         for &stmt_idx in &statements.nodes {
             if self.statement_needs_extends(stmt_idx) {
                 return true;
             }
         }
+        false
+    }
+
+    fn needs_extends_helper_from_transforms(&self) -> Option<bool> {
+        let mut saw_class = false;
+        for (_, directive) in self.transforms.iter() {
+            if let Some(needed) = self.directive_needs_extends_helper(directive) {
+                saw_class = true;
+                if needed {
+                    return Some(true);
+                }
+            }
+        }
+
+        if saw_class {
+            Some(false)
+        } else {
+            None
+        }
+    }
+
+    fn directive_needs_extends_helper(&self, directive: &TransformDirective) -> Option<bool> {
+        match directive {
+            TransformDirective::ES5Class {
+                class_node,
+                heritage,
+                ..
+            } => {
+                if heritage.is_some() {
+                    return Some(true);
+                }
+                Some(self.class_has_extends_node(*class_node))
+            }
+            TransformDirective::CommonJSExportDefaultClassES5 { class_node } => {
+                Some(self.class_has_extends_node(*class_node))
+            }
+            TransformDirective::CommonJSExport { inner, .. } => {
+                self.directive_needs_extends_helper(inner)
+            }
+            TransformDirective::Chain(directives) => {
+                let mut saw_class = false;
+                for directive in directives {
+                    if let Some(needed) = self.directive_needs_extends_helper(directive) {
+                        saw_class = true;
+                        if needed {
+                            return Some(true);
+                        }
+                    }
+                }
+
+                if saw_class {
+                    Some(false)
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+
+    fn class_has_extends_node(&self, class_idx: NodeIndex) -> bool {
+        let Some(class_node) = self.arena.get(class_idx) else {
+            return false;
+        };
+        let Some(class_data) = self.arena.get_class(class_node) else {
+            return false;
+        };
+        self.class_has_extends(&class_data.heritage_clauses)
+    }
+
+    fn needs_class_private_field_helpers(&self) -> bool {
+        for (_, directive) in self.transforms.iter() {
+            if self.directive_has_private_members(directive) {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn directive_has_private_members(&self, directive: &TransformDirective) -> bool {
+        match directive {
+            TransformDirective::ES5Class { class_node, .. } => {
+                self.class_has_private_members(*class_node)
+            }
+            TransformDirective::CommonJSExportDefaultClassES5 { class_node } => {
+                self.class_has_private_members(*class_node)
+            }
+            TransformDirective::CommonJSExport { inner, .. } => {
+                self.directive_has_private_members(inner)
+            }
+            TransformDirective::Chain(directives) => {
+                directives.iter().any(|directive| self.directive_has_private_members(directive))
+            }
+            _ => false,
+        }
+    }
+
+    fn class_has_private_members(&self, class_idx: NodeIndex) -> bool {
+        let Some(class_node) = self.arena.get(class_idx) else {
+            return false;
+        };
+        let Some(class_data) = self.arena.get_class(class_node) else {
+            return false;
+        };
+
+        for &member_idx in &class_data.members.nodes {
+            let Some(member_node) = self.arena.get(member_idx) else { continue };
+
+            match member_node.kind {
+                k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                    if let Some(prop) = self.arena.get_property_decl(member_node) {
+                        if crate::transforms::private_fields_es5::is_private_identifier(
+                            self.arena,
+                            prop.name,
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                    if let Some(method) = self.arena.get_method_decl(member_node) {
+                        if crate::transforms::private_fields_es5::is_private_identifier(
+                            self.arena,
+                            method.name,
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                    if let Some(accessor) = self.arena.get_accessor(member_node) {
+                        if crate::transforms::private_fields_es5::is_private_identifier(
+                            self.arena,
+                            accessor.name,
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
         false
     }
 
