@@ -2495,6 +2495,10 @@ impl<'a> ThinCheckerState<'a> {
 
         // Resolve via binder persistent scopes for stateless lookup.
         if let Some(sym_id) = self.resolve_identifier_symbol(idx) {
+            if self.alias_resolves_to_type_only(sym_id) {
+                self.error_type_only_value_at(name, idx);
+                return TypeId::ERROR;
+            }
             let declared_type = self.get_type_of_symbol(sym_id);
             return self.apply_flow_narrowing(idx, declared_type);
         }
@@ -3236,6 +3240,32 @@ impl<'a> ThinCheckerState<'a> {
 
         let has_value = (member_symbol.flags & (symbol_flags::VALUE | symbol_flags::ALIAS)) != 0;
         let has_type = (member_symbol.flags & symbol_flags::TYPE) != 0;
+        has_type && !has_value
+    }
+
+    fn alias_resolves_to_type_only(&self, sym_id: SymbolId) -> bool {
+        let symbol = match self.ctx.binder.get_symbol(sym_id) {
+            Some(symbol) => symbol,
+            None => return false,
+        };
+
+        if symbol.flags & symbol_flags::ALIAS == 0 {
+            return false;
+        }
+
+        let mut visited = Vec::new();
+        let target = match self.resolve_alias_symbol(sym_id, &mut visited) {
+            Some(target) => target,
+            None => return false,
+        };
+
+        let target_symbol = match self.ctx.binder.get_symbol(target) {
+            Some(target_symbol) => target_symbol,
+            None => return false,
+        };
+
+        let has_value = (target_symbol.flags & symbol_flags::VALUE) != 0;
+        let has_type = (target_symbol.flags & symbol_flags::TYPE) != 0;
         has_type && !has_value
     }
 

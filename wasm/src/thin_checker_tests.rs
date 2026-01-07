@@ -3961,6 +3961,36 @@ const bad = NS.Foo;
 }
 
 #[test]
+fn test_namespace_type_only_alias_value_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+namespace NS {
+    export interface Foo { value: number; }
+}
+import Alias = NS.Foo;
+const bad = Alias;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert!(
+        codes.contains(&2693),
+        "Expected error 2693 for type-only namespace alias used as value, got: {:?}",
+        codes
+    );
+}
+
+#[test]
 fn test_namespace_value_member_access() {
     use crate::thin_parser::ThinParserState;
 
