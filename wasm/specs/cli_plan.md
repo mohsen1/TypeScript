@@ -29,11 +29,11 @@ Implement a high-performance, `tsc`-compatible command-line interface. This driv
   - Implement `--help` and `--version`.
 
 ### Phase 2: Project Configuration (tsconfig)
-- [ ] **JSONC Parsing**
-  - Implement `tsconfig.json` parser that handles comments (JSONC).
-  - Support `extends` inheritance (recursive loading).
+- [x] **JSONC Parsing**
+  - [x] Implement `tsconfig.json` parser that handles comments (JSONC).
+  - [x] Support `extends` inheritance (recursive loading).
 - [ ] **Option Mapping**
-  - Map `tsconfig` "compilerOptions" to internal `PrinterOptions` (Emitter) and `CheckerOptions`.
+  - [x] Map `tsconfig` "compilerOptions" to internal `PrinterOptions` (Emitter) and `CheckerOptions`.
   - Handle `include`, `exclude`, and `files` globs.
 
 ### Phase 3: The Driver (Orchestration)
