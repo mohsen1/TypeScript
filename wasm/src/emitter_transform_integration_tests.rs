@@ -390,6 +390,37 @@ fn test_lowering_pass_es5_variable_declaration_list_directive() {
 }
 
 #[test]
+fn test_lowering_pass_es5_function_parameters_directive() {
+    let source = "function foo(x = 1) { return x; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let root_node = arena.get(root).expect("expected source file node");
+    let source_file = arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let func_idx = *source_file
+        .statements
+        .nodes
+        .first()
+        .expect("expected function declaration");
+
+    let directive = transforms.get(func_idx);
+    assert!(
+        matches!(
+            directive,
+            Some(TransformDirective::ES5FunctionParameters { .. })
+        ),
+        "LoweringPass should emit ES5FunctionParameters directive for default params"
+    );
+}
+
+#[test]
 fn test_two_phase_emission_es5_object_literal_computed() {
     let source = "const obj = { a: 1, [key]: 2 };";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -446,6 +477,29 @@ fn test_two_phase_emission_es5_variable_destructuring() {
     assert!(
         output.contains("x = _a.x"),
         "ES5 output should assign destructured properties: {}",
+        output
+    );
+}
+
+#[test]
+fn test_two_phase_emission_es5_function_parameters_downlevel() {
+    let source = "function foo(x = 1) { return x; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.arena;
+
+    let ctx = EmitContext::es5();
+    let lowering = LoweringPass::new(&arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms(&arena, transforms);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("if (x === void 0) { x = 1; }"),
+        "ES5 output should downlevel default parameters: {}",
         output
     );
 }
