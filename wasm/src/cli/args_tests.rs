@@ -6,8 +6,8 @@ use super::args::{CliArgs, Module, Target};
 fn parses_defaults() {
     let args = CliArgs::try_parse_from(["stc"]).expect("default args should parse");
 
-    assert_eq!(args.target, Target::EsNext);
-    assert_eq!(args.module, Module::None);
+    assert_eq!(args.target, None);
+    assert_eq!(args.module, None);
     assert!(args.out_dir.is_none());
     assert!(!args.strict);
     assert!(!args.no_emit);
@@ -30,8 +30,8 @@ fn parses_common_flags() {
     ])
     .expect("flagged args should parse");
 
-    assert_eq!(args.target, Target::Es2020);
-    assert_eq!(args.module, Module::CommonJs);
+    assert_eq!(args.target, Some(Target::Es2020));
+    assert_eq!(args.module, Some(Module::CommonJs));
     assert_eq!(args.out_dir.as_deref(), Some(std::path::Path::new("dist")));
     assert!(args.strict);
     assert!(args.no_emit);

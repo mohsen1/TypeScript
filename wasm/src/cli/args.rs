@@ -8,12 +8,12 @@ use crate::thin_emitter::{ModuleKind, ScriptTarget};
 #[command(name = "stc", version, about = "Speedy TypeScript Compiler")]
 pub struct CliArgs {
     /// ECMAScript target version.
-    #[arg(long, value_enum, default_value_t = Target::EsNext)]
-    pub target: Target,
+    #[arg(long, value_enum)]
+    pub target: Option<Target>,
 
     /// Module system for emitted JavaScript.
-    #[arg(long, value_enum, default_value_t = Module::None)]
-    pub module: Module,
+    #[arg(long, value_enum)]
+    pub module: Option<Module>,
 
     /// Output directory for emitted files.
     #[arg(long = "outDir", alias = "out-dir")]
