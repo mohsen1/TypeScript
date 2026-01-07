@@ -1910,6 +1910,48 @@ fn test_rest_unknown_callable_target_from_callable() {
 }
 
 #[test]
+fn test_mapped_type_over_number_keys_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::NUMBER));
+    let mapped = interner.mapped(MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint,
+        name_type: None,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let to_fixed = interner.intern_string("toFixed");
+    let expected = interner.object(vec![PropertyInfo {
+        name: to_fixed,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let mismatch = interner.object(vec![PropertyInfo {
+        name: to_fixed,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_assignable(mapped, expected));
+    assert!(!checker.is_assignable(mapped, mismatch));
+    assert!(!checker.is_assignable(expected, mapped));
+}
+
+#[test]
 fn test_mapped_type_key_remap_filters_keys() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);

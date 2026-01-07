@@ -2094,6 +2094,46 @@ fn test_mapped_type_over_number_keys() {
 }
 
 #[test]
+fn test_mapped_type_over_number_keys_evaluate_type() {
+    let interner = TypeInterner::new();
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::NUMBER));
+    let mapped = interner.mapped(MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint,
+        name_type: None,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let result = evaluate_type(&interner, mapped);
+    let key = interner.lookup(result).expect("Expected object type");
+
+    match key {
+        TypeKey::Object(shape_id) => {
+            let shape = interner.object_shape(shape_id);
+            let to_fixed = interner.intern_string("toFixed");
+            let mut saw_to_fixed = false;
+
+            for prop in &shape.properties {
+                if prop.name == to_fixed {
+                    assert_eq!(prop.type_id, TypeId::BOOLEAN);
+                    saw_to_fixed = true;
+                }
+            }
+
+            assert!(saw_to_fixed, "missing toFixed property");
+        }
+        other => panic!("Expected object type, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_mapped_type_over_boolean_keys() {
     let interner = TypeInterner::new();
 
