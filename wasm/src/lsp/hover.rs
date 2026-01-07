@@ -7,7 +7,7 @@ use crate::parser::NodeIndex;
 use crate::thin_binder::ThinBinderState;
 use crate::solver::TypeInterner;
 use crate::lsp::position::{Position, Range, LineMap};
-use crate::lsp::utils::find_node_at_offset;
+use crate::lsp::utils::find_node_at_or_before_offset;
 use crate::lsp::resolver::{ScopeCache, ScopeCacheStats, ScopeWalker};
 use crate::lsp::jsdoc::{jsdoc_for_node, parse_jsdoc};
 use crate::thin_checker::ThinCheckerState;
@@ -87,10 +87,7 @@ impl<'a> HoverProvider<'a> {
     ) -> Option<HoverInfo> {
         // 1. Find node at position
         let offset = self.line_map.position_to_offset(position, self.source_text)?;
-        let mut node_idx = find_node_at_offset(self.arena, offset);
-        if node_idx.is_none() && offset > 0 {
-            node_idx = find_node_at_offset(self.arena, offset - 1);
-        }
+        let node_idx = find_node_at_or_before_offset(self.arena, offset, self.source_text);
 
         if node_idx.is_none() {
             return None;
@@ -318,6 +315,37 @@ mod hover_tests {
         assert!(info.is_some(), "Should find hover info at EOF");
         if let Some(info) = info {
             assert!(info.contents.iter().any(|content| content.contains("The answer")));
+        }
+    }
+
+    #[test]
+    fn test_hover_incomplete_member_access() {
+        let source = "const foo = 1;\nfoo.";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let interner = TypeInterner::new();
+        let line_map = LineMap::build(source);
+
+        let provider = HoverProvider::new(
+            parser.get_arena(),
+            &binder,
+            &line_map,
+            &interner,
+            source,
+            "test.ts".to_string()
+        );
+
+        let pos = Position::new(1, 4); // After the trailing dot.
+        let mut cache = None;
+        let info = provider.get_hover(root, pos, &mut cache);
+
+        assert!(info.is_some(), "Should find hover info after incomplete member access");
+        if let Some(info) = info {
+            assert!(info.contents[0].contains("foo"), "Should use base identifier for hover");
         }
     }
 

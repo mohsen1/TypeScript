@@ -7,7 +7,7 @@ Reach compiler-case parity for TypeScript semantics with a performance-first, so
 Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (integration), `wasm/src/thin_binder.rs`.
 
 ## Current Status
-Status: Complete
+Status: Active
 - Solver TypeDatabase + lowering/inference/compat layers are integrated.
 - Control flow narrowing covers typeof/truthiness, discriminant/literal equality, logical `&&`/`||`, and loose nullish checks.
 - Namespace member resolution covers nested namespaces and import-equals aliases.
@@ -62,6 +62,10 @@ Status: Complete
   - Emit assignment/array-mutation flow nodes and update flow analyzer.
   - Add tests for reassignment inside branches.
   - Risk: assignment clears to declared type (RHS type not tracked) and array mutation detection is method-name based; destructuring/aliasing writes still conservative.
+- [x] Clear narrowing for destructuring and compound assignments
+  - Inspect assignment patterns (array/object) to detect bound references.
+  - Add focused tests for destructuring and compound assignment narrowing clears.
+  - Risk: still conservative for nested aliasing and property writes beyond the base identifier.
 
 ## Baseline / Validation
 - `./wasm/test.sh`
