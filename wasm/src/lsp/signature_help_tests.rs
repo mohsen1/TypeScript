@@ -110,6 +110,40 @@ fn test_signature_help_first_arg() {
 }
 
 #[test]
+fn test_signature_help_incomplete_call_eof() {
+    // function add(a: number, b: number): number { return a + b; }
+    // add(
+    let source = "function add(a: number, b: number): number { return a + b; }\nadd(";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let interner = TypeInterner::new();
+    let line_map = LineMap::build(source);
+
+    let provider = SignatureHelpProvider::new(
+        parser.get_arena(),
+        &binder,
+        &line_map,
+        &interner,
+        source,
+        "test.ts".to_string(),
+    );
+
+    // Position at EOF, just after '(' (line 1, column 4).
+    let pos = Position::new(1, 4);
+    let mut cache = None;
+    let help = provider.get_signature_help(root, pos, &mut cache);
+
+    assert!(help.is_some(), "Should find signature help in incomplete call");
+    if let Some(h) = help {
+        assert_eq!(h.active_parameter, 0, "Should be on first parameter");
+    }
+}
+
+#[test]
 fn test_signature_help_between_arguments() {
     // Test edge case: cursor between arguments (after comma, before next arg)
     // function process(a: any, b: number, c: string): void {}

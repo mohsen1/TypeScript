@@ -87,7 +87,10 @@ impl<'a> HoverProvider<'a> {
     ) -> Option<HoverInfo> {
         // 1. Find node at position
         let offset = self.line_map.position_to_offset(position, self.source_text)?;
-        let node_idx = find_node_at_offset(self.arena, offset);
+        let mut node_idx = find_node_at_offset(self.arena, offset);
+        if node_idx.is_none() && offset > 0 {
+            node_idx = find_node_at_offset(self.arena, offset - 1);
+        }
 
         if node_idx.is_none() {
             return None;
@@ -280,6 +283,41 @@ mod hover_tests {
 
             // Check that we have a range
             assert!(info.range.is_some(), "Should have range");
+        }
+    }
+
+    #[test]
+    fn test_hover_at_eof_identifier() {
+        // /** The answer */
+        // const x = 42;
+        // x
+        let source = "/** The answer */\nconst x = 42;\nx";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let interner = TypeInterner::new();
+        let line_map = LineMap::build(source);
+
+        let provider = HoverProvider::new(
+            parser.get_arena(),
+            &binder,
+            &line_map,
+            &interner,
+            source,
+            "test.ts".to_string()
+        );
+
+        // Position at EOF, just after 'x' (line 2, column 1).
+        let pos = Position::new(2, 1);
+        let mut cache = None;
+        let info = provider.get_hover(root, pos, &mut cache);
+
+        assert!(info.is_some(), "Should find hover info at EOF");
+        if let Some(info) = info {
+            assert!(info.contents.iter().any(|content| content.contains("The answer")));
         }
     }
 

@@ -143,7 +143,10 @@ impl<'a> SignatureHelpProvider<'a> {
         let offset = self.line_map.position_to_offset(position, self.source_text)?;
 
         // 1. Find the deepest node at the cursor
-        let leaf_node = find_node_at_offset(self.arena, offset);
+        let mut leaf_node = find_node_at_offset(self.arena, offset);
+        if leaf_node.is_none() && offset > 0 {
+            leaf_node = find_node_at_offset(self.arena, offset - 1);
+        }
 
         // 2. Walk up to find the nearest CallExpression or NewExpression
         let (call_node_idx, call_expr, call_kind) = self.find_containing_call(leaf_node)?;
