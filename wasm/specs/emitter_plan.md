@@ -20,13 +20,14 @@ Status: Active
 - [x] Add minimal source map anchors for transform emission paths.
 - [x] Replace declaration map stub with minimal source map output.
 - [x] Add identifier name entries to source maps for transform-path metadata.
-- [ ] Shrink `thin_emitter/mod.rs` for maintainability
+- [x] Shrink `thin_emitter/mod.rs` for maintainability
   - [x] Extract comment utilities + comment/output helpers into modules (keep API stable).
   - [x] Extract module wrapper emission helpers into a submodule (keep API stable).
   - [x] Extract ES5 template literal helpers into a submodule (keep API stable).
   - [x] Extract ES5 binding/destructuring + for-of helpers into a submodule (keep API stable).
   - [x] Split into focused modules (printer core, ES5 helpers, module emission).
   - [x] Keep public API stable and update call sites/tests.
+  - [x] Extract literal/identifier emission helpers into a module.
 - [ ] Performance tuning (deferred until correctness parity)
   - [x] Pre-allocate output buffer from source size; write numeric indices without allocations.
   - [x] Write numeric values in ES5 transforms without allocating strings.
