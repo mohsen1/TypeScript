@@ -15,9 +15,10 @@ Files: `wasm/src/lsp/*`, `wasm/src/thin_binder.rs`, `wasm/src/checker/*`.
 - [ ] Incremental file updates
   - [x] Add `Project::update_file` that applies LSP edits and re-parses.
   - [ ] Reuse parsed arena + binder where possible.
-  - [ ] Cache `TypeCache` per file for hover/completions/diagnostics.
-- [ ] JSDoc extraction for signature help/hover
-  - Parse JSDoc blocks and attach to `SignatureInformation` and `Hover`.
+  - [x] Cache `TypeCache` per file for hover/signature help.
+  - [ ] Extend caches for type-aware completions/diagnostics.
+- [x] JSDoc extraction for signature help/hover
+  - [x] Parse JSDoc blocks and attach to `SignatureInformation` and `Hover`.
 - [x] Extract variable precedence fix
   - [x] Wrap selected expressions to preserve semantics.
   - [x] Add tests around binary/conditional expressions.

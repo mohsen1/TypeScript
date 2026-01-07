@@ -135,6 +135,41 @@ fn test_project_update_file_refreshes_cross_file_references() {
 }
 
 #[test]
+fn test_project_hover_includes_jsdoc() {
+    let mut project = Project::new();
+    let source = "/** The answer */\nconst x = 42;\nx;";
+    project.set_file("a.ts".to_string(), source.to_string());
+
+    let info = project
+        .get_hover("a.ts", Position::new(2, 0))
+        .expect("Expected hover info");
+
+    assert!(info.contents.iter().any(|content| content.contains("The answer")));
+}
+
+#[test]
+fn test_project_signature_help_includes_jsdoc() {
+    let mut project = Project::new();
+    let source = "/** Adds two numbers. */\nfunction add(a: number, b: number): number { return a + b; }\nadd(1, 2);";
+    project.set_file("a.ts".to_string(), source.to_string());
+
+    let pos = {
+        let file = project.file("a.ts").unwrap();
+        range_for_substring(file.source_text(), file.line_map(), "1").start
+    };
+
+    let help = project
+        .get_signature_help("a.ts", pos)
+        .expect("Expected signature help");
+
+    let doc = help.signatures[help.active_signature as usize]
+        .documentation
+        .clone()
+        .unwrap_or_default();
+    assert_eq!(doc, "Adds two numbers.");
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 

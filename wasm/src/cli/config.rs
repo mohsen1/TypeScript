@@ -28,6 +28,8 @@ pub struct CompilerOptions {
     #[serde(default)]
     pub module: Option<String>,
     #[serde(default)]
+    pub jsx: Option<String>,
+    #[serde(default)]
     pub root_dir: Option<String>,
     #[serde(default)]
     pub out_dir: Option<String>,
@@ -52,6 +54,7 @@ pub struct CheckerOptions {
 pub struct ResolvedCompilerOptions {
     pub printer: PrinterOptions,
     pub checker: CheckerOptions,
+    pub jsx: Option<JsxEmit>,
     pub root_dir: Option<PathBuf>,
     pub out_dir: Option<PathBuf>,
     pub declaration_dir: Option<PathBuf>,
@@ -60,11 +63,18 @@ pub struct ResolvedCompilerOptions {
     pub no_emit_on_error: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum JsxEmit {
+    Preserve,
+    ReactNative,
+}
+
 impl Default for ResolvedCompilerOptions {
     fn default() -> Self {
         ResolvedCompilerOptions {
             printer: PrinterOptions::default(),
             checker: CheckerOptions::default(),
+            jsx: None,
             root_dir: None,
             out_dir: None,
             declaration_dir: None,
@@ -87,6 +97,10 @@ pub fn resolve_compiler_options(options: Option<&CompilerOptions>) -> Result<Res
 
     if let Some(module) = options.module.as_deref() {
         resolved.printer.module = parse_module_kind(module)?;
+    }
+
+    if let Some(jsx) = options.jsx.as_deref() {
+        resolved.jsx = Some(parse_jsx_emit(jsx)?);
     }
 
     if let Some(root_dir) = options.root_dir.as_deref() {
@@ -197,6 +211,7 @@ fn merge_compiler_options(base: CompilerOptions, child: CompilerOptions) -> Comp
     CompilerOptions {
         target: child.target.or(base.target),
         module: child.module.or(base.module),
+        jsx: child.jsx.or(base.jsx),
         root_dir: child.root_dir.or(base.root_dir),
         out_dir: child.out_dir.or(base.out_dir),
         declaration: child.declaration.or(base.declaration),
@@ -245,6 +260,17 @@ fn parse_module_kind(value: &str) -> Result<ModuleKind> {
     };
 
     Ok(module)
+}
+
+fn parse_jsx_emit(value: &str) -> Result<JsxEmit> {
+    let normalized = normalize_option(value);
+    let jsx = match normalized.as_str() {
+        "preserve" => JsxEmit::Preserve,
+        "reactnative" => JsxEmit::ReactNative,
+        _ => bail!("unsupported compilerOptions.jsx '{}'", value),
+    };
+
+    Ok(jsx)
 }
 
 fn normalize_option(value: &str) -> String {
