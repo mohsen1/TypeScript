@@ -25,6 +25,7 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - BigInt literals normalize base prefixes to decimal
   - BigInt literals with base prefixes are tokenized in the scanner
   - Numeric separators are accepted for numeric and bigint literals
+  - [x] Scanner flags invalid numeric separators for diagnostics
 - [x] Parse and lower `unique symbol` type operator
 - [x] Tests for basic lowering
   - Test: `number` annotation -> Intrinsic(Number)

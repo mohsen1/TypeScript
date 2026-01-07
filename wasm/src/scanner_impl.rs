@@ -953,14 +953,7 @@ impl ScannerState {
                 // Hex number
                 self.pos += 2;
                 self.token_flags |= TokenFlags::HexSpecifier as u32;
-                while self.pos < self.end {
-                    let ch = self.char_code_unchecked(self.pos);
-                    if is_hex_digit(ch) || ch == CharacterCodes::UNDERSCORE {
-                        self.pos += 1;
-                        continue;
-                    }
-                    break;
-                }
+                self.scan_digits_with_separators(is_hex_digit);
                 if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LOWER_N {
                     self.pos += 1;
                     self.token_value = self.substring(start, self.pos);
@@ -975,16 +968,7 @@ impl ScannerState {
                 // Binary number
                 self.pos += 2;
                 self.token_flags |= TokenFlags::BinarySpecifier as u32;
-                while self.pos < self.end {
-                    let ch = self.char_code_unchecked(self.pos);
-                    if ch != CharacterCodes::_0
-                        && ch != CharacterCodes::_1
-                        && ch != CharacterCodes::UNDERSCORE
-                    {
-                        break;
-                    }
-                    self.pos += 1;
-                }
+                self.scan_digits_with_separators(is_binary_digit);
                 if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LOWER_N {
                     self.pos += 1;
                     self.token_value = self.substring(start, self.pos);
@@ -999,14 +983,7 @@ impl ScannerState {
                 // Octal number
                 self.pos += 2;
                 self.token_flags |= TokenFlags::OctalSpecifier as u32;
-                while self.pos < self.end {
-                    let ch = self.char_code_unchecked(self.pos);
-                    if is_octal_digit(ch) || ch == CharacterCodes::UNDERSCORE {
-                        self.pos += 1;
-                        continue;
-                    }
-                    break;
-                }
+                self.scan_digits_with_separators(is_octal_digit);
                 if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::LOWER_N {
                     self.pos += 1;
                     self.token_value = self.substring(start, self.pos);
@@ -1020,26 +997,12 @@ impl ScannerState {
         }
 
         // Decimal number
-        while self.pos < self.end {
-            let ch = self.char_code_unchecked(self.pos);
-            if is_digit(ch) || ch == CharacterCodes::UNDERSCORE {
-                self.pos += 1;
-                continue;
-            }
-            break;
-        }
+        self.scan_digits_with_separators(is_digit);
         
         // Decimal point
         if self.pos < self.end && self.char_code_unchecked(self.pos) == CharacterCodes::DOT {
             self.pos += 1;
-            while self.pos < self.end {
-                let ch = self.char_code_unchecked(self.pos);
-                if is_digit(ch) || ch == CharacterCodes::UNDERSCORE {
-                    self.pos += 1;
-                    continue;
-                }
-                break;
-            }
+            self.scan_digits_with_separators(is_digit);
         }
         
         // Exponent
@@ -1054,14 +1017,7 @@ impl ScannerState {
                         self.pos += 1;
                     }
                 }
-                while self.pos < self.end {
-                    let digit = self.char_code_unchecked(self.pos);
-                    if is_digit(digit) || digit == CharacterCodes::UNDERSCORE {
-                        self.pos += 1;
-                        continue;
-                    }
-                    break;
-                }
+                self.scan_digits_with_separators(is_digit);
             }
         }
         
@@ -1075,6 +1031,35 @@ impl ScannerState {
         
         self.token_value = self.substring(start, self.pos);
         self.token = SyntaxKind::NumericLiteral;
+    }
+
+    fn scan_digits_with_separators(&mut self, is_valid_digit: fn(u32) -> bool) {
+        let mut saw_digit = false;
+        let mut prev_separator = false;
+
+        while self.pos < self.end {
+            let ch = self.char_code_unchecked(self.pos);
+            if ch == CharacterCodes::UNDERSCORE {
+                self.token_flags |= TokenFlags::ContainsSeparator as u32;
+                if !saw_digit || prev_separator {
+                    self.token_flags |= TokenFlags::ContainsInvalidSeparator as u32;
+                }
+                prev_separator = true;
+                self.pos += 1;
+                continue;
+            }
+            if is_valid_digit(ch) {
+                saw_digit = true;
+                prev_separator = false;
+                self.pos += 1;
+                continue;
+            }
+            break;
+        }
+
+        if prev_separator {
+            self.token_flags |= TokenFlags::ContainsInvalidSeparator as u32;
+        }
     }
 
     /// Scan an identifier.
@@ -2035,6 +2020,10 @@ fn is_white_space_single_line(ch: u32) -> bool {
 
 fn is_digit(ch: u32) -> bool {
     ch >= CharacterCodes::_0 && ch <= CharacterCodes::_9
+}
+
+fn is_binary_digit(ch: u32) -> bool {
+    ch == CharacterCodes::_0 || ch == CharacterCodes::_1
 }
 
 fn is_octal_digit(ch: u32) -> bool {
