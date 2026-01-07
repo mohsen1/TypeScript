@@ -1145,54 +1145,65 @@ impl<'a> LoweringPass<'a> {
         for &stmt_idx in &statements.nodes {
             if let Some(node) = self.arena.get(stmt_idx) {
                 match node.kind {
-                    k if k == syntax_kind_ext::IMPORT_DECLARATION => return true,
-                    k if k == syntax_kind_ext::EXPORT_DECLARATION => return true,
+                    k if k == syntax_kind_ext::IMPORT_DECLARATION
+                        || k == syntax_kind_ext::IMPORT_EQUALS_DECLARATION =>
+                    {
+                        if let Some(import_decl) = self.arena.get_import_decl(node) {
+                            if self.import_has_runtime_dependency(import_decl) {
+                                return true;
+                            }
+                        }
+                    }
+                    k if k == syntax_kind_ext::EXPORT_DECLARATION => {
+                        if let Some(export_decl) = self.arena.get_export_decl(node) {
+                            if self.export_decl_has_runtime_value(export_decl) {
+                                return true;
+                            }
+                        }
+                    }
                     k if k == syntax_kind_ext::EXPORT_ASSIGNMENT => return true,
                     k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
                         if let Some(var_stmt) = self.arena.get_variable(node) {
-                            if self.has_export_modifier(&var_stmt.modifiers) {
+                            if self.has_export_modifier(&var_stmt.modifiers)
+                                && !self.has_declare_modifier(&var_stmt.modifiers)
+                            {
                                 return true;
                             }
                         }
                     }
                     k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
                         if let Some(func) = self.arena.get_function(node) {
-                            if self.has_export_modifier(&func.modifiers) {
+                            if self.has_export_modifier(&func.modifiers)
+                                && !self.has_declare_modifier(&func.modifiers)
+                            {
                                 return true;
                             }
                         }
                     }
                     k if k == syntax_kind_ext::CLASS_DECLARATION => {
                         if let Some(class) = self.arena.get_class(node) {
-                            if self.has_export_modifier(&class.modifiers) {
+                            if self.has_export_modifier(&class.modifiers)
+                                && !self.has_declare_modifier(&class.modifiers)
+                            {
                                 return true;
                             }
                         }
                     }
                     k if k == syntax_kind_ext::ENUM_DECLARATION => {
                         if let Some(enum_decl) = self.arena.get_enum(node) {
-                            if self.has_export_modifier(&enum_decl.modifiers) {
-                                return true;
-                            }
-                        }
-                    }
-                    k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
-                        if let Some(iface) = self.arena.get_interface(node) {
-                            if self.has_export_modifier(&iface.modifiers) {
-                                return true;
-                            }
-                        }
-                    }
-                    k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
-                        if let Some(type_alias) = self.arena.get_type_alias(node) {
-                            if self.has_export_modifier(&type_alias.modifiers) {
+                            if self.has_export_modifier(&enum_decl.modifiers)
+                                && !self.has_declare_modifier(&enum_decl.modifiers)
+                                && !self.has_const_modifier(&enum_decl.modifiers)
+                            {
                                 return true;
                             }
                         }
                     }
                     k if k == syntax_kind_ext::MODULE_DECLARATION => {
                         if let Some(module) = self.arena.get_module(node) {
-                            if self.has_export_modifier(&module.modifiers) {
+                            if self.has_export_modifier(&module.modifiers)
+                                && !self.has_declare_modifier(&module.modifiers)
+                            {
                                 return true;
                             }
                         }
@@ -1315,6 +1326,95 @@ impl<'a> LoweringPass<'a> {
         }
 
         false
+    }
+
+    fn export_decl_has_runtime_value(
+        &self,
+        export_decl: &crate::parser::thin_node::ExportDeclData,
+    ) -> bool {
+        if export_decl.is_type_only {
+            return false;
+        }
+
+        if export_decl.is_default_export {
+            return true;
+        }
+
+        if export_decl.export_clause.is_none() {
+            return true;
+        }
+
+        let Some(clause_node) = self.arena.get(export_decl.export_clause) else {
+            return false;
+        };
+
+        if let Some(named) = self.arena.get_named_imports(clause_node) {
+            if !named.name.is_none() {
+                return true;
+            }
+
+            if named.elements.nodes.is_empty() {
+                return true;
+            }
+
+            for &spec_idx in &named.elements.nodes {
+                let Some(spec_node) = self.arena.get(spec_idx) else {
+                    continue;
+                };
+                if let Some(spec) = self.arena.get_specifier(spec_node) {
+                    if !spec.is_type_only {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        if self.export_clause_is_type_only(clause_node) {
+            return false;
+        }
+
+        true
+    }
+
+    fn export_clause_is_type_only(&self, clause_node: &ThinNode) -> bool {
+        match clause_node.kind {
+            k if k == syntax_kind_ext::INTERFACE_DECLARATION => true,
+            k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => true,
+            k if k == syntax_kind_ext::ENUM_DECLARATION => {
+                let Some(enum_decl) = self.arena.get_enum(clause_node) else {
+                    return false;
+                };
+                self.has_declare_modifier(&enum_decl.modifiers)
+                    || self.has_const_modifier(&enum_decl.modifiers)
+            }
+            k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                let Some(class_decl) = self.arena.get_class(clause_node) else {
+                    return false;
+                };
+                self.has_declare_modifier(&class_decl.modifiers)
+            }
+            k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                let Some(func_decl) = self.arena.get_function(clause_node) else {
+                    return false;
+                };
+                self.has_declare_modifier(&func_decl.modifiers)
+            }
+            k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+                let Some(var_decl) = self.arena.get_variable(clause_node) else {
+                    return false;
+                };
+                self.has_declare_modifier(&var_decl.modifiers)
+            }
+            k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                let Some(module_decl) = self.arena.get_module(clause_node) else {
+                    return false;
+                };
+                self.has_declare_modifier(&module_decl.modifiers)
+            }
+            _ => false,
+        }
     }
 
     fn export_has_runtime_dependency(

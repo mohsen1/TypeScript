@@ -989,6 +989,58 @@ fn test_commonjs_preamble() {
     assert!(output.contains("exports.x"), "Expected exports.x in CommonJS output: {}", output);
 }
 
+// =============================================================================
+// Auto-Detect Module Tests
+// =============================================================================
+
+#[test]
+fn test_auto_detect_skips_type_only_imports() {
+    let source = r#"import type { Foo } from "./types"; const x = 1;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::with_options(&parser.arena, PrinterOptions::default());
+    printer.set_auto_detect_module(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        !output.contains("\"use strict\";"),
+        "Type-only imports should not trigger CommonJS preamble: {}",
+        output
+    );
+    assert!(
+        !output.contains("exports."),
+        "Type-only imports should not emit exports assignments: {}",
+        output
+    );
+    assert!(output.contains("var x = 1"), "Expected value statement in output: {}", output);
+}
+
+#[test]
+fn test_auto_detect_skips_type_only_exports() {
+    let source = r#"export type { Foo } from "./types"; const x = 1;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::with_options(&parser.arena, PrinterOptions::default());
+    printer.set_auto_detect_module(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        !output.contains("\"use strict\";"),
+        "Type-only exports should not trigger CommonJS preamble: {}",
+        output
+    );
+    assert!(
+        !output.contains("exports."),
+        "Type-only exports should not emit exports assignments: {}",
+        output
+    );
+    assert!(output.contains("var x = 1"), "Expected value statement in output: {}", output);
+}
+
 #[test]
 fn test_commonjs_import_named() {
     let source = r#"import { foo, bar } from "./module";"#;
@@ -1339,6 +1391,27 @@ fn test_legacy_system_wrapper() {
     assert!(
         output.contains("execute: function () {"),
         "Expected System.register execute block: {}",
+        output
+    );
+}
+
+#[test]
+fn test_legacy_amd_wrapper_skips_pure_type_only_module() {
+    let source = r#"import type { Foo } from "./types";"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::AMD,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.trim().is_empty(),
+        "Type-only modules should not emit AMD wrappers: {}",
         output
     );
 }
