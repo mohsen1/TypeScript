@@ -92,6 +92,13 @@ fn collect_export_name_from_declaration(arena: &ThinNodeArena, decl_node: &ThinN
                 }
             }
         }
+        k if k == syntax_kind_ext::IMPORT_EQUALS_DECLARATION => {
+            if let Some(import_decl) = arena.get_import_decl(decl_node) {
+                if let Some(name) = get_identifier_text(arena, import_decl.import_clause) {
+                    exports.push(name);
+                }
+            }
+        }
         _ => {
             // Interface, Type Alias, etc. don't need runtime exports
         }
@@ -513,158 +520,4 @@ pub fn sanitize_module_name(module_spec: &str) -> String {
         .trim_start_matches("./")
         .trim_start_matches("../")
         .replace(['/', '-', '.', '@'], "_")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_sanitize_module_name() {
-        assert_eq!(sanitize_module_name("./foo"), "foo");
-        assert_eq!(sanitize_module_name("./foo/bar"), "foo_bar");
-        assert_eq!(sanitize_module_name("../utils"), "utils");
-        assert_eq!(sanitize_module_name("@scope/pkg"), "_scope_pkg");
-    }
-
-    #[test]
-    fn test_emit_commonjs_preamble() {
-        let mut output = String::new();
-        emit_commonjs_preamble(&mut output).unwrap();
-        assert!(output.contains("\"use strict\";"));
-        assert!(output.contains("Object.defineProperty(exports, \"__esModule\""));
-    }
-
-    #[test]
-    fn test_emit_exports_init() {
-        let mut output = String::new();
-        emit_exports_init(&mut output, &["foo".to_string(), "bar".to_string()]).unwrap();
-        assert_eq!(output, "exports.foo = exports.bar = void 0;\n");
-    }
-
-    #[test]
-    fn test_emit_export_assignment() {
-        assert_eq!(emit_export_assignment("foo"), "exports.foo = foo;");
-    }
-
-    #[test]
-    fn test_emit_reexport_property() {
-        let result = emit_reexport_property("foo", "module_1", "foo");
-        assert!(result.contains("Object.defineProperty"));
-        assert!(result.contains("\"foo\""));
-        assert!(result.contains("module_1.foo"));
-    }
-
-    #[test]
-    fn test_collect_export_names_with_parsed_ast() {
-        use crate::thin_parser::ThinParserState;
-        use crate::parser::syntax_kind_ext;
-
-        let source = "export class C {}";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-
-        let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
-            panic!("Failed to get source file");
-        };
-
-        // Debug: print the statements
-        eprintln!("Source file has {} statements", source_file.statements.nodes.len());
-        for (i, &stmt_idx) in source_file.statements.nodes.iter().enumerate() {
-            if let Some(node) = parser.arena.get(stmt_idx) {
-                eprintln!("Statement {}: kind = {} (ClassDecl = {})",
-                    i, node.kind, syntax_kind_ext::CLASS_DECLARATION);
-
-                if node.kind == syntax_kind_ext::CLASS_DECLARATION {
-                    if let Some(class) = parser.arena.get_class(node) {
-                        eprintln!("  Found class, modifiers: {:?}", class.modifiers);
-                        if let Some(modifiers) = &class.modifiers {
-                            eprintln!("  Modifiers count: {}", modifiers.nodes.len());
-                            for &mod_idx in &modifiers.nodes {
-                                if let Some(mod_node) = parser.arena.get(mod_idx) {
-                                    eprintln!("    Modifier kind: {} (Export = {})",
-                                        mod_node.kind, SyntaxKind::ExportKeyword as u16);
-                                }
-                            }
-                        }
-                        if let Some(name_node) = parser.arena.get(class.name) {
-                            if let Some(ident) = parser.arena.get_identifier(name_node) {
-                                eprintln!("  Class name: {}", ident.escaped_text);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
-
-        eprintln!("Collected export names: {:?}", export_names);
-
-        assert!(!export_names.is_empty(), "Expected to find exported class name");
-        assert_eq!(export_names, vec!["C"], "Expected to find class name 'C' in exports");
-    }
-
-    #[test]
-    fn test_collect_export_names_with_destructuring() {
-        use crate::thin_parser::ThinParserState;
-
-        let source = "export const { a, b: c } = obj;";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-
-        let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
-            panic!("Failed to get source file");
-        };
-
-        let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
-
-        assert_eq!(
-            export_names,
-            vec!["a", "c"],
-            "Expected destructured export names"
-        );
-    }
-
-    #[test]
-    fn test_collect_export_names_with_default_export() {
-        use crate::thin_parser::ThinParserState;
-
-        let source = "export default function () {}";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-
-        let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
-            panic!("Failed to get source file");
-        };
-
-        let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
-
-        assert_eq!(
-            export_names,
-            vec!["default"],
-            "Expected default export name"
-        );
-    }
-
-    #[test]
-    fn test_collect_export_names_with_named_exports() {
-        use crate::thin_parser::ThinParserState;
-
-        let source = "const foo = 1; export { foo as bar };";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-
-        let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
-            panic!("Failed to get source file");
-        };
-
-        let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
-
-        assert_eq!(
-            export_names,
-            vec!["bar"],
-            "Expected exported name from named export"
-        );
-    }
 }

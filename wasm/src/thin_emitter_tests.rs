@@ -1367,6 +1367,11 @@ fn test_commonjs_export_import_equals() {
 
     let output = printer.get_output();
     assert!(
+        output.contains("exports.Foo = void 0;"),
+        "Expected exports preamble for import equals: {}",
+        output
+    );
+    assert!(
         output.contains("var Foo = require(\"./bar\")"),
         "Expected import equals require in CommonJS output: {}",
         output
