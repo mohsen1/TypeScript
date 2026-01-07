@@ -175,6 +175,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Compare deferred conditional structure before branch subtyping
 - [x] Tests for deferred conditional source/target/conditional subtyping
 
+### Phase 28: Conditional Any/Never Evaluation
+- [x] Treat `any` in conditional checks as union of true/false branches
+- [x] Collapse distributive conditionals over `never` to `never`
+- [x] Tests for conditional `any` and distributive `never`
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

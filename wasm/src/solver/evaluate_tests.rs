@@ -108,6 +108,43 @@ fn test_conditional_non_distributive_union() {
 }
 
 #[test]
+fn test_conditional_any_produces_union() {
+    let interner = TypeInterner::new();
+
+    // any extends string ? number : boolean
+    // any produces union of branches
+    let cond = ConditionalType {
+        check_type: TypeId::ANY,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::NUMBER,
+        false_type: TypeId::BOOLEAN,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::BOOLEAN]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_distributive_never() {
+    let interner = TypeInterner::new();
+
+    // T extends string ? number : boolean, with T = never (distributive)
+    // Distributes over empty union -> never
+    let cond = ConditionalType {
+        check_type: TypeId::NEVER,
+        extends_type: TypeId::STRING,
+        true_type: TypeId::NUMBER,
+        false_type: TypeId::BOOLEAN,
+        is_distributive: true,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
 fn test_conditional_deferred_type_parameter() {
     let interner = TypeInterner::new();
 

@@ -105,6 +105,16 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         let check_type = cond.check_type;
         let extends_type = cond.extends_type;
 
+        if cond.is_distributive && check_type == TypeId::NEVER {
+            return TypeId::NEVER;
+        }
+
+        if check_type == TypeId::ANY {
+            let true_eval = self.evaluate(cond.true_type);
+            let false_eval = self.evaluate(cond.false_type);
+            return self.interner.union(vec![true_eval, false_eval]);
+        }
+
         // Step 1: Check for distributivity
         // Only distribute for naked type parameters (recorded at lowering time).
         if cond.is_distributive {
