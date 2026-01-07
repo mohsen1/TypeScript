@@ -1475,6 +1475,33 @@ fn test_type_parameter_constraint_assignability() {
 }
 
 #[test]
+fn test_base_constraint_assignability_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+    let u_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+    let v_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("V"),
+        constraint: Some(TypeId::NUMBER),
+        default: None,
+    }));
+
+    assert!(checker.is_subtype_of(t_param, TypeId::STRING));
+    assert!(!checker.is_subtype_of(t_param, TypeId::NUMBER));
+    assert!(!checker.is_subtype_of(t_param, u_param));
+    assert!(!checker.is_subtype_of(t_param, v_param));
+}
+
+#[test]
 fn test_type_parameter_identity_only() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);

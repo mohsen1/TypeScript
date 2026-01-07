@@ -236,6 +236,14 @@ pub trait QueryDatabase: TypeDatabase {
         crate::solver::evaluate::evaluate_keyof(self.as_type_database(), operand)
     }
 
+    fn is_property_readonly(&self, object_type: TypeId, prop_name: &str) -> bool {
+        crate::solver::operations::property_is_readonly(
+            self.as_type_database(),
+            object_type,
+            prop_name,
+        )
+    }
+
     fn is_subtype_of(&self, source: TypeId, target: TypeId) -> bool {
         crate::solver::subtype::is_subtype_of(self.as_type_database(), source, target)
     }

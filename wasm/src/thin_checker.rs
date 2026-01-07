@@ -5949,58 +5949,9 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check if a property is marked readonly in a type.
     fn is_property_readonly(&self, type_id: TypeId, prop_name: &str) -> bool {
-        use crate::solver::TypeKey;
+        use crate::solver::QueryDatabase;
 
-        match self.ctx.types.lookup(type_id) {
-            Some(TypeKey::ReadonlyType(inner)) => {
-                if let Some(TypeKey::Array(_) | TypeKey::Tuple(_)) = self.ctx.types.lookup(inner) {
-                    if self.get_numeric_index_from_string(prop_name).is_some() {
-                        return true;
-                    }
-                }
-                self.is_property_readonly(inner, prop_name)
-            }
-            Some(TypeKey::Object(shape_id)) => {
-                let shape = self.ctx.types.object_shape(shape_id);
-                for prop in shape.properties.iter() {
-                    if self.ctx.types.resolve_atom(prop.name) == prop_name {
-                        return prop.readonly;
-                    }
-                }
-                false
-            }
-            Some(TypeKey::ObjectWithIndex(shape_id)) => {
-                let shape = self.ctx.types.object_shape(shape_id);
-                for prop in shape.properties.iter() {
-                    if self.ctx.types.resolve_atom(prop.name) == prop_name {
-                        return prop.readonly;
-                    }
-                }
-                // Check index signatures for readonly
-                if let Some(ref idx) = shape.string_index {
-                    if idx.readonly {
-                        return true;
-                    }
-                }
-                if let Some(ref idx) = shape.number_index {
-                    if idx.readonly {
-                        return true;
-                    }
-                }
-                false
-            }
-            Some(TypeKey::Union(types)) => {
-                let types = self.ctx.types.type_list(types);
-                // Property is readonly if any union member is readonly
-                types.iter().any(|t| self.is_property_readonly(*t, prop_name))
-            }
-            Some(TypeKey::Intersection(types)) => {
-                let types = self.ctx.types.type_list(types);
-                // Property is readonly if readonly in any intersection member
-                types.iter().any(|t| self.is_property_readonly(*t, prop_name))
-            }
-            _ => false,
-        }
+        self.ctx.types.is_property_readonly(type_id, prop_name)
     }
 
     fn is_readonly_index_signature(

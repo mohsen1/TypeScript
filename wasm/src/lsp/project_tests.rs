@@ -1838,6 +1838,47 @@ fn test_project_nested_function_body_edit_preserves_prefix_symbol_and_scope_cach
 }
 
 #[test]
+fn test_project_nested_function_body_edit_preserves_suffix_definition_scope_cache() {
+    let mut project = Project::new();
+
+    project.set_file(
+        "a.ts".to_string(),
+        "const alpha = 1;\nfunction outer() {\n  function inner() {\n    return alpha;\n  }\n  return inner();\n}\nconst beta = alpha;\nbeta;\n".to_string(),
+    );
+    let position = {
+        let file = project.file("a.ts").unwrap();
+        range_for_substring(file.source_text(), file.line_map(), "beta;").start
+    };
+
+    let edit = {
+        let file = project.file("a.ts").unwrap();
+        let range = range_for_substring(file.source_text(), file.line_map(), "return alpha;");
+        TextEdit::new(range, "return alpha + 1;".to_string())
+    };
+    project
+        .update_file("a.ts", &[edit])
+        .expect("Expected update to succeed");
+
+    assert!(project.get_hover("a.ts", position).is_some());
+    assert!(project.get_definition("a.ts", position).is_some());
+
+    let timing = project
+        .performance()
+        .timing(ProjectRequestKind::Definition)
+        .expect("Expected timing data for definition");
+
+    assert!(
+        timing.scope_hits > 0,
+        "Expected scope cache hit for suffix symbol after nested edit"
+    );
+    assert_eq!(
+        timing.scope_misses,
+        0,
+        "Expected definition to reuse cached scope for suffix symbol after nested edit"
+    );
+}
+
+#[test]
 fn test_project_cross_file_references_reexport_named() {
     let mut project = Project::new();
 
