@@ -15,6 +15,7 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 - [ ] Shrink `thin_emitter/mod.rs` for maintainability
   - [x] Extract comment utilities + comment/output helpers into modules (keep API stable).
   - [x] Extract module wrapper emission helpers into a submodule (keep API stable).
+  - [x] Extract ES5 template literal helpers into a submodule (keep API stable).
   - [ ] Split into focused modules (printer core, ES5 helpers, module emission).
   - [ ] Keep public API stable and update call sites/tests.
 - [ ] Performance tuning: remove obvious hot-path overheads
