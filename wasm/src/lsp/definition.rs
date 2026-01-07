@@ -290,6 +290,27 @@ mod definition_tests {
     }
 
     #[test]
+    fn test_goto_definition_class_member_not_in_scope() {
+        let source = "class Foo {\n  value = 1;\n  method() {\n    return value;\n  }\n}";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+        let arena = parser.get_arena();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(arena, root);
+
+        let line_map = LineMap::build(source);
+
+        // Position at the 'value' usage (line 3)
+        let position = Position::new(3, 11);
+
+        let goto_def = GoToDefinition::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+        let definitions = goto_def.get_definition(root, position);
+
+        assert!(definitions.is_none(), "Class members should not resolve as lexical identifiers");
+    }
+
+    #[test]
     fn test_goto_definition_not_found() {
         let source = "const x = 1;";
         let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
