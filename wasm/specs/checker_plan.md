@@ -7,6 +7,7 @@ Reach compiler-case parity for TypeScript semantics with a performance-first, so
 Files: `wasm/src/thin_checker.rs`, `wasm/src/checker/*`, `wasm/src/solver/*` (integration), `wasm/src/thin_binder.rs`.
 
 ## Current Status
+Status: Complete
 - Solver TypeDatabase + lowering/inference/compat layers are integrated.
 - Control flow narrowing covers typeof/truthiness, discriminant/literal equality, logical `&&`/`||`, and loose nullish checks.
 - Namespace member resolution covers nested namespaces and import-equals aliases.
