@@ -229,6 +229,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Add missing legacy/modern string methods from lib.d.ts (HTML methods, normalize, well-formed)
 - [x] Tests for legacy/modern string apparent members
 
+### Phase 40: Primitive Index Access Evaluation
+- [x] Evaluate index access on primitive types using apparent members
+- [x] Treat numeric string literals as number index keys
+- [x] Tests for string primitive index access cases
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

@@ -509,6 +509,39 @@ fn test_index_access_readonly_tuple_literal() {
 }
 
 #[test]
+fn test_index_access_string_number() {
+    let interner = TypeInterner::new();
+
+    let result = evaluate_index_access(&interner, TypeId::STRING, TypeId::NUMBER);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_index_access_string_literal_numeric_key() {
+    let interner = TypeInterner::new();
+
+    let zero = interner.literal_string("0");
+    let result = evaluate_index_access(&interner, TypeId::STRING, zero);
+    assert_eq!(result, TypeId::STRING);
+}
+
+#[test]
+fn test_index_access_string_literal_member() {
+    let interner = TypeInterner::new();
+
+    let length_key = interner.literal_string("length");
+    let length_type = evaluate_index_access(&interner, TypeId::STRING, length_key);
+    assert_eq!(length_type, TypeId::NUMBER);
+
+    let to_string_key = interner.literal_string("toString");
+    let to_string_type = evaluate_index_access(&interner, TypeId::STRING, to_string_key);
+    match interner.lookup(to_string_type) {
+        Some(TypeKey::Function(func)) => assert_eq!(func.return_type, TypeId::STRING),
+        other => panic!("Expected function type, got {:?}", other),
+    }
+}
+
+#[test]
 fn test_keyof_readonly_array() {
     let interner = TypeInterner::new();
 

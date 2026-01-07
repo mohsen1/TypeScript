@@ -11,8 +11,10 @@
 //! - Handles deferred evaluation when type parameters are unknown
 //! - Supports distributivity for naked type parameters in unions
 
+use crate::interner::Atom;
 use crate::solver::types::*;
-use crate::solver::{apparent_primitive_members, TypeDatabase};
+use crate::solver::{apparent_primitive_members, ApparentMemberKind, TypeDatabase};
+use crate::solver::infer::InferenceContext;
 use crate::solver::subtype::{SubtypeChecker, TypeResolver, NoopResolver};
 use crate::solver::instantiate::{TypeSubstitution, instantiate_type};
 
@@ -188,6 +190,10 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             None => return TypeId::ERROR,
         };
 
+        if let Some(shape) = self.apparent_primitive_shape_for_key(&obj_key) {
+            return self.evaluate_object_with_index(&shape, index_type);
+        }
+
         match obj_key {
             TypeKey::ReadonlyType(inner) => {
                 self.evaluate_index_access(inner, index_type)
@@ -313,6 +319,11 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             for prop in &shape.properties {
                 if prop.name == name {
                     return prop.type_id;
+                }
+            }
+            if self.is_numeric_property_name(name) {
+                if let Some(number_index) = shape.number_index.as_ref() {
+                    return self.add_undefined_if_unchecked(number_index.value_type);
                 }
             }
             if let Some(string_index) = shape.string_index.as_ref() {
@@ -654,6 +665,83 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
     }
 
+    fn apparent_primitive_shape_for_key(&self, key: &TypeKey) -> Option<ObjectShape> {
+        let kind = self.apparent_primitive_kind(key)?;
+        Some(self.apparent_primitive_shape(kind))
+    }
+
+    fn apparent_primitive_kind(&self, key: &TypeKey) -> Option<IntrinsicKind> {
+        match key {
+            TypeKey::Intrinsic(kind) => match kind {
+                IntrinsicKind::String
+                | IntrinsicKind::Number
+                | IntrinsicKind::Boolean
+                | IntrinsicKind::Bigint
+                | IntrinsicKind::Symbol => Some(*kind),
+                _ => None,
+            },
+            TypeKey::Literal(literal) => match literal {
+                LiteralValue::String(_) => Some(IntrinsicKind::String),
+                LiteralValue::Number(_) => Some(IntrinsicKind::Number),
+                LiteralValue::BigInt(_) => Some(IntrinsicKind::Bigint),
+                LiteralValue::Boolean(_) => Some(IntrinsicKind::Boolean),
+            },
+            _ => None,
+        }
+    }
+
+    fn apparent_primitive_shape(&self, kind: IntrinsicKind) -> ObjectShape {
+        let members = apparent_primitive_members(self.interner, kind);
+        let mut properties = Vec::with_capacity(members.len());
+
+        for member in members {
+            let name = self.interner.intern_string(member.name);
+            match member.kind {
+                ApparentMemberKind::Value(type_id) => properties.push(PropertyInfo {
+                    name,
+                    type_id,
+                    optional: false,
+                    readonly: false,
+                    is_method: false,
+                }),
+                ApparentMemberKind::Method(return_type) => properties.push(PropertyInfo {
+                    name,
+                    type_id: self.apparent_method_type(return_type),
+                    optional: false,
+                    readonly: false,
+                    is_method: true,
+                }),
+            }
+        }
+
+        let number_index = if kind == IntrinsicKind::String {
+            Some(IndexSignature {
+                key_type: TypeId::NUMBER,
+                value_type: TypeId::STRING,
+                readonly: false,
+            })
+        } else {
+            None
+        };
+
+        ObjectShape {
+            properties,
+            string_index: None,
+            number_index,
+        }
+    }
+
+    fn apparent_method_type(&self, return_type: TypeId) -> TypeId {
+        self.interner.function(FunctionShape {
+            params: Vec::new(),
+            this_type: None,
+            return_type,
+            type_params: Vec::new(),
+            type_predicate: None,
+            is_constructor: false,
+        })
+    }
+
     fn apparent_primitive_keyof(&self, kind: IntrinsicKind) -> TypeId {
         let members = apparent_primitive_members(self.interner, kind);
         let mut key_types = Vec::with_capacity(members.len());
@@ -665,6 +753,11 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         } else {
             self.interner.union(key_types)
         }
+    }
+
+    fn is_numeric_property_name(&self, name: Atom) -> bool {
+        let prop_name = self.interner.resolve_atom(name);
+        InferenceContext::is_numeric_literal_name(&prop_name)
     }
 }
 
