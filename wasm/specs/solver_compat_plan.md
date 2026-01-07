@@ -299,6 +299,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Surface Object prototype members for primitive property access
 - [x] Tests for primitive property access to Object prototype members
 
+### Phase 57: Template Literal String-Like Behavior
+- [x] Treat template literal types as string-like for property access and apparent members
+- [x] Tests for template literal property access, keyof, and Object-interface assignability
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

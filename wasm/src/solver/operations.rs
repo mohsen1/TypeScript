@@ -1426,6 +1426,11 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 }
             }
 
+            TypeKey::TemplateLiteral(_) => {
+                let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));
+                self.resolve_string_property(prop_name, prop_atom)
+            }
+
             // Built-in properties
             TypeKey::Intrinsic(IntrinsicKind::String) => {
                 let prop_atom = prop_atom.unwrap_or_else(|| self.interner.intern_string(prop_name));

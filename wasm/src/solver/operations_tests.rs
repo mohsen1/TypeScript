@@ -597,6 +597,24 @@ fn test_property_access_primitive_constructor_value() {
 }
 
 #[test]
+fn test_property_access_template_literal() {
+    let interner = TypeInterner::new();
+    let evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let template = interner.intern(TypeKey::TemplateLiteral(vec![
+        TemplateSpan::Text(interner.intern_string("prefix")),
+        TemplateSpan::Type(TypeId::STRING),
+        TemplateSpan::Text(interner.intern_string("suffix")),
+    ]));
+
+    let result = evaluator.resolve_property_access(template, "length");
+    match result {
+        PropertyAccessResult::Success { type_id: t, .. } => assert_eq!(t, TypeId::NUMBER),
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_property_access_literal_string_length() {
     let interner = TypeInterner::new();
     let evaluator = PropertyAccessEvaluator::new(&interner);
