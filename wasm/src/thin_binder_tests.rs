@@ -368,6 +368,21 @@ export function getModuleInstanceState(
 
     assert_bound_state_resolves_param(source, "getModuleInstanceState", "node");
 }
+
+#[test]
+fn test_thin_binder_resolves_parameter_from_bound_state_binder_ts_331() {
+    let source = r#"
+export function getModuleInstanceState(node: ModuleDeclaration, visited?: Map<number, ModuleInstanceState | undefined>): ModuleInstanceState {
+    if (node.body && !node.body.parent) {
+        setParent(node.body, node);
+        setParentRecursive(node.body, /*incremental*/ false);
+    }
+    return node.body ? getModuleInstanceStateCached(node.body, visited) : ModuleInstanceState.Instantiated;
+}
+"#;
+
+    assert_bound_state_resolves_param(source, "getModuleInstanceState", "node");
+}
 #[test]
 fn test_namespace_binding_debug() {
     use crate::thin_parser::ThinParserState;
