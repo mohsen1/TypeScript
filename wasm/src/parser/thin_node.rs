@@ -3264,6 +3264,17 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get tagged template expression data.
+    #[inline]
+    pub fn get_tagged_template(&self, node: &ThinNode) -> Option<&TaggedTemplateData> {
+        use super::syntax_kind_ext::TAGGED_TEMPLATE_EXPRESSION;
+        if node.has_data() && node.kind == TAGGED_TEMPLATE_EXPRESSION {
+            self.tagged_templates.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Get spread element/assignment data.
     #[inline]
     pub fn get_spread(&self, node: &ThinNode) -> Option<&SpreadData> {
