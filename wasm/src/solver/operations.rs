@@ -253,6 +253,23 @@ impl<'a> CallEvaluator<'a> {
                 rest: p.rest,
             }
         }).collect();
+        let (min_args, max_args) = self.arg_count_bounds(&instantiated_params);
+        if arg_types.len() < min_args {
+            return CallResult::ArgumentCountMismatch {
+                expected_min: min_args,
+                expected_max: max_args,
+                actual: arg_types.len(),
+            };
+        }
+        if let Some(max) = max_args {
+            if arg_types.len() > max {
+                return CallResult::ArgumentCountMismatch {
+                    expected_min: min_args,
+                    expected_max: Some(max),
+                    actual: arg_types.len(),
+                };
+            }
+        }
         if let Some(result) = self.check_argument_types(&instantiated_params, arg_types) {
             return result;
         }

@@ -606,6 +606,46 @@ fn test_call_generic_argument_count_mismatch() {
 }
 
 #[test]
+fn test_call_generic_rest_tuple_constraint_count_mismatch() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+    let mut evaluator = CallEvaluator::new(&interner, &mut subtype);
+
+    let tuple_constraint = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(tuple_constraint),
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let func = interner.function(FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: t_type,
+            optional: false,
+            rest: true,
+        }],
+        return_type: TypeId::VOID,
+        is_constructor: false,
+    });
+
+    let result = evaluator.resolve_call(func, &[]);
+    match result {
+        CallResult::ArgumentCountMismatch { expected_min, expected_max, actual } => {
+            assert_eq!(expected_min, 2);
+            assert_eq!(expected_max, Some(2));
+            assert_eq!(actual, 0);
+        }
+        _ => panic!("Expected ArgumentCountMismatch, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_call_generic_argument_type_mismatch_non_generic_param() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
