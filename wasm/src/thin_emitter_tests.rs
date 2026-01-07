@@ -62,6 +62,30 @@ fn test_thin_emitter_source_map_transform_class() {
     );
 }
 
+#[test]
+fn test_thin_emitter_source_map_names() {
+    let source = "const x = 1;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new(&parser.arena);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let names = map_value
+        .get("names")
+        .and_then(|value| value.as_array())
+        .cloned()
+        .unwrap_or_default();
+    assert!(
+        names.iter().any(|name| name.as_str() == Some("x")),
+        "expected identifier name in source map: {map_json}"
+    );
+}
+
 // Note: write() is private, so we can't test it directly.
 // The write functionality is tested indirectly through emit tests.
 
