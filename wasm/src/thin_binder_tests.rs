@@ -21,6 +21,39 @@ fn test_thin_binder_variable_declaration() {
 }
 
 #[test]
+fn test_thin_binder_reset_clears_state() {
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "const a = 1;".to_string(),
+    );
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    assert!(binder.file_locals.has("a"));
+    assert!(!binder.symbols.is_empty());
+    assert!(!binder.node_symbols.is_empty());
+
+    binder.reset();
+
+    assert!(binder.file_locals.is_empty());
+    assert!(binder.symbols.is_empty());
+    assert!(binder.node_symbols.is_empty());
+    assert_eq!(binder.flow_nodes.len(), 1);
+
+    let mut parser = ThinParserState::new(
+        "test.ts".to_string(),
+        "const b = 2;".to_string(),
+    );
+    let root = parser.parse_source_file();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    assert!(binder.file_locals.has("b"));
+    assert!(!binder.file_locals.has("a"));
+}
+
+#[test]
 fn test_thin_binder_function_declaration() {
     let mut parser = ThinParserState::new(
         "test.ts".to_string(),

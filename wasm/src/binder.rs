@@ -197,6 +197,11 @@ impl SymbolTable {
         self.symbols.is_empty()
     }
 
+    /// Clear all symbols while keeping the allocated capacity.
+    pub fn clear(&mut self) {
+        self.symbols.clear();
+    }
+
     /// Iterate over symbols.
     pub fn iter(&self) -> impl Iterator<Item = (&String, &SymbolId)> {
         self.symbols.iter()
@@ -345,6 +350,11 @@ impl SymbolArena {
         self.symbols.is_empty()
     }
 
+    /// Clear all symbols while keeping the allocated capacity.
+    pub fn clear(&mut self) {
+        self.symbols.clear();
+    }
+
     /// Find a symbol by name (linear search through all symbols).
     ///
     /// This is a fallback for when scope chain lookup is not available.
@@ -471,6 +481,10 @@ impl FlowNodeArena {
 
     pub fn is_empty(&self) -> bool {
         self.nodes.is_empty()
+    }
+
+    pub fn clear(&mut self) {
+        self.nodes.clear();
     }
 }
 
