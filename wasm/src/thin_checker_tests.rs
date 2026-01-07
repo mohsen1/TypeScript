@@ -556,6 +556,48 @@ const d = new Derived();
 }
 
 #[test]
+fn test_new_expression_infers_generic_class_type_params() {
+    use crate::thin_parser::ThinParserState;
+    use crate::solver::TypeKey;
+
+    let source = r#"
+class Box<T> {
+    value: T;
+    constructor(value: T) {
+        this.value = value;
+    }
+}
+const b = new Box("hi");
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let b_sym = binder.file_locals.get("b").expect("b should exist");
+    let b_type = checker.get_type_of_symbol(b_sym);
+    let b_key = types.lookup(b_type).expect("b type should exist");
+    match b_key {
+        TypeKey::Object(props) => {
+            let value_atom = types.intern_string("value");
+            let value_prop = props
+                .iter()
+                .find(|p| p.name == value_atom)
+                .expect("value property should exist");
+            assert_eq!(value_prop.type_id, TypeId::STRING);
+        }
+        _ => panic!("Expected b to be Object type, got {:?}", b_key),
+    }
+}
+
+#[test]
 fn test_new_expression_reports_overload_mismatch() {
     use crate::checker::types::diagnostics::diagnostic_codes;
     use crate::thin_parser::ThinParserState;

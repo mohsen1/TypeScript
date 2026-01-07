@@ -1152,14 +1152,19 @@ impl<'a> ThinCheckerState<'a> {
         &mut self,
         ctor: &crate::parser::thin_node::ConstructorData,
         instance_type: TypeId,
+        class_type_params: &[crate::solver::TypeParamInfo],
     ) -> crate::solver::CallSignature {
         let (type_params, type_param_updates) = self.push_type_parameters(&ctor.type_parameters);
         let (params, this_type) = self.extract_params_from_parameter_list(&ctor.parameters);
 
         self.pop_type_parameters(type_param_updates);
 
+        let mut all_type_params = Vec::with_capacity(class_type_params.len() + type_params.len());
+        all_type_params.extend_from_slice(class_type_params);
+        all_type_params.extend(type_params);
+
         crate::solver::CallSignature {
-            type_params,
+            type_params: all_type_params,
             params,
             this_type,
             return_type: instance_type,
@@ -1501,7 +1506,7 @@ impl<'a> ThinCheckerState<'a> {
     ) -> TypeId {
         use crate::solver::{CallSignature, CallableShape};
 
-        let (_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
+        let (class_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
         let instance_type = self.get_class_instance_type(class_idx, class);
 
         let mut has_overloads = false;
@@ -1533,17 +1538,25 @@ impl<'a> ThinCheckerState<'a> {
 
             if has_overloads {
                 if ctor.body.is_none() {
-                    construct_signatures.push(self.call_signature_from_constructor(ctor, instance_type));
+                    construct_signatures.push(self.call_signature_from_constructor(
+                        ctor,
+                        instance_type,
+                        &class_type_params,
+                    ));
                 }
             } else {
-                construct_signatures.push(self.call_signature_from_constructor(ctor, instance_type));
+                construct_signatures.push(self.call_signature_from_constructor(
+                    ctor,
+                    instance_type,
+                    &class_type_params,
+                ));
                 break;
             }
         }
 
         if construct_signatures.is_empty() {
             construct_signatures.push(CallSignature {
-                type_params: Vec::new(),
+                type_params: class_type_params,
                 params: Vec::new(),
                 this_type: None,
                 return_type: instance_type,
