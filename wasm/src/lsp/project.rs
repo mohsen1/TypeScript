@@ -9,15 +9,20 @@ use std::path::{Component, Path, PathBuf};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::binder::SymbolId;
+use crate::checker::TypeCache;
 use crate::lsp::code_actions::{
     CodeAction, CodeActionContext, CodeActionKind, CodeActionProvider, ImportCandidate,
     ImportCandidateKind,
 };
+use crate::lsp::completions::{CompletionItem, Completions};
 use crate::lsp::diagnostics::LspDiagnostic;
+use crate::lsp::hover::{HoverInfo, HoverProvider};
+use crate::lsp::signature_help::{SignatureHelp, SignatureHelpProvider};
 use crate::lsp::utils::find_node_at_offset;
 use crate::parser::thin_node::NodeAccess;
 use crate::parser::{NodeIndex, syntax_kind_ext, thin_node::ThinNodeArena};
 use crate::scanner::SyntaxKind;
+use crate::solver::TypeInterner;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_parser::ThinParserState;
 use crate::lsp::definition::GoToDefinition;
@@ -54,6 +59,8 @@ pub struct ProjectFile {
     parser: ThinParserState,
     binder: ThinBinderState,
     line_map: LineMap,
+    type_interner: TypeInterner,
+    type_cache: Option<TypeCache>,
 }
 
 impl ProjectFile {
@@ -74,6 +81,8 @@ impl ProjectFile {
             parser,
             binder,
             line_map,
+            type_interner: TypeInterner::new(),
+            type_cache: None,
         }
     }
 
@@ -105,6 +114,43 @@ impl ProjectFile {
     /// Original source text for this file.
     pub fn source_text(&self) -> &str {
         self.parser.get_source_text()
+    }
+
+    pub fn get_hover(&mut self, position: Position) -> Option<HoverInfo> {
+        let provider = HoverProvider::new(
+            self.parser.get_arena(),
+            &self.binder,
+            &self.line_map,
+            &self.type_interner,
+            self.parser.get_source_text(),
+            self.file_name.clone(),
+        );
+
+        provider.get_hover(self.root, position, &mut self.type_cache)
+    }
+
+    pub fn get_signature_help(&mut self, position: Position) -> Option<SignatureHelp> {
+        let provider = SignatureHelpProvider::new(
+            self.parser.get_arena(),
+            &self.binder,
+            &self.line_map,
+            &self.type_interner,
+            self.parser.get_source_text(),
+            self.file_name.clone(),
+        );
+
+        provider.get_signature_help(self.root, position, &mut self.type_cache)
+    }
+
+    pub fn get_completions(&self, position: Position) -> Option<Vec<CompletionItem>> {
+        let provider = Completions::new(
+            self.parser.get_arena(),
+            &self.binder,
+            &self.line_map,
+            self.parser.get_source_text(),
+        );
+
+        provider.get_completions(self.root, position)
     }
 
     fn node_location(&self, node_idx: NodeIndex) -> Option<Location> {
@@ -568,6 +614,24 @@ impl Project {
             file.source_text(),
         );
         goto_def.get_definition(file.root(), position)
+    }
+
+    /// Hover within a single file.
+    pub fn get_hover(&mut self, file_name: &str, position: Position) -> Option<HoverInfo> {
+        let file = self.files.get_mut(file_name)?;
+        file.get_hover(position)
+    }
+
+    /// Signature help within a single file.
+    pub fn get_signature_help(&mut self, file_name: &str, position: Position) -> Option<SignatureHelp> {
+        let file = self.files.get_mut(file_name)?;
+        file.get_signature_help(position)
+    }
+
+    /// Completions within a single file.
+    pub fn get_completions(&self, file_name: &str, position: Position) -> Option<Vec<CompletionItem>> {
+        let file = self.files.get(file_name)?;
+        file.get_completions(position)
     }
 
     /// Code actions for a file (project-aware).

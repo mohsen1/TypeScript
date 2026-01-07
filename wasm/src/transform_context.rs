@@ -237,6 +237,11 @@ impl TransformContext {
         self.directives.get(&node)
     }
 
+    /// Iterate over all registered directives.
+    pub fn iter(&self) -> impl Iterator<Item = (&NodeIndex, &TransformDirective)> {
+        self.directives.iter()
+    }
+
     /// Check if a node has a transform directive
     pub fn has_transform(&self, node: NodeIndex) -> bool {
         self.directives.contains_key(&node)
