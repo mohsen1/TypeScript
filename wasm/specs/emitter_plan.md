@@ -29,6 +29,7 @@ Status: Active
   - [x] Keep public API stable and update call sites/tests.
   - [x] Extract literal/identifier emission helpers into a module.
   - [x] Extract expression emission helpers into a module.
+  - [x] Extract statement emission helpers into a module.
 - [ ] Performance tuning (deferred until correctness parity)
   - [x] Pre-allocate output buffer from source size; write numeric indices without allocations.
   - [x] Write numeric values in ES5 transforms without allocating strings.
