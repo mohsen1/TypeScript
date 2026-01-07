@@ -355,6 +355,24 @@ fn test_keyof_unknown() {
     assert_eq!(result, TypeId::NEVER);
 }
 
+#[test]
+fn test_keyof_string_apparent_members() {
+    let interner = TypeInterner::new();
+
+    let result = evaluate_keyof(&interner, TypeId::STRING);
+    let key = interner.lookup(result).expect("expected union for keyof string");
+
+    match key {
+        TypeKey::Union(members) => {
+            let length = interner.literal_string("length");
+            let to_string = interner.literal_string("toString");
+            assert!(members.contains(&length));
+            assert!(members.contains(&to_string));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
+}
+
 // =============================================================================
 // Mapped Type Tests
 // =============================================================================
@@ -389,6 +407,51 @@ fn test_mapped_type_basic() {
         PropertyInfo { name: interner.intern_string("y"), type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
     ]);
     assert_eq!(result, expected);
+}
+
+#[test]
+fn test_mapped_type_over_string_keys() {
+    let interner = TypeInterner::new();
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::STRING));
+    let mapped = MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    let key = interner.lookup(result).expect("Expected object type");
+
+    match key {
+        TypeKey::Object(props) => {
+            let length = interner.intern_string("length");
+            let to_string = interner.intern_string("toString");
+            let mut saw_length = false;
+            let mut saw_to_string = false;
+
+            for prop in props {
+                if prop.name == length {
+                    assert_eq!(prop.type_id, TypeId::BOOLEAN);
+                    saw_length = true;
+                }
+                if prop.name == to_string {
+                    assert_eq!(prop.type_id, TypeId::BOOLEAN);
+                    saw_to_string = true;
+                }
+            }
+
+            assert!(saw_length, "missing length property");
+            assert!(saw_to_string, "missing toString property");
+        }
+        other => panic!("Expected object type, got {:?}", other),
+    }
 }
 
 #[test]
