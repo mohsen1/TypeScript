@@ -11,6 +11,7 @@ pub struct CompatChecker<'a, R: TypeResolver = NoopResolver> {
     interner: &'a TypeInterner,
     subtype: SubtypeChecker<'a, R>,
     strict_function_types: bool,
+    strict_null_checks: bool,
     exact_optional_property_types: bool,
     cache: FxHashMap<(TypeId, TypeId), bool>,
 }
@@ -22,6 +23,7 @@ impl<'a> CompatChecker<'a, NoopResolver> {
             interner,
             subtype: SubtypeChecker::new(interner),
             strict_function_types: false,
+            strict_null_checks: true,
             exact_optional_property_types: false,
             cache: FxHashMap::default(),
         }
@@ -35,6 +37,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
             interner,
             subtype: SubtypeChecker::with_resolver(interner, resolver),
             strict_function_types: false,
+            strict_null_checks: true,
             exact_optional_property_types: false,
             cache: FxHashMap::default(),
         }
@@ -45,6 +48,14 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
     pub fn set_strict_function_types(&mut self, strict: bool) {
         if self.strict_function_types != strict {
             self.strict_function_types = strict;
+            self.cache.clear();
+        }
+    }
+
+    /// Configure strict null checks (legacy null/undefined assignability).
+    pub fn set_strict_null_checks(&mut self, strict: bool) {
+        if self.strict_null_checks != strict {
+            self.strict_null_checks = strict;
             self.cache.clear();
         }
     }
@@ -70,6 +81,10 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         } else if source == TypeId::ANY || target == TypeId::ANY {
             // `any` is the JS escape hatch (top + bottom). See https://github.com/microsoft/TypeScript/issues/10715.
             true
+        } else if !self.strict_null_checks
+            && (source == TypeId::NULL || source == TypeId::UNDEFINED)
+        {
+            true
         } else if target == TypeId::UNKNOWN {
             // `unknown` is top but not assignable to non-top types. See https://github.com/microsoft/TypeScript/issues/10715.
             true
@@ -87,6 +102,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
             self.subtype.allow_void_return = true;
             self.subtype.allow_bivariant_rest = true;
             self.subtype.exact_optional_property_types = self.exact_optional_property_types;
+            self.subtype.strict_null_checks = self.strict_null_checks;
             self.subtype.is_subtype_of(source, target)
         };
 
@@ -97,6 +113,9 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
     /// Explain why `source` is not assignable to `target` using TS compatibility rules.
     pub fn explain_failure(&mut self, source: TypeId, target: TypeId) -> Option<SubtypeFailureReason> {
         if source == target || source == TypeId::ANY || target == TypeId::ANY || target == TypeId::UNKNOWN {
+            return None;
+        }
+        if !self.strict_null_checks && (source == TypeId::NULL || source == TypeId::UNDEFINED) {
             return None;
         }
         if source == TypeId::NEVER || source == TypeId::ERROR || target == TypeId::ERROR {
@@ -118,6 +137,7 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
         self.subtype.allow_void_return = true;
         self.subtype.allow_bivariant_rest = true;
         self.subtype.exact_optional_property_types = self.exact_optional_property_types;
+        self.subtype.strict_null_checks = self.strict_null_checks;
         self.subtype.explain_failure(source, target)
     }
 
@@ -199,6 +219,11 @@ impl<'a, R: TypeResolver> CompatChecker<'a, R> {
 
     fn is_assignable_to_empty_object(&self, source: TypeId) -> bool {
         if source == TypeId::ANY || source == TypeId::NEVER || source == TypeId::ERROR {
+            return true;
+        }
+        if !self.strict_null_checks
+            && (source == TypeId::NULL || source == TypeId::UNDEFINED)
+        {
             return true;
         }
         if source == TypeId::UNKNOWN

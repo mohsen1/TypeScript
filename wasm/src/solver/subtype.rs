@@ -124,6 +124,9 @@ pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
     /// Whether optional properties are exact (exclude implicit `undefined`).
     /// Default: false (legacy TS behavior).
     pub exact_optional_property_types: bool,
+    /// Whether null/undefined are treated as separate types.
+    /// Default: true (strict null checks).
+    pub strict_null_checks: bool,
 }
 
 impl<'a> SubtypeChecker<'a, NoopResolver> {
@@ -139,6 +142,7 @@ impl<'a> SubtypeChecker<'a, NoopResolver> {
             allow_void_return: false,
             allow_bivariant_rest: false,
             exact_optional_property_types: false,
+            strict_null_checks: true,
         }
     }
 }
@@ -155,6 +159,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             allow_void_return: false,
             allow_bivariant_rest: false,
             exact_optional_property_types: false,
+            strict_null_checks: true,
         }
     }
 
@@ -257,6 +262,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // If evaluation changed anything, recurse with the simplified types
         if source_eval != source || target_eval != target {
             return self.check_subtype(source_eval, target_eval);
+        }
+
+        if !self.strict_null_checks
+            && (source == TypeId::NULL || source == TypeId::UNDEFINED)
+        {
+            return SubtypeResult::True;
         }
 
         // Look up the type keys
@@ -1430,6 +1441,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     pub fn explain_failure(&mut self, source: TypeId, target: TypeId) -> Option<SubtypeFailureReason> {
         // Fast path: if types are equal, no failure
         if source == target {
+            return None;
+        }
+
+        if !self.strict_null_checks
+            && (source == TypeId::NULL || source == TypeId::UNDEFINED)
+        {
             return None;
         }
 
