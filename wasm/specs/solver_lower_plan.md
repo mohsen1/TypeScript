@@ -170,10 +170,13 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Test: interface extension detects string literal property mismatch (2430)
   - [x] Checker: interface type parameters are scoped during member checks
   - [x] Checker: interface extension applies base type arguments
+  - [x] Checker: merge base interface members into derived interface types
   - [x] Checker: interface extension resolves namespace-qualified bases
   - [x] Test: interface extension detects generic argument mismatch (2430)
   - [x] Test: interface extension accepts matching generic type arguments
   - [x] Test: interface extension detects namespace-qualified base mismatch (2430)
+  - [x] Test: interface extends inherits base properties
+  - [x] Test: interface extends applies type arguments to inherited members
   - [x] Checker: infer function return types from unannotated bodies
   - [x] Test: function return type inference (simple return)
   - [x] Test: function return type inference (union returns)
