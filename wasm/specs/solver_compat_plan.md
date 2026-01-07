@@ -251,6 +251,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Emit string/number index signatures when mapping over `string`/`number` constraints
 - [x] Tests for mapped index signatures and modifiers
 
+### Phase 45: Keyof Array/Tuple Members
+- [x] Include array member keys in `keyof` arrays and tuples
+- [x] Tests for `keyof` array/tuple member unions
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

@@ -578,7 +578,18 @@ fn test_keyof_readonly_array() {
     let readonly_array = interner.intern(TypeKey::ReadonlyType(array));
 
     let result = evaluate_keyof(&interner, readonly_array);
-    assert_eq!(result, TypeId::NUMBER);
+    let key = interner.lookup(result).expect("expected union for keyof readonly array");
+
+    match key {
+        TypeKey::Union(members) => {
+            let length = interner.literal_string("length");
+            let map = interner.literal_string("map");
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&length));
+            assert!(members.contains(&map));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
 }
 
 #[test]
@@ -592,11 +603,22 @@ fn test_keyof_readonly_tuple() {
     let readonly_tuple = interner.intern(TypeKey::ReadonlyType(tuple));
 
     let result = evaluate_keyof(&interner, readonly_tuple);
-    let expected = interner.union(vec![
-        interner.literal_string("0"),
-        interner.literal_string("1"),
-    ]);
-    assert_eq!(result, expected);
+    let key = interner.lookup(result).expect("expected union for keyof readonly tuple");
+
+    match key {
+        TypeKey::Union(members) => {
+            let key_0 = interner.literal_string("0");
+            let key_1 = interner.literal_string("1");
+            let length = interner.literal_string("length");
+            let map = interner.literal_string("map");
+            assert!(members.contains(&key_0));
+            assert!(members.contains(&key_1));
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&length));
+            assert!(members.contains(&map));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
 }
 
 #[test]
@@ -832,18 +854,29 @@ fn test_keyof_empty_object() {
 fn test_keyof_array() {
     let interner = TypeInterner::new();
 
-    // keyof string[] = number (simplified)
+    // keyof string[] includes number and array members
     let arr = interner.array(TypeId::STRING);
 
     let result = evaluate_keyof(&interner, arr);
-    assert_eq!(result, TypeId::NUMBER);
+    let key = interner.lookup(result).expect("expected union for keyof array");
+
+    match key {
+        TypeKey::Union(members) => {
+            let length = interner.literal_string("length");
+            let map = interner.literal_string("map");
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&length));
+            assert!(members.contains(&map));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
 }
 
 #[test]
 fn test_keyof_tuple() {
     let interner = TypeInterner::new();
 
-    // keyof [string, number] = "0" | "1"
+    // keyof [string, number] includes tuple indices and array members
     let tuple = interner.tuple(vec![
         TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
         TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
@@ -851,10 +884,22 @@ fn test_keyof_tuple() {
 
     let result = evaluate_keyof(&interner, tuple);
 
-    let key_0 = interner.literal_string("0");
-    let key_1 = interner.literal_string("1");
-    let expected = interner.union(vec![key_0, key_1]);
-    assert_eq!(result, expected);
+    let key = interner.lookup(result).expect("expected union for keyof tuple");
+
+    match key {
+        TypeKey::Union(members) => {
+            let key_0 = interner.literal_string("0");
+            let key_1 = interner.literal_string("1");
+            let length = interner.literal_string("length");
+            let map = interner.literal_string("map");
+            assert!(members.contains(&key_0));
+            assert!(members.contains(&key_1));
+            assert!(members.contains(&TypeId::NUMBER));
+            assert!(members.contains(&length));
+            assert!(members.contains(&map));
+        }
+        other => panic!("Expected union, got {:?}", other),
+    }
 }
 
 #[test]

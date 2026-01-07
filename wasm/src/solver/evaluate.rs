@@ -44,6 +44,48 @@ struct MappedKeys {
     has_number: bool,
 }
 
+const ARRAY_KEY_NAMES: &[&str] = &[
+    "length",
+    "concat",
+    "filter",
+    "flat",
+    "flatMap",
+    "map",
+    "reverse",
+    "slice",
+    "sort",
+    "splice",
+    "toReversed",
+    "toSorted",
+    "toSpliced",
+    "with",
+    "at",
+    "find",
+    "findLast",
+    "pop",
+    "shift",
+    "every",
+    "includes",
+    "some",
+    "findIndex",
+    "findLastIndex",
+    "indexOf",
+    "lastIndexOf",
+    "push",
+    "unshift",
+    "forEach",
+    "copyWithin",
+    "fill",
+    "join",
+    "toLocaleString",
+    "toString",
+    "entries",
+    "keys",
+    "values",
+    "reduce",
+    "reduceRight",
+];
+
 impl<'a> TypeEvaluator<'a, NoopResolver> {
     /// Create a new evaluator without a resolver.
     pub fn new(interner: &'a dyn TypeDatabase) -> TypeEvaluator<'a, NoopResolver> {
@@ -381,6 +423,15 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
     }
 
+    fn array_keyof_keys(&self) -> Vec<TypeId> {
+        let mut keys = Vec::with_capacity(ARRAY_KEY_NAMES.len() + 1);
+        keys.push(TypeId::NUMBER);
+        for &name in ARRAY_KEY_NAMES {
+            keys.push(self.interner.literal_string(name));
+        }
+        keys
+    }
+
     fn add_undefined_if_unchecked(&self, type_id: TypeId) -> TypeId {
         if !self.no_unchecked_indexed_access || type_id == TypeId::UNDEFINED {
             return type_id;
@@ -597,15 +648,14 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
             }
             TypeKey::Array(_) => {
-                // keyof T[] = number | array methods
-                // Simplified: just return number for array indices
-                TypeId::NUMBER
+                self.interner.union(self.array_keyof_keys())
             }
             TypeKey::Tuple(elements) => {
-                // keyof [A, B, C] = "0" | "1" | "2" | number methods
-                let key_types: Vec<TypeId> = (0..elements.len())
+                let mut key_types: Vec<TypeId> = (0..elements.len())
                     .map(|i| self.interner.literal_string(&i.to_string()))
                     .collect();
+                let mut array_keys = self.array_keyof_keys();
+                key_types.append(&mut array_keys);
                 if key_types.is_empty() {
                     return TypeId::NEVER;
                 }
