@@ -1280,6 +1280,57 @@ impl<'a> ClassES5Emitter<'a> {
         self.write_line();
     }
 
+    fn get_binding_element_property_key(
+        &self,
+        elem: &crate::parser::thin_node::BindingElementData,
+    ) -> Option<NodeIndex> {
+        let key_idx = if !elem.property_name.is_none() {
+            elem.property_name
+        } else {
+            elem.name
+        };
+        let Some(key_node) = self.arena.get(key_idx) else { return None };
+        match key_node.kind {
+            k if k == syntax_kind_ext::COMPUTED_PROPERTY_NAME
+                || k == SyntaxKind::Identifier as u16
+                || k == SyntaxKind::StringLiteral as u16
+                || k == SyntaxKind::NumericLiteral as u16 =>
+            {
+                Some(key_idx)
+            }
+            _ => None,
+        }
+    }
+
+    fn emit_binding_element_access(&mut self, key_idx: NodeIndex, temp_name: &str) {
+        self.write(temp_name);
+
+        let Some(name_node) = self.arena.get(key_idx) else { return };
+        if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+            if let Some(computed) = self.arena.get_computed_property(name_node) {
+                self.write("[");
+                self.emit_expression(computed.expression);
+                self.write("]");
+            }
+        } else if name_node.kind == SyntaxKind::Identifier as u16 {
+            let name = self.get_identifier_text(key_idx);
+            self.write(".");
+            self.write(&name);
+        } else if name_node.kind == SyntaxKind::StringLiteral as u16 {
+            if let Some(lit) = self.arena.get_literal(name_node) {
+                self.write("[\"");
+                self.write(&lit.text);
+                self.write("\"]");
+            }
+        } else if name_node.kind == SyntaxKind::NumericLiteral as u16 {
+            if let Some(lit) = self.arena.get_literal(name_node) {
+                self.write("[");
+                self.write(&lit.text);
+                self.write("]");
+            }
+        }
+    }
+
     fn emit_param_binding_assignments(
         &mut self,
         pattern_idx: NodeIndex,
@@ -1330,14 +1381,34 @@ impl<'a> ClassES5Emitter<'a> {
             return;
         }
 
-        let prop_name = if !elem.property_name.is_none() {
-            self.get_identifier_text(elem.property_name)
-        } else {
-            self.get_identifier_text(elem.name)
+        let Some(key_idx) = self.get_binding_element_property_key(elem) else {
+            return;
         };
-        let binding_name = self.get_identifier_text(elem.name);
 
-        if prop_name.is_empty() || binding_name.is_empty() {
+        if self.is_binding_pattern(elem.name) {
+            let value_name = self.get_temp_var_name();
+            self.emit_param_assignment_prefix(started);
+            self.write(&value_name);
+            self.write(" = ");
+            self.emit_binding_element_access(key_idx, temp_name);
+
+            if !elem.initializer.is_none() {
+                self.write(", ");
+                self.write(&value_name);
+                self.write(" = ");
+                self.write(&value_name);
+                self.write(" === void 0 ? ");
+                self.emit_expression(elem.initializer);
+                self.write(" : ");
+                self.write(&value_name);
+            }
+
+            self.emit_param_binding_assignments(elem.name, &value_name, started);
+            return;
+        }
+
+        let binding_name = self.get_identifier_text(elem.name);
+        if binding_name.is_empty() {
             return;
         }
 
@@ -1346,9 +1417,7 @@ impl<'a> ClassES5Emitter<'a> {
             let value_name = self.get_temp_var_name();
             self.write(&value_name);
             self.write(" = ");
-            self.write(temp_name);
-            self.write(".");
-            self.write(&prop_name);
+            self.emit_binding_element_access(key_idx, temp_name);
             self.write(", ");
             self.write(&binding_name);
             self.write(" = ");
@@ -1360,9 +1429,7 @@ impl<'a> ClassES5Emitter<'a> {
         } else {
             self.write(&binding_name);
             self.write(" = ");
-            self.write(temp_name);
-            self.write(".");
-            self.write(&prop_name);
+            self.emit_binding_element_access(key_idx, temp_name);
         }
     }
 
@@ -1381,6 +1448,31 @@ impl<'a> ClassES5Emitter<'a> {
 
         if elem.dot_dot_dot_token {
             self.emit_param_array_rest_element(elem.name, temp_name, index, started);
+            return;
+        }
+
+        if self.is_binding_pattern(elem.name) {
+            let value_name = self.get_temp_var_name();
+            self.emit_param_assignment_prefix(started);
+            self.write(&value_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write("[");
+            self.write(&index.to_string());
+            self.write("]");
+
+            if !elem.initializer.is_none() {
+                self.write(", ");
+                self.write(&value_name);
+                self.write(" = ");
+                self.write(&value_name);
+                self.write(" === void 0 ? ");
+                self.emit_expression(elem.initializer);
+                self.write(" : ");
+                self.write(&value_name);
+            }
+
+            self.emit_param_binding_assignments(elem.name, &value_name, started);
             return;
         }
 
@@ -1755,27 +1847,58 @@ impl<'a> ClassES5Emitter<'a> {
             return;
         }
 
-        // Get the property name (or use the binding name if no propertyName)
-        let prop_name = if !elem.property_name.is_none() {
-            self.get_identifier_text_clone(elem.property_name)
-        } else {
-            self.get_identifier_text_clone(elem.name)
+        let Some(key_idx) = self.get_binding_element_property_key(elem) else {
+            return;
         };
 
-        // Get the binding name
-        let binding_name = self.get_identifier_text_clone(elem.name);
+        if self.is_binding_pattern(elem.name) {
+            let value_name = self.get_temp_var_name();
+            self.write(", ");
+            self.write(&value_name);
+            self.write(" = ");
+            self.emit_binding_element_access(key_idx, temp_name);
 
-        if prop_name.is_empty() || binding_name.is_empty() {
+            if !elem.initializer.is_none() {
+                self.write(", ");
+                self.write(&value_name);
+                self.write(" = ");
+                self.write(&value_name);
+                self.write(" === void 0 ? ");
+                self.emit_expression(elem.initializer);
+                self.write(" : ");
+                self.write(&value_name);
+            }
+
+            self.emit_es5_destructuring_pattern_idx(elem.name, &value_name);
             return;
         }
 
-        // Emit: , bindingName = temp.propName
-        self.write(", ");
-        self.write(&binding_name);
-        self.write(" = ");
-        self.write(temp_name);
-        self.write(".");
-        self.write(&prop_name);
+        let binding_name = self.get_identifier_text_clone(elem.name);
+        if binding_name.is_empty() {
+            return;
+        }
+
+        if elem.initializer.is_none() {
+            // Emit: , bindingName = temp.propName
+            self.write(", ");
+            self.write(&binding_name);
+            self.write(" = ");
+            self.emit_binding_element_access(key_idx, temp_name);
+        } else {
+            let value_name = self.get_temp_var_name();
+            self.write(", ");
+            self.write(&value_name);
+            self.write(" = ");
+            self.emit_binding_element_access(key_idx, temp_name);
+            self.write(", ");
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(&value_name);
+            self.write(" === void 0 ? ");
+            self.emit_expression(elem.initializer);
+            self.write(" : ");
+            self.write(&value_name);
+        }
     }
 
     /// Emit a single binding element for ES5 array destructuring
@@ -1788,19 +1911,63 @@ impl<'a> ClassES5Emitter<'a> {
             return;
         }
 
+        if self.is_binding_pattern(elem.name) {
+            let value_name = self.get_temp_var_name();
+            self.write(", ");
+            self.write(&value_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write("[");
+            self.write(&index.to_string());
+            self.write("]");
+
+            if !elem.initializer.is_none() {
+                self.write(", ");
+                self.write(&value_name);
+                self.write(" = ");
+                self.write(&value_name);
+                self.write(" === void 0 ? ");
+                self.emit_expression(elem.initializer);
+                self.write(" : ");
+                self.write(&value_name);
+            }
+
+            self.emit_es5_destructuring_pattern_idx(elem.name, &value_name);
+            return;
+        }
+
         let binding_name = self.get_identifier_text_clone(elem.name);
         if binding_name.is_empty() {
             return;
         }
 
-        // Emit: , bindingName = temp[index]
-        self.write(", ");
-        self.write(&binding_name);
-        self.write(" = ");
-        self.write(temp_name);
-        self.write("[");
-        self.write(&index.to_string());
-        self.write("]");
+        if elem.initializer.is_none() {
+            // Emit: , bindingName = temp[index]
+            self.write(", ");
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write("[");
+            self.write(&index.to_string());
+            self.write("]");
+        } else {
+            let value_name = self.get_temp_var_name();
+            self.write(", ");
+            self.write(&value_name);
+            self.write(" = ");
+            self.write(temp_name);
+            self.write("[");
+            self.write(&index.to_string());
+            self.write("]");
+            self.write(", ");
+            self.write(&binding_name);
+            self.write(" = ");
+            self.write(&value_name);
+            self.write(" === void 0 ? ");
+            self.emit_expression(elem.initializer);
+            self.write(" : ");
+            self.write(&value_name);
+        }
     }
 
     fn emit_es5_destructuring_pattern(&mut self, pattern_node: &ThinNode, temp_name: &str) {

@@ -314,6 +314,28 @@ fn test_thin_emit_class_method_default_param_es5() {
 }
 
 #[test]
+fn test_thin_emit_class_method_nested_destructured_param_es5() {
+    let source = "class Foo { method({ a: { b } }) { return b; } }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_b = _a.a"),
+        "Expected temp value for nested param binding: {}",
+        output
+    );
+    assert!(
+        output.contains("b = _b.b"),
+        "Expected nested param binding assignment: {}",
+        output
+    );
+}
+
+#[test]
 fn test_thin_emit_class_method_rest_param_es5() {
     let source = "class Foo { method(...rest) { return rest.length; } }";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -380,6 +402,94 @@ fn test_thin_emit_array_rest_destructuring_es5() {
     assert!(
         !output.contains("__rest"),
         "Array rest should not require __rest helper: {}",
+        output
+    );
+}
+
+#[test]
+fn test_thin_emit_object_destructuring_default_es5() {
+    let source = "let { x = 1 } = obj;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_b = _a.x"),
+        "Expected temp value for defaulted object binding: {}",
+        output
+    );
+    assert!(
+        output.contains("x = _b === void 0 ? 1 : _b"),
+        "Expected default value assignment for object binding: {}",
+        output
+    );
+}
+
+#[test]
+fn test_thin_emit_array_destructuring_default_es5() {
+    let source = "let [x = 1] = arr;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_b = _a[0]"),
+        "Expected temp value for defaulted array binding: {}",
+        output
+    );
+    assert!(
+        output.contains("x = _b === void 0 ? 1 : _b"),
+        "Expected default value assignment for array binding: {}",
+        output
+    );
+}
+
+#[test]
+fn test_thin_emit_object_nested_destructuring_es5() {
+    let source = "let { a: { b } } = obj;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_b = _a.a"),
+        "Expected temp value for nested object binding: {}",
+        output
+    );
+    assert!(
+        output.contains("b = _b.b"),
+        "Expected nested object binding assignment: {}",
+        output
+    );
+}
+
+#[test]
+fn test_thin_emit_array_nested_destructuring_es5() {
+    let source = "let [[x]] = arr;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut printer = ThinPrinter::new_es5(&parser.arena);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        output.contains("_b = _a[0]"),
+        "Expected temp value for nested array binding: {}",
+        output
+    );
+    assert!(
+        output.contains("x = _b[0]"),
+        "Expected nested array binding assignment: {}",
         output
     );
 }

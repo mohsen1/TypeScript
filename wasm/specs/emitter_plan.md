@@ -48,6 +48,7 @@ Pick the most doable and impactful
 23. ES5 emit: object/array rest destructuring with __rest helper [done]
 24. ES5 emit: downlevel rest parameters in functions/methods [done]
 25. ES5 emit: downlevel default parameters in functions/methods [done]
+26. ES5 emit: handle destructuring defaults/nested patterns in ES5 bindings [done]
 
 
 ## Quick Reference
