@@ -13,7 +13,11 @@ Files: `wasm/src/thin_emitter/*`, `wasm/src/transforms/*`, `wasm/src/lowering_pa
 Status: Active
 
 ## Highest-Impact Next Tasks
-- [x] Emit minimal source maps for no-transform JS output (ThinPrinter mapping + CLI output map).
+- [x] Emit minimal source maps for no-transform JS output
+  - [x] Queue node source positions for default emission.
+  - [x] Emit real CLI JS source map output (no stub).
+  - [x] Add emitter + CLI source map tests.
+- [x] Add minimal source map anchors for transform emission paths.
 - [ ] Shrink `thin_emitter/mod.rs` for maintainability
   - [x] Extract comment utilities + comment/output helpers into modules (keep API stable).
   - [x] Extract module wrapper emission helpers into a submodule (keep API stable).

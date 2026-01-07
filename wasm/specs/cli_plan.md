@@ -10,7 +10,7 @@ Files: `wasm/src/bin/tsz.rs`, `wasm/src/cli/*`, `wasm/src/parallel.rs`, `wasm/sr
 - Args/tsconfig parsing, globbing, compile + emit work.
 - Watch mode implemented with notify + debounce.
 - Incremental compile in place (cache reuse + export-hash dependent invalidation + symbol-level dependent invalidation).
-- Module resolution supports node/bundler + exports/conditions basics + typesVersions mappings (default TS version 6.0.0, override via flag/env).
+- Module resolution supports node/bundler + exports/conditions basics + typesVersions mappings (default TS version 6.0.0, override via flag/env `TSZ_TYPES_VERSIONS_COMPILER_VERSION`).
 - Benchmark harness script added for tsz vs tsc comparisons.
 
 ## Current Investigation Notes (Incremental export hash)
@@ -93,7 +93,7 @@ Tests run in this state:
   - [x] Honor package.json `type` + Node16/NodeNext extension rules.
   - [x] Apply `typesVersions` mappings for package subpaths.
 - [x] typesVersions range selection/fallback + fixed version doc.
-- [x] typesVersions compiler version override (flag/env) + fallback tests.
+- [x] typesVersions compiler version override (flag/env) + fallback tests (Status: Active, env: TSZ_TYPES_VERSIONS_COMPILER_VERSION).
 - [x] Benchmark harness
   - Script: `wasm/bench_cli.sh` (tsz vs tsc timing + memory stats).
 
