@@ -342,6 +342,29 @@ impl Default for PrinterOptions {
     }
 }
 
+#[derive(Default)]
+struct ParamTransformPlan {
+    destructures: Vec<ParamDestructure>,
+    rest: Option<RestParamTransform>,
+}
+
+impl ParamTransformPlan {
+    fn has_transforms(&self) -> bool {
+        !self.destructures.is_empty() || self.rest.is_some()
+    }
+}
+
+struct ParamDestructure {
+    temp_name: String,
+    pattern: NodeIndex,
+}
+
+struct RestParamTransform {
+    name: String,
+    pattern: Option<NodeIndex>,
+    index: usize,
+}
+
 // =============================================================================
 // ThinPrinter
 // =============================================================================
@@ -1989,34 +2012,59 @@ impl<'a> ThinPrinter<'a> {
         }
 
         self.write("function (");
-        self.emit_function_parameters_js(&func.parameters.nodes);
+        let param_transforms = self.emit_function_parameters_es5(&func.parameters.nodes);
         self.write(") ");
 
         // If body is not a block (concise arrow), wrap with return
         let body_node = self.arena.get(func.body);
         let is_block = body_node.map(|n| n.kind == syntax_kind_ext::BLOCK).unwrap_or(false);
+        let needs_param_prologue = param_transforms.has_transforms();
 
         if is_block {
             // Check if it's a simple single-return block
             if let Some(block_node) = self.arena.get(func.body) {
                 if let Some(block) = self.arena.get_block(block_node) {
-                    if block.statements.nodes.len() == 1
+                    if !needs_param_prologue
+                        && block.statements.nodes.len() == 1
                         && self.is_simple_return_statement(block.statements.nodes[0]) {
                         self.emit_single_line_block(func.body);
+                    } else if needs_param_prologue {
+                        self.emit_block_with_param_prologue(func.body, &param_transforms);
                     } else {
                         self.emit(func.body);
                     }
                 } else {
-                    self.emit(func.body);
+                    if needs_param_prologue {
+                        self.emit_block_with_param_prologue(func.body, &param_transforms);
+                    } else {
+                        self.emit(func.body);
+                    }
                 }
             } else {
-                self.emit(func.body);
+                if needs_param_prologue {
+                    self.emit_block_with_param_prologue(func.body, &param_transforms);
+                } else {
+                    self.emit(func.body);
+                }
             }
         } else {
-            // Concise body: (x) => x + 1  →  function (x) { return x + 1; }
-            self.write("{ return ");
-            self.emit(func.body);
-            self.write("; }");
+            if needs_param_prologue {
+                self.write("{");
+                self.write_line();
+                self.increase_indent();
+                self.emit_param_prologue(&param_transforms);
+                self.write("return ");
+                self.emit(func.body);
+                self.write(";");
+                self.write_line();
+                self.decrease_indent();
+                self.write("}");
+            } else {
+                // Concise body: (x) => x + 1  →  function (x) { return x + 1; }
+                self.write("{ return ");
+                self.emit(func.body);
+                self.write("; }");
+            }
         }
 
         // Restore this capture depth
@@ -2070,7 +2118,12 @@ impl<'a> ThinPrinter<'a> {
 
         // Parameters (without types for JavaScript)
         self.write("(");
-        self.emit_function_parameters_js(&func.parameters.nodes);
+        let param_transforms = if self.ctx.target_es5 {
+            self.emit_function_parameters_es5(&func.parameters.nodes)
+        } else {
+            self.emit_function_parameters_js(&func.parameters.nodes);
+            ParamTransformPlan::default()
+        };
         self.write(") ");
 
         // Emit body - check if it's a simple single-statement body
@@ -2087,7 +2140,9 @@ impl<'a> ThinPrinter<'a> {
             false
         };
         
-        if is_simple_body {
+        if self.ctx.target_es5 && param_transforms.has_transforms() {
+            self.emit_block_with_param_prologue(func.body, &param_transforms);
+        } else if is_simple_body {
             self.emit_single_line_block(func.body);
         } else {
             self.emit(func.body);
@@ -2120,6 +2175,28 @@ impl<'a> ThinPrinter<'a> {
             self.emit(stmt_idx);
         }
         self.write(" }");
+    }
+
+    fn emit_block_with_param_prologue(&mut self, block_idx: NodeIndex, transforms: &ParamTransformPlan) {
+        let Some(block_node) = self.arena.get(block_idx) else { return };
+        let Some(block) = self.arena.get_block(block_node) else { return };
+
+        self.write("{");
+        self.write_line();
+        self.increase_indent();
+        self.emit_param_prologue(transforms);
+
+        for &stmt_idx in &block.statements.nodes {
+            let before_len = self.writer.len();
+            self.emit(stmt_idx);
+            if self.writer.len() > before_len {
+                self.write_line();
+            }
+        }
+
+        self.decrease_indent();
+        self.write("}");
+        self.emit_trailing_comments(block_node.end);
     }
 
     fn emit_function_declaration(&mut self, node: &ThinNode, _idx: NodeIndex) {
@@ -2174,13 +2251,22 @@ impl<'a> ThinPrinter<'a> {
 
         // Parameters - only emit names, not types for JavaScript
         self.write("(");
-        self.emit_function_parameters_js(&func.parameters.nodes);
+        let param_transforms = if self.ctx.target_es5 {
+            self.emit_function_parameters_es5(&func.parameters.nodes)
+        } else {
+            self.emit_function_parameters_js(&func.parameters.nodes);
+            ParamTransformPlan::default()
+        };
         self.write(")");
 
         // No return type for JavaScript
 
         self.write_space();
-        self.emit(func.body);
+        if self.ctx.target_es5 && param_transforms.has_transforms() {
+            self.emit_block_with_param_prologue(func.body, &param_transforms);
+        } else {
+            self.emit(func.body);
+        }
 
         // CommonJS: emit exports.funcName = funcName; after the function
         if is_exported && !func_name.is_empty() {
@@ -2212,17 +2298,20 @@ impl<'a> ThinPrinter<'a> {
             self.write(func_name);
         }
         self.write("(");
-        self.emit_function_parameters_js(&func.parameters.nodes);
+        let param_transforms = self.emit_function_parameters_es5(&func.parameters.nodes);
         self.write(") {");
         self.write_line();
+        self.increase_indent();
+
+        self.emit_param_prologue(&param_transforms);
 
         // Emit indented __awaiter body
         //     return __awaiter(this, void 0, void 0, function () {
         //         return __generator(this, function (_a) { ... });
         //     });
         let mut async_emitter = crate::transforms::async_es5::AsyncES5Emitter::new(self.arena);
-        // Transform emitter handles its own indentation, starting from level 1 (inside function)
-        async_emitter.set_indent_level(1);
+        // Transform emitter handles its own indentation inside __awaiter
+        async_emitter.set_indent_level(self.writer.indent_level() + 1);
 
         let generator_body = if async_emitter.body_contains_await(func.body) {
             async_emitter.emit_generator_body_with_await(func.body)
@@ -2231,13 +2320,15 @@ impl<'a> ThinPrinter<'a> {
         };
 
         // Write with surrounding __awaiter wrapper
-        self.write("    return __awaiter(this, void 0, void 0, function () {");
+        self.write("return __awaiter(this, void 0, void 0, function () {");
         self.write_line();
-        self.write("        ");
+        self.increase_indent();
         self.write(&generator_body);
+        self.decrease_indent();
         self.write_line();
-        self.write("    });");
+        self.write("});");
         self.write_line();
+        self.decrease_indent();
         self.write("}");
 
         // CommonJS: emit exports.funcName = funcName; after the function
@@ -2253,6 +2344,58 @@ impl<'a> ThinPrinter<'a> {
             self.write(func_name);
             self.write(";");
         }
+    }
+
+    fn emit_function_parameters_es5(&mut self, params: &[NodeIndex]) -> ParamTransformPlan {
+        let mut plan = ParamTransformPlan::default();
+        let mut first = true;
+
+        for (index, &param_idx) in params.iter().enumerate() {
+            let Some(param_node) = self.arena.get(param_idx) else { continue };
+            let Some(param) = self.arena.get_parameter(param_node) else { continue };
+
+            if param.dot_dot_dot_token {
+                let rest_target = param.name;
+                let rest_is_pattern = self.is_binding_pattern(rest_target);
+                let rest_name = if rest_is_pattern {
+                    self.get_temp_var_name()
+                } else {
+                    self.get_identifier_text(rest_target)
+                };
+
+                if !rest_name.is_empty() {
+                    plan.rest = Some(RestParamTransform {
+                        name: rest_name,
+                        pattern: if rest_is_pattern { Some(rest_target) } else { None },
+                        index,
+                    });
+                }
+                break;
+            }
+
+            if !first {
+                self.write(", ");
+            }
+            first = false;
+
+            if self.is_binding_pattern(param.name) {
+                let temp_name = self.get_temp_var_name();
+                self.write(&temp_name);
+                plan.destructures.push(ParamDestructure {
+                    temp_name,
+                    pattern: param.name,
+                });
+            } else {
+                self.emit(param.name);
+            }
+
+            if !param.initializer.is_none() {
+                self.write(" = ");
+                self.emit(param.initializer);
+            }
+        }
+
+        plan
     }
 
     /// Emit function parameters for JavaScript (no types)
@@ -2641,6 +2784,229 @@ impl<'a> ThinPrinter<'a> {
                     self.emit_es5_array_binding_element(elem_idx, temp_name, i);
                 }
             }
+        }
+    }
+
+    fn emit_param_prologue(&mut self, transforms: &ParamTransformPlan) {
+        if let Some(rest) = &transforms.rest {
+            if !rest.name.is_empty() {
+                self.write("var ");
+                self.write(&rest.name);
+                self.write(" = [];");
+                self.write_line();
+
+                let iter_name = self.get_temp_var_name();
+                self.write("for (var ");
+                self.write(&iter_name);
+                self.write(" = ");
+                self.write(&rest.index.to_string());
+                self.write("; ");
+                self.write(&iter_name);
+                self.write(" < arguments.length; ");
+                self.write(&iter_name);
+                self.write("++) ");
+                self.write(&rest.name);
+                self.write("[");
+                self.write(&iter_name);
+                self.write(" - ");
+                self.write(&rest.index.to_string());
+                self.write("] = arguments[");
+                self.write(&iter_name);
+                self.write("];");
+                self.write_line();
+            }
+        }
+
+        let mut started = false;
+        for destructure in &transforms.destructures {
+            self.emit_param_binding_assignments(destructure.pattern, &destructure.temp_name, &mut started);
+        }
+        if let Some(rest) = &transforms.rest {
+            if let Some(pattern) = rest.pattern {
+                self.emit_param_binding_assignments(pattern, &rest.name, &mut started);
+            }
+        }
+
+        if started {
+            self.write(";");
+            self.write_line();
+        }
+    }
+
+    fn emit_param_binding_assignments(
+        &mut self,
+        pattern_idx: NodeIndex,
+        temp_name: &str,
+        started: &mut bool,
+    ) {
+        let Some(pattern_node) = self.arena.get(pattern_idx) else { return };
+
+        match pattern_node.kind {
+            k if k == syntax_kind_ext::OBJECT_BINDING_PATTERN => {
+                if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                    let rest_props = self.collect_object_rest_props(pattern);
+                    for &elem_idx in &pattern.elements.nodes {
+                        if elem_idx.is_none() {
+                            continue;
+                        }
+                        let Some(elem_node) = self.arena.get(elem_idx) else { continue };
+                        let Some(elem) = self.arena.get_binding_element(elem_node) else { continue };
+                        if elem.dot_dot_dot_token {
+                            self.emit_param_object_rest_element(elem, &rest_props, temp_name, started);
+                        } else {
+                            self.emit_param_object_binding_element(elem_idx, temp_name, started);
+                        }
+                    }
+                }
+            }
+            k if k == syntax_kind_ext::ARRAY_BINDING_PATTERN => {
+                if let Some(pattern) = self.arena.get_binding_pattern(pattern_node) {
+                    for (i, &elem_idx) in pattern.elements.nodes.iter().enumerate() {
+                        self.emit_param_array_binding_element(elem_idx, temp_name, i, started);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn emit_param_object_binding_element(
+        &mut self,
+        elem_idx: NodeIndex,
+        temp_name: &str,
+        started: &mut bool,
+    ) {
+        let Some(elem_node) = self.arena.get(elem_idx) else { return };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+
+        if elem.dot_dot_dot_token {
+            return;
+        }
+
+        let prop_name = if !elem.property_name.is_none() {
+            self.get_identifier_text(elem.property_name)
+        } else {
+            self.get_identifier_text(elem.name)
+        };
+        let binding_name = self.get_identifier_text(elem.name);
+
+        if prop_name.is_empty() || binding_name.is_empty() {
+            return;
+        }
+
+        self.emit_param_assignment_prefix(started);
+        self.write(&binding_name);
+        self.write(" = ");
+        self.write(temp_name);
+        self.write(".");
+        self.write(&prop_name);
+    }
+
+    fn emit_param_array_binding_element(
+        &mut self,
+        elem_idx: NodeIndex,
+        temp_name: &str,
+        index: usize,
+        started: &mut bool,
+    ) {
+        if elem_idx.is_none() {
+            return;
+        }
+        let Some(elem_node) = self.arena.get(elem_idx) else { return };
+        let Some(elem) = self.arena.get_binding_element(elem_node) else { return };
+
+        if elem.dot_dot_dot_token {
+            self.emit_param_array_rest_element(elem.name, temp_name, index, started);
+            return;
+        }
+
+        let binding_name = self.get_identifier_text(elem.name);
+        if binding_name.is_empty() {
+            return;
+        }
+
+        self.emit_param_assignment_prefix(started);
+        self.write(&binding_name);
+        self.write(" = ");
+        self.write(temp_name);
+        self.write("[");
+        self.write(&index.to_string());
+        self.write("]");
+    }
+
+    fn emit_param_object_rest_element(
+        &mut self,
+        elem: &crate::parser::thin_node::BindingElementData,
+        rest_props: &[NodeIndex],
+        temp_name: &str,
+        started: &mut bool,
+    ) {
+        let rest_target = elem.name;
+        let is_pattern = self.is_binding_pattern(rest_target);
+        let rest_temp = if is_pattern {
+            Some(self.get_temp_var_name())
+        } else {
+            None
+        };
+
+        self.emit_param_assignment_prefix(started);
+        if let Some(ref name) = rest_temp {
+            self.write(name);
+        } else {
+            self.emit(rest_target);
+        }
+        self.write(" = __rest(");
+        self.write(temp_name);
+        self.write(", ");
+        self.emit_rest_exclude_list(rest_props);
+        self.write(")");
+
+        if let Some(ref name) = rest_temp {
+            self.emit_param_binding_assignments(rest_target, name, started);
+        }
+    }
+
+    fn emit_param_array_rest_element(
+        &mut self,
+        rest_target: NodeIndex,
+        temp_name: &str,
+        index: usize,
+        started: &mut bool,
+    ) {
+        let is_pattern = self.is_binding_pattern(rest_target);
+        let rest_temp = if is_pattern {
+            Some(self.get_temp_var_name())
+        } else {
+            None
+        };
+
+        self.emit_param_assignment_prefix(started);
+        if let Some(ref name) = rest_temp {
+            self.write(name);
+        } else {
+            let binding_name = self.get_identifier_text(rest_target);
+            if binding_name.is_empty() {
+                return;
+            }
+            self.write(&binding_name);
+        }
+        self.write(" = ");
+        self.write(temp_name);
+        self.write(".slice(");
+        self.write(&index.to_string());
+        self.write(")");
+
+        if let Some(ref name) = rest_temp {
+            self.emit_param_binding_assignments(rest_target, name, started);
+        }
+    }
+
+    fn emit_param_assignment_prefix(&mut self, started: &mut bool) {
+        if !*started {
+            self.write("var ");
+            *started = true;
+        } else {
+            self.write(", ");
         }
     }
 

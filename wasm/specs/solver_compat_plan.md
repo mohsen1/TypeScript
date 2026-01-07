@@ -110,6 +110,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Tests for primitive-to-object assignability and index signature cases
 - [x] Deduplicate primitive member lists across property access and subtyping
 
+### Phase 14: Mapped Types Over Primitives
+- [x] `keyof` on primitive intrinsics/literals yields apparent member keys
+- [x] Mapped types can expand over primitive apparent keys
+- [x] Tests for primitive `keyof` and mapped types
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

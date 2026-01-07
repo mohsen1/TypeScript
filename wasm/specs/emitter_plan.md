@@ -46,6 +46,7 @@ Pick the most doable and impactful
 21. ES5 emit: close for-of iterators with try/finally [done]
 22. Expand transform system: ES5 for-of directive [done]
 23. ES5 emit: object/array rest destructuring with __rest helper [done]
+24. ES5 emit: downlevel rest parameters in functions/methods [done]
 
 
 ## Quick Reference
