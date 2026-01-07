@@ -161,6 +161,11 @@ Convert AST nodes to TypeId representations. Bridge the gap between syntax (Thin
   - [x] Checker: union readonly assignment checks any union member
   - [x] Test: checker element access assignment reports readonly property (literal key)
   - [x] Test: checker element access assignment respects readonly index signatures
+  - [x] Checker: interface extension compatibility respects readonly/optional properties
+  - [x] Checker: interface extension compatibility resolves method type parameters
+  - [x] Test: interface extension detects readonly property mismatch (2430)
+  - [x] Test: interface extension detects optional property mismatch (2430)
+  - [x] Test: interface extension accepts matching generic method signatures
 - [x] Parser: fix interface member parsing to track progress by token position (avoid skipping consecutive identifiers)
 - [x] Perf: avoid extra String clone when lowering negative bigint literals
 - [x] Perf: avoid extra allocation when normalizing bigint leading zeros
