@@ -1077,6 +1077,39 @@ fn test_lower_type_query_uses_value_resolver() {
 }
 
 #[test]
+fn test_lower_type_query_with_type_arguments() {
+    let (arena, type_idx) = parse_type_alias_type_node("type T = typeof Foo<string>;");
+    let interner = TypeInterner::new();
+
+    let type_resolver = |_node_idx: NodeIndex| None;
+    let value_resolver = |node_idx: NodeIndex| {
+        arena.get(node_idx)
+            .and_then(|node| arena.get_identifier(node))
+            .and_then(|ident| {
+                if ident.escaped_text == "Foo" {
+                    Some(2)
+                } else {
+                    None
+                }
+            })
+    };
+    let lowering = TypeLowering::with_resolvers(&arena, &interner, &type_resolver, &value_resolver);
+
+    let type_id = lowering.lower_type(type_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Application(app) => {
+            assert_eq!(app.args, vec![TypeId::STRING]);
+            match interner.lookup(app.base) {
+                Some(TypeKey::TypeQuery(SymbolRef(sym_id))) => assert_eq!(sym_id, 2),
+                other => panic!("Expected TypeQuery base type, got {:?}", other),
+            }
+        }
+        _ => panic!("Expected Application type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_template_literal_type_spans() {
     let (arena, template_idx) = parse_template_literal_type("type T = `hello${string}world`;");
 

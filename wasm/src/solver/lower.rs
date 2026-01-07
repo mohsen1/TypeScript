@@ -1450,7 +1450,18 @@ impl<'a> TypeLowering<'a> {
         if let Some(data) = self.arena.get_type_query(node) {
             // Create a symbol reference from the expression name
             if let Some(symbol_id) = self.resolve_value_symbol(data.expr_name) {
-                return self.interner.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)));
+                let base = self.interner.intern(TypeKey::TypeQuery(SymbolRef(symbol_id)));
+                if let Some(args) = &data.type_arguments {
+                    if !args.nodes.is_empty() {
+                        let type_args: Vec<TypeId> = args
+                            .nodes
+                            .iter()
+                            .map(|&idx| self.lower_type(idx))
+                            .collect();
+                        return self.interner.application(base, type_args);
+                    }
+                }
+                return base;
             }
             TypeId::ERROR
         } else {
