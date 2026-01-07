@@ -1563,18 +1563,18 @@ impl<'a> TypeLowering<'a> {
     }
 
     fn normalize_bigint_literal<'b>(&self, text: &'b str) -> Option<std::borrow::Cow<'b, str>> {
+        if let Some(rest) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
+            return Self::bigint_base_to_decimal(rest, 16).map(std::borrow::Cow::Owned);
+        }
+        if let Some(rest) = text.strip_prefix("0b").or_else(|| text.strip_prefix("0B")) {
+            return Self::bigint_base_to_decimal(rest, 2).map(std::borrow::Cow::Owned);
+        }
+        if let Some(rest) = text.strip_prefix("0o").or_else(|| text.strip_prefix("0O")) {
+            return Self::bigint_base_to_decimal(rest, 8).map(std::borrow::Cow::Owned);
+        }
+
         match Self::strip_numeric_separators(text) {
             std::borrow::Cow::Borrowed(cleaned) => {
-                if let Some(rest) = cleaned.strip_prefix("0x").or_else(|| cleaned.strip_prefix("0X")) {
-                    return Self::bigint_base_to_decimal(rest, 16).map(std::borrow::Cow::Owned);
-                }
-                if let Some(rest) = cleaned.strip_prefix("0b").or_else(|| cleaned.strip_prefix("0B")) {
-                    return Self::bigint_base_to_decimal(rest, 2).map(std::borrow::Cow::Owned);
-                }
-                if let Some(rest) = cleaned.strip_prefix("0o").or_else(|| cleaned.strip_prefix("0O")) {
-                    return Self::bigint_base_to_decimal(rest, 8).map(std::borrow::Cow::Owned);
-                }
-
                 let trimmed = cleaned.trim_start_matches('0');
                 if trimmed.is_empty() {
                     return Some(std::borrow::Cow::Borrowed("0"));
@@ -1586,16 +1586,6 @@ impl<'a> TypeLowering<'a> {
             }
             std::borrow::Cow::Owned(mut cleaned) => {
                 let cleaned_ref = cleaned.as_str();
-                if let Some(rest) = cleaned_ref.strip_prefix("0x").or_else(|| cleaned_ref.strip_prefix("0X")) {
-                    return Self::bigint_base_to_decimal(rest, 16).map(std::borrow::Cow::Owned);
-                }
-                if let Some(rest) = cleaned_ref.strip_prefix("0b").or_else(|| cleaned_ref.strip_prefix("0B")) {
-                    return Self::bigint_base_to_decimal(rest, 2).map(std::borrow::Cow::Owned);
-                }
-                if let Some(rest) = cleaned_ref.strip_prefix("0o").or_else(|| cleaned_ref.strip_prefix("0O")) {
-                    return Self::bigint_base_to_decimal(rest, 8).map(std::borrow::Cow::Owned);
-                }
-
                 let trimmed = cleaned_ref.trim_start_matches('0');
                 if trimmed.is_empty() {
                     return Some(std::borrow::Cow::Borrowed("0"));
@@ -1617,7 +1607,12 @@ impl<'a> TypeLowering<'a> {
         }
 
         let mut digits: Vec<u8> = vec![0];
+        let mut saw_digit = false;
         for &byte in text.as_bytes() {
+            if byte == b'_' {
+                continue;
+            }
+
             let digit = match byte {
                 b'0'..=b'9' => (byte - b'0') as u32,
                 b'a'..=b'f' => (byte - b'a' + 10) as u32,
@@ -1627,6 +1622,7 @@ impl<'a> TypeLowering<'a> {
             if digit >= base {
                 return None;
             }
+            saw_digit = true;
 
             let mut carry = digit;
             for slot in &mut digits {
@@ -1638,6 +1634,10 @@ impl<'a> TypeLowering<'a> {
                 digits.push((carry % 10) as u8);
                 carry /= 10;
             }
+        }
+
+        if !saw_digit {
+            return None;
         }
 
         while digits.len() > 1 && *digits.last().unwrap() == 0 {
