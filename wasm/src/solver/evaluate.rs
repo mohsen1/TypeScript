@@ -96,7 +96,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     /// Evaluate a conditional type: T extends U ? X : Y
     ///
     /// Algorithm:
-    /// 1. If check_type is a union, distribute the conditional over it
+    /// 1. If check_type is a union and the conditional is distributive, distribute
     /// 2. Otherwise, check if check_type <: extends_type
     /// 3. If true -> return true_type
     /// 4. If false (disjoint) -> return false_type
@@ -106,14 +106,16 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         let extends_type = cond.extends_type;
 
         // Step 1: Check for distributivity
-        // If check_type is a naked union, distribute
-        if let Some(TypeKey::Union(members)) = self.interner.lookup(check_type) {
-            return self.distribute_conditional(
-                &members,
-                extends_type,
-                cond.true_type,
-                cond.false_type,
-            );
+        // Only distribute for naked type parameters (recorded at lowering time).
+        if cond.is_distributive {
+            if let Some(TypeKey::Union(members)) = self.interner.lookup(check_type) {
+                return self.distribute_conditional(
+                    &members,
+                    extends_type,
+                    cond.true_type,
+                    cond.false_type,
+                );
+            }
         }
 
         // Step 2: Check for naked type parameter (defer)
@@ -154,6 +156,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 extends_type,
                 true_type,
                 false_type,
+                is_distributive: false,
             };
 
             // Recursively evaluate (handles nested unions, type parameters)

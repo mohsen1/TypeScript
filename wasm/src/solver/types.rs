@@ -312,6 +312,7 @@ pub struct ConditionalType {
     pub extends_type: TypeId,
     pub true_type: TypeId,
     pub false_type: TypeId,
+    pub is_distributive: bool,
 }
 
 /// Mapped type structure

@@ -398,6 +398,7 @@ fn test_instantiate_conditional() {
         extends_type: TypeId::STRING,
         true_type: type_param_t,
         false_type: TypeId::NEVER,
+        is_distributive: true,
     })));
 
     // Substitute T = "hello" (a string literal)
@@ -412,6 +413,7 @@ fn test_instantiate_conditional() {
         extends_type: TypeId::STRING,
         true_type: hello_lit,
         false_type: TypeId::NEVER,
+        is_distributive: true,
     })));
     assert_eq!(result, expected);
 }

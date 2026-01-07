@@ -165,6 +165,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Treat type parameters as their constraints for subtype checks
 - [x] Tests for type parameter assignability rules
 
+### Phase 26: Distributivity Disabling
+- [x] Track distributive conditional types and skip distribution when wrapped
+- [x] Tests for distributive flag lowering and non-distributive unions
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

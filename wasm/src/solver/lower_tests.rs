@@ -522,6 +522,42 @@ fn test_lower_conditional_infer_binding_false_branch() {
 }
 
 #[test]
+fn test_lower_conditional_distributive_flag() {
+    let (arena, func_idx) =
+        parse_type_alias("type F = <T>() => T extends string ? number : boolean;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => match interner.lookup(shape.return_type) {
+            Some(TypeKey::Conditional(cond)) => assert!(cond.is_distributive),
+            other => panic!("Expected conditional return type, got {:?}", other),
+        },
+        _ => panic!("Expected function type, got {:?}", key),
+    }
+}
+
+#[test]
+fn test_lower_conditional_non_distributive_flag() {
+    let (arena, func_idx) =
+        parse_type_alias("type F = <T>() => [T] extends [string] ? number : boolean;");
+    let interner = TypeInterner::new();
+    let lowering = TypeLowering::new(&arena, &interner);
+
+    let type_id = lowering.lower_type(func_idx);
+    let key = interner.lookup(type_id).expect("Type should exist");
+    match key {
+        TypeKey::Function(shape) => match interner.lookup(shape.return_type) {
+            Some(TypeKey::Conditional(cond)) => assert!(!cond.is_distributive),
+            other => panic!("Expected conditional return type, got {:?}", other),
+        },
+        _ => panic!("Expected function type, got {:?}", key),
+    }
+}
+
+#[test]
 fn test_lower_deduplicates_identical_types() {
     let (arena_one, type_one) = parse_type_alias_type_node("type A = \"same\";");
     let (arena_two, type_two) = parse_type_alias_type_node("type B = \"same\";");
@@ -992,13 +1028,7 @@ fn test_lower_intersection_type_normalization() {
     let lowering = TypeLowering::new(&arena, &interner);
 
     let type_id = lowering.lower_type(intersection_idx);
-    let key = interner.lookup(type_id).expect("Type should exist");
-    match key {
-        TypeKey::Intersection(members) => {
-            assert_eq!(members, vec![TypeId::NUMBER, TypeId::STRING]);
-        }
-        _ => panic!("Expected Intersection type, got {:?}", key),
-    }
+    assert_eq!(type_id, TypeId::NEVER);
 }
 
 #[test]
