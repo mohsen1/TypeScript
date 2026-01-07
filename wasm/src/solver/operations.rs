@@ -852,11 +852,19 @@ pub enum PropertyAccessResult {
 /// Evaluates property access.
 pub struct PropertyAccessEvaluator<'a> {
     interner: &'a dyn TypeDatabase,
+    no_unchecked_indexed_access: bool,
 }
 
 impl<'a> PropertyAccessEvaluator<'a> {
     pub fn new(interner: &'a dyn TypeDatabase) -> Self {
-        PropertyAccessEvaluator { interner }
+        PropertyAccessEvaluator {
+            interner,
+            no_unchecked_indexed_access: false,
+        }
+    }
+
+    pub fn set_no_unchecked_indexed_access(&mut self, enabled: bool) {
+        self.no_unchecked_indexed_access = enabled;
     }
 
     /// Resolve property access: obj.prop -> type
@@ -937,7 +945,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
                 // Check string index signature (THIS is the case for error 4111)
                 if let Some(ref idx) = shape.string_index {
                     return PropertyAccessResult::Success {
-                        type_id: idx.value_type,
+                        type_id: self.add_undefined_if_unchecked(idx.value_type),
                         from_index_signature: true,  // Resolved via index signature!
                     };
                 }
@@ -991,7 +999,7 @@ impl<'a> PropertyAccessEvaluator<'a> {
                         self.interner.union(nullable_causes)
                     };
 
-                    let property_type = if valid_results.is_empty() {
+                    let mut property_type = if valid_results.is_empty() {
                         None
                     } else if valid_results.len() == 1 {
                         Some(valid_results[0])
@@ -999,15 +1007,26 @@ impl<'a> PropertyAccessEvaluator<'a> {
                         Some(self.interner.union(valid_results))
                     };
 
+                    if any_from_index && self.no_unchecked_indexed_access {
+                        if let Some(t) = property_type {
+                            property_type = Some(self.add_undefined_if_unchecked(t));
+                        }
+                    }
+
                     return PropertyAccessResult::PossiblyNullOrUndefined {
                         property_type,
                         cause,
                     };
                 }
 
+                let mut type_id = self.interner.union(valid_results);
+                if any_from_index && self.no_unchecked_indexed_access {
+                    type_id = self.add_undefined_if_unchecked(type_id);
+                }
+
                 // Union of all result types
                 PropertyAccessResult::Success {
-                    type_id: self.interner.union(valid_results),
+                    type_id,
                     from_index_signature: any_from_index,  // Contagious across union members
                 }
             }
@@ -1094,6 +1113,13 @@ impl<'a> PropertyAccessEvaluator<'a> {
             type_id: self.any_args_function(return_type),
             from_index_signature: false,
         }
+    }
+
+    fn add_undefined_if_unchecked(&self, type_id: TypeId) -> TypeId {
+        if !self.no_unchecked_indexed_access || type_id == TypeId::UNDEFINED {
+            return type_id;
+        }
+        self.interner.union(vec![type_id, TypeId::UNDEFINED])
     }
 
     fn resolve_apparent_property(

@@ -130,6 +130,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Thread unchecked index access through subtype evaluation
 - [x] Tests for unchecked index access behavior
 
+### Phase 18: Unchecked Property Access Via Index Signatures
+- [x] Add `noUncheckedIndexedAccess` toggle to property access evaluator
+- [x] Include `undefined` when resolving string index signatures
+- [x] Tests for index-signature property access toggle
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

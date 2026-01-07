@@ -351,6 +351,43 @@ fn test_property_access_object() {
 }
 
 #[test]
+fn test_property_access_index_signature_no_unchecked() {
+    let interner = TypeInterner::new();
+    let mut evaluator = PropertyAccessEvaluator::new(&interner);
+
+    let obj = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+
+    let result = evaluator.resolve_property_access(obj, "anything");
+    match result {
+        PropertyAccessResult::Success { type_id, from_index_signature } => {
+            assert_eq!(type_id, TypeId::NUMBER);
+            assert!(from_index_signature);
+        }
+        _ => panic!("Expected success, got {:?}", result),
+    }
+
+    evaluator.set_no_unchecked_indexed_access(true);
+
+    let result = evaluator.resolve_property_access(obj, "anything");
+    match result {
+        PropertyAccessResult::Success { type_id, from_index_signature } => {
+            let expected = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+            assert_eq!(type_id, expected);
+            assert!(from_index_signature);
+        }
+        _ => panic!("Expected success, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_property_access_string() {
     let interner = TypeInterner::new();
     let evaluator = PropertyAccessEvaluator::new(&interner);
