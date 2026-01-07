@@ -74,6 +74,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Binary comparison allows unconstrained generics and rejects disjoint constrained unions.
 - [x] Add overlap coverage for any/unknown/never/template literals
   - Binary comparison handles top/bottom types and template literals.
+- [x] Add index signature property consistency coverage
+  - Source properties must satisfy target index signatures even with source index signatures.
 
 ## Success Criteria
 - Solver remains lock-contention free in parallel builds.
