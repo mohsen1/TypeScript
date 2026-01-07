@@ -639,6 +639,24 @@ impl<'a> InferenceContext<'a> {
             return self.function_subtype_of(s_fn, t_fn);
         }
 
+        if let (Some(TypeKey::Callable(s_callable)), Some(TypeKey::Callable(t_callable))) =
+            (source_key.as_ref(), target_key.as_ref())
+        {
+            return self.callable_subtype_of(s_callable, t_callable);
+        }
+
+        if let (Some(TypeKey::Function(s_fn)), Some(TypeKey::Callable(t_callable))) =
+            (source_key.as_ref(), target_key.as_ref())
+        {
+            return self.function_subtype_callable(s_fn, t_callable);
+        }
+
+        if let (Some(TypeKey::Callable(s_callable)), Some(TypeKey::Function(t_fn))) =
+            (source_key.as_ref(), target_key.as_ref())
+        {
+            return self.callable_subtype_function(s_callable, t_fn);
+        }
+
         if let (Some(TypeKey::Application(s_app)), Some(TypeKey::Application(t_app))) =
             (source_key.as_ref(), target_key.as_ref())
         {
@@ -792,54 +810,56 @@ impl<'a> InferenceContext<'a> {
         self.is_subtype(target, source)
     }
 
-    fn function_subtype_of(&self, source: &FunctionShape, target: &FunctionShape) -> bool {
-        if source.is_constructor != target.is_constructor {
+    fn function_like_subtype_of(
+        &self,
+        source_params: &[ParamInfo],
+        source_return: TypeId,
+        target_params: &[ParamInfo],
+        target_return: TypeId,
+    ) -> bool {
+        if !self.is_subtype(source_return, target_return) {
             return false;
         }
 
-        if !self.is_subtype(source.return_type, target.return_type) {
-            return false;
-        }
-
-        let target_has_rest = target.params.last().map_or(false, |p| p.rest);
-        let source_has_rest = source.params.last().map_or(false, |p| p.rest);
+        let target_has_rest = target_params.last().map_or(false, |p| p.rest);
+        let source_has_rest = source_params.last().map_or(false, |p| p.rest);
         let target_fixed = if target_has_rest {
-            target.params.len().saturating_sub(1)
+            target_params.len().saturating_sub(1)
         } else {
-            target.params.len()
+            target_params.len()
         };
         let source_fixed = if source_has_rest {
-            source.params.len().saturating_sub(1)
+            source_params.len().saturating_sub(1)
         } else {
-            source.params.len()
+            source_params.len()
         };
 
-        if !target_has_rest && source.params.len() > target.params.len() {
+        if !target_has_rest && source_params.len() > target_params.len() {
             return false;
         }
 
         let fixed_compare = std::cmp::min(source_fixed, target_fixed);
         for i in 0..fixed_compare {
-            let s_param = &source.params[i];
-            let t_param = &target.params[i];
+            let s_param = &source_params[i];
+            let t_param = &target_params[i];
             if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
                 return false;
             }
         }
 
         if target_has_rest {
-            let rest_param = target.params.last().unwrap();
+            let rest_param = target_params.last().unwrap();
             let rest_elem = self.rest_element_type(rest_param.type_id);
 
             for i in target_fixed..source_fixed {
-                let s_param = &source.params[i];
+                let s_param = &source_params[i];
                 if !self.are_parameters_compatible(s_param.type_id, rest_elem) {
                     return false;
                 }
             }
 
             if source_has_rest {
-                let s_rest = source.params.last().unwrap();
+                let s_rest = source_params.last().unwrap();
                 let s_rest_elem = self.rest_element_type(s_rest.type_id);
                 if !self.are_parameters_compatible(s_rest_elem, rest_elem) {
                     return false;
@@ -848,6 +868,86 @@ impl<'a> InferenceContext<'a> {
         }
 
         true
+    }
+
+    fn function_subtype_of(&self, source: &FunctionShape, target: &FunctionShape) -> bool {
+        if source.is_constructor != target.is_constructor {
+            return false;
+        }
+
+        self.function_like_subtype_of(
+            &source.params,
+            source.return_type,
+            &target.params,
+            target.return_type,
+        )
+    }
+
+    fn call_signature_subtype_of(&self, source: &CallSignature, target: &CallSignature) -> bool {
+        self.function_like_subtype_of(
+            &source.params,
+            source.return_type,
+            &target.params,
+            target.return_type,
+        )
+    }
+
+    fn callable_subtype_of(&self, source: &CallableShape, target: &CallableShape) -> bool {
+        for t_sig in &target.call_signatures {
+            let mut found = false;
+            for s_sig in &source.call_signatures {
+                if self.call_signature_subtype_of(s_sig, t_sig) {
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                return false;
+            }
+        }
+
+        for t_sig in &target.construct_signatures {
+            let mut found = false;
+            for s_sig in &source.construct_signatures {
+                if self.call_signature_subtype_of(s_sig, t_sig) {
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                return false;
+            }
+        }
+
+        self.object_subtype_of(&source.properties, &target.properties)
+    }
+
+    fn function_subtype_callable(&self, source: &FunctionShape, target: &CallableShape) -> bool {
+        for t_sig in &target.call_signatures {
+            if !self.function_like_subtype_of(
+                &source.params,
+                source.return_type,
+                &t_sig.params,
+                t_sig.return_type,
+            ) {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn callable_subtype_function(&self, source: &CallableShape, target: &FunctionShape) -> bool {
+        for s_sig in &source.call_signatures {
+            if self.function_like_subtype_of(
+                &s_sig.params,
+                s_sig.return_type,
+                &target.params,
+                target.return_type,
+            ) {
+                return true;
+            }
+        }
+        false
     }
 
     fn tuple_subtype_array(&self, source: &[TupleElement], target_elem: TypeId) -> bool {
