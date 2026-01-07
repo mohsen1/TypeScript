@@ -307,6 +307,10 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Treat template literal types as string-like for narrowing
 - [x] Tests for typeof narrowing with template literal types
 
+### Phase 59: Comparison Operator Overlap
+- [x] Detect disjoint equality comparisons in BinaryOpEvaluator
+- [x] Tests for disjoint/overlapping equality comparisons
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

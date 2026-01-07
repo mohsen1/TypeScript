@@ -208,6 +208,46 @@ fn test_call_rest_parameter_min_args_with_required() {
 }
 
 #[test]
+fn test_binary_overlap_disjoint_primitives() {
+    let interner = TypeInterner::new();
+    let evaluator = BinaryOpEvaluator::new(&interner);
+
+    let result = evaluator.evaluate(TypeId::STRING, TypeId::NUMBER, "===");
+    assert!(matches!(result, BinaryOpResult::TypeError { .. }));
+}
+
+#[test]
+fn test_binary_overlap_disjoint_literals() {
+    let interner = TypeInterner::new();
+    let evaluator = BinaryOpEvaluator::new(&interner);
+
+    let one = interner.literal_number(1.0);
+    let two = interner.literal_number(2.0);
+
+    let result = evaluator.evaluate(one, two, "===");
+    assert!(matches!(result, BinaryOpResult::TypeError { .. }));
+}
+
+#[test]
+fn test_binary_overlap_union_literals() {
+    let interner = TypeInterner::new();
+    let evaluator = BinaryOpEvaluator::new(&interner);
+
+    let lit_a = interner.literal_string("a");
+    let lit_b = interner.literal_string("b");
+    let lit_c = interner.literal_string("c");
+
+    let left = interner.union(vec![lit_a, lit_b]);
+    let right = interner.union(vec![lit_b, lit_c]);
+
+    let result = evaluator.evaluate(left, right, "===");
+    match result {
+        BinaryOpResult::Success(result_type) => assert_eq!(result_type, TypeId::BOOLEAN),
+        _ => panic!("Expected boolean result, got {:?}", result),
+    }
+}
+
+#[test]
 fn test_call_rest_parameter_type_match() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
@@ -1634,6 +1674,71 @@ fn test_infer_generic_template_literal_param() {
 }
 
 #[test]
+fn test_infer_generic_mapped_param_from_object_arg() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let key_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let key_x = interner.literal_string("x");
+    let key_y = interner.literal_string("y");
+    let keys = interner.union(vec![key_x, key_y]);
+
+    let mapped = MappedType {
+        type_param: key_param,
+        constraint: keys,
+        template: t_type,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+    let mapped_type = interner.intern(TypeKey::Mapped(Box::new(mapped)));
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("values")),
+            type_id: mapped_type,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let arg_object = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("x"),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("y"),
+            type_id: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[arg_object]);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
 fn test_infer_generic_array_map() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
@@ -1712,6 +1817,52 @@ fn test_infer_generic_array_map() {
     );
     let expected = interner.array(TypeId::STRING);
     assert_eq!(result, expected);
+}
+
+#[test]
+fn test_infer_generic_array_param_from_tuple_arg() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let array_t = interner.array(t_type);
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("values")),
+            type_id: array_t,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let tuple_arg = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ]);
+
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[tuple_arg]);
+    assert_eq!(result, TypeId::NUMBER);
 }
 
 #[test]
