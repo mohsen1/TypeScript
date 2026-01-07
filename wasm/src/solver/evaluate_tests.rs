@@ -783,6 +783,22 @@ fn test_index_access_tuple_literal() {
 }
 
 #[test]
+fn test_index_access_tuple_optional_literal() {
+    let interner = TypeInterner::new();
+
+    // [string, number?][1] -> number | undefined
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+    ]);
+    let one = interner.literal_number(1.0);
+
+    let result = evaluate_index_access(&interner, tuple, one);
+    let expected = interner.union(vec![TypeId::NUMBER, TypeId::UNDEFINED]);
+    assert_eq!(result, expected);
+}
+
+#[test]
 fn test_index_access_tuple_string_index() {
     let interner = TypeInterner::new();
 
@@ -1102,6 +1118,21 @@ fn test_index_access_tuple_number() {
 
     // Should be string | number
     let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
+}
+
+#[test]
+fn test_index_access_tuple_optional_number() {
+    let interner = TypeInterner::new();
+
+    // [string, number?][number] -> string | number | undefined
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: true, rest: false },
+    ]);
+
+    let result = evaluate_index_access(&interner, tuple, TypeId::NUMBER);
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER, TypeId::UNDEFINED]);
     assert_eq!(result, expected);
 }
 
