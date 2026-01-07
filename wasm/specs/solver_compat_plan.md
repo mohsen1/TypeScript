@@ -190,6 +190,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Wire call resolution in ThinChecker through CompatChecker
 - [x] Tests for weak-type rejection during call resolution
 
+### Phase 31: Readonly Type Operator Assignability
+- [x] Allow mutable arrays/tuples to assign to readonly type operator targets
+- [x] Reject readonly arrays/tuples when target expects mutable
+- [x] Tests for readonly array/tuple assignability
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

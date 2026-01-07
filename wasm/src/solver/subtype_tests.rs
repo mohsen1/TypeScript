@@ -106,6 +106,33 @@ fn test_readonly_property_subtyping() {
 }
 
 #[test]
+fn test_readonly_array_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let mutable_array = interner.array(TypeId::STRING);
+    let readonly_array = interner.intern(TypeKey::ReadonlyType(mutable_array));
+
+    assert!(checker.is_subtype_of(mutable_array, readonly_array));
+    assert!(!checker.is_subtype_of(readonly_array, mutable_array));
+}
+
+#[test]
+fn test_readonly_tuple_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+    let readonly_tuple = interner.intern(TypeKey::ReadonlyType(tuple));
+
+    assert!(checker.is_subtype_of(tuple, readonly_tuple));
+    assert!(!checker.is_subtype_of(readonly_tuple, tuple));
+}
+
+#[test]
 fn test_array_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);

@@ -118,6 +118,7 @@ fn test_call_weak_type_with_compat_checker() {
         }],
         return_type: TypeId::VOID,
         type_params: Vec::new(),
+        type_predicate: None,
         is_constructor: false,
     });
 

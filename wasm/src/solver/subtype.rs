@@ -592,6 +592,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             (TypeKey::ReadonlyType(s_inner), TypeKey::ReadonlyType(t_inner)) => {
                 self.check_subtype(*s_inner, *t_inner)
             }
+            // Mutable arrays/tuples are assignable to readonly versions
+            (_, TypeKey::ReadonlyType(t_inner)) => self.check_subtype(source, *t_inner),
 
             // Unique symbol - only equal to itself
             (TypeKey::UniqueSymbol(s_sym), TypeKey::UniqueSymbol(t_sym)) => {
