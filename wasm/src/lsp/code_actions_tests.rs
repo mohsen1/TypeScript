@@ -175,6 +175,39 @@ fn test_extract_variable_parenthesizes_comma_expression() {
 }
 
 #[test]
+fn test_extract_variable_blocks_tdz_for_loop_initializer() {
+    let source = "for (let i = 0; i < limit; i++) { console.log(i); }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let range = range_for_substring(source, &line_map, "i < limit");
+    let actions = provider.provide_code_actions(
+        root,
+        range,
+        CodeActionContext {
+            diagnostics: Vec::new(),
+            only: None,
+            import_candidates: Vec::new(),
+        },
+    );
+
+    assert_eq!(actions.len(), 0);
+}
+
+#[test]
 fn test_extract_variable_no_action_cross_scope() {
     let source = "const result = ((x) => x + 1)(2);";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
