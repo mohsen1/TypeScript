@@ -436,7 +436,9 @@ const f = new Foo();
     let f_type = checker.get_type_of_symbol(f_sym);
     let f_key = types.lookup(f_type).expect("f type should exist");
     match f_key {
-        TypeKey::Object(props) => {
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let props = shape.properties.as_slice();
             let name_atom = types.intern_string("name");
             let count_atom = types.intern_string("count");
             let tag_atom = types.intern_string("tag");
@@ -492,7 +494,9 @@ const f = new Foo(1, "x", 2);
     let f_type = checker.get_type_of_symbol(f_sym);
     let f_key = types.lookup(f_type).expect("f type should exist");
     match f_key {
-        TypeKey::Object(props) => {
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let props = shape.properties.as_slice();
             let id_atom = types.intern_string("id");
             let tag_atom = types.intern_string("tag");
             let count_atom = types.intern_string("count");
@@ -546,7 +550,9 @@ const d = new Derived();
     let d_type = checker.get_type_of_symbol(d_sym);
     let d_key = types.lookup(d_type).expect("d type should exist");
     match d_key {
-        TypeKey::Object(props) => {
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let props = shape.properties.as_slice();
             let value_atom = types.intern_string("value");
             let count_atom = types.intern_string("count");
             let value_prop = props
@@ -594,7 +600,9 @@ const b = new Box("hi");
     let b_type = checker.get_type_of_symbol(b_sym);
     let b_key = types.lookup(b_type).expect("b type should exist");
     match b_key {
-        TypeKey::Object(props) => {
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let props = shape.properties.as_slice();
             let value_atom = types.intern_string("value");
             let value_prop = props
                 .iter()
@@ -1532,9 +1540,10 @@ takesHandler(function(this: { value: number }, x) {
     checker.get_type_of_node(call_idx);
 
     let func_type = checker.get_type_of_node(func_idx);
-    let Some(TypeKey::Function(shape)) = checker.ctx.types.lookup(func_type) else {
+    let Some(TypeKey::Function(shape_id)) = checker.ctx.types.lookup(func_type) else {
         panic!("expected function type for argument");
     };
+    let shape = checker.ctx.types.function_shape(shape_id);
     assert!(shape.this_type.is_some(), "expected this type on contextual function");
     assert_eq!(shape.params.len(), 1, "expected single parameter besides this");
     assert_eq!(shape.params[0].type_id, TypeId::STRING, "expected contextual string parameter");
@@ -1708,6 +1717,7 @@ fn test_strict_null_checks_both_null_and_undefined() {
             let cause_key = types.lookup(cause);
             match cause_key {
                 Some(TypeKey::Union(members)) => {
+                    let members = types.type_list(members);
                     assert!(members.contains(&TypeId::NULL), "Cause should contain null");
                     assert!(members.contains(&TypeId::UNDEFINED), "Cause should contain undefined");
                 }
@@ -1876,7 +1886,8 @@ fn test_symbol_property_access_description() {
             // description should be string | undefined
             let key = types.lookup(prop_type).expect("Property type should exist");
             match key {
-                TypeKey::Union(ref members) => {
+                TypeKey::Union(members) => {
+                    let members = types.type_list(members);
                     assert_eq!(members.len(), 2);
                     assert!(members.contains(&TypeId::STRING));
                     assert!(members.contains(&TypeId::UNDEFINED));
@@ -2043,8 +2054,11 @@ type Qux = { [key: string]: Foo };
     let foo_type = checker.get_type_of_symbol(foo_sym);
     let foo_key = types.lookup(foo_type).expect("Foo type should exist");
     match foo_key {
-        TypeKey::Object(props) => {
-            let prop = props.iter()
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let prop = shape
+                .properties
+                .iter()
                 .find(|prop| types.resolve_atom(prop.name) == "x")
                 .expect("Expected property x");
             assert_eq!(prop.type_id, TypeId::NUMBER);
@@ -2056,6 +2070,7 @@ type Qux = { [key: string]: Foo };
     let bar_key = types.lookup(bar_type).expect("Bar type should exist");
     match bar_key {
         TypeKey::Union(members) => {
+            let members = types.type_list(members);
             assert_eq!(members.len(), 2);
             assert!(members.contains(&TypeId::STRING));
             assert!(members.contains(&foo_type));
@@ -2067,6 +2082,7 @@ type Qux = { [key: string]: Foo };
     let baz_key = types.lookup(baz_type).expect("Baz type should exist");
     match baz_key {
         TypeKey::Tuple(elements) => {
+            let elements = types.tuple_list(elements);
             assert_eq!(elements.len(), 2);
             assert_eq!(elements[0].type_id, TypeId::STRING);
             assert_eq!(elements[1].type_id, TypeId::NUMBER);
@@ -2077,8 +2093,9 @@ type Qux = { [key: string]: Foo };
     let qux_type = checker.get_type_of_symbol(qux_sym);
     let qux_key = types.lookup(qux_type).expect("Qux type should exist");
     match qux_key {
-        TypeKey::ObjectWithIndex(shape) => {
-            let string_index = shape.string_index.expect("Expected string index signature");
+        TypeKey::ObjectWithIndex(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let string_index = shape.string_index.as_ref().expect("Expected string index signature");
             assert_eq!(string_index.key_type, TypeId::STRING);
             let value_key = types.lookup(string_index.value_type).expect("Index value type should exist");
             match value_key {
@@ -2433,8 +2450,11 @@ type Alias = Outer.Inner;
     let alias_type = checker.get_type_of_symbol(alias_sym);
     let alias_key = types.lookup(alias_type).expect("Alias type should exist");
     match alias_key {
-        TypeKey::Object(props) => {
-            let prop = props.iter()
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let prop = shape
+                .properties
+                .iter()
                 .find(|prop| types.resolve_atom(prop.name) == "y")
                 .expect("Expected property y");
             assert_eq!(prop.type_id, TypeId::STRING);
@@ -2478,8 +2498,11 @@ type AliasB = Outer.B;
 
     let alias_a_key = types.lookup(alias_a_type).expect("AliasA type should exist");
     match alias_a_key {
-        TypeKey::Object(props) => {
-            let prop = props.iter()
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let prop = shape
+                .properties
+                .iter()
                 .find(|prop| types.resolve_atom(prop.name) == "x")
                 .expect("Expected property x");
             assert_eq!(prop.type_id, TypeId::NUMBER);
@@ -2489,8 +2512,11 @@ type AliasB = Outer.B;
 
     let alias_b_key = types.lookup(alias_b_type).expect("AliasB type should exist");
     match alias_b_key {
-        TypeKey::Object(props) => {
-            let prop = props.iter()
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let prop = shape
+                .properties
+                .iter()
                 .find(|prop| types.resolve_atom(prop.name) == "y")
                 .expect("Expected property y");
             assert_eq!(prop.type_id, TypeId::STRING);
@@ -2526,7 +2552,8 @@ type Alias = Box<string>;
     let alias_type = checker.get_type_of_symbol(alias_sym);
     let alias_key = types.lookup(alias_type).expect("Alias type should exist");
     match alias_key {
-        TypeKey::Application(app) => {
+        TypeKey::Application(app_id) => {
+            let app = types.type_application(app_id);
             assert_eq!(app.args, vec![TypeId::STRING]);
             match types.lookup(app.base) {
                 Some(TypeKey::Ref(SymbolRef(sym_id))) => assert_eq!(sym_id, box_sym.0),
@@ -2561,7 +2588,8 @@ const f: <T>(value: T) => T = (value) => value;
     let f_type = checker.get_type_of_symbol(f_sym);
     let f_key = types.lookup(f_type).expect("f type should exist");
     match f_key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = types.function_shape(shape_id);
             assert_eq!(shape.type_params.len(), 1);
             assert_eq!(types.resolve_atom(shape.type_params[0].name), "T");
             assert_eq!(shape.params.len(), 1);
@@ -2612,7 +2640,8 @@ interface Callable {
     let callable_type = checker.get_type_of_symbol(callable_sym);
     let callable_key = types.lookup(callable_type).expect("Callable type should exist");
     match callable_key {
-        TypeKey::Callable(shape) => {
+        TypeKey::Callable(shape_id) => {
+            let shape = types.callable_shape(shape_id);
             assert_eq!(shape.call_signatures.len(), 1);
             let sig = &shape.call_signatures[0];
             assert_eq!(sig.type_params.len(), 1);
@@ -2665,7 +2694,8 @@ interface Factory {
     let factory_type = checker.get_type_of_symbol(factory_sym);
     let factory_key = types.lookup(factory_type).expect("Factory type should exist");
     match factory_key {
-        TypeKey::Callable(shape) => {
+        TypeKey::Callable(shape_id) => {
+            let shape = types.callable_shape(shape_id);
             assert_eq!(shape.construct_signatures.len(), 1);
             let sig = &shape.construct_signatures[0];
             assert_eq!(sig.type_params.len(), 1);
@@ -2718,7 +2748,8 @@ function id<T>(value: T): T {
     let id_type = checker.get_type_of_symbol(id_sym);
     let id_key = types.lookup(id_type).expect("id type should exist");
     match id_key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = types.function_shape(shape_id);
             assert_eq!(shape.type_params.len(), 1);
             assert_eq!(types.resolve_atom(shape.type_params[0].name), "T");
             assert_eq!(shape.params.len(), 1);
@@ -2769,7 +2800,10 @@ function id(x: string) {
     let id_type = checker.get_type_of_symbol(id_sym);
     let id_key = types.lookup(id_type).expect("id type should exist");
     match id_key {
-        TypeKey::Function(shape) => assert_eq!(shape.return_type, TypeId::STRING),
+        TypeKey::Function(shape_id) => {
+            let shape = types.function_shape(shape_id);
+            assert_eq!(shape.return_type, TypeId::STRING);
+        }
         _ => panic!("Expected id to be Function type, got {:?}", id_key),
     }
 }
@@ -2803,10 +2837,12 @@ const f = (flag: boolean) => {
     let f_type = checker.get_type_of_symbol(f_sym);
     let f_key = types.lookup(f_type).expect("f type should exist");
     match f_key {
-        TypeKey::Function(shape) => {
+        TypeKey::Function(shape_id) => {
+            let shape = types.function_shape(shape_id);
             let return_key = types.lookup(shape.return_type).expect("return type should exist");
             match return_key {
                 TypeKey::Union(members) => {
+                    let members = types.type_list(members);
                     assert!(members.contains(&TypeId::NUMBER));
                     assert!(members.contains(&TypeId::STRING));
                 }
@@ -3107,6 +3143,7 @@ const value = obj[key];
     let value_key = types.lookup(value_type).expect("value type should exist");
     match value_key {
         TypeKey::Union(members) => {
+            let members = types.type_list(members);
             assert!(members.contains(&TypeId::NUMBER));
             assert!(members.contains(&TypeId::STRING));
         }
@@ -3168,6 +3205,7 @@ const value = tup[idx];
     let value_key = types.lookup(value_type).expect("value type should exist");
     match value_key {
         TypeKey::Union(members) => {
+            let members = types.type_list(members);
             assert!(members.contains(&TypeId::STRING));
             assert!(members.contains(&TypeId::BOOLEAN));
             assert_eq!(members.len(), 2);
@@ -3203,6 +3241,7 @@ const value = arr[key];
     let value_key = types.lookup(value_type).expect("value type should exist");
     match value_key {
         TypeKey::Union(members) => {
+            let members = types.type_list(members);
             assert!(members.contains(&TypeId::STRING));
             assert!(members.contains(&TypeId::NUMBER));
             assert_eq!(members.len(), 2);
@@ -3266,6 +3305,7 @@ const value = obj?.["a"];
     let value_key = types.lookup(value_type).expect("value type should exist");
     match value_key {
         TypeKey::Union(members) => {
+            let members = types.type_list(members);
             assert!(members.contains(&TypeId::NUMBER));
             assert!(members.contains(&TypeId::UNDEFINED));
         }
@@ -3301,8 +3341,11 @@ type Alias = Foo.Bar;
     let alias_type = checker.get_type_of_symbol(alias_sym);
     let alias_key = types.lookup(alias_type).expect("Alias type should exist");
     match alias_key {
-        TypeKey::Object(props) => {
-            let prop = props.iter()
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let prop = shape
+                .properties
+                .iter()
                 .find(|prop| types.resolve_atom(prop.name) == "x")
                 .expect("Expected property x");
             assert_eq!(prop.type_id, TypeId::NUMBER);
@@ -3349,14 +3392,21 @@ interface Bar {
     let bar_type = checker.get_type_of_symbol(bar_sym);
     let bar_key = types.lookup(bar_type).expect("Bar type should exist");
     match bar_key {
-        TypeKey::Object(props) => {
-            let prop_names: Vec<String> = props.iter()
+        TypeKey::Object(shape_id) => {
+            let shape = types.object_shape(shape_id);
+            let prop_names: Vec<String> = shape
+                .properties
+                .iter()
                 .map(|prop| types.resolve_atom(prop.name))
                 .collect();
-            let prop_x = props.iter()
+            let prop_x = shape
+                .properties
+                .iter()
                 .find(|prop| types.resolve_atom(prop.name) == "x")
                 .expect("Expected property x");
-            let prop_y = props.iter()
+            let prop_y = shape
+                .properties
+                .iter()
                 .find(|prop| types.resolve_atom(prop.name) == "y")
                 .expect(&format!("Expected property y, got {:?}", prop_names));
 
@@ -3401,7 +3451,8 @@ type Alias = typeof Foo<string>;
     let alias_type = checker.get_type_of_symbol(alias_sym);
     let alias_key = types.lookup(alias_type).expect("Alias type should exist");
     match alias_key {
-        TypeKey::Application(app) => {
+        TypeKey::Application(app_id) => {
+            let app = types.type_application(app_id);
             assert_eq!(app.args, vec![TypeId::STRING]);
             match types.lookup(app.base) {
                 Some(TypeKey::TypeQuery(SymbolRef(sym_id))) => assert_eq!(sym_id, foo_sym.0),

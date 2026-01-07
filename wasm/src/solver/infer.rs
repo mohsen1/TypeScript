@@ -298,13 +298,31 @@ impl<'a> InferenceContext<'a> {
         match key {
             TypeKey::TypeParameter(info) => info.name == target,
             TypeKey::Array(elem) => self.type_contains_param(elem, target, visited),
-            TypeKey::Tuple(elements) => elements.iter().any(|e| self.type_contains_param(e.type_id, target, visited)),
-            TypeKey::Union(members) | TypeKey::Intersection(members) => {
-                members.iter().any(|&member| self.type_contains_param(member, target, visited))
+            TypeKey::Tuple(elements) => {
+                let elements = self.interner.tuple_list(elements);
+                elements
+                    .iter()
+                    .any(|e| self.type_contains_param(e.type_id, target, visited))
             }
-            TypeKey::Object(props) => props.iter().any(|p| self.type_contains_param(p.type_id, target, visited)),
-            TypeKey::ObjectWithIndex(shape) => {
-                shape.properties.iter().any(|p| self.type_contains_param(p.type_id, target, visited))
+            TypeKey::Union(members) | TypeKey::Intersection(members) => {
+                let members = self.interner.type_list(members);
+                members
+                    .iter()
+                    .any(|&member| self.type_contains_param(member, target, visited))
+            }
+            TypeKey::Object(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                shape
+                    .properties
+                    .iter()
+                    .any(|p| self.type_contains_param(p.type_id, target, visited))
+            }
+            TypeKey::ObjectWithIndex(shape_id) => {
+                let shape = self.interner.object_shape(shape_id);
+                shape
+                    .properties
+                    .iter()
+                    .any(|p| self.type_contains_param(p.type_id, target, visited))
                     || shape.string_index.as_ref().is_some_and(|idx| {
                         self.type_contains_param(idx.key_type, target, visited)
                             || self.type_contains_param(idx.value_type, target, visited)
@@ -314,18 +332,24 @@ impl<'a> InferenceContext<'a> {
                             || self.type_contains_param(idx.value_type, target, visited)
                     })
             }
-            TypeKey::Application(app) => {
+            TypeKey::Application(app_id) => {
+                let app = self.interner.type_application(app_id);
                 self.type_contains_param(app.base, target, visited)
-                    || app.args.iter().any(|&arg| self.type_contains_param(arg, target, visited))
+                    || app
+                        .args
+                        .iter()
+                        .any(|&arg| self.type_contains_param(arg, target, visited))
             }
-            TypeKey::Function(shape) => {
+            TypeKey::Function(shape_id) => {
+                let shape = self.interner.function_shape(shape_id);
                 if shape.type_params.iter().any(|tp| tp.name == target) {
                     return false;
                 }
                 shape.params.iter().any(|p| self.type_contains_param(p.type_id, target, visited))
                     || self.type_contains_param(shape.return_type, target, visited)
             }
-            TypeKey::Callable(shape) => {
+            TypeKey::Callable(shape_id) => {
+                let shape = self.interner.callable_shape(shape_id);
                 let in_call = shape.call_signatures.iter().any(|sig| {
                     if sig.type_params.iter().any(|tp| tp.name == target) {
                         false
@@ -370,10 +394,13 @@ impl<'a> InferenceContext<'a> {
             TypeKey::KeyOf(operand) | TypeKey::ReadonlyType(operand) => {
                 self.type_contains_param(operand, target, visited)
             }
-            TypeKey::TemplateLiteral(spans) => spans.iter().any(|span| match span {
-                TemplateSpan::Text(_) => false,
-                TemplateSpan::Type(inner) => self.type_contains_param(*inner, target, visited),
-            }),
+            TypeKey::TemplateLiteral(spans) => {
+                let spans = self.interner.template_list(spans);
+                spans.iter().any(|span| match span {
+                    TemplateSpan::Text(_) => false,
+                    TemplateSpan::Type(inner) => self.type_contains_param(*inner, target, visited),
+                })
+            }
             TypeKey::Infer(info) => info.name == target,
             TypeKey::Intrinsic(_)
             | TypeKey::Literal(_)
@@ -644,66 +671,87 @@ impl<'a> InferenceContext<'a> {
         if let (Some(TypeKey::Tuple(s_elems)), Some(TypeKey::Tuple(t_elems))) =
             (source_key.as_ref(), target_key.as_ref())
         {
-            return self.tuple_subtype_of(s_elems, t_elems);
+            let s_elems = self.interner.tuple_list(*s_elems);
+            let t_elems = self.interner.tuple_list(*t_elems);
+            return self.tuple_subtype_of(&s_elems, &t_elems);
         }
 
         if let (Some(TypeKey::Tuple(s_elems)), Some(TypeKey::Array(t_elem))) =
             (source_key.as_ref(), target_key.as_ref())
         {
-            return self.tuple_subtype_array(s_elems, *t_elem);
+            let s_elems = self.interner.tuple_list(*s_elems);
+            return self.tuple_subtype_array(&s_elems, *t_elem);
         }
 
         if let (Some(TypeKey::Object(s_props)), Some(TypeKey::Object(t_props))) =
             (source_key.as_ref(), target_key.as_ref())
         {
-            return self.object_subtype_of(s_props, t_props);
+            let s_shape = self.interner.object_shape(*s_props);
+            let t_shape = self.interner.object_shape(*t_props);
+            return self.object_subtype_of(&s_shape.properties, &t_shape.properties);
         }
 
         if let (Some(TypeKey::ObjectWithIndex(s_shape)), Some(TypeKey::ObjectWithIndex(t_shape))) =
             (source_key.as_ref(), target_key.as_ref())
         {
-            return self.object_with_index_subtype_of(s_shape, t_shape);
+            let s_shape = self.interner.object_shape(*s_shape);
+            let t_shape = self.interner.object_shape(*t_shape);
+            return self.object_with_index_subtype_of(&s_shape, &t_shape);
         }
 
         if let (Some(TypeKey::Object(s_props)), Some(TypeKey::ObjectWithIndex(t_shape))) =
             (source_key.as_ref(), target_key.as_ref())
         {
-            return self.object_props_subtype_index(s_props, t_shape);
+            let s_shape = self.interner.object_shape(*s_props);
+            let t_shape = self.interner.object_shape(*t_shape);
+            return self.object_props_subtype_index(&s_shape.properties, &t_shape);
         }
 
         if let (Some(TypeKey::ObjectWithIndex(s_shape)), Some(TypeKey::Object(t_props))) =
             (source_key.as_ref(), target_key.as_ref())
         {
-            return self.object_subtype_of(&s_shape.properties, t_props);
+            let s_shape = self.interner.object_shape(*s_shape);
+            let t_shape = self.interner.object_shape(*t_props);
+            return self.object_subtype_of(&s_shape.properties, &t_shape.properties);
         }
 
         if let (Some(TypeKey::Function(s_fn)), Some(TypeKey::Function(t_fn))) =
             (source_key.as_ref(), target_key.as_ref())
         {
-            return self.function_subtype_of(s_fn, t_fn);
+            let s_fn = self.interner.function_shape(*s_fn);
+            let t_fn = self.interner.function_shape(*t_fn);
+            return self.function_subtype_of(&s_fn, &t_fn);
         }
 
         if let (Some(TypeKey::Callable(s_callable)), Some(TypeKey::Callable(t_callable))) =
             (source_key.as_ref(), target_key.as_ref())
         {
-            return self.callable_subtype_of(s_callable, t_callable);
+            let s_callable = self.interner.callable_shape(*s_callable);
+            let t_callable = self.interner.callable_shape(*t_callable);
+            return self.callable_subtype_of(&s_callable, &t_callable);
         }
 
         if let (Some(TypeKey::Function(s_fn)), Some(TypeKey::Callable(t_callable))) =
             (source_key.as_ref(), target_key.as_ref())
         {
-            return self.function_subtype_callable(s_fn, t_callable);
+            let s_fn = self.interner.function_shape(*s_fn);
+            let t_callable = self.interner.callable_shape(*t_callable);
+            return self.function_subtype_callable(&s_fn, &t_callable);
         }
 
         if let (Some(TypeKey::Callable(s_callable)), Some(TypeKey::Function(t_fn))) =
             (source_key.as_ref(), target_key.as_ref())
         {
-            return self.callable_subtype_function(s_callable, t_fn);
+            let s_callable = self.interner.callable_shape(*s_callable);
+            let t_fn = self.interner.function_shape(*t_fn);
+            return self.callable_subtype_function(&s_callable, &t_fn);
         }
 
         if let (Some(TypeKey::Application(s_app)), Some(TypeKey::Application(t_app))) =
             (source_key.as_ref(), target_key.as_ref())
         {
+            let s_app = self.interner.type_application(*s_app);
+            let t_app = self.interner.type_application(*t_app);
             if s_app.args.len() != t_app.args.len() {
                 return false;
             }
@@ -720,21 +768,25 @@ impl<'a> InferenceContext<'a> {
 
         // Intersection: A & B <: T if either member is a subtype of T
         if let Some(TypeKey::Intersection(members)) = source_key.as_ref() {
+            let members = self.interner.type_list(*members);
             return members.iter().any(|&member| self.is_subtype(member, target));
         }
 
         // Union: A | B <: T if both A <: T and B <: T
         if let Some(TypeKey::Union(members)) = source_key.as_ref() {
+            let members = self.interner.type_list(*members);
             return members.iter().all(|&member| self.is_subtype(member, target));
         }
 
         // Target intersection: S <: (A & B) if S <: A and S <: B
         if let Some(TypeKey::Intersection(members)) = target_key.as_ref() {
+            let members = self.interner.type_list(*members);
             return members.iter().all(|&member| self.is_subtype(source, member));
         }
 
         // Target union: S <: (A | B) if S <: A or S <: B
         if let Some(TypeKey::Union(members)) = target_key.as_ref() {
+            let members = self.interner.type_list(*members);
             return members.iter().any(|&member| self.is_subtype(source, member));
         }
 
@@ -802,6 +854,8 @@ impl<'a> InferenceContext<'a> {
 
         match (source_key.as_ref(), target_key.as_ref()) {
             (Some(TypeKey::Function(s_fn)), Some(TypeKey::Function(t_fn))) => {
+                let s_fn = self.interner.function_shape(*s_fn);
+                let t_fn = self.interner.function_shape(*t_fn);
                 return self.function_like_subtype_of_with_variance(
                     &s_fn.params,
                     s_fn.return_type,
@@ -811,13 +865,19 @@ impl<'a> InferenceContext<'a> {
                 );
             }
             (Some(TypeKey::Callable(s_callable)), Some(TypeKey::Callable(t_callable))) => {
-                return self.callable_subtype_of_with_variance(s_callable, t_callable, true);
+                let s_callable = self.interner.callable_shape(*s_callable);
+                let t_callable = self.interner.callable_shape(*t_callable);
+                return self.callable_subtype_of_with_variance(&s_callable, &t_callable, true);
             }
             (Some(TypeKey::Function(s_fn)), Some(TypeKey::Callable(t_callable))) => {
-                return self.function_subtype_callable_with_variance(s_fn, t_callable, true);
+                let s_fn = self.interner.function_shape(*s_fn);
+                let t_callable = self.interner.callable_shape(*t_callable);
+                return self.function_subtype_callable_with_variance(&s_fn, &t_callable, true);
             }
             (Some(TypeKey::Callable(s_callable)), Some(TypeKey::Function(t_fn))) => {
-                return self.callable_subtype_function_with_variance(s_callable, t_fn, true);
+                let s_callable = self.interner.callable_shape(*s_callable);
+                let t_fn = self.interner.function_shape(*t_fn);
+                return self.callable_subtype_function_with_variance(&s_callable, &t_fn, true);
             }
             _ => {}
         }
@@ -1315,8 +1375,9 @@ impl<'a> InferenceContext<'a> {
                 variadic: Some(elem),
             },
             Some(TypeKey::Tuple(elements)) => {
+                let elements = self.interner.tuple_list(elements);
                 let mut fixed = Vec::new();
-                for elem in elements {
+                for elem in elements.iter() {
                     if elem.rest {
                         let inner = self.expand_tuple_rest(elem.type_id);
                         fixed.extend(inner.fixed);
