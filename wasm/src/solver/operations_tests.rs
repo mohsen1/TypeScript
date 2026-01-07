@@ -2258,6 +2258,7 @@ fn test_infer_generic_mapped_param_from_object_arg() {
     let mapped = MappedType {
         type_param: key_param,
         constraint: keys,
+        name_type: None,
         template: t_type,
         readonly_modifier: None,
         optional_modifier: None,

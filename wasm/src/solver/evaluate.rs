@@ -855,6 +855,21 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             None => return self.interner.mapped(mapped.clone()),
         };
 
+        let remap_key_type = |key_type: TypeId| -> Result<Option<TypeId>, ()> {
+            let Some(name_type) = mapped.name_type else {
+                return Ok(Some(key_type));
+            };
+
+            let mut subst = TypeSubstitution::new();
+            subst.insert(mapped.type_param.name, key_type);
+            let remapped = instantiate_type(self.interner, name_type, &subst);
+            let remapped = self.evaluate(remapped);
+            if remapped == TypeId::NEVER {
+                return Ok(None);
+            }
+            Ok(Some(remapped))
+        };
+
         let optional = match mapped.optional_modifier {
             Some(MappedModifier::Add) => true,
             Some(MappedModifier::Remove) => false,
@@ -874,6 +889,15 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             // Create substitution: type_param.name -> literal key type
             // First intern the Atom as a literal string type
             let key_literal = self.interner.intern(TypeKey::Literal(LiteralValue::String(key_name)));
+            let remapped = match remap_key_type(key_literal) {
+                Ok(Some(remapped)) => remapped,
+                Ok(None) => continue,
+                Err(()) => return self.interner.mapped(mapped.clone()),
+            };
+            let remapped_name = match self.interner.lookup(remapped) {
+                Some(TypeKey::Literal(LiteralValue::String(name))) => name,
+                _ => return self.interner.mapped(mapped.clone()),
+            };
 
             let mut subst = TypeSubstitution::new();
             subst.insert(mapped.type_param.name, key_literal);
@@ -882,7 +906,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             let property_type = instantiate_type(self.interner, mapped.template, &subst);
 
             properties.push(PropertyInfo {
-                name: key_name,
+                name: remapped_name,
                 type_id: property_type,
                 write_type: property_type,
                 optional,
@@ -892,35 +916,53 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
 
         let string_index = if key_set.has_string {
-            let key_type = TypeId::STRING;
-            let mut subst = TypeSubstitution::new();
-            subst.insert(mapped.type_param.name, key_type);
-            let mut value_type = instantiate_type(self.interner, mapped.template, &subst);
-            if optional {
-                value_type = self.interner.union2(value_type, TypeId::UNDEFINED);
+            match remap_key_type(TypeId::STRING) {
+                Ok(Some(remapped)) => {
+                    if remapped != TypeId::STRING {
+                        return self.interner.mapped(mapped.clone());
+                    }
+                    let key_type = TypeId::STRING;
+                    let mut subst = TypeSubstitution::new();
+                    subst.insert(mapped.type_param.name, key_type);
+                    let mut value_type = instantiate_type(self.interner, mapped.template, &subst);
+                    if optional {
+                        value_type = self.interner.union2(value_type, TypeId::UNDEFINED);
+                    }
+                    Some(IndexSignature {
+                        key_type,
+                        value_type,
+                        readonly,
+                    })
+                }
+                Ok(None) => None,
+                Err(()) => return self.interner.mapped(mapped.clone()),
             }
-            Some(IndexSignature {
-                key_type,
-                value_type,
-                readonly,
-            })
         } else {
             None
         };
 
         let number_index = if key_set.has_number {
-            let key_type = TypeId::NUMBER;
-            let mut subst = TypeSubstitution::new();
-            subst.insert(mapped.type_param.name, key_type);
-            let mut value_type = instantiate_type(self.interner, mapped.template, &subst);
-            if optional {
-                value_type = self.interner.union2(value_type, TypeId::UNDEFINED);
+            match remap_key_type(TypeId::NUMBER) {
+                Ok(Some(remapped)) => {
+                    if remapped != TypeId::NUMBER {
+                        return self.interner.mapped(mapped.clone());
+                    }
+                    let key_type = TypeId::NUMBER;
+                    let mut subst = TypeSubstitution::new();
+                    subst.insert(mapped.type_param.name, key_type);
+                    let mut value_type = instantiate_type(self.interner, mapped.template, &subst);
+                    if optional {
+                        value_type = self.interner.union2(value_type, TypeId::UNDEFINED);
+                    }
+                    Some(IndexSignature {
+                        key_type,
+                        value_type,
+                        readonly,
+                    })
+                }
+                Ok(None) => None,
+                Err(()) => return self.interner.mapped(mapped.clone()),
             }
-            Some(IndexSignature {
-                key_type,
-                value_type,
-                readonly,
-            })
         } else {
             None
         };

@@ -443,6 +443,7 @@ fn test_instantiate_mapped_type_shadowed_param() {
     let mapped = interner.mapped(MappedType {
         type_param: t_param.clone(),
         constraint: TypeId::STRING,
+        name_type: None,
         template: t_type,
         readonly_modifier: None,
         optional_modifier: None,
@@ -455,6 +456,7 @@ fn test_instantiate_mapped_type_shadowed_param() {
     let expected = interner.mapped(MappedType {
         type_param: t_param,
         constraint: TypeId::STRING,
+        name_type: None,
         template: t_type,
         readonly_modifier: None,
         optional_modifier: None,
