@@ -640,6 +640,13 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             (_, Some(TypeKey::ReadonlyType(t_inner))) => {
                 self.constrain_types(ctx, var_map, source, t_inner);
             }
+            (Some(TypeKey::IndexAccess(s_obj, s_idx)), Some(TypeKey::IndexAccess(t_obj, t_idx))) => {
+                self.constrain_types(ctx, var_map, s_obj, t_obj);
+                self.constrain_types(ctx, var_map, s_idx, t_idx);
+            }
+            (Some(TypeKey::KeyOf(s_inner)), Some(TypeKey::KeyOf(t_inner))) => {
+                self.constrain_types(ctx, var_map, t_inner, s_inner);
+            }
             (Some(TypeKey::Union(ref s_members)), _) => {
                 for &member in s_members {
                     self.constrain_types(ctx, var_map, member, target);
