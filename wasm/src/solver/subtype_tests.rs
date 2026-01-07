@@ -89,6 +89,23 @@ fn test_object_subtyping() {
 }
 
 #[test]
+fn test_readonly_property_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let name = interner.intern_string("x");
+    let readonly_obj = interner.object(vec![
+        PropertyInfo { name, type_id: TypeId::NUMBER, optional: false, readonly: true, is_method: false },
+    ]);
+    let mutable_obj = interner.object(vec![
+        PropertyInfo { name, type_id: TypeId::NUMBER, optional: false, readonly: false, is_method: false },
+    ]);
+
+    assert!(!checker.is_subtype_of(readonly_obj, mutable_obj));
+    assert!(checker.is_subtype_of(mutable_obj, readonly_obj));
+}
+
+#[test]
 fn test_array_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
@@ -789,6 +806,82 @@ fn test_number_and_string_index_signatures() {
 
     // This should SUCCEED - "0" satisfies number index, both satisfy string index
     assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_readonly_index_signature_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let readonly_source = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        number_index: None,
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: true,
+        }),
+    });
+
+    let mutable_target = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        number_index: None,
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let readonly_target = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        number_index: None,
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: true,
+        }),
+    });
+
+    assert!(!checker.is_subtype_of(readonly_source, mutable_target));
+    assert!(checker.is_subtype_of(mutable_target, readonly_target));
+}
+
+#[test]
+fn test_readonly_property_with_mutable_index_signature() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let source = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("x"),
+        type_id: TypeId::NUMBER,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+
+    let mutable_index = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        number_index: None,
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: false,
+        }),
+    });
+
+    let readonly_index = interner.object_with_index(ObjectShape {
+        properties: vec![],
+        number_index: None,
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: TypeId::NUMBER,
+            readonly: true,
+        }),
+    });
+
+    assert!(!checker.is_subtype_of(source, mutable_index));
+    assert!(checker.is_subtype_of(source, readonly_index));
 }
 
 #[test]

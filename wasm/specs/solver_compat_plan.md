@@ -180,6 +180,11 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 - [x] Collapse distributive conditionals over `never` to `never`
 - [x] Tests for conditional `any` and distributive `never`
 
+### Phase 29: Readonly Assignability
+- [x] Reject readonly properties when target expects mutable properties
+- [x] Enforce readonly compatibility for index signatures
+- [x] Tests for readonly property and index signature assignability
+
 ## Architecture Notes
 - This module implements TypeScript's INTENTIONAL unsoundness
 - Document why each unsound rule exists (comments with TS issue links)

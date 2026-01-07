@@ -822,6 +822,17 @@ impl SubtypeFailureReason {
                 ))
             }
 
+            SubtypeFailureReason::ReadonlyPropertyMismatch { property_name } => {
+                PendingDiagnostic::error(
+                    codes::TYPE_NOT_ASSIGNABLE,
+                    vec![source.into(), target.into()],
+                )
+                .with_related(PendingDiagnostic::error(
+                    codes::READONLY_PROPERTY,
+                    vec![(*property_name).into()],
+                ))
+            }
+
             SubtypeFailureReason::ReturnTypeMismatch {
                 source_return,
                 target_return,
