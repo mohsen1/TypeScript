@@ -2426,6 +2426,22 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get type assertion data (as/satisfies/type assertion).
+    /// Returns None if node is not a type assertion or has no data.
+    #[inline]
+    pub fn get_type_assertion(&self, node: &ThinNode) -> Option<&TypeAssertionData> {
+        use super::syntax_kind_ext::{AS_EXPRESSION, SATISFIES_EXPRESSION, TYPE_ASSERTION};
+        if node.has_data()
+            && (node.kind == TYPE_ASSERTION
+                || node.kind == AS_EXPRESSION
+                || node.kind == SATISFIES_EXPRESSION)
+        {
+            self.type_assertions.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Get unary expression data (prefix or postfix).
     /// Returns None if node is not a unary expression or has no data.
     #[inline]
@@ -2438,12 +2454,16 @@ impl ThinNodeArena {
         }
     }
 
-    /// Get extended unary expression data (await/yield).
+    /// Get extended unary expression data (await/yield/non-null).
     /// Returns None if node is not an await/yield expression or has no data.
     #[inline]
     pub fn get_unary_expr_ex(&self, node: &ThinNode) -> Option<&UnaryExprDataEx> {
-        use super::syntax_kind_ext::{AWAIT_EXPRESSION, YIELD_EXPRESSION};
-        if node.has_data() && (node.kind == AWAIT_EXPRESSION || node.kind == YIELD_EXPRESSION) {
+        use super::syntax_kind_ext::{AWAIT_EXPRESSION, NON_NULL_EXPRESSION, YIELD_EXPRESSION};
+        if node.has_data()
+            && (node.kind == AWAIT_EXPRESSION
+                || node.kind == YIELD_EXPRESSION
+                || node.kind == NON_NULL_EXPRESSION)
+        {
             self.unary_exprs_ex.get(node.data_index as usize)
         } else {
             None
