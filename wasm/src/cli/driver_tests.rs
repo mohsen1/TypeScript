@@ -1242,6 +1242,99 @@ fn compile_resolves_node_modules_types_versions_falls_back_to_wildcard() {
 }
 
 #[test]
+fn compile_resolves_package_imports_wildcard() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "noEmitOnError": true
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { widget } from '#utils/widget'; export { widget };",
+    );
+    write_file(
+        &base.join("package.json"),
+        r##"{
+          "imports": {
+            "#utils/*": "./types/*"
+          }
+        }"##,
+    );
+    write_file(
+        &base.join("types/widget.d.ts"),
+        "export const widget = ;",
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("types/widget.d.ts")));
+    assert!(!base.join("dist/src/index.js").is_file());
+}
+
+#[test]
+fn compile_resolves_package_imports_prefers_types_condition() {
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist",
+            "noEmitOnError": true
+          },
+          "files": ["src/index.ts"]
+        }"#,
+    );
+    write_file(
+        &base.join("src/index.ts"),
+        "import { feature } from '#feature'; export { feature };",
+    );
+    write_file(
+        &base.join("package.json"),
+        r##"{
+          "imports": {
+            "#feature": {
+              "types": "./types/feature.d.ts",
+              "default": "./default/feature.d.ts"
+            }
+          }
+        }"##,
+    );
+    write_file(
+        &base.join("types/feature.d.ts"),
+        "export const feature = ;",
+    );
+    write_file(
+        &base.join("default/feature.d.ts"),
+        "export const feature = 1;",
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(!result.diagnostics.is_empty());
+    assert!(result
+        .diagnostics
+        .iter()
+        .any(|diag| diag.file.contains("types/feature.d.ts")));
+    assert!(!base.join("dist/src/index.js").is_file());
+}
+
+#[test]
 fn compile_prefers_browser_exports_for_bundler() {
     let temp = TempDir::new().expect("temp dir");
     let base = &temp.path;
