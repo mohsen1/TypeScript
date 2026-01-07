@@ -2434,12 +2434,19 @@ impl ThinNodeArena {
 
     /// Add a for-in/for-of statement node
     pub fn add_for_in_of(&mut self, kind: u16, pos: u32, end: u32, data: ForInOfData) -> NodeIndex {
+        let initializer = data.initializer;
+        let expression = data.expression;
+        let statement = data.statement;
         let data_index = self.for_in_of.len() as u32;
         self.for_in_of.push(data);
         let index = self.nodes.len() as u32;
         self.nodes.push(ThinNode::with_data(kind, pos, end, data_index));
         self.extended_info.push(ExtendedNodeInfo::default());
-        NodeIndex(index)
+        let parent = NodeIndex(index);
+        self.set_parent(initializer, parent);
+        self.set_parent(expression, parent);
+        self.set_parent(statement, parent);
+        parent
     }
 
     /// Get a thin node by index
