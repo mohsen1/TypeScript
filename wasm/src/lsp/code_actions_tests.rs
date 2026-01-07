@@ -1026,3 +1026,262 @@ fn test_quickfix_add_missing_import_namespace() {
     let updated = apply_text_edits(source, &line_map, edits);
     assert_eq!(updated, "import * as ns from \"./foo\";\nns.foo;\n");
 }
+
+#[test]
+fn test_quickfix_add_missing_import_type_position_uses_import_type() {
+    let source = "let x: Foo;\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "Foo");
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Error),
+        code: Some(CANNOT_FIND_NAME),
+        source: None,
+        message: "Cannot find name 'Foo'.".to_string(),
+        related_information: None,
+    };
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: vec![ImportCandidate::named(
+                "./foo".to_string(),
+                "Foo".to_string(),
+                "Foo".to_string(),
+            )],
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    let updated = apply_text_edits(source, &line_map, edits);
+    assert_eq!(updated, "import type { Foo } from \"./foo\";\nlet x: Foo;\n");
+}
+
+#[test]
+fn test_quickfix_add_missing_import_value_skips_type_only_candidate() {
+    let source = "Foo();\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "Foo");
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Error),
+        code: Some(CANNOT_FIND_NAME),
+        source: None,
+        message: "Cannot find name 'Foo'.".to_string(),
+        related_information: None,
+    };
+
+    let mut candidate = ImportCandidate::named(
+        "./foo".to_string(),
+        "Foo".to_string(),
+        "Foo".to_string(),
+    );
+    candidate.is_type_only = true;
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: vec![candidate],
+        },
+    );
+
+    assert_eq!(actions.len(), 0);
+}
+
+#[test]
+fn test_quickfix_add_missing_import_type_query_uses_value_import() {
+    let source = "type T = typeof Foo;\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "Foo");
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Error),
+        code: Some(CANNOT_FIND_NAME),
+        source: None,
+        message: "Cannot find name 'Foo'.".to_string(),
+        related_information: None,
+    };
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: vec![ImportCandidate::named(
+                "./foo".to_string(),
+                "Foo".to_string(),
+                "Foo".to_string(),
+            )],
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    let updated = apply_text_edits(source, &line_map, edits);
+    assert_eq!(updated, "import { Foo } from \"./foo\";\ntype T = typeof Foo;\n");
+}
+
+#[test]
+fn test_quickfix_add_missing_import_class_extends_uses_value_import() {
+    let source = "class Bar extends Foo {}\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "Foo");
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Error),
+        code: Some(CANNOT_FIND_NAME),
+        source: None,
+        message: "Cannot find name 'Foo'.".to_string(),
+        related_information: None,
+    };
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: vec![ImportCandidate::named(
+                "./foo".to_string(),
+                "Foo".to_string(),
+                "Foo".to_string(),
+            )],
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    let updated = apply_text_edits(source, &line_map, edits);
+    assert_eq!(updated, "import { Foo } from \"./foo\";\nclass Bar extends Foo {}\n");
+}
+
+#[test]
+fn test_quickfix_add_missing_import_class_implements_uses_import_type() {
+    let source = "class Bar implements Foo {}\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "Foo");
+
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Error),
+        code: Some(CANNOT_FIND_NAME),
+        source: None,
+        message: "Cannot find name 'Foo'.".to_string(),
+        related_information: None,
+    };
+
+    let provider = CodeActionProvider::new(
+        arena,
+        &binder,
+        &line_map,
+        "test.ts".to_string(),
+        source,
+    );
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: vec![ImportCandidate::named(
+                "./foo".to_string(),
+                "Foo".to_string(),
+                "Foo".to_string(),
+            )],
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    let updated = apply_text_edits(source, &line_map, edits);
+    assert_eq!(updated, "import type { Foo } from \"./foo\";\nclass Bar implements Foo {}\n");
+}

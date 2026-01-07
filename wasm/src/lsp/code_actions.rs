@@ -302,7 +302,7 @@ impl<'a> CodeActionProvider<'a> {
             return Vec::new();
         }
 
-        let Some(missing_name) = self.diagnostic_identifier(diag) else {
+        let Some((missing_name, usage)) = self.diagnostic_identifier_usage(diag) else {
             return Vec::new();
         };
 
@@ -311,7 +311,16 @@ impl<'a> CodeActionProvider<'a> {
             if candidate.local_name != missing_name {
                 continue;
             }
-            let Some(edits) = self.build_import_edit(root, candidate) else {
+            if usage == ImportUsage::Value && candidate.is_type_only {
+                continue;
+            }
+
+            let mut resolved = candidate.clone();
+            if usage == ImportUsage::Type {
+                resolved.is_type_only = true;
+            }
+
+            let Some(edits) = self.build_import_edit(root, &resolved) else {
                 continue;
             };
 
@@ -724,7 +733,7 @@ impl<'a> CodeActionProvider<'a> {
         (Range::new(start_pos, end_pos), trailing)
     }
 
-    fn diagnostic_identifier(&self, diag: &LspDiagnostic) -> Option<String> {
+    fn diagnostic_identifier_usage(&self, diag: &LspDiagnostic) -> Option<(String, ImportUsage)> {
         let start_offset = self.line_map.position_to_offset(diag.range.start, self.source)?;
         let node_idx = find_node_at_offset(self.arena, start_offset);
         if node_idx.is_none() {
@@ -734,7 +743,76 @@ impl<'a> CodeActionProvider<'a> {
         if node.kind != SyntaxKind::Identifier as u16 {
             return None;
         }
-        self.arena.get_identifier_text(node_idx).map(|text| text.to_string())
+        let name = self.arena.get_identifier_text(node_idx)?.to_string();
+        let usage = self.import_usage_for_node(node_idx);
+        Some((name, usage))
+    }
+
+    fn import_usage_for_node(&self, node_idx: NodeIndex) -> ImportUsage {
+        let mut current = node_idx;
+        while !current.is_none() {
+            let Some(extended) = self.arena.get_extended(current) else {
+                break;
+            };
+            if extended.parent.is_none() {
+                break;
+            }
+            let parent_idx = extended.parent;
+            let Some(parent_node) = self.arena.get(parent_idx) else {
+                break;
+            };
+
+            if parent_node.kind == syntax_kind_ext::TYPE_QUERY {
+                return ImportUsage::Value;
+            }
+
+            if parent_node.kind == syntax_kind_ext::EXPRESSION_WITH_TYPE_ARGUMENTS {
+                if let Some(usage) = self.import_usage_in_heritage(parent_idx) {
+                    return usage;
+                }
+            }
+
+            if parent_node.is_type_node() {
+                return ImportUsage::Type;
+            }
+
+            current = parent_idx;
+        }
+
+        ImportUsage::Value
+    }
+
+    fn import_usage_in_heritage(&self, expr_idx: NodeIndex) -> Option<ImportUsage> {
+        let parent_idx = self.arena.get_extended(expr_idx)?.parent;
+        if parent_idx.is_none() {
+            return None;
+        }
+        let parent_node = self.arena.get(parent_idx)?;
+        if parent_node.kind != syntax_kind_ext::HERITAGE_CLAUSE {
+            return None;
+        }
+
+        let heritage = self.arena.get_heritage_clause(parent_node)?;
+        let container_idx = self.arena.get_extended(parent_idx)?.parent;
+        if container_idx.is_none() {
+            return None;
+        }
+        let container_node = self.arena.get(container_idx)?;
+
+        if heritage.token == SyntaxKind::ExtendsKeyword as u16 {
+            if container_node.kind == syntax_kind_ext::CLASS_DECLARATION
+                || container_node.kind == syntax_kind_ext::CLASS_EXPRESSION
+            {
+                return Some(ImportUsage::Value);
+            }
+            return Some(ImportUsage::Type);
+        }
+
+        if heritage.token == SyntaxKind::ImplementsKeyword as u16 {
+            return Some(ImportUsage::Type);
+        }
+
+        None
     }
 
     fn build_import_edit(&self, root: NodeIndex, candidate: &ImportCandidate) -> Option<Vec<TextEdit>> {
@@ -1616,6 +1694,12 @@ enum ImportRemoval {
     Default { name: String },
     Namespace { name: String },
     Named { specifier: NodeIndex, name: String },
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ImportUsage {
+    Type,
+    Value,
 }
 
 #[derive(Clone, Debug)]
