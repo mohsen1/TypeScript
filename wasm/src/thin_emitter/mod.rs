@@ -1498,13 +1498,13 @@ impl<'a> ThinPrinter<'a> {
 
     fn emit_identifier(&mut self, node: &ThinNode) {
         if let Some(ident) = self.arena.get_identifier(node) {
-            self.write(&ident.escaped_text);
+            self.write_identifier(&ident.escaped_text);
         }
     }
 
     fn write_identifier_by_id(&mut self, id: IdentifierId) {
         if let Some(ident) = self.arena.identifiers.get(id as usize) {
-            self.write(&ident.escaped_text);
+            self.write_identifier(&ident.escaped_text);
         }
     }
 

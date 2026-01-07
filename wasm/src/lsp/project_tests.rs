@@ -262,6 +262,26 @@ fn test_project_update_file_reuses_binder_prefix_symbols() {
 }
 
 #[test]
+fn test_project_update_file_refreshes_file_locals_for_suffix() {
+    let mut project = Project::new();
+    let source = "const alpha = 1;\nconst beta = 2;\n";
+    project.set_file("a.ts".to_string(), source.to_string());
+
+    let edit = {
+        let file = project.file("a.ts").unwrap();
+        let range = range_for_substring(file.source_text(), file.line_map(), "beta");
+        TextEdit::new(range, "gamma".to_string())
+    };
+    project.update_file("a.ts", &[edit]).expect("Expected update to succeed");
+
+    let file = project.file("a.ts").unwrap();
+    let locals = &file.binder().file_locals;
+    assert!(locals.has("alpha"), "Expected prefix symbol to remain");
+    assert!(locals.has("gamma"), "Expected updated suffix symbol");
+    assert!(!locals.has("beta"), "Expected removed suffix symbol");
+}
+
+#[test]
 fn test_project_update_file_refreshes_cross_file_references() {
     let mut project = Project::new();
 
