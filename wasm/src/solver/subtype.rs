@@ -11,6 +11,7 @@
 
 use std::collections::HashSet;
 use crate::interner::Atom;
+use crate::solver::infer::InferenceContext;
 use crate::solver::types::*;
 use crate::solver::{apparent_primitive_members, ApparentMemberKind, AssignabilityChecker, TypeDatabase};
 
@@ -449,9 +450,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 self.check_object_with_index_subtype(s_shape, t_shape)
             }
 
-            // Object with index to simple object (index signatures ignored)
+            // Object with index to simple object (index signatures can satisfy missing properties)
             (TypeKey::ObjectWithIndex(s_shape), TypeKey::Object(t_props)) => {
-                self.check_object_subtype(&s_shape.properties, t_props)
+                self.check_object_with_index_to_object(s_shape, t_props)
             }
 
             // Simple object to object with index
@@ -1036,6 +1037,91 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         SubtypeResult::True
     }
 
+    fn check_object_with_index_to_object(
+        &mut self,
+        source: &ObjectShape,
+        target: &[PropertyInfo],
+    ) -> SubtypeResult {
+        for t_prop in target {
+            if let Some(sp) = source.properties.iter().find(|p| p.name == t_prop.name) {
+                // Check optional compatibility
+                if sp.optional && !t_prop.optional {
+                    return SubtypeResult::False;
+                }
+                // Readonly in source can't satisfy mutable target
+                if sp.readonly && !t_prop.readonly {
+                    return SubtypeResult::False;
+                }
+                let source_type = self.optional_property_type(sp);
+                let target_type = self.optional_property_type(t_prop);
+                if !self
+                    .check_subtype_with_method_variance(source_type, target_type, t_prop.is_method)
+                    .is_true()
+                {
+                    return SubtypeResult::False;
+                }
+            } else if !self
+                .check_missing_property_against_index_signatures(source, t_prop)
+                .is_true()
+            {
+                return SubtypeResult::False;
+            }
+        }
+
+        SubtypeResult::True
+    }
+
+    fn check_missing_property_against_index_signatures(
+        &mut self,
+        source: &ObjectShape,
+        target_prop: &PropertyInfo,
+    ) -> SubtypeResult {
+        let mut checked = false;
+        let target_type = self.optional_property_type(target_prop);
+
+        if self.is_numeric_property_name(target_prop.name) {
+            if let Some(number_idx) = &source.number_index {
+                checked = true;
+                if number_idx.readonly && !target_prop.readonly {
+                    return SubtypeResult::False;
+                }
+                if !self
+                    .check_subtype_with_method_variance(
+                        number_idx.value_type,
+                        target_type,
+                        target_prop.is_method,
+                    )
+                    .is_true()
+                {
+                    return SubtypeResult::False;
+                }
+            }
+        }
+
+        if let Some(string_idx) = &source.string_index {
+            checked = true;
+            if string_idx.readonly && !target_prop.readonly {
+                return SubtypeResult::False;
+            }
+            if !self
+                .check_subtype_with_method_variance(
+                    string_idx.value_type,
+                    target_type,
+                    target_prop.is_method,
+                )
+                .is_true()
+            {
+                return SubtypeResult::False;
+            }
+        }
+
+        if checked || target_prop.optional {
+            SubtypeResult::True
+        } else {
+            SubtypeResult::False
+        }
+    }
+
     fn check_properties_against_index_signatures(
         &mut self,
         source: &[PropertyInfo],
@@ -1052,8 +1138,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             let prop_type = self.optional_property_type(prop);
 
             if let Some(number_idx) = number_index {
-                let prop_name_str = self.interner.resolve_atom(prop.name);
-                let is_numeric = prop_name_str.parse::<f64>().is_ok();
+                let is_numeric = self.is_numeric_property_name(prop.name);
                 if is_numeric && !self.check_subtype(prop_type, number_idx.value_type).is_true() {
                     return SubtypeResult::False;
                 }
@@ -1168,6 +1253,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         } else {
             prop.type_id
         }
+    }
+
+    fn is_numeric_property_name(&self, name: Atom) -> bool {
+        let prop_name = self.interner.resolve_atom(name);
+        InferenceContext::is_numeric_literal_name(&prop_name)
     }
 
     /// Check function subtyping
@@ -1690,6 +1780,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 self.explain_indexed_object_failure(source, target, s_shape, t_shape)
             }
 
+            // Object with index to object
+            (TypeKey::ObjectWithIndex(s_shape), TypeKey::Object(t_props)) => {
+                self.explain_object_with_index_to_object_failure(source, target, s_shape, t_props)
+            }
+
             // Simple object to indexed object
             (TypeKey::Object(s_props), TypeKey::ObjectWithIndex(t_shape)) => {
                 // First check properties
@@ -1891,6 +1986,107 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         None
     }
 
+    fn explain_object_with_index_to_object_failure(
+        &mut self,
+        source: TypeId,
+        target: TypeId,
+        source_shape: &ObjectShape,
+        target_props: &[PropertyInfo],
+    ) -> Option<SubtypeFailureReason> {
+        for t_prop in target_props {
+            if let Some(sp) = source_shape.properties.iter().find(|p| p.name == t_prop.name) {
+                if sp.optional && !t_prop.optional {
+                    return Some(SubtypeFailureReason::OptionalPropertyRequired {
+                        property_name: t_prop.name,
+                    });
+                }
+                if sp.readonly && !t_prop.readonly {
+                    return Some(SubtypeFailureReason::ReadonlyPropertyMismatch {
+                        property_name: t_prop.name,
+                    });
+                }
+
+                let source_type = self.optional_property_type(sp);
+                let target_type = self.optional_property_type(t_prop);
+                if !self
+                    .check_subtype_with_method_variance(source_type, target_type, t_prop.is_method)
+                    .is_true()
+                {
+                    let nested =
+                        self.explain_failure_with_method_variance(source_type, target_type, t_prop.is_method);
+                    return Some(SubtypeFailureReason::PropertyTypeMismatch {
+                        property_name: t_prop.name,
+                        source_property_type: source_type,
+                        target_property_type: target_type,
+                        nested_reason: nested.map(Box::new),
+                    });
+                }
+                continue;
+            }
+
+            let mut checked = false;
+            let target_type = self.optional_property_type(t_prop);
+
+            if self.is_numeric_property_name(t_prop.name) {
+                if let Some(number_idx) = &source_shape.number_index {
+                    checked = true;
+                    if number_idx.readonly && !t_prop.readonly {
+                        return Some(SubtypeFailureReason::ReadonlyPropertyMismatch {
+                            property_name: t_prop.name,
+                        });
+                    }
+                    if !self
+                        .check_subtype_with_method_variance(
+                            number_idx.value_type,
+                            target_type,
+                            t_prop.is_method,
+                        )
+                        .is_true()
+                    {
+                        return Some(SubtypeFailureReason::IndexSignatureMismatch {
+                            index_kind: "number",
+                            source_value_type: number_idx.value_type,
+                            target_value_type: target_type,
+                        });
+                    }
+                }
+            }
+
+            if let Some(string_idx) = &source_shape.string_index {
+                checked = true;
+                if string_idx.readonly && !t_prop.readonly {
+                    return Some(SubtypeFailureReason::ReadonlyPropertyMismatch {
+                        property_name: t_prop.name,
+                    });
+                }
+                if !self
+                    .check_subtype_with_method_variance(
+                        string_idx.value_type,
+                        target_type,
+                        t_prop.is_method,
+                    )
+                    .is_true()
+                {
+                    return Some(SubtypeFailureReason::IndexSignatureMismatch {
+                        index_kind: "string",
+                        source_value_type: string_idx.value_type,
+                        target_value_type: target_type,
+                    });
+                }
+            }
+
+            if !checked && !t_prop.optional {
+                return Some(SubtypeFailureReason::MissingProperty {
+                    property_name: t_prop.name,
+                    source_type: source,
+                    target_type: target,
+                });
+            }
+        }
+
+        None
+    }
+
     fn explain_properties_against_index_signatures(
         &mut self,
         source: &[PropertyInfo],
@@ -1907,8 +2103,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             let prop_type = self.optional_property_type(prop);
 
             if let Some(number_idx) = number_index {
-                let prop_name_str = self.interner.resolve_atom(prop.name);
-                let is_numeric = prop_name_str.parse::<f64>().is_ok();
+                let is_numeric = self.is_numeric_property_name(prop.name);
                 if is_numeric {
                     if !number_idx.readonly && prop.readonly {
                         return Some(SubtypeFailureReason::ReadonlyPropertyMismatch {

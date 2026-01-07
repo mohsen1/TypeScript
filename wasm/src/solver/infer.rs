@@ -964,7 +964,7 @@ impl<'a> InferenceContext<'a> {
         Self::is_numeric_literal_name(&prop_name)
     }
 
-    fn is_numeric_literal_name(name: &str) -> bool {
+    pub(crate) fn is_numeric_literal_name(name: &str) -> bool {
         if name == "NaN" || name == "Infinity" || name == "-Infinity" {
             return true;
         }

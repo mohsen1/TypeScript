@@ -86,7 +86,6 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
             params: sig.params.clone(),
             this_type: sig.this_type,
             return_type: sig.return_type,
-            type_predicate: sig.type_predicate.clone(),
             type_params: sig.type_params.clone(),
             type_predicate: sig.type_predicate.clone(),
             is_constructor: false,
@@ -675,12 +674,26 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 if let (Some(s_idx), Some(t_idx)) = (&s_shape.number_index, &t_shape.number_index) {
                     self.constrain_types(ctx, var_map, s_idx.value_type, t_idx.value_type);
                 }
+                self.constrain_properties_against_index_signatures(
+                    ctx,
+                    var_map,
+                    &s_shape.properties,
+                    t_shape,
+                );
+                self.constrain_index_signatures_to_properties(
+                    ctx,
+                    var_map,
+                    s_shape,
+                    &t_shape.properties,
+                );
             }
             (Some(TypeKey::Object(ref s_props)), Some(TypeKey::ObjectWithIndex(ref t_shape))) => {
                 self.constrain_properties(ctx, var_map, s_props, &t_shape.properties);
+                self.constrain_properties_against_index_signatures(ctx, var_map, s_props, t_shape);
             }
             (Some(TypeKey::ObjectWithIndex(ref s_shape)), Some(TypeKey::Object(ref t_props))) => {
                 self.constrain_properties(ctx, var_map, &s_shape.properties, t_props);
+                self.constrain_index_signatures_to_properties(ctx, var_map, s_shape, t_props);
             }
             (Some(TypeKey::Application(ref s_app)), Some(TypeKey::Application(ref t_app))) => {
                 if s_app.base == t_app.base && s_app.args.len() == t_app.args.len() {
@@ -721,6 +734,77 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 }
             }
         }
+    }
+
+    fn constrain_properties_against_index_signatures(
+        &self,
+        ctx: &mut InferenceContext,
+        var_map: &FxHashMap<TypeId, crate::solver::infer::InferenceVar>,
+        source_props: &[PropertyInfo],
+        target: &ObjectShape,
+    ) {
+        let string_index = target.string_index.as_ref();
+        let number_index = target.number_index.as_ref();
+
+        if string_index.is_none() && number_index.is_none() {
+            return;
+        }
+
+        for prop in source_props {
+            let prop_type = self.optional_property_type(prop);
+
+            if let Some(number_idx) = number_index {
+                if self.is_numeric_property_name(prop.name) {
+                    self.constrain_types(ctx, var_map, prop_type, number_idx.value_type);
+                }
+            }
+
+            if let Some(string_idx) = string_index {
+                self.constrain_types(ctx, var_map, prop_type, string_idx.value_type);
+            }
+        }
+    }
+
+    fn constrain_index_signatures_to_properties(
+        &self,
+        ctx: &mut InferenceContext,
+        var_map: &FxHashMap<TypeId, crate::solver::infer::InferenceVar>,
+        source: &ObjectShape,
+        target_props: &[PropertyInfo],
+    ) {
+        let string_index = source.string_index.as_ref();
+        let number_index = source.number_index.as_ref();
+
+        if string_index.is_none() && number_index.is_none() {
+            return;
+        }
+
+        for prop in target_props {
+            let prop_type = self.optional_property_type(prop);
+
+            if let Some(number_idx) = number_index {
+                if self.is_numeric_property_name(prop.name) {
+                    self.constrain_types(ctx, var_map, number_idx.value_type, prop_type);
+                }
+            }
+
+            if let Some(string_idx) = string_index {
+                self.constrain_types(ctx, var_map, string_idx.value_type, prop_type);
+            }
+        }
+    }
+
+    fn optional_property_type(&self, prop: &PropertyInfo) -> TypeId {
+        if prop.optional {
+            self.interner.union(vec![prop.type_id, TypeId::UNDEFINED])
+        } else {
+            prop.type_id
+        }
+    }
+
+    fn is_numeric_property_name(&self, name: Atom) -> bool {
+        let prop_name = self.interner.resolve_atom(name);
+        InferenceContext::is_numeric_literal_name(&prop_name)
     }
 
     fn constrain_tuple_types(
@@ -786,7 +870,6 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 params: sig.params.clone(),
                 this_type: sig.this_type,
                 return_type: sig.return_type,
-                type_predicate: sig.type_predicate.clone(),
                 type_params: sig.type_params.clone(),
                 type_predicate: sig.type_predicate.clone(),
                 is_constructor: false,
