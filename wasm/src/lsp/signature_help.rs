@@ -3,8 +3,9 @@
 //! Provides function signature information and active parameter highlighting
 //! when typing arguments in a call expression.
 
-use crate::parser::thin_node::{ThinNodeArena, CallExprData};
+use crate::parser::thin_node::{CallExprData, NodeAccess, ThinNodeArena};
 use crate::parser::{NodeIndex, NodeList, syntax_kind_ext};
+use crate::binder::symbol_flags;
 use crate::thin_binder::ThinBinderState;
 use crate::solver::{TypeInterner, TypeId, TypeKey, FunctionShape};
 use crate::lsp::position::{Position, LineMap};
@@ -153,9 +154,9 @@ impl<'a> SignatureHelpProvider<'a> {
         // 4. Resolve the symbol being called using ScopeWalker
         let mut walker = crate::lsp::resolver::ScopeWalker::new(self.arena, self.binder);
         let symbol_id = if let Some(scope_cache) = scope_cache {
-            walker.resolve_node_cached(root, call_expr.expression, scope_cache, scope_stats.as_deref_mut())?
+            walker.resolve_node_cached(root, call_expr.expression, scope_cache, scope_stats.as_deref_mut())
         } else {
-            walker.resolve_node(root, call_expr.expression)?
+            walker.resolve_node(root, call_expr.expression)
         };
 
         // 5. Create checker with persistent cache if available
@@ -176,12 +177,25 @@ impl<'a> SignatureHelpProvider<'a> {
             )
         };
 
-        let callee_type = checker.get_type_of_symbol(symbol_id);
+        let access_docs = if call_kind == CallKind::Call {
+            self.signature_documentation_for_property_access(root, call_expr.expression)
+        } else {
+            None
+        };
+
+        let (callee_type, docs) = if let Some(symbol_id) = symbol_id {
+            (
+                checker.get_type_of_symbol(symbol_id),
+                access_docs.or_else(|| self.signature_documentation_for_symbol(root, symbol_id, call_kind)),
+            )
+        } else {
+            (checker.get_type_of_node(call_expr.expression), access_docs)
+        };
 
         // 6. Extract signatures from the type
         let mut signatures = self.get_signatures_from_type(callee_type, &checker, call_kind);
 
-        if let Some(docs) = self.signature_documentation_for_symbol(root, symbol_id) {
+        if let Some(docs) = docs {
             self.apply_signature_docs(&mut signatures, &docs);
         }
 
@@ -540,6 +554,7 @@ impl<'a> SignatureHelpProvider<'a> {
         &self,
         root: NodeIndex,
         symbol_id: crate::binder::SymbolId,
+        call_kind: CallKind,
     ) -> Option<SignatureDocs> {
         let symbol = self.binder.get_symbol(symbol_id)?;
         let mut decls = symbol.declarations.clone();
@@ -553,6 +568,9 @@ impl<'a> SignatureHelpProvider<'a> {
         for decl in decls {
             if decl.is_none() {
                 continue;
+            }
+            if call_kind == CallKind::New {
+                self.collect_constructor_docs_from_class(root, decl, &mut candidates, &mut fallback);
             }
             let doc = jsdoc_for_node(self.arena, root, decl, self.source_text);
             if doc.is_empty() {
@@ -583,6 +601,277 @@ impl<'a> SignatureHelpProvider<'a> {
         }
     }
 
+    fn collect_constructor_docs_from_class(
+        &self,
+        root: NodeIndex,
+        decl: NodeIndex,
+        candidates: &mut Vec<SignatureDocCandidate>,
+        fallback: &mut Option<ParsedJsdoc>,
+    ) {
+        let Some(node) = self.arena.get(decl) else { return; };
+        let Some(class_data) = self.arena.get_class(node) else { return; };
+
+        for &member in class_data.members.nodes.iter() {
+            let Some(member_node) = self.arena.get(member) else { continue; };
+            if self.arena.get_constructor(member_node).is_none() {
+                continue;
+            }
+
+            let doc = jsdoc_for_node(self.arena, root, member, self.source_text);
+            if doc.is_empty() {
+                continue;
+            }
+            let parsed = parse_jsdoc(&doc);
+            if parsed.is_empty() {
+                continue;
+            }
+
+            if let Some((required_params, total_params, has_rest)) = self.signature_meta_from_decl(member) {
+                candidates.push(SignatureDocCandidate {
+                    doc: parsed,
+                    required_params,
+                    total_params,
+                    has_rest,
+                });
+            } else if fallback.is_none() {
+                *fallback = Some(parsed);
+            }
+        }
+    }
+
+    fn signature_documentation_for_property_access(
+        &self,
+        root: NodeIndex,
+        access_idx: NodeIndex,
+    ) -> Option<SignatureDocs> {
+        let Some(access_node) = self.arena.get(access_idx) else { return None; };
+        let Some(access) = self.arena.get_access_expr(access_node) else { return None; };
+        let property_name = self
+            .arena
+            .get_identifier_text(access.name_or_argument)
+            .or_else(|| self.arena.get_literal_text(access.name_or_argument))?;
+
+        let (class_decls, static_only) = if let Some(result) = self.class_decls_for_expression(access.expression) {
+            result
+        } else if let Some(decls) = self.class_decls_for_property_name_in_file(root, property_name) {
+            (decls, false)
+        } else {
+            return None;
+        };
+        let mut candidates = Vec::new();
+        let mut fallback = None;
+
+        for class_decl in class_decls {
+            let Some(class_node) = self.arena.get(class_decl) else { continue; };
+            let Some(class_data) = self.arena.get_class(class_node) else { continue; };
+
+            for &member in class_data.members.nodes.iter() {
+                let Some(member_node) = self.arena.get(member) else { continue; };
+                let Some(method) = self.arena.get_method_decl(member_node) else { continue; };
+                let Some(member_name) = self
+                    .arena
+                    .get_identifier_text(method.name)
+                    .or_else(|| self.arena.get_literal_text(method.name)) else { continue; };
+                if member_name != property_name {
+                    continue;
+                }
+
+                let is_static = self.is_static_method(method);
+                if static_only && !is_static {
+                    continue;
+                }
+                if !static_only && is_static {
+                    continue;
+                }
+
+                let doc = jsdoc_for_node(self.arena, root, member, self.source_text);
+                if doc.is_empty() {
+                    continue;
+                }
+                let parsed = parse_jsdoc(&doc);
+                if parsed.is_empty() {
+                    continue;
+                }
+
+                if let Some((required_params, total_params, has_rest)) = self.signature_meta_from_decl(member) {
+                    candidates.push(SignatureDocCandidate {
+                        doc: parsed,
+                        required_params,
+                        total_params,
+                        has_rest,
+                    });
+                } else if fallback.is_none() {
+                    fallback = Some(parsed);
+                }
+            }
+        }
+
+        let docs = SignatureDocs { candidates, fallback };
+        if docs.is_empty() {
+            None
+        } else {
+            Some(docs)
+        }
+    }
+
+    fn class_decls_for_expression(&self, expr: NodeIndex) -> Option<(Vec<NodeIndex>, bool)> {
+        let Some(expr_node) = self.arena.get(expr) else { return None; };
+        if expr_node.kind == SyntaxKind::Identifier as u16 {
+            let sym_id = self.resolve_symbol_for_identifier(expr)?;
+            return self.class_decls_for_symbol(sym_id);
+        }
+        if expr_node.kind == syntax_kind_ext::NEW_EXPRESSION {
+            let decls = self.class_decls_from_new_expression(expr);
+            if !decls.is_empty() {
+                return Some((decls, false));
+            }
+        }
+        None
+    }
+
+    fn class_decls_for_symbol(
+        &self,
+        sym_id: crate::binder::SymbolId,
+    ) -> Option<(Vec<NodeIndex>, bool)> {
+        let symbol = self.binder.get_symbol(sym_id)?;
+        if symbol.flags & symbol_flags::CLASS != 0 {
+            let decls = self.class_decls_from_symbol(sym_id);
+            if decls.is_empty() {
+                None
+            } else {
+                Some((decls, true))
+            }
+        } else if symbol.flags & (symbol_flags::BLOCK_SCOPED_VARIABLE | symbol_flags::FUNCTION_SCOPED_VARIABLE) != 0 {
+            let decls = self.class_decls_from_variable_symbol(symbol);
+            if decls.is_empty() {
+                None
+            } else {
+                Some((decls, false))
+            }
+        } else {
+            None
+        }
+    }
+
+    fn class_decls_from_symbol(&self, sym_id: crate::binder::SymbolId) -> Vec<NodeIndex> {
+        let Some(symbol) = self.binder.get_symbol(sym_id) else { return Vec::new(); };
+        let mut decls = symbol.declarations.clone();
+        if !symbol.value_declaration.is_none() && !decls.contains(&symbol.value_declaration) {
+            decls.push(symbol.value_declaration);
+        }
+
+        let mut class_decls = Vec::new();
+        for decl in decls {
+            if decl.is_none() {
+                continue;
+            }
+            let Some(node) = self.arena.get(decl) else { continue; };
+            if self.arena.get_class(node).is_some() {
+                class_decls.push(decl);
+            }
+        }
+        class_decls
+    }
+
+    fn class_decls_from_variable_symbol(&self, symbol: &crate::binder::Symbol) -> Vec<NodeIndex> {
+        let mut decls = Vec::new();
+        let decl_idx = symbol.value_declaration;
+        if decl_idx.is_none() {
+            return decls;
+        }
+        let Some(node) = self.arena.get(decl_idx) else { return decls; };
+        let Some(var_decl) = self.arena.get_variable_declaration(node) else { return decls; };
+        if !var_decl.initializer.is_none() {
+            decls.extend(self.class_decls_from_new_expression(var_decl.initializer));
+        }
+        decls
+    }
+
+    fn class_decls_from_new_expression(&self, expr: NodeIndex) -> Vec<NodeIndex> {
+        let Some(node) = self.arena.get(expr) else { return Vec::new(); };
+        if node.kind != syntax_kind_ext::NEW_EXPRESSION {
+            return Vec::new();
+        }
+        let Some(call) = self.arena.get_call_expr(node) else { return Vec::new(); };
+        let callee_idx = call.expression;
+        let Some(callee_node) = self.arena.get(callee_idx) else { return Vec::new(); };
+        if callee_node.kind != SyntaxKind::Identifier as u16 {
+            return Vec::new();
+        }
+        let Some(sym_id) = self.resolve_symbol_for_identifier(callee_idx) else { return Vec::new(); };
+        self.class_decls_from_symbol(sym_id)
+    }
+
+    fn class_decls_for_property_name_in_file(
+        &self,
+        root: NodeIndex,
+        property_name: &str,
+    ) -> Option<Vec<NodeIndex>> {
+        let root_node = self.arena.get(root)?;
+        let sf = self.arena.get_source_file(root_node)?;
+        let mut matches = Vec::new();
+
+        for &stmt in sf.statements.nodes.iter() {
+            let Some(node) = self.arena.get(stmt) else { continue; };
+            let Some(class_data) = self.arena.get_class(node) else { continue; };
+            if self.class_has_method_named(class_data, property_name) {
+                matches.push(stmt);
+                if matches.len() > 1 {
+                    return None;
+                }
+            }
+        }
+
+        if matches.is_empty() {
+            None
+        } else {
+            Some(matches)
+        }
+    }
+
+    fn class_has_method_named(
+        &self,
+        class_data: &crate::parser::thin_node::ClassData,
+        property_name: &str,
+    ) -> bool {
+        for &member in class_data.members.nodes.iter() {
+            let Some(member_node) = self.arena.get(member) else { continue; };
+            let Some(method) = self.arena.get_method_decl(member_node) else { continue; };
+            let Some(member_name) = self
+                .arena
+                .get_identifier_text(method.name)
+                .or_else(|| self.arena.get_literal_text(method.name)) else { continue; };
+            if member_name == property_name {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn is_static_method(&self, method: &crate::parser::thin_node::MethodDeclData) -> bool {
+        let Some(modifiers) = method.modifiers.as_ref() else { return false; };
+        for &mod_idx in modifiers.nodes.iter() {
+            let Some(mod_node) = self.arena.get(mod_idx) else { continue; };
+            if mod_node.kind == SyntaxKind::StaticKeyword as u16 {
+                return true;
+            }
+        }
+        false
+    }
+
+    fn resolve_symbol_for_identifier(&self, ident_idx: NodeIndex) -> Option<crate::binder::SymbolId> {
+        self.binder
+            .resolve_identifier(self.arena, ident_idx)
+            .or_else(|| {
+                let name = self.arena.get_identifier_text(ident_idx)?;
+                self.binder.file_locals.get(name)
+            })
+            .or_else(|| {
+                let name = self.arena.get_identifier_text(ident_idx)?;
+                self.binder.get_symbols().find_by_name(name)
+            })
+    }
+
     fn signature_meta_from_decl(&self, decl: NodeIndex) -> Option<(usize, usize, bool)> {
         let node = self.arena.get(decl)?;
         if let Some(func) = self.arena.get_function(node) {
@@ -609,6 +898,11 @@ impl<'a> SignatureHelpProvider<'a> {
                 if name_node.kind == SyntaxKind::ThisKeyword as u16 {
                     continue;
                 }
+                if let Some(ident) = self.arena.get_identifier(name_node) {
+                    if ident.escaped_text == "this" {
+                        continue;
+                    }
+                }
             }
 
             total_params += 1;
@@ -627,376 +921,5 @@ impl<'a> SignatureHelpProvider<'a> {
 }
 
 #[cfg(test)]
-mod signature_help_tests {
-    use super::*;
-    use crate::thin_parser::ThinParserState;
-    use crate::thin_binder::ThinBinderState;
-    use crate::solver::TypeInterner;
-    use crate::lsp::position::LineMap;
-
-    #[test]
-    fn test_signature_help_simple() {
-        // function add(x: number, y: number): number { return x + y; }
-        // add(1, 2|);
-        let source = "function add(x: number, y: number): number { return x + y; }\nadd(1, 2);";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-
-        let mut binder = ThinBinderState::new();
-        binder.bind_source_file(parser.get_arena(), root);
-
-        let interner = TypeInterner::new();
-        let line_map = LineMap::build(source);
-
-        let provider = SignatureHelpProvider::new(
-            parser.get_arena(),
-            &binder,
-            &line_map,
-            &interner,
-            source,
-            "test.ts".to_string()
-        );
-
-        // Position at the second argument '2' (line 1, column 7)
-        let pos = Position::new(1, 7);
-        let mut cache = None;
-        let help = provider.get_signature_help(root, pos, &mut cache);
-
-        assert!(help.is_some(), "Should find signature help");
-
-        if let Some(h) = help {
-            assert_eq!(h.active_parameter, 1, "Should be on second parameter");
-            assert!(!h.signatures.is_empty(), "Should have signatures");
-            // Note: The label format depends on how ThinChecker resolves types
-            // For a simple function it may not include the full signature
-        }
-    }
-
-    #[test]
-    fn test_signature_help_no_call() {
-        let source = "const x = 42;";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-
-        let mut binder = ThinBinderState::new();
-        binder.bind_source_file(parser.get_arena(), root);
-
-        let interner = TypeInterner::new();
-        let line_map = LineMap::build(source);
-
-        let provider = SignatureHelpProvider::new(
-            parser.get_arena(),
-            &binder,
-            &line_map,
-            &interner,
-            source,
-            "test.ts".to_string()
-        );
-
-        // Position not in a call
-        let pos = Position::new(0, 5);
-        let mut cache = None;
-        let help = provider.get_signature_help(root, pos, &mut cache);
-
-        assert!(help.is_none(), "Should not find signature help outside call");
-    }
-
-    #[test]
-    fn test_signature_help_first_arg() {
-        // function foo(a: string): void {}
-        // foo(|);
-        let source = "function foo(a: string): void {}\nfoo();";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-
-        let mut binder = ThinBinderState::new();
-        binder.bind_source_file(parser.get_arena(), root);
-
-        let interner = TypeInterner::new();
-        let line_map = LineMap::build(source);
-
-        let provider = SignatureHelpProvider::new(
-            parser.get_arena(),
-            &binder,
-            &line_map,
-            &interner,
-            source,
-            "test.ts".to_string()
-        );
-
-        // Position inside the call (line 1, column 4)
-        let pos = Position::new(1, 4);
-        let mut cache = None;
-        let help = provider.get_signature_help(root, pos, &mut cache);
-
-        assert!(help.is_some(), "Should find signature help");
-
-        if let Some(h) = help {
-            assert_eq!(h.active_parameter, 0, "Should be on first parameter");
-        }
-    }
-
-    #[test]
-    fn test_signature_help_between_arguments() {
-        // Test edge case: cursor between arguments (after comma, before next arg)
-        // function process(a: any, b: number, c: string): void {}
-        // process(1, |2, 3);
-        //          ^ cursor here should be on parameter 1
-        let source = "function process(a: any, b: number, c: string): void {}\nprocess(1, 2, 3);";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-
-        let mut binder = ThinBinderState::new();
-        binder.bind_source_file(parser.get_arena(), root);
-
-        let interner = TypeInterner::new();
-        let line_map = LineMap::build(source);
-
-        let provider = SignatureHelpProvider::new(
-            parser.get_arena(),
-            &binder,
-            &line_map,
-            &interner,
-            source,
-            "test.ts".to_string()
-        );
-
-        // Test cursor at first argument
-        let pos1 = Position::new(1, 8); // At "1"
-        let mut cache = None;
-        let help1 = provider.get_signature_help(root, pos1, &mut cache);
-        if let Some(h) = help1 {
-            assert_eq!(h.active_parameter, 0, "Should be on first parameter");
-        }
-
-        // Test cursor at second argument
-        let pos2 = Position::new(1, 11); // At "2"
-        let help2 = provider.get_signature_help(root, pos2, &mut cache);
-        if let Some(h) = help2 {
-            assert_eq!(h.active_parameter, 1, "Should be on second parameter");
-        }
-
-        // Test cursor between comma and second argument
-        let pos_between = Position::new(1, 10); // Between "," and "2"
-        let help_between = provider.get_signature_help(root, pos_between, &mut cache);
-        if let Some(h) = help_between {
-            assert_eq!(h.active_parameter, 1, "Should be on second parameter");
-        }
-
-        // Test cursor at third argument
-        let pos3 = Position::new(1, 14); // At "3"
-        let help3 = provider.get_signature_help(root, pos3, &mut cache);
-        if let Some(h) = help3 {
-            assert_eq!(h.active_parameter, 2, "Should be on third parameter");
-        }
-    }
-
-    #[test]
-    fn test_signature_help_overload_selection() {
-        let source = "interface Fn {\n  (a: number): void;\n  (a: number, b: string): void;\n}\ndeclare const fn: Fn;\nfn(1);\nfn(1, \"x\");";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-
-        let mut binder = ThinBinderState::new();
-        binder.bind_source_file(parser.get_arena(), root);
-
-        let interner = TypeInterner::new();
-        let line_map = LineMap::build(source);
-
-        let provider = SignatureHelpProvider::new(
-            parser.get_arena(),
-            &binder,
-            &line_map,
-            &interner,
-            source,
-            "test.ts".to_string(),
-        );
-
-        let mut cache = None;
-        let pos_first = Position::new(5, 3); // At "1"
-        let help_first = provider.get_signature_help(root, pos_first, &mut cache);
-        assert!(help_first.is_some(), "Should find signature help for first call");
-        let first = help_first.unwrap();
-        assert!(first.signatures.len() >= 2, "Expected overload signatures");
-        let first_active = &first.signatures[first.active_signature as usize];
-        assert!(
-            !first_active.label.contains("b: string"),
-            "First call should select single-arg overload"
-        );
-
-        let pos_second = Position::new(6, 6); // At "\"x\""
-        let help_second = provider.get_signature_help(root, pos_second, &mut cache);
-        assert!(help_second.is_some(), "Should find signature help for second call");
-        let second = help_second.unwrap();
-        assert!(second.signatures.len() >= 2, "Expected overload signatures");
-        let second_active = &second.signatures[second.active_signature as usize];
-        assert!(
-            second_active.label.contains("b: string"),
-            "Second call should select two-arg overload"
-        );
-    }
-
-    #[test]
-    fn test_signature_help_new_overload_selection() {
-        let source = "interface Ctor {\n  new (a: number): Foo;\n  new (a: number, b: string): Foo;\n}\nclass Foo {}\ndeclare const Ctor: Ctor;\nnew Ctor(1);\nnew Ctor(1, \"x\");";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-
-        let mut binder = ThinBinderState::new();
-        binder.bind_source_file(parser.get_arena(), root);
-
-        let interner = TypeInterner::new();
-        let line_map = LineMap::build(source);
-
-        let provider = SignatureHelpProvider::new(
-            parser.get_arena(),
-            &binder,
-            &line_map,
-            &interner,
-            source,
-            "test.ts".to_string(),
-        );
-
-        let mut cache = None;
-        let pos_first = Position::new(6, 9); // At "1"
-        let help_first = provider.get_signature_help(root, pos_first, &mut cache);
-        assert!(help_first.is_some(), "Should find signature help for first new");
-        let first = help_first.unwrap();
-        assert!(!first.signatures.is_empty(), "Expected constructor signatures");
-        let first_active = &first.signatures[first.active_signature as usize];
-        assert!(
-            first_active.label.starts_with("new ("),
-            "Constructor signatures should use new() label"
-        );
-        assert!(
-            !first_active.label.contains("b: string"),
-            "First new should select single-arg overload"
-        );
-
-        let pos_second = Position::new(7, 13); // At "x"
-        let help_second = provider.get_signature_help(root, pos_second, &mut cache);
-        assert!(help_second.is_some(), "Should find signature help for second new");
-        let second = help_second.unwrap();
-        assert!(!second.signatures.is_empty(), "Expected constructor signatures");
-        let second_active = &second.signatures[second.active_signature as usize];
-        assert!(
-            second_active.label.contains("b: string"),
-            "Second new should select two-arg overload"
-        );
-    }
-
-    #[test]
-    fn test_signature_help_includes_jsdoc() {
-        let source = "/** Adds two numbers. */\nfunction add(a: number, b: number): number { return a + b; }\nadd(1, 2);";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-
-        let mut binder = ThinBinderState::new();
-        binder.bind_source_file(parser.get_arena(), root);
-
-        let interner = TypeInterner::new();
-        let line_map = LineMap::build(source);
-
-        let provider = SignatureHelpProvider::new(
-            parser.get_arena(),
-            &binder,
-            &line_map,
-            &interner,
-            source,
-            "test.ts".to_string(),
-        );
-
-        let pos = Position::new(2, 6); // At "1"
-        let mut cache = None;
-        let help = provider.get_signature_help(root, pos, &mut cache);
-        assert!(help.is_some(), "Should find signature help");
-
-        let help = help.unwrap();
-        assert!(!help.signatures.is_empty(), "Should have signatures");
-        let doc = help.signatures[help.active_signature as usize]
-            .documentation
-            .clone()
-            .unwrap_or_default();
-        assert_eq!(doc, "Adds two numbers.");
-    }
-
-    #[test]
-    fn test_signature_help_param_docs() {
-        let source = "/**\n * Adds two numbers.\n * @param a First number.\n * @param b Second number.\n */\nfunction add(a: number, b: number): number { return a + b; }\nadd(1, 2);";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-
-        let mut binder = ThinBinderState::new();
-        binder.bind_source_file(parser.get_arena(), root);
-
-        let interner = TypeInterner::new();
-        let line_map = LineMap::build(source);
-
-        let provider = SignatureHelpProvider::new(
-            parser.get_arena(),
-            &binder,
-            &line_map,
-            &interner,
-            source,
-            "test.ts".to_string(),
-        );
-
-        let pos = Position::new(6, 6); // At "1"
-        let mut cache = None;
-        let help = provider.get_signature_help(root, pos, &mut cache);
-        assert!(help.is_some(), "Should find signature help");
-
-        let help = help.unwrap();
-        let sig = &help.signatures[help.active_signature as usize];
-        assert_eq!(sig.parameters.len(), 2);
-        assert_eq!(
-            sig.parameters[0].documentation.as_deref(),
-            Some("First number.")
-        );
-        assert_eq!(
-            sig.parameters[1].documentation.as_deref(),
-            Some("Second number.")
-        );
-    }
-
-    #[test]
-    fn test_signature_help_overload_jsdoc() {
-        let source = "/** One arg */\nfunction foo(a: number): void;\n/** Two args */\nfunction foo(a: number, b: string): void;\nfunction foo(a: number, b?: string): void {}\nfoo(1);\nfoo(1, \"x\");";
-        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
-        let root = parser.parse_source_file();
-
-        let mut binder = ThinBinderState::new();
-        binder.bind_source_file(parser.get_arena(), root);
-
-        let interner = TypeInterner::new();
-        let line_map = LineMap::build(source);
-
-        let provider = SignatureHelpProvider::new(
-            parser.get_arena(),
-            &binder,
-            &line_map,
-            &interner,
-            source,
-            "test.ts".to_string(),
-        );
-
-        let mut cache = None;
-        let pos_first = Position::new(5, 4); // At "1"
-        let help_first = provider.get_signature_help(root, pos_first, &mut cache)
-            .expect("Expected signature help for first call");
-        let doc_first = help_first.signatures[help_first.active_signature as usize]
-            .documentation
-            .clone()
-            .unwrap_or_default();
-        assert_eq!(doc_first, "One arg");
-
-        let pos_second = Position::new(6, 8); // At "x"
-        let help_second = provider.get_signature_help(root, pos_second, &mut cache)
-            .expect("Expected signature help for second call");
-        let doc_second = help_second.signatures[help_second.active_signature as usize]
-            .documentation
-            .clone()
-            .unwrap_or_default();
-        assert_eq!(doc_second, "Two args");
-    }
-}
+#[path = "signature_help_tests.rs"]
+mod signature_help_tests;

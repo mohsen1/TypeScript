@@ -19,7 +19,7 @@ impl ParsedJsdoc {
     }
 }
 
-/// Extract JSDoc comments preceding a node.
+/// Extract the nearest JSDoc comment preceding a node.
 /// Uses cached comment ranges from SourceFileData for O(log N) performance.
 pub fn jsdoc_for_node(
     arena: &ThinNodeArena,
@@ -39,13 +39,16 @@ pub fn jsdoc_for_node(
         return String::new();
     };
 
-    let leading_comments = get_leading_comments_from_cache(comments, node.pos, source_text);
-    let mut docs = Vec::new();
-    let mut check_pos = node.pos;
+    if let Some(comment) = comments.iter().find(|comment| comment.pos <= node.pos && node.pos < comment.end) {
+        if is_jsdoc_comment(comment, source_text) {
+            return get_jsdoc_content(comment, source_text);
+        }
+    }
 
+    let leading_comments = get_leading_comments_from_cache(comments, node.pos, source_text);
     for comment in leading_comments.iter().rev() {
         let end = comment.end as usize;
-        let check = check_pos as usize;
+        let check = node.pos as usize;
         if end <= check {
             let gap = &source_text[end..check];
             if gap.chars().any(|c| !c.is_whitespace()) {
@@ -54,15 +57,12 @@ pub fn jsdoc_for_node(
         }
 
         if is_jsdoc_comment(comment, source_text) {
-            docs.push(get_jsdoc_content(comment, source_text));
-            check_pos = comment.pos;
-        } else {
-            break;
+            return get_jsdoc_content(comment, source_text);
         }
+        break;
     }
 
-    docs.reverse();
-    docs.join("\n\n")
+    String::new()
 }
 
 pub fn parse_jsdoc(doc: &str) -> ParsedJsdoc {

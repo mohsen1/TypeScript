@@ -39,8 +39,8 @@ Files: `wasm/src/solver/*`, `wasm/src/interner.rs` (string interning), `wasm/spe
   - Reduce Vec churn in interner normalization and hot-path unions.
 - [x] Add fast-path property lookup for large object shapes
   - Cached per-shape map in TypeInterner; wired into subtype/infer/property access.
-- [ ] Expand array/tuple method inference beyond `any` placeholders
-  - Cover map/filter/concat/at/reduce + iterator helpers to improve precision.
+- [x] Expand array/tuple method inference beyond `any` placeholders
+  - Added method signatures for map/filter/concat/at/reduce and iterator helpers.
 - [x] Add microbench for property lookup and union/intersection normalization
   - Added benchmarks in solver_bench for cached property lookup and normalization.
 
