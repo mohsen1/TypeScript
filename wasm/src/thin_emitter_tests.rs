@@ -1009,6 +1009,28 @@ fn test_commonjs_import_named() {
 }
 
 #[test]
+fn test_commonjs_import_type_only_is_erased() {
+    let source = r#"import type { Foo } from "./module"; const x = 1;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        !output.contains("require(\"./module\")"),
+        "Type-only import should not emit require: {}",
+        output
+    );
+    assert!(output.contains("var x = 1"), "Expected value statement in output: {}", output);
+}
+
+#[test]
 fn test_commonjs_import_side_effect() {
     let source = r#"import "./module";"#;
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
@@ -1085,6 +1107,33 @@ fn test_commonjs_reexport() {
     let output = printer.get_output();
     assert!(output.contains("require(\"./module\")"), "Expected require() in CommonJS output: {}", output);
     assert!(output.contains("Object.defineProperty(exports, \"foo\""), "Expected Object.defineProperty for re-export: {}", output);
+}
+
+#[test]
+fn test_commonjs_export_type_only_reexport_is_erased() {
+    let source = r#"export type { Foo } from "./module"; const x = 1;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let options = PrinterOptions {
+        module: ModuleKind::CommonJS,
+        ..Default::default()
+    };
+    let mut printer = ThinPrinter::with_options(&parser.arena, options);
+    printer.emit(root);
+
+    let output = printer.get_output();
+    assert!(
+        !output.contains("require(\"./module\")"),
+        "Type-only re-export should not emit require: {}",
+        output
+    );
+    assert!(
+        !output.contains("Object.defineProperty(exports, \"Foo\""),
+        "Type-only re-export should not emit exports: {}",
+        output
+    );
+    assert!(output.contains("var x = 1"), "Expected value statement in output: {}", output);
 }
 
 #[test]
