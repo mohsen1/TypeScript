@@ -622,6 +622,15 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         let is_nullish = |ty: TypeId| matches!(ty, TypeId::NULL | TypeId::UNDEFINED | TypeId::VOID);
 
         match (source_key, target_key) {
+            (Some(TypeKey::ReadonlyType(s_inner)), Some(TypeKey::ReadonlyType(t_inner))) => {
+                self.constrain_types(ctx, var_map, s_inner, t_inner);
+            }
+            (Some(TypeKey::ReadonlyType(s_inner)), _) => {
+                self.constrain_types(ctx, var_map, s_inner, target);
+            }
+            (_, Some(TypeKey::ReadonlyType(t_inner))) => {
+                self.constrain_types(ctx, var_map, source, t_inner);
+            }
             (Some(TypeKey::Union(ref s_members)), _) => {
                 for &member in s_members {
                     self.constrain_types(ctx, var_map, member, target);

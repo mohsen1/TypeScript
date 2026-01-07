@@ -1142,6 +1142,85 @@ fn test_infer_generic_array_map() {
 }
 
 #[test]
+fn test_infer_generic_readonly_array_param() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let readonly_array_t = interner.intern(TypeKey::ReadonlyType(interner.array(t_type)));
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("items")),
+            type_id: readonly_array_t,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let readonly_number_array =
+        interner.intern(TypeKey::ReadonlyType(interner.array(TypeId::NUMBER)));
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[readonly_number_array]);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
+fn test_infer_generic_readonly_tuple_param() {
+    let interner = TypeInterner::new();
+    let mut subtype = SubtypeChecker::new(&interner);
+
+    let t_param = TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let readonly_tuple_t = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
+        TupleElement {
+            type_id: t_type,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ])));
+
+    let func = FunctionShape {
+        type_params: vec![t_param],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("pair")),
+            type_id: readonly_tuple_t,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: t_type,
+        type_predicate: None,
+        is_constructor: false,
+    };
+
+    let readonly_tuple_number = interner.intern(TypeKey::ReadonlyType(interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: None,
+            optional: false,
+            rest: false,
+        },
+    ])));
+    let result = infer_generic_function(&interner, &mut subtype, &func, &[readonly_tuple_number]);
+    assert_eq!(result, TypeId::NUMBER);
+}
+
+#[test]
 fn test_infer_generic_constructor_instantiation() {
     let interner = TypeInterner::new();
     let mut subtype = SubtypeChecker::new(&interner);
