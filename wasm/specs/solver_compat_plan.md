@@ -12,6 +12,8 @@ Implement TypeScript's intentional unsoundness and compatibility rules. This is 
 🟢 **Ready to Start** - TypeKey refactor is complete, APIs are stable.
 
 ## Tasks
+*   **Next Steps:** Focus on **Validation**. With so many rules implemented, the risk of regression or interaction bugs is high. Run `tests/cases/compiler` against the new solver logic.
+
 
 ### Phase 1: The Compatibility Layer (compat.rs)
 - [x] Create `CompatChecker` struct

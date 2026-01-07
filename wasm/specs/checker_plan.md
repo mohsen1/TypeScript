@@ -18,6 +18,10 @@ Pass tests/cases/compiler.
 ## Tasks
 
 Our focus is to make wasm checker complete
+**Objective:** Pass `tests/cases/compiler`.
+*   **Current State:** The bridge is being built. The `ThinChecker` is the consumer of the massive work done in the Solver track.
+*   **Critical Path:** The **"Salsa Gap"**. The `TypeDatabase` trait (`src/solver/db.rs`) is the interface that allows the Solver to be query-based. `ThinChecker` needs to fully utilize this abstraction to enable future incremental compilation.
+*   **Action:** Ensure `ThinChecker` delegates *all* semantic questions to `solver::*` modules rather than implementing ad-hoc checks.
 
 ### Immediate Priorities
 - [x] **Fix Atom Refactor Compilation Errors** (High Priority)
