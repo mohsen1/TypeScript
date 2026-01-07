@@ -314,6 +314,108 @@ fn test_tuple_subtyping_with_rest_target() {
 }
 
 #[test]
+fn test_tuple_subtyping_rest_tuple_expansion() {
+    // [number, string, boolean] IS assignable to [number, ...[string, boolean]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let rest_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    let target = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+    ]);
+
+    assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_tuple_subtyping_rest_tuple_missing_element() {
+    // [number, string] is NOT assignable to [number, ...[string, boolean]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let rest_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+    ]);
+
+    let target = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+    ]);
+
+    assert!(!checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_tuple_subtyping_rest_tuple_extra_element() {
+    // [number, string, boolean, boolean] is NOT assignable to [number, ...[string, boolean]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let rest_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    let target = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+    ]);
+
+    assert!(!checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_tuple_subtyping_rest_tuple_variadic_tail() {
+    // [number, string, boolean, boolean] IS assignable to [number, ...[string, ...boolean[]]]
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let boolean_array = interner.array(TypeId::BOOLEAN);
+    let rest_tuple = interner.tuple(vec![
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: boolean_array, name: None, optional: false, rest: true },
+    ]);
+
+    let source = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::STRING, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+        TupleElement { type_id: TypeId::BOOLEAN, name: None, optional: false, rest: false },
+    ]);
+
+    let target = interner.tuple(vec![
+        TupleElement { type_id: TypeId::NUMBER, name: None, optional: false, rest: false },
+        TupleElement { type_id: rest_tuple, name: None, optional: false, rest: true },
+    ]);
+
+    assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
 fn test_tuple_subtyping_source_rest_closed_target() {
     // [number, ...string[]] is NOT assignable to [number, string]
     let interner = TypeInterner::new();
