@@ -48,12 +48,12 @@ Implement a high-performance, `tsc`-compatible command-line interface. This driv
   - [x] Ensure directory structures are created.
 
 ### Phase 4: Diagnostics & Reporting
-- [ ] **Diagnostic Formatter**
-  - Implement a reporter that looks like `tsc` (file.ts:line:col - error TS1234: Message).
-  - Add color support (`colored` crate).
-  - Integrate `solver::diagnostics` output into the CLI reporter.
-- [ ] **Exit Codes**
-  - Return proper exit codes (0 for success, 1 for errors) based on diagnostic severity.
+- [x] **Diagnostic Formatter**
+  - [x] Implement a reporter that looks like `tsc` (file.ts:line:col - error TS1234: Message).
+  - [x] Add color support (`colored` crate).
+  - [x] Integrate `solver::diagnostics` output into the CLI reporter.
+- [x] **Exit Codes**
+  - [x] Return proper exit codes (0 for success, 1 for errors) based on diagnostic severity.
 
 ### Phase 5: Watch Mode (The Speed Demon)
 - [ ] **File Watching**
