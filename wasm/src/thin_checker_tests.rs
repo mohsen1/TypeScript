@@ -1941,6 +1941,137 @@ const second = tup[1];
 }
 
 #[test]
+fn test_checker_lowers_element_access_string_literal_property() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const obj = { x: 1, y: "hi" };
+const value = obj["x"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_lowers_element_access_array_length() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const arr = [1, 2];
+const length = arr["length"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let length_sym = binder.file_locals.get("length").expect("length should exist");
+    let length_type = checker.get_type_of_symbol(length_sym);
+    assert_eq!(length_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_lowers_element_access_numeric_string_index() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const arr: number[] = [1, 2];
+const value = arr["0"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::NUMBER);
+}
+
+#[test]
+fn test_checker_lowers_element_access_string_index_signature() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface StringMap {
+    [key: string]: boolean;
+}
+const map: StringMap = {} as any;
+const value = map["foo"];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::BOOLEAN);
+}
+
+#[test]
+fn test_checker_lowers_element_access_number_index_signature() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+interface NumberMap {
+    [key: number]: string;
+}
+const map: NumberMap = {} as any;
+const value = map[1];
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+    assert!(checker.ctx.diagnostics.is_empty(), "Unexpected diagnostics: {:?}", checker.ctx.diagnostics);
+
+    let value_sym = binder.file_locals.get("value").expect("value should exist");
+    let value_type = checker.get_type_of_symbol(value_sym);
+    assert_eq!(value_type, TypeId::STRING);
+}
+
+#[test]
 fn test_checker_namespace_merges_with_class_exports() {
     use crate::thin_parser::ThinParserState;
     use crate::solver::TypeKey;

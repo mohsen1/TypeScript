@@ -1720,6 +1720,8 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Get type of element access expression (e.g., arr[0], obj["prop"]).
     fn get_type_of_element_access(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::solver::{PropertyAccessEvaluator, PropertyAccessResult};
+
         let Some(node) = self.ctx.arena.get(idx) else {
             return TypeId::ANY;
         };
@@ -1731,8 +1733,36 @@ impl<'a> ThinCheckerState<'a> {
         // Get the type of the object
         let object_type = self.get_type_of_node(access.expression);
 
+        // Don't report errors for any/error types
+        if object_type == TypeId::ANY || object_type == TypeId::ERROR {
+            return TypeId::ANY;
+        }
+
+        let literal_string = self.get_literal_string_from_node(access.name_or_argument);
+        let numeric_string_index = literal_string.and_then(|name| self.get_numeric_index_from_string(name));
+        if let Some(property_name) = literal_string {
+            if numeric_string_index.is_none() {
+                let evaluator = PropertyAccessEvaluator::new(self.ctx.types);
+                let result = evaluator.resolve_property_access(object_type, property_name);
+                return match result {
+                    PropertyAccessResult::Success { type_id, .. } => type_id,
+                    PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
+                        if access.question_dot_token {
+                            let base_type = property_type.unwrap_or(TypeId::ANY);
+                            self.ctx.types.union(vec![base_type, TypeId::UNDEFINED])
+                        } else {
+                            property_type.unwrap_or(TypeId::ANY)
+                        }
+                    }
+                    PropertyAccessResult::IsUnknown => TypeId::ANY,
+                    PropertyAccessResult::PropertyNotFound { .. } => TypeId::ANY,
+                };
+            }
+        }
+
         // Get the index type
-        let literal_index = self.get_literal_index_from_node(access.name_or_argument);
+        let literal_index = self.get_literal_index_from_node(access.name_or_argument)
+            .or(numeric_string_index);
         let index_type = self.get_type_of_node(access.name_or_argument);
 
         self.get_element_access_type(object_type, index_type, literal_index)
@@ -1784,6 +1814,35 @@ impl<'a> ThinCheckerState<'a> {
                     self.ctx.types.union(element_types)
                 }
             }
+            Some(TypeKey::ObjectWithIndex(shape)) => {
+                if literal_index.is_some() {
+                    if let Some(number_index) = shape.number_index.as_ref() {
+                        return number_index.value_type;
+                    }
+                    if let Some(string_index) = shape.string_index.as_ref() {
+                        return string_index.value_type;
+                    }
+                    return TypeId::ANY;
+                }
+
+                if index_type == TypeId::NUMBER {
+                    if let Some(number_index) = shape.number_index.as_ref() {
+                        return number_index.value_type;
+                    }
+                    if let Some(string_index) = shape.string_index.as_ref() {
+                        return string_index.value_type;
+                    }
+                    return TypeId::ANY;
+                }
+
+                if index_type == TypeId::STRING {
+                    if let Some(string_index) = shape.string_index.as_ref() {
+                        return string_index.value_type;
+                    }
+                }
+
+                TypeId::ANY
+            }
             Some(TypeKey::Union(members)) => {
                 let mut member_types = Vec::with_capacity(members.len());
                 for member in members {
@@ -1823,6 +1882,39 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         None
+    }
+
+    fn get_literal_string_from_node(&self, idx: NodeIndex) -> Option<&str> {
+        use crate::scanner::SyntaxKind;
+
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return None;
+        };
+
+        if node.kind == syntax_kind_ext::PARENTHESIZED_EXPRESSION {
+            if let Some(paren) = self.ctx.arena.get_parenthesized(node) {
+                return self.get_literal_string_from_node(paren.expression);
+            }
+        }
+
+        if node.kind == SyntaxKind::StringLiteral as u16
+            || node.kind == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+        {
+            return self.ctx.arena.get_literal(node).map(|lit| lit.text.as_str());
+        }
+
+        None
+    }
+
+    fn get_numeric_index_from_string(&self, value: &str) -> Option<usize> {
+        let parsed: f64 = value.parse().ok()?;
+        if !parsed.is_finite() || parsed.fract() != 0.0 || parsed < 0.0 {
+            return None;
+        }
+        if parsed > (usize::MAX as f64) {
+            return None;
+        }
+        Some(parsed as usize)
     }
 
     /// Get type of conditional expression (ternary: a ? b : c).
