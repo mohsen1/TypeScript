@@ -7,11 +7,12 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [EM: Assign next task]
+- Fix async ES5 computed `super[...]` element access lowering in returned/nested arrows in `wasm/src/transforms/async_es5.rs`; update expectations in `wasm/src/emitter_transform_integration_tests.rs` to assert lowered output and preserved `this`/`arguments` capture; run `./wasm/test.sh`.
 
 ## Task Queue
+- [ ] Convert async computed `super[...]` TODOs in `wasm/src/emitter_transform_integration_tests.rs` into passing assertions (prioritize returned arrow + nested arrow cases, including no-args returns where body currently drops).
+- [ ] Audit `_super` helper emission in `wasm/src/transforms/async_es5.rs` to ensure computed element access uses `.call` with correct receiver (no `void 0["m"]` or leftover `super[...]`).
 - [ ] Add regression coverage for computed `super[...]` inside async arrow returns with `this`/`arguments` capture.
-- [ ] Expand integration coverage if ordering regression is found.
 
 ## Completed
 - [x] Lowered computed `super[...]` calls in async ES5 emitter + updated integration expectations; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
@@ -19,9 +20,10 @@ Priority: 2
 - [x] Confirmed `super()` ordering remains stable with computed field initializers via regression; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).
 
 ## Ready for Merge
-Yes - branch ready for merge into rust.
+No
 
 ## Notes
+- Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
 - Conformance focus: tie regressions to official TypeScript conformance cases when possible.

@@ -27,7 +27,8 @@ Director (sets GOALS.md)
 | `forge` | `zang-org:forge` | `solver/`, `checker/`, `binder/`, `types/` (Type System) |
 | `anvil` | `zang-org:anvil` | `thin_emitter/`, `transforms/`, `cli/`, `lsp/` (Output) |
 
-Your workers are in panes 1-5 of your window. You are in pane 0.
+Your workers are in panes 0-4 of your squad window (zang-org:forge or zang-org:anvil).
+You (EM) are in the director window (zang-org:director pane 1 for forge, pane 2 for anvil).
 
 ## Workspace Layout
 - Main repo: `TypeScript` (branch: `rust`)
@@ -99,12 +100,13 @@ Keep all 5 workers active at all times. If a worker finishes or stalls:
 ### 1. Check & Unblock Workers FIRST (Highest Priority)
 Before anything else, check all worker panes for prompts or stalls:
 ```bash
-tmux capture-pane -p -t zang-org:<squad>.1 -S -80  # Worker 1
-tmux capture-pane -p -t zang-org:<squad>.2 -S -80  # Worker 2
-tmux capture-pane -p -t zang-org:<squad>.3 -S -80  # Worker 3
-tmux capture-pane -p -t zang-org:<squad>.4 -S -80  # Worker 4
-tmux capture-pane -p -t zang-org:<squad>.5 -S -80  # Worker 5
+tmux capture-pane -p -t zang-org:<squad>.0 -S -80  # Worker 1
+tmux capture-pane -p -t zang-org:<squad>.1 -S -80  # Worker 2
+tmux capture-pane -p -t zang-org:<squad>.2 -S -80  # Worker 3
+tmux capture-pane -p -t zang-org:<squad>.3 -S -80  # Worker 4
+tmux capture-pane -p -t zang-org:<squad>.4 -S -80  # Worker 5
 ```
+Note: Panes 0-4 are workers 1-5. EM is in the director window.
 
 **Pane status heuristics:**
 - **Busy/working**: "Running", "Compiling", "Analyzing", streaming logs
