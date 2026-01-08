@@ -209,6 +209,35 @@ impl<'a> AsyncES5Emitter<'a> {
             }
         }
 
+        // Check property/element access expressions
+        if node.kind == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
+            || node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION
+        {
+            if let Some(access) = self.arena.get_access_expr(node) {
+                if self.contains_await_recursive(access.expression) {
+                    return true;
+                }
+                if self.contains_await_recursive(access.name_or_argument) {
+                    return true;
+                }
+            }
+        }
+
+        // Check conditional expressions
+        if node.kind == syntax_kind_ext::CONDITIONAL_EXPRESSION {
+            if let Some(cond) = self.arena.get_conditional_expr(node) {
+                if self.contains_await_recursive(cond.condition) {
+                    return true;
+                }
+                if self.contains_await_recursive(cond.when_true) {
+                    return true;
+                }
+                if self.contains_await_recursive(cond.when_false) {
+                    return true;
+                }
+            }
+        }
+
         // Check binary expressions
         if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
             if let Some(bin) = self.arena.get_binary_expr(node) {
@@ -807,6 +836,32 @@ mod tests {
                         if let Some(func) = parser.arena.get_function(func_node) {
                             let emitter = AsyncES5Emitter::new(&parser.arena);
                             assert!(emitter.body_contains_await(func.body), "Should detect await");
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_body_contains_await_in_conditional_property_access() {
+        let mut parser = ThinParserState::new(
+            "test.ts".to_string(),
+            "async function foo() { return cond ? (await bar()).baz : (await qux())[idx]; }"
+                .to_string(),
+        );
+        let root = parser.parse_source_file();
+
+        if let Some(root_node) = parser.arena.get(root) {
+            if let Some(source_file) = parser.arena.get_source_file(root_node) {
+                if let Some(&func_idx) = source_file.statements.nodes.first() {
+                    if let Some(func_node) = parser.arena.get(func_idx) {
+                        if let Some(func) = parser.arena.get_function(func_node) {
+                            let emitter = AsyncES5Emitter::new(&parser.arena);
+                            assert!(
+                                emitter.body_contains_await(func.body),
+                                "Should detect await in conditional property/element access"
+                            );
                         }
                     }
                 }
