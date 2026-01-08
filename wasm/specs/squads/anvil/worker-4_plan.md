@@ -70,6 +70,7 @@ Priority: 4
 - [x] Add destructuring assignment source-map coverage. Tests: `./wasm/test.sh destructuring_assignment_mapping`
 - [x] Add template literal source-map coverage. Tests: `./wasm/test.sh template_literal_mapping`
 - [x] Add source map roundtrip accuracy test. Tests: `./wasm/test.sh roundtrip_accuracy`
+- [x] Add source map multiple files test. Tests: `./wasm/test.sh multiple_files`
 
 ## Ready for Merge
 Yes
