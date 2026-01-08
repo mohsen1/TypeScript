@@ -10308,3 +10308,47 @@ fn test_source_map_es5_transform_class_private_fields_mapping() {
     let has_any_valid_mapping = decoded.iter().any(|m| m.source_index == 0);
     assert!(has_any_valid_mapping, "expected at least one mapping to source file");
 }
+
+#[test]
+fn test_source_map_es5_transform_nullish_coalescing_mapping() {
+    let source = "const value = input ?? defaultValue;";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Nullish coalescing gets transformed to !== null && !== void 0 check
+    assert!(
+        output.contains("null") || output.contains("void 0") || output.contains("undefined") || output.contains("??"),
+        "expected nullish coalescing downlevel in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+    let (value_line, _) = find_line_col(source, "value");
+
+    // Verify we have mappings on the source line
+    let has_mapping = decoded.iter().any(|m| m.source_index == 0 && m.original_line == value_line);
+    assert!(
+        has_mapping,
+        "expected mapping for nullish coalescing line. mappings: {mappings}"
+    );
+}
