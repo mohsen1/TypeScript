@@ -1840,3 +1840,135 @@ class Derived extends Base {
         output
     );
 }
+
+#[test]
+fn test_class_es5_super_property_in_static_method() {
+    // Test super property access in a static method
+    let source = r#"
+class Base {
+    static config = { debug: true };
+    static getVersion() { return "1.0"; }
+}
+class Derived extends Base {
+    static init() {
+        const cfg = super.config;
+        const ver = super.getVersion();
+        return { cfg, ver };
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Static method should access super as Base (the parent class)
+    // super.config (property read) becomes _super.config
+    assert!(
+        output.contains("_super.config"),
+        "Expected super.config in static method to reference _super.config: {}",
+        output
+    );
+    // super.getVersion() (method call) becomes _super.prototype.getVersion.call(this)
+    assert!(
+        output.contains("_super.prototype.getVersion.call"),
+        "Expected super.getVersion() in static method to use prototype.call pattern: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_computed_super_property_read() {
+    // Test computed super property read (not call) - super[key] as property access
+    let source = r#"
+class Base {
+    data = { x: 1, y: 2 };
+}
+class Derived extends Base {
+    getProperty(key: string) {
+        return super[key];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Computed super property read should be transformed
+    // For instance method super[key] property read, it becomes _super[key] or _super.prototype[key]
+    assert!(
+        output.contains("_super[key]") || output.contains("_super.prototype[key]"),
+        "Expected computed super property read to be lowered: {}",
+        output
+    );
+    // The raw super[key] should not appear (should be _super[key])
+    // Note: super[key] becomes _super[key] in the output
+    assert!(
+        !output.contains("super[key]") || output.contains("_super[key]"),
+        "Expected super[key] property access to be lowered in ES5 output: {}",
+        output
+    );
+}
+
+#[test]
+fn test_class_es5_computed_super_property_in_static_method() {
+    // Test computed super property access in a static method
+    let source = r#"
+class Base {
+    static values = { a: 1, b: 2 };
+}
+class Derived extends Base {
+    static getValue(key: string) {
+        return super[key];
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let root_node = parser.arena.get(root).expect("expected source file node");
+    let source_file = parser
+        .arena
+        .get_source_file(root_node)
+        .expect("expected source file data");
+    let class_idx = *source_file
+        .statements
+        .nodes
+        .get(1)
+        .expect("expected derived class declaration");
+
+    let mut emitter = ClassES5Emitter::new(&parser.arena);
+    let output = emitter.emit_class(class_idx);
+
+    // Static method computed super should reference parent class
+    assert!(
+        output.contains("Base[key]") || output.contains("_super[key]"),
+        "Expected static computed super property to reference parent class: {}",
+        output
+    );
+}

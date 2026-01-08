@@ -95,6 +95,7 @@ Priority: 4
 - [x] Add class getters/setters source-map test. Tests: `./wasm/test.sh class_getters_setters_mapping`
 - [x] Add TypeScript namespace source-map test. Tests: `./wasm/test.sh typescript_namespace_mapping`
 - [x] Add ES5 computed super[] edge case tests. Tests: `./wasm/test.sh computed_super`
+- [x] Add ES5 super property access tests. Tests: `./wasm/test.sh super_property`
 
 ## Ready for Merge
 Yes
