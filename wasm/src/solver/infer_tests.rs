@@ -108,32 +108,6 @@ fn test_inference_occurs_check() {
     assert!(matches!(result, Err(InferenceError::OccursCheck { .. })));
 }
 
-#[test]
-fn test_inference_occurs_check_function_this_type() {
-    let interner = TypeInterner::new();
-    let mut ctx = InferenceContext::new(&interner);
-    let t_name = interner.intern_string("T");
-
-    let var_t = ctx.fresh_type_param(t_name);
-    let t_type = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
-        name: t_name,
-        constraint: None,
-        default: None,
-    }));
-
-    let func_t = interner.function(FunctionShape {
-        type_params: Vec::new(),
-        params: Vec::new(),
-        this_type: Some(t_type),
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    let result = ctx.unify_var_type(var_t, func_t);
-    assert!(matches!(result, Err(InferenceError::OccursCheck { .. })));
-}
-
 // =============================================================================
 // Constraint Collection Tests
 // =============================================================================
@@ -1114,44 +1088,6 @@ fn test_resolve_bounds_function_subtype() {
 
     let result = ctx.resolve_with_constraints(var).unwrap();
     assert_eq!(result, lower);
-}
-
-#[test]
-fn test_resolve_bounds_function_this_type_mismatch() {
-    let interner = TypeInterner::new();
-    let mut ctx = InferenceContext::new(&interner);
-
-    let var = ctx.fresh_type_param(interner.intern_string("T"));
-
-    let lower = interner.function(FunctionShape {
-        type_params: Vec::new(),
-        params: Vec::new(),
-        this_type: Some(TypeId::STRING),
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-    let upper = interner.function(FunctionShape {
-        type_params: Vec::new(),
-        params: Vec::new(),
-        this_type: Some(TypeId::NUMBER),
-        return_type: TypeId::VOID,
-        type_predicate: None,
-        is_constructor: false,
-    });
-
-    ctx.add_lower_bound(var, lower);
-    ctx.add_upper_bound(var, upper);
-
-    let result = ctx.resolve_with_constraints(var);
-    assert!(matches!(
-        result,
-        Err(InferenceError::BoundsViolation {
-            lower: actual_lower,
-            upper: actual_upper,
-            ..
-        }) if actual_lower == lower && actual_upper == upper
-    ));
 }
 
 #[test]

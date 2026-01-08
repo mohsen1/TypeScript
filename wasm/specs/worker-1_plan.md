@@ -7,14 +7,13 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- Awaiting next manager assignment.
+- Solver hardening: focus on inference from contextual types in `wasm/src/solver/infer.rs`. Add a focused test in `wasm/src/solver/infer_tests.rs` that currently fails (contextual function inference or circular constraint) and implement the minimal fix.
 
 ## Task Queue
 - [ ] If contextual inference is already correct, target circular `extends` constraints and add a regression test.
 
 ## Completed
-- [x] Hardened function bound checks to respect `this` types; added `test_resolve_bounds_function_this_type_mismatch` and updated inference subtyping. Tests: `./wasm/test.sh` (fails: `emitter_edge_case_tests::test_class_extends_helper`).
-- [x] Added occurs-check coverage for function/callable `this` types with `test_inference_occurs_check_function_this_type`. Tests: `./wasm/test.sh test_inference_occurs_check_function_this_type`.
+- [x] (Move finished items here with brief notes and tests run.)
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
