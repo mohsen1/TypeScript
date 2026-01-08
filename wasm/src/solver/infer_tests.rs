@@ -650,6 +650,28 @@ fn test_resolve_bounds_object_subtype() {
 }
 
 #[test]
+fn test_resolve_bounds_union_lower_vs_string_upper() {
+    let interner = TypeInterner::new();
+    let mut ctx = InferenceContext::new(&interner);
+
+    let var = ctx.fresh_type_param(interner.intern_string("T"));
+    let lower = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    ctx.add_lower_bound(var, lower);
+    ctx.add_upper_bound(var, TypeId::STRING);
+
+    let result = ctx.resolve_with_constraints(var);
+    assert!(matches!(
+        result,
+        Err(InferenceError::BoundsViolation {
+            lower: actual_lower,
+            upper: actual_upper,
+            ..
+        }) if actual_lower == lower && actual_upper == TypeId::STRING
+    ));
+}
+
+#[test]
 fn test_resolve_bounds_object_readonly_property_mismatch() {
     let interner = TypeInterner::new();
     let mut ctx = InferenceContext::new(&interner);
