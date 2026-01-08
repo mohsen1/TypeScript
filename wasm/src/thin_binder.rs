@@ -2254,12 +2254,14 @@ impl ThinBinderState {
         if let Some(import) = arena.get_import_decl(node) {
             if let Some(clause_node) = arena.get(import.import_clause) {
                 if let Some(clause) = arena.get_import_clause(clause_node) {
+                    let clause_type_only = clause.is_type_only;
                     // Default import
                     if !clause.name.is_none() {
                         if let Some(name) = self.get_identifier_name(arena, clause.name) {
                             let sym_id = self.symbols.alloc(symbol_flags::ALIAS, name.to_string());
                             if let Some(sym) = self.symbols.get_mut(sym_id) {
                                 sym.declarations.push(clause.name);
+                                sym.is_type_only = clause_type_only;
                             }
                             self.current_scope.set(name.to_string(), sym_id);
                             self.node_symbols.insert(clause.name.0, sym_id);
@@ -2274,6 +2276,7 @@ impl ThinBinderState {
                                     let sym_id = self.symbols.alloc(symbol_flags::ALIAS, name.to_string());
                                     if let Some(sym) = self.symbols.get_mut(sym_id) {
                                         sym.declarations.push(clause.named_bindings);
+                                        sym.is_type_only = clause_type_only;
                                     }
                                     self.current_scope.set(name.to_string(), sym_id);
                                     self.node_symbols.insert(clause.named_bindings.0, sym_id);
@@ -2282,6 +2285,7 @@ impl ThinBinderState {
                                 for &spec_idx in &named.elements.nodes {
                                     if let Some(spec_node) = arena.get(spec_idx) {
                                         if let Some(spec) = arena.get_specifier(spec_node) {
+                                            let spec_type_only = clause_type_only || spec.is_type_only;
                                             let local_ident = if !spec.name.is_none() {
                                                 spec.name
                                             } else {
@@ -2293,6 +2297,7 @@ impl ThinBinderState {
                                                 let sym_id = self.symbols.alloc(symbol_flags::ALIAS, name.to_string());
                                                 if let Some(sym) = self.symbols.get_mut(sym_id) {
                                                     sym.declarations.push(local_ident);
+                                                    sym.is_type_only = spec_type_only;
                                                 }
                                                 self.current_scope.set(name.to_string(), sym_id);
                                                 self.node_symbols.insert(spec_idx.0, sym_id);

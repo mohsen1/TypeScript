@@ -29,3 +29,17 @@ fn test_emit_multiple_helpers() {
     assert!(output.contains("__assign"));
     assert!(output.contains("__rest"));
 }
+
+#[test]
+fn test_emit_awaiter_before_generator() {
+    let mut helpers = HelpersNeeded::default();
+    helpers.awaiter = true;
+    helpers.generator = true;
+    let output = emit_helpers(&helpers);
+    let awaiter_pos = output.find("__awaiter").expect("Expected __awaiter helper");
+    let generator_pos = output.find("__generator").expect("Expected __generator helper");
+    assert!(
+        awaiter_pos < generator_pos,
+        "__awaiter should be emitted before __generator"
+    );
+}

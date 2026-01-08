@@ -339,12 +339,6 @@ type DeepPartial<T> = {
   [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
 };
 
-type Store<S, A extends AnyAction> = {
-  getState(): S;
-  dispatch(action: A): A;
-  replaceState(next: DeepPartial<S>): void;
-};
-
 type Dictionary<T> = { [key: string]: T };
 type ValueOf<T> = T[keyof T];
 type PickValue<T, V> = { [K in keyof T]: T[K] extends V ? T[K] : never };
@@ -383,6 +377,12 @@ const rootReducers: RootReducers = {
 const incAction: ActionByType<AppAction, "inc"> = { type: "inc" };
 "#.to_string()),
         ("store.ts".to_string(), r#"
+interface Store<S, A> {
+  getState: () => S;
+  dispatch: (action: A) => A;
+  replaceState: (next: DeepPartial<S>) => void;
+}
+
 type StateFromReducer<R> = R extends Reducer<infer S, AnyAction> ? S : never;
 type ActionFromReducer<R> = R extends Reducer<any, infer A> ? A : AnyAction;
 
@@ -440,30 +440,6 @@ function runApp() {
 
     assert_eq!(stats.file_count, 4);
     assert!(stats.function_count >= 5, "Expected at least 5 functions");
-    if result.diagnostic_count != 0 {
-        for file in &result.file_results {
-            for diagnostic in &file.diagnostics {
-                eprintln!(
-                    "{}:{}:{} {}",
-                    diagnostic.file,
-                    diagnostic.start,
-                    diagnostic.length,
-                    diagnostic.message_text
-                );
-            }
-            for function in &file.function_results {
-                for diagnostic in &function.diagnostics {
-                    eprintln!(
-                        "{}:{}:{} {}",
-                        diagnostic.file,
-                        diagnostic.start,
-                        diagnostic.length,
-                        diagnostic.message_text
-                    );
-                }
-            }
-        }
-    }
     assert_eq!(result.diagnostic_count, 0);
 }
 

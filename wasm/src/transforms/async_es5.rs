@@ -65,6 +65,7 @@ use crate::thin_emitter::ThinPrinter;
 use crate::transform_context::{TransformContext, TransformDirective};
 use crate::transforms::arrow_es5::contains_this_reference;
 use crate::transforms::emit_utils;
+use crate::transforms::private_fields_es5::{is_private_identifier, get_private_field_name};
 use memchr;
 
 /// State for tracking async function transformation
@@ -110,6 +111,8 @@ pub struct AsyncES5Emitter<'a> {
     column: u32,
     state: AsyncTransformState,
     this_capture_depth: u32,
+    /// Class name for private field access (e.g., "Foo" for _Foo_field)
+    class_name: Option<String>,
 }
 
 impl<'a> AsyncES5Emitter<'a> {
@@ -125,6 +128,7 @@ impl<'a> AsyncES5Emitter<'a> {
             column: 0,
             state: AsyncTransformState::new(),
             this_capture_depth: 0,
+            class_name: None,
         }
     }
 
@@ -132,12 +136,17 @@ impl<'a> AsyncES5Emitter<'a> {
         self.indent_level = level;
     }
 
-    pub fn set_use_this_capture(&mut self, capture: bool) {
-        self.set_lexical_this(capture);
-    }
-
     pub fn set_lexical_this(&mut self, capture: bool) {
         self.this_capture_depth = if capture { 1 } else { 0 };
+    }
+
+    pub fn set_use_this_capture(&mut self, capture: bool) {
+        self.this_capture_depth = if capture { 1 } else { 0 };
+    }
+
+    /// Set the class name for private field access transformations
+    pub fn set_class_name(&mut self, name: &str) {
+        self.class_name = Some(name.to_string());
     }
 
     pub fn set_source_map_context(&mut self, source_text: &'a str, source_index: u32) {
@@ -668,6 +677,20 @@ impl<'a> AsyncES5Emitter<'a> {
         self.increase_indent();
     }
 
+    /// Emit __classPrivateFieldGet(receiver, _ClassName_field, "f")
+    fn emit_private_field_get(&mut self, receiver_idx: NodeIndex, name_idx: NodeIndex) {
+        let field_name = get_private_field_name(self.arena, name_idx).unwrap_or_default();
+        let class_name = self.class_name.clone().unwrap_or_else(|| "_".to_string());
+
+        self.write("__classPrivateFieldGet(");
+        self.emit_expression(receiver_idx);
+        self.write(", _");
+        self.write(&class_name);
+        self.write("_");
+        self.write(&field_name);
+        self.write(", \"f\")");
+    }
+
     fn emit_expression(&mut self, idx: NodeIndex) {
         let Some(node) = self.arena.get(idx) else {
             return;
@@ -743,9 +766,14 @@ impl<'a> AsyncES5Emitter<'a> {
             }
             k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
                 if let Some(access) = self.arena.get_access_expr(node) {
-                    self.emit_expression(access.expression);
-                    self.write(".");
-                    self.emit_expression(access.name_or_argument);
+                    // Check if this is a private field access (this.#field)
+                    if is_private_identifier(self.arena, access.name_or_argument) {
+                        self.emit_private_field_get(access.expression, access.name_or_argument);
+                    } else {
+                        self.emit_expression(access.expression);
+                        self.write(".");
+                        self.emit_expression(access.name_or_argument);
+                    }
                 }
             }
             k if k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
