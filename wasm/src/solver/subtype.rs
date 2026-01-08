@@ -1351,18 +1351,6 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
     }
 
-    fn param_type_for_comparison(&self, param: &ParamInfo) -> TypeId {
-        if param.optional && self.strict_null_checks {
-            self.interner.union2(param.type_id, TypeId::UNDEFINED)
-        } else {
-            param.type_id
-        }
-    }
-
-    fn required_param_count(params: &[ParamInfo]) -> usize {
-        params.iter().filter(|param| !param.optional && !param.rest).count()
-    }
-
     fn are_this_parameters_compatible(
         &mut self,
         source_type: Option<TypeId>,
@@ -1458,15 +1446,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         let target_has_rest = target.params.last().map_or(false, |p| p.rest);
         let source_has_rest = source.params.last().map_or(false, |p| p.rest);
 
-        let target_required = Self::required_param_count(&target.params);
-        let source_required = Self::required_param_count(&source.params);
-
         // Count non-rest parameters
         let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
         let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
 
-        // Source cannot require more parameters than target
-        if source_required > target_required {
+        // If target doesn't have a rest parameter, source can't have more params than target
+        if !target_has_rest && source.params.len() > target.params.len() {
             return SubtypeResult::False;
         }
 
@@ -1476,9 +1461,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             let s_param = &source.params[i];
             let t_param = &target.params[i];
             // Check parameter compatibility (contravariant in strict mode, bivariant in legacy)
-            let s_param_type = self.param_type_for_comparison(s_param);
-            let t_param_type = self.param_type_for_comparison(t_param);
-            if !self.are_parameters_compatible(s_param_type, t_param_type) {
+            if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
                 return SubtypeResult::False;
             }
         }
@@ -1499,8 +1482,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
                 // Check parameter compatibility against rest element type
-                let s_param_type = self.param_type_for_comparison(s_param);
-                if !self.are_parameters_compatible(s_param_type, rest_elem_type) {
+                if !self.are_parameters_compatible(s_param.type_id, rest_elem_type) {
                     return SubtypeResult::False;
                 }
             }
@@ -1624,15 +1606,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         let target_has_rest = target.params.last().map_or(false, |p| p.rest);
         let source_has_rest = source.params.last().map_or(false, |p| p.rest);
 
-        let target_required = Self::required_param_count(&target.params);
-        let source_required = Self::required_param_count(&source.params);
-
         // Count non-rest parameters
         let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
         let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
 
-        // Source cannot require more parameters than target
-        if source_required > target_required {
+        // If target doesn't have a rest parameter, source can't have more params than target
+        if !target_has_rest && source.params.len() > target.params.len() {
             return SubtypeResult::False;
         }
 
@@ -1642,9 +1621,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             let s_param = &source.params[i];
             let t_param = &target.params[i];
             // Check parameter compatibility (contravariant in strict mode, bivariant in legacy)
-            let s_param_type = self.param_type_for_comparison(s_param);
-            let t_param_type = self.param_type_for_comparison(t_param);
-            if !self.are_parameters_compatible(s_param_type, t_param_type) {
+            if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
                 return SubtypeResult::False;
             }
         }
@@ -1662,9 +1639,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
-                let s_param_type = self.param_type_for_comparison(s_param);
-                if !self.check_subtype(s_param_type, rest_elem_type).is_true()
-                    && !self.check_subtype(rest_elem_type, s_param_type).is_true()
+                if !self.check_subtype(s_param.type_id, rest_elem_type).is_true()
+                    && !self.check_subtype(rest_elem_type, s_param.type_id).is_true()
                 {
                     return SubtypeResult::False;
                 }
@@ -1698,15 +1674,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         let target_has_rest = target.params.last().map_or(false, |p| p.rest);
         let source_has_rest = source.params.last().map_or(false, |p| p.rest);
 
-        let target_required = Self::required_param_count(&target.params);
-        let source_required = Self::required_param_count(&source.params);
-
         // Count non-rest parameters
         let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
         let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
 
-        // Source cannot require more parameters than target
-        if source_required > target_required {
+        // If target doesn't have a rest parameter, source can't have more params than target
+        if !target_has_rest && source.params.len() > target.params.len() {
             return SubtypeResult::False;
         }
 
@@ -1716,9 +1689,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             let s_param = &source.params[i];
             let t_param = &target.params[i];
             // Check parameter compatibility (contravariant in strict mode, bivariant in legacy)
-            let s_param_type = self.param_type_for_comparison(s_param);
-            let t_param_type = self.param_type_for_comparison(t_param);
-            if !self.are_parameters_compatible(s_param_type, t_param_type) {
+            if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
                 return SubtypeResult::False;
             }
         }
@@ -1736,9 +1707,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
-                let s_param_type = self.param_type_for_comparison(s_param);
-                if !self.check_subtype(s_param_type, rest_elem_type).is_true()
-                    && !self.check_subtype(rest_elem_type, s_param_type).is_true()
+                if !self.check_subtype(s_param.type_id, rest_elem_type).is_true()
+                    && !self.check_subtype(rest_elem_type, s_param.type_id).is_true()
                 {
                     return SubtypeResult::False;
                 }
@@ -1772,15 +1742,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         let target_has_rest = target.params.last().map_or(false, |p| p.rest);
         let source_has_rest = source.params.last().map_or(false, |p| p.rest);
 
-        let target_required = Self::required_param_count(&target.params);
-        let source_required = Self::required_param_count(&source.params);
-
         // Count non-rest parameters
         let target_fixed_count = if target_has_rest { target.params.len().saturating_sub(1) } else { target.params.len() };
         let source_fixed_count = if source_has_rest { source.params.len().saturating_sub(1) } else { source.params.len() };
 
-        // Source cannot require more parameters than target
-        if source_required > target_required {
+        // If target doesn't have a rest parameter, source can't have more params than target
+        if !target_has_rest && source.params.len() > target.params.len() {
             return SubtypeResult::False;
         }
 
@@ -1790,9 +1757,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             let s_param = &source.params[i];
             let t_param = &target.params[i];
             // Check parameter compatibility (contravariant in strict mode, bivariant in legacy)
-            let s_param_type = self.param_type_for_comparison(s_param);
-            let t_param_type = self.param_type_for_comparison(t_param);
-            if !self.are_parameters_compatible(s_param_type, t_param_type) {
+            if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
                 return SubtypeResult::False;
             }
         }
@@ -1810,9 +1775,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
-                let s_param_type = self.param_type_for_comparison(s_param);
-                if !self.check_subtype(s_param_type, rest_elem_type).is_true()
-                    && !self.check_subtype(rest_elem_type, s_param_type).is_true()
+                if !self.check_subtype(s_param.type_id, rest_elem_type).is_true()
+                    && !self.check_subtype(rest_elem_type, s_param.type_id).is_true()
                 {
                     return SubtypeResult::False;
                 }
@@ -2460,12 +2424,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // Check parameter count
         let target_has_rest = target.params.last().map_or(false, |p| p.rest);
         let source_has_rest = source.params.last().map_or(false, |p| p.rest);
-        let target_required = Self::required_param_count(&target.params);
-        let source_required = Self::required_param_count(&source.params);
-        if source_required > target_required {
+        if source.params.len() > target.params.len() && !target_has_rest {
             return Some(SubtypeFailureReason::TooManyParameters {
-                source_count: source_required,
-                target_count: target_required,
+                source_count: source.params.len(),
+                target_count: target.params.len(),
             });
         }
 
@@ -2485,13 +2447,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             let s_param = &source.params[i];
             let t_param = &target.params[i];
             // Check parameter compatibility (contravariant in strict mode, bivariant in legacy)
-            let s_param_type = self.param_type_for_comparison(s_param);
-            let t_param_type = self.param_type_for_comparison(t_param);
-            if !self.are_parameters_compatible(s_param_type, t_param_type) {
+            if !self.are_parameters_compatible(s_param.type_id, t_param.type_id) {
                 return Some(SubtypeFailureReason::ParameterTypeMismatch {
                     param_index: i,
-                    source_param: s_param_type,
-                    target_param: t_param_type,
+                    source_param: s_param.type_id,
+                    target_param: t_param.type_id,
                 });
             }
         }
@@ -2508,11 +2468,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
             for i in target_fixed_count..source_fixed_count {
                 let s_param = &source.params[i];
-                let s_param_type = self.param_type_for_comparison(s_param);
-                if !self.are_parameters_compatible(s_param_type, rest_elem_type) {
+                if !self.are_parameters_compatible(s_param.type_id, rest_elem_type) {
                     return Some(SubtypeFailureReason::ParameterTypeMismatch {
                         param_index: i,
-                        source_param: s_param_type,
+                        source_param: s_param.type_id,
                         target_param: rest_elem_type,
                     });
                 }

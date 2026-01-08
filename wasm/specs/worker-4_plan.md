@@ -7,10 +7,10 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- (Manager to fill in.)
+- Emitter fidelity: own the `emitter_parity_tests::test_parity_async_es5` investigation. Run the targeted test, capture expected vs actual output, and implement the minimal fix in `wasm/src/thin_emitter/async_es5.rs` or related helpers.
 
 ## Task Queue
-- [ ] (Manager to fill in.)
+- [ ] After fixing parity_async_es5, verify ES5 downleveling edge cases for `this` capture and `super()` + property initializer ordering.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run.)

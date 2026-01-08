@@ -2,6 +2,7 @@ use super::{ParamTransformPlan, ThinPrinter};
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNode;
 use crate::parser::syntax_kind_ext;
+use crate::transforms::arrow_es5::contains_this_reference;
 
 impl<'a> ThinPrinter<'a> {
     // =========================================================================
@@ -12,6 +13,12 @@ impl<'a> ThinPrinter<'a> {
         let Some(func) = self.arena.get_function(node) else {
             return;
         };
+
+        if self.ctx.target_es5 {
+            let captures_this = contains_this_reference(self.arena, _idx);
+            self.emit_arrow_function_es5(node, func, captures_this);
+            return;
+        }
 
         self.emit_arrow_function_native(func);
     }
@@ -39,6 +46,16 @@ impl<'a> ThinPrinter<'a> {
         let Some(func) = self.arena.get_function(node) else {
             return;
         };
+
+        if func.is_async && self.ctx.target_es5 && !func.asterisk_token {
+            let func_name = if !func.name.is_none() {
+                self.get_identifier_text_idx(func.name)
+            } else {
+                String::new()
+            };
+            self.emit_async_function_es5(func, &func_name, "this");
+            return;
+        }
 
         if func.is_async {
             self.write("async ");

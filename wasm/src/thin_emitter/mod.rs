@@ -1652,6 +1652,11 @@ impl<'a> ThinPrinter<'a> {
                     helpers.class_private_field_set = true;
                 }
             }
+        } else if self.ctx.target_es5 {
+            if self.needs_async_helpers() {
+                helpers.awaiter = true;
+                helpers.generator = true;
+            }
         }
 
         // Emit all needed helpers

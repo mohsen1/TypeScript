@@ -7,10 +7,10 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- (Manager to fill in.)
+- Emitter fidelity: validate source map correctness. Add a focused test in `wasm/src/source_map_tests.rs` that checks mappings for a transformed ES5 output, then fix `wasm/src/source_writer.rs` or `wasm/src/source_map.rs` if needed.
 
 ## Task Queue
-- [ ] (Manager to fill in.)
+- [ ] If mappings are correct, expand coverage to include async/await downleveling and verify debuggers can attach.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run.)

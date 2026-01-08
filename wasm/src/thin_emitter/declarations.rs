@@ -25,6 +25,16 @@ impl<'a> ThinPrinter<'a> {
             return;
         }
 
+        if func.is_async && self.ctx.target_es5 && !func.asterisk_token {
+            let func_name = if !func.name.is_none() {
+                self.get_identifier_text_idx(func.name)
+            } else {
+                String::new()
+            };
+            self.emit_async_function_es5(func, &func_name, "this");
+            return;
+        }
+
         if func.is_async {
             self.write("async ");
         }
@@ -57,6 +67,11 @@ impl<'a> ThinPrinter<'a> {
         let Some(decl_list) = self.arena.get_variable(node) else {
             return;
         };
+
+        if self.ctx.target_es5 {
+            self.emit_variable_declaration_list_es5(node);
+            return;
+        }
 
         // Emit keyword based on node flags.
         let flags = node.flags as u32;

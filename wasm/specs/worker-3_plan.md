@@ -7,10 +7,10 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- (Manager to fill in.)
+- Solver hardening: verify variance rules in `wasm/src/solver/subtype.rs`. Add targeted cases in `wasm/src/solver/subtype_tests.rs` for parameter contravariance and return-type covariance, then fix any inconsistencies.
 
 ## Task Queue
-- [ ] (Manager to fill in.)
+- [ ] If variance coverage is solid, add edge cases for optional/rest parameters and `this` parameters in assignability.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run.)

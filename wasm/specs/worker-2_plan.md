@@ -7,10 +7,10 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- (Manager to fill in.)
+- Solver hardening: stress test conditional type evaluation in `wasm/src/solver/evaluate.rs`. Add or extend tests in `wasm/src/solver/evaluate_tests.rs` for distributive conditionals over unions and fix any mismatches.
 
 ## Task Queue
-- [ ] (Manager to fill in.)
+- [ ] If conditionals already pass, add coverage for nested/distributive conditionals with `extends` and `infer` positions.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run.)
