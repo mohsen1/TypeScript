@@ -54,6 +54,8 @@ Priority: 3
 - [x] Apparent members of primitives (TS unsoundness #12): added thin checker coverage for primitive method access via wrapper interfaces. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Void return exception (TS unsoundness #6): added thin checker coverage for assigning a non-void return function to `() => void`. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Distributivity disabling (TS unsoundness #40): added thin checker coverage for `[T] extends [U]` pattern that disables conditional type distribution. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
+- [x] Constructor void exception (TS unsoundness #28): added thin checker coverage for `new () => void` accepting concrete classes. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
+- [x] Key remapping syntax (TS unsoundness #41): added thin checker coverage for `[P in keyof T as ...]: T[P]` key filtering syntax (Omit, Pick). Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 
 ## Ready for Merge
 Yes
