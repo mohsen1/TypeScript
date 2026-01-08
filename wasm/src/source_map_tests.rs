@@ -11580,3 +11580,80 @@ fn test_source_map_es5_transform_nullish_coalescing_mapping() {
         "expected mapping for nullish coalescing line. mappings: {mappings}"
     );
 }
+
+#[test]
+fn test_source_map_es5_transform_numeric_separators_mapping() {
+    // Test source maps with numeric separators in the source code
+    // Numeric separators are a lexer feature - the value 1_000_000 equals 1000000
+    let source = r#"const million = 1_000_000;
+const binary = 0b1010_0101;
+const hex = 0xFF_FF_FF;"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify the variable declarations are in the output
+    assert!(
+        output.contains("million") && output.contains("binary") && output.contains("hex"),
+        "expected variable names in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|value| value.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the variable declarations
+    let (million_line, million_col) = find_line_col(source, "million");
+    let has_million_mapping = decoded.iter().any(|m| {
+        m.source_index == 0
+            && m.original_line == million_line
+            && m.original_column >= million_col
+            && m.original_column <= million_col + 10
+    });
+
+    let (binary_line, binary_col) = find_line_col(source, "binary");
+    let has_binary_mapping = decoded.iter().any(|m| {
+        m.source_index == 0
+            && m.original_line == binary_line
+            && m.original_column >= binary_col
+            && m.original_column <= binary_col + 10
+    });
+
+    let (hex_line, hex_col) = find_line_col(source, "hex");
+    let has_hex_mapping = decoded.iter().any(|m| {
+        m.source_index == 0
+            && m.original_line == hex_line
+            && m.original_column >= hex_col
+            && m.original_column <= hex_col + 10
+    });
+
+    // We should have mappings for the numeric literal declarations
+    assert!(
+        has_million_mapping || has_binary_mapping || has_hex_mapping,
+        "expected mappings for numeric separator declarations. mappings: {mappings}"
+    );
+
+    // Verify non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for numeric separators code"
+    );
+}
