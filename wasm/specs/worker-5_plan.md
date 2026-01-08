@@ -10,7 +10,6 @@ Priority: 5
 - Await next manager assignment.
 
 ## Task Queue
-- [ ] Add async sequence expression mapping with mixed await/non-await (e.g., `foo(), await bar()`).
 - [ ] Add async compound assignment mapping with a different operator (e.g., `*=`).
 - [ ] Add async optional chaining await regression (`await foo?.bar()`); expect mapping for `foo` or `bar` identifier.
 - [ ] Add async nullish coalescing await regression (`(await foo()) ?? bar()`); expect mapping for `foo` and fallback to function anchor.
@@ -208,6 +207,8 @@ Priority: 5
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_compound_assignment_mapping`.
 - [x] Added ES5 async sequence await source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_sequence_await_mapping`.
+- [x] Added ES5 async sequence mixed await source map mapping test in `wasm/src/source_map_tests.rs`.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_async_sequence_mixed_await_mapping`.
 - [x] Added ES5 async ternary consequent await source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_ternary_consequent_await_mapping`.
 
@@ -219,3 +220,4 @@ Priority: 5
 - Re-ran `./wasm/test.sh test_source_map_es5_transform_async_await_conditional_mapping`.
 - Re-ran `./wasm/test.sh test_source_map_es5_transform_async_arrow_captures_this_mapping`.
 - Re-ran `./wasm/test.sh test_source_map_es5_transform_async_binary_modulo_mapping`.
+- Ready for merge.
