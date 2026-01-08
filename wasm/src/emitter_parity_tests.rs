@@ -1836,3 +1836,47 @@ fn test_parity_type_only_import_erasure() {
         output
     );
 }
+
+/// Parity test for interface erasure.
+/// TypeScript interfaces should be completely removed from output.
+#[test]
+fn test_parity_interface_erasure() {
+    let source = "interface User { name: string; age: number; } const user: User = { name: 'Alice', age: 30 };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Interface should be completely erased
+    assert!(
+        !output.contains("interface User"),
+        "Interface declaration should be erased: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": User"),
+        "Type annotation should be erased: {}",
+        output
+    );
+    // Value code should remain
+    assert!(
+        output.contains("var user") && output.contains("Alice") && output.contains("30"),
+        "Value code should remain: {}",
+        output
+    );
+}
