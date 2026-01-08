@@ -1603,6 +1603,61 @@ fn test_conditional_infer_object_index_signature_distributive() {
 }
 
 #[test]
+fn test_conditional_infer_object_index_signature_non_object_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // T extends { [key: string]: infer R } ? R : never, with T = { a: string } | number.
+    // TODO: Index signature inference is not implemented; current behavior yields never.
+    let extends_obj = interner.object_with_index(ObjectShape {
+        properties: Vec::new(),
+        string_index: Some(IndexSignature {
+            key_type: TypeId::STRING,
+            value_type: infer_r,
+            readonly: false,
+        }),
+        number_index: None,
+    });
+    let cond = ConditionalType {
+        check_type: t_param,
+        extends_type: extends_obj,
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let obj_string = interner.object(vec![PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    subst.insert(t_name, interner.union(vec![obj_string, TypeId::NUMBER]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
 fn test_conditional_infer_object_index_signature_non_distributive_union_input() {
     let interner = TypeInterner::new();
 
