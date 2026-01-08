@@ -52,6 +52,8 @@ Priority: 3
 - [x] Optionality vs undefined (TS unsoundness #14): added thin checker coverage for optional properties accepting `undefined` by default. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Unchecked indexed access (TS unsoundness #8): added thin checker coverage for array element access returning element type without `undefined`. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 - [x] Apparent members of primitives (TS unsoundness #12): added thin checker coverage for primitive method access via wrapper interfaces. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
+- [x] Void return exception (TS unsoundness #6): added thin checker coverage for assigning a non-void return function to `() => void`. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
+- [x] Distributivity disabling (TS unsoundness #40): added thin checker coverage for `[T] extends [U]` pattern that disables conditional type distribution. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 
 ## Ready for Merge
 Yes
