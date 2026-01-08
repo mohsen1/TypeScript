@@ -5,6 +5,7 @@ Execute tasks assigned by EM-Anvil for the Anvil squad (output: emitter, transfo
 
 Status: Active
 Priority: 1
+Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
 - [EM: Assign next task]
