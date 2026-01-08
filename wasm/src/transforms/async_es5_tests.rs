@@ -71,6 +71,26 @@ fn test_async_with_await() {
 }
 
 #[test]
+fn test_async_return_await_emits_sent() {
+    let output = parse_and_emit_async("async function foo() { return await bar(); }");
+    assert!(
+        output.contains("switch (_a.label)"),
+        "Return await should emit switch: {}",
+        output
+    );
+    assert!(
+        output.contains("return [4 /*yield*/, bar()]"),
+        "Return await should yield bar(): {}",
+        output
+    );
+    assert!(
+        output.contains("return [2 /*return*/, _a.sent()]"),
+        "Return await should return _a.sent(): {}",
+        output
+    );
+}
+
+#[test]
 fn test_body_contains_await_detection() {
     let mut parser =
         ThinParserState::new("test.ts".to_string(), "async function foo() { await x; }".to_string());

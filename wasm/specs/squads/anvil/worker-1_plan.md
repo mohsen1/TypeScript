@@ -25,6 +25,7 @@ Priority: 1
 - [x] Fixed ES5 async generator emission for non-await blocks, aligned super calls with `_this`, and suppressed static-field `this` capture; ran `./wasm/test.sh` (fails: `solver::compat::tests::test_explain_failure_reports_rest_mismatch`).
 - [x] Added static field arrow `this` regression for ES5 class emission; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 - [x] Added async ES5 no-await statement ordering regression; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
+- [x] Added async ES5 return-await regression; ran `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics`).
 
 ## Ready for Merge
 No
