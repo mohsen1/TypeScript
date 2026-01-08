@@ -7,12 +7,13 @@ Status: Active
 Priority: 2
 
 ## Current Assignment
-- [ ] Add ES5 emitter parity tests for template literals in `wasm/src/emitter_parity_tests.rs`. Run `./wasm/test.sh emitter_parity`.
+- [ ] (awaiting next task)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 template literal parity tests (multi-expr, tagged, call, nested) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (84 tests).
 - [x] Added ES5 nullish coalescing parity tests (call, assignment, chained, property) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (80 tests).
 - [x] Added ES5 optional chaining parity tests (method call, element access, with nullish, call) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (76 tests).
 - [x] Added ES5 destructuring parity tests (array, object, nested, defaults, rest) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (72 tests).
