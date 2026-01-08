@@ -5063,3 +5063,248 @@ export function wrap(inner: string, outer: string): string {
     let js = std::fs::read_to_string(base.join("dist/src/nested.js")).expect("read js");
     assert!(!js.is_empty(), "JS output should not be empty");
 }
+
+// =============================================================================
+// E2E: Destructuring Assignment Compilation
+// =============================================================================
+
+#[test]
+fn compile_object_destructuring() {
+    // Test object destructuring compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/extract.ts"),
+        r#"
+interface Point {
+    x: number;
+    y: number;
+}
+
+export function getX(point: Point): number {
+    const { x } = point;
+    return x;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/extract.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_array_destructuring() {
+    // Test array destructuring compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/arrays.ts"),
+        r#"
+export function getFirst(arr: number[]): number {
+    const [first] = arr;
+    return first;
+}
+
+export function getSecond(arr: number[]): number {
+    const [, second] = arr;
+    return second;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/arrays.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_destructuring_with_defaults() {
+    // Test destructuring with default values
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/defaults.ts"),
+        r#"
+interface Config {
+    host: string;
+    port: number;
+}
+
+export function getPort(config: Config): number {
+    const { port = 3000 } = config;
+    return port;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/defaults.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_optional_chaining() {
+    // Test optional chaining (?.) compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/optional.ts"),
+        r#"
+interface User {
+    name: string;
+    address?: {
+        city: string;
+    };
+}
+
+export function getCity(user: User): string | undefined {
+    return user.address?.city;
+}
+
+export function getLength(arr?: string[]): number | undefined {
+    return arr?.length;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/optional.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_nullish_coalescing() {
+    // Test nullish coalescing (??) compilation
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/nullish.ts"),
+        r#"
+export function getValueOrDefault(value: string | null | undefined): string {
+    return value ?? "default";
+}
+
+export function getNumberOrZero(num: number | null): number {
+    return num ?? 0;
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/nullish.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
+
+#[test]
+fn compile_optional_chaining_with_call() {
+    // Test optional chaining with method calls
+    let temp = TempDir::new().expect("temp dir");
+    let base = &temp.path;
+
+    write_file(
+        &base.join("tsconfig.json"),
+        r#"{
+          "compilerOptions": {
+            "outDir": "dist"
+          },
+          "include": ["src/**/*.ts"]
+        }"#,
+    );
+
+    write_file(
+        &base.join("src/optcall.ts"),
+        r#"
+interface Logger {
+    log?: (msg: string) => void;
+}
+
+export function maybeLog(logger: Logger, msg: string): void {
+    logger.log?.(msg);
+}
+"#,
+    );
+
+    let args = default_args();
+    let result = compile(&args, base).expect("compile should succeed");
+
+    assert!(result.diagnostics.is_empty(), "Should compile without errors: {:?}", result.diagnostics);
+
+    let js = std::fs::read_to_string(base.join("dist/src/optcall.js")).expect("read js");
+    assert!(!js.is_empty(), "JS output should not be empty");
+}
