@@ -2209,7 +2209,6 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                         _ => false,
                     };
                 }
-
                 if pattern_fn.this_type.is_none() && !has_param_infer && has_return_infer {
                     let mut match_function_return = |source_type: TypeId,
                                                      source_fn_id: FunctionShapeId,

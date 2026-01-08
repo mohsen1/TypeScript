@@ -10,9 +10,7 @@ Priority: 2
 - [EM: Assign next task]
 
 ## Task Queue
-- [ ] Convert async computed `super[...]` TODOs in `wasm/src/emitter_transform_integration_tests.rs` into passing assertions (prioritize returned arrow + nested arrow cases, including no-args returns where body currently drops).
-- [ ] Audit `_super` helper emission in `wasm/src/transforms/async_es5.rs` to ensure computed element access uses `.call` with correct receiver (no `void 0["m"]` or leftover `super[...]`).
-- [ ] Add regression coverage for computed `super[...]` inside async arrow returns with `this`/`arguments` capture.
+- [ ] [EM: Add queued tasks]
 
 ## Completed
 - [x] Lowered async ES5 computed `super[...]` element access in returned/nested arrows + updated integration expectations; `./wasm/test.sh` failed at `emitter_edge_case_tests::test_export_assignment_suppresses_other_exports` (unrelated).

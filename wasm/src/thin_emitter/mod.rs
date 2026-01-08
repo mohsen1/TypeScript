@@ -217,6 +217,8 @@ pub struct ThinPrinter<'a> {
     /// Transform directives from lowering pass (optional, defaults to empty)
     pub(super) transforms: TransformContext,
 
+    /// Emit `void 0` for missing initializers during recovery.
+    pub(super) emit_missing_initializer_as_void_0: bool,
 
     /// Source text for detecting single-line constructs
     pub(super) source_text: Option<&'a str>,
@@ -261,6 +263,7 @@ impl<'a> ThinPrinter<'a> {
             writer,
             ctx,
             transforms: TransformContext::new(), // Empty by default, can be set later
+            emit_missing_initializer_as_void_0: false,
             source_text: None,
             source_map_text: None,
             last_processed_pos: 0,

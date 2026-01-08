@@ -3786,6 +3786,54 @@ fn test_void_return_exception_subtype() {
 }
 
 #[test]
+fn test_void_return_exception_method_property() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    let method_name = interner.intern_string("m");
+
+    let returns_number = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let returns_void = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let source = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: returns_number,
+        write_type: returns_number,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+    let target = interner.object(vec![PropertyInfo {
+        name: method_name,
+        type_id: returns_void,
+        write_type: returns_void,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(!checker.is_subtype_of(source, target));
+
+    checker.allow_void_return = true;
+    assert!(checker.is_subtype_of(source, target));
+    assert!(!checker.is_subtype_of(target, source));
+}
+
+#[test]
 fn test_constructor_void_exception_subtype() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
@@ -3972,6 +4020,102 @@ fn test_this_parameter_function_property_contravariant() {
 
     assert!(checker.is_subtype_of(wide_obj, narrow_obj));
     assert!(!checker.is_subtype_of(narrow_obj, wide_obj));
+}
+
+#[test]
+fn test_this_parameter_method_source_bivariant_against_function_property() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    let name = interner.intern_string("m");
+
+    let wide_this = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let narrow_this = TypeId::STRING;
+
+    let narrow_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(narrow_this),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let wide_func = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(wide_this),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let source = interner.object(vec![PropertyInfo {
+        name,
+        type_id: narrow_method,
+        write_type: narrow_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    let target = interner.object(vec![PropertyInfo {
+        name,
+        type_id: wide_func,
+        write_type: wide_func,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_subtype_of(source, target));
+}
+
+#[test]
+fn test_this_parameter_function_source_bivariant_against_method_property() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    let name = interner.intern_string("m");
+
+    let wide_this = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    let narrow_this = TypeId::STRING;
+
+    let narrow_func = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(narrow_this),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let wide_method = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(wide_this),
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let source = interner.object(vec![PropertyInfo {
+        name,
+        type_id: narrow_func,
+        write_type: narrow_func,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let target = interner.object(vec![PropertyInfo {
+        name,
+        type_id: wide_method,
+        write_type: wide_method,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(checker.is_subtype_of(source, target));
 }
 
 #[test]
