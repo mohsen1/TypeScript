@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added parity test for async iteration (for await...of) in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (14 tests).
 - [x] Added parity test for default export class in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (13 tests).
 - [x] Added parity test for rest parameters in arrow function in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (12 tests).
 - [x] Added parity test for async generator function in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (11 tests).
