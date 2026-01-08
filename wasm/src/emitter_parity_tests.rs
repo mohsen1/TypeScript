@@ -2865,3 +2865,200 @@ fn test_parity_es5_async_generator_await_yield() {
         output
     );
 }
+
+/// Parity test for ES5 class decorator downlevel.
+/// Class decorators should use __decorate helper.
+#[test]
+fn test_parity_es5_class_decorator() {
+    let source = r#"function sealed(constructor: Function) {}
+
+@sealed
+class Greeter {
+    greeting: string;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("Greeter"),
+        "Output should define Greeter class: {}",
+        output
+    );
+    // Decorator syntax should not appear directly in ES5 output
+    assert!(
+        !output.contains("@sealed"),
+        "ES5 output should not contain @sealed decorator syntax: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": Function"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 method decorator downlevel.
+/// Method decorators should use __decorate helper.
+#[test]
+fn test_parity_es5_method_decorator() {
+    let source = r#"function log(target: any, key: string, descriptor: PropertyDescriptor) {}
+
+class Calculator {
+    @log
+    add(a: number, b: number): number {
+        return a + b;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("Calculator"),
+        "Output should define Calculator class: {}",
+        output
+    );
+    // Decorator syntax should not appear directly in ES5 output
+    assert!(
+        !output.contains("@log"),
+        "ES5 output should not contain @log decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": number") && !output.contains(": any") && !output.contains("PropertyDescriptor"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 property decorator downlevel.
+/// Property decorators should use __decorate helper.
+#[test]
+fn test_parity_es5_property_decorator() {
+    let source = r#"function observable(target: any, key: string) {}
+
+class User {
+    @observable
+    name: string = "";
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("User"),
+        "Output should define User class: {}",
+        output
+    );
+    // Decorator syntax should not appear directly in ES5 output
+    assert!(
+        !output.contains("@observable"),
+        "ES5 output should not contain @observable decorator syntax: {}",
+        output
+    );
+    // Type annotation should be erased
+    assert!(
+        !output.contains(": string") && !output.contains(": any"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 parameter decorator downlevel.
+/// Parameter decorators should use __param helper.
+#[test]
+fn test_parity_es5_parameter_decorator() {
+    let source = r#"function inject(target: any, key: string, index: number) {}
+
+class Service {
+    constructor(@inject private dep: any) {}
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify class exists
+    assert!(
+        output.contains("Service"),
+        "Output should define Service class: {}",
+        output
+    );
+    // Decorator syntax should not appear directly in ES5 output
+    assert!(
+        !output.contains("@inject"),
+        "ES5 output should not contain @inject decorator syntax: {}",
+        output
+    );
+    // Type annotations should be erased
+    assert!(
+        !output.contains(": any") && !output.contains(": number"),
+        "Type annotations should be erased: {}",
+        output
+    );
+}
