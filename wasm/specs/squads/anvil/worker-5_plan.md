@@ -7,10 +7,12 @@ Status: Active
 Priority: 5
 
 ## Current Assignment
-- [EM: Assign initial task]
+- Expand async ES5 source-map coverage for loop/try constructs in `wasm/src/source_map_tests.rs` (e.g., `for` init/condition/increment awaits, `do/while` await condition); ensure mappings are non-trivial; run `./wasm/test.sh`.
 
 ## Task Queue
-- [ ] [EM: Add queued tasks]
+- [ ] Add async `for` loop mapping tests with await in init/condition/update positions.
+- [ ] Add async `do/while` or `switch` mapping test with await in the condition/discriminant.
+- [ ] Add an async `try/finally` mapping test to cover await in `finally` and verify map entries.
 
 ## Completed
 - [x] (Move finished items here with brief notes and tests run)
@@ -19,8 +21,10 @@ Priority: 5
 No
 
 ## Notes
+- Project Direction: integration and conformance-first; prioritize emitter fidelity (ES5 downleveling/source maps) before new features.
 - Follow `wasm/specs/WASM_ARCHITECTURE.md`
 - Use Docker for Rust tests: `./wasm/test.sh`
+- Conformance focus: tie regressions to official TypeScript conformance cases when possible.
 - Commit format: `[wasm] emitter: <description>` or `[wasm] cli: <description>`
 - Sync before each task: `git fetch origin && git merge origin/rust --no-edit`
 - Push to: `origin/worker/anvil-5`

@@ -217,6 +217,8 @@ pub struct ThinPrinter<'a> {
     /// Transform directives from lowering pass (optional, defaults to empty)
     pub(super) transforms: TransformContext,
 
+    /// Emit `void 0` for missing initializers during recovery.
+    pub(super) emit_missing_initializer_as_void_0: bool,
 
     /// Source text for detecting single-line constructs
     pub(super) source_text: Option<&'a str>,
@@ -261,6 +263,7 @@ impl<'a> ThinPrinter<'a> {
             writer,
             ctx,
             transforms: TransformContext::new(), // Empty by default, can be set later
+            emit_missing_initializer_as_void_0: false,
             source_text: None,
             source_map_text: None,
             last_processed_pos: 0,
@@ -505,11 +508,26 @@ impl<'a> ThinPrinter<'a> {
                 // Delegate to existing ClassES5Emitter
                 let mut es5_emitter = ClassES5Emitter::new(self.arena);
                 es5_emitter.set_indent_level(self.writer.indent_level());
-                if let Some(source_text) = self.source_text {
-                    es5_emitter.set_source_text(source_text);
+                if let Some(text) = self.source_text_for_map() {
+                    if self.writer.has_source_map() {
+                        es5_emitter
+                            .set_source_map_context(text, self.writer.current_source_index());
+                    } else {
+                        es5_emitter.set_source_text(text);
+                    }
                 }
                 let es5_output = es5_emitter.emit_class(class_node);
-                self.write(&es5_output);
+                let es5_mappings = es5_emitter.take_mappings();
+                if !es5_mappings.is_empty() && self.writer.has_source_map() {
+                    self.writer.write("");
+                    let base_line = self.writer.current_line();
+                    let base_column = self.writer.current_column();
+                    self.writer
+                        .add_offset_mappings(base_line, base_column, &es5_mappings);
+                    self.writer.write(&es5_output);
+                } else {
+                    self.write(&es5_output);
+                }
             }
             EmitDirective::ES5ClassExpression { class_node } => {
                 self.emit_class_expression_es5(class_node);
@@ -665,11 +683,26 @@ impl<'a> ThinPrinter<'a> {
             EmitDirective::ES5Class { class_node } => {
                 let mut es5_emitter = ClassES5Emitter::new(self.arena);
                 es5_emitter.set_indent_level(self.writer.indent_level());
-                if let Some(source_text) = self.source_text {
-                    es5_emitter.set_source_text(source_text);
+                if let Some(text) = self.source_text_for_map() {
+                    if self.writer.has_source_map() {
+                        es5_emitter
+                            .set_source_map_context(text, self.writer.current_source_index());
+                    } else {
+                        es5_emitter.set_source_text(text);
+                    }
                 }
                 let es5_output = es5_emitter.emit_class(*class_node);
-                self.write(&es5_output);
+                let es5_mappings = es5_emitter.take_mappings();
+                if !es5_mappings.is_empty() && self.writer.has_source_map() {
+                    self.writer.write("");
+                    let base_line = self.writer.current_line();
+                    let base_column = self.writer.current_column();
+                    self.writer
+                        .add_offset_mappings(base_line, base_column, &es5_mappings);
+                    self.writer.write(&es5_output);
+                } else {
+                    self.write(&es5_output);
+                }
             }
             EmitDirective::ES5ClassExpression { class_node } => {
                 self.emit_class_expression_es5(*class_node);
@@ -768,11 +801,26 @@ impl<'a> ThinPrinter<'a> {
             EmitDirective::ES5Class { class_node } => {
                 let mut es5_emitter = ClassES5Emitter::new(self.arena);
                 es5_emitter.set_indent_level(self.writer.indent_level());
-                if let Some(source_text) = self.source_text {
-                    es5_emitter.set_source_text(source_text);
+                if let Some(text) = self.source_text_for_map() {
+                    if self.writer.has_source_map() {
+                        es5_emitter
+                            .set_source_map_context(text, self.writer.current_source_index());
+                    } else {
+                        es5_emitter.set_source_text(text);
+                    }
                 }
                 let es5_output = es5_emitter.emit_class(*class_node);
-                self.write(&es5_output);
+                let es5_mappings = es5_emitter.take_mappings();
+                if !es5_mappings.is_empty() && self.writer.has_source_map() {
+                    self.writer.write("");
+                    let base_line = self.writer.current_line();
+                    let base_column = self.writer.current_column();
+                    self.writer
+                        .add_offset_mappings(base_line, base_column, &es5_mappings);
+                    self.writer.write(&es5_output);
+                } else {
+                    self.write(&es5_output);
+                }
             }
             EmitDirective::ES5ClassExpression { class_node } => {
                 self.emit_class_expression_es5(*class_node);
@@ -1728,7 +1776,7 @@ impl<'a> ThinPrinter<'a> {
             let before_len = self.writer.len();
             self.emit(stmt_idx);
             // Only add newline if something was actually emitted
-            if self.writer.len() > before_len {
+            if self.writer.len() > before_len && !self.writer.is_at_line_start() {
                 self.write_line();
             }
         }

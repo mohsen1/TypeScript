@@ -46,6 +46,7 @@ impl<'a> ThinPrinter<'a> {
                 self.write(";");
             }
         }
+        self.write_line();
     }
 
     pub(super) fn emit_commonjs_default_export_expr(&mut self, node: &ThinNode, idx: NodeIndex) {
@@ -91,11 +92,24 @@ impl<'a> ThinPrinter<'a> {
         let temp_name = format!("{}_default", self.get_temp_var_name());
         let mut es5_emitter = ClassES5Emitter::new(self.arena);
         es5_emitter.set_indent_level(self.writer.indent_level());
-        if let Some(source_text) = self.source_text {
-            es5_emitter.set_source_text(source_text);
+        if let Some(text) = self.source_text_for_map() {
+            if self.writer.has_source_map() {
+                es5_emitter.set_source_map_context(text, self.writer.current_source_index());
+            } else {
+                es5_emitter.set_source_text(text);
+            }
         }
         let es5_output = es5_emitter.emit_class_with_name(class_node, &temp_name);
-        self.write(&es5_output);
+        let mappings = es5_emitter.take_mappings();
+        if !mappings.is_empty() && self.writer.has_source_map() {
+            self.writer.write("");
+            let base_line = self.writer.current_line();
+            let base_column = self.writer.current_column();
+            self.writer.add_offset_mappings(base_line, base_column, &mappings);
+            self.writer.write(&es5_output);
+        } else {
+            self.write(&es5_output);
+        }
         self.write_line();
         self.write("exports.default = ");
         self.write(&temp_name);

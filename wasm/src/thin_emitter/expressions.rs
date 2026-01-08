@@ -68,6 +68,30 @@ impl<'a> ThinPrinter<'a> {
                         }
                     }
                 }
+                if expr_node.kind == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION {
+                    if let Some(access) = self.arena.get_access_expr(expr_node) {
+                        if let Some(base) = self.arena.get(access.expression) {
+                            if base.kind == SyntaxKind::SuperKeyword as u16 {
+                                self.write("_super.prototype[");
+                                self.emit(access.name_or_argument);
+                                self.write("].call(");
+                                if self.ctx.arrow_state.this_capture_depth > 0 {
+                                    self.write("_this");
+                                } else {
+                                    self.write("this");
+                                }
+                                if let Some(ref args) = call.arguments {
+                                    for &arg_idx in &args.nodes {
+                                        self.write(", ");
+                                        self.emit(arg_idx);
+                                    }
+                                }
+                                self.write(")");
+                                return;
+                            }
+                        }
+                    }
+                }
             }
         }
 

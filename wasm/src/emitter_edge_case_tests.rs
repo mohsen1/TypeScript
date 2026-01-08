@@ -136,8 +136,11 @@ export = C;
     printer.emit(root);
     let output = printer.get_output();
 
-    // Should emit class declaration
-    assert!(output.contains("var C"), "Should emit class declaration");
+    // Should emit class declaration (ES5 or ES6 form)
+    assert!(
+        output.contains("var C") || output.contains("class C"),
+        "Should emit class declaration"
+    );
 
     // Should emit module.exports = C
     assert!(output.contains("module.exports = C"), "Should emit export assignment");

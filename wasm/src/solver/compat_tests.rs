@@ -159,6 +159,33 @@ fn test_error_poisoning_assignability() {
 }
 
 #[test]
+fn test_error_poisoning_union_normalization() {
+    let interner = TypeInterner::new();
+
+    let union = interner.union(vec![TypeId::STRING, TypeId::ERROR]);
+    assert_eq!(union, TypeId::ERROR);
+}
+
+#[test]
+fn test_recursion_depth_limit_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    fn nest_array(interner: &TypeInterner, base: TypeId, depth: usize) -> TypeId {
+        let mut ty = base;
+        for _ in 0..depth {
+            ty = interner.array(ty);
+        }
+        ty
+    }
+
+    let deep_string = nest_array(&interner, TypeId::STRING, 120);
+    let deep_number = nest_array(&interner, TypeId::NUMBER, 120);
+
+    assert!(checker.is_assignable(deep_string, deep_number));
+}
+
+#[test]
 fn test_base_constraint_assignability_compat() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
@@ -260,6 +287,19 @@ fn test_function_variance_strict() {
     });
 
     assert!(!checker.is_assignable(fn_dog, fn_animal));
+}
+
+#[test]
+fn test_array_covariance_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let (animal, dog) = make_animal_dog(&interner);
+    let dog_array = interner.array(dog);
+    let animal_array = interner.array(animal);
+
+    assert!(checker.is_assignable(dog_array, animal_array));
+    assert!(!checker.is_assignable(animal_array, dog_array));
 }
 
 #[test]
@@ -1060,10 +1100,63 @@ fn test_explain_failure_reports_rest_mismatch() {
         is_constructor: false,
     });
 
+    let reason = checker.explain_failure(source, target);
     assert!(matches!(
-        checker.explain_failure(source, target),
+        reason,
         Some(SubtypeFailureReason::ParameterTypeMismatch { .. })
     ));
+    if let Some(SubtypeFailureReason::ParameterTypeMismatch { param_index, source_param, target_param }) = reason
+    {
+        assert_eq!(param_index, 1);
+        assert_eq!(source_param, TypeId::STRING);
+        assert_eq!(target_param, TypeId::NUMBER);
+    }
+}
+
+#[test]
+fn test_explain_failure_reports_rest_mismatch_source_rest() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let source = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: interner.array(TypeId::STRING),
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let target = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::NUMBER,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let reason = checker.explain_failure(source, target);
+    assert!(matches!(
+        reason,
+        Some(SubtypeFailureReason::ParameterTypeMismatch { .. })
+    ));
+    if let Some(SubtypeFailureReason::ParameterTypeMismatch { param_index, source_param, target_param }) = reason
+    {
+        assert_eq!(param_index, 0);
+        assert_eq!(source_param, TypeId::STRING);
+        assert_eq!(target_param, TypeId::NUMBER);
+    }
 }
 
 #[test]
@@ -1776,6 +1869,33 @@ fn test_apparent_number_method_assignable() {
 }
 
 #[test]
+fn test_apparent_number_method_not_assignable_to_number() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let to_fixed = interner.intern_string("toFixed");
+    let to_fixed_type = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: None,
+        return_type: TypeId::STRING,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let target = interner.object(vec![PropertyInfo {
+        name: to_fixed,
+        type_id: to_fixed_type,
+        write_type: to_fixed_type,
+        optional: false,
+        readonly: false,
+        is_method: true,
+    }]);
+
+    assert!(!checker.is_assignable(target, TypeId::NUMBER));
+}
+
+#[test]
 fn test_apparent_number_member_rejects_mismatch() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
@@ -2235,6 +2355,90 @@ fn test_mapped_type_over_number_keys_assignable() {
 }
 
 #[test]
+fn test_mapped_type_over_string_keys_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::STRING));
+    let mapped = interner.mapped(MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint,
+        name_type: None,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let to_upper = interner.intern_string("toUpperCase");
+    let expected = interner.object(vec![PropertyInfo {
+        name: to_upper,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let mismatch = interner.object(vec![PropertyInfo {
+        name: to_upper,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_assignable(mapped, expected));
+    assert!(!checker.is_assignable(mapped, mismatch));
+    assert!(!checker.is_assignable(expected, mapped));
+}
+
+#[test]
+fn test_mapped_type_over_boolean_keys_assignable() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::BOOLEAN));
+    let mapped = interner.mapped(MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint,
+        name_type: None,
+        template: TypeId::NUMBER,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let to_string = interner.intern_string("toString");
+    let expected = interner.object(vec![PropertyInfo {
+        name: to_string,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let mismatch = interner.object(vec![PropertyInfo {
+        name: to_string,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_assignable(mapped, expected));
+    assert!(!checker.is_assignable(mapped, mismatch));
+    assert!(!checker.is_assignable(expected, mapped));
+}
+
+#[test]
 fn test_mapped_type_key_remap_filters_keys() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
@@ -2399,6 +2603,50 @@ fn test_keyof_union_index_signature_assignable() {
 }
 
 #[test]
+fn test_keyof_union_intersection_only_shared_keys() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let prop_a = PropertyInfo {
+        name: interner.intern_string("a"),
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    };
+    let prop_b = PropertyInfo {
+        name: interner.intern_string("b"),
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    };
+    let prop_c = PropertyInfo {
+        name: interner.intern_string("c"),
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    };
+
+    let obj_ab = interner.object(vec![prop_a.clone(), prop_b]);
+    let obj_ac = interner.object(vec![prop_a, prop_c]);
+    let union = interner.union(vec![obj_ab, obj_ac]);
+    let keyof_union = interner.intern(TypeKey::KeyOf(union));
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let key_c = interner.literal_string("c");
+
+    assert!(checker.is_assignable(key_a, keyof_union));
+    assert!(!checker.is_assignable(key_b, keyof_union));
+    assert!(!checker.is_assignable(key_c, keyof_union));
+}
+
+#[test]
 fn test_intersection_reduction_disjoint_discriminant_assignable() {
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
@@ -2425,4 +2673,43 @@ fn test_intersection_reduction_disjoint_discriminant_assignable() {
 
     assert!(checker.is_assignable(intersection, TypeId::NEVER));
     assert!(checker.is_assignable(intersection, TypeId::STRING));
+}
+
+#[test]
+fn test_intersection_reduction_disjoint_primitives() {
+    let interner = TypeInterner::new();
+
+    let intersection = interner.intersection(vec![TypeId::STRING, TypeId::NUMBER]);
+
+    assert_eq!(intersection, TypeId::NEVER);
+}
+
+#[test]
+fn test_unique_symbol_nominal_assignability() {
+    let interner = TypeInterner::new();
+    let mut checker = CompatChecker::new(&interner);
+
+    let sym_a = interner.intern(TypeKey::UniqueSymbol(SymbolRef(1)));
+    let sym_b = interner.intern(TypeKey::UniqueSymbol(SymbolRef(2)));
+
+    assert!(checker.is_assignable(sym_a, TypeId::SYMBOL));
+    assert!(!checker.is_assignable(TypeId::SYMBOL, sym_a));
+    assert!(checker.is_assignable(sym_a, sym_a));
+    assert!(!checker.is_assignable(sym_a, sym_b));
+}
+
+#[test]
+fn test_template_literal_expansion_limit_widens_to_string() {
+    let interner = TypeInterner::new();
+
+    let count = crate::solver::TEMPLATE_LITERAL_EXPANSION_LIMIT + 1;
+    let mut members = Vec::with_capacity(count);
+    for idx in 0..count {
+        let literal = interner.literal_string(&format!("k{idx}"));
+        members.push(literal);
+    }
+    let union = interner.union(members);
+    let template = interner.template_literal(vec![TemplateSpan::Type(union)]);
+
+    assert_eq!(template, TypeId::STRING);
 }
