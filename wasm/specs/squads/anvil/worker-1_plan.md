@@ -8,12 +8,13 @@ Priority: 1
 Blocked: Awaiting next EM-Anvil assignment.
 
 ## Current Assignment
-- [ ] Add ES5 class tests for satisfies expressions in `wasm/src/transforms/class_es5_tests.rs`. Run `./wasm/test.sh class_es5_tests`.
+- [ ] (awaiting next EM-Anvil assignment)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added ES5 tests for satisfies expressions (6 tests): field initializer, in method, static field, in constructor, array literal, in derived class. Ran `./wasm/test.sh class_es5_tests` (all 147 pass).
 - [x] Added ES5 tests for override keyword (6 tests): basic override, accessor, multiple methods, multi-level inheritance, with super call, abstract method. Ran `./wasm/test.sh class_es5_tests` (all 141 pass).
 - [x] Added ES5 tests for class field decorators (6 tests): basic decorator, with initializer, static field, multiple decorators, in derived class, with accessor. Ran `./wasm/test.sh class_es5_tests` (all 135 pass).
 - [x] Added ES5 tests for ambient/declare classes (6 tests): basic declare, with methods, with static, with extends, with implements, with constructor. Fixed ClassES5Emitter to skip declare classes. Ran `./wasm/test.sh class_es5_tests` (all 129 pass).
