@@ -19,6 +19,7 @@ Priority: 3
 - [x] Solver variance: method vs function `this` parameter assignability tests in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_this_parameter_`.
 - [x] Solver variance: optional/rest + `this` parameter assignability for method vs function properties in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_variance_optional_rest_`.
 - [x] Solver unsoundness: void return exception coverage in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_void_return_exception_subtype`.
+- [x] Solver unsoundness: method bivariance regression in `wasm/src/solver/subtype_tests.rs`. Tests: `./wasm/test.sh test_method_bivariant_required_param`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
