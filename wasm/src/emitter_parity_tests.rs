@@ -2118,3 +2118,110 @@ fn test_parity_es5_rest_params() {
         output
     );
 }
+
+/// Parity test for ES5 class static block downlevel.
+/// Static blocks should be converted to static initialization code.
+#[test]
+fn test_parity_es5_static_block() {
+    let source = r#"class Counter {
+    static count = 0;
+    static {
+        Counter.count = 10;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Counter") || output.contains("function Counter"),
+        "ES5 output should define Counter: {}",
+        output
+    );
+    // Static block syntax should not appear in ES5 output
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+    // Static initialization should occur
+    assert!(
+        output.contains("Counter.count"),
+        "ES5 output should have static property access: {}",
+        output
+    );
+}
+
+/// Parity test for ES5 class static block with multiple statements.
+/// Multiple statements in static block should be preserved.
+#[test]
+fn test_parity_es5_static_block_multi_stmt() {
+    let source = r#"class Config {
+    static debug = false;
+    static version = "";
+    static {
+        Config.debug = true;
+        Config.version = "1.0.0";
+        console.log("Initialized");
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = &parser.arena;
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    options.module = ModuleKind::None;
+
+    let ctx = EmitContext::with_options(options.clone());
+    let lowering = LoweringPass::new(arena, &ctx);
+    let transforms = lowering.run(root);
+
+    let mut printer = ThinPrinter::with_transforms_and_options(arena, transforms, options);
+    printer.set_source_text(source);
+    printer.set_target_es5(true);
+    printer.emit(root);
+
+    let output = printer.get_output();
+
+    // Verify ES5 class structure
+    assert!(
+        output.contains("var Config") || output.contains("function Config"),
+        "ES5 output should define Config: {}",
+        output
+    );
+    // Static block syntax should not appear in ES5 output
+    assert!(
+        !output.contains("static {"),
+        "ES5 output should not contain static block syntax: {}",
+        output
+    );
+    // All static property assignments should occur
+    assert!(
+        output.contains("Config.debug") && output.contains("Config.version"),
+        "ES5 output should have static property assignments: {}",
+        output
+    );
+    // Console.log call should be preserved
+    assert!(
+        output.contains("console.log"),
+        "ES5 output should preserve console.log call: {}",
+        output
+    );
+}
