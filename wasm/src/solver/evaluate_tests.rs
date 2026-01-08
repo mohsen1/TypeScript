@@ -15207,3 +15207,1255 @@ fn test_double_readonly() {
     let result = evaluate_type(&interner, double_readonly);
     assert!(result != TypeId::ERROR, "Double readonly should evaluate without error");
 }
+
+// =============================================================================
+// Mapped Type Edge Cases - Homomorphic
+// =============================================================================
+
+#[test]
+fn test_homomorphic_mapped_identity_no_changes() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T]: T[K] } is identity - should return same shape
+    // When T = { a: string; b: number }
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_t = interner.intern(TypeKey::KeyOf(t_type));
+    let t_k = interner.intern(TypeKey::IndexAccess(t_type, k_type));
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_t,
+        name_type: None,
+        template: t_k,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, source_obj);
+
+    let result = instantiate_type(&interner, mapped, &subst);
+    assert!(result != TypeId::ERROR, "Homomorphic identity should work");
+}
+
+#[test]
+fn test_homomorphic_mapped_adds_readonly() {
+    let interner = TypeInterner::new();
+
+    // { readonly [K in keyof T]: T[K] } adds readonly to all properties
+    // When T = { a: string; b: number }
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_t = interner.intern(TypeKey::KeyOf(t_type));
+    let t_k = interner.intern(TypeKey::IndexAccess(t_type, k_type));
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_t,
+        name_type: None,
+        template: t_k,
+        readonly_modifier: Some(MappedModifier::Add), // +readonly
+        optional_modifier: None,
+    });
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, source_obj);
+
+    let result = instantiate_type(&interner, mapped, &subst);
+    assert!(result != TypeId::ERROR, "Homomorphic +readonly should work");
+}
+
+#[test]
+fn test_homomorphic_mapped_adds_optional() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T]?: T[K] } adds optional to all properties
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_t = interner.intern(TypeKey::KeyOf(t_type));
+    let t_k = interner.intern(TypeKey::IndexAccess(t_type, k_type));
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_t,
+        name_type: None,
+        template: t_k,
+        readonly_modifier: None,
+        optional_modifier: Some(MappedModifier::Add), // +?
+    });
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, source_obj);
+
+    let result = instantiate_type(&interner, mapped, &subst);
+    assert!(result != TypeId::ERROR, "Homomorphic +? should work");
+}
+
+#[test]
+fn test_homomorphic_mapped_removes_both_modifiers() {
+    let interner = TypeInterner::new();
+
+    // { -readonly [K in keyof T]-?: T[K] } removes both modifiers
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true,
+            readonly: true,
+            is_method: false,
+        },
+    ]);
+
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_t = interner.intern(TypeKey::KeyOf(t_type));
+    let t_k = interner.intern(TypeKey::IndexAccess(t_type, k_type));
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_t,
+        name_type: None,
+        template: t_k,
+        readonly_modifier: Some(MappedModifier::Remove), // -readonly
+        optional_modifier: Some(MappedModifier::Remove), // -?
+    });
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, source_obj);
+
+    let result = instantiate_type(&interner, mapped, &subst);
+    assert!(result != TypeId::ERROR, "Homomorphic -readonly -? should work");
+}
+
+#[test]
+fn test_homomorphic_mapped_on_union_type() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T]: T[K] } where T = A | B
+    // Should distribute over union
+
+    let obj_a = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let obj_b = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let union_ab = interner.union(vec![obj_a, obj_b]);
+
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_t = interner.intern(TypeKey::KeyOf(t_type));
+    let t_k = interner.intern(TypeKey::IndexAccess(t_type, k_type));
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_t,
+        name_type: None,
+        template: t_k,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, union_ab);
+
+    let result = instantiate_type(&interner, mapped, &subst);
+    assert!(result != TypeId::ERROR, "Homomorphic on union should work");
+}
+
+#[test]
+fn test_homomorphic_mapped_on_intersection_type() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T]: T[K] } where T = A & B
+    // Should work on intersection
+
+    let obj_a = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let obj_b = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let intersection_ab = interner.intersection(vec![obj_a, obj_b]);
+
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_t = interner.intern(TypeKey::KeyOf(t_type));
+    let t_k = interner.intern(TypeKey::IndexAccess(t_type, k_type));
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_t,
+        name_type: None,
+        template: t_k,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, intersection_ab);
+
+    let result = instantiate_type(&interner, mapped, &subst);
+    assert!(result != TypeId::ERROR, "Homomorphic on intersection should work");
+}
+
+#[test]
+fn test_homomorphic_mapped_with_conditional_template() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T]: T[K] extends string ? "str" : "other" }
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_t = interner.intern(TypeKey::KeyOf(t_type));
+    let t_k = interner.intern(TypeKey::IndexAccess(t_type, k_type));
+
+    let str_lit = interner.literal_string("str");
+    let other_lit = interner.literal_string("other");
+
+    let template = interner.conditional(ConditionalType {
+        check_type: t_k,
+        extends_type: TypeId::STRING,
+        true_type: str_lit,
+        false_type: other_lit,
+        is_distributive: false,
+    });
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_t,
+        name_type: None,
+        template,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, source_obj);
+
+    let result = instantiate_type(&interner, mapped, &subst);
+    assert!(result != TypeId::ERROR, "Homomorphic with conditional template should work");
+}
+
+// =============================================================================
+// Mapped Type Edge Cases - Key Remapping
+// =============================================================================
+
+#[test]
+fn test_key_remap_with_template_literal_getters() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T as `get${Capitalize<K>}`]: () => T[K] }
+    // Getters pattern: { a: string } -> { getA: () => string }
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("name"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_t = interner.intern(TypeKey::KeyOf(t_type));
+    let t_k = interner.intern(TypeKey::IndexAccess(t_type, k_type));
+
+    // Capitalize<K> - modeled as type application
+    let capitalize_symbol = SymbolRef(312);
+    let capitalize_base = interner.reference(capitalize_symbol);
+    let cap_k = interner.application(capitalize_base, vec![k_type]);
+
+    // `get${Capitalize<K>}`
+    let name_type = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("get")),
+        TemplateSpan::Type(cap_k),
+    ]);
+
+    // () => T[K]
+    let getter_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None,
+        return_type: t_k,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_t,
+        name_type: Some(name_type),
+        template: getter_fn,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, source_obj);
+
+    let result = instantiate_type(&interner, mapped, &subst);
+    assert!(result != TypeId::ERROR, "Key remap with template literal getters should work");
+}
+
+#[test]
+fn test_key_remap_with_template_literal_setters() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T as `set${Capitalize<K>}`]: (value: T[K]) => void }
+    // Setters pattern
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("value"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let keyof_t = interner.intern(TypeKey::KeyOf(t_type));
+    let t_k = interner.intern(TypeKey::IndexAccess(t_type, k_type));
+
+    // Capitalize<K> - modeled as type application
+    let capitalize_symbol = SymbolRef(312);
+    let capitalize_base = interner.reference(capitalize_symbol);
+    let cap_k = interner.application(capitalize_base, vec![k_type]);
+
+    // `set${Capitalize<K>}`
+    let name_type = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("set")),
+        TemplateSpan::Type(cap_k),
+    ]);
+
+    // (value: T[K]) => void
+    let setter_fn = interner.function(FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("value")),
+            type_id: t_k,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    });
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_t,
+        name_type: Some(name_type),
+        template: setter_fn,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, source_obj);
+
+    let result = instantiate_type(&interner, mapped, &subst);
+    assert!(result != TypeId::ERROR, "Key remap with template literal setters should work");
+}
+
+#[test]
+fn test_key_remap_filter_all_to_never() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T as never]: T[K] }
+    // Should produce empty object
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: None,
+        default: None,
+    };
+
+    let keyof_t = interner.intern(TypeKey::KeyOf(t_type));
+    let t_k = interner.intern(TypeKey::IndexAccess(t_type, interner.intern(TypeKey::TypeParameter(k_param.clone()))));
+
+    let mapped = interner.mapped(MappedType {
+        type_param: k_param,
+        constraint: keyof_t,
+        name_type: Some(TypeId::NEVER), // All keys remapped to never = filtered out
+        template: t_k,
+        readonly_modifier: None,
+        optional_modifier: None,
+    });
+
+    let mut subst = TypeSubstitution::new();
+    subst.insert(t_name, source_obj);
+
+    let result = instantiate_type(&interner, mapped, &subst);
+    assert!(result != TypeId::ERROR, "Key remap all to never should produce empty object");
+}
+
+#[test]
+fn test_key_remap_with_exclude_pattern() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T as Exclude<K, "b">]: T[K] }
+    // Omit pattern - exclude key "b"
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: Some(keys),
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // Exclude<K, "b"> = K extends "b" ? never : K
+    let exclude_cond = interner.conditional(ConditionalType {
+        check_type: k_type,
+        extends_type: key_b,
+        true_type: TypeId::NEVER,
+        false_type: k_type,
+        is_distributive: true,
+    });
+
+    let template = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: keys,
+        name_type: Some(exclude_cond),
+        template,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR, "Key remap with Exclude pattern should work");
+}
+
+#[test]
+fn test_key_remap_with_extract_pattern() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T as Extract<K, "a">]: T[K] }
+    // Pick pattern - only keep key "a"
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: Some(keys),
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // Extract<K, "a"> = K extends "a" ? K : never
+    let extract_cond = interner.conditional(ConditionalType {
+        check_type: k_type,
+        extends_type: key_a,
+        true_type: k_type,
+        false_type: TypeId::NEVER,
+        is_distributive: true,
+    });
+
+    let template = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: keys,
+        name_type: Some(extract_cond),
+        template,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR, "Key remap with Extract pattern should work");
+}
+
+#[test]
+fn test_key_remap_uppercase_keys() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T as Uppercase<K>]: T[K] }
+    // { a: string } -> { A: string }
+
+    let key_a = interner.literal_string("a");
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: Some(key_a),
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // Uppercase<K> - modeled as type application
+    let uppercase_symbol = SymbolRef(310);
+    let uppercase_base = interner.reference(uppercase_symbol);
+    let upper_k = interner.application(uppercase_base, vec![k_type]);
+
+    let template = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: key_a,
+        name_type: Some(upper_k),
+        template,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR, "Key remap with Uppercase should work");
+}
+
+#[test]
+fn test_key_remap_lowercase_keys() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T as Lowercase<K>]: T[K] }
+    // { A: string } -> { a: string }
+
+    let key_upper = interner.literal_string("A");
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("A"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: Some(key_upper),
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // Lowercase<K> - modeled as type application
+    let lowercase_symbol = SymbolRef(311);
+    let lowercase_base = interner.reference(lowercase_symbol);
+    let lower_k = interner.application(lowercase_base, vec![k_type]);
+
+    let template = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: key_upper,
+        name_type: Some(lower_k),
+        template,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR, "Key remap with Lowercase should work");
+}
+
+#[test]
+fn test_key_remap_with_prefix_template() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T as `_${K}`]: T[K] }
+    // Add underscore prefix to all keys
+
+    let key_a = interner.literal_string("a");
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: Some(key_a),
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // `_${K}`
+    let underscore = interner.literal_string("_");
+    let name_type = interner.template_literal(vec![underscore, k_type]);
+
+    let template = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: key_a,
+        name_type: Some(name_type),
+        template,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR, "Key remap with prefix template should work");
+}
+
+#[test]
+fn test_key_remap_with_suffix_template() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T as `${K}Changed`]: T[K] }
+    // Add suffix to all keys
+
+    let key_a = interner.literal_string("value");
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("value"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: Some(key_a),
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // `${K}Changed`
+    let suffix = interner.literal_string("Changed");
+    let name_type = interner.template_literal(vec![k_type, suffix]);
+
+    let template = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: key_a,
+        name_type: Some(name_type),
+        template,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR, "Key remap with suffix template should work");
+}
+
+#[test]
+fn test_key_remap_filter_by_value_type() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T as T[K] extends string ? K : never]: T[K] }
+    // Only keep keys whose values are strings
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: Some(keys),
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let t_k = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    // T[K] extends string ? K : never
+    let name_type = interner.conditional(ConditionalType {
+        check_type: t_k,
+        extends_type: TypeId::STRING,
+        true_type: k_type,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    });
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: keys,
+        name_type: Some(name_type),
+        template: t_k,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR, "Key remap filtering by value type should work");
+}
+
+#[test]
+fn test_key_remap_multiple_keys_to_same() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T as "shared"]: T[K] }
+    // All keys remap to same name - values should union
+
+    let key_a = interner.literal_string("a");
+    let key_b = interner.literal_string("b");
+    let keys = interner.union(vec![key_a, key_b]);
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("b"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: Some(keys),
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let shared_key = interner.literal_string("shared");
+    let template = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: keys,
+        name_type: Some(shared_key), // All keys map to "shared"
+        template,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR, "Key remap colliding keys should produce union value");
+}
+
+#[test]
+fn test_key_remap_preserves_optionality() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T as `new_${K}`]: T[K] }
+    // Remapped keys should preserve original optional modifiers
+
+    let key_a = interner.literal_string("a");
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: true, // optional
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: Some(key_a),
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let prefix = interner.literal_string("new_");
+    let name_type = interner.template_literal(vec![prefix, k_type]);
+
+    let template = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: key_a,
+        name_type: Some(name_type),
+        template,
+        readonly_modifier: None,
+        optional_modifier: None, // No modifier change - should preserve
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR, "Key remap should preserve optionality");
+}
+
+#[test]
+fn test_key_remap_with_conditional_rename() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T as K extends "old" ? "new" : K]: T[K] }
+    // Rename specific key while keeping others
+
+    let key_old = interner.literal_string("old");
+    let key_other = interner.literal_string("other");
+    let keys = interner.union(vec![key_old, key_other]);
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("old"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: interner.intern_string("other"),
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: Some(keys),
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    let key_new = interner.literal_string("new");
+
+    // K extends "old" ? "new" : K
+    let name_type = interner.conditional(ConditionalType {
+        check_type: k_type,
+        extends_type: key_old,
+        true_type: key_new,
+        false_type: k_type,
+        is_distributive: true,
+    });
+
+    let template = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: keys,
+        name_type: Some(name_type),
+        template,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR, "Key remap with conditional rename should work");
+}
+
+#[test]
+fn test_key_remap_symbol_keys_filtered() {
+    let interner = TypeInterner::new();
+
+    // { [K in keyof T as K extends symbol ? never : K]: T[K] }
+    // Filter out symbol keys
+
+    let key_a = interner.literal_string("a");
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: interner.intern_string("a"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: Some(key_a),
+        default: None,
+    };
+    let k_type = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // K extends symbol ? never : K
+    let name_type = interner.conditional(ConditionalType {
+        check_type: k_type,
+        extends_type: TypeId::SYMBOL,
+        true_type: TypeId::NEVER,
+        false_type: k_type,
+        is_distributive: true,
+    });
+
+    let template = interner.intern(TypeKey::IndexAccess(source_obj, k_type));
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: key_a,
+        name_type: Some(name_type),
+        template,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    assert!(result != TypeId::ERROR, "Key remap filtering symbols should work");
+}
+
+#[test]
+fn test_mapped_empty_constraint() {
+    let interner = TypeInterner::new();
+
+    // { [K in never]: string }
+    // Should produce empty object
+
+    let k_name = interner.intern_string("K");
+    let k_param = TypeParamInfo {
+        name: k_name,
+        constraint: Some(TypeId::NEVER),
+        default: None,
+    };
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: TypeId::NEVER,
+        name_type: None,
+        template: TypeId::STRING,
+        readonly_modifier: None,
+        optional_modifier: None,
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+    // Should be empty object
+    let empty_obj = interner.object(vec![]);
+    assert_eq!(result, empty_obj, "Mapped over never should produce empty object");
+}
