@@ -193,6 +193,8 @@ Priority: 5
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_delete_mapping`.
 - [x] Added ES5 async compound assignment await source map mapping test in `wasm/src/source_map_tests.rs`.
       Tests: `./wasm/test.sh test_source_map_es5_transform_async_compound_assignment_mapping`.
+- [x] Added ES5 async sequence await source map mapping test in `wasm/src/source_map_tests.rs`.
+      Tests: `./wasm/test.sh test_source_map_es5_transform_async_sequence_await_mapping`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
