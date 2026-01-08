@@ -73,6 +73,7 @@ Priority: 4
 - [x] Add source map multiple files test. Tests: `./wasm/test.sh multiple_files`
 - [x] Add inline source map generation test. Tests: `./wasm/test.sh inline_generation`
 - [x] Add class private fields source-map test. Tests: `./wasm/test.sh private_fields_mapping`
+- [x] Add nullish coalescing source-map test. Tests: `./wasm/test.sh nullish_coalescing_mapping`
 
 ## Ready for Merge
 Yes
