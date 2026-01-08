@@ -30,7 +30,7 @@ Priority: 3
 - [x] Rechecked FunctionId build error in `wasm/src/solver/evaluate.rs` after sync; not reproducible. Tests: `./wasm/test.sh` (fails: `parallel::tests::test_check_redux_lodash_style_generics` assertion left 6 right 0 at `wasm/src/parallel_tests.rs:437:5`).
 
 ## Ready for Merge
-Yes
+No
 
 ## Notes
 - Project Direction: integration and conformance-first; prioritize solver correctness (inference/conditional/subtype) before new features.
