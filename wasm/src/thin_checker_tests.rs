@@ -7213,3 +7213,313 @@ declare const end: ExtractElementNonDist<string[]>;
         checker.ctx.diagnostics
     );
 }
+
+// =========================================================================
+// Redux/Lodash Pattern Minimal Repros (Support for Worker 2)
+// These tests isolate specific patterns from test_check_redux_lodash_style_generics
+// =========================================================================
+
+/// Minimal repro: Conditional type with infer for extracting state type
+/// Pattern: `R extends Reducer<infer S, any> ? S : never`
+#[test]
+fn test_redux_pattern_extract_state_with_infer() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Reducer<S, A> = (state: S | undefined, action: A) => S;
+
+type ExtractState<R> = R extends Reducer<infer S, any> ? S : never;
+
+// Test extraction: should infer S = number
+type NumberReducer = Reducer<number, { type: string }>;
+type ExtractedState = ExtractState<NumberReducer>;
+
+// Verify the extracted state type
+declare const s: ExtractedState;
+const n: number = s;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Print diagnostics for debugging
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Redux Pattern: ExtractState Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "ExtractState pattern should work: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Minimal repro: Mapped type over keyof with conditional extraction
+/// Pattern: `{ [K in keyof R]: ExtractState<R[K]> }`
+#[test]
+fn test_redux_pattern_state_from_reducers_mapped() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Reducer<S, A> = (state: S | undefined, action: A) => S;
+type AnyAction = { type: string };
+
+type ExtractState<R> = R extends Reducer<infer S, AnyAction> ? S : never;
+
+type StateFromReducers<R> = { [K in keyof R]: ExtractState<R[K]> };
+
+interface Reducers {
+    count: Reducer<number, AnyAction>;
+    message: Reducer<string, AnyAction>;
+}
+
+type AppState = StateFromReducers<Reducers>;
+
+// Verify the mapped type evaluates correctly
+declare const state: AppState;
+const c: number = state.count;
+const m: string = state.message;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Redux Pattern: StateFromReducers Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "StateFromReducers mapped type should work: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Minimal repro: DeepPartial recursive mapped type
+/// Pattern: `{ [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K] }`
+#[test]
+fn test_redux_pattern_deep_partial() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type DeepPartial<T> = {
+    [K in keyof T]?: T[K] extends object ? DeepPartial<T[K]> : T[K];
+};
+
+interface State {
+    count: number;
+    message: string;
+    nested: { value: number };
+}
+
+type PartialState = DeepPartial<State>;
+
+// Verify partial assignment works
+const patch: PartialState = { message: "ok" };
+const partial: PartialState = { nested: { value: 42 } };
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Redux Pattern: DeepPartial Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "DeepPartial mapped type should work: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Minimal repro: Generic function returning conditional type
+/// Pattern: `function createStore<R>(r: R): Store<StateFromReducer<R>>`
+#[test]
+fn test_redux_pattern_generic_function_with_conditional_return() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type Reducer<S> = (state: S | undefined) => S;
+type ExtractState<R> = R extends Reducer<infer S> ? S : never;
+
+interface Store<S> {
+    getState: () => S;
+}
+
+function createStore<R extends Reducer<any>>(reducer: R): Store<ExtractState<R>> {
+    return { getState: () => ({} as ExtractState<R>) };
+}
+
+const numberReducer: Reducer<number> = (state = 0) => state;
+const store = createStore(numberReducer);
+
+// The returned store should have getState returning number
+const state = store.getState();
+const n: number = state;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Redux Pattern: createStore Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Generic function with conditional return should work: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Minimal repro: Index access on union to extract union of types
+/// Pattern: `ActionFromReducers<R> = { [K in keyof R]: ExtractAction<R[K]> }[keyof R]`
+#[test]
+fn test_redux_pattern_indexed_access_on_mapped_union() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type AnyAction = { type: string };
+type Reducer<S, A extends AnyAction> = (state: S | undefined, action: A) => S;
+
+type ExtractAction<R> = R extends Reducer<any, infer A> ? A : never;
+
+type ActionFromReducers<R> = { [K in keyof R]: ExtractAction<R[K]> }[keyof R];
+
+interface Reducers {
+    count: Reducer<number, { type: "inc" } | { type: "dec" }>;
+    message: Reducer<string, { type: "set"; payload: string }>;
+}
+
+type AllActions = ActionFromReducers<Reducers>;
+
+// AllActions should be the union of all action types
+declare const action: AllActions;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Redux Pattern: ActionFromReducers Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "Indexed access on mapped type union should work: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Minimal repro: ReducersMapObject constraint with homomorphic mapped type
+/// Pattern: `type ReducersMapObject<S, A> = { [K in keyof S]: Reducer<S[K], A> }`
+#[test]
+fn test_redux_pattern_reducers_map_object() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+type AnyAction = { type: string; payload?: any };
+type Reducer<S, A extends AnyAction> = (state: S | undefined, action: A) => S;
+
+type ReducersMapObject<S, A extends AnyAction> = {
+    [K in keyof S]: Reducer<S[K], A>;
+};
+
+interface RootState {
+    count: number;
+    message: string;
+}
+
+type RootReducers = ReducersMapObject<RootState, AnyAction>;
+
+// Create concrete reducers
+const counterReducer: Reducer<number, AnyAction> = (state = 0, action) => state;
+const messageReducer: Reducer<string, AnyAction> = (state = "", action) => state;
+
+// This should type-check: reducers match the expected shape
+const reducers: RootReducers = {
+    count: counterReducer,
+    message: messageReducer,
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    if !checker.ctx.diagnostics.is_empty() {
+        eprintln!("=== Redux Pattern: ReducersMapObject Diagnostics ===");
+        for diag in &checker.ctx.diagnostics {
+            eprintln!("[{}] {}", diag.start, diag.message_text);
+        }
+    }
+
+    assert!(
+        checker.ctx.diagnostics.is_empty(),
+        "ReducersMapObject constraint should work: {:?}",
+        checker.ctx.diagnostics
+    );
+}

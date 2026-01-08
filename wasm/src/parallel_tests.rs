@@ -377,6 +377,12 @@ const rootReducers: RootReducers = {
 const incAction: ActionByType<AppAction, "inc"> = { type: "inc" };
 "#.to_string()),
         ("store.ts".to_string(), r#"
+interface Store<S, A> {
+  getState: () => S;
+  dispatch: (action: A) => A;
+  replaceState: (next: DeepPartial<S>) => void;
+}
+
 type StateFromReducer<R> = R extends Reducer<infer S, AnyAction> ? S : never;
 type ActionFromReducer<R> = R extends Reducer<any, infer A> ? A : AnyAction;
 
