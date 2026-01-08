@@ -4356,6 +4356,79 @@ fn test_conditional_infer_function_param_non_distributive_union_input() {
 }
 
 #[test]
+fn test_conditional_infer_function_param_non_distributive_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [(arg: infer R) => void] ? R : never, with T = ((arg: string) => void) | number.
+    let extends_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: infer_r,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_fn,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    subst.insert(t_name, interner.union(vec![string_fn, TypeId::NUMBER]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
+}
+
+#[test]
 fn test_conditional_infer_function_rest_param_distributive() {
     let interner = TypeInterner::new();
 
@@ -4434,6 +4507,80 @@ fn test_conditional_infer_function_rest_param_distributive() {
         interner.array(TypeId::NUMBER),
     ]);
     assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_function_rest_param_non_distributive_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [(...args: infer R) => void] ? R : never, with T = ((...args: string[]) => void)
+    // | number.
+    let extends_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: infer_r,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_fn,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_fn = interner.function(FunctionShape {
+        params: vec![ParamInfo {
+            name: None,
+            type_id: interner.array(TypeId::STRING),
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    subst.insert(t_name, interner.union(vec![string_fn, TypeId::NUMBER]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
 }
 
 #[test]
@@ -4570,6 +4717,70 @@ fn test_conditional_infer_function_this_param_non_distributive_union_input() {
     let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
     assert_eq!(result, expected);
+}
+
+#[test]
+fn test_conditional_infer_function_this_param_non_distributive_union_branch() {
+    let interner = TypeInterner::new();
+
+    let t_name = interner.intern_string("T");
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    }));
+
+    let infer_name = interner.intern_string("R");
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: infer_name,
+        constraint: None,
+        default: None,
+    }));
+
+    // [T] extends [(this: infer R) => void] ? R : never, with T = ((this: string) => void)
+    // | number.
+    let extends_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: Some(infer_r),
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    let cond = ConditionalType {
+        check_type: interner.tuple(vec![TupleElement {
+            type_id: t_param,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        extends_type: interner.tuple(vec![TupleElement {
+            type_id: extends_fn,
+            name: None,
+            optional: false,
+            rest: false,
+        }]),
+        true_type: infer_r,
+        false_type: TypeId::NEVER,
+        is_distributive: false,
+    };
+
+    let cond_type = interner.conditional(cond);
+    let mut subst = TypeSubstitution::new();
+    let string_fn = interner.function(FunctionShape {
+        params: Vec::new(),
+        this_type: Some(TypeId::STRING),
+        return_type: TypeId::VOID,
+        type_params: Vec::new(),
+        type_predicate: None,
+        is_constructor: false,
+    });
+    subst.insert(t_name, interner.union(vec![string_fn, TypeId::NUMBER]));
+
+    let instantiated = instantiate_type(&interner, cond_type, &subst);
+    let result = evaluate_type(&interner, instantiated);
+
+    assert_eq!(result, TypeId::NEVER);
 }
 
 #[test]
