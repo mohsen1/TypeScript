@@ -475,6 +475,27 @@ fn test_collect_export_names_with_multiple_named_exports() {
 }
 
 #[test]
+fn test_collect_export_names_with_string_named_exports() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = "const foo = 1; export { foo as \"foo-bar\" };";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let Some(source_file) = parser.arena.get_source_file(parser.arena.get(root).unwrap()) else {
+        panic!("Failed to get source file");
+    };
+
+    let export_names = collect_export_names(&parser.arena, &source_file.statements.nodes);
+
+    assert_eq!(
+        export_names,
+        vec!["foo-bar"],
+        "Expected string-named export to be collected"
+    );
+}
+
+#[test]
 fn test_collect_export_names_with_export_import_equals() {
     use crate::thin_parser::ThinParserState;
 
