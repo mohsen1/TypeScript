@@ -7,13 +7,15 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- Emitter fidelity: own the `emitter_parity_tests::test_parity_async_es5` investigation. Run the targeted test, capture expected vs actual output, and implement the minimal fix in `wasm/src/thin_emitter/async_es5.rs` or related helpers.
+- Ask manager for next assignment (no additional ES5 class parity gaps after fix).
 
 ## Task Queue
-- [ ] After fixing parity_async_es5, verify ES5 downleveling edge cases for `this` capture and `super()` + property initializer ordering.
+- [ ] Stand by for next emitter/LSP task.
 
 ## Completed
-- [x] (Move finished items here with brief notes and tests run.)
+- [x] Async ES5 parity investigation: parity test passed; fixed nested arrow `this` capture in async ES5 emission; tests `./wasm/test.sh test_parity_async_es5`, `./wasm/test.sh nested_arrow`.
+- [x] ES5 downleveling edge cases: fixed default-constructor arrow `this` capture and preserved pre-super statements with property initializer ordering; tests `./wasm/test.sh class_es5`.
+- [x] ES5 class parity gap: legacy emitter now downlevels classes when targeting ES5; test `./wasm/test.sh test_parity_es5_class`.
 
 ## Notes
 - Follow `wasm/specs/WASM_ARCHITECTURE.md` and `wasm/specs/SOLVER.md` when applicable.
