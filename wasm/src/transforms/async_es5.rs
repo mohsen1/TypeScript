@@ -187,6 +187,15 @@ impl<'a> AsyncES5Emitter<'a> {
             return true;
         }
 
+        // Check spread elements (array/object literals)
+        if node.kind == syntax_kind_ext::SPREAD_ELEMENT {
+            if node.has_data() {
+                if let Some(spread) = self.arena.unary_exprs_ex.get(node.data_index as usize) {
+                    return self.contains_await_recursive(spread.expression);
+                }
+            }
+        }
+
         // Don't recurse into nested functions (they have their own async context)
         if node.kind == syntax_kind_ext::FUNCTION_DECLARATION
             || node.kind == syntax_kind_ext::FUNCTION_EXPRESSION

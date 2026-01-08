@@ -34,6 +34,7 @@ Priority: 4
 - [x] Add async await detection for object literals. Tests: `./wasm/test.sh body_contains_await_in_object_literal`
 - [x] Add async await detection for array literals. Tests: `./wasm/test.sh body_contains_await_in_array_literal`
 - [x] Add async await detection for computed object literal names. Tests: `./wasm/test.sh body_contains_await_in_object_literal_computed_name`
+- [x] Add async await detection for object literal spreads. Tests: `./wasm/test.sh body_contains_await_in_object_literal_spread`
 - [x] Add derived ctor param property ordering test. Tests: `./wasm/test.sh derived_constructor_orders_param_property`
 - [x] Add derived ctor private field ordering test. Tests: `./wasm/test.sh derived_constructor_orders_private`
 - [x] Add async await property name source-map coverage. Tests: `./wasm/test.sh async_await_property_name_mapping`
