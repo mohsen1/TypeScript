@@ -13,6 +13,7 @@ Priority: 2
 - [ ] [EM: Add queued tasks]
 
 ## Completed
+- [x] Added parity test for array destructuring params ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (22 tests).
 - [x] Added parity test for for...of loop ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (21 tests).
 - [x] Added parity test for default parameters ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (20 tests).
 - [x] Added parity test for method shorthand ES5 downlevel in `emitter_parity_tests.rs`; `./wasm/test.sh emitter_parity` passed (19 tests).
