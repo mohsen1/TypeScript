@@ -6,8 +6,8 @@ set -euo pipefail
 # =============================================================================
 # Creates a hierarchical AI agent organization:
 #   Window 1 (director): Director agent
-#   Window 2 (solver):   EM-Solver + 3 Workers
-#   Window 3 (tools):    EM-Tools + 3 Workers
+#   Window 2 (forge):    EM-Forge + 5 Workers (type system)
+#   Window 3 (anvil):    EM-Anvil + 5 Workers (output)
 # =============================================================================
 
 SESSION="zang-org"
@@ -27,12 +27,13 @@ EM_POKE="${EM_POKE:-continue}"
 WORKER_IDLE_SECONDS="${WORKER_IDLE_SECONDS:-180}"
 WORKER_POKE="${WORKER_POKE:-continue with your plan.}"
 
-# Startup
+# Startup - longer delays to ensure codex is fully loaded
 WORKER_START_PROMPT="${WORKER_START_PROMPT:-continue with your plan.}"
 EM_START_PROMPT="${EM_START_PROMPT:-continue}"
 DIRECTOR_START_PROMPT="${DIRECTOR_START_PROMPT:-continue}"
-START_PAUSE="${START_PAUSE:-30}"
-SEND_ENTER_PAUSE="${SEND_ENTER_PAUSE:-2}"
+START_PAUSE="${START_PAUSE:-45}"
+SEND_ENTER_PAUSE="${SEND_ENTER_PAUSE:-3}"
+STAGGER_PAUSE="${STAGGER_PAUSE:-5}"
 
 AUTO_MONITOR="${AUTO_MONITOR:-0}"
 AUTO_ATTACH="${AUTO_ATTACH:-1}"
@@ -122,7 +123,7 @@ fi
 # =============================================================================
 SPEC_DIR="$ROOT_DIR/wasm/specs"
 SQUAD_DIR="$SPEC_DIR/squads"
-mkdir -p "$SQUAD_DIR/solver" "$SQUAD_DIR/tools"
+mkdir -p "$SQUAD_DIR/forge" "$SQUAD_DIR/anvil"
 
 # =============================================================================
 # Create initial GOALS.md files if they don't exist
@@ -170,8 +171,8 @@ EOF
   fi
 }
 
-create_goals_if_missing "solver"
-create_goals_if_missing "tools"
+create_goals_if_missing "forge"
+create_goals_if_missing "anvil"
 
 # =============================================================================
 # Create initial worker plan files if they don't exist
@@ -216,8 +217,8 @@ EOF
   fi
 }
 
-for squad in solver tools; do
-  for n in 1 2 3 4; do
+for squad in forge anvil; do
+  for n in 1 2 3 4 5; do
     create_worker_plan_if_missing "$squad" "$n"
   done
 done
@@ -251,17 +252,19 @@ ensure_worktree() {
 # =============================================================================
 # Ensure worktrees for all workers (using simple variables instead of assoc array)
 # =============================================================================
-WORKTREE_solver_1=""
-WORKTREE_solver_2=""
-WORKTREE_solver_3=""
-WORKTREE_solver_4=""
-WORKTREE_tools_1=""
-WORKTREE_tools_2=""
-WORKTREE_tools_3=""
-WORKTREE_tools_4=""
+WORKTREE_forge_1=""
+WORKTREE_forge_2=""
+WORKTREE_forge_3=""
+WORKTREE_forge_4=""
+WORKTREE_forge_5=""
+WORKTREE_anvil_1=""
+WORKTREE_anvil_2=""
+WORKTREE_anvil_3=""
+WORKTREE_anvil_4=""
+WORKTREE_anvil_5=""
 
-for squad in solver tools; do
-  for n in 1 2 3 4; do
+for squad in forge anvil; do
+  for n in 1 2 3 4 5; do
     name="${squad}-${n}"
     if dir="$(ensure_worktree "$name")"; then
       eval "WORKTREE_${squad}_${n}=\"$dir\""
@@ -315,7 +318,7 @@ sleep "$SEND_ENTER_PAUSE"
 tmux send-keys -t "$SESSION:director.0" C-m
 
 # =============================================================================
-# Helper: Setup squad window (EM + 4 workers)
+# Helper: Setup squad window (EM + 5 workers)
 # =============================================================================
 setup_squad_window() {
   local squad="$1"
@@ -331,7 +334,7 @@ setup_squad_window() {
   tmux send-keys -t "$SESSION:$window.0" "export SQUAD_NAME=$squad && bash -lc '$em_cmd'" C-m
   tmux select-pane -t "$SESSION:$window.0" -T "em-$squad" 2>/dev/null || true
 
-  # Create layout: EM + 4 workers
+  # Create layout: EM + 5 workers (3x2 grid)
   # Split horizontally: creates pane 1 (right)
   local worker1_dir
   worker1_dir="$(get_worktree_dir "$squad" 1)"
@@ -348,7 +351,7 @@ setup_squad_window() {
   tmux send-keys -t "$SESSION:$window.2" "bash -lc '$worker_cmd'" C-m
   tmux select-pane -t "$SESSION:$window.2" -T "${squad}-2" 2>/dev/null || true
 
-  # Split pane 1 vertically: creates pane 3 (bottom-right top)
+  # Split pane 1 vertically: creates pane 3
   local worker3_dir
   worker3_dir="$(get_worktree_dir "$squad" 3)"
   [ -z "$worker3_dir" ] && worker3_dir="$ROOT_DIR"
@@ -356,13 +359,21 @@ setup_squad_window() {
   tmux send-keys -t "$SESSION:$window.3" "bash -lc '$worker_cmd'" C-m
   tmux select-pane -t "$SESSION:$window.3" -T "${squad}-3" 2>/dev/null || true
 
-  # Split pane 3 vertically: creates pane 4 (bottom-right bottom)
+  # Split pane 2 vertically: creates pane 4
   local worker4_dir
   worker4_dir="$(get_worktree_dir "$squad" 4)"
   [ -z "$worker4_dir" ] && worker4_dir="$ROOT_DIR"
-  tmux split-window -v -t "$SESSION:$window.3" -c "$worker4_dir"
+  tmux split-window -v -t "$SESSION:$window.2" -c "$worker4_dir"
   tmux send-keys -t "$SESSION:$window.4" "bash -lc '$worker_cmd'" C-m
   tmux select-pane -t "$SESSION:$window.4" -T "${squad}-4" 2>/dev/null || true
+
+  # Split pane 3 vertically: creates pane 5
+  local worker5_dir
+  worker5_dir="$(get_worktree_dir "$squad" 5)"
+  [ -z "$worker5_dir" ] && worker5_dir="$ROOT_DIR"
+  tmux split-window -v -t "$SESSION:$window.3" -c "$worker5_dir"
+  tmux send-keys -t "$SESSION:$window.5" "bash -lc '$worker_cmd'" C-m
+  tmux select-pane -t "$SESSION:$window.5" -T "${squad}-5" 2>/dev/null || true
 
   # Balance the layout
   tmux select-layout -t "$SESSION:$window" tiled
@@ -375,9 +386,9 @@ setup_squad_window() {
   sleep "$SEND_ENTER_PAUSE"
   tmux send-keys -t "$SESSION:$window.0" C-m
 
-  # Worker starts (staggered slightly)
-  for pane in 1 2 3 4; do
-    sleep 3
+  # Worker starts (staggered to allow each codex to fully load)
+  for pane in 1 2 3 4 5; do
+    sleep "$STAGGER_PAUSE"
     tmux send-keys -t "$SESSION:$window.$pane" "$WORKER_START_PROMPT"
     sleep "$SEND_ENTER_PAUSE"
     tmux send-keys -t "$SESSION:$window.$pane" C-m
@@ -385,14 +396,14 @@ setup_squad_window() {
 }
 
 # =============================================================================
-# Window 2: Solver Squad
+# Window 2: Forge Squad (Type System - solver, checker, binder, types)
 # =============================================================================
-setup_squad_window "solver"
+setup_squad_window "forge"
 
 # =============================================================================
-# Window 3: Tools Squad
+# Window 3: Anvil Squad (Output - emitter, transforms, cli, lsp)
 # =============================================================================
-setup_squad_window "tools"
+setup_squad_window "anvil"
 
 # =============================================================================
 # Select director window
@@ -478,7 +489,7 @@ set_last_change() {
 while tmux has-session -t "$SESSION" 2>/dev/null; do
   now=$(date +%s)
 
-  for window in director solver tools; do
+  for window in director forge anvil; do
     if ! tmux list-windows -t "$SESSION" -F "#{window_name}" | grep -qx "$window"; then
       continue
     fi
@@ -555,12 +566,12 @@ echo "Session: $SESSION"
 echo ""
 echo "Windows:"
 echo "  1. director  - Director agent"
-echo "  2. solver    - EM-Solver + 4 Workers"
-echo "  3. tools     - EM-Tools + 4 Workers"
+echo "  2. forge     - EM-Forge + 5 Workers (type system)"
+echo "  3. anvil     - EM-Anvil + 5 Workers (output)"
 echo ""
 echo "Worktrees:"
-for squad in solver tools; do
-  for n in 1 2 3 4; do
+for squad in forge anvil; do
+  for n in 1 2 3 4 5; do
     dir="$(get_worktree_dir "$squad" "$n")"
     [ -n "$dir" ] && echo "  ${squad}-${n}: $dir"
   done
@@ -568,8 +579,8 @@ done
 echo ""
 echo "Quick navigation:"
 echo "  tmux select-window -t $SESSION:director"
-echo "  tmux select-window -t $SESSION:solver"
-echo "  tmux select-window -t $SESSION:tools"
+echo "  tmux select-window -t $SESSION:forge"
+echo "  tmux select-window -t $SESSION:anvil"
 echo ""
 echo "Attach: tmux attach -t $SESSION"
 echo "Kill:   $0 --kill"

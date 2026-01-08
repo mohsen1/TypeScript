@@ -35,13 +35,33 @@ Human (sets Project Direction in README.md)
 3. **EM reports** (via tmux pane capture or goal file updates)
 
 ## What You Write
-1. **`squads/solver/GOALS.md`** - Strategic goals for the Solver squad
-2. **`squads/tools/GOALS.md`** - Strategic goals for the Tools squad
+1. **`squads/forge/GOALS.md`** - Strategic goals for the Forge squad
+2. **`squads/anvil/GOALS.md`** - Strategic goals for the Anvil squad
 3. **Executive Summary** in `wasm/README.md` (update the "Executive Summary" section only)
+4. **Squad priorities** - You can reprioritize squads or even reassign their focus areas as the project evolves
+
+## Squad Configuration (You Control This)
+
+You have full authority to:
+- **Reprioritize squads**: If Forge needs more focus, make it Priority 1
+- **Reassign focus areas**: If Anvil squad should help with Forge work, update their GOALS.md
+- **Create new squads**: If needed, define new squad directories and goals
+- **Merge/split squads**: Restructure as the project demands
+
+Current squads (you can change this):
+| Squad | Priority | Focus Areas | Workers |
+|-------|----------|-------------|---------|
+| forge | 1 | `solver/`, `checker/`, `binder/`, `types/` | 5 |
+| anvil | 2 | `lsp/`, `cli/`, `thin_emitter/`, `transforms/` | 5 |
+
+Squad names are abstract - Forge (type system, where types are shaped) and Anvil (output, where code is hammered into form).
+
+To change squad priority, update the "Priority" field in their GOALS.md.
+To reassign focus, update the "Focus Areas" section in their GOALS.md and notify the EM.
 
 ### GOALS.md Format
 ```markdown
-# Squad [Solver|Tools] Goals
+# Squad [Forge|Anvil] Goals
 
 Updated: YYYY-MM-DD
 
@@ -90,8 +110,8 @@ This is your management cycle. Run it continuously.
 cat wasm/README.md | head -100
 
 # Check squad goal files for staleness
-cat wasm/specs/squads/solver/GOALS.md
-cat wasm/specs/squads/tools/GOALS.md
+cat wasm/specs/squads/forge/GOALS.md
+cat wasm/specs/squads/anvil/GOALS.md
 ```
 
 ### 2. Parse Project Direction
@@ -136,8 +156,8 @@ cd /path/to/TypeScript  # main repo, rust branch
 git fetch origin
 
 # Merge squad branches (EMs maintain these)
-git merge origin/squad/solver --no-edit
-git merge origin/squad/tools --no-edit
+git merge origin/squad/forge --no-edit
+git merge origin/squad/anvil --no-edit
 
 # Push to origin/rust
 git push origin rust
@@ -150,52 +170,52 @@ If merge conflicts occur:
 
 **Hierarchy:**
 - Workers push to `origin/worker/<squad>-<N>`
-- EMs merge workers into `origin/squad/<squad>` (e.g., `squad/solver`)
+- EMs merge workers into `origin/squad/<squad>` (e.g., `squad/forge`)
 - Director merges squads into `origin/rust`
 
 **This step ensures no work is lost at the end of the day.**
 
 ## Squad Ownership Reference
 
-### Squad Solver (EM-Solver)
+### Squad Forge (EM-Forge) - Type System
 - `wasm/src/solver/` - Type inference, constraint solving
 - `wasm/src/checker/` - Type checking logic
 - `wasm/src/binder/` - Symbol binding, scope analysis
 - `wasm/src/types/` - Type representations
 
-### Squad Tools (EM-Tools)
-- `wasm/src/lsp/` - Language Server Protocol
-- `wasm/src/cli/` - Command-line interface
+### Squad Anvil (EM-Anvil) - Output
 - `wasm/src/thin_emitter/` - JavaScript emission
 - `wasm/src/transforms/` - ES5 downleveling, source maps
+- `wasm/src/cli/` - Command-line interface
+- `wasm/src/lsp/` - Language Server Protocol
 
 ## Communication via Tmux
 
 ### Check EM Status
 ```bash
-# Capture EM-Solver pane output
-tmux capture-pane -p -t zang-org:solver.0 -S -100
+# Capture EM-Forge pane output
+tmux capture-pane -p -t zang-org:forge.0 -S -100
 
-# Capture EM-Tools pane output
-tmux capture-pane -p -t zang-org:tools.0 -S -100
+# Capture EM-Anvil pane output
+tmux capture-pane -p -t zang-org:anvil.0 -S -100
 ```
 
 ### Send Message to EM
 ```bash
-# To EM-Solver
-tmux send-keys -t zang-org:solver.0 "your message"
+# To EM-Forge
+tmux send-keys -t zang-org:forge.0 "your message"
 sleep 1
-tmux send-keys -t zang-org:solver.0 C-m
+tmux send-keys -t zang-org:forge.0 C-m
 
-# To EM-Tools
-tmux send-keys -t zang-org:tools.0 "your message"
+# To EM-Anvil
+tmux send-keys -t zang-org:anvil.0 "your message"
 sleep 1
-tmux send-keys -t zang-org:tools.0 C-m
+tmux send-keys -t zang-org:anvil.0 C-m
 ```
 
 ### Cancel EM Operation (if needed)
 ```bash
-tmux send-keys -t zang-org:solver.0 Escape
+tmux send-keys -t zang-org:forge.0 Escape
 sleep 1
 ```
 

@@ -13,23 +13,25 @@ Director (sets GOALS.md)
     ↓
 ├── Worker 1
 ├── Worker 2
-└── Worker 3
+├── Worker 3
+├── Worker 4
+└── Worker 5
 ```
 
 ## Squad Identity
 
 **Read your environment variable `SQUAD_NAME` to know which squad you manage.**
 
-| SQUAD_NAME | Window | Crates Owned |
-|------------|--------|--------------|
-| `solver` | `zang-org:solver` | `solver/`, `checker/`, `binder/`, `types/` |
-| `tools` | `zang-org:tools` | `lsp/`, `cli/`, `thin_emitter/`, `transforms/` |
+| SQUAD_NAME | Window | Focus Areas |
+|------------|--------|-------------|
+| `forge` | `zang-org:forge` | `solver/`, `checker/`, `binder/`, `types/` (Type System) |
+| `anvil` | `zang-org:anvil` | `thin_emitter/`, `transforms/`, `cli/`, `lsp/` (Output) |
 
-Your workers are in panes 1-3 of your window. You are in pane 0.
+Your workers are in panes 1-5 of your window. You are in pane 0.
 
 ## Workspace Layout
 - Main repo: `TypeScript` (branch: `rust`)
-- Worker worktrees: `TypeScript-<squad>-<N>-track` (e.g., `TypeScript-solver-1-track`)
+- Worker worktrees: `TypeScript-<squad>-<N>-track` (e.g., `TypeScript-forge-1-track`)
 - Your specs: `TypeScript/wasm/specs/squads/<squad>/`
 
 ## Canonical References
@@ -46,7 +48,7 @@ Your workers are in panes 1-3 of your window. You are in pane 0.
 3. **Worker pane output** (via tmux capture)
 
 ## What You Write
-1. **`worker-1_plan.md`**, **`worker-2_plan.md`**, **`worker-3_plan.md`** in your squad directory
+1. **`worker-1_plan.md`** through **`worker-5_plan.md`** in your squad directory
 2. **Status updates** in GOALS.md (the "Squad Status" section only)
 
 ### Worker Plan Format
@@ -86,7 +88,7 @@ Priority: [1-3, lower is higher]
 - Change GOALS.md objectives (only update "Squad Status" section)
 
 ## Zero-Idle Policy
-Keep all 3 workers active at all times. If a worker finishes or stalls:
+Keep all 5 workers active at all times. If a worker finishes or stalls:
 1. Immediately assign the next task from the queue
 2. If queue is empty, break down the next GOALS.md objective into tasks
 
@@ -100,6 +102,8 @@ Before anything else, check all worker panes for prompts or stalls:
 tmux capture-pane -p -t zang-org:<squad>.1 -S -80  # Worker 1
 tmux capture-pane -p -t zang-org:<squad>.2 -S -80  # Worker 2
 tmux capture-pane -p -t zang-org:<squad>.3 -S -80  # Worker 3
+tmux capture-pane -p -t zang-org:<squad>.4 -S -80  # Worker 4
+tmux capture-pane -p -t zang-org:<squad>.5 -S -80  # Worker 5
 ```
 
 **Pane status heuristics:**
@@ -134,6 +138,7 @@ git merge origin/worker/<squad>-1 --no-edit
 git merge origin/worker/<squad>-2 --no-edit
 git merge origin/worker/<squad>-3 --no-edit
 git merge origin/worker/<squad>-4 --no-edit
+git merge origin/worker/<squad>-5 --no-edit
 
 # Push your squad branch (Director will merge into rust)
 git push origin squad/<squad>
@@ -164,8 +169,8 @@ Update the "Squad Status" section in GOALS.md:
 ```markdown
 ## Squad Status
 - Last EM Report: YYYY-MM-DD HH:MM
-- Workers Active: 3/3
-- Branches Pending Merge: worker/solver-2
+- Workers Active: 5/5
+- Branches Pending Merge: worker/forge-2
 - Current Focus: Generic inference in infer.rs
 - Blockers: None
 ```
@@ -176,19 +181,19 @@ Update the "Squad Status" section in GOALS.md:
 ```
 origin/rust          <- Director merges squad branches here
     ↑
-origin/squad/solver  <- EM-Solver merges worker branches here
-origin/squad/tools   <- EM-Tools merges worker branches here
+origin/squad/forge   <- EM-Forge merges worker branches here
+origin/squad/anvil   <- EM-Anvil merges worker branches here
     ↑
 origin/worker/<squad>-<N>  <- Workers push here
 ```
 
 ### Worker Branches
-- Branch naming: `worker/<squad>-<N>` (e.g., `worker/solver-1`)
+- Branch naming: `worker/<squad>-<N>` (e.g., `worker/forge-1`, `worker/anvil-3`)
 - Workers push to their branch, never to squad or rust
 - Workers mark "Ready for Merge: Yes" in their plan after pushing
 
 ### Squad Branch (Your Responsibility)
-- Branch naming: `squad/<squad>` (e.g., `squad/solver`)
+- Branch naming: `squad/<squad>` (e.g., `squad/forge`, `squad/anvil`)
 - You merge worker branches into your squad branch
 - Director merges squad branches into `rust`
 

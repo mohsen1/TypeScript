@@ -21,33 +21,42 @@ This document describes the hierarchical organization of AI agents for Project Z
           |                               |
           v                               v
     +------------+                  +------------+
-    | EM-Solver  |                  | EM-Tools   |
+    |  EM-Forge  |                  |  EM-Anvil  |
     | (Window 2) |                  | (Window 3) |
     +-----+------+                  +-----+------+
           |                               |
-    +-----+-----+-----+             +-----+-----+-----+
-    |     |     |     |             |     |     |     |
-    v     v     v     v             v     v     v     v
-   W1    W2    W3    W4            W1    W2    W3    W4
+    +--+--+--+--+--+               +--+--+--+--+--+
+    |  |  |  |  |  |               |  |  |  |  |  |
+    v  v  v  v  v  v               v  v  v  v  v  v
+   W1 W2 W3 W4 W5                 W1 W2 W3 W4 W5
 ```
+
+## Squad Names
+
+| Squad | Meaning | Focus |
+|-------|---------|-------|
+| **Forge** | Where metal is shaped by fire | Type system (solver, checker, binder) |
+| **Anvil** | Where metal is hammered into form | Output (emitter, transforms, cli, lsp) |
 
 ## Directory Layout
 
 ```
 wasm/specs/squads/
 ├── STRUCTURE.md          # This file
-├── solver/
+├── forge/
 │   ├── GOALS.md          # Strategic goals from Director
-│   ├── worker-1_plan.md  # Worker 1 tasks (EM-Solver assigns)
+│   ├── worker-1_plan.md  # Worker 1 tasks (EM-Forge assigns)
 │   ├── worker-2_plan.md  # Worker 2 tasks
 │   ├── worker-3_plan.md  # Worker 3 tasks
-│   └── worker-4_plan.md  # Worker 4 tasks
-└── tools/
+│   ├── worker-4_plan.md  # Worker 4 tasks
+│   └── worker-5_plan.md  # Worker 5 tasks
+└── anvil/
     ├── GOALS.md          # Strategic goals from Director
-    ├── worker-1_plan.md  # Worker 1 tasks (EM-Tools assigns)
+    ├── worker-1_plan.md  # Worker 1 tasks (EM-Anvil assigns)
     ├── worker-2_plan.md  # Worker 2 tasks
     ├── worker-3_plan.md  # Worker 3 tasks
-    └── worker-4_plan.md  # Worker 4 tasks
+    ├── worker-4_plan.md  # Worker 4 tasks
+    └── worker-5_plan.md  # Worker 5 tasks
 ```
 
 ## Role Responsibilities
@@ -59,106 +68,55 @@ wasm/specs/squads/
 
 ### Director
 - **Reads:** `wasm/README.md` (Project Direction)
-- **Writes:** `squads/solver/GOALS.md`, `squads/tools/GOALS.md`
+- **Writes:** `squads/forge/GOALS.md`, `squads/anvil/GOALS.md`
 - **Does NOT:** Write code, assign individual worker tasks
 - **Focus:** Strategic alignment, cross-squad coordination, risk escalation
+- **Can:** Reprioritize squads, reassign focus areas, restructure teams
 
 ### Engineering Managers (EMs)
 - **Reads:** Their squad's `GOALS.md`
 - **Writes:** Worker plan files (`worker-*_plan.md`)
 - **Does NOT:** Write code (except plan/doc edits for course correction)
 - **Focus:** Task breakdown, worker coordination, merge management
-- **Manages:** 4 workers per squad
+- **Manages:** 5 workers per squad
 
 ### Workers
 - **Reads:** Their `worker-*_plan.md`
 - **Writes:** Code in their assigned crates
-- **Does NOT:** Self-switch tasks, edit other squads' files
+- **Does NOT:** Self-switch tasks, edit other squads' files, edit management files
 - **Focus:** Execute assigned tasks, write tests, sync branches
 
-## Squad Ownership
+## Squad Ownership (Director can reassign)
 
-### Squad Solver (EM-Solver + 4 Workers)
-Owns these crates/directories:
+### Squad Forge (EM-Forge + 5 Workers)
+Default focus areas:
 - `wasm/src/solver/` - Type inference, constraint solving
 - `wasm/src/checker/` - Type checking logic
 - `wasm/src/binder/` - Symbol binding, scope analysis
 - `wasm/src/types/` - Type representations
 
-### Squad Tools (EM-Tools + 4 Workers)
-Owns these crates/directories:
-- `wasm/src/lsp/` - Language Server Protocol
-- `wasm/src/cli/` - Command-line interface
+### Squad Anvil (EM-Anvil + 5 Workers)
+Default focus areas:
 - `wasm/src/thin_emitter/` - JavaScript emission
 - `wasm/src/transforms/` - ES5 downleveling, source maps
-
-## File Naming Conventions
-
-### GOALS.md
-Written by Director. Format:
-```markdown
-# Squad [Name] Goals
-
-Updated: YYYY-MM-DD
-
-## Current Milestone
-[One-line description]
-
-## Objectives (Ranked)
-1. **[Objective Name]**
-   - Context: [why this matters]
-   - Success Criteria: [measurable outcome]
-   - Estimated Complexity: [Low/Medium/High]
-
-2. ...
-
-## Anti-Priorities
-- [Things NOT to work on]
-
-## Notes to EM
-- [Any context or constraints]
-```
-
-### worker-*_plan.md
-Written by EM. Format:
-```markdown
-# Worker [N] Plan
-
-## Mission
-[Squad-level mission statement]
-
-Status: Active
-Priority: [1-3]
-
-## Current Assignment
-- [Specific task with file paths]
-
-## Task Queue
-- [ ] [Next task]
-- [ ] [Future task]
-
-## Completed
-- [x] [Done task with notes]
-
-## Notes
-- [Any relevant context]
-```
+- `wasm/src/cli/` - Command-line interface
+- `wasm/src/lsp/` - Language Server Protocol
 
 ## Branch Hierarchy
 
 ```
-origin/rust                <- Director merges squad branches here
+origin/rust                <- Director merges squad branches
     ↑
-origin/squad/solver        <- EM-Solver merges worker branches here
-origin/squad/tools         <- EM-Tools merges worker branches here
+origin/squad/forge         <- EM-Forge merges worker branches
+origin/squad/anvil         <- EM-Anvil merges worker branches
     ↑
-origin/worker/<squad>-<N>  <- Workers push here (e.g., worker/solver-1)
+origin/worker/<squad>-<N>  <- Workers push here (e.g., worker/forge-1)
 ```
 
 ## Sync Protocol
 
 1. Workers sync from `origin/rust` before each task
-2. Workers push to `origin/worker/<squad>-<N>` (e.g., `worker/solver-1`)
+2. Workers push to `origin/worker/<squad>-<N>` (e.g., `worker/forge-1`)
 3. Workers mark "Ready for merge" in plan
 4. **EM merges worker branches into `origin/squad/<squad>`**
 5. **Director merges squad branches into `origin/rust`**
@@ -178,22 +136,22 @@ Window 1: director
 │            Director                 │
 └─────────────────────────────────────┘
 
-Window 2: solver (5 panes: 1 EM + 4 Workers)
+Window 2: forge (6 panes: 1 EM + 5 Workers)
 ┌─────────────────┬───────────────────┐
-│   EM-Solver     │     Worker 1      │
+│   EM-Forge      │     Worker 1      │
 ├─────────────────┼───────────────────┤
 │    Worker 2     │     Worker 3      │
 ├─────────────────┼───────────────────┤
-│                 │     Worker 4      │
+│    Worker 4     │     Worker 5      │
 └─────────────────┴───────────────────┘
 
-Window 3: tools (5 panes: 1 EM + 4 Workers)
+Window 3: anvil (6 panes: 1 EM + 5 Workers)
 ┌─────────────────┬───────────────────┐
-│   EM-Tools      │     Worker 1      │
+│   EM-Anvil      │     Worker 1      │
 ├─────────────────┼───────────────────┤
 │    Worker 2     │     Worker 3      │
 ├─────────────────┼───────────────────┤
-│                 │     Worker 4      │
+│    Worker 4     │     Worker 5      │
 └─────────────────┴───────────────────┘
 ```
 
