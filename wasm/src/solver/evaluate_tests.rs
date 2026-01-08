@@ -10095,3 +10095,344 @@ fn test_conditional_parameters_with_rest() {
     let result = evaluate_conditional(&interner, &cond);
     assert!(result != TypeId::ERROR, "Parameters with rest should not produce error");
 }
+
+#[test]
+fn test_conditional_awaited_pattern() {
+    let interner = TypeInterner::new();
+
+    // Test Awaited<T> pattern: T extends Promise<infer U> ? U : T
+    // This unwraps Promise types to get the resolved value type
+
+    // Create Promise<string> as the check type
+    let promise_base = interner.reference(SymbolRef(200));
+    let promise_string = interner.application(promise_base, vec![TypeId::STRING]);
+
+    // Create infer U
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    }));
+
+    // Create Promise<infer U> as extends type
+    let promise_infer = interner.application(promise_base, vec![infer_u]);
+
+    // Awaited<T> = T extends Promise<infer U> ? U : T
+    let cond = ConditionalType {
+        check_type: promise_string,
+        extends_type: promise_infer,
+        true_type: infer_u,
+        false_type: promise_string, // Returns T if not a Promise
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert!(result != TypeId::ERROR, "Awaited pattern should not produce error type");
+}
+
+#[test]
+fn test_conditional_awaited_non_promise() {
+    let interner = TypeInterner::new();
+
+    // Test Awaited<T> with non-Promise type (should return T)
+    // Awaited<string> should return string
+
+    let promise_base = interner.reference(SymbolRef(201));
+
+    // Create infer U
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    }));
+
+    // Create Promise<infer U> as extends type
+    let promise_infer = interner.application(promise_base, vec![infer_u]);
+
+    // Awaited<string> - string doesn't extend Promise<infer U>, so returns string
+    let cond = ConditionalType {
+        check_type: TypeId::STRING,
+        extends_type: promise_infer,
+        true_type: infer_u,
+        false_type: TypeId::STRING,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert!(result != TypeId::ERROR, "Awaited with non-Promise should not produce error");
+}
+
+#[test]
+fn test_conditional_this_parameter_type_pattern() {
+    let interner = TypeInterner::new();
+
+    // Test ThisParameterType<T> pattern:
+    // T extends (this: infer U, ...args: any[]) => any ? U : unknown
+    // Extracts the `this` parameter type from a function
+
+    // Create a function with explicit this type: (this: Window) => void
+    let window_symbol = SymbolRef(210);
+    let window_type = interner.intern(TypeKey::Ref(window_symbol));
+
+    let fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: Some(window_type), // Explicit this parameter
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let fn_with_this = interner.function(fn_shape);
+
+    // Create infer U for the this type
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    }));
+
+    // Create extends type: (this: infer U, ...args: any[]) => any
+    let any_array = interner.array(TypeId::ANY);
+    let extends_fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: any_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: Some(infer_u),
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let extends_fn = interner.function(extends_fn_shape);
+
+    let cond = ConditionalType {
+        check_type: fn_with_this,
+        extends_type: extends_fn,
+        true_type: infer_u,
+        false_type: TypeId::UNKNOWN,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert!(result != TypeId::ERROR, "ThisParameterType pattern should not produce error");
+}
+
+#[test]
+fn test_conditional_this_parameter_type_no_this() {
+    let interner = TypeInterner::new();
+
+    // Test ThisParameterType<T> with function that has no this parameter
+    // Should return unknown
+
+    // Create a function without this type: () => void
+    let fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![],
+        this_type: None, // No explicit this parameter
+        return_type: TypeId::VOID,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let fn_no_this = interner.function(fn_shape);
+
+    // Create infer U
+    let infer_u = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("U"),
+        constraint: None,
+        default: None,
+    }));
+
+    // Create extends type with this: infer U
+    let any_array = interner.array(TypeId::ANY);
+    let extends_fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: any_array,
+            optional: false,
+            rest: true,
+        }],
+        this_type: Some(infer_u),
+        return_type: TypeId::ANY,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let extends_fn = interner.function(extends_fn_shape);
+
+    let cond = ConditionalType {
+        check_type: fn_no_this,
+        extends_type: extends_fn,
+        true_type: infer_u,
+        false_type: TypeId::UNKNOWN,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    // When function has no this, should return unknown (false branch)
+    assert!(result != TypeId::ERROR, "ThisParameterType with no this should not produce error");
+}
+
+#[test]
+fn test_conditional_omit_this_parameter_pattern() {
+    let interner = TypeInterner::new();
+
+    // Test OmitThisParameter<T> pattern:
+    // T extends (...args: infer A) => infer R ? (...args: A) => R : T
+    // This creates a new function type without the this parameter
+
+    // Create a function with this: (this: Window, x: string) => number
+    let window_symbol = SymbolRef(220);
+    let window_type = interner.intern(TypeKey::Ref(window_symbol));
+
+    let fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: Some(window_type),
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let fn_with_this = interner.function(fn_shape);
+
+    // Create infer types for args and return
+    let infer_a = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("A"),
+        constraint: None,
+        default: None,
+    }));
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("R"),
+        constraint: None,
+        default: None,
+    }));
+
+    // Create extends type: (...args: infer A) => infer R
+    let extends_fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: infer_a,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None, // No this in the pattern
+        return_type: infer_r,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let extends_fn = interner.function(extends_fn_shape);
+
+    // True branch: (...args: A) => R (new function without this)
+    let true_fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: infer_a,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: infer_r,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let true_fn = interner.function(true_fn_shape);
+
+    let cond = ConditionalType {
+        check_type: fn_with_this,
+        extends_type: extends_fn,
+        true_type: true_fn,
+        false_type: fn_with_this, // Return T if not a function
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert!(result != TypeId::ERROR, "OmitThisParameter pattern should not produce error");
+}
+
+#[test]
+fn test_conditional_omit_this_parameter_no_this() {
+    let interner = TypeInterner::new();
+
+    // Test OmitThisParameter<T> with function that has no this
+    // Should return the same function type
+
+    // Create a function without this: (x: string) => number
+    let fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("x")),
+            type_id: TypeId::STRING,
+            optional: false,
+            rest: false,
+        }],
+        this_type: None,
+        return_type: TypeId::NUMBER,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let fn_no_this = interner.function(fn_shape);
+
+    // Create infer types
+    let infer_a = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("A"),
+        constraint: None,
+        default: None,
+    }));
+    let infer_r = interner.intern(TypeKey::Infer(TypeParamInfo {
+        name: interner.intern_string("R"),
+        constraint: None,
+        default: None,
+    }));
+
+    // Create extends type
+    let extends_fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: infer_a,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: infer_r,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let extends_fn = interner.function(extends_fn_shape);
+
+    // True branch
+    let true_fn_shape = FunctionShape {
+        type_params: vec![],
+        params: vec![ParamInfo {
+            name: Some(interner.intern_string("args")),
+            type_id: infer_a,
+            optional: false,
+            rest: true,
+        }],
+        this_type: None,
+        return_type: infer_r,
+        type_predicate: None,
+        is_constructor: false,
+    };
+    let true_fn = interner.function(true_fn_shape);
+
+    let cond = ConditionalType {
+        check_type: fn_no_this,
+        extends_type: extends_fn,
+        true_type: true_fn,
+        false_type: fn_no_this,
+        is_distributive: false,
+    };
+
+    let result = evaluate_conditional(&interner, &cond);
+    assert!(result != TypeId::ERROR, "OmitThisParameter with no this should not produce error");
+}
