@@ -7,12 +7,13 @@ Status: Active
 Priority: 3
 
 ## Current Assignment
-- [ ] Add source map tests for nullish coalescing transforms in `wasm/src/source_map_tests.rs`. Run `./wasm/test.sh source_map`.
+- [ ] (awaiting)
 
 ## Task Queue
 - [ ] (empty)
 
 ## Completed
+- [x] Added nullish coalescing transform source map tests (basic, with null, with undefined, chained, with function call, assignment, in conditional, with objects, in function, combined); `./wasm/test.sh source_map` passes.
 - [x] Added optional chaining transform source map tests (property access, method call, element access, nested, with nullish coalescing, in function, with method chain, delete, call expression, combined); `./wasm/test.sh source_map` passes.
 - [x] Added destructuring transform source map tests (object basic, array basic, object with rename, array with skip, nested object, nested array, object with defaults, array with defaults, function parameters, mixed); `./wasm/test.sh source_map` passes.
 - [x] Added template literal transform source map tests (simple, with expression, multiple expressions, nested, tagged, in function, with method calls, conditional, multiline, in class); `./wasm/test.sh source_map` passes.
