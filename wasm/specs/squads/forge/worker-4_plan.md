@@ -7,7 +7,7 @@ Status: Active
 Priority: 4
 
 ## Current Assignment
-- [x] Add solver tests for variadic tuple types ([...T, string], spread operations). **Done:** Added 20 tests covering variadic tuple patterns.
+- [x] Add solver tests for default type params, index access, keyof union/intersection, homomorphic mapped, conditional edge cases. **Done:** Added 25+ tests.
 
 ## Task Queue
 (empty - awaiting next assignment)
