@@ -55,10 +55,10 @@ const DEFAULT_IDLE_THRESHOLDS: IdleThresholds = {
 
 const DEFAULT_POKE_MESSAGES: PokeMessages = {
   director:
-    'MERGE CHECK: Check if EMs have branches ready to merge. Only merge squad branches that EMs have already pushed. Do NOT interrupt workers. After merging, EMs can tell workers to sync when they reach a natural stopping point.',
-  em: 'Check for worker branches that are already pushed and marked "Ready for Merge" in their plan files. Merge those into squad branch. Do NOT interrupt workers who are mid-task - let them finish their current work naturally.',
+    'Run `git fetch origin` and check for new commits on squad branches. Merge any squad branches that have new commits into rust. No need to coordinate with EMs or workers.',
+  em: 'Run `git fetch origin` and check for new commits on worker branches (origin/worker/$SQUAD_NAME-*). Merge any that have new commits into your squad branch, then push.',
   worker:
-    'How is your task going? If you need help, describe what you are stuck on.',
+    'How is your task going? If stuck, describe the issue.',
 };
 
 const DEFAULT_STARTUP_PROMPTS: StartupPrompts = {

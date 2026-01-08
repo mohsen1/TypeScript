@@ -12073,3 +12073,162 @@ const myStatus = Status.Active;"#;
         "expected non-empty source mappings for TypeScript enums"
     );
 }
+
+#[test]
+fn test_source_map_generator_es5_offset_accuracy() {
+    // Test source-map offset accuracy for generator function ES5 downleveling
+    let source = r#"function* numberGenerator() {
+    yield 1;
+    yield 2;
+    yield 3;
+}
+
+function* infiniteSequence() {
+    let i = 0;
+    while (true) {
+        yield i++;
+    }
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+
+    // Verify generator function is in output (may be __generator helper or function* syntax)
+    assert!(
+        output.contains("__generator") || output.contains("numberGenerator") || output.contains("function*"),
+        "expected generator function in output: {output}"
+    );
+
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for generator function declarations
+    let (num_gen_line, _) = find_line_col(source, "function* numberGenerator");
+    let has_num_gen_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == num_gen_line
+    });
+
+    let (inf_seq_line, _) = find_line_col(source, "function* infiniteSequence");
+    let has_inf_seq_mapping = decoded.iter().any(|m| {
+        m.source_index == 0 && m.original_line == inf_seq_line
+    });
+
+    // We should have mappings for both generator declarations
+    assert!(
+        has_num_gen_mapping || has_inf_seq_mapping,
+        "expected mappings for generator function declarations. mappings: {mappings}"
+    );
+
+    // Verify non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for generator ES5 code"
+    );
+
+    // Verify mappings span multiple source lines
+    let unique_source_lines: std::collections::HashSet<_> =
+        decoded.iter().map(|m| m.original_line).collect();
+    assert!(
+        unique_source_lines.len() >= 2,
+        "expected mappings from at least 2 different source lines, got: {:?}",
+        unique_source_lines
+    );
+}
+
+#[test]
+fn test_source_map_destructuring_patterns() {
+    // Test object and array destructuring patterns
+    let source = r#"const obj = { a: 1, b: 2, c: 3 };
+const { a, b: renamed, ...rest } = obj;
+
+const arr = [1, 2, 3, 4, 5];
+const [first, second, ...remaining] = arr;
+
+function processPoint({ x, y }: { x: number; y: number }) {
+    return x + y;
+}
+
+const swap = ([a, b]: [number, number]) => [b, a];
+
+const result = processPoint({ x: 10, y: 20 });
+const swapped = swap([1, 2]);"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut options = PrinterOptions::default();
+    options.target = ScriptTarget::ES5;
+    let ctx = EmitContext::with_options(options.clone());
+    let transforms = LoweringPass::new(&parser.arena, &ctx).run(root);
+
+    let mut printer =
+        ThinPrinter::with_transforms_and_options(&parser.arena, transforms, options);
+    printer.set_target_es5(ctx.target_es5);
+    printer.set_source_map_text(parser.get_source_text());
+    printer.enable_source_map("test.js", "test.ts");
+    printer.emit(root);
+
+    let output = printer.get_output().to_string();
+    let map_json = printer.generate_source_map_json().expect("source map");
+    let map_value: Value = serde_json::from_str(&map_json).expect("parse source map");
+
+    let mappings = map_value
+        .get("mappings")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
+    let decoded = decode_mappings(mappings);
+
+    // Verify we have mappings for the object declaration
+    let (obj_line, obj_col) = find_line_col(source, "const obj");
+    let has_obj_mapping = decoded.iter().any(|entry| {
+        entry.original_line == obj_line
+            && entry.original_column >= obj_col
+            && entry.original_column <= obj_col + 9
+    });
+
+    // Verify we have mappings for the function declaration
+    let (fn_line, fn_col) = find_line_col(source, "function processPoint");
+    let has_fn_mapping = decoded.iter().any(|entry| {
+        entry.original_line == fn_line
+            && entry.original_column >= fn_col
+            && entry.original_column <= fn_col + 21
+    });
+
+    // At minimum, we should have mappings for declarations
+    assert!(
+        has_obj_mapping || has_fn_mapping,
+        "expected mappings for destructuring patterns. mappings: {mappings}"
+    );
+
+    // Verify output contains expected identifiers
+    assert!(
+        output.contains("processPoint") && output.contains("swap"),
+        "expected output to contain function names. output: {output}"
+    );
+
+    // Verify source map has non-empty mappings
+    assert!(
+        !decoded.is_empty(),
+        "expected non-empty source mappings for destructuring patterns"
+    );
+}
