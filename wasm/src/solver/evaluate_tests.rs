@@ -9188,3 +9188,99 @@ fn test_mapped_type_with_conditional_value_filter() {
         _ => panic!("Expected result to be an object type, got {:?}", result_key),
     }
 }
+
+#[test]
+fn test_mapped_type_with_optional_modifier_and_conditional() {
+    let interner = TypeInterner::new();
+
+    // DeepPartial-like pattern (simplified non-recursive):
+    // { [K in keyof T]?: T[K] extends object ? string : T[K] }
+    // Applied to { a: number; b: { x: number } }
+    // Should evaluate to { a?: number; b?: string }
+    let prop_a = interner.intern_string("a");
+    let prop_b = interner.intern_string("b");
+    let prop_x = interner.intern_string("x");
+
+    // Nested object for property b
+    let nested_obj = interner.object(vec![PropertyInfo {
+        name: prop_x,
+        type_id: TypeId::NUMBER,
+        write_type: TypeId::NUMBER,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    let source_obj = interner.object(vec![
+        PropertyInfo {
+            name: prop_a,
+            type_id: TypeId::NUMBER,
+            write_type: TypeId::NUMBER,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+        PropertyInfo {
+            name: prop_b,
+            type_id: nested_obj,
+            write_type: nested_obj,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        },
+    ]);
+
+    // Type param K for the mapped type
+    let k_param = TypeParamInfo {
+        name: interner.intern_string("K"),
+        constraint: None,
+        default: None,
+    };
+    let k_ref = interner.intern(TypeKey::TypeParameter(k_param.clone()));
+
+    // T[K] as indexed access
+    let indexed_access = interner.intern(TypeKey::IndexAccess(source_obj, k_ref));
+
+    // object intrinsic type for comparison
+    let object_type = interner.intern(TypeKey::Intrinsic(IntrinsicKind::Object));
+
+    // Conditional: T[K] extends object ? string : T[K]
+    let conditional = interner.conditional(ConditionalType {
+        check_type: indexed_access,
+        extends_type: object_type,
+        true_type: TypeId::STRING,
+        false_type: indexed_access,
+        is_distributive: false,
+    });
+
+    // keyof T
+    let keyof_obj = interner.intern(TypeKey::KeyOf(source_obj));
+
+    let mapped = MappedType {
+        type_param: k_param,
+        constraint: keyof_obj,
+        name_type: None,
+        template: conditional,
+        readonly_modifier: None,
+        optional_modifier: Some(MappedModifier::Add), // Makes properties optional (the ? in DeepPartial)
+    };
+
+    let result = evaluate_mapped(&interner, &mapped);
+
+    // Verify result is an object with 2 optional properties
+    let result_key = interner.lookup(result);
+    match result_key {
+        Some(TypeKey::Object(shape_id)) => {
+            let shape = interner.object_shape(shape_id);
+            assert_eq!(shape.properties.len(), 2, "Expected 2 properties");
+
+            let prop_a_info = shape.properties.iter().find(|p| p.name == prop_a).expect("Expected property 'a'");
+            let prop_b_info = shape.properties.iter().find(|p| p.name == prop_b).expect("Expected property 'b'");
+
+            // Both properties should be optional due to MappingModifier::Add
+            assert!(prop_a_info.optional, "Property 'a' should be optional");
+            assert!(prop_b_info.optional, "Property 'b' should be optional");
+        }
+        _ => panic!("Expected result to be an object type, got {:?}", result_key),
+    }
+}
