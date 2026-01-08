@@ -10,7 +10,10 @@ Priority: 1
 - Awaiting next assignment.
 
 ## Task Queue
-- [ ] None.
+- [ ] Add mixed-case exponent negative leading zeros test (`1Ee-0001`).
+- [ ] Add mixed-case exponent missing sign with leading zeros test (`1Ee01`).
+- [ ] Add mixed-case exponent trailing double-minus test (`1Ee--`).
+- [ ] Add uppercase exponent leading zeros with zero exponent test (`1E+00`).
 
 ## Completed
 - [x] Conditional infer object coverage in `wasm/src/solver/evaluate.rs` with tests in `wasm/src/solver/evaluate_tests.rs`. Tests: `./wasm/test.sh test_conditional_infer_object_`.
@@ -76,6 +79,11 @@ Priority: 1
 - [x] Number index ignores mixed-case exponent trailing sign; added `test_resolve_bounds_number_index_ignores_mixed_case_exponent_trailing_sign`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_mixed_case_exponent_trailing_sign`.
 - [x] Number index ignores mixed-case exponent trailing minus; added `test_resolve_bounds_number_index_ignores_mixed_case_exponent_trailing_minus`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_mixed_case_exponent_trailing_minus`.
 - [x] Number index ignores mixed-case exponent leading zeros; added `test_resolve_bounds_number_index_ignores_mixed_case_exponent_leading_zeros`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_mixed_case_exponent_leading_zeros`.
+- [x] Number index ignores mixed-case exponent leading zeros without sign; added `test_resolve_bounds_number_index_ignores_mixed_case_exponent_leading_zeros_without_sign`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_mixed_case_exponent_leading_zeros_without_sign`.
+- [x] Number index ignores mixed-case negative exponent zero; added `test_resolve_bounds_number_index_ignores_mixed_case_negative_exponent_zero`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_mixed_case_negative_exponent_zero`.
+- [x] Number index ignores mixed-case exponent positive zero; added `test_resolve_bounds_number_index_ignores_mixed_case_exponent_positive_zero`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_mixed_case_exponent_positive_zero`.
+- [x] Number index ignores mixed-case exponent zero without sign; added `test_resolve_bounds_number_index_ignores_mixed_case_exponent_zero_without_sign`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_mixed_case_exponent_zero_without_sign`.
+- [x] Number index ignores mixed-case exponent trailing double sign; added `test_resolve_bounds_number_index_ignores_mixed_case_exponent_double_sign_trailing`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_mixed_case_exponent_double_sign_trailing`.
 - [x] Number index ignores uppercase exponent missing digits; added `test_resolve_bounds_number_index_ignores_uppercase_exponent_missing_digits`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_uppercase_exponent_missing_digits`.
 - [x] Number index ignores uppercase exponent missing negative digits; added `test_resolve_bounds_number_index_ignores_uppercase_exponent_minus_missing_digits`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_uppercase_exponent_minus_missing_digits`.
 - [x] Number index ignores uppercase exponent double sign; added `test_resolve_bounds_number_index_ignores_uppercase_exponent_double_sign`. Tests: `./wasm/test.sh test_resolve_bounds_number_index_ignores_uppercase_exponent_double_sign`.

@@ -14,6 +14,7 @@ set -e
 
 IMAGE_NAME="rust-wasm-base"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Parse arguments
 REBUILD=false
@@ -61,15 +62,17 @@ if [ -n "$TEST_FILTER" ]; then
     echo "   Filter: $TEST_FILTER"
     docker run --rm --memory="2g" --cpus="2.0" \
         -v "$SCRIPT_DIR:/source:ro" \
+        -v "$ROOT_DIR:/repo:ro" \
         -v cargo-registry:/usr/local/cargo/registry \
         -v cargo-git:/usr/local/cargo/git \
-        "$IMAGE_NAME" bash -c "rm -rf /app/* && cp -r /source/* /app/ && cargo nextest run $TEST_FILTER"
+        "$IMAGE_NAME" bash -c "rm -rf /app/* && cp -r /source/* /app/ && cp /repo/package.json /package.json && cargo nextest run $TEST_FILTER"
 else
     docker run --rm --memory="2g" --cpus="2.0" \
         -v "$SCRIPT_DIR:/source:ro" \
+        -v "$ROOT_DIR:/repo:ro" \
         -v cargo-registry:/usr/local/cargo/registry \
         -v cargo-git:/usr/local/cargo/git \
-        "$IMAGE_NAME" bash -c "rm -rf /app/* && cp -r /source/* /app/ && cargo nextest run"
+        "$IMAGE_NAME" bash -c "rm -rf /app/* && cp -r /source/* /app/ && cp /repo/package.json /package.json && cargo nextest run"
 fi
 
 echo "✅ Tests complete!"

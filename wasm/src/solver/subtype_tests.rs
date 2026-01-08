@@ -91,6 +91,23 @@ fn test_literal_subtyping() {
 }
 
 #[test]
+fn test_template_literal_subtyping_to_string() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let red = interner.literal_string("red");
+    let blue = interner.literal_string("blue");
+    let colors = interner.union(vec![red, blue]);
+    let template = interner.template_literal(vec![
+        TemplateSpan::Text(interner.intern_string("color-")),
+        TemplateSpan::Type(colors),
+    ]);
+
+    assert!(checker.is_subtype_of(template, TypeId::STRING));
+    assert!(!checker.is_subtype_of(TypeId::STRING, template));
+}
+
+#[test]
 fn test_apparent_number_member_subtyping() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
@@ -2318,6 +2335,20 @@ fn test_base_constraint_assignability_subtyping() {
 }
 
 #[test]
+fn test_base_constraint_not_assignable_to_param() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let t_param = interner.intern(TypeKey::TypeParameter(TypeParamInfo {
+        name: interner.intern_string("T"),
+        constraint: Some(TypeId::STRING),
+        default: None,
+    }));
+
+    assert!(!checker.is_subtype_of(TypeId::STRING, t_param));
+}
+
+#[test]
 fn test_type_parameter_identity_only() {
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
@@ -4054,6 +4085,56 @@ fn test_mapped_type_over_number_keys_subtyping() {
     assert!(!checker.is_subtype_of(mapped, mismatch));
     assert!(!checker.is_subtype_of(mapped, wrong_key));
     assert!(!checker.is_subtype_of(expected, mapped));
+}
+
+#[test]
+fn test_mapped_type_over_number_keys_optional_readonly_add_subtyping() {
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+
+    let constraint = interner.intern(TypeKey::KeyOf(TypeId::NUMBER));
+    let mapped = interner.mapped(MappedType {
+        type_param: TypeParamInfo {
+            name: interner.intern_string("K"),
+            constraint: None,
+            default: None,
+        },
+        constraint,
+        name_type: None,
+        template: TypeId::BOOLEAN,
+        readonly_modifier: Some(MappedModifier::Add),
+        optional_modifier: Some(MappedModifier::Add),
+    });
+
+    let to_fixed = interner.intern_string("toFixed");
+    let optional_readonly = interner.object(vec![PropertyInfo {
+        name: to_fixed,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: true,
+        readonly: true,
+        is_method: false,
+    }]);
+    let required_readonly = interner.object(vec![PropertyInfo {
+        name: to_fixed,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: false,
+        readonly: true,
+        is_method: false,
+    }]);
+    let optional_mutable = interner.object(vec![PropertyInfo {
+        name: to_fixed,
+        type_id: TypeId::BOOLEAN,
+        write_type: TypeId::BOOLEAN,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    assert!(checker.is_subtype_of(mapped, optional_readonly));
+    assert!(!checker.is_subtype_of(mapped, required_readonly));
+    assert!(!checker.is_subtype_of(mapped, optional_mutable));
 }
 
 #[test]
