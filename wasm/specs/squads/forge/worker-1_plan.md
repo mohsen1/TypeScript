@@ -7,7 +7,10 @@ Status: Active
 Priority: 1
 
 ## Current Assignment
-- [ ] Redux test (`test_check_redux_lodash_style_generics`) has 3 remaining diagnostics related to conditional type evaluation with type parameters. Root cause: when comparing object literal to `Store<StateFromReducer<R>, ActionFromReducer<R>>` where R is a type parameter, conditional types can't be fully evaluated. Need to implement deferred evaluation or structural comparison that handles unresolved conditionals.
+- [ ] Redux test (`test_check_redux_lodash_style_generics`) has 3 remaining diagnostics:
+  - store.ts:716 - Object literal not assignable to Store<StateFromReducer<R>, ActionFromReducer<R>> where conditional types contain type param R
+  - app.ts:375 (x2) - Action type inference with nested mapped/conditional types
+  - Root cause: Conditional types with type parameters can't be fully evaluated until instantiation. TypeScript defers evaluation. Need similar handling in SubtypeChecker.
 
 ## Task Queue
 - [ ] Add callable-parameter inference regressions (e.g., union inputs, overload shapes) in `wasm/src/solver/evaluate_tests.rs`.
